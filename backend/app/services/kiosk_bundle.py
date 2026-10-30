@@ -64,6 +64,26 @@ BUNDLE_FILES: list[BundleFile] = [
         "0644",
         None,
     ),
+    # Opt-in cog stack (WPE WebKit on DRM/KMS). Like the Wayland unit it is never
+    # enabled or restarted by a bundle update: setup enables exactly one display
+    # owner, and restarting cog drops the panel (the display agent restarts it to
+    # apply a rotation change).
+    BundleFile(
+        "calvin-cog.service",
+        "deploy/systemd/calvin-cog.service",
+        "/etc/systemd/system/calvin-cog.service",
+        "0644",
+        None,
+    ),
+    # Root half of the display agent on the cog stack (panel power + rotation).
+    # The calvin user may run it only through the sudoers fragment setup installs.
+    BundleFile(
+        "calvin-cog-panel.sh",
+        "deploy/kiosk-agent/calvin-cog-panel.sh",
+        "/usr/local/bin/calvin-cog-panel.sh",
+        "0755",
+        None,
+    ),
     # labwc session config. setup-kiosk.sh writes the same bytes, so a kiosk that
     # switches stacks later gets the bundle's copy; backend tests pin them equal.
     BundleFile(

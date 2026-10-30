@@ -34,31 +34,38 @@ BASE="${CALVIN_BACKEND_URL%/}"
 
 log() { printf '[update-kiosk] %s\n' "$*"; }
 
-# Display stack of THIS kiosk (x11|wayland). Phase 1: anything but an explicit
-# wayland is X11, matching resolve_display_stack in scripts/setup-common.sh.
+# Display stack of THIS kiosk (x11|wayland|cog). Phase 1: anything but an explicit
+# wayland/cog is X11, matching resolve_display_stack in scripts/setup-common.sh.
 display_stack() {
   local stack="${CALVIN_DISPLAY_STACK:-}"
   case "$stack" in
     wayland) echo wayland ;;
+    cog) echo cog ;;
     *) echo x11 ;;
   esac
 }
 
-# The compositor that is NOT the configured stack must never be re-enabled by an
-# update: exactly one compositor unit owns tty1.
+# The display owners of the OTHER stacks must never be re-enabled by an update:
+# exactly one of calvin-x/calvin-wayland/calvin-cog owns tty1, and Chromium only
+# runs on the X11/Wayland stacks.
 unit_suppressed() {  # $1 = unit name
+  local stack
+  stack="$(display_stack)"
   case "$1" in
-    calvin-x.service) [ "$(display_stack)" = wayland ] ;;
-    calvin-wayland.service) [ "$(display_stack)" = x11 ] ;;
+    calvin-x.service) [ "$stack" != x11 ] ;;
+    calvin-wayland.service) [ "$stack" != wayland ] ;;
+    calvin-cog.service) [ "$stack" != cog ] ;;
+    calvin-kiosk-remote.service) [ "$stack" = cog ] ;;
     *) return 1 ;;
   esac
 }
 
 # Session env file the kiosk/display-agent units read (DISPLAY/XAUTHORITY on X11,
-# XDG_SESSION_TYPE/WAYLAND_DISPLAY/XDG_RUNTIME_DIR on Wayland). Older kiosks do
-# not have it yet and these units require it, so create the current stack's file
-# before anything is swapped. setup owns the content: an existing file is only
-# touched for the Chromium flags line (sync_chromium_display_flags below).
+# XDG_SESSION_TYPE/WAYLAND_DISPLAY/XDG_RUNTIME_DIR on Wayland, and just an empty
+# Chromium flag on cog). Older kiosks do not have it yet and these units require
+# it, so create the current stack's file before anything is swapped. setup owns
+# the content: an existing file is only touched for the Chromium flags line
+# (sync_chromium_display_flags below).
 #
 # Chromium's GPU path (calvin-scuh): VC4-class boards (Pi 3 family, Zero 2 W, CM3)
 # crash the renderer under Chromium's GPU process ("Aw, Snap! error 11"), so they
@@ -109,7 +116,14 @@ ensure_display_env() {
   uid="$(id -u calvin 2>/dev/null || echo 1000)"
   flags="$(chromium_display_flags "$(display_stack)")"
   mkdir -p "$(dirname "$DISPLAY_ENV_FILE")"
-  if [ "$(display_stack)" = wayland ]; then
+  if [ "$(display_stack)" = cog ]; then
+    cat > "$DISPLAY_ENV_FILE" <<EOF
+# Calvin kiosk display session (stack: cog). Created by update-kiosk.sh;
+# re-run the kiosk installer to change stacks. cog owns DRM/KMS directly, so
+# there is no X or Wayland session to publish; Chromium does not run here.
+CALVIN_CHROMIUM_DISPLAY_FLAGS=${flags}
+EOF
+  elif [ "$(display_stack)" = wayland ]; then
     cat > "$DISPLAY_ENV_FILE" <<EOF
 # Calvin kiosk display session (stack: wayland). Created by update-kiosk.sh;
 # re-run the kiosk installer to change stacks.
@@ -172,6 +186,7 @@ if sync_chromium_display_flags; then FLAGS_CHANGED=1; fi
 
 restart_kiosk_for_flags() {
   [ "$FLAGS_CHANGED" = 1 ] || return 0
+  [ "$(display_stack)" = cog ] && return 0   # no Chromium on the cog stack
   [ -f "$SYSTEMD_DIR/calvin-kiosk-remote.service" ] || return 0
   # restart_all() already covers a changed unit file.
   [ -z "${RESTART_UNITS[calvin-kiosk-remote.service]:-}" ] || return 0
@@ -194,14 +209,14 @@ path_allowed() {  # $1 = absolute target path
 # newer update-kiosk.sh, which is then re-run to install the rest.
 pinned_entry() {  # $1 = name -> "<dir> <mode>"
   case "$1" in
-    calvin_display_agent.py|update-kiosk.sh) echo "$BIN_DIR 0755" ;;
-    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service|calvin-wayland.service) echo "$SYSTEMD_DIR 0644" ;;
+    calvin_display_agent.py|update-kiosk.sh|calvin-cog-panel.sh) echo "$BIN_DIR 0755" ;;
+    calvin-display-agent.service|calvin-kiosk-remote.service|calvin-x.service|calvin-kiosk-update.service|calvin-wayland.service|calvin-cog.service) echo "$SYSTEMD_DIR 0644" ;;
     autostart) echo "$LABWC_DIR 0755" ;;
     rc.xml) echo "$LABWC_DIR 0644" ;;
     *) return 1 ;;
   esac
 }
-KNOWN_UNITS=" calvin-display-agent.service calvin-kiosk-remote.service calvin-x.service calvin-wayland.service calvin-kiosk-update.service "
+KNOWN_UNITS=" calvin-display-agent.service calvin-kiosk-remote.service calvin-x.service calvin-wayland.service calvin-cog.service calvin-kiosk-update.service "
 
 name_allowed() {  # $1 = manifest file name; must be a bare filename (calvin-10n)
   case "$1" in
