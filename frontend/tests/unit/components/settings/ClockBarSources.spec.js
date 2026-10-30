@@ -5,9 +5,12 @@ import { ref } from "vue";
 const pluginsRef = ref([]);
 const instancesRef = ref({});
 const mockLoadPlugins = vi.fn().mockResolvedValue(undefined);
+const route = { query: {} };
+const openAddButton = vi.fn();
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useRoute: () => route,
 }));
 
 vi.mock("@/composables", () => ({
@@ -40,6 +43,7 @@ const addStub = {
   name: "AddSourceButton",
   emits: ["saved"],
   template: "<div />",
+  methods: { open: openAddButton },
 };
 
 const mountSection = async () => {
@@ -54,6 +58,7 @@ describe("Clock bar info section", () => {
   beforeEach(() => {
     pluginsRef.value = [weather];
     instancesRef.value = {};
+    route.query = {};
     vi.clearAllMocks();
   });
 
@@ -63,6 +68,19 @@ describe("Clock bar info section", () => {
 
     expect(w.find(".sl-row").text()).toContain("Outside");
     expect(w.find(".sl-row").text()).toContain("In the clock bar");
+  });
+
+  it("opens the add flow when Clock bar items links here to add the first tile", async () => {
+    route.query = { setting: "content-clock-bar", add: "clock" };
+    await mountSection();
+
+    expect(openAddButton).toHaveBeenCalled();
+  });
+
+  it("does not open the add flow on a normal visit", async () => {
+    await mountSection();
+
+    expect(openAddButton).not.toHaveBeenCalled();
   });
 
   it("switches the new source's tile on when it is added", async () => {

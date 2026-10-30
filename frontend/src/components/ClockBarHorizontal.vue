@@ -34,7 +34,7 @@
       </div>
 
       <div class="clock-bar-side clock-bar-right">
-        <PluginStatusbarItems v-if="showStatusbar" :size="pluginItemSize" />
+        <PluginStatusbarItems :size="pluginItemSize" />
         <BarActionCluster v-if="!previewMode" :compact="false" />
       </div>
     </div>
@@ -103,7 +103,6 @@ const props = defineProps({
 const {
   shouldShow,
   showDate,
-  showStatusbar,
   formattedTime,
   formattedDate,
   fontSize,

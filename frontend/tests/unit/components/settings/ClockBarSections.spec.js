@@ -41,4 +41,16 @@ describe("ClockBarSections", () => {
     expect(emitted).toBeTruthy();
     expect(emitted[0][0]).toHaveProperty("clockShowDate");
   });
+
+  it("drops the global Show plugin info row (decision C)", () => {
+    // Each tile is switched on/off in Clock bar items, so the master toggle only
+    // duplicated them — and left no control to bring tiles back if it was off.
+    const wrapper = mount(ClockBarSections, { props: { config: baseConfig }, global: { stubs } });
+    const labels = wrapper
+      .findAll(".setting-row__label, .settings-row__label")
+      .map(el => el.text());
+    expect(labels.join(" ")).not.toContain("Show plugin info");
+    expect(wrapper.text()).not.toContain("Show plugin info");
+    expect(wrapper.text()).not.toContain("plugin readouts");
+  });
 });

@@ -2,7 +2,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick } from "vue"; // eslint-disable-line no-unused-vars
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
 import { useConfigStore } from "@/stores/config";
@@ -238,9 +238,11 @@ describe("ClockBarVertical", () => {
     expect(timeElement.attributes("style")).toContain("font-size: 18px");
   });
 
-  it("should render statusbar items vertically when plugin items are enabled", async () => {
+  it("renders statusbar items vertically regardless of the retired global switch", async () => {
     const store = useConfigStore();
     store.showUI = true;
+    // Decision C removed the global "Show plugin info" toggle: a stale false
+    // value must not hide every tile with no control to bring them back.
     store.clockBarShowPluginItems = false;
 
     const wrapper = mount(ClockBarVertical, {
@@ -254,11 +256,6 @@ describe("ClockBarVertical", () => {
         ...globalMountOptions,
       },
     });
-
-    expect(wrapper.find(".plugin-statusbar-stub").exists()).toBe(false);
-
-    store.clockBarShowPluginItems = true;
-    await nextTick();
 
     const statusbar = wrapper.find(".plugin-statusbar-stub");
     expect(statusbar.exists()).toBe(true);
