@@ -296,7 +296,10 @@ this stack: there is no X or Wayland session for it, and it would fight cog for
 the panel.
 
 cog runs as the `calvin` user with `video`, `render` and `input` groups, on tty1
-(same login-session shape as `calvin-x.service`), and is launched as:
+like `calvin-x.service` but **without** a PAM/logind session (`PAMName=login`
+makes cog trap with SIGTRAP on the Pi 3B+). As the first DRM client it becomes
+DRM master by opening `/dev/dri/card0`, and systemd gives the unit its own
+`XDG_RUNTIME_DIR` (`/run/calvin-cog`). It is launched as:
 
 ```bash
 cog --platform=drm \
@@ -312,12 +315,14 @@ cog --platform=drm \
   `calvin-cog.service` when it changes (rotation is a cog startup property).
   The `renderer=gles` part is required: cog's default `modeset` renderer cannot
   rotate.
-- **Screen power** (display schedule) works: cog holds DRM master, so the agent's
-  root helper stops `calvin-cog.service`, writes `4` to
+- **Screen power** (display schedule) works: cog is the only DRM client, so the
+  agent's root helper stops `calvin-cog.service`, writes `4` to
   `/sys/class/graphics/fb0/blank` (DPMS off), and on wake writes `0` and starts
-  the unit again (the dashboard is back in ~5 s). The helper
-  (`/usr/local/bin/calvin-cog-panel.sh`) is the only thing `calvin` may run
-  through a sudoers drop-in.
+  the unit again (the dashboard is back in ~5 s). cog aborts on SIGTERM
+  (SIGSEGV as root, SIGABRT as `calvin`), so the unit lists both in
+  `SuccessExitStatus` and a scheduled screen-off does not leave it `failed`. The
+  helper (`/usr/local/bin/calvin-cog-panel.sh`) is the only thing `calvin` may
+  run through a sudoers drop-in.
 - **Crash recovery** is cog's own `--webprocess-failure=restart`; the Chromium
   DevTools watchdog does not run on this stack. A hung page still recovers through
   `Restart=always` when cog exits.
