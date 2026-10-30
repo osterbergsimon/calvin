@@ -54,6 +54,8 @@ async def test_list_kiosks_shape(test_db):
         "agentUpdateStatus",
         "agentUpdateMessage",
         "agentUpdateRequested",
+        "overrides",
+        "viewport",
     }
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
 
@@ -142,6 +144,41 @@ async def test_record_kiosk_truncates_over_long_hostname(test_db):
     row = await KioskDB.objects.get(id="kiosk-abc123")
     assert row.hostname is not None
     assert len(row.hostname) == 255
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_stores_and_lists_viewport(test_db):
+    """A reported viewport is stored and returned by the list (CLV-36)."""
+    await kiosk_registry.record_kiosk("hall-1", hostname="pi-hall", viewport={"w": 1080, "h": 1920})
+    row = await KioskDB.objects.get(id="hall-1")
+    assert row.viewport == {"w": 1080, "h": 1920}
+    kiosks = await kiosk_registry.list_kiosks()
+    assert kiosks[0]["viewport"] == {"w": 1080, "h": 1920}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "bad", [{"w": 0, "h": 1920}, {"w": 1080, "h": -1}, {"w": "1080", "h": 1920}, {"w": 1080}]
+)
+async def test_record_kiosk_rejects_bad_viewport(test_db, bad):
+    """Malformed viewport reports are ignored, never stored."""
+    await kiosk_registry.record_kiosk("hall-2", viewport=bad)
+    row = await KioskDB.objects.get(id="hall-2")
+    assert row.viewport is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_list_kiosks_strips_agent_only_override_keys(test_db):
+    """The public override layer never exposes the host-internal update flag."""
+    await kiosk_registry.record_kiosk("hall-3")
+    await kiosk_registry.request_agent_update("hall-3")
+    assert (await get_overrides("hall-3"))["_agentUpdateRequested"] is True
+    listed = (await kiosk_registry.list_kiosks())[0]
+    assert listed["agentUpdateRequested"] is True
+    assert "_agentUpdateRequested" not in listed["overrides"]
 
 
 @pytest.mark.unit
