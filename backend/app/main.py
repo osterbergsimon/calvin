@@ -134,6 +134,7 @@ from app.api.routes import (  # noqa: E402
     security,
     system,
 )
+from app.mcp_server.gateway import mcp_gateway  # noqa: E402
 from app.security.install import apply_startup_admin_password, install_security  # noqa: E402
 from app.security.route_policy import enforce_route_policy  # noqa: E402
 from app.services.scheduler import calendar_scheduler  # noqa: E402
@@ -520,7 +521,8 @@ async def lifespan(app: FastAPI):
         logger.exception(f"Error during startup: {e}")
         raise
 
-    yield
+    async with mcp_gateway.lifespan():
+        yield
 
     # Shutdown
     logger.info("Shutting down application...")
@@ -657,6 +659,11 @@ app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(security.router, prefix="/api", tags=["security"])
 app.include_router(backup.router, prefix="/api", tags=["backup"])
+
+# MCP server (CLV-33). Not a FastAPI route, so the gateway authenticates itself:
+# every request needs a bearer API key. Both spellings avoid a redirect on POST.
+for _mcp_path in ("/api/mcp", "/api/mcp/"):
+    app.add_route(_mcp_path, mcp_gateway, methods=["GET", "POST", "DELETE"], include_in_schema=False)
 
 # Serve static files from frontend dist directory
 # Get the project root (parent of backend directory)
