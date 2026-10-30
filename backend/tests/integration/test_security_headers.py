@@ -3,7 +3,7 @@
 import asyncio
 import tempfile
 from collections.abc import Generator
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -133,8 +133,8 @@ class TestSecurityHeaders:
                     enabled=True,
                     config={"url": "https://grafana.lab:3000/d/home"},
                     display_order=0,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
 
         loop = asyncio.new_event_loop()
@@ -169,8 +169,8 @@ class TestSecurityHeaders:
                     enabled=False,
                     config={"url": "https://disabled-kiosk.internal/board"},
                     display_order=0,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
 
             # (b) enabled non-iframe service instance — should be excluded
@@ -185,8 +185,8 @@ class TestSecurityHeaders:
                     enabled=True,
                     config={"url": "https://mealie.internal/api"},
                     display_order=1,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
 
         loop = asyncio.new_event_loop()
@@ -287,8 +287,8 @@ class TestSecurityHeaders:
                 enabled=True,
                 config={"url": "https://embed.internal/board"},
                 display_order=0,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
         loop = asyncio.new_event_loop()
