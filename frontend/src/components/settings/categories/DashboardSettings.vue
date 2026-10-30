@@ -1,12 +1,12 @@
 <template>
   <div class="dashboard-settings">
     <!-- DASHBOARD SCREENS / REGIONS -->
-    <SettingsSection id="regions" title="Screens & regions">
+    <SettingsSection id="regions" title="Pages & regions">
       <div class="regions-launch">
         <div class="regions-launch__summary">
           <span class="regions-launch__count">{{ screenSummary }}</span>
           <span class="regions-launch__hint"
-            >Design each screen’s regions in the full-size editor.</span
+            >Design each page’s regions in the full-size editor.</span
           >
         </div>
         <button type="button" class="regions-launch__btn" @click="editorOpen = true">
@@ -26,190 +26,94 @@
 
     <!-- APPEARANCE -->
     <SettingsSection id="appearance" title="Appearance">
-      <SettingRow label="Theme" description="The color theme applied to the whole dashboard.">
+      <SettingRow label="Theme">
         <ThemePicker
           :selected-theme-id="config.selectedTheme"
           @select="id => emit('update:config', { selectedTheme: id })"
         />
       </SettingRow>
-      <SettingRow label="Theme mode" description="Control whether light or dark mode is active.">
+      <SettingRow label="Light or dark">
         <SelectPill
           :model-value="config.themeMode"
           :options="[
             { value: 'light', label: 'Light' },
             { value: 'dark', label: 'Dark' },
-            { value: 'auto', label: 'Auto' },
-            { value: 'time', label: 'Time' },
+            { value: 'auto', label: 'Follow device' },
+            { value: 'time', label: 'On a schedule' },
           ]"
-          aria-label="Theme mode"
+          aria-label="Light or dark"
           @update:model-value="v => emit('update:config', { themeMode: v })"
         />
       </SettingRow>
-      <template v-if="config.themeMode === 'time'">
-        <SettingRow
-          label="Dark mode start (hour)"
-          description="The hour of day when dark mode turns on (0–23)."
-        >
-          <NumberStepper
-            :model-value="config.darkModeStart"
-            :min="0"
-            :max="23"
-            aria-label="Dark mode start hour"
-            @update:model-value="v => emit('update:config', { darkModeStart: v })"
+      <SettingRow v-if="config.themeMode === 'time'" label="Dark from">
+        <div class="dash-hours">
+          <input
+            class="dash-time"
+            type="time"
+            step="3600"
+            :value="hourToTime(config.darkModeStart, 18)"
+            aria-label="Dark from"
+            @change="e => emit('update:config', { darkModeStart: timeToHour(e.target.value) })"
           />
-        </SettingRow>
-        <SettingRow
-          label="Dark mode end (hour)"
-          description="The hour of day when dark mode turns off (0–23)."
-        >
-          <NumberStepper
-            :model-value="config.darkModeEnd"
-            :min="0"
-            :max="23"
-            aria-label="Dark mode end hour"
-            @update:model-value="v => emit('update:config', { darkModeEnd: v })"
+          <span class="dash-hours__to">to</span>
+          <input
+            class="dash-time"
+            type="time"
+            step="3600"
+            :value="hourToTime(config.darkModeEnd, 6)"
+            aria-label="Dark to"
+            @change="e => emit('update:config', { darkModeEnd: timeToHour(e.target.value) })"
           />
-        </SettingRow>
-      </template>
-      <SettingRow label="Typeface" description="The font family used throughout the dashboard.">
+        </div>
+      </SettingRow>
+      <SettingRow label="Font">
         <TypefacePicker />
       </SettingRow>
       <SettingRow
-        label="Settings UI size"
-        description="Scale this settings interface — text and controls. The live dashboard is not affected."
+        label="Settings text size"
+        description="Only changes Settings. The dashboard has its own size below."
       >
+        <template #label-extra><ScopeChip /></template>
         <SegmentedControl
-          :model-value="config.uiSize"
+          :model-value="uiSize"
           :options="UI_SIZE_OPTIONS"
-          aria-label="Settings UI size"
-          @update:model-value="v => emit('update:config', { uiSize: v })"
+          aria-label="Settings text size"
+          @update:model-value="setUiSize"
         />
       </SettingRow>
-      <SettingRow
-        label="Display name"
-        description="A friendly name for this dashboard shown in the title bar."
-      >
+      <SettingRow label="Room name" :description="ROOM_NAME_DESCRIPTION">
         <input
           class="display-name-input"
           type="text"
           :value="config.displayName"
-          aria-label="Display name"
+          aria-label="Room name"
           @input="e => emit('update:config', { displayName: e.target.value })"
         />
       </SettingRow>
     </SettingsSection>
 
-    <!-- TOUCH & CONTROLS -->
-    <SettingsSection id="kiosk-touch" title="Touch & controls">
-      <!-- Enter the wall state -->
+    <!-- TOUCH & CONTROLS — what the wall shows, then what reacts to touches -->
+    <SettingsSection id="kiosk-touch" title="Controls">
       <SettingRow
-        label="Hide controls in kiosk mode"
-        description="Suppress on-screen controls (the ⋯ menu, headers) for a clean wall display."
+        label="Hide controls"
+        description="Hides the ⋯ menu and region headers for a calm wall display."
       >
         <ToggleSwitch
           :model-value="!config.showUI"
-          aria-label="Hide controls in kiosk mode"
+          aria-label="Hide controls"
           @update:model-value="v => emit('update:config', { showUI: !v })"
         />
       </SettingRow>
-      <!-- What survives hiding -->
-      <SettingRow
-        label="Keep clock bar visible"
-        description="Keep the clock bar on-screen even when controls are hidden — it still shows the time and any status items."
-      >
+      <SettingRow label="Keep the clock bar when hidden">
         <ToggleSwitch
           :model-value="config.clockBarShowInKiosk"
-          aria-label="Keep clock bar visible"
+          aria-label="Keep the clock bar when hidden"
           @update:model-value="v => emit('update:config', { clockBarShowInKiosk: v })"
-        />
-      </SettingRow>
-      <!-- Visual calm -->
-      <SettingRow
-        label="Focus light"
-        description="Highlights the active region. 'Only while controls are shown' turns it off when controls are hidden (e.g. a calm wall)."
-      >
-        <SelectPill
-          :model-value="config.focusLightMode"
-          :options="[
-            { value: 'interaction', label: 'Only while controls shown' },
-            { value: 'always', label: 'Always on' },
-            { value: 'off', label: 'Off' },
-          ]"
-          aria-label="Focus light"
-          @update:model-value="v => emit('update:config', { focusLightMode: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Dim other regions"
-        description="Reduce brightness of non-focused regions while the focus light is active."
-      >
-        <ToggleSwitch
-          :model-value="config.focusLightDimOthers"
-          aria-label="Dim other regions"
-          @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
-        />
-      </SettingRow>
-      <!-- Exit / reveal -->
-      <SettingRow
-        label="Reveal corner"
-        description="Which screen corner reveals the controls on a press-and-hold while they're hidden."
-      >
-        <SelectPill
-          :model-value="config.hotCornerPosition || 'bottom-left'"
-          :options="[
-            { value: 'bottom-left', label: 'Bottom left' },
-            { value: 'bottom-right', label: 'Bottom right' },
-            { value: 'top-left', label: 'Top left' },
-            { value: 'top-right', label: 'Top right' },
-          ]"
-          aria-label="Reveal corner"
-          @update:model-value="v => emit('update:config', { hotCornerPosition: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Reveal corner opacity"
-        description="How visible the reveal corner is at rest (0 = invisible, but press-and-hold still reveals)."
-      >
-        <NumberStepper
-          :model-value="config.hotCornerOpacity ?? 55"
-          :min="0"
-          :max="100"
-          :step="5"
-          aria-label="Reveal corner opacity percentage"
-          @update:model-value="v => emit('update:config', { hotCornerOpacity: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Reveal corner size"
-        description="Size of the corner target and its press-and-hold hit area."
-      >
-        <RangeSlider
-          :model-value="config.hotCornerSize ?? 64"
-          :min="40"
-          :max="96"
-          :step="4"
-          unit="px"
-          aria-label="Reveal corner size in pixels"
-          @update:model-value="v => emit('update:config', { hotCornerSize: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Reveal hold time"
-        description="How long to press-and-hold the corner before the controls appear."
-      >
-        <RangeSlider
-          :model-value="config.hotCornerLongPressMs ?? 500"
-          :min="200"
-          :max="1200"
-          :step="50"
-          unit="ms"
-          aria-label="Reveal hold time in milliseconds"
-          @update:model-value="v => emit('update:config', { hotCornerLongPressMs: v })"
         />
       </SettingRow>
       <SettingRow
         label="Tap anywhere to show controls"
-        description="When controls are hidden, tapping the calendar or photos brings them back. Off by default — use the reveal corner instead."
+        description="A tap on calendar or photos brings controls back."
       >
         <ToggleSwitch
           :model-value="config.tapAnywhereReveal"
@@ -217,25 +121,80 @@
           @update:model-value="v => emit('update:config', { tapAnywhereReveal: v })"
         />
       </SettingRow>
-      <!-- Device: is this a touchscreen -->
+      <!-- The corner rows only matter while the controls are hidden. -->
+      <template v-if="!config.showUI">
+        <SettingRow
+          label="Show-controls corner"
+          description="Press and hold this corner to bring hidden controls back."
+        >
+          <SelectPill
+            :model-value="config.hotCornerPosition || 'bottom-left'"
+            :options="[
+              { value: 'bottom-left', label: 'Bottom left' },
+              { value: 'bottom-right', label: 'Bottom right' },
+              { value: 'top-left', label: 'Top left' },
+              { value: 'top-right', label: 'Top right' },
+            ]"
+            aria-label="Show-controls corner"
+            @update:model-value="v => emit('update:config', { hotCornerPosition: v })"
+          />
+        </SettingRow>
+        <SettingRow label="Corner visibility" description="At 0 it's invisible but still works.">
+          <NumberStepper
+            :model-value="config.hotCornerOpacity ?? 55"
+            :min="0"
+            :max="100"
+            :step="5"
+            unit="%"
+            aria-label="Corner visibility percentage"
+            @update:model-value="v => emit('update:config', { hotCornerOpacity: v })"
+          />
+        </SettingRow>
+        <SettingRow label="Corner size">
+          <RangeSlider
+            :model-value="config.hotCornerSize ?? 64"
+            :min="40"
+            :max="96"
+            :step="4"
+            unit="px"
+            aria-label="Corner size in pixels"
+            @update:model-value="v => emit('update:config', { hotCornerSize: v })"
+          />
+        </SettingRow>
+        <SettingRow label="Hold for">
+          <RangeSlider
+            :model-value="config.hotCornerLongPressMs ?? 500"
+            :min="200"
+            :max="1200"
+            :step="50"
+            unit="ms"
+            aria-label="Hold for, in milliseconds"
+            @update:model-value="v => emit('update:config', { hotCornerLongPressMs: v })"
+          />
+        </SettingRow>
+      </template>
+    </SettingsSection>
+
+    <SettingsSection id="kiosk-touch-focus" title="Touch & focus">
       <SettingRow
         label="Touchscreen"
-        description="Whether this device is treated as a touchscreen — shows touch navigation controls (region arrows, screen dots). Auto-detects; force on/off for hybrid setups."
+        description="Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse."
       >
-        <SelectPill
-          :model-value="config.touchControls"
+        <template #label-extra><ScopeChip /></template>
+        <SegmentedControl
+          :model-value="touchMode"
           :options="[
             { value: 'auto', label: 'Auto' },
-            { value: 'on', label: 'Always on' },
+            { value: 'on', label: 'On' },
             { value: 'off', label: 'Off' },
           ]"
           aria-label="Touchscreen"
-          @update:model-value="v => emit('update:config', { touchControls: v })"
+          @update:model-value="setTouchMode"
         />
       </SettingRow>
       <SettingRow
         label="Dashboard size"
-        description="Scales the dashboard region labels and touch controls (calendar, photos, services). Independent of Settings UI size and the clock bar."
+        description="Size of labels and touch buttons on the dashboard."
       >
         <SelectPill
           :model-value="config.touchControlSize"
@@ -250,6 +209,31 @@
           @update:model-value="v => emit('update:config', { touchControlSize: v })"
         />
       </SettingRow>
+      <SettingRow
+        label="Focus light"
+        description="Outlines the region the remote or arrow keys will act on."
+      >
+        <SelectPill
+          :model-value="config.focusLightMode"
+          :options="[
+            { value: 'always', label: 'Always' },
+            { value: 'interaction', label: 'Only while controls show' },
+            { value: 'off', label: 'Off' },
+          ]"
+          aria-label="Focus light"
+          @update:model-value="v => emit('update:config', { focusLightMode: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Dim other regions"
+        description="Dims the rest while the focus light is on."
+      >
+        <ToggleSwitch
+          :model-value="config.focusLightDimOthers"
+          aria-label="Dim other regions"
+          @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
+        />
+      </SettingRow>
     </SettingsSection>
   </div>
 </template>
@@ -257,6 +241,7 @@
 <script setup>
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import ScopeChip from "@/components/settings/shell/ScopeChip.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
@@ -269,12 +254,18 @@ import ClockBarSections from "@/components/settings/categories/ClockBarSections.
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 import { computed, ref } from "vue";
 import { normalizeDashboardScreens } from "@/utils/layout";
+import { useScreenSetting } from "@/composables/useScreenSetting";
+import { useUiScale } from "@/composables/useUiScale";
 
 const props = defineProps({
   config: { type: Object, required: true },
 });
 
 const emit = defineEmits(["update:config"]);
+
+// Kept out of the template: the quoted example would fight the formatter's
+// attribute quoting.
+const ROOM_NAME_DESCRIPTION = 'Shown in the clock bar, e.g. "Kitchen".';
 
 const editorOpen = ref(false);
 const screenSummary = computed(() => {
@@ -285,8 +276,41 @@ const screenSummary = computed(() => {
   }, 0);
   const s = screens.length === 1 ? "" : "s";
   const r = regionCount === 1 ? "" : "s";
-  return `${screens.length} screen${s} · ${regionCount} region${r}`;
+  return `${screens.length} page${s} · ${regionCount} region${r}`;
 });
+
+// --- Per-screen rows (settings copy audit §2) ------------------------------
+// These two answer differently on a mouse PC and a wall panel, so the choice
+// lives in this browser (or this kiosk's overrides). The server value is the
+// seed a screen with no choice of its own starts from.
+const uiSizeSetting = useScreenSetting("uiSize", {
+  storageKey: "calvin-ui-size",
+  serverValue: () => props.config.uiSize,
+});
+const uiSize = computed(() => uiSizeSetting.value.value || "default");
+const { applyUiScale } = useUiScale();
+const setUiSize = async value => {
+  await uiSizeSetting.set(value);
+  // Apply immediately, without waiting for the config store to round-trip.
+  applyUiScale(value);
+};
+
+const touchSetting = useScreenSetting("touchControls", {
+  storageKey: "calvin-touch-controls",
+  serverValue: () => props.config.touchControls,
+});
+const touchMode = computed(() => touchSetting.value.value || "auto");
+const setTouchMode = value => touchSetting.set(value);
+
+// --- Dark from: two whole-hour pickers, one row ----------------------------
+const hourToTime = (hour, fallback) => {
+  const value = Number.isFinite(Number(hour)) ? Number(hour) : fallback;
+  return `${String(Math.max(0, Math.min(23, value))).padStart(2, "0")}:00`;
+};
+const timeToHour = value => {
+  const hour = parseInt(String(value).split(":")[0], 10);
+  return Number.isNaN(hour) ? 0 : Math.max(0, Math.min(23, hour));
+};
 </script>
 
 <style scoped>
@@ -308,6 +332,31 @@ const screenSummary = computed(() => {
 }
 
 .display-name-input:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.dash-hours {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.dash-hours__to {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.dash-time {
+  height: var(--control-height);
+  min-height: var(--touch-target);
+  padding: 0 0.75rem;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-data);
+  font-size: var(--fs-control-lg);
+  color: var(--ink);
+}
+.dash-time:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

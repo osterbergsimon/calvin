@@ -8,17 +8,14 @@
           @update:model-value="v => emit('update:config', { clockShowDate: v })"
         />
       </SettingRow>
-      <SettingRow label="Show seconds" description="Update the time every second.">
+      <SettingRow label="Show seconds">
         <ToggleSwitch
           :model-value="config.clockShowSeconds"
           aria-label="Show seconds"
           @update:model-value="v => emit('update:config', { clockShowSeconds: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Show Calvin logo"
-        description="Show a small Calvin glyph at the leading edge of the bar."
-      >
+      <SettingRow label="Show Calvin logo">
         <ToggleSwitch
           :model-value="config.clockBarShowLogo !== false"
           aria-label="Show Calvin logo"
@@ -26,36 +23,30 @@
         />
       </SettingRow>
       <SettingRow
-        label="Show plugin items"
-        description="Show statusbar items from plugins (e.g. weather). Each service opts in via its own settings."
+        label="Show plugin info"
+        description="Weather and other plugin readouts. Turn each on in its own settings."
       >
         <ToggleSwitch
           :model-value="config.clockBarShowPluginItems !== false"
-          aria-label="Show plugin items"
+          aria-label="Show plugin info"
           @update:model-value="v => emit('update:config', { clockBarShowPluginItems: v })"
         />
       </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="clock-bar-layout" title="Clock bar layout">
-      <SettingRow
-        label="Horizontal layout"
-        description="How time and date are arranged on the top and bottom bars."
-      >
+      <SettingRow label="Top or bottom bar">
         <SelectPill
           :model-value="config.clockBarLayout || 'single-line'"
           :options="[
             { value: 'single-line', label: 'Single line' },
             { value: 'two-lines', label: 'Two lines' },
           ]"
+          aria-label="Top or bottom bar"
           @update:model-value="v => emit('update:config', { clockBarLayout: v })"
         />
       </SettingRow>
-      <SettingRow
-        stacked
-        label="Horizontal sizing"
-        description="Time, date, and padding for the top and bottom bars."
-      >
+      <SettingRow stacked label="Top or bottom bar size">
         <ClockBarFontSizePicker
           :time-size="config.clockBarFontSize || 16"
           :date-size="config.clockBarDateFontSize || 14"
@@ -70,10 +61,7 @@
           @update:plugin-item-size="v => emit('update:config', { clockBarPluginItemSize: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Vertical layout"
-        description="How time and date are arranged on the left and right bars."
-      >
+      <SettingRow label="Side bar">
         <SelectPill
           :model-value="config.clockBarVerticalLayout || 'upright'"
           :options="[
@@ -81,14 +69,11 @@
             { value: 'compact-time', label: 'Compact time' },
             { value: 'compact-time-date', label: 'Compact time & date' },
           ]"
+          aria-label="Side bar"
           @update:model-value="v => emit('update:config', { clockBarVerticalLayout: v })"
         />
       </SettingRow>
-      <SettingRow
-        stacked
-        label="Vertical sizing"
-        description="Time, date, and padding for the left and right vertical bars."
-      >
+      <SettingRow stacked label="Side bar size">
         <ClockBarFontSizePicker
           :time-size="config.clockBarVerticalFontSize || 18"
           :date-size="config.clockBarVerticalDateFontSize || 11"
