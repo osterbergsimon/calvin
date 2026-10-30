@@ -382,7 +382,7 @@ setup enables (Debian, Debian-Security and the Raspberry Pi archive).
 
 A remote kiosk Pi runs only the display-agent, not the full stack, so it does
 not use `update-calvin.sh` and does not carry a repo checkout. Update its agent
-from the server instead: **Settings → Kiosks → Update**. The kiosk pulls a
+from the server instead: **Settings → Screens → Update**. The kiosk pulls a
 verified file bundle from the backend on its next poll, swaps only what changed,
 restarts only the affected services, and auto-rolls-back if the agent does not
 come up healthy — no SSH or re-provisioning needed. See

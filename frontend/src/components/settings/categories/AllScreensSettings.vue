@@ -1,7 +1,7 @@
-<!-- frontend/src/components/settings/categories/DeviceSettings.vue -->
+<!-- frontend/src/components/settings/categories/AllScreensSettings.vue -->
 <template>
-  <div class="device-settings">
-    <SettingsSection id="layout" title="Screen orientation">
+  <div class="all-screens-settings">
+    <SettingsSection id="layout" title="All screens · Display">
       <SettingRow
         label="Orientation"
         description="Which way the screen is mounted. Pages & regions decides how regions stack."
@@ -35,7 +35,7 @@
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="device-power" title="Screen power">
+    <SettingsSection id="device-power" title="All screens · Power">
       <SettingRow
         label="Screen on/off schedule"
         description="Turns the screen off and on at set times."
@@ -79,9 +79,28 @@
           <button type="button" class="device-btn" @click="onTurnOn">Turn on</button>
         </div>
       </SettingRow>
+
+      <!-- The reboot combo restarts the Pi, so it sits under Power (decision C). -->
+      <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
 
-    <SettingsSection id="device-keyboard" title="On-screen keyboard">
+    <SettingsSection id="device-keyboard" title="All screens · Touch & keyboard">
+      <SettingRow
+        label="Touchscreen"
+        description="Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse."
+      >
+        <template #label-extra><ScopeChip /></template>
+        <SegmentedControl
+          :model-value="touchMode"
+          :options="[
+            { value: 'auto', label: 'Auto' },
+            { value: 'on', label: 'On' },
+            { value: 'off', label: 'Off' },
+          ]"
+          aria-label="Touchscreen"
+          @update:model-value="setTouchMode"
+        />
+      </SettingRow>
       <SettingRow label="Show it">
         <template #label-extra><ScopeChip /></template>
         <template #description>
@@ -147,42 +166,6 @@
         </div>
       </SettingRow>
     </SettingsSection>
-
-    <SettingsSection id="device-buttons" title="Remote & buttons">
-      <SettingRow
-        label="Show button presses"
-        description="A short label appears when a remote or keyboard button does something."
-      >
-        <ToggleSwitch
-          :model-value="config.keyboardFeedbackEnabled"
-          aria-label="Show button presses"
-          @update:model-value="v => emit('update:config', { keyboardFeedbackEnabled: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Label size">
-        <SegmentedControl
-          :model-value="config.keyboardFeedbackMode"
-          :options="[
-            { value: 'normal', label: 'Normal' },
-            { value: 'small', label: 'Small' },
-          ]"
-          aria-label="Label size"
-          @update:model-value="v => emit('update:config', { keyboardFeedbackMode: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Hide label after">
-        <NumberStepper
-          :model-value="config.modeIndicatorTimeout"
-          :min="0"
-          :max="60"
-          unit=" s"
-          aria-label="Hide label after, in seconds"
-          @update:model-value="v => emit('update:config', { modeIndicatorTimeout: v })"
-        />
-      </SettingRow>
-      <KeyboardTab />
-      <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
-    </SettingsSection>
   </div>
 </template>
 
@@ -195,9 +178,7 @@ import ScopeChip from "@/components/settings/shell/ScopeChip.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
-import NumberStepper from "@/components/ui/NumberStepper.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
-import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import { useScreenSetting } from "@/composables/useScreenSetting";
@@ -258,6 +239,17 @@ const setIdle = seconds => {
   }
   emit("update:config", { displayTimeoutEnabled: true, displayTimeout: seconds });
 };
+
+// --- Touchscreen (settings copy audit §2) -----------------------------------
+// A mouse PC and a wall panel need opposite answers, so the choice lives in
+// this browser (or this kiosk's overrides). The server value is the seed a
+// screen with no choice of its own starts from.
+const touchSetting = useScreenSetting("touchControls", {
+  storageKey: "calvin-touch-controls",
+  serverValue: () => props.config.touchControls,
+});
+const touchMode = computed(() => touchSetting.value.value || "auto");
+const setTouchMode = value => touchSetting.set(value);
 
 // --- On-screen keyboard: Auto · Always · Never, per screen (CLV-27 §6) ------
 // The row edits this screen: a kiosk override on a kiosk, localStorage on any
@@ -358,7 +350,7 @@ const onTurnOff = async () => {
 </script>
 
 <style scoped>
-.device-settings {
+.all-screens-settings {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;

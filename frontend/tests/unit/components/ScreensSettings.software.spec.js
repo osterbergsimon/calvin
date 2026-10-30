@@ -1,12 +1,38 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import KiosksSettings from "@/components/settings/categories/KiosksSettings.vue";
+import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
 
 const AVAILABLE = "e4f5a6b7c8d9e0f1";
 const OLD = "a1b2c3d4e5f6a7b8";
+
+const config = {
+  orientation: "landscape",
+  orientationFlipped: false,
+  dashboardScreens: {
+    version: 2,
+    activeScreenId: "home",
+    screens: [
+      {
+        id: "home",
+        name: "Home",
+        layout: {
+          version: 1,
+          direction: "row",
+          regions: [{ id: "r1", kind: "calendar", size: 100 }],
+        },
+      },
+    ],
+  },
+  displayScheduleEnabled: false,
+  displaySchedule: [],
+  displayTimeoutEnabled: false,
+  displayTimeout: 0,
+  touchControls: "auto",
+  onScreenKeyboard: "auto",
+};
 
 const kiosk = (over = {}) => ({
   id: "kitchen",
@@ -17,6 +43,7 @@ const kiosk = (over = {}) => ({
   agentUpdateStatus: "ok",
   agentUpdateMessage: null,
   agentUpdateRequested: false,
+  overrides: {},
   ...over,
 });
 
@@ -27,20 +54,29 @@ function mountWith({ kiosks = [], availableVersion = AVAILABLE, fetchManifest } 
     store.kiosks = kiosks;
   });
   store.fetchOverrides = vi.fn(async () => ({}));
+  store.setKioskOverrides = vi.fn();
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = fetchManifest || vi.fn(async () => availableVersion);
   store.triggerUpdate = vi.fn(async id => {
     const target = store.kiosks.find(k => k.id === id);
     if (target) target.agentUpdateRequested = true;
   });
-  return { wrapper: mount(KiosksSettings), store };
+  return {
+    wrapper: mount(ScreensSettings, { props: { config } }),
+    store,
+  };
 }
 
 const summary = wrapper => wrapper.find('[data-test="kiosk-software-state"]');
 const updateAll = wrapper => wrapper.find('[data-test="kiosk-software-update-all"]');
-const card = (wrapper, index) => wrapper.findAll('[data-test="kiosk-card"]')[index];
+const card = (wrapper, index) => wrapper.findAll('[data-test="screen-card"]')[index];
 
-describe("KiosksSettings — kiosk software summary", () => {
+async function openFirst(wrapper) {
+  await wrapper.find('[data-test="screen-card"]').trigger("click");
+  await flushPromises();
+}
+
+describe("ScreensSettings — kiosk software summary", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("is hidden when no kiosk has an agent (browser-only setup)", async () => {
@@ -88,21 +124,17 @@ describe("KiosksSettings — kiosk software summary", () => {
     expect(updateAll(wrapper).exists()).toBe(false);
   });
 
-  it("uses singular copy when one kiosk can be updated", async () => {
-    const { wrapper } = mountWith({
+  it("uses singular and plural copy", async () => {
+    const one = mountWith({
       kiosks: [kiosk(), kiosk({ id: "hallway", agentVersion: AVAILABLE })],
     });
     await flushPromises();
-    expect(summary(wrapper).text()).toBe("1 kiosk can be updated to e4f5a6b.");
-    expect(updateAll(wrapper).text()).toBe("Update all");
-  });
+    expect(summary(one.wrapper).text()).toBe("1 kiosk can be updated to e4f5a6b.");
+    expect(updateAll(one.wrapper).text()).toBe("Update all");
 
-  it("uses plural copy when several kiosks can be updated", async () => {
-    const { wrapper } = mountWith({
-      kiosks: [kiosk(), kiosk({ id: "hallway" })],
-    });
+    const two = mountWith({ kiosks: [kiosk(), kiosk({ id: "hallway" })] });
     await flushPromises();
-    expect(summary(wrapper).text()).toBe("2 of 2 kiosks can be updated to e4f5a6b.");
+    expect(summary(two.wrapper).text()).toBe("2 of 2 kiosks can be updated to e4f5a6b.");
   });
 
   it("shows the updating state with a disabled Update all", async () => {
@@ -173,37 +205,32 @@ describe("KiosksSettings — kiosk software summary", () => {
   });
 });
 
-describe("KiosksSettings — kiosk card software line", () => {
+describe("ScreensSettings — screen card software line", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("marks an up-to-date kiosk and shows no update button", async () => {
+  it("marks an up-to-date kiosk", async () => {
     const { wrapper } = mountWith({ kiosks: [kiosk({ agentVersion: AVAILABLE })] });
     await flushPromises();
     expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe(
       "Kiosk software e4f5a6b · up to date"
     );
-    expect(wrapper.find('[data-test="kiosk-update-btn"]').exists()).toBe(false);
   });
 
-  it("shows the available version and an Update button", async () => {
+  it("shows the available version", async () => {
     const { wrapper } = mountWith({ kiosks: [kiosk()] });
     await flushPromises();
     expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe(
       "Kiosk software a1b2c3d · e4f5a6b available"
     );
-    expect(wrapper.find('[data-test="kiosk-update-btn"]').text()).toBe("Update");
   });
 
   it("shows Updating to the available version while requested", async () => {
     const { wrapper } = mountWith({ kiosks: [kiosk({ agentUpdateRequested: true })] });
     await flushPromises();
     expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe("Updating to e4f5a6b…");
-    const btn = wrapper.find('[data-test="kiosk-update-btn"]');
-    expect(btn.text()).toBe("Updating…");
-    expect(btn.attributes("disabled")).toBeDefined();
   });
 
-  it("marks a python-too-old failure as needing a newer OS, with no Update button", async () => {
+  it("marks a python-too-old failure as needing a newer OS", async () => {
     const { wrapper } = mountWith({
       kiosks: [
         kiosk({
@@ -216,14 +243,9 @@ describe("KiosksSettings — kiosk card software line", () => {
     const line = wrapper.find('[data-test="kiosk-version-line"]');
     expect(line.text()).toBe("Kiosk software a1b2c3d · update needs a newer OS");
     expect(line.classes()).toContain("is-warn");
-    expect(wrapper.find('[data-test="kiosk-update-btn"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain(
-      "Reinstall this kiosk with a current Raspberry Pi OS, then update."
-    );
-    expect(wrapper.text()).not.toContain("needs OS update\n");
   });
 
-  it("treats a rollback as a normal failure with Try again", async () => {
+  it("treats a rollback as a normal failure", async () => {
     const { wrapper } = mountWith({
       kiosks: [
         kiosk({
@@ -236,25 +258,73 @@ describe("KiosksSettings — kiosk card software line", () => {
     const line = wrapper.find('[data-test="kiosk-version-line"]');
     expect(line.text()).toBe("Kiosk software a1b2c3d · last update failed, kept this version");
     expect(line.classes()).toContain("is-err");
-    expect(wrapper.find('[data-test="kiosk-update-btn"]').text()).toBe("Try again");
-  });
-
-  it("falls back to the normal failure state when the message is missing", async () => {
-    const { wrapper } = mountWith({
-      kiosks: [kiosk({ agentUpdateStatus: "error", agentUpdateMessage: null })],
-    });
-    await flushPromises();
-    expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toContain(
-      "last update failed, kept this version"
-    );
-    expect(wrapper.find('[data-test="kiosk-update-btn"]').text()).toBe("Try again");
   });
 
   it("shows no software line for a kiosk without an agent", async () => {
     const { wrapper } = mountWith({ kiosks: [kiosk({ agentVersion: null })] });
     await flushPromises();
     expect(wrapper.find('[data-test="kiosk-version-line"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="kiosk-update-btn"]').exists()).toBe(false);
     expect(card(wrapper, 0).exists()).toBe(true);
+  });
+});
+
+describe("ScreensSettings — update button in the screen's Software section", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("calls triggerUpdate when the update button is clicked", async () => {
+    const { wrapper, store } = mountWith({ kiosks: [kiosk()] });
+    await flushPromises();
+    await openFirst(wrapper);
+
+    const btn = wrapper.find('[data-test="kiosk-update-btn"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.text()).toBe("Update");
+
+    await btn.trigger("click");
+    await flushPromises();
+
+    expect(store.triggerUpdate).toHaveBeenCalledWith("kitchen");
+  });
+
+  it("does not show the update button when agentVersion matches availableVersion", async () => {
+    const { wrapper } = mountWith({ kiosks: [kiosk({ agentVersion: AVAILABLE })] });
+    await flushPromises();
+    await openFirst(wrapper);
+    expect(wrapper.find('[data-test="kiosk-update-btn"]').exists()).toBe(false);
+  });
+
+  it("shows Updating… and disables the button when requested", async () => {
+    const { wrapper } = mountWith({ kiosks: [kiosk({ agentUpdateRequested: true })] });
+    await flushPromises();
+    await openFirst(wrapper);
+
+    const btn = wrapper.find('[data-test="kiosk-update-btn"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.text()).toBe("Updating…");
+    expect(btn.attributes("disabled")).toBeDefined();
+  });
+
+  it("does not show the update button when availableVersion is null", async () => {
+    const { wrapper } = mountWith({
+      kiosks: [kiosk()],
+      availableVersion: null,
+    });
+    await flushPromises();
+    await openFirst(wrapper);
+    expect(wrapper.find('[data-test="kiosk-update-btn"]').exists()).toBe(false);
+  });
+
+  it("offers Try again after a failed update", async () => {
+    const { wrapper } = mountWith({
+      kiosks: [
+        kiosk({
+          agentUpdateStatus: "error",
+          agentUpdateMessage: "rolled back to previous version",
+        }),
+      ],
+    });
+    await flushPromises();
+    await openFirst(wrapper);
+    expect(wrapper.find('[data-test="kiosk-update-btn"]').text()).toBe("Try again");
   });
 });

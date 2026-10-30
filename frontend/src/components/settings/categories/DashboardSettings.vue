@@ -175,40 +175,7 @@
       </template>
     </SettingsSection>
 
-    <SettingsSection id="kiosk-touch-focus" title="Touch & focus">
-      <SettingRow
-        label="Touchscreen"
-        description="Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse."
-      >
-        <template #label-extra><ScopeChip /></template>
-        <SegmentedControl
-          :model-value="touchMode"
-          :options="[
-            { value: 'auto', label: 'Auto' },
-            { value: 'on', label: 'On' },
-            { value: 'off', label: 'Off' },
-          ]"
-          aria-label="Touchscreen"
-          @update:model-value="setTouchMode"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Dashboard size"
-        description="Size of labels and touch buttons on the dashboard."
-      >
-        <SelectPill
-          :model-value="config.touchControlSize"
-          :options="[
-            { value: 'xsmall', label: 'X-Small' },
-            { value: 'small', label: 'Small' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'large', label: 'Large' },
-            { value: 'xlarge', label: 'X-Large' },
-          ]"
-          aria-label="Dashboard size"
-          @update:model-value="v => emit('update:config', { touchControlSize: v })"
-        />
-      </SettingRow>
+    <SettingsSection id="kiosk-touch-focus" title="Focus & remote">
       <SettingRow
         label="Focus light"
         description="Outlines the region the remote or arrow keys will act on."
@@ -234,6 +201,55 @@
           @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
         />
       </SettingRow>
+      <SettingRow
+        label="Dashboard size"
+        description="Size of labels and touch buttons on the dashboard."
+      >
+        <SelectPill
+          :model-value="config.touchControlSize"
+          :options="[
+            { value: 'xsmall', label: 'X-Small' },
+            { value: 'small', label: 'Small' },
+            { value: 'medium', label: 'Medium' },
+            { value: 'large', label: 'Large' },
+            { value: 'xlarge', label: 'X-Large' },
+          ]"
+          aria-label="Dashboard size"
+          @update:model-value="v => emit('update:config', { touchControlSize: v })"
+        />
+      </SettingRow>
+      <SettingRow
+        label="Show button presses"
+        description="A short label appears when a remote or keyboard button does something."
+      >
+        <ToggleSwitch
+          :model-value="config.keyboardFeedbackEnabled"
+          aria-label="Show button presses"
+          @update:model-value="v => emit('update:config', { keyboardFeedbackEnabled: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Label size">
+        <SegmentedControl
+          :model-value="config.keyboardFeedbackMode"
+          :options="[
+            { value: 'normal', label: 'Normal' },
+            { value: 'small', label: 'Small' },
+          ]"
+          aria-label="Label size"
+          @update:model-value="v => emit('update:config', { keyboardFeedbackMode: v })"
+        />
+      </SettingRow>
+      <SettingRow label="Hide label after">
+        <NumberStepper
+          :model-value="config.modeIndicatorTimeout"
+          :min="0"
+          :max="60"
+          unit=" s"
+          aria-label="Hide label after, in seconds"
+          @update:model-value="v => emit('update:config', { modeIndicatorTimeout: v })"
+        />
+      </SettingRow>
+      <KeyboardTab />
     </SettingsSection>
   </div>
 </template>
@@ -251,6 +267,7 @@ import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
+import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 import { computed, ref } from "vue";
 import { normalizeDashboardScreens } from "@/utils/layout";
@@ -294,13 +311,6 @@ const setUiSize = async value => {
   // Apply immediately, without waiting for the config store to round-trip.
   applyUiScale(value);
 };
-
-const touchSetting = useScreenSetting("touchControls", {
-  storageKey: "calvin-touch-controls",
-  serverValue: () => props.config.touchControls,
-});
-const touchMode = computed(() => touchSetting.value.value || "auto");
-const setTouchMode = value => touchSetting.set(value);
 
 // --- Dark from: two whole-hour pickers, one row ----------------------------
 const hourToTime = (hour, fallback) => {
