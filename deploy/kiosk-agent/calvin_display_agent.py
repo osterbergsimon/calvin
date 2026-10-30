@@ -125,10 +125,13 @@ def apply_on(on, env=None):
 
     X11 uses BOTH vcgencmd and xset (belt-and-suspenders: vcgencmd is a no-op under
     some KMS drivers, xset needs DPMS). Wayland has neither: wlopm speaks
-    wlr-output-power-management, and wlr-randr --on is the wake fallback.
+    wlr-output-power-management, and wlr-randr --on is the wake fallback. cog owns
+    DRM master, so it is stopped before the framebuffer is blanked.
     Returns a '+'-joined list of the methods that appeared to work, or 'none'."""
     if display_stack(env) == "wayland":
         return apply_on_wayland(on, env)
+    if display_stack(env) == "cog":
+        return apply_on_cog(on, env)
     val = "1" if on else "0"
     methods = []
     try:
@@ -332,11 +335,11 @@ _RESOLUTION_RE = re.compile(r"^(\d+x\d+)(?:@(\d+(?:\.\d+)?))?$")
 # alone: an X11 session can host XWayland, and a failed Wayland session can leave
 # a stale variable behind.
 WAYLAND_DISPLAY_DEFAULT = "wayland-0"
-DISPLAY_STACKS = ("x11", "wayland")
+DISPLAY_STACKS = ("x11", "wayland", "cog")
 
 
 def display_stack(env=None):
-    """'x11' or 'wayland' for this kiosk."""
+    """'x11', 'wayland' or 'cog' for this kiosk."""
     if env is None:
         env = os.environ
     requested = str(env.get("CALVIN_DISPLAY_STACK", "")).strip().lower()
@@ -441,6 +444,75 @@ def apply_on_wayland(on, env=None):
     return "+".join(methods) if methods else "none"
 
 
+# --- cog (WPE WebKit on DRM/KMS) ---------------------------------------------
+# cog is a fullscreen browser on the DRM/KMS device: there is no X server and no
+# compositor, so xrandr/xset/wlopm cannot reach the panel. While cog runs it holds
+# DRM master, so the panel power sequence is "stop cog, blank the framebuffer"
+# and the reverse on wake. Privileged work lives in a root-owned helper; the agent
+# may run only that helper through sudo (installed with the kiosk bundle).
+COG_PANEL_HELPER = "/usr/local/bin/calvin-cog-panel.sh"
+
+# Calvin's rotation names are xrandr semantics: `left` is 90 degrees
+# counter-clockwise, `right` 90 degrees clockwise. cog's `rotation` parameter is
+# also counter-clockwise and takes quarter turns (0..3), so the mapping is direct:
+#   normal 0 | left (90 CCW) 1 | inverted 180 2 | right (270 CCW) 3
+# Verified on the owner's Pi 3B+ (cog 0.18.4): rotation=1 renders portrait. Only
+# the gles renderer can rotate; the default `modeset` renderer refuses.
+COG_ROTATIONS = {
+    "normal": 0,
+    "left": 1,
+    "inverted": 2,
+    "right": 3,
+    "0": 0,
+    "1": 1,
+    "2": 2,
+    "3": 3,
+}
+
+
+def _cog_panel(*args, env=None):
+    """Run the root helper with `args`; returns its result or None."""
+    e = dict(os.environ)
+    if env is not None:
+        e.update(env)
+    return _run(["sudo", "-n", COG_PANEL_HELPER, *args], e)
+
+
+def apply_on_cog(on, env=None):
+    """Power the panel on/off by stopping/starting cog around the fb blank."""
+    action = "on" if on else "off"
+    r = _cog_panel(action, env=env)
+    if r is not None and r.returncode == 0:
+        return "cog"
+    detail = (r.stderr.strip() if r is not None else "helper not available") or ""
+    log(f"cog panel {action} failed: {detail}")
+    return "none"
+
+
+def apply_rotation_cog(rotation, env=None):
+    """Persist the cog rotation and restart the unit when it changed."""
+    value = COG_ROTATIONS.get(str(rotation))
+    if value is None:
+        log(
+            f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})"
+        )
+        return None
+    r = _cog_panel("rotate", str(value), env=env)
+    if r is not None and r.returncode == 0:
+        log(f"rotation applied: cog -> {value} ({rotation})")
+        return "cog"
+    detail = (r.stderr.strip() if r is not None else "helper not available") or ""
+    log(f"rotation failed: {detail}")
+    return None
+
+
+def apply_mode_cog(output=None, resolution=None, env=None):
+    """cog uses the output's preferred mode; output/mode changes are a no-op."""
+    if output or resolution:
+        log("output/mode is fixed by cog on the DRM platform; skipping")
+    return None
+
+
 # Calvin's rotation values are the xrandr names; wlroots transforms turn
 # counter-clockwise and are numeric (§7.4 of the research doc):
 #   normal -> normal, left (90 CCW) -> 90, inverted -> 180, right (90 CW) -> 270.
@@ -487,6 +559,8 @@ def apply_rotation(rotation, output=None, env=None):
     """
     if display_stack(env) == "wayland":
         return apply_rotation_wayland(rotation, output, env)
+    if display_stack(env) == "cog":
+        return apply_rotation_cog(rotation, env)
     if rotation not in VALID_ROTATIONS:
         log(
             f"ignoring invalid rotation {rotation!r} (expected one of {VALID_ROTATIONS})"
@@ -562,6 +636,8 @@ def apply_mode(output, resolution, env=None):
         return None
     if display_stack(env) == "wayland":
         return apply_mode_wayland(output, resolution, env)
+    if display_stack(env) == "cog":
+        return apply_mode_cog(output, resolution, env)
     out = output or detect_primary_output()
     if not out:
         log("no connected display output found; cannot set output/mode")
@@ -1258,6 +1334,15 @@ def start_watchdog(port, interval, *, thread_factory=None, **kwargs):
     return thread
 
 
+def watchdog_applies(stack):
+    """The CDP watchdog is a Chromium-only workaround.
+
+    cog runs with --webprocess-failure=restart and exposes no Chromium DevTools
+    endpoint, so probing 127.0.0.1:9222 there would only log "unreachable".
+    """
+    return stack != "cog"
+
+
 def main():
     check_python()
     backend = os.environ.get("CALVIN_BACKEND_URL", "").strip()
@@ -1278,7 +1363,12 @@ def main():
     )
     log(f"starting: backend={backend} refresh={refresh}s stack={display_stack()}")
     watchdog = kiosk_watchdog_config()
-    if watchdog["enabled"]:
+    if not watchdog_applies(display_stack()):
+        log(
+            "watchdog: not used on the cog stack "
+            "(cog --webprocess-failure=restart handles it)"
+        )
+    elif watchdog["enabled"]:
         log(
             "watchdog: probing chromium at "
             f"127.0.0.1:{watchdog['port']} every {watchdog['interval']}s"

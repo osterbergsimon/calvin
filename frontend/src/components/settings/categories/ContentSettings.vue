@@ -42,7 +42,7 @@
       </SettingRow>
       <SettingRow
         label="Show week numbers"
-        description="Display ISO week numbers alongside each calendar row."
+        description="Shows the week number at the start of each week."
       >
         <ToggleSwitch
           :model-value="config.showWeekNumbers"
@@ -64,22 +64,16 @@
           @update:model-value="v => emit('update:config', { timeFormat: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Max visible events"
-        description="How many events can appear in a single calendar cell."
-      >
+      <SettingRow label="Events per day" :description="EVENTS_PER_DAY_DESCRIPTION">
         <NumberStepper
           :model-value="config.maxVisibleEvents"
           :min="1"
           :max="20"
-          aria-label="Max visible events"
+          aria-label="Events per day"
           @update:model-value="v => emit('update:config', { maxVisibleEvents: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Highlight holidays"
-        description="Mark public holidays and red days on the calendar."
-      >
+      <SettingRow label="Highlight holidays" description="Marks public holidays on the calendar.">
         <ToggleSwitch
           :model-value="config.showRedDays"
           aria-label="Highlight holidays"
@@ -89,65 +83,59 @@
     </SettingsSection>
 
     <SettingsSection id="content-photos" title="Photos">
-      <SettingRow
-        label="Rotation interval"
-        description="Seconds each photo is shown before advancing."
-      >
+      <SettingRow label="Show each photo for">
         <NumberStepper
           :model-value="config.photoRotationInterval || 30"
           :min="5"
           :max="3600"
-          :step="1"
-          aria-label="Photo rotation interval in seconds"
+          :step="5"
+          unit=" s"
+          aria-label="Show each photo for, in seconds"
           @update:model-value="v => emit('update:config', { photoRotationInterval: v })"
         />
       </SettingRow>
-      <SettingRow label="Image display mode" description="How each image is fitted to the screen.">
+      <SettingRow label="Fit photos" description="How a photo fills its space.">
+        <template v-if="isSmartFit" #description>
+          <p class="setting-row__desc">How a photo fills its space.</p>
+          <p class="content-hint">Smart picks Whole photo or Fill per photo.</p>
+        </template>
         <SelectPill
           :model-value="config.imageDisplayMode || 'smart'"
           :options="[
             { value: 'smart', label: 'Smart' },
-            { value: 'fit', label: 'Fit' },
+            { value: 'fit', label: 'Whole photo' },
             { value: 'fill', label: 'Fill' },
             { value: 'crop', label: 'Crop' },
-            { value: 'center', label: 'Center' },
+            { value: 'center', label: 'Centre' },
           ]"
+          aria-label="Fit photos"
           @update:model-value="v => emit('update:config', { imageDisplayMode: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Randomize image order"
-        description="Shuffle the order photos are displayed in."
-      >
+      <SettingRow label="Shuffle photos">
         <ToggleSwitch
           :model-value="config.randomizeImages ?? false"
-          aria-label="Randomize image order"
+          aria-label="Shuffle photos"
           @update:model-value="v => emit('update:config', { randomizeImages: v })"
         />
       </SettingRow>
       <SettingRow
-        label="Photo-frame mode"
-        description="Show a single photo full-screen as a digital frame."
+        label="Photo frame when idle"
+        description="After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back."
       >
         <ToggleSwitch
           :model-value="config.photoFrameEnabled || config.photoFrameMode"
-          aria-label="Photo-frame mode"
+          aria-label="Photo frame when idle"
           @update:model-value="
             v => emit('update:config', { photoFrameEnabled: v, photoFrameMode: v })
           "
         />
       </SettingRow>
-      <SettingRow
-        v-if="config.photoFrameEnabled || config.photoFrameMode"
-        label="Photo-frame timeout"
-        description="Seconds before the photo frame advances."
-      >
-        <NumberStepper
-          :model-value="config.photoFrameTimeout || 60"
-          :min="5"
-          :max="3600"
-          :step="1"
-          aria-label="Photo-frame timeout in seconds"
+      <SettingRow v-if="config.photoFrameEnabled || config.photoFrameMode" label="Start after">
+        <SelectPill
+          :model-value="photoFrameTimeout"
+          :options="photoFrameTimeoutOptions"
+          aria-label="Start the photo frame after"
           @update:model-value="v => emit('update:config', { photoFrameTimeout: v })"
         />
       </SettingRow>
@@ -168,6 +156,7 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -181,8 +170,40 @@ import PhotoUpload from "@/components/settings/tabs/content/PhotoUpload.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
 import AddWebPageButton from "@/components/settings/specialized/AddWebPageButton.vue";
 
-defineProps({ config: { type: Object, required: true } });
+// Kept out of the template: the quoted "+N more" would fight the formatter's
+// attribute quoting.
+const EVENTS_PER_DAY_DESCRIPTION = 'How many events fit in one day before it shows "+N more".';
+
+const props = defineProps({ config: { type: Object, required: true } });
 const emit = defineEmits(["update:config"]);
+
+const isSmartFit = computed(() => (props.config.imageDisplayMode || "smart") === "smart");
+
+// Photo frame "Start after": the idle wait, in seconds. The store's default is
+// 300 s, so a missing value means 5 min (the old `|| 60` fallback showed 1 min
+// for a fresh install). Options are the minutes the control offers.
+const PHOTO_FRAME_MINUTES = [1, 2, 5, 10, 15, 30];
+const photoFrameTimeout = computed(() => {
+  const seconds = Number(props.config.photoFrameTimeout) || 300;
+  return seconds;
+});
+const minutesLabel = seconds => {
+  if (seconds % 60 !== 0) return `${seconds} s`;
+  const minutes = seconds / 60;
+  return `${minutes} min`;
+};
+const photoFrameTimeoutOptions = computed(() => {
+  const options = PHOTO_FRAME_MINUTES.map(minutes => ({
+    value: minutes * 60,
+    label: `${minutes} min`,
+  }));
+  const current = photoFrameTimeout.value;
+  if (!options.some(option => option.value === current)) {
+    options.push({ value: current, label: minutesLabel(current) });
+    options.sort((a, b) => a.value - b.value);
+  }
+  return options;
+});
 </script>
 
 <style scoped>
@@ -195,5 +216,18 @@ const emit = defineEmits(["update:config"]);
   display: flex;
   justify-content: flex-end;
   padding: 0.875rem 1rem 0;
+}
+/* Slot content is in this component's scope, not SettingRow's. */
+.setting-row__desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.content-hint {
+  margin: 0.15rem 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: var(--ink-3);
 }
 </style>
