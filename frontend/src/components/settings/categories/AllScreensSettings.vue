@@ -55,10 +55,12 @@
         </SettingRow>
         <SettingRow label="Timezone" description="Used by the schedule.">
           <SelectPill
-            :model-value="config.timezone || 'system'"
+            :model-value="config.timezone || SERVER_TIMEZONE"
             :options="timezoneOptions"
+            searchable
+            search-label="Search timezones"
             @update:model-value="
-              v => emit('update:config', { timezone: v === 'system' ? null : v })
+              v => emit('update:config', { timezone: v === SERVER_TIMEZONE ? null : v })
             "
           />
         </SettingRow>
@@ -183,6 +185,7 @@ import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useOskHardwareSeen } from "@/composables/useOnScreenKeyboard";
+import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
 import {
   OSK_LAYOUT_CHANGE_EVENT,
   clearStoredOskLayout,
@@ -317,21 +320,7 @@ const useDefaultLayout = () => {
 onMounted(() => window.addEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
 onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
 
-const timezoneOptions = [
-  { value: "system", label: "Server's timezone" },
-  { value: "UTC", label: "UTC" },
-  { value: "America/New_York", label: "New York (EST/EDT)" },
-  { value: "America/Chicago", label: "Chicago (CST/CDT)" },
-  { value: "America/Denver", label: "Denver (MST/MDT)" },
-  { value: "America/Los_Angeles", label: "Los Angeles (PST/PDT)" },
-  { value: "Europe/London", label: "London (GMT/BST)" },
-  { value: "Europe/Paris", label: "Paris (CET/CEST)" },
-  { value: "Europe/Berlin", label: "Berlin (CET/CEST)" },
-  { value: "Europe/Stockholm", label: "Stockholm (CET/CEST)" },
-  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
-  { value: "Asia/Shanghai", label: "Shanghai (CST)" },
-  { value: "Australia/Sydney", label: "Sydney (AEDT/AEST)" },
-];
+const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezone));
 
 const onTurnOn = async () => {
   try {
