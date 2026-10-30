@@ -1061,13 +1061,22 @@ async def get_plugin_data(
         if plugin_instance.stopped_by_request:
             raise HTTPException(status_code=409, detail="Plugin instance is stopped")
         # Enabled but never came up (e.g. initialize() failed at boot because
-        # the network wasn't up yet): retry, so it recovers on its own.
-        try:
-            await plugin_instance.initialize()
-            plugin_instance.start()
-        except Exception as e:
-            logger.exception("Error initializing plugin {}", plugin_id)
-            raise HTTPException(status_code=503, detail=f"Plugin instance failed to start: {e}")
+        # the network wasn't up yet): retry, so it recovers on its own. Serialize
+        # the retry per instance — concurrent dashboard polls must not run
+        # initialize() in parallel — and re-check inside the lock because the
+        # poll we waited behind may already have brought the instance up.
+        async with plugin_manager.get_lifecycle_lock(plugin_id):
+            if not plugin_instance.is_running():
+                if plugin_instance.stopped_by_request:
+                    raise HTTPException(status_code=409, detail="Plugin instance is stopped")
+                try:
+                    await plugin_instance.initialize()
+                    plugin_instance.start()
+                except Exception as e:
+                    logger.exception("Error initializing plugin {}", plugin_id)
+                    raise HTTPException(
+                        status_code=503, detail=f"Plugin instance failed to start: {e}"
+                    )
 
     try:
         data = await plugin_instance.fetch(start_date=start_date, end_date=end_date)
