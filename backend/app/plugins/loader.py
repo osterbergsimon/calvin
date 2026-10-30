@@ -21,6 +21,7 @@ from app.plugins.base import BasePlugin, PluginType
 from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION, PluginMetadata
 from app.plugins.protocols import BackendPlugin, CalendarPlugin, ImagePlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
+from app.services.validation import validate_plugin_id
 
 _FAMILY_BASES: tuple[tuple[type[BasePlugin], PluginType], ...] = (
     (CalendarPlugin, PluginType.CALENDAR),
@@ -164,6 +165,38 @@ class PluginLoader:
         except Exception:
             logger.exception("Error loading plugins from package {}", package_name)
 
+    @staticmethod
+    def _manifest_label(manifest: Any) -> str:
+        """Best-effort name for a manifest too malformed to carry a valid id."""
+        if isinstance(manifest, dict):
+            installed_path = manifest.get("_installed_path")
+            if isinstance(installed_path, str) and installed_path:
+                return Path(installed_path).name
+            raw_id = manifest.get("id")
+            if isinstance(raw_id, str) and raw_id:
+                return raw_id
+        return "<unknown plugin>"
+
+    def _record_malformed_manifest(self, manifest: Any, message: str) -> None:
+        """Log and record a load error for a manifest we cannot identify by id."""
+        label = self._manifest_label(manifest)
+        self._load_errors[label] = message
+        logger.error("Skipping installed plugin {}: {}", label, message)
+
+    def _validated_plugin_id(self, manifest: Any) -> str | None:
+        """Return the manifest's validated plugin id, or None if it is malformed."""
+        if not isinstance(manifest, dict):
+            self._record_malformed_manifest(
+                manifest,
+                f"plugin manifest is not a JSON object (got {type(manifest).__name__})",
+            )
+            return None
+        try:
+            return validate_plugin_id(manifest.get("id"))
+        except ValueError as exc:
+            self._record_malformed_manifest(manifest, str(exc))
+            return None
+
     def load_installed_plugins(self) -> None:
         """
         Load plugins from the installed plugins directory.
@@ -182,11 +215,13 @@ class PluginLoader:
             sys.path.insert(0, backend_dir_str)
 
         for plugin_manifest in installed_plugins:
-            plugin_id = plugin_manifest["id"]
+            plugin_id = self._validated_plugin_id(plugin_manifest)
+            if plugin_id is None:
+                continue
             try:
                 plugin_path = plugin_installer.get_plugin_path(plugin_id)
             except ValueError as e:
-                logger.warning("Skipping installed plugin with unsafe id: {}", e)
+                self._record_malformed_manifest(plugin_manifest, f"unsafe plugin path: {e}")
                 continue
             plugin_py = plugin_path / "plugin.py"
 
