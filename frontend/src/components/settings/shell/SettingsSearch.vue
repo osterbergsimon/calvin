@@ -103,7 +103,7 @@ onUnmounted(() => {
   gap: var(--space-2, 8px);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius, 6px);
+  border-radius: var(--radius, var(--radius-xs));
   padding: 0 var(--space-3, 12px);
 }
 
@@ -121,7 +121,7 @@ onUnmounted(() => {
   outline: none;
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   padding: var(--space-2, 8px) 0;
   min-width: 0;
   /* Remove default search input styling */
@@ -153,11 +153,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   font-family: var(--font-ui);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--ink-3);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   padding: 1px 5px;
   line-height: 1.4;
 }
@@ -170,7 +170,7 @@ onUnmounted(() => {
   z-index: 100;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius, 6px);
+  border-radius: var(--radius, var(--radius-xs));
   list-style: none;
   margin: 0;
   padding: var(--space-1, 4px);
@@ -192,7 +192,7 @@ onUnmounted(() => {
   padding: var(--space-2, 8px) var(--space-3, 12px);
   background: transparent;
   border: none;
-  border-radius: calc(var(--radius, 6px) - 2px);
+  border-radius: calc(var(--radius, var(--radius-xs)) - 2px);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -209,14 +209,14 @@ onUnmounted(() => {
 
 .settings-search__result-label {
   font-family: var(--font-ui);
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink);
   font-weight: 500;
   line-height: 1.2;
 }
 
 .settings-search__result-path {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--ink-3);
   line-height: 1.3;
 }

@@ -40,7 +40,7 @@ defineProps({
 }
 .setting-row__label {
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink);
 }
@@ -55,7 +55,7 @@ defineProps({
 }
 .setting-row__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }

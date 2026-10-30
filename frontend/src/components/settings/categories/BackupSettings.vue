@@ -407,7 +407,7 @@ onMounted(async () => {
   padding: 0.75rem 1rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   color: var(--ink);
 }
 .backup-preview ul {
@@ -417,21 +417,21 @@ onMounted(async () => {
 .backup-note {
   margin: 0;
   color: var(--ink-2);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 .backup-warning {
   margin: 0;
-  color: var(--warn);
-  font-size: 0.9rem;
+  color: var(--warn-text);
+  font-size: var(--fs-md);
 }
 .backup-error {
   margin: 0;
-  color: var(--err);
-  font-size: 0.9rem;
+  color: var(--err-text);
+  font-size: var(--fs-md);
 }
 .backup-warnings {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 .backup-file {
   font-family: var(--font-ui);
@@ -465,12 +465,12 @@ onMounted(async () => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .backup-btn--primary {

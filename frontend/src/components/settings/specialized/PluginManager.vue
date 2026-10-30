@@ -216,7 +216,7 @@ const handleDeleteImage = imageId => emit("delete-image", imageId);
   text-align: center;
   color: var(--ink-3);
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   margin: 0;
 }
 
@@ -231,10 +231,10 @@ const handleDeleteImage = imageId => emit("delete-image", imageId);
   padding: 0.75rem 1rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--ink-2);
   font-family: var(--font-ui);
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   line-height: 1.5;
 }
 </style>

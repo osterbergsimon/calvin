@@ -90,7 +90,7 @@ const onResize = (firstIndex, event) =>
   display: flex;
   min-width: 0;
   min-height: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   overflow: hidden;
   transition:
@@ -148,13 +148,13 @@ const onResize = (firstIndex, event) =>
 /* The device screen is always a dark, lit surface regardless of the app theme,
    so on-screen text is fixed light rather than theme-driven --ink. */
 .sre-region-emoji {
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   filter: saturate(1.05);
 }
 .sre-region-name {
   font-size: var(--fs-2xs);
   font-weight: 600;
-  color: rgba(240, 244, 248, 0.92);
+  color: var(--device-ink);
   letter-spacing: 0.01em;
 }
 .sre-region-size {
@@ -162,7 +162,7 @@ const onResize = (firstIndex, event) =>
   right: 5px;
   bottom: 4px;
   font-size: var(--fs-micro);
-  color: rgba(240, 244, 248, 0.55);
+  color: var(--device-ink-2);
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
 }
