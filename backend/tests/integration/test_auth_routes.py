@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.security.admin_auth import get_admin_store, login_limiter
+from app.security.setup_code import ensure_setup_code, format_code, invalidate_setup_code
 
 pytestmark = pytest.mark.no_admin_login
 
@@ -15,11 +16,20 @@ def _clean_rate_limiter():
     yield
     login_limiter._failures.clear()
     login_limiter._lockouts.clear()
+    get_admin_store().reset()
+    invalidate_setup_code()
 
 
 def _code(response) -> str | None:
     detail = response.json().get("detail")
     return detail.get("code") if isinstance(detail, dict) else None
+
+
+def _setup(client: TestClient, password: str = "setup-pass-1", code: str | None = None):
+    if code is None:
+        current = ensure_setup_code()
+        code = format_code(current) if current else "AAAA-BBBB"
+    return client.post("/api/auth/setup", json={"password": password, "code": code})
 
 
 def _login(client: TestClient, password: str = "test-admin-password"):
@@ -35,7 +45,7 @@ def test_status_unconfigured(test_client):
 
 def test_setup_logs_in(test_client):
     get_admin_store().reset()
-    response = test_client.post("/api/auth/setup", json={"password": "setup-pass-1"})
+    response = _setup(test_client)
     assert response.status_code == 200
     assert response.json() == {"ok": True}
     assert "calvin_admin" in response.headers["set-cookie"]
@@ -47,15 +57,15 @@ def test_setup_logs_in(test_client):
 
 def test_second_setup_409(test_client):
     get_admin_store().reset()
-    assert test_client.post("/api/auth/setup", json={"password": "setup-pass-1"}).status_code == 200
-    second = test_client.post("/api/auth/setup", json={"password": "setup-pass-2"})
+    assert _setup(test_client).status_code == 200
+    second = _setup(test_client, "setup-pass-2")
     assert second.status_code == 409
     assert _code(second) == "already_configured"
 
 
 def test_setup_short_password_422(test_client):
     get_admin_store().reset()
-    response = test_client.post("/api/auth/setup", json={"password": "short"})
+    response = _setup(test_client, "short")
     assert response.status_code == 422
     assert _code(response) == "password_too_short"
 
@@ -105,7 +115,7 @@ def test_password_change_rate_limited(test_client):
 
     # Same peer IP, even a fresh store: still locked out.
     get_admin_store().reset()
-    setup = test_client.post("/api/auth/setup", json={"password": "setup-pass-1"})
+    setup = _setup(test_client)
     assert setup.status_code == 429
     assert int(setup.headers["Retry-After"]) > 0
 
