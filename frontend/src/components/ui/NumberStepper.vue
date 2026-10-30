@@ -57,7 +57,7 @@ const bump = delta => {
   color: var(--ink);
   background: transparent;
   border: 0;
-  border-radius: 0.5625rem; /* 9px */
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .stepper__btn:hover {
