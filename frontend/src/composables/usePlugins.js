@@ -23,7 +23,6 @@ const githubBranch = ref("main");
 const availablePlugins = ref([]);
 const pluginInstallError = ref("");
 const pluginInstallSuccess = ref("");
-const pluginRequiresRestart = ref(false);
 const pluginBranchSwitched = ref(false);
 const pluginActualBranch = ref("");
 const expandedPlugins = ref({});
@@ -155,17 +154,13 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
 
     try {
       const response = await pluginsApi.installPluginFromZip(file);
       pluginInstallSuccess.value = "Plugin installed successfully!";
-      pluginRequiresRestart.value = response.requires_restart || false;
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-        }, 5000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
 
       await loadPlugins();
       return response.manifest?.id ? [response.manifest.id] : [];
@@ -259,14 +254,12 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
     pluginBranchSwitched.value = false;
     pluginActualBranch.value = "";
 
     try {
       const response = await pluginsApi.installPluginFromGitHub(repoUrl, pluginPath, branch, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
-      pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
       // Mark the installed plugin in-place so the list stays visible
@@ -284,11 +277,9 @@ export function usePlugins() {
 
       await loadPlugins();
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-        }, 5000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
       return [installedId];
     } catch (error) {
       const errorDetail = error.response?.data?.detail || error.message || "";
@@ -311,14 +302,12 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
     pluginBranchSwitched.value = false;
     pluginActualBranch.value = "";
 
     const results = {
       success: [],
       failed: [],
-      requiresRestart: false,
     };
 
     try {
@@ -335,9 +324,6 @@ export function usePlugins() {
             name: plugin.name || plugin.id,
             response,
           });
-          if (response.requires_restart) {
-            results.requiresRestart = true;
-          }
           if (response.branch_switched) {
             pluginBranchSwitched.value = true;
             pluginActualBranch.value = response.branch || branch;
@@ -356,14 +342,12 @@ export function usePlugins() {
         // All succeeded
         const successNames = results.success.map(s => s.name).join(", ");
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.success.length > 0 && results.failed.length > 0) {
         // Partial success
         const successNames = results.success.map(s => s.name).join(", ");
         const failedNames = results.failed.map(f => f.name).join(", ");
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.failed.length > 0) {
         // All failed
         const failedNames = results.failed.map(f => f.name).join(", ");
@@ -389,12 +373,10 @@ export function usePlugins() {
         await loadPlugins();
       }
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-          pluginInstallError.value = "";
-        }, 10000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+        pluginInstallError.value = "";
+      }, 10000);
     } catch (error) {
       pluginInstallError.value =
         error.response?.data?.detail || error.message || "Failed to install plugins from GitHub";
@@ -471,12 +453,10 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
 
     try {
       const response = await pluginsApi.installPluginFromLocal(localPath, pluginPath, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
-      pluginRequiresRestart.value = response.requires_restart || false;
       // Mark the installed plugin in-place so the list stays visible
       const installedId = response.manifest?.id || pluginPath;
       const idx = availablePlugins.value.findIndex(
@@ -492,11 +472,9 @@ export function usePlugins() {
 
       await loadPlugins();
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-        }, 5000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
       return [installedId];
     } catch (error) {
       pluginInstallError.value =
@@ -515,9 +493,8 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
 
-    const results = { success: [], failed: [], requiresRestart: false };
+    const results = { success: [], failed: [] };
 
     try {
       for (const plugin of plugins) {
@@ -528,7 +505,6 @@ export function usePlugins() {
             name: plugin.name || plugin.id,
             response,
           });
-          if (response.requires_restart) results.requiresRestart = true;
         } catch (error) {
           results.failed.push({
             id: plugin.id,
@@ -540,11 +516,9 @@ export function usePlugins() {
 
       if (results.success.length > 0 && results.failed.length === 0) {
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map(s => s.name).join(", ")}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.success.length > 0) {
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map(s => s.name).join(", ")}`;
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map(f => f.name).join(", ")}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else {
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map(f => `${f.name}: ${f.error}`).join("; ")}`;
       }
@@ -565,12 +539,10 @@ export function usePlugins() {
 
       if (results.success.length > 0) await loadPlugins();
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-          pluginInstallError.value = "";
-        }, 10000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+        pluginInstallError.value = "";
+      }, 10000);
     } catch (error) {
       pluginInstallError.value =
         error.response?.data?.detail ||
@@ -852,7 +824,6 @@ export function usePlugins() {
     availablePlugins,
     pluginInstallError,
     pluginInstallSuccess,
-    pluginRequiresRestart,
     pluginBranchSwitched,
     pluginActualBranch,
     expandedPlugins,
