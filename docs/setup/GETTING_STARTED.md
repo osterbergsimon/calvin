@@ -81,6 +81,53 @@ If you don't have `uv`/`node` installed, the Windows setup script
 (`scripts/setup-dev.sh`) install them for you. They are otherwise
 unnecessary.
 
+### Sample data
+
+Calvin can fill itself with realistic sample content — a calendar, photos and
+two dashboard pages — so you can try it, take screenshots, or run a demo
+before connecting any accounts. No accounts or internet access are needed,
+and nothing you created is touched:
+
+```bash
+# Dev stack: the compose stack keeps its data in docker/.calvin-dev-data.
+make demo-seed DATA_DIR=$PWD/docker/.calvin-dev-data
+
+# Native install: the same data dir the service uses (CALVIN_DATA_DIR, or
+# backend/data when unset).
+cd backend && uv run python -m app.demo seed
+
+# Remove exactly the seeded items again.
+make demo-clear DATA_DIR=$PWD/docker/.calvin-dev-data
+```
+
+For a Docker install, point `--data-dir` at the directory bind-mounted as
+`/var/lib/calvin`, or run the command inside the container.
+
+`seed` adds:
+
+- a sample calendar with events anchored to today (served by the backend at
+  `/api/demo/calendar.ics`, so it also works in Docker),
+- twelve small CC0 sample photos in the local photos source,
+- two pages — “calendar + photos” and “photo frame” — and the room name
+  “Demo Room”, but **only when you have no pages yet**,
+- a manifest at `<data-dir>/demo/manifest.json` marking every seeded item.
+
+`clear` reads that manifest and removes only those items, so your own
+calendars, photos, pages and room name survive both commands. Plugin
+instances load at startup, so restart Calvin after seeding or clearing to
+see the change.
+
+The two sample pages (and the room name) are only added when Calvin has no
+pages yet — seed **before** the first start if you want them, because a
+first start creates a default “Home” page. The calendar and photos are
+added either way.
+
+The equivalent commands are `uv run python -m app.demo seed|clear` from
+`backend/`; add `--data-dir DIR` to point at another data directory and
+`--calendar-url URL` if the backend is not reachable at
+`http://127.0.0.1:<API_PORT>`.
+
+
 ## Deployment
 
 Production runs in one of two shapes — see
