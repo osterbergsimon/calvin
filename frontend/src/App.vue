@@ -2,6 +2,7 @@
   <div id="app">
     <KeyboardHandler />
     <RouterView />
+    <ConnectionStatus v-if="!clockBarVisible" floating />
     <StatusRail />
     <OnScreenKeyboard />
     <AdminSignInDialog />
@@ -15,6 +16,8 @@ import KeyboardHandler from "./components/KeyboardHandler.vue";
 import StatusRail from "./components/StatusRail.vue";
 import OnScreenKeyboard from "./components/ui/OnScreenKeyboard.vue";
 import AdminSignInDialog from "./components/auth/AdminSignInDialog.vue";
+import ConnectionStatus from "./components/ConnectionStatus.vue";
+import { useClockBarVisible } from "./composables/useClockBarVisible";
 // Initialize photo frame mode globally
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally
@@ -28,6 +31,7 @@ usePhotoFrameMode();
 const theme = useTheme();
 const uiScale = useUiScale();
 const connectionStore = useConnectionStore();
+const clockBarVisible = useClockBarVisible();
 
 // Ensure theme is initialized immediately
 onMounted(() => {
