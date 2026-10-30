@@ -52,6 +52,7 @@ async def test_list_kiosks_shape(test_db):
         "lastAppliedVersion",
         "agentVersion",
         "agentUpdateStatus",
+        "agentUpdateMessage",
         "agentUpdateRequested",
     }
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
@@ -244,10 +245,16 @@ async def test_set_overrides_upserts_and_replaces(test_db):
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_agent_version_columns_roundtrip(test_db):
-    await KioskDB.objects.create(id="k-cols", agent_version="abc123", agent_update_status="ok")
+    await KioskDB.objects.create(
+        id="k-cols",
+        agent_version="abc123",
+        agent_update_status="ok",
+        agent_update_message="updated to abc123",
+    )
     row = await KioskDB.objects.get(id="k-cols")
     assert row.agent_version == "abc123"
     assert row.agent_update_status == "ok"
+    assert row.agent_update_message == "updated to abc123"
 
 
 @pytest.mark.asyncio
@@ -260,6 +267,26 @@ async def test_record_kiosk_stores_agent_report(test_db):
     row = next(r for r in rows if r["id"] == "k1")
     assert row["agentVersion"] == "v1"
     assert row["agentUpdateStatus"] == "ok"
+    assert row["agentUpdateMessage"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_stores_agent_update_message(test_db):
+    """The updater's message rides along with the status so the UI can tell a
+    python-too-old failure from a rollback (CLV-19)."""
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk(
+        "k1",
+        agent_version="v1",
+        agent_status="error",
+        agent_message="device python < 3.9; keeping current agent",
+    )
+    rows = await kr.list_kiosks()
+    row = next(r for r in rows if r["id"] == "k1")
+    assert row["agentUpdateStatus"] == "error"
+    assert row["agentUpdateMessage"] == "device python < 3.9; keeping current agent"
 
 
 @pytest.mark.asyncio

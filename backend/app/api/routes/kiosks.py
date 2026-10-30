@@ -125,6 +125,7 @@ async def get_kiosk_config(
     khost: str | None = None,
     kagent: str | None = None,
     kstat: str | None = None,
+    kmsg: str | None = None,
 ):
     """Return a kiosk's effective (merged) config; records the kiosk + its agent report."""
     _valid_id_or_400(kiosk_id)
@@ -142,6 +143,7 @@ async def get_kiosk_config(
             hostname=khost,
             agent_version=kagent,
             agent_status=kstat,
+            agent_message=kmsg,
             available_version=available,
         )
     except Exception as exc:
