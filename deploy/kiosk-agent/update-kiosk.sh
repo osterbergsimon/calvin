@@ -350,11 +350,13 @@ if [ -n "$min_py" ]; then
   fi
 fi
 # Emit one TAB-separated line per file: name sha256 mode target_path restart_unit enable
+# "-" stands in for an empty field: TAB is IFS whitespace, so a bare empty field
+# would collapse and shift the following ones under `read` (calvin-g4w6).
 files_tsv="$(printf '%s' "$manifest" | "$PYTHON" -c '
 import sys, json
 for f in json.load(sys.stdin)["files"]:
     print("\t".join([f["name"], f["sha256"], f["mode"], f["target_path"],
-                     f.get("restart_unit") or "", "1" if f.get("enable") else ""]))')"
+                     f.get("restart_unit") or "-", "1" if f.get("enable") else "-"]))')"
 
 write_state running fetch "checking bundle ${version}"
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
@@ -370,6 +372,7 @@ installed_sha() { [ -f "$1" ] && sha256sum "$1" | cut -d' ' -f1 || echo ""; }
 
 while IFS=$'\t' read -r name sha mode target unit enable; do
   [ -n "$name" ] || continue
+  [ "$unit" = "-" ] && unit=""   # placeholder for an empty manifest field
   if ! name_allowed "$name"; then
     write_state error verify "file name not allowed: $name" "$version"
     log "file name not allowed: $name"; exit 1
