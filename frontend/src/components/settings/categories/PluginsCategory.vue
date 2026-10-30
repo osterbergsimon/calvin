@@ -1,31 +1,5 @@
 <template>
   <div class="plugins-category">
-    <!-- Plugin Installation Section -->
-    <SettingsSection id="plugins-install" title="Install">
-      <PluginInstaller
-        :repo-url="githubRepoUrl"
-        :branch="githubBranch"
-        :enumerating="enumeratingPlugins"
-        :installing="installingPlugin"
-        :available-plugins="availablePlugins"
-        :error="pluginInstallError"
-        :success="pluginInstallSuccess"
-        :branch-switched="pluginBranchSwitched"
-        :actual-branch="pluginActualBranch"
-        :dev-mode="configStore.devMode"
-        :initial-type="installKindFilter"
-        @update:repoUrl="githubRepoUrl = $event"
-        @update:branch="githubBranch = $event"
-        @zip-select="handleZipSelect"
-        @list-plugins="handleListPlugins"
-        @install="handleInstall"
-        @install-selected="handleInstallSelected"
-        @install-local="handleInstallLocal"
-        @install-selected-local="handleInstallSelectedLocal"
-        @force-update="handleForceUpdate"
-      />
-    </SettingsSection>
-
     <!-- Plugin Management -->
     <SettingsSection id="plugins-installed" title="Installed">
       <PluginManager
@@ -60,6 +34,32 @@
         @open-appearance="openAppearance"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
+      />
+    </SettingsSection>
+
+    <!-- Plugin Installation Section -->
+    <SettingsSection id="plugins-install" title="Install">
+      <PluginInstaller
+        :repo-url="githubRepoUrl"
+        :branch="githubBranch"
+        :enumerating="enumeratingPlugins"
+        :installing="installingPlugin"
+        :available-plugins="availablePlugins"
+        :error="pluginInstallError"
+        :success="pluginInstallSuccess"
+        :branch-switched="pluginBranchSwitched"
+        :actual-branch="pluginActualBranch"
+        :dev-mode="configStore.devMode"
+        :initial-type="installKindFilter"
+        @update:repoUrl="githubRepoUrl = $event"
+        @update:branch="githubBranch = $event"
+        @zip-select="handleZipSelect"
+        @list-plugins="handleListPlugins"
+        @install="handleInstall"
+        @install-selected="handleInstallSelected"
+        @install-local="handleInstallLocal"
+        @install-selected-local="handleInstallSelectedLocal"
+        @force-update="handleForceUpdate"
       />
     </SettingsSection>
 
