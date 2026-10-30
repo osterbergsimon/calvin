@@ -21,7 +21,7 @@ help:
 	@echo "  make test-scripts   - Test setup scripts (requires bats)"
 	@echo "  make lint           - Run linters (native)"
 	@echo "  make format         - Format code (native)"
-	@echo "  make type-check     - Run type checkers (native)"
+	@echo "  make type-check     - Run type checkers (native; vue-tsc covers src/api only)"
 	@echo "  make build          - Build the production docker image"
 	@echo "  make clean          - Tear down dev stack and remove dev data"
 
@@ -79,6 +79,9 @@ format:
 	cd backend && uv run ruff format .
 	cd frontend && npm run format
 
+# Frontend type-checking is narrow on purpose: vue-tsc covers the typed API
+# layer (frontend/src/api, including the generated types.ts) only. The rest of
+# the frontend is JavaScript and .vue files are not checked yet.
 type-check:
 	cd backend && uv run mypy app/
 	cd frontend && npm run type-check

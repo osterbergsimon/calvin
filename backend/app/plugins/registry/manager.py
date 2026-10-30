@@ -101,7 +101,32 @@ async def register_plugin(
             logger.exception("Failed to mark plugin {} disabled", plugin_id)
     else:
         if plugin.enabled:
+            # Mirror plugin_manager.start_plugin(): a newly created backend
+            # plugin must start its worker and scheduled tasks now, not wait for
+            # the next restart (calvin-qq4l).
+            from app.plugins.protocols import BackendPlugin
+            from app.services.backend_scheduler import backend_plugin_scheduler
+
+            if isinstance(plugin, BackendPlugin):
+                try:
+                    await plugin.start_worker()
+                except NotImplementedError:
+                    # Plugin doesn't implement start_worker, that's fine
+                    pass
+                except Exception:
+                    logger.opt(exception=True).warning(
+                        "Error starting worker for backend plugin {}", plugin_id
+                    )
+
             plugin.start()
+
+            if isinstance(plugin, BackendPlugin):
+                try:
+                    await backend_plugin_scheduler.register_plugin_tasks(plugin)
+                except Exception:
+                    logger.exception(
+                        "Error registering scheduled tasks for backend plugin {}", plugin_id
+                    )
 
     return plugin
 

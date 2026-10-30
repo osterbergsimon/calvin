@@ -71,6 +71,11 @@ make format        # ruff format + prettier
 make type-check    # mypy + vue-tsc
 ```
 
+`make type-check` type-checks the backend with mypy and the frontend with
+`vue-tsc`, but the frontend scope is deliberately narrow: only `src/api/`
+(including the generated `types.ts`) is checked. The rest of the frontend is
+JavaScript, so `.vue` and `.js` files are not type-checked yet.
+
 If you don't have `uv`/`node` installed, the Windows setup script
 (`.\setup-windows.ps1`) and the Linux dev script
 (`scripts/setup-dev.sh`) install them for you. They are otherwise
