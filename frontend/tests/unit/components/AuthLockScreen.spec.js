@@ -31,7 +31,20 @@ describe("AuthLockScreen", () => {
 
     expect(wrapper.text()).toContain("Choose an admin password");
     expect(wrapper.text()).toContain("Anyone on your network who knows it can change Calvin.");
+    expect(wrapper.text()).toContain("Setup code");
+    expect(wrapper.text()).toContain("Find it in Calvin's server log or on the kiosk screen.");
     expect(wrapper.text()).toContain("Repeat password");
+  });
+
+  it("shows the code on the setup screen when the server allows it (loopback kiosk)", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    api.get.mockResolvedValueOnce({ data: { code: "ABCD-EFGH" } });
+
+    const wrapper = mountLock();
+    await flushPromises();
+
+    expect(wrapper.get("[data-test='setup-code-shown']").text()).toContain("ABCD-EFGH");
   });
 
   it("renders the sign-in variant when configured but locked", () => {
@@ -60,6 +73,7 @@ describe("AuthLockScreen", () => {
     auth.applyStatus({ configured: false, authenticated: false });
     const wrapper = mountLock();
 
+    await wrapper.get("#auth-setup-code").setValue("ABCD-EFGH");
     await wrapper.get("#auth-setup-password").setValue("short");
     await wrapper.get("#auth-setup-repeat").setValue("short");
     await wrapper.get("form").trigger("submit");
@@ -69,12 +83,61 @@ describe("AuthLockScreen", () => {
     expect(api.post).not.toHaveBeenCalled();
   });
 
+  it("requires the setup code before sending a request", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    const wrapper = mountLock();
+
+    await wrapper.get("#auth-setup-password").setValue("correct horse");
+    await wrapper.get("#auth-setup-repeat").setValue("correct horse");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Enter the setup code.");
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("sends the setup code with the new password", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    api.post.mockResolvedValueOnce({ data: { ok: true } });
+    const wrapper = mountLock();
+
+    await wrapper.get("#auth-setup-code").setValue("ABCD-EFGH");
+    await wrapper.get("#auth-setup-password").setValue("correct horse");
+    await wrapper.get("#auth-setup-repeat").setValue("correct horse");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(api.post).toHaveBeenCalledWith("/auth/setup", {
+      password: "correct horse",
+      code: "ABCD-EFGH",
+    });
+  });
+
+  it("shows a field error for a wrong setup code", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    api.post.mockRejectedValueOnce(httpError(403, { code: "bad_setup_code" }));
+    const wrapper = mountLock();
+
+    await wrapper.get("#auth-setup-code").setValue("AAAA-BBBB");
+    await wrapper.get("#auth-setup-password").setValue("correct horse");
+    await wrapper.get("#auth-setup-repeat").setValue("correct horse");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("That's not the setup code.");
+    expect(wrapper.get("#auth-setup-code").element.value).toBe("AAAA-BBBB");
+  });
+
   it("switches setup to sign-in with the warn banner on 409", async () => {
     const auth = useAuthStore();
     auth.applyStatus({ configured: false, authenticated: false });
     api.post.mockRejectedValueOnce(httpError(409, { code: "already_configured" }));
     const wrapper = mountLock();
 
+    await wrapper.get("#auth-setup-code").setValue("ABCD-EFGH");
     await wrapper.get("#auth-setup-password").setValue("correct horse");
     await wrapper.get("#auth-setup-repeat").setValue("correct horse");
     await wrapper.get("form").trigger("submit");

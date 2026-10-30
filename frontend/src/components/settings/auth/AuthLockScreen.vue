@@ -58,6 +58,14 @@
         <p v-if="notice" class="auth-banner auth-banner--warn" role="status">{{ notice }}</p>
         <p v-else-if="!oskCollapsed" class="auth-card__lead">{{ lead }}</p>
 
+        <p
+          v-if="mode === 'setup' && shownSetupCode && !oskCollapsed"
+          class="auth-card__setup-code"
+          data-test="setup-code-shown"
+        >
+          Setup code: <code>{{ shownSetupCode }}</code>
+        </p>
+
         <!-- Password managers attach saved passwords to one consistent account. -->
         <input
           class="auth-card__username"
@@ -81,6 +89,17 @@
         <p class="auth-card__live" aria-live="polite">{{ liveMessage }}</p>
 
         <div v-if="mode === 'setup'" class="auth-card__fields">
+          <PasswordField
+            ref="codeField"
+            v-model="setupCode"
+            type="text"
+            label="Setup code"
+            autocomplete="one-time-code"
+            hint="Find it in Calvin's server log or on the kiosk screen."
+            :error="error3"
+            :disabled="submitting || rateLocked"
+            input-id="auth-setup-code"
+          />
           <PasswordField
             ref="firstField"
             v-model="password"
@@ -191,19 +210,23 @@ const lead = computed(() =>
 
 const password = ref("");
 const repeat = ref("");
+const setupCode = ref("");
 const revealed = ref(false);
 const error1 = ref("");
 const error2 = ref("");
+const error3 = ref("");
 const notice = ref("");
 const networkError = ref(false);
 const submitting = ref(false);
 const retrying = ref(false);
+const shownSetupCode = ref("");
 
 const submitLabel = computed(() => {
   if (mode.value === "setup") return submitting.value ? "Setting password…" : "Set password";
   return submitting.value ? "Signing in…" : "Sign in";
 });
 
+const codeField = ref(null);
 const firstField = ref(null);
 const secondField = ref(null);
 
@@ -219,7 +242,7 @@ watch(rateLocked, lockedNow => {
     liveMessage.value = "Too many wrong passwords.";
   } else if (liveMessage.value) {
     liveMessage.value = "You can try again now.";
-    nextTick(() => firstField.value?.focus());
+    nextTick(() => focusField());
   }
 });
 
@@ -257,15 +280,26 @@ onUnmounted(() => {
 
 // ── Focus: autofocus only on non-touch (a kiosk keyboard would pop unasked) ──
 function focusField() {
-  nextTick(() => firstField.value?.focus());
+  nextTick(() => {
+    if (mode.value === "setup") codeField.value?.focus();
+    else firstField.value?.focus();
+  });
 }
+
+/** The kiosk screen may show the code itself when the server allows it (loopback). */
+async function loadSetupCode() {
+  shownSetupCode.value = (await auth.fetchSetupCode()) || "";
+}
+
 watch(
   () => auth.status,
   value => {
+    if (value === "setup") loadSetupCode();
     if (!isTouch.value && (value === "setup" || value === "locked")) focusField();
   }
 );
 onMounted(() => {
+  if (auth.status === "setup") loadSetupCode();
   if (!isTouch.value && (auth.status === "setup" || auth.status === "locked")) focusField();
 });
 
@@ -274,6 +308,9 @@ watch(password, () => {
 });
 watch(repeat, () => {
   error2.value = "";
+});
+watch(setupCode, () => {
+  error3.value = "";
 });
 
 function onFirstBlur() {
@@ -287,6 +324,11 @@ function onSecondBlur() {
 }
 
 function validateSetup() {
+  if (!setupCode.value.trim()) {
+    error3.value = "Enter the setup code.";
+    nextTick(() => codeField.value?.focus());
+    return false;
+  }
   if ([...password.value].length < 8) {
     error1.value = "Use at least 8 characters.";
     nextTick(() => firstField.value?.focus());
@@ -303,8 +345,10 @@ function validateSetup() {
 function resetSetupFields() {
   password.value = "";
   repeat.value = "";
+  setupCode.value = "";
   error1.value = "";
   error2.value = "";
+  error3.value = "";
   revealed.value = false;
 }
 
@@ -327,6 +371,7 @@ async function submit() {
 function submitBannerClear() {
   error1.value = "";
   error2.value = "";
+  error3.value = "";
 }
 
 async function submitSetup() {
@@ -334,7 +379,7 @@ async function submitSetup() {
 
   submitting.value = true;
   try {
-    await auth.setup(password.value);
+    await auth.setup(password.value, setupCode.value.trim());
     resetSetupFields();
     notifications.notify({ severity: "success", message: "Admin password set." });
   } catch (err) {
@@ -346,6 +391,9 @@ async function submitSetup() {
         "Someone else set the admin password a moment ago. Sign in with it, or ask them for it.";
       resetSetupFields();
       focusField();
+    } else if (code === "bad_setup_code") {
+      error3.value = "That's not the setup code.";
+      nextTick(() => codeField.value?.focus());
     } else if (err?.response?.status === 422 || err?.response?.status === 400) {
       const detail = err.response?.data?.detail;
       error1.value =
@@ -457,6 +505,11 @@ async function submitLogin() {
   margin: 0 0 20px;
   font-size: 0.95rem;
   line-height: 1.45;
+  color: var(--ink-2);
+}
+.auth-card__setup-code {
+  margin: 0 0 16px;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .auth-card__username {

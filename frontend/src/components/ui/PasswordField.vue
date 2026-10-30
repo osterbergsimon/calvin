@@ -7,7 +7,7 @@
         ref="inputEl"
         class="password-field__input"
         :class="{ 'password-field__input--invalid': error }"
-        :type="revealed ? 'text' : 'password'"
+        :type="type === 'password' && !revealed ? 'password' : 'text'"
         :value="modelValue"
         :autocomplete="autocomplete"
         :disabled="disabled"
@@ -20,7 +20,7 @@
         @blur="$emit('blur', $event)"
       />
       <button
-        v-if="showToggle"
+        v-if="showToggle && type === 'password'"
         type="button"
         class="password-field__toggle"
         :aria-pressed="revealed ? 'true' : 'false'"
@@ -46,6 +46,8 @@ const props = defineProps({
   modelValue: { type: String, default: "" },
   label: { type: String, required: true },
   autocomplete: { type: String, default: "current-password" },
+  // "text" for a visible one-off value such as the setup code; no Show toggle then.
+  type: { type: String, default: "password" },
   hint: { type: String, default: "" },
   error: { type: String, default: "" },
   disabled: { type: Boolean, default: false },

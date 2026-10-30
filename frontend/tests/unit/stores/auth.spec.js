@@ -53,11 +53,29 @@ describe("auth store", () => {
     auth.applyStatus({ configured: false, authenticated: false });
     api.post.mockResolvedValueOnce({ data: { ok: true } });
 
-    await auth.setup("correct horse");
+    await auth.setup("correct horse", "ABCD-EFGH");
 
-    expect(api.post).toHaveBeenCalledWith("/auth/setup", { password: "correct horse" });
+    expect(api.post).toHaveBeenCalledWith("/auth/setup", {
+      password: "correct horse",
+      code: "ABCD-EFGH",
+    });
     expect(auth.status).toBe("authenticated");
     expect(auth.configured).toBe(true);
+  });
+
+  it("reads the one-time setup code when the server allows it", async () => {
+    const auth = useAuthStore();
+    api.get.mockResolvedValueOnce({ data: { code: "ABCD-EFGH" } });
+
+    await expect(auth.fetchSetupCode()).resolves.toBe("ABCD-EFGH");
+    expect(api.get).toHaveBeenCalledWith("/auth/setup-code");
+  });
+
+  it("returns null when the setup code is not available (not loopback)", async () => {
+    const auth = useAuthStore();
+    api.get.mockRejectedValueOnce(httpError(403, { code: "loopback_only" }));
+
+    await expect(auth.fetchSetupCode()).resolves.toBe(null);
   });
 
   it("turns a 409 setup into the sign-in variant", async () => {
@@ -65,7 +83,7 @@ describe("auth store", () => {
     auth.applyStatus({ configured: false, authenticated: false });
     api.post.mockRejectedValueOnce(httpError(409, { code: "already_configured" }));
 
-    const error = await auth.setup("correct horse").catch(e => e);
+    const error = await auth.setup("correct horse", "ABCD-EFGH").catch(e => e);
 
     expect(auth.status).toBe("locked");
     expect(auth.configured).toBe(true);
