@@ -281,6 +281,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
+import { logError } from "@/utils/logger";
 import {
   MAX_TOP_REGIONS,
   addTopRegion,
@@ -352,17 +353,14 @@ const kioskOptions = computed(() => [
 const previewKiosk = computed(
   () => kiosksStore.kiosks.find(k => k.id === previewKioskId.value) || null
 );
+// GET /kiosks carries no overrides, so they're fetched when a kiosk is picked.
+const previewOverrides = ref({});
 const previewKioskName = computed(
   () => previewKiosk.value?.hostname || previewKiosk.value?.id || ""
 );
-const orientation = computed(
-  () => previewKiosk.value?.overrides?.orientation || orientationConfig.value
-);
+const orientation = computed(() => previewOverrides.value.orientation || orientationConfig.value);
 const previewFlipped = computed(
-  () =>
-    previewKiosk.value?.overrides?.orientationFlipped ??
-    configValue.value.orientationFlipped ??
-    false
+  () => previewOverrides.value.orientationFlipped ?? configValue.value.orientationFlipped ?? false
 );
 const orientationBadge = computed(
   () =>
@@ -371,7 +369,7 @@ const orientationBadge = computed(
     (previewFlipped.value ? " · 180°" : "")
 );
 const mismatch = computed(() => {
-  const avail = previewKiosk.value?.overrides?.availableScreens;
+  const avail = previewOverrides.value.availableScreens;
   return Array.isArray(avail) && !avail.includes(activeScreenId.value);
 });
 const stageTag = computed(() =>
@@ -664,7 +662,17 @@ const stopResize = () => {
   window.removeEventListener("pointermove", onResizeMove);
 };
 
-const setPreviewKiosk = id => (previewKioskId.value = id);
+const setPreviewKiosk = async id => {
+  previewKioskId.value = id;
+  previewOverrides.value = {};
+  if (id === GLOBAL) return;
+  try {
+    const overrides = await kiosksStore.fetchOverrides(id);
+    if (previewKioskId.value === id) previewOverrides.value = overrides || {};
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to load kiosk overrides:", err);
+  }
+};
 
 /* keep selection valid when screen changes */
 watch(activeScreenId, () => (selectedRegionId.value = null));
