@@ -463,6 +463,10 @@ const setAnyBrowserOrientation = next => {
   // Preview-only: never emitted, never saved.
   anyBrowserOrientation.value = next;
 };
+// The shared orientation can hydrate after the editor mounts.
+watch(orientationConfig, next => {
+  if (previewScreenId.value === ANY_BROWSER) anyBrowserOrientation.value = next;
+});
 
 /* --- layout direction + clock bar --- */
 const layoutDir = computed(() => getLayoutDirection(activeScreen.value.layout, orientation.value));
