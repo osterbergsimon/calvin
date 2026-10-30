@@ -6,7 +6,6 @@
     </div>
 
     <section class="ins-group">
-      <h3 class="ins-h">Page</h3>
       <label class="ins-field">
         <span class="ins-label">Name</span>
         <input

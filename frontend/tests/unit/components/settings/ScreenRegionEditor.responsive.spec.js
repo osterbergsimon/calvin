@@ -152,7 +152,10 @@ describe("ScreenRegionEditor size classes", () => {
     await resize(w, ".sre-modal", 800, 480);
     const caption = w.find('[data-test="orientation-caption"]');
     expect(caption.exists()).toBe(true);
-    expect(caption.text()).toBe(w.find('[data-test="orientation-badge"]').text());
+    // Any browser owns its orientation through the toggle, so the caption
+    // carries the value where the badge would otherwise sit.
+    expect(caption.text()).toBe("Landscape");
+    expect(w.find('[data-test="orientation-badge"]').exists()).toBe(false);
   });
 });
 

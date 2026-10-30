@@ -87,7 +87,13 @@
               aria-label="Preview orientation"
               @update:model-value="setAnyBrowserOrientation"
             />
-            <Tag class="sre-orient-badge" data-test="orientation-badge">{{ orientationBadge }}</Tag>
+            <Tag
+              v-if="previewScreenId !== ANY_BROWSER"
+              class="sre-orient-badge"
+              data-test="orientation-badge"
+            >
+              {{ orientationBadge }}
+            </Tag>
           </div>
         </div>
 
