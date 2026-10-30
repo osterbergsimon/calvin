@@ -29,13 +29,13 @@ feature PR ──▶ develop ──(CI passes)──▶ promote PR ──▶ mai
    (`feat:`, `fix:`, `docs:`, `chore:`, …) — release-please reads them to build
    the changelog and pick the version.
 2. **CI succeeds on `develop`.**
-   [`promote-develop-to-main.yml`](../.github/workflows/promote-develop-to-main.yml)
+   [`promote-develop-to-main.yml`](https://github.com/osterbergsimon/calvin/blob/develop/.github/workflows/promote-develop-to-main.yml)
    opens (or updates) the **Promote develop to main** PR. Merging it is a
    release-candidate step: `main` now builds exactly what passed CI on
    `develop`. Merge it as a **merge commit**, not a squash — `main` must stay a
    descendant of `develop` or the next promotion conflicts.
 3. **release-please opens the release PR.** Every push to `main` runs
-   [`release-please.yml`](../.github/workflows/release-please.yml)
+   [`release-please.yml`](https://github.com/osterbergsimon/calvin/blob/develop/.github/workflows/release-please.yml)
    (`googleapis/release-please-action`). It maintains a single PR titled
    `chore(main): release X.Y.Z` containing:
    - the new `CHANGELOG.md` section, grouped by commit type,
@@ -50,7 +50,7 @@ feature PR ──▶ develop ──(CI passes)──▶ promote PR ──▶ mai
    - the GitHub Release with the changelog as its body.
 5. **Images publish.** A tag created with `GITHUB_TOKEN` does not trigger
    another workflow's `push: tags` event, so the release workflow dispatches
-   [`docker-build.yml`](../.github/workflows/docker-build.yml) at the new tag.
+   [`docker-build.yml`](https://github.com/osterbergsimon/calvin/blob/develop/.github/workflows/docker-build.yml) at the new tag.
    That build publishes the release images (below). Watch it under **Actions →
    Build and Push Docker Image**.
 
@@ -64,7 +64,7 @@ cannot find it as its predecessor.
   patch, a breaking change bumps the minor (never to `1.0.0` on its own —
   `bump-minor-pre-major` is on).
 - `0.1.0` is the starting version in
-  [`.release-please-manifest.json`](../.release-please-manifest.json). The
+  [`.release-please-manifest.json`](https://github.com/osterbergsimon/calvin/blob/develop/.release-please-manifest.json). The
   first release PR proposes the next 0.x version from the commits since the
   repository began, so its changelog covers the project history up to that
   point.
