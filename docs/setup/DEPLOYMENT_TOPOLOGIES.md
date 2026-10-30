@@ -88,10 +88,11 @@ the same Docker compose used in Mode A:
 
 ```bash
 # On the server (any Linux box with Docker):
-git clone -b develop https://github.com/osterbergsimon/calvin.git
+# v0.1.0 = the release you want; use develop only to test the next one.
+git clone -b v0.1.0 https://github.com/osterbergsimon/calvin.git
 cd calvin
 cp deploy/calvin.env.example docker/.env
-# Edit docker/.env — set CALVIN_PORT, DATABASE_URL, etc. as needed.
+# Edit docker/.env — set CALVIN_IMAGE_TAG=v0.1.0, CALVIN_PORT, DATABASE_URL, etc.
 docker compose -f docker/docker-compose.yml up -d
 ```
 
