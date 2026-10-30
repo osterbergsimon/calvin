@@ -170,9 +170,11 @@
   --scrim-strong: rgba(0, 0, 0, 0.75);
   --on-scrim: #ffffff;
   /* Calendar chips are painted in a user-chosen calendar colour, so their
-     ink and separators are fixed light-on-colour (see CalendarEventItem). */
+     ink and separators are fixed light-on-colour (see CalendarEventItem).
+     Light chips (yellow, mint, …) take the dark ink instead: useEventHelpers
+     picks between the two by the colour's luminance. */
   --on-event-ink: #ffffff;
-  --on-event-edge: color-mix(in srgb, var(--on-event-ink) 30%, transparent);
+  --on-event-ink-dark: #10151a;
   /* QR codes are read by cameras: always dark modules on a light quiet zone. */
   --qr-surface: #ffffff;
   /* mask-image needs a fully opaque stop; it is alpha, not colour. */

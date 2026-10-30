@@ -10,7 +10,7 @@
       'event-middle': event._isMiddle,
       'event-multi-day': event._isMultiDay,
     }"
-    :style="{ backgroundColor: eventColor }"
+    :style="{ backgroundColor: eventColor, '--on-event': eventInk }"
     :title="eventTitle"
     tabindex="0"
     @click="handleClick"
@@ -61,7 +61,8 @@ const props = defineProps({
 
 const emit = defineEmits(["click", "focus"]);
 
-const { getEventColor, getEventTitle, getEventDisplayText, truncateEventTitle } = useEventHelpers();
+const { getEventColor, getEventInk, getEventTitle, getEventDisplayText, truncateEventTitle } =
+  useEventHelpers();
 
 const eventItemRef = ref(null);
 
@@ -75,6 +76,7 @@ defineExpose({
 
 // Computed properties
 const eventColor = computed(() => getEventColor(props.event));
+const eventInk = computed(() => getEventInk?.(props.event) || "var(--on-event-ink)");
 const eventTitle = computed(() => getEventTitle(props.event));
 const displayText = computed(() => getEventDisplayText(props.event));
 const truncatedTitle = computed(() => truncateEventTitle(props.event.title, 15));
@@ -97,7 +99,7 @@ const handleFocus = () => {
   font-size: var(--fs-2xs);
   padding: 0.25rem 0.5rem;
   border-radius: var(--radius-xs);
-  color: var(--on-event-ink);
+  color: var(--on-event, var(--on-event-ink));
   white-space: normal;
   overflow-wrap: break-word;
   word-wrap: break-word;
@@ -129,7 +131,7 @@ const handleFocus = () => {
   /* Reduce negative margin to prevent grid expansion */
   margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
-  border-right: 1px dashed var(--on-event-edge);
+  border-right: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margin doesn't cause cell expansion */
   position: relative;
 }
@@ -142,7 +144,7 @@ const handleFocus = () => {
   /* Reduce negative margin to prevent grid expansion */
   margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
-  border-left: 1px dashed var(--on-event-edge);
+  border-left: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margin doesn't cause cell expansion */
   position: relative;
 }
@@ -153,8 +155,8 @@ const handleFocus = () => {
   margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
-  border-left: 1px dashed var(--on-event-edge);
-  border-right: 1px dashed var(--on-event-edge);
+  border-left: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margins don't cause cell expansion */
   position: relative;
 }
@@ -204,18 +206,18 @@ const handleFocus = () => {
 }
 
 .event-item:focus {
-  outline: 2px solid var(--on-event-ink); /* Keep white for contrast on colored event backgrounds */
+  outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
-  border-color: var(--on-event-ink); /* Keep white for contrast on colored event backgrounds */
+  border-color: var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 2px var(--focus);
   z-index: 10;
   position: relative;
 }
 
 .event-item.focused {
-  outline: 2px solid var(--on-event-ink); /* Keep white for contrast on colored event backgrounds */
+  outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
-  border-color: var(--on-event-ink); /* Keep white for contrast on colored event backgrounds */
+  border-color: var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 2px var(--focus);
   z-index: 10;
   position: relative;
@@ -228,7 +230,7 @@ const handleFocus = () => {
 }
 
 .event-item.selected {
-  border: 2px solid var(--on-event-ink);
+  border: 2px solid var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 80%, transparent);
 }
 

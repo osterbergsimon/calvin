@@ -158,7 +158,9 @@ const handleFocus = () => emit("focus", props.ribbon);
 .ribbon-chevron {
   flex-shrink: 0;
   font-weight: 700;
-  color: var(--ribbon-hue);
+  /* A raw hue can be too light to read (yellow): pull it toward the theme ink,
+     the same 55% mix the tone-text tokens use. */
+  color: color-mix(in srgb, var(--ribbon-hue) 55%, var(--ink));
   opacity: 0.9;
 }
 
