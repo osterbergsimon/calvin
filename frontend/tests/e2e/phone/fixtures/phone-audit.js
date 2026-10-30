@@ -90,14 +90,7 @@ async function collectProblems(page, scope) {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      const isVisible = el => {
-        const style = getComputedStyle(el);
-        if (style.display === "none" || style.visibility === "hidden") return false;
-        if (Number(style.opacity) === 0) return false;
-        const rect = el.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) return false;
-        // Clipped away by a scrolling/collapsing ancestor (a collapsed sheet,
-        // the category rail): it cannot be seen or tapped.
+      const clippedAway = (el, rect) => {
         for (
           let node = el.parentElement;
           node && node !== document.body;
@@ -112,10 +105,21 @@ async function collectProblems(page, scope) {
             rect.right <= nr.left + 1 ||
             rect.left >= nr.right - 1
           ) {
-            return false;
+            return true;
           }
         }
-        return true;
+        return false;
+      };
+
+      const isVisible = el => {
+        const style = getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        if (Number(style.opacity) === 0) return false;
+        const rect = el.getBoundingClientRect();
+        if (rect.width <= 0 || rect.height <= 0) return false;
+        // Clipped away by a scrolling/collapsing ancestor (a collapsed sheet,
+        // the category rail): it cannot be seen or tapped.
+        return !clippedAway(el, rect);
       };
 
       const dialogs = [
@@ -203,6 +207,10 @@ async function collectProblems(page, scope) {
 
         el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
         const rect = el.getBoundingClientRect();
+        // Scrolling may have pulled a clipped control into a collapsed
+        // container (the pages editor's 64px sheet peek): it is not reachable,
+        // but that is the container's resting state, not a layout bug.
+        if (clippedAway(el, rect)) continue;
         if (rect.right <= 1 || rect.left >= vw - 1 || rect.bottom <= 1 || rect.top >= vh - 1) {
           problems.push(`control offscreen after scrolling to it: ${describeElement(el)}`);
           continue;
