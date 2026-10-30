@@ -26,7 +26,7 @@ export default [
       "vue/multi-word-component-names": [
         "error",
         {
-          ignores: ["Dashboard", "Settings"],
+          ignores: ["Dashboard", "Settings", "Tag"],
         },
       ],
       // Allow unused variables that start with underscore

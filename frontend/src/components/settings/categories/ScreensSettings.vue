@@ -133,14 +133,15 @@
                 >
                   {{ isOnline(k) ? "● Online" : "○ Offline" }}
                 </span>
-                <span
+                <Tag
                   v-if="isPending(k)"
                   class="screen-card__badge"
+                  tone="warn"
                   data-test="kiosk-pending-badge"
                   role="img"
                   :aria-label="`${k.id}: offline, hardware config not yet applied`"
                   title="Offline — this screen hasn't applied the current hardware config yet"
-                  >⚠</span
+                  >⚠</Tag
                 >
               </span>
               <span class="screen-card__id" data-test="screen-id">{{ k.id }}</span>
@@ -631,6 +632,7 @@ import {
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
@@ -1330,12 +1332,12 @@ onUnmounted(() => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screens__add:hover {
@@ -1362,7 +1364,7 @@ onUnmounted(() => {
   color: inherit;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   cursor: pointer;
 }
 /* The Default is a real screen now: no dashed "shared" treatment. */
@@ -1420,10 +1422,6 @@ onUnmounted(() => {
 .screen-card__status.is-offline {
   color: var(--ink-3);
 }
-.screen-card__badge {
-  font-size: var(--fs-xs);
-  color: var(--warn);
-}
 .screen-card__software {
   font-size: var(--fs-sm);
   color: var(--ink-2);
@@ -1442,7 +1440,7 @@ onUnmounted(() => {
 /* Kiosk software summary row (CLV-19). */
 .kiosk-software__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -1450,12 +1448,12 @@ onUnmounted(() => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .kiosk-software__btn:hover:not(:disabled) {
@@ -1486,7 +1484,7 @@ onUnmounted(() => {
   border: none;
   color: var(--ink-2);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .screens__back:hover {
@@ -1532,11 +1530,10 @@ onUnmounted(() => {
 }
 .screen-pages__scope-label {
   margin: 0;
-  font-family: var(--font-data);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
 }
 .screen-pages__start-scope {
   display: flex;
@@ -1554,7 +1551,7 @@ onUnmounted(() => {
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screen-page {
@@ -1585,7 +1582,7 @@ onUnmounted(() => {
   min-width: 0;
 }
 .screen-page__name {
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
 }
@@ -1627,7 +1624,7 @@ onUnmounted(() => {
 }
 .screen-software__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -1645,7 +1642,7 @@ onUnmounted(() => {
   padding: 1rem 1.25rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 .screen-footer__copy {
   margin: 0;
@@ -1661,12 +1658,12 @@ onUnmounted(() => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screen-footer__btn--ghost {

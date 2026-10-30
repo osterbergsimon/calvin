@@ -87,6 +87,21 @@ describe("ScreenRegionEditor preview on a screen", () => {
     const { w } = await mountEditor({ kiosks: [{ id: "hall", hostname: "pi-hall" }] });
     expect(w.find(".pill__label").text()).toBe("Any browser");
     expect(w.find(".sre-orient-toggle").exists()).toBe(true);
+    expect(w.find('[data-test="orientation-badge"]').exists()).toBe(false);
+  });
+
+  it("shows the orientation toggle for Any browser and the badge for a screen, never both", async () => {
+    const { w } = await mountEditor({ kiosks: [{ id: "hall", hostname: "pi-hall" }] });
+    expect(w.find(".sre-orient-toggle").exists()).toBe(true);
+    expect(w.find('[data-test="orientation-badge"]').exists()).toBe(false);
+
+    await selectPreview(w, "hall");
+    expect(w.find(".sre-orient-toggle").exists()).toBe(false);
+    expect(w.find('[data-test="orientation-badge"]').exists()).toBe(true);
+
+    await selectPreview(w, "__global");
+    expect(w.find(".sre-orient-toggle").exists()).toBe(true);
+    expect(w.find('[data-test="orientation-badge"]').exists()).toBe(false);
   });
 
   it("names a screen by displayName, then hostname, then id", async () => {
@@ -149,7 +164,8 @@ describe("ScreenRegionEditor preview on a screen", () => {
     const portrait = w.findAll(".sre-orient-toggle .seg__btn").find(b => b.text() === "Portrait");
     await portrait.trigger("click");
     expect(device(w).classes()).toContain("portrait");
-    expect(badge(w)).toBe("Portrait");
+    // The toggle owns the Any-browser state; the badge is only for a screen.
+    expect(w.find('[data-test="orientation-badge"]').exists()).toBe(false);
     expect(w.emitted("update:config")).toBeUndefined();
   });
 });
@@ -178,7 +194,7 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
       ],
     });
     const lines = w.findAll('[data-test="page-screens"]').map(n => n.text());
-    expect(lines).toEqual(["Kitchen · Hallway", "Office"]);
+    expect(lines).toEqual(["Kitchen, Hallway", "Office"]);
   });
 
   it("says All screens when every screen shows the page", async () => {
@@ -204,8 +220,8 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
       kiosks: [{ id: "hall", overrides: { availableScreens: [] } }],
     });
     expect(w.findAll('[data-test="page-screens"]').map(n => n.text())).toEqual([
-      "Not on any screen",
-      "Not on any screen",
+      "Not shown",
+      "Not shown",
     ]);
   });
 

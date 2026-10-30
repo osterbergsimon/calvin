@@ -306,13 +306,11 @@ const choose = provider => {
 
 .pp-group {
   margin: 0;
-  padding: 0.9rem 1.5rem 0;
+  padding: var(--space-xl) var(--space-3xl) 0;
   font-family: var(--font-ui);
-  font-size: 0.75rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink);
 }
 
 .pp-install {
