@@ -13,6 +13,7 @@ import {
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
+import { migrateDisplaySettings } from "../utils/displaySettingsMigration";
 import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
 
 // The config is what a kiosk boots from, so its offline copy is kept for a day
@@ -234,6 +235,34 @@ export const useConfigStore = defineStore("config", () => {
     window.addEventListener("resize", viewportResizeHandler);
   };
 
+  // One-time move of the old household display settings into regions (CLV-49).
+  // The flag lives in config; the old keys stay stored but are never read again.
+  const migrateDisplaySettingsOnce = async data => {
+    if (!data || typeof data !== "object" || data.displaySettingsMigrated === true) return;
+    const rawScreens = data.dashboardScreens ?? data.dashboard_screens;
+    if (!rawScreens) return;
+    const result = migrateDisplaySettings(rawScreens, {
+      showWeekNumbers: data.showWeekNumbers ?? data.show_week_numbers ?? false,
+      maxVisibleEvents: data.maxVisibleEvents ?? data.max_visible_events ?? 4,
+      imageDisplayMode: data.imageDisplayMode ?? data.image_display_mode ?? "smart",
+    });
+    if (result.changed) {
+      dashboardScreens.value = result.screens;
+      data.dashboardScreens = result.screens;
+    }
+    try {
+      await updateConfig({
+        displaySettingsMigrated: true,
+        ...(result.changed ? { dashboardScreens: result.screens } : {}),
+      });
+      data.displaySettingsMigrated = true;
+    } catch (err) {
+      // Offline or not allowed to save: keep the in-memory values and retry on
+      // the next successful fetch rather than losing the user's old settings.
+      logError("[ConfigStore]", "Display settings migration could not be saved:", err);
+    }
+  };
+
   const fetchConfig = async () => {
     loading.value = true;
     error.value = null;
@@ -251,6 +280,7 @@ export const useConfigStore = defineStore("config", () => {
     try {
       const response = await api.get(path);
       applyFetched(response.data);
+      await migrateDisplaySettingsOnce(response.data);
       setCachedData(cacheKey, response.data);
       loadedFromServer = true;
       stale.value = false;
@@ -261,6 +291,7 @@ export const useConfigStore = defineStore("config", () => {
         if (cached) {
           logInfo("[ConfigStore]", "Backend unreachable, using cached config");
           applyFetched(cached);
+          await migrateDisplaySettingsOnce(cached);
           stale.value = true;
           return cached;
         }
