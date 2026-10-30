@@ -16,7 +16,35 @@
       :inert="!osk.visible.value"
       @pointerdown.prevent
     >
-      <div ref="host" class="osk-host"></div>
+      <div v-if="osk.pickerOpen.value" class="osk-picker" role="group" aria-label="Keyboard layout">
+        <div class="osk-picker__head">Keyboard layout</div>
+        <div class="osk-picker__grid">
+          <button
+            v-for="option in pickerOptions"
+            :key="option.id ?? 'default'"
+            type="button"
+            class="osk-picker__option"
+            :class="{ 'osk-picker__option--on': option.active }"
+            :aria-pressed="option.active ? 'true' : 'false'"
+            tabindex="-1"
+            @click="osk.chooseLetterLayout(option.id)"
+          >
+            <span class="osk-picker__name">{{ option.label }}</span>
+            <code v-if="option.code" class="osk-picker__code">&nbsp;{{ option.code }}</code>
+          </button>
+        </div>
+        <div class="osk-picker__foot">
+          <button
+            type="button"
+            class="osk-picker__abc"
+            tabindex="-1"
+            @click="osk.closeLayoutPicker()"
+          >
+            abc
+          </button>
+        </div>
+      </div>
+      <div v-show="!osk.pickerOpen.value" ref="host" class="osk-host"></div>
     </div>
   </Teleport>
 </template>
@@ -30,7 +58,10 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 // it. The named export is the constructor in both the CJS and ESM builds.
 import { SimpleKeyboard } from "simple-keyboard";
 import { OSK_CASE_CHARS, useOnScreenKeyboard } from "@/composables/useOnScreenKeyboard";
+import { OSK_LAYOUTS_BY_ID, OSK_LAYOUT_IDS } from "@/utils/oskLayouts";
 import { logError } from "@/utils/logger";
+
+const LAYOUT_LONG_PRESS_MS = 500;
 
 const ICONS = {
   bksp: '<svg class="osk-ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M21 5H9l-6 7 6 7h12z"/><path d="M17 9l-6 6M11 9l6 6"/></svg>',
@@ -64,32 +95,57 @@ const buttonAttributes = computed(() => [
   { attribute: "aria-label", value: "Shift", buttons: "{shift}" },
   { attribute: "aria-label", value: "Hide keyboard", buttons: "{hide}" },
   { attribute: "aria-label", value: "Space", buttons: "{space}" },
-  // The layout key names the LAYOUT, never the UI language.
+  // The layout key names the LAYOUT, never the UI language. With extras it
+  // cycles; without, it opens the list (CLV-21 §3).
   {
     attribute: "aria-label",
-    value: `Switch keyboard layout, now ${osk.activeLayoutName.value}`,
+    value: osk.hasExtraLayouts.value
+      ? `Switch keyboard layout, now ${osk.activeLayoutName.value}`
+      : `Keyboard layout: ${osk.activeLayoutName.value}. Opens the list.`,
     buttons: "{layout}",
   },
+  { attribute: "aria-haspopup", value: "true", buttons: "{layout}" },
 ]);
+
+const compact = computed(() => osk.height.value > 0 && osk.height.value < 260);
+
+const pickerOptions = computed(() => {
+  const device = osk.deviceLayout.value;
+  const options = [
+    {
+      id: null,
+      label: compact.value
+        ? `Default (${osk.mainLayoutCode.value})`
+        : `Default (${osk.mainLayoutName.value})`,
+      code: "",
+      active: !device,
+    },
+  ];
+  for (const id of OSK_LAYOUT_IDS) {
+    options.push({
+      id,
+      label: OSK_LAYOUTS_BY_ID[id].name,
+      code: OSK_LAYOUTS_BY_ID[id].code,
+      active: device === id,
+    });
+  }
+  return options;
+});
 
 const display = computed(() => {
   const map = {
     "{bksp}": ICONS.bksp,
     "{shift}": ICONS.shift,
     "{hide}": ICONS.hide,
-    // simple-keyboard treats an empty string as "no label" and falls back to
-    // the token, so a real space is what renders a blank key.
-    "{space}": " ",
     "{numbers}": "?123",
     "{accents}": "åäö",
     "{abc}": "abc",
     "{layout}": osk.activeLayoutCode.value,
     "{enter}": osk.enterLabel.value,
+    // The space bar always names the active layout, so a lock screen shows
+    // which one you are typing on. Only the label opens the picker (CLV-21 §3).
+    "{space}": `<span class="osk-space-label" role="button" tabindex="-1" aria-label="Change keyboard layout"><small class="osk-space-name">${osk.activeLayoutName.value}</small></span>`,
   };
-  // While extra layouts are set, the space bar names the active layout (K6).
-  if (osk.showLayoutKey.value) {
-    map["{space}"] = `<small class="osk-space-name">${osk.activeLayoutName.value}</small>`;
-  }
   if (osk.shiftOn.value) Object.assign(map, SHIFTED_LABELS);
   return map;
 });
@@ -107,6 +163,65 @@ const clearRepeat = () => {
     clearInterval(repeatInterval);
     repeatInterval = null;
   }
+};
+
+// --- Layout key: tap vs long-press, and the space-bar label ---------------
+// simple-keyboard fires on pointerdown, so a long press would already have
+// cycled the layout. Capture the event before it reaches the button and decide
+// on pointerup instead: a short tap keeps the old behaviour, a 500ms hold opens
+// the picker (CLV-21 §2).
+let layoutHoldTimer = null;
+let layoutHoldFired = false;
+let layoutPressActive = false;
+
+const clearLayoutHold = () => {
+  if (layoutHoldTimer !== null) {
+    clearTimeout(layoutHoldTimer);
+    layoutHoldTimer = null;
+  }
+};
+
+const onPanelPointerDown = event => {
+  const target = event.target;
+  if (!target?.closest) return;
+
+  // A tap on the label text opens the picker; the rest of the key types a space.
+  if (target.closest(".osk-space-label")) {
+    event.preventDefault();
+    event.stopPropagation();
+    osk.openLayoutPicker();
+    return;
+  }
+
+  if (!target.closest(".hg-button-layout")) return;
+  event.preventDefault();
+  event.stopPropagation();
+  layoutPressActive = true;
+  layoutHoldFired = false;
+  clearLayoutHold();
+  layoutHoldTimer = setTimeout(() => {
+    layoutHoldTimer = null;
+    layoutHoldFired = true;
+    osk.openLayoutPicker();
+  }, LAYOUT_LONG_PRESS_MS);
+};
+
+const onWindowPointerUp = () => {
+  if (!layoutPressActive) return;
+  layoutPressActive = false;
+  clearLayoutHold();
+  if (layoutHoldFired) {
+    layoutHoldFired = false;
+    return;
+  }
+  osk.tapLayoutKey();
+};
+
+// A cancelled gesture (scrolled away, system gesture) must not cycle.
+const onWindowPointerCancel = () => {
+  layoutPressActive = false;
+  layoutHoldFired = false;
+  clearLayoutHold();
 };
 
 // Backspace repeats after 500ms, then every 60ms. simple-keyboard's own hold
@@ -165,8 +280,11 @@ onMounted(() => {
     resizeObserver.observe(panel.value);
   }
   panel.value?.addEventListener("pointerdown", onRootPointerDown);
+  panel.value?.addEventListener("pointerdown", onPanelPointerDown, true);
   window.addEventListener("pointerup", clearRepeat);
   window.addEventListener("pointercancel", clearRepeat);
+  window.addEventListener("pointerup", onWindowPointerUp);
+  window.addEventListener("pointercancel", onWindowPointerCancel);
 });
 
 onUnmounted(() => {
@@ -174,8 +292,12 @@ onUnmounted(() => {
   resizeObserver?.disconnect();
   resizeObserver = null;
   panel.value?.removeEventListener("pointerdown", onRootPointerDown);
+  panel.value?.removeEventListener("pointerdown", onPanelPointerDown, true);
   window.removeEventListener("pointerup", clearRepeat);
   window.removeEventListener("pointercancel", clearRepeat);
+  window.removeEventListener("pointerup", onWindowPointerUp);
+  window.removeEventListener("pointercancel", onWindowPointerCancel);
+  clearLayoutHold();
   osk.stop();
   keyboard?.destroy();
   keyboard = null;
@@ -187,7 +309,7 @@ watch(
     osk.shiftOn.value,
     osk.enterLabel.value,
     osk.activeLetterLayout.value,
-    osk.showLayoutKey.value,
+    osk.hasExtraLayouts.value,
   ],
   () => nextTick(applyLayout)
 );
@@ -312,11 +434,133 @@ defineExpose({
   flex-grow: 1;
 }
 
-/* With extra layouts set, the space bar names the active layout (K6). */
+/* The space bar names the active layout on every field (CLV-21 §3). Only the
+   label itself opens the picker; the rest of the key types a space. */
+:deep(.osk-space-label) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
 :deep(.osk-space-name) {
   color: var(--ink-3);
   font-size: var(--fs-sm);
   font-weight: 400;
+}
+
+/* Layout picker: replaces the key rows inside the same panel, so the field
+   above stays visible and the panel keeps its height (CLV-21 §4). */
+.osk-picker {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.osk-picker__head {
+  flex: 0 0 auto;
+  padding-left: 4px;
+  color: var(--ink-2);
+  font-size: var(--fs-md);
+}
+.osk-picker__grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: minmax(44px, 1fr);
+  gap: 8px;
+}
+.osk-picker__option {
+  min-width: 0;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 6px;
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 0 var(--line);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.osk-picker__option:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.osk-picker__option--on {
+  background: color-mix(in srgb, var(--focus) 16%, var(--bg-2));
+  border-color: var(--focus);
+}
+.osk-picker__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.osk-picker__code {
+  color: var(--ink-3);
+  font-family: var(--font-data);
+  font-size: var(--fs-sm);
+}
+.osk-picker__foot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+.osk-picker__abc {
+  min-height: 44px;
+  min-width: 110px;
+  padding: 0 1.5rem;
+  background: color-mix(in srgb, var(--ink) 6%, var(--bg-0));
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  cursor: pointer;
+}
+.osk-picker__abc:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 800×480 (216px tall panel): tighter heading and bottom row, no codes. */
+.osk--compact .osk-picker {
+  gap: 6px;
+}
+.osk--compact .osk-picker__head {
+  flex-basis: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  font-size: var(--fs-sm);
+}
+.osk--compact .osk-picker__grid {
+  gap: 6px;
+}
+.osk--compact .osk-picker__code {
+  display: none;
+}
+.osk--compact .osk-picker__foot {
+  flex-basis: 44px;
+}
+
+@media (max-width: 480px) {
+  .osk-picker__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 :deep(.hg-button.hg-button-enter) {

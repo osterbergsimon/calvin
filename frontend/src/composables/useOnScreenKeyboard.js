@@ -5,6 +5,8 @@ import { useTouchCapability } from "./useTouchCapability";
 import {
   DEFAULT_OSK_LAYOUT,
   buildOskLayouts,
+  clearStoredOskLayout,
+  isOskLayoutId,
   layoutSwitchOrder,
   nextOskLayout,
   normalizeOskExtraLayouts,
@@ -150,29 +152,61 @@ export function useOnScreenKeyboard() {
       normalizeOskExtraLayouts(configStore.oskExtraLayouts, mainLayout.value)
     )
   );
-  // The active layout survives hiding and showing, and falls back to the main
-  // layout when the one remembered on this device stops being valid (for
-  // example, it was removed from Settings).
+  // The active layout survives hiding and showing. A device choice is honoured
+  // even when it isn't the main or an extra layout (CLV-21 §5); only an entry
+  // that is no longer a valid layout falls back to the main one.
   const activeLetterLayout = computed(() => {
-    const order = layoutOrder.value;
-    if (preferredLetterLayout.value && order.includes(preferredLetterLayout.value)) {
-      return preferredLetterLayout.value;
-    }
-    return order[0] ?? DEFAULT_OSK_LAYOUT;
+    if (isOskLayoutId(preferredLetterLayout.value)) return preferredLetterLayout.value;
+    return layoutOrder.value[0] ?? DEFAULT_OSK_LAYOUT;
   });
-  const showLayoutKey = computed(() => layoutOrder.value.length > 1);
+  const hasExtraLayouts = computed(() => layoutOrder.value.length > 1);
+  // The choice made on this device, or null when the keyboard follows Settings.
+  const deviceLayout = computed(() =>
+    isOskLayoutId(preferredLetterLayout.value) ? preferredLetterLayout.value : null
+  );
   const activeLayoutName = computed(() => oskLayoutName(activeLetterLayout.value));
   const activeLayoutCode = computed(() => oskLayoutCode(activeLetterLayout.value));
-  const layouts = computed(() =>
-    buildOskLayouts({
-      layout: activeLetterLayout.value,
-      showLayoutKey: showLayoutKey.value,
-    })
-  );
-  const cycleLetterLayout = () => {
-    preferredLetterLayout.value = nextOskLayout(layoutOrder.value, activeLetterLayout.value);
+  const mainLayoutName = computed(() => oskLayoutName(mainLayout.value));
+  const mainLayoutCode = computed(() => oskLayoutCode(mainLayout.value));
+  const layouts = computed(() => buildOskLayouts({ layout: activeLetterLayout.value }));
+
+  // The picker replaces the key rows inside the keyboard panel (CLV-21 §4).
+  const pickerOpen = ref(false);
+  const openLayoutPicker = () => {
+    if (!visible.value || !target.value) return;
+    pickerOpen.value = true;
   };
-  watch(activeLetterLayout, id => storeOskLayout(id), { immediate: true });
+  const closeLayoutPicker = () => {
+    pickerOpen.value = false;
+  };
+
+  const setLetterLayout = id => {
+    preferredLetterLayout.value = id;
+    if (id) storeOskLayout(id);
+  };
+
+  const cycleLetterLayout = () => {
+    setLetterLayout(nextOskLayout(layoutOrder.value, activeLetterLayout.value));
+  };
+
+  /** Picking from the list: a layout id, or null for the Settings default. */
+  const chooseLetterLayout = id => {
+    if (id) {
+      setLetterLayout(id);
+    } else {
+      preferredLetterLayout.value = null;
+      clearStoredOskLayout();
+    }
+    pickerOpen.value = false;
+    layout.value = baseLayout.value;
+    resetShift();
+  };
+
+  /** A short tap on the layout key: cycle with extras, open the list without. */
+  const tapLayoutKey = () => {
+    if (hasExtraLayouts.value) cycleLetterLayout();
+    else openLayoutPicker();
+  };
 
   const shiftOn = computed(() => shiftActive.value || capsLock.value);
   const isNumeric = computed(() => layout.value === "numeric");
@@ -402,6 +436,7 @@ export function useOnScreenKeyboard() {
     layout.value = baseLayout.value;
     enterLabel.value = enterLabelFor(el);
     resetShift();
+    pickerOpen.value = false;
     visible.value = true;
     syncHeight();
     scrollTargetIntoView(el);
@@ -414,6 +449,7 @@ export function useOnScreenKeyboard() {
     }
     visible.value = false;
     target.value = null;
+    pickerOpen.value = false;
     resetShift();
     syncHeight();
   };
@@ -481,7 +517,7 @@ export function useOnScreenKeyboard() {
         layout.value = "accents";
         return;
       case "{layout}":
-        cycleLetterLayout();
+        tapLayoutKey();
         return;
       case "{abc}":
         layout.value = baseLayout.value;
@@ -594,13 +630,21 @@ export function useOnScreenKeyboard() {
     enabled,
     // Letter layout state and switching.
     mainLayout,
+    mainLayoutName,
+    mainLayoutCode,
     layoutOrder,
+    hasExtraLayouts,
+    deviceLayout,
     activeLetterLayout,
     activeLayoutName,
     activeLayoutCode,
-    showLayoutKey,
     layouts,
+    pickerOpen,
+    openLayoutPicker,
+    closeLayoutPicker,
+    chooseLetterLayout,
     cycleLetterLayout,
+    tapLayoutKey,
     start,
     stop,
     hide,

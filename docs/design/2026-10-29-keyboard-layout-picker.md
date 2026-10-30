@@ -59,9 +59,13 @@ field or the form, and the panel keeps its height (`--osk-height` is unchanged).
 
 ## 5. What the choice means
 
-- Picking a named layout saves it **on this device** in `localStorage["calvin-osk-layout"]` (the existing key).
+- Picking a named layout saves it **on this device** in `localStorage["calvin-osk-device-layout"]`.
   It is honoured **even if it isn't the main or an extra layout**. Today's code only accepts a stored layout
   that is in `[main, ...extras]` (`useOnScreenKeyboard.js:156-160`). Change that check to "any valid layout id".
+- **Migration:** the old `localStorage["calvin-osk-layout"]` key was written on *every* device by the previous
+  `watch(activeLetterLayout, …, { immediate: true })`, so it is not evidence of a device choice. Do not read it
+  (especially now that any valid id is honoured, which would pin every upgraded kiosk to its old main layout).
+  Remove it on load; devices start from Settings again.
 - **Default ({main name})** removes the device choice (`removeItem`), so the device follows Settings again.
 - Cycling with extras: the order is `[main, ...extras]`. If the active layout isn't in it (a device choice), the
   first tap goes to `main`.
@@ -79,7 +83,8 @@ field or the form, and the panel keeps its height (`--osk-height` is unchanged).
 - The space-bar label is always rendered; tapping the label opens the picker; tapping the rest of the key types a space.
 - Picker:
   - lists Default + 7 layouts in order, and the active one has `aria-pressed`;
-  - choosing writes `calvin-osk-layout` and returns to letters; **Default** removes the key;
+  - choosing writes `calvin-osk-device-layout` and returns to letters; **Default** removes the key;
+  - a pre-existing legacy `calvin-osk-layout` is ignored and removed, and does not pin the layout;
   - **abc** changes nothing;
   - focus stays in the input.
 - A stored layout outside `[main, ...extras]` is honoured; cycling from it goes to main.
