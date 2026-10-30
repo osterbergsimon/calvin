@@ -79,7 +79,7 @@ const conflictHint = computed(() => {
   padding: 10px 8px;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   min-height: var(--touch-target);
 }
 .kbt--empty {
@@ -91,11 +91,11 @@ const conflictHint = computed(() => {
 .kbt-key {
   font-family: var(--font-data);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
 }
 .kbt-action {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--ink-2);
   text-align: center;
   line-height: 1.2;
@@ -107,7 +107,7 @@ const conflictHint = computed(() => {
 .kbt-btn {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   color: var(--ink-2);
   min-width: var(--touch-target);
   min-height: var(--touch-target);
@@ -150,7 +150,7 @@ const conflictHint = computed(() => {
   background: var(--ink);
   color: var(--bg-1);
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   line-height: 1.3;
   text-align: center;
   border-radius: var(--radius-xs);

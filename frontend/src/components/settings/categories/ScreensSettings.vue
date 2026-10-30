@@ -1332,12 +1332,12 @@ onUnmounted(() => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screens__add:hover {
@@ -1364,7 +1364,7 @@ onUnmounted(() => {
   color: inherit;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   cursor: pointer;
 }
 /* The Default is a real screen now: no dashed "shared" treatment. */
@@ -1440,7 +1440,7 @@ onUnmounted(() => {
 /* Kiosk software summary row (CLV-19). */
 .kiosk-software__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -1448,12 +1448,12 @@ onUnmounted(() => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .kiosk-software__btn:hover:not(:disabled) {
@@ -1484,7 +1484,7 @@ onUnmounted(() => {
   border: none;
   color: var(--ink-2);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 .screens__back:hover {
@@ -1551,7 +1551,7 @@ onUnmounted(() => {
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screen-page {
@@ -1582,7 +1582,7 @@ onUnmounted(() => {
   min-width: 0;
 }
 .screen-page__name {
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
 }
@@ -1624,7 +1624,7 @@ onUnmounted(() => {
 }
 .screen-software__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -1642,7 +1642,7 @@ onUnmounted(() => {
   padding: 1rem 1.25rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
 }
 .screen-footer__copy {
   margin: 0;
@@ -1658,12 +1658,12 @@ onUnmounted(() => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screen-footer__btn--ghost {

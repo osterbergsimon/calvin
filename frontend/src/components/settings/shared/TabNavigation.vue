@@ -145,7 +145,7 @@ const handleKeydown = event => {
 }
 
 .tab-icon {
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
 }
 
 .tab-label {

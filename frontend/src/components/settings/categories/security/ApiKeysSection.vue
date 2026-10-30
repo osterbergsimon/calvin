@@ -644,7 +644,7 @@ async function revoke() {
 .api-keys__result {
   padding: 1.25rem;
   border: 1px solid var(--focus);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 .api-keys__result-title {
   margin: 0;
@@ -664,7 +664,7 @@ async function revoke() {
   flex: 1;
   min-width: 0;
   font-family: var(--font-data);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
 }
 .api-keys__result .security-btn:last-child {
   margin-top: 0.75rem;

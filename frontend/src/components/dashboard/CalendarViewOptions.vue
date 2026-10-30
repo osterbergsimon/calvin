@@ -127,7 +127,7 @@ const setWeekNumbers = value => {
 
 .cvo-label {
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink);
 }
 
@@ -138,17 +138,17 @@ const setWeekNumbers = value => {
   padding: 2px;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .cvo-seg button {
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   line-height: 1;
   color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 0.2rem 0.4rem;
   min-height: 22px;
   cursor: pointer;
@@ -173,11 +173,11 @@ const setWeekNumbers = value => {
 /* Reset chip — only shown when the density is an explicit override. */
 .cvo-default-chip {
   font-family: var(--font-ui);
-  font-size: 0.68rem;
+  font-size: var(--fs-micro);
   color: var(--ink-2);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.1rem 0.4rem;
   min-height: 22px;
   cursor: pointer;
@@ -208,7 +208,7 @@ const setWeekNumbers = value => {
   min-width: 24px;
   min-height: 24px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--bg-1);
   color: var(--ink);
   cursor: pointer;
@@ -222,7 +222,7 @@ const setWeekNumbers = value => {
   min-width: 1.25rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 
 /* Compact toggle — smaller than the shared ToggleSwitch used in settings. */
@@ -231,7 +231,7 @@ const setWeekNumbers = value => {
   height: 18px;
   flex: none;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--line);
   position: relative;
   cursor: pointer;
@@ -245,7 +245,7 @@ const setWeekNumbers = value => {
   left: 2px;
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--switch-knob);
   transition: transform 0.2s;
 }

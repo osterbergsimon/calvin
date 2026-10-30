@@ -1268,7 +1268,7 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   border-radius: var(--radius-2xl);
   overflow: hidden;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 24px 70px var(--shadow-hover);
   animation: sre-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes sre-rise {
@@ -1297,7 +1297,7 @@ onUnmounted(() => {
 .sre-title h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 650;
   color: var(--ink);
 }
@@ -1308,7 +1308,7 @@ onUnmounted(() => {
 }
 .sre-close {
   margin-left: auto;
-  font-size: 1.3rem;
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -1449,7 +1449,7 @@ onUnmounted(() => {
   border-top: 1px solid var(--focus-edge, var(--line));
   border-bottom: 1px solid var(--focus-edge, var(--line));
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 .sre-place__cancel {
@@ -1458,7 +1458,7 @@ onUnmounted(() => {
   background: var(--bg-1);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   font-weight: 600;
   cursor: pointer;
@@ -1477,7 +1477,7 @@ onUnmounted(() => {
   background: radial-gradient(
     120% 120% at 50% 8%,
     var(--bg-0),
-    color-mix(in srgb, var(--bg-0) 60%, #000 6%)
+    color-mix(in srgb, var(--bg-0) 60%, var(--device-shade) 6%)
   );
 }
 .sre-stage-tag {
@@ -1495,7 +1495,7 @@ onUnmounted(() => {
 .sre-stage-tag .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--ok);
 }
 .sre-mismatch {
@@ -1571,11 +1571,11 @@ onUnmounted(() => {
 .sre-device {
   position: relative;
   padding: 12px;
-  border-radius: 18px;
-  background: linear-gradient(160deg, #33383f, #1b1e24);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(160deg, var(--device-bezel-a), var(--device-bezel-b));
   box-shadow:
-    0 30px 50px -18px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 30px 50px -18px var(--device-inset),
+    inset 0 1px 0 var(--device-highlight);
   transition:
     width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
     height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1587,11 +1587,11 @@ onUnmounted(() => {
   display: flex;
   gap: 2px;
   padding: 3px;
-  border-radius: 7px;
-  background: #06070a;
+  border-radius: var(--radius-xs);
+  background: var(--device-screen);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 0 22px rgba(0, 0, 0, 0.5);
+    inset 0 0 0 1px var(--device-highlight-soft),
+    inset 0 0 22px var(--device-inset);
 }
 .sre-regions {
   display: flex;
@@ -1630,7 +1630,7 @@ onUnmounted(() => {
 .sre-resizer .grip {
   width: 4px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--focus) 55%, transparent);
 }
 .sre-resizer.row .grip {
@@ -1652,7 +1652,7 @@ onUnmounted(() => {
   color: var(--bg-1);
   background: var(--ink);
   padding: 0.12rem 0.4rem;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   opacity: 0;
   white-space: nowrap;
   pointer-events: none;
@@ -1669,7 +1669,7 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
   color: var(--focus);
   border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   font-size: var(--fs-micro);
   font-variant-numeric: tabular-nums;
 }
@@ -1699,10 +1699,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--focus) 9%, transparent);
   border: 1px dashed color-mix(in srgb, var(--focus) 50%, transparent);
-  color: color-mix(in srgb, var(--focus) 85%, #fff 15%);
+  color: color-mix(in srgb, var(--focus) 85%, var(--bg-1));
   font-size: var(--fs-micro);
   font-weight: 600;
   transition:
@@ -1873,9 +1873,9 @@ onUnmounted(() => {
   height: 64px;
   border-left: 0;
   border-top: 1px solid var(--line);
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   background: var(--bg-1);
-  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 -12px 32px var(--shadow-hover);
   transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sre-rail.is-sheet.is-open {
@@ -1898,7 +1898,7 @@ onUnmounted(() => {
   width: 40px;
   height: 4px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--line);
   cursor: grab;
 }
@@ -1920,7 +1920,7 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   background: var(--bg-1);
   color: var(--ink-2);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   cursor: pointer;
 }

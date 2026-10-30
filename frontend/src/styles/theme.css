@@ -92,6 +92,8 @@
   --fs-base: 1rem;
   --fs-lg: 1.15rem;
   --fs-xl: 1.25rem;
+  --fs-2xl: 1.4rem;
+  --fs-3xl: 1.7rem;
   --fs-control: 0.875rem; /* 14px */
   --fs-control-lg: 0.9375rem; /* 15px */
 
@@ -136,6 +138,7 @@
   --device-screen: #06070a;
   --device-shade: #000000;
   --device-highlight: rgba(255, 255, 255, 0.06);
+  --device-highlight-soft: rgba(255, 255, 255, 0.04);
   --device-inset: rgba(0, 0, 0, 0.5);
 }
 
