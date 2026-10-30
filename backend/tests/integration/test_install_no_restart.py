@@ -106,6 +106,14 @@ def test_installed_plugin_appears_without_restart(test_client, plugin_zip):
     body = detail.json()
     assert body["display_schema"]["kind"] == "status"
 
+    # The list carries the same display metadata, so the settings UI can tell
+    # an iframe page from a card plugin without a request per plugin.
+    listed = next(
+        p for p in test_client.get("/api/plugins").json()["plugins"] if p["id"] == PLUGIN_ID
+    )
+    assert listed["display_schema"]["kind"] == "status"
+    assert listed["statusbar_schema"] is None
+
 
 def test_uninstalled_plugin_disappears_without_restart(test_client, plugin_zip):
     with open(plugin_zip, "rb") as zip_file:
