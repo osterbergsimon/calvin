@@ -173,3 +173,6 @@ class KioskDB(ormar.Model):
     agent_update_message: str | None = ormar.String(
         max_length=255, nullable=True
     )  # updater's human-readable message for the last agent update (calvin-dvy3)
+    viewport: dict | None = ormar.JSON(
+        nullable=True
+    )  # screen's reported CSS viewport {w, h}, used by the layout editor preview (CLV-36)
