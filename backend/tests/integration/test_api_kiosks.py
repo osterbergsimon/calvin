@@ -276,11 +276,11 @@ def test_install_script_prefers_public_url(test_client: TestClient, monkeypatch)
     from app.services import kiosk_bundle
     from app.utils import public_url as public_url_module
 
-    monkeypatch.setattr(public_url_module.settings, "public_url", "https://calvin.wholab.xyz/")
+    monkeypatch.setattr(public_url_module.settings, "public_url", "https://calvin.example.com/")
     with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
         r = test_client.get("/api/kiosks/install.sh")
     assert r.status_code == 200
-    assert "SERVER_URL='https://calvin.wholab.xyz'" in r.text
+    assert "SERVER_URL='https://calvin.example.com'" in r.text
     assert "http://testserver" not in r.text
 
 

@@ -30,7 +30,7 @@
 
 ## Review Focus
 
-1. **Reverse proxy / Docker port mapping:** a request with `Host: 192.168.1.10:8080` and `Origin: http://192.168.1.10:8080` (port differs from the container's 8000) must pass. Compare Origin's host:port with the Host header *as received*. Test in Task 5.
+1. **Reverse proxy / Docker port mapping:** a request with `Host: 192.0.2.10:8080` and `Origin: http://192.0.2.10:8080` (port differs from the container's 8000) must pass. Compare Origin's host:port with the Host header *as received*. Test in Task 5.
 2. **Vite dev server:** `Origin: http://localhost:5173` against `Host: localhost:8000` must pass when `http://localhost:5173` is in `CORS_ORIGINS`. Test in Task 5.
 3. **Restart with `CALVIN_ADMIN_PASSWORD` unchanged:** it must NOT bump `generation` (or every restart would sign everyone out). Only a different password rewrites the hash. Test in Task 1.
 4. **Corrupt or empty `admin-auth.json`:** treat it as not configured and log an error. No crash at startup, no 500 on every request. Test in Task 1.
@@ -213,10 +213,10 @@ Rules (spec §5):
 - Origin: only for unsafe methods on paths starting with `/api`. If `settings.cors_allow_all`, skip. If Origin is present: its `host[:port]` (from `urlsplit`, with default ports made explicit on both sides: http 80, https 443) must equal the Host header's `host[:port]`, OR the origin must be in `cors_origins`. Scheme is ignored. Origin `null` is rejected. If Origin is absent: reject only if `Sec-Fetch-Site == "cross-site"`. Rejection: 403 JSON `cross_origin`.
 
 - [ ] **Step 1: Write failing tests** (pure functions plus a tiny Starlette app with the middleware for the ASGI path):
-  - Hosts allowed: `"192.168.1.10:8000"`, `"[fe80::1]:8000"`, `"[::1]"`, `"localhost:5173"`, `"app.localhost"`, `"calvin"`, `"raspberrypi:8000"`, `"calvin.local"`, `"pi.home.arpa"`, `"x.lan"`, `"testserver"`, the host of `public_url="https://dash.example.com"`, and `"foo.example.org"` with `allowed_hosts="foo.example.org"`; anything with `allowed_hosts="*"`
+  - Hosts allowed: `"192.0.2.10:8000"`, `"[fe80::1]:8000"`, `"[::1]"`, `"localhost:5173"`, `"app.localhost"`, `"calvin"`, `"raspberrypi:8000"`, `"calvin.local"`, `"pi.home.arpa"`, `"x.lan"`, `"testserver"`, the host of `public_url="https://dash.example.com"`, and `"foo.example.org"` with `allowed_hosts="foo.example.org"`; anything with `allowed_hosts="*"`
   - Hosts rejected: `"evil.example"`, `"calvin.local.evil.example"`, `"1.2.3.4.nip.io"`
-  - Origin allowed: same host:port (`http://192.168.1.10:8080` vs Host `192.168.1.10:8080`); `https://dash.example.com` vs Host `dash.example.com` (default ports); `http://localhost:5173` with that value in `cors_origins`; no Origin and no Sec-Fetch-Site (curl)
-  - Origin rejected: `http://evil.example` vs Host `192.168.1.10:8000`; Origin `null`; no Origin + `Sec-Fetch-Site: cross-site`
+  - Origin allowed: same host:port (`http://192.0.2.10:8080` vs Host `192.0.2.10:8080`); `https://dash.example.com` vs Host `dash.example.com` (default ports); `http://localhost:5173` with that value in `cors_origins`; no Origin and no Sec-Fetch-Site (curl)
+  - Origin rejected: `http://evil.example` vs Host `192.0.2.10:8000`; Origin `null`; no Origin + `Sec-Fetch-Site: cross-site`
   - ASGI: a GET with Host `evil.example` → 400 plain text containing `CALVIN_ALLOWED_HOSTS`; a POST `/api/x` with a foreign Origin → 403; the same POST to a non-`/api` path → passes the Origin check
 - [ ] **Step 2: Run.** Expected: FAIL.
 - [ ] **Step 3: Implement** and add to `install_security`.

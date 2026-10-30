@@ -13,7 +13,7 @@ from app.security.host_origin import HostOriginMiddleware, is_allowed_host, orig
 @pytest.mark.parametrize(
     "host",
     [
-        "192.168.1.10:8000",
+        "192.0.2.10:8000",
         "[fe80::1]:8000",
         "[::1]",
         "localhost:5173",
@@ -54,7 +54,7 @@ def test_hosts_rejected(host):
 
 
 def test_origin_same_host_port():
-    assert origin_allowed("http://192.168.1.10:8080", None, "192.168.1.10:8080", []) is True
+    assert origin_allowed("http://192.0.2.10:8080", None, "192.0.2.10:8080", []) is True
 
 
 def test_origin_bare_host_uses_origin_scheme_default_port():
@@ -88,7 +88,7 @@ def test_origin_in_cors_list():
 
 
 def test_origin_absent_curl():
-    assert origin_allowed(None, None, "192.168.1.10:8000", []) is True
+    assert origin_allowed(None, None, "192.0.2.10:8000", []) is True
 
 
 @pytest.mark.parametrize(
@@ -96,7 +96,7 @@ def test_origin_absent_curl():
     [("http://evil.example", None), ("null", None), (None, "cross-site")],
 )
 def test_origin_rejected(origin, sec_fetch_site):
-    assert origin_allowed(origin, sec_fetch_site, "192.168.1.10:8000", []) is False
+    assert origin_allowed(origin, sec_fetch_site, "192.0.2.10:8000", []) is False
 
 
 async def _ok(request):
