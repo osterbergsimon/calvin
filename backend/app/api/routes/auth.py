@@ -76,8 +76,27 @@ def _set_admin_cookie(response: Response, value: str) -> None:
     )
 
 
+# A local reverse proxy makes every visitor's peer loopback. If the request
+# carries any proxy header it came through (or a client tried to look like it
+# did), so it is never a trusted loopback caller.
+_PROXY_HEADERS = (
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+)
+
+
 def _is_loopback(request: Request) -> bool:
-    """True only when the peer address itself is loopback (no proxy headers)."""
+    """True only for a direct loopback peer with no proxy headers at all.
+
+    ``X-Forwarded-*``/``Forwarded`` is never trusted (design §5). Uvicorn may
+    rewrite ``request.client`` from ``X-Forwarded-For`` when a local proxy is
+    trusted, so the header check comes first and does not depend on that.
+    """
+    if any(header in request.headers for header in _PROXY_HEADERS):
+        return False
     host = request.client.host if request.client else ""
     if not host:
         return False
