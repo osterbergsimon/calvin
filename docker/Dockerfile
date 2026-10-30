@@ -42,6 +42,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     liblcms2-dev \
     libtiff-dev \
     libwebp-dev \
+    libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir uv
