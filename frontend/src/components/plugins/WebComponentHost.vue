@@ -92,6 +92,6 @@ onBeforeUnmount(() => {
 
 .web-component-host__error,
 .web-component-host__loading {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
 }
 </style>
