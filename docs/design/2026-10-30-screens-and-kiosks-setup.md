@@ -154,12 +154,25 @@ Approved 2026-10-30: A and B. C is a follow-up to the owner's question "should k
 
 - **A. Rename dashboard "screens" to "pages" in the UI** (keys unchanged). Recommended: it ends the double meaning
   at its source.
-- **C. Keyboard placement** (§3.2): the on-screen keyboard and its layout stay with Screens; remote buttons and
-  key-press feedback go to Dashboard › Focus & remote; the reboot combo goes under Screens › Power.
 - **B. Merge Kiosks + Screen & keyboard into one Screens category** (7 → 6) with an "All screens" card and a page per
   screen. Recommended: one Pi's settings end up in one place.
+- **C. Keyboard placement** (§3.2): the on-screen keyboard and its layout stay with Screens; remote buttons and
+  key-press feedback go to Dashboard › Focus & remote; the reboot combo goes under Screens › Power.
 
-## 7. Tests (vitest), phase 1
+## 7. For CLV-31 (audit build, in flight)
+
+Phase 2 waits for CLV-31. To avoid redoing its work, CLV-31 should:
+- **Use "page" for layouts in any string it touches** (decision A). For example, the audit's Orientation description
+  becomes **Which way the screen is mounted. Pages & regions decides how regions stack.**, and "Screens shown" /
+  "Default screen" become **Pages shown** / **Start page**.
+- **Use "Only this screen", not "Only this kiosk"**, for the audit §3.5 override label. The rest of §3.5 is unchanged
+  (**Same as all screens**, **Use the shared setting**). Kiosk section titles use the name from §3.3 when it's
+  set, otherwise the id: `{name} · Screen on/off schedule`.
+- **Leave rows where they are.** Don't move Touchscreen, Remote & buttons or key-press feedback between categories;
+  phase 2 does that (§3.2, decision C). The audit's Dashboard split (**Controls** / **Touch & focus**) stays as specced.
+  Phase 2 then renames Touch & focus to **Focus & remote** when Touchscreen leaves and the remote rows arrive.
+
+## 8. Tests (vitest), phase 1
 
 - Preview on:
   - preselects the kiosk on a kiosk, and the screen from **Edit pages**;
