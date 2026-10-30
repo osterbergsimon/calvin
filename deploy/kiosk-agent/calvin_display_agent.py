@@ -659,6 +659,7 @@ WATCHDOG_DEFAULT_PORT = 9222
 WATCHDOG_DEFAULT_SECONDS = 30
 WATCHDOG_DEFAULT_FAILURES = 3
 WATCHDOG_DEFAULT_COOLDOWN = 300
+WATCHDOG_DEFAULT_BACKOFF_MAX = 3600
 WATCHDOG_WARMUP_SECONDS = 120
 WATCHDOG_TIMEOUT = 10
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -700,6 +701,19 @@ def kiosk_watchdog_config(env=None):
             0,
             _int_or(
                 env.get("CALVIN_KIOSK_WATCHDOG_COOLDOWN"), WATCHDOG_DEFAULT_COOLDOWN
+            ),
+        ),
+        "backoff_max": max(
+            max(
+                0,
+                _int_or(
+                    env.get("CALVIN_KIOSK_WATCHDOG_COOLDOWN"),
+                    WATCHDOG_DEFAULT_COOLDOWN,
+                ),
+            ),
+            _int_or(
+                env.get("CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX"),
+                WATCHDOG_DEFAULT_BACKOFF_MAX,
             ),
         ),
     }
@@ -855,13 +869,23 @@ def _http_json(url, timeout):
         return json.load(response)
 
 
-def cdp_page_target(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
-    """webSocketDebuggerUrl of the first page target, or None."""
+def cdp_targets(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
+    """Chromium's target list, or None when this is not a Chromium DevTools port.
+
+    Only a JSON array is accepted: another server on the port, an old Chromium, or
+    a disabled port must never look like a dead page, or the watchdog would
+    restart the kiosk for no reason.
+    """
     if fetch is None:
         fetch = _http_json
-    targets = fetch(f"http://127.0.0.1:{port}/json/list", timeout)
-    if not isinstance(targets, list):
+    try:
+        targets = fetch(f"http://127.0.0.1:{port}/json/list", timeout)
+    except (OSError, ValueError):
         return None
+    return targets if isinstance(targets, list) else None
+
+
+def _page_ws_url(targets):
     for target in targets:
         if isinstance(target, dict) and target.get("type") == "page":
             ws_url = target.get("webSocketDebuggerUrl")
@@ -870,18 +894,24 @@ def cdp_page_target(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
     return None
 
 
+def cdp_page_target(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
+    """webSocketDebuggerUrl of the first page target, or None."""
+    return _page_ws_url(cdp_targets(port, timeout, fetch=fetch) or [])
+
+
 def probe_page(port, timeout=WATCHDOG_TIMEOUT, fetch=None, evaluate=None):
     """PAGE_OK | PAGE_DEAD | PAGE_UNREACHABLE for the kiosk's Chromium page.
 
-    PAGE_UNREACHABLE means nothing answered on the debugging port, i.e. the
-    browser is gone (systemd's job) or this unit has no port: never act on it.
+    PAGE_UNREACHABLE means no Chromium answered on the debugging port (port
+    disabled, an older unit file, a foreign server): never act on it. PAGE_DEAD
+    means Chromium answered and the page behind the dashboard did not.
     """
     if evaluate is None:
         evaluate = cdp_eval
-    try:
-        ws_url = cdp_page_target(port, timeout, fetch=fetch)
-    except (OSError, ValueError):
+    targets = cdp_targets(port, timeout, fetch=fetch)
+    if targets is None:
         return PAGE_UNREACHABLE
+    ws_url = _page_ws_url(targets)
     if not ws_url:
         return PAGE_DEAD
     try:
@@ -1066,7 +1096,14 @@ def restart_kiosk_unit(
 
 # -- the decision and the loop ------------------------------------------------
 def new_watchdog_state():
-    return {"failures": 0, "last_restart": None}
+    return {"failures": 0, "last_restart": None, "restarts": 0}
+
+
+def next_cooldown(restarts, base, cap):
+    """Wait before the next restart: base, then doubling, never above `cap`."""
+    if restarts <= 0:
+        return base
+    return min(base * (2 ** (restarts - 1)), cap)
 
 
 def watchdog_step(
@@ -1078,15 +1115,18 @@ def watchdog_step(
     now,
     failures_needed=WATCHDOG_DEFAULT_FAILURES,
     cooldown=WATCHDOG_DEFAULT_COOLDOWN,
+    backoff_max=WATCHDOG_DEFAULT_BACKOFF_MAX,
     warmup=WATCHDOG_WARMUP_SECONDS,
 ):
     """Turn one probe into one decision. Mutates `state`, returns the action."""
     if health == PAGE_OK:
         state["failures"] = 0
+        state["restarts"] = 0  # the page recovered: the next crash gets the base wait
         return "ok"
     if health == PAGE_UNREACHABLE:
-        # Nothing on the debugging port: the browser is gone (systemd restarts
-        # it) or this kiosk's unit has no port. Either way, not our call.
+        # Nothing that is Chromium answered on the debugging port: the browser is
+        # gone (systemd restarts it), the port is disabled, or it is an old
+        # Chromium. Either way, never our call.
         state["failures"] = 0
         return "unreachable"
     if unit_state is None or not unit_state.get("active"):
@@ -1099,8 +1139,9 @@ def watchdog_step(
     state["failures"] = min(state["failures"] + 1, failures_needed)
     if state["failures"] < failures_needed:
         return "waiting"
+    restarts = int(state.get("restarts") or 0)
     last = state.get("last_restart")
-    if last is not None and now - last < cooldown:
+    if last is not None and now - last < next_cooldown(restarts, cooldown, backoff_max):
         return "cooldown"
     unit = unit_state.get("unit", KIOSK_UNITS[0])
     state["last_restart"] = now
@@ -1110,6 +1151,7 @@ def watchdog_step(
         ok = bool(restart(unit))
     except Exception as e:
         log(f"watchdog: restarting {unit} failed ({e})")
+    state["restarts"] = restarts + 1  # back off even when the signal failed
     if ok:
         log(f"watchdog: {unit} restarted because the page stopped answering")
         return "restarted"
@@ -1122,6 +1164,7 @@ def run_watchdog(
     *,
     failures_needed=WATCHDOG_DEFAULT_FAILURES,
     cooldown=WATCHDOG_DEFAULT_COOLDOWN,
+    backoff_max=WATCHDOG_DEFAULT_BACKOFF_MAX,
     probe=None,
     state=None,
     restart=None,
@@ -1158,6 +1201,7 @@ def run_watchdog(
                 now=clock(),
                 failures_needed=failures_needed,
                 cooldown=cooldown,
+                backoff_max=backoff_max,
             )
             if action == "unreachable" and not idle_logged:
                 idle_logged = True
@@ -1219,6 +1263,7 @@ def main():
             watchdog["interval"],
             failures_needed=watchdog["failures"],
             cooldown=watchdog["cooldown"],
+            backoff_max=watchdog["backoff_max"],
         )
     else:
         log("watchdog: disabled (CALVIN_KIOSK_WATCHDOG)")

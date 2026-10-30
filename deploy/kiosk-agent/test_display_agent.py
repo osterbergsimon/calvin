@@ -958,6 +958,7 @@ def test_watchdog_config_defaults(monkeypatch):
         "interval": 30,
         "failures": 3,
         "cooldown": 300,
+        "backoff_max": 3600,
     }
 
 
@@ -967,12 +968,14 @@ def test_watchdog_config_reads_environment(monkeypatch):
     monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_SECONDS", "15")
     monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_FAILURES", "5")
     monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_COOLDOWN", "60")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX", "900")
     assert agent.kiosk_watchdog_config() == {
         "enabled": False,
         "port": 9333,
         "interval": 15,
         "failures": 5,
         "cooldown": 60,
+        "backoff_max": 900,
     }
 
 
@@ -990,6 +993,13 @@ def test_watchdog_enabled_by_default_and_when_blank(monkeypatch):
     assert agent.kiosk_watchdog_config()["enabled"] is True
     monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG", "1")
     assert agent.kiosk_watchdog_config()["enabled"] is True
+
+
+def test_watchdog_backoff_cap_never_shrinks_below_the_base_cooldown(monkeypatch):
+    _clear_watchdog_env(monkeypatch)
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_COOLDOWN", "300")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX", "30")
+    assert agent.kiosk_watchdog_config()["backoff_max"] == 300
 
 
 def test_watchdog_config_ignores_garbage(monkeypatch):
@@ -1179,6 +1189,14 @@ def test_probe_page_unreachable_when_nothing_listens():
     assert agent.probe_page(9222, fetch=closed) == agent.PAGE_UNREACHABLE
 
 
+def test_probe_page_unreachable_for_a_non_chromium_json_response():
+    # Only a JSON *array* (Chromium's target list) is evidence of Chromium. Some
+    # other server answering with a JSON object must not make us kill the kiosk.
+    assert agent.probe_page(9222, fetch=lambda u, t: {"hello": "world"}) == (
+        agent.PAGE_UNREACHABLE
+    )
+
+
 def test_probe_page_dead_without_a_page_target():
     targets = [{"type": "browser", "webSocketDebuggerUrl": "ws://x/browser"}]
     assert agent.probe_page(9222, fetch=lambda u, t: targets) == agent.PAGE_DEAD
@@ -1303,6 +1321,63 @@ def test_watchdog_step_respects_the_cooldown():
         )
         == "restarted"
     )
+
+
+def _fail_until_restart(state, restart, now, **over):
+    """Give the state the failures a dead page needs, then take one step."""
+    state["failures"] = 3
+    return agent.watchdog_step(
+        state, agent.PAGE_DEAD, _unit(), restart=restart, now=now, **over
+    )
+
+
+def test_watchdog_restart_backoff_doubles_and_caps():
+    state = {"failures": 0, "last_restart": None, "restarts": 0}
+    restarted = []
+    restart = _recorder(restarted)
+
+    # 1st restart, then the wait is one base cooldown (300s).
+    assert _fail_until_restart(state, restart, 1000.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 1
+    assert (
+        _fail_until_restart(state, restart, 1299.0, backoff_max=1000.0) == "cooldown"
+    )
+    assert _fail_until_restart(state, restart, 1300.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 2
+
+    # 2nd restart doubles the wait to 600s, so 1600 is still too early.
+    assert (
+        _fail_until_restart(state, restart, 1899.0, backoff_max=1000.0) == "cooldown"
+    )
+    assert _fail_until_restart(state, restart, 1900.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 3
+
+    # 3rd restart would wait 1200s; the cap holds it at 1000s.
+    assert (
+        _fail_until_restart(state, restart, 2899.0, backoff_max=1000.0) == "cooldown"
+    )
+    assert _fail_until_restart(state, restart, 2900.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 4
+    assert restarted == ["calvin-kiosk-remote.service"] * 4
+
+
+def test_watchdog_healthy_page_resets_the_backoff():
+    state = {"failures": 2, "last_restart": 1000.0, "restarts": 3}
+    assert agent.watchdog_step(state, agent.PAGE_OK, None, restart=_never, now=1100) == (
+        "ok"
+    )
+    assert state["restarts"] == 0
+    # The next crash waits one base cooldown again, not 4x.
+    assert _fail_until_restart(state, _recorder([]), 1299.0) == "cooldown"
+    assert _fail_until_restart(state, _recorder([]), 1300.0) == "restarted"
 
 
 def test_watchdog_step_leaves_a_stopped_or_starting_unit_alone():
@@ -1545,6 +1620,45 @@ def test_run_watchdog_restarts_the_unit_after_three_dead_probes():
     )
     assert restarted == ["calvin-kiosk-remote.service"]
     assert slept == [30, 30, 30, 30]
+
+
+def test_run_watchdog_never_restarts_when_cdp_never_answers(capsys):
+    restarted = []
+    slept = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=50,
+        probe=lambda: agent.PAGE_UNREACHABLE,  # disabled, missing flag, old Chromium
+        state=lambda unit: _unit(),
+        restart=_recorder(restarted),
+        sleep=slept.append,
+        clock=lambda: 1.0,
+    )
+    assert restarted == []
+    assert len(slept) == 50
+    out = capsys.readouterr().out
+    assert out.count("crash recovery is idle") == 1
+
+
+def test_run_watchdog_restarts_only_after_cdp_reports_a_dead_page():
+    probes = iter([agent.PAGE_UNREACHABLE] * 5 + [agent.PAGE_DEAD] * 3)
+    restarted = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=8,
+        probe=lambda: next(probes, agent.PAGE_OK),
+        state=lambda unit: _unit(),
+        restart=_recorder(restarted),
+        sleep=lambda s: None,
+        clock=lambda: 1000.0,
+    )
+    assert restarted == ["calvin-kiosk-remote.service"]
 
 
 def test_run_watchdog_survives_probe_errors():
