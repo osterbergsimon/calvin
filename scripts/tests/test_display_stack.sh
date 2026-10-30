@@ -18,6 +18,7 @@ export CALVIN_HOME_OVERRIDE="$tmp/home"
 export CALVIN_SYSTEMD_DIR="$tmp/systemd"
 export CALVIN_KIOSK_ENV_FILE="$tmp/calvin-kiosk"
 export CALVIN_KIOSK_DISPLAY_ENV_FILE="$tmp/calvin-kiosk-display"
+export CALVIN_KIOSK_COG_ENV_FILE="$tmp/calvin-kiosk-cog"
 export SYSTEMCTL_LOG="$tmp/systemctl.log"
 make_stub "$tmp/bin" systemctl "echo \"\$*\" >> \"\${SYSTEMCTL_LOG}\""
 make_stub "$tmp/bin" chown ":"
@@ -36,8 +37,10 @@ reset_systemctl_log() { rm -f "$SYSTEMCTL_LOG"; }
 assert_eq "x11" "$(CALVIN_DISPLAY_STACK=auto resolve_display_stack)" "auto must mean x11 in phase 1"
 assert_eq "x11" "$(unset CALVIN_DISPLAY_STACK; resolve_display_stack)" "unset must mean x11"
 assert_eq "wayland" "$(CALVIN_DISPLAY_STACK=wayland resolve_display_stack)" "env override ignored"
+assert_eq "cog" "$(CALVIN_DISPLAY_STACK=cog resolve_display_stack)" "cog env override ignored"
 assert_eq "x11" "$(CALVIN_DISPLAY_STACK=wayland resolve_display_stack x11)" "--display-stack must win over env"
 assert_eq "wayland" "$(CALVIN_DISPLAY_STACK=x11 resolve_display_stack wayland)" "--display-stack must win over env"
+assert_eq "cog" "$(CALVIN_DISPLAY_STACK=x11 resolve_display_stack cog)" "--display-stack cog must win over env"
 if err="$(CALVIN_DISPLAY_STACK=bogus resolve_display_stack 2>&1)"; then
     fail "invalid CALVIN_DISPLAY_STACK accepted"
 fi
@@ -55,6 +58,8 @@ for p in xserver-xorg xinit openbox unclutter xdotool x11-xserver-utils chromium
         || fail "shared kiosk package set lost $p (X11 rollback needs it)"
 done
 [ -z "$(display_stack_packages x11)" ] || fail "x11 must not add packages beyond the shared set"
+cog_pkgs="$(display_stack_packages cog)"
+echo "$cog_pkgs" | grep -qx "cog" || fail "cog package set is missing cog"
 pass "package split keeps X11 installed"
 
 # --- 3. Fresh install on each stack ------------------------------------------
@@ -73,6 +78,8 @@ assert_not_contains "$CALVIN_KIOSK_DISPLAY_ENV_FILE" '^DISPLAY=' "wayland env fi
 assert_not_contains "$CALVIN_KIOSK_DISPLAY_ENV_FILE" 'XAUTHORITY' "wayland env file still sets XAUTHORITY"
 assert_contains "$SYSTEMCTL_LOG" '^enable calvin-wayland.service$' "wayland not enabled"
 assert_contains "$SYSTEMCTL_LOG" '^disable calvin-x.service$' "X11 not disabled"
+assert_contains "$SYSTEMCTL_LOG" '^disable calvin-cog.service$' "cog not disabled on wayland"
+assert_contains "$SYSTEMCTL_LOG" '^enable calvin-kiosk-remote.service$' "Chromium not enabled on wayland"
 assert_mode "$tmp/home/calvin/.config/labwc/autostart" 755
 # shellcheck disable=SC2016  # matching the literal script text
 assert_contains "$tmp/home/calvin/.config/labwc/autostart" 'wlr-randr --output "\$out" --on'
@@ -102,6 +109,7 @@ assert_not_contains "$CALVIN_KIOSK_DISPLAY_ENV_FILE" 'WAYLAND_DISPLAY' "x11 env 
 assert_not_contains "$CALVIN_KIOSK_DISPLAY_ENV_FILE" 'XDG_RUNTIME_DIR' "x11 env file still sets XDG_RUNTIME_DIR"
 assert_contains "$SYSTEMCTL_LOG" '^enable calvin-x.service$' "X11 not re-enabled"
 assert_contains "$SYSTEMCTL_LOG" '^disable calvin-wayland.service$' "wayland not disabled"
+assert_contains "$SYSTEMCTL_LOG" '^enable calvin-kiosk-remote.service$' "Chromium not re-enabled on x11"
 pass "rollback rewrites the env and flips the compositor units"
 
 # --- 5. Idempotent in both directions ----------------------------------------
@@ -123,6 +131,39 @@ if grep -qx 'enable calvin-x.service' "$SYSTEMCTL_LOG"; then
     fail "switching to wayland also enabled calvin-x.service"
 fi
 pass "switching is idempotent in both directions"
+
+# --- 5b. The cog stack -------------------------------------------------------
+# cog owns DRM/KMS itself: no X/Wayland session env, Chromium must stay off, and
+# the rotation file is seeded once (the agent's helper keeps its value later).
+reset_systemctl_log
+rm -f "$CALVIN_KIOSK_DISPLAY_ENV_FILE"
+apply_display_stack cog calvin >/dev/null
+assert_contains "$SYSTEMCTL_LOG" '^enable calvin-cog.service$' "cog not enabled"
+assert_contains "$SYSTEMCTL_LOG" '^disable calvin-x.service$' "X11 not disabled on cog"
+assert_contains "$SYSTEMCTL_LOG" '^disable calvin-wayland.service$' "wayland not disabled on cog"
+assert_contains "$SYSTEMCTL_LOG" '^disable calvin-kiosk-remote.service$' "Chromium not disabled on cog"
+if grep -qx 'enable calvin-kiosk-remote.service' "$SYSTEMCTL_LOG"; then
+    fail "Chromium enabled on the cog stack (no X/Wayland session exists there)"
+fi
+assert_not_contains "$CALVIN_KIOSK_DISPLAY_ENV_FILE" '^DISPLAY=' "cog env file sets DISPLAY"
+assert_not_contains "$CALVIN_KIOSK_DISPLAY_ENV_FILE" '^WAYLAND_DISPLAY=' "cog env file sets WAYLAND_DISPLAY"
+assert_eq "0" "$(read_env_value "$CALVIN_KIOSK_COG_ENV_FILE" CALVIN_COG_ROTATION)" \
+    "cog rotation file was not seeded with 0"
+assert_mode "$CALVIN_KIOSK_COG_ENV_FILE" 644
+
+# A persisted rotation (the agent's live setting) survives a setup re-run.
+printf 'CALVIN_COG_ROTATION=2\n' > "$CALVIN_KIOSK_COG_ENV_FILE"
+apply_display_stack cog calvin >/dev/null
+assert_eq "2" "$(read_env_value "$CALVIN_KIOSK_COG_ENV_FILE" CALVIN_COG_ROTATION)" \
+    "setup clobbered the persisted cog rotation"
+
+# ... and switching back re-enables Chromium.
+reset_systemctl_log
+apply_display_stack x11 calvin >/dev/null
+assert_contains "$SYSTEMCTL_LOG" '^enable calvin-x.service$' "X11 not re-enabled after cog"
+assert_contains "$SYSTEMCTL_LOG" '^disable calvin-cog.service$' "cog not disabled after switching to x11"
+assert_contains "$SYSTEMCTL_LOG" '^enable calvin-kiosk-remote.service$' "Chromium not re-enabled after cog"
+pass "cog stack owns the display, keeps Chromium off, and rolls back to x11"
 
 # --- 6. /etc/default/calvin-kiosk owns the stack, and a switch keeps identity --
 cat > "$CALVIN_KIOSK_ENV_FILE" <<'EOF'
