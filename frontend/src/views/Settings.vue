@@ -69,6 +69,7 @@
               v-if="activeCategory === 'screens' && localConfig"
               :key="categoryRenderKey"
               :config="localConfig"
+              :initial-section="routeSection"
               @update:config="handleConfigUpdate"
             />
             <MaintenanceSettings
@@ -157,6 +158,9 @@ const getRouteSettingDestination = () => {
 };
 
 const initialRouteDestination = getRouteSettingDestination();
+// Screens destinations that live inside the Default page open it on mount, so a
+// ?setting=device-power / device-keyboard / layout link still lands (§8).
+const routeSection = computed(() => getRouteSettingDestination()?.section ?? null);
 // Honour tab hints for non-dashboard categories on initial load
 if (
   initialRouteDestination?.tabKey &&
