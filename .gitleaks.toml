@@ -1,0 +1,36 @@
+# gitleaks configuration for Calvin (CLV-59).
+#
+# Runs the upstream default rules plus one repo-specific rule: the
+# maintainer's personal hostname/domain must never be committed again.
+# The allowlist covers fixtures that are intentionally fake test values, so
+# the scan is green today and still catches new leaks.
+
+title = "Calvin"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "calvin-owner-identifier"
+description = "Maintainer-specific hostname or domain"
+regex = '''(?i)\b(?:wholab\.xyz|tardis|osterberg\.co)\b'''
+tags = ["personal"]
+
+[allowlist]
+description = "Known test fixtures and documentation placeholders"
+# The scanner config and the repo-hygiene test name the forbidden values on
+# purpose; everything else is scanned.
+paths = [
+  '''(^|/)\.gitleaks\.toml$''',
+  '''backend/tests/unit/test_repo_hygiene\.py$''',
+]
+regexes = [
+  # Kiosk manifest signing key used by scripts/tests/*.sh and the design docs.
+  '''0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef''',
+  # base64("the sample nonce") in deploy/kiosk-agent/test_display_agent.py.
+  '''dGhlIHNhbXBsZSBub25jZQ==''',
+  # API-key placeholders in docs and frontend fixtures (real keys are random).
+  '''clv_YOUR_KEY_HERE''',
+  '''clv_7Hq2[A-Za-z0-9]+''',
+  '''clv_Qa81''',
+]
