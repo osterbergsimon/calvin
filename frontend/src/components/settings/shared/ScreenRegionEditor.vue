@@ -882,24 +882,38 @@ const confirmReplace = () => {
   if (replaceTarget.value) commitPlacement(replaceTarget.value.regionId);
 };
 
+// A deep link ("Where it shows") may switch pages; remember the region until
+// the page switch settles, because the activeScreenId watcher clears selection.
+const pendingRegionId = ref(null);
+const selectDeepLinkedRegion = id => {
+  if (!id) return;
+  if (getPathById(activeScreen.value.layout, id)) {
+    selectedRegionId.value = id;
+    if (isPhone.value) sheetOpen.value = true;
+  }
+};
+const applyInitialSelection = async () => {
+  if (props.initialPageId) {
+    const pageChanges = props.initialPageId !== activeScreenId.value;
+    if (pageChanges) pendingRegionId.value = props.initialRegionId;
+    selectScreen(props.initialPageId);
+    await nextTick();
+  }
+  if (!pendingRegionId.value) selectDeepLinkedRegion(props.initialRegionId);
+};
+
 // A placement link names the page the source is on: open the editor there. A
 // "Where it shows" line also names the region, so open its inspector too.
 watch(
   () => props.open,
   async open => {
-    if (open && props.initialPageId) {
-      selectScreen(props.initialPageId);
-      await nextTick();
+    if (open) await applyInitialSelection();
+    if (!open) {
+      pendingRegionId.value = null;
+      replaceTarget.value = null;
     }
-    if (open && props.initialRegionId) {
-      const exists = getPathById(activeScreen.value.layout, props.initialRegionId);
-      if (exists) {
-        selectedRegionId.value = props.initialRegionId;
-        if (isPhone.value) sheetOpen.value = true;
-      }
-    }
-    if (!open) replaceTarget.value = null;
-  }
+  },
+  { immediate: true }
 );
 
 /* --- screen ops --- */
@@ -1165,6 +1179,12 @@ watch(
 
 /* keep selection valid when screen changes */
 watch(activeScreenId, () => {
+  if (pendingRegionId.value) {
+    const id = pendingRegionId.value;
+    pendingRegionId.value = null;
+    selectDeepLinkedRegion(id);
+    return;
+  }
   selectedRegionId.value = null;
   clockSelected.value = false;
 });
