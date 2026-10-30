@@ -33,7 +33,7 @@ export const settingsCategories = [
     id: "security",
     label: "Security",
     icon: "🔒",
-    subtitle: "Admin password · allowed origins · network access",
+    subtitle: "Admin password · API keys · allowed sites",
   },
 ];
 
@@ -312,6 +312,15 @@ export const settingsDestinations = [
     tabKey: "settings_tab_security",
     tab: "admin",
     keywords: ["password", "sign out", "admin", "lock", "admin password", "security"],
+  },
+  {
+    id: "security-api-keys",
+    label: "API keys",
+    path: "Security / API keys",
+    category: "security",
+    tabKey: "settings_tab_security",
+    tab: "api-keys",
+    keywords: ["api", "api key", "token", "bearer", "home assistant", "script", "automation"],
   },
   {
     id: "maintenance-updates",

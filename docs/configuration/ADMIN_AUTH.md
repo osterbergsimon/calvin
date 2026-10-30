@@ -101,6 +101,57 @@ An unauthenticated admin request answers
 `401 {"detail":{"code":"setup_required"}}`. Kiosk dashboards should never see
 either.
 
+## API keys
+
+Apps and scripts (Home Assistant, a cron job) can use Calvin without the admin
+password by sending a key. Create, list and revoke keys in **Settings › Security
+› API keys**, or through the API below.
+
+```bash
+curl -H "Authorization: Bearer clv_YOUR_KEY_HERE" http://calvin.local:8000/api/backup/files
+curl -X POST -H "Authorization: Bearer clv_YOUR_KEY_HERE" \
+     -H "Content-Type: application/json" -d '{"showUI": true}' \
+     http://calvin.local:8000/api/config
+```
+
+Scopes form a ladder, `host` ⊇ `admin` ⊇ `read`:
+
+| Scope | May do |
+|---|---|
+| `read` | Every `GET`, including the admin-only reads (backup export and files, scans). Never an unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`), not even the viewer writes. |
+| `admin` | Everything a signed-in admin may do, except the host-acting routes below. |
+| `host` | `admin`, plus the host-acting routes: `POST /api/system/update`, `/reboot`, `/restart-backend`, `/restart-frontend`, `/reload-ui`, `/display/power/on|off`, `/display/timeout/configure`. |
+
+A `host` key does not bypass `CALVIN_HOST_CONTROL`: with it off, host routes
+answer `409 host_control_disabled` for everyone, keys included, and creating a
+`host` key is refused with `403 host_control_disabled`. A key of too low a scope
+gets `403 insufficient_scope`.
+
+Rules:
+
+- The key goes in the `Authorization: Bearer` header only, never in the URL. A
+  bearer request ignores any cookie. A malformed, unknown or revoked key answers
+  `401 invalid_api_key`, even on public routes: it never falls back to anonymous.
+- Keys cannot manage keys. `GET`/`POST /api/auth/keys` and
+  `DELETE /api/auth/keys/{id}` need an admin **session** (the cookie); a key of
+  any scope gets `403 session_required`. Changing the admin password needs the
+  session too.
+- `POST /api/auth/keys {"name", "scope"}` returns `201 {"key": {...}, "secret"}`.
+  The secret (`clv_` + 43 URL-safe characters) is shown only in that response.
+  `409` for a duplicate name (case-insensitive), `422` for an unknown scope or a
+  name that is empty or over 40 characters. `GET` returns
+  `{"keys": [{id, name, scope, prefix, createdAt, lastUsedAt}]}`, never the secret.
+- Revoking (`DELETE`, `204`) takes effect on the very next request.
+- **Changing the admin password does not revoke keys.** Revoke them one by one.
+- Bearer requests skip the cookie Origin/CSRF check (a header can't be forged
+  cross-site) but still get the Host check. Failed bearer attempts are rate
+  limited per IP like logins (5 in a minute, then `429` with `Retry-After`), in
+  their own counter, so a stale script can't lock you out of the password form.
+- Only a SHA-256 of each secret is stored, in `api-keys.json` next to
+  `admin-auth.json` (mode 0600). `last_used_at` is updated at most once a minute
+  per key. Key-shaped strings are redacted from the logs.
+- Deleting `api-keys.json` revokes every key.
+
 ## Limits
 
 - Calvin is normally served over plain HTTP on the LAN; TLS remains a reverse
@@ -108,7 +159,7 @@ either.
 - Anyone on the LAN can still rearrange the dashboard, switch screens and change
   the theme. That is deliberate: display state is writable without a password,
   but code, secrets and backups are not.
-- One password, no usernames, roles or multiple admins.
+- One password, no usernames or multiple admins. API keys are the only other credential.
 - Installed plugins run in the server process, as before. An upload is first
   imported once in a short-lived child interpreter
   (`python -I -m app.plugins.check_plugin`), so a plugin that crashes, calls

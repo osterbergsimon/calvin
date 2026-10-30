@@ -203,3 +203,16 @@ describe("auth store", () => {
     expect(retryAfterSeconds(httpError(429, {}))).toBe(60);
   });
 });
+
+describe("auth store: API key routes (CLV-32)", () => {
+  it("opens the sign-in dialog for a 401 from /auth/keys, unlike the form routes", () => {
+    setActivePinia(createPinia());
+    const auth = useAuthStore();
+    const error = {
+      response: { status: 401, data: { detail: { code: "admin_required" } } },
+      config: { url: "/auth/keys" },
+    };
+    expect(auth.handleUnauthorized(error)).toBe(true);
+    expect(auth.dialog.open).toBe(true);
+  });
+});

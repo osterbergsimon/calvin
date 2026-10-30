@@ -191,7 +191,8 @@ export const useAuthStore = defineStore("auth", () => {
 
     const url = String(error?.config?.url || "");
     // /api/auth/* 401s are form errors (setup, login, password) — §2 handles them.
-    if (/(^|\/)auth\//.test(url)) return false;
+    // API key management (CLV-32) has no form that reads a 401, so it opens the dialog.
+    if (/(^|\/)auth\/(?!keys(\/|$|\?))/.test(url)) return false;
 
     error.adminRequired = true;
     requestSignIn({
