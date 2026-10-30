@@ -59,7 +59,7 @@ const scaled = computed(() => props.context === "panel" && !UNSCALED_KINDS.has(p
    internals size in em against this same base, so all plugin content scales as
    one unit with the "Dashboard size" setting. */
 .schema-renderer__body--scaled {
-  font-size: var(--region-content-fs, 1rem);
+  font-size: var(--region-content-fs, var(--fs-base));
   --plugin-value-size: 2em;
   --plugin-value-size-lg: 2.6em;
   --plugin-value-size-sm: 1.05em;
