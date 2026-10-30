@@ -86,7 +86,7 @@ from the Calvin admin UI — no SSH, no re-flash.
 
 ### How it works
 
-1. **Admin triggers the update.** In Settings → Kiosks, click **Update** next to
+1. **Admin triggers the update.** In Settings → Screens, click **Update** next to
    a kiosk. This sets a per-kiosk `agentUpdateRequested` flag in the backend
    registry (`POST /api/kiosks/{id}/update`).
 
@@ -257,7 +257,7 @@ below 3.9 the update is aborted with a `python-too-old` status and the current
 agent is left in place. The agent reports the updater's status and message on
 its next config poll, so the backend's `agentUpdateStatus` is `"error"` and its
 `agentUpdateMessage` is `"device python < 3.9; keeping current agent"` — the
-kiosk will need an OS upgrade before the agent can be updated, and the Kiosks
+kiosk will need an OS upgrade before the agent can be updated, and the Screens
 list marks it "update needs a newer OS".
 
 The display-agent itself enforces the same floor at startup and exits
