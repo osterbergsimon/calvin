@@ -4,6 +4,8 @@ The pieces land incrementally (route policy in Task 3, auth router in Task 4,
 Host/Origin middleware in Task 5); callers only ever call this function.
 """
 
+from typing import Any
+
 from fastapi import FastAPI
 from loguru import logger
 
@@ -23,8 +25,16 @@ def apply_startup_admin_password() -> None:
     logger.info("Admin password set from CALVIN_ADMIN_PASSWORD")
 
 
+def redact_secrets(record: Any) -> None:
+    """Loguru patcher: blank anything shaped like an API key in every log line."""
+    from app.security.api_keys import SECRET_PATTERN
+
+    record["message"] = SECRET_PATTERN.sub("clv_[redacted]", record["message"])
+
+
 def install_security(app: FastAPI) -> None:
     """Install the admin-auth pieces on ``app``."""
+    logger.configure(patcher=redact_secrets)
     from app.api.routes.auth import router as auth_router
     from app.security.host_origin import HostOriginMiddleware
 
