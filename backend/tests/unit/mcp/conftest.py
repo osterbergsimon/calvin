@@ -24,7 +24,9 @@ def key_store(tmp_path, monkeypatch):
 @pytest.fixture
 def secrets(key_store):
     """One secret per scope."""
-    return {scope: key_store.create(f"{scope}-key", scope)[1] for scope in ("read", "admin", "host")}
+    return {
+        scope: key_store.create(f"{scope}-key", scope)[1] for scope in ("read", "admin", "host")
+    }
 
 
 def fake_ctx(scope: str | None):

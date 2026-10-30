@@ -51,6 +51,9 @@ New to Calvin? Get started quickly:
 - [Host control (`CALVIN_HOST_CONTROL`)](configuration/HOST_CONTROL.md)
 - System configuration
 
+### Integrations
+- [MCP server for AI assistants](integrations/MCP.md)
+
 ### Architecture
 - Event system documentation
 - Plugin relationships and interactions

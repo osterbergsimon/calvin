@@ -121,6 +121,7 @@ from fastapi.encoders import jsonable_encoder  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
+from starlette.routing import Route  # noqa: E402
 
 from app.api.routes import (  # noqa: E402
     backup,
@@ -663,7 +664,7 @@ app.include_router(backup.router, prefix="/api", tags=["backup"])
 # MCP server (CLV-33). Not a FastAPI route, so the gateway authenticates itself:
 # every request needs a bearer API key. Both spellings avoid a redirect on POST.
 for _mcp_path in ("/api/mcp", "/api/mcp/"):
-    app.add_route(_mcp_path, mcp_gateway, methods=["GET", "POST", "DELETE"], include_in_schema=False)
+    app.router.routes.append(Route(_mcp_path, mcp_gateway, methods=["GET", "POST", "DELETE"]))
 
 # Serve static files from frontend dist directory
 # Get the project root (parent of backend directory)
