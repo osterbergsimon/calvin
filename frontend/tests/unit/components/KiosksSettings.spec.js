@@ -596,3 +596,81 @@ describe("KiosksSettings — detail order and hardware drawer", () => {
     expect(w.findComponent(CollapsibleSection).get("section").classes()).not.toContain("expanded");
   });
 });
+
+describe("KiosksSettings — Touch & keyboard (CLV-27)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const one = [
+    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+  ];
+
+  async function selectKeyboard(overrides = {}, globalMode = "auto") {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = one;
+    });
+    store.fetchOverrides = vi.fn(async () => overrides);
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.onScreenKeyboard = globalMode;
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w, store, cfg };
+  }
+
+  const oskControl = w =>
+    w.findAllComponents(SegmentedControl).find(c => c.props("ariaLabel") === "On-screen keyboard");
+
+  it("adds a Touch & keyboard drawer after Display hardware", async () => {
+    const { w } = await selectKeyboard();
+    const titles = w.findAllComponents(CollapsibleSection).map(c => c.props("title"));
+
+    expect(titles).toEqual(["Display hardware", "Touch & keyboard"]);
+  });
+
+  it("inherits the shared setting and says so", async () => {
+    const { w } = await selectKeyboard({}, "on");
+
+    expect(oskControl(w).props("modelValue")).toBe("on");
+    expect(w.text()).toContain("Same as all screens");
+    expect(w.find("[data-test='osk-use-shared']").exists()).toBe(false);
+  });
+
+  it("shows Only this kiosk with a way back when overridden", async () => {
+    const { w } = await selectKeyboard({ onScreenKeyboard: "off" }, "auto");
+
+    expect(oskControl(w).props("modelValue")).toBe("off");
+    expect(w.text()).toContain("Only this kiosk");
+    expect(w.find("[data-test='osk-use-shared']").text()).toBe("Use the shared setting");
+  });
+
+  it("saves an override without dropping other keys", async () => {
+    const { w, store } = await selectKeyboard({ orientation: "portrait" }, "auto");
+
+    oskControl(w).vm.$emit("update:modelValue", "on");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+      orientation: "portrait",
+      onScreenKeyboard: "on",
+    });
+    expect(w.text()).toContain("Only this kiosk");
+  });
+
+  it("Use the shared setting removes only the keyboard key", async () => {
+    const { w, store } = await selectKeyboard(
+      { orientation: "portrait", onScreenKeyboard: "off" },
+      "auto"
+    );
+
+    await w.find("[data-test='osk-use-shared']").trigger("click");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
+    expect(w.text()).toContain("Same as all screens");
+  });
+});

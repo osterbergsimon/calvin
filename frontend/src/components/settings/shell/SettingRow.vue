@@ -2,7 +2,8 @@
   <div class="setting-row" :class="{ 'setting-row--stacked': stacked }">
     <div class="setting-row__info">
       <div class="setting-row__label">
-        <span v-if="statusDot" class="setting-row__dot" aria-hidden="true"></span>{{ label }}
+        <span v-if="statusDot" class="setting-row__dot" aria-hidden="true"></span>
+        {{ label }}<slot name="label-extra" />
       </div>
       <slot name="description">
         <p v-if="description" class="setting-row__desc">{{ description }}</p>
