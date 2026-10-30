@@ -258,6 +258,9 @@ class LoginRateLimiter:
 
 
 login_limiter = LoginRateLimiter()
+# Failed bearer attempts (CLV-32): same policy, own buckets, so a script with a
+# stale key cannot lock the owner out of the password form.
+api_key_limiter = LoginRateLimiter()
 
 
 _store: AdminAuthStore | None = None
