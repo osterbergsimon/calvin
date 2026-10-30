@@ -32,11 +32,15 @@ describe("AuthLockScreen", () => {
     expect(wrapper.text()).toContain("Choose an admin password");
     expect(wrapper.text()).toContain("Anyone on your network who knows it can change Calvin.");
     expect(wrapper.text()).toContain("Setup code");
-    expect(wrapper.text()).toContain("Find it in Calvin's server log or on the kiosk screen.");
+    expect(wrapper.text()).toContain("Calvin printed it in its log when it first started.");
+    const link = wrapper.get("a[href*='GETTING_STARTED']");
+    expect(link.text()).toBe("Where to find it");
+    expect(link.attributes("href")).toContain("#first-sign-in");
+    expect(link.attributes("target")).toBe("_blank");
     expect(wrapper.text()).toContain("Repeat password");
   });
 
-  it("shows the code on the setup screen when the server allows it (loopback kiosk)", async () => {
+  it("prefills the code when the server allows it (loopback kiosk)", async () => {
     const auth = useAuthStore();
     auth.applyStatus({ configured: false, authenticated: false });
     api.get.mockResolvedValueOnce({ data: { code: "ABCD-EFGH" } });
@@ -44,7 +48,22 @@ describe("AuthLockScreen", () => {
     const wrapper = mountLock();
     await flushPromises();
 
-    expect(wrapper.get("[data-test='setup-code-shown']").text()).toContain("ABCD-EFGH");
+    expect(wrapper.get("#auth-setup-code").element.value).toBe("ABCD-EFGH");
+    expect(wrapper.text()).toContain("Filled in from this screen.");
+    expect(wrapper.find("[data-test='setup-code-shown']").exists()).toBe(false);
+  });
+
+  it("gives the code input the right mobile and length attributes", () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+
+    const wrapper = mountLock();
+    const input = wrapper.get("#auth-setup-code");
+
+    expect(input.attributes("autocapitalize")).toBe("characters");
+    expect(input.attributes("autocorrect")).toBe("off");
+    expect(input.attributes("spellcheck")).toBe("false");
+    expect(input.attributes("maxlength")).toBe("9");
   });
 
   it("renders the sign-in variant when configured but locked", () => {
@@ -129,6 +148,26 @@ describe("AuthLockScreen", () => {
 
     expect(wrapper.text()).toContain("That's not the setup code.");
     expect(wrapper.get("#auth-setup-code").element.value).toBe("AAAA-BBBB");
+  });
+
+  it("uses the setup wording when rate limited", async () => {
+    vi.useFakeTimers();
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    api.post.mockRejectedValueOnce(
+      httpError(429, { code: "rate_limited", retry_after: 3 }, { headers: { "retry-after": "3" } })
+    );
+    const wrapper = mountLock();
+
+    await wrapper.get("#auth-setup-code").setValue("AAAA-BBBB");
+    await wrapper.get("#auth-setup-password").setValue("correct horse");
+    await wrapper.get("#auth-setup-repeat").setValue("correct horse");
+    await wrapper.get("form").trigger("submit");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Too many wrong tries. Try again in 0:03.");
+    expect(wrapper.text()).not.toContain("Too many wrong passwords.");
+    expect(wrapper.get("#auth-setup-code").attributes("disabled")).toBeDefined();
   });
 
   it("switches setup to sign-in with the warn banner on 409", async () => {

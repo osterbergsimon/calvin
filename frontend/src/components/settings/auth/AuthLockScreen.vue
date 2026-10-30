@@ -58,14 +58,6 @@
         <p v-if="notice" class="auth-banner auth-banner--warn" role="status">{{ notice }}</p>
         <p v-else-if="!oskCollapsed" class="auth-card__lead">{{ lead }}</p>
 
-        <p
-          v-if="mode === 'setup' && shownSetupCode && !oskCollapsed"
-          class="auth-card__setup-code"
-          data-test="setup-code-shown"
-        >
-          Setup code: <code>{{ shownSetupCode }}</code>
-        </p>
-
         <!-- Password managers attach saved passwords to one consistent account. -->
         <input
           class="auth-card__username"
@@ -84,7 +76,7 @@
           role="status"
           aria-live="off"
         >
-          Too many wrong passwords. Try again in {{ rateRemaining }}.
+          {{ rateMessage }}
         </p>
         <p class="auth-card__live" aria-live="polite">{{ liveMessage }}</p>
 
@@ -95,11 +87,26 @@
             type="text"
             label="Setup code"
             autocomplete="one-time-code"
-            hint="Find it in Calvin's server log or on the kiosk screen."
+            autocapitalize="characters"
+            :maxlength="9"
             :error="error3"
             :disabled="submitting || rateLocked"
             input-id="auth-setup-code"
-          />
+          >
+            <template #hint>
+              <template v-if="shownSetupCode">Filled in from this screen.</template>
+              <template v-else>
+                Calvin printed it in its log when it first started.
+                <a
+                  class="auth-card__hint-link"
+                  href="https://osterbergsimon.github.io/calvin/setup/GETTING_STARTED/#first-sign-in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Where to find it</a
+                >
+              </template>
+            </template>
+          </PasswordField>
           <PasswordField
             ref="firstField"
             v-model="password"
@@ -236,10 +243,16 @@ const {
   start: startCountdown,
 } = useRateLimitCountdown();
 const liveMessage = ref("");
+const rateMessage = computed(() =>
+  mode.value === "setup"
+    ? `Too many wrong tries. Try again in ${rateRemaining.value}.`
+    : `Too many wrong passwords. Try again in ${rateRemaining.value}.`
+);
 
 watch(rateLocked, lockedNow => {
   if (lockedNow) {
-    liveMessage.value = "Too many wrong passwords.";
+    liveMessage.value =
+      mode.value === "setup" ? "Too many wrong tries." : "Too many wrong passwords.";
   } else if (liveMessage.value) {
     liveMessage.value = "You can try again now.";
     nextTick(() => focusField());
@@ -288,7 +301,9 @@ function focusField() {
 
 /** The kiosk screen may show the code itself when the server allows it (loopback). */
 async function loadSetupCode() {
-  shownSetupCode.value = (await auth.fetchSetupCode()) || "";
+  const code = await auth.fetchSetupCode();
+  shownSetupCode.value = code || "";
+  if (code) setupCode.value = code;
 }
 
 watch(
@@ -507,10 +522,14 @@ async function submitLogin() {
   line-height: 1.45;
   color: var(--ink-2);
 }
-.auth-card__setup-code {
-  margin: 0 0 16px;
-  font-size: var(--fs-md);
-  color: var(--ink-2);
+.auth-card__hint-link {
+  margin-left: 4px;
+  color: var(--focus);
+  text-underline-offset: 2px;
+}
+.auth-card__hint-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .auth-card__username {
   position: absolute;

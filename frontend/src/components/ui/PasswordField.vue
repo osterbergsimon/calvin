@@ -11,7 +11,8 @@
         :value="modelValue"
         :autocomplete="autocomplete"
         :disabled="disabled"
-        autocapitalize="off"
+        :autocapitalize="autocapitalize"
+        :maxlength="maxlength"
         autocorrect="off"
         spellcheck="false"
         :aria-invalid="error ? 'true' : 'false'"
@@ -33,12 +34,14 @@
       </button>
     </div>
     <p v-if="error" :id="errorId" class="password-field__error">{{ error }}</p>
-    <p v-else-if="hint" :id="hintId" class="password-field__hint">{{ hint }}</p>
+    <p v-else-if="hint || $slots.hint" :id="hintId" class="password-field__hint">
+      <slot name="hint">{{ hint }}</slot>
+    </p>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, useSlots } from "vue";
 
 let fieldSeq = 0;
 
@@ -48,6 +51,8 @@ const props = defineProps({
   autocomplete: { type: String, default: "current-password" },
   // "text" for a visible one-off value such as the setup code; no Show toggle then.
   type: { type: String, default: "password" },
+  autocapitalize: { type: String, default: "off" },
+  maxlength: { type: [String, Number], default: undefined },
   hint: { type: String, default: "" },
   error: { type: String, default: "" },
   disabled: { type: Boolean, default: false },
@@ -59,13 +64,14 @@ const props = defineProps({
 
 defineEmits(["update:modelValue", "update:revealed", "blur"]);
 
+const slots = useSlots();
 const fallbackId = `password-field-${++fieldSeq}`;
 const fieldId = computed(() => props.inputId || fallbackId);
 const errorId = computed(() => `${fieldId.value}-error`);
 const hintId = computed(() => `${fieldId.value}-hint`);
 const describedBy = computed(() => {
   if (props.error) return errorId.value;
-  if (props.hint) return hintId.value;
+  if (props.hint || slots.hint) return hintId.value;
   return undefined;
 });
 
