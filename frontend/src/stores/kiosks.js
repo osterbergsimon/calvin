@@ -36,6 +36,15 @@ export const useKiosksStore = defineStore("kiosks", () => {
     await api.put(`/kiosks/${encodeURIComponent(id)}/overrides`, { overrides });
   }
 
+  // Keep the list's copy in step after a write (the list carries overrides so
+  // screens can be previewed and named without N extra requests).
+  function setKioskOverrides(id, overrides) {
+    const kiosk = kiosks.value.find(k => k.id === id);
+    if (!kiosk) return;
+    kiosk.overrides = overrides;
+    setCachedData(CACHE_KEY, kiosks.value);
+  }
+
   async function fetchDeviceConfigVersion(id) {
     try {
       const response = await api.get(`/kiosks/${encodeURIComponent(id)}/config`);
@@ -64,6 +73,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     loadKiosks,
     fetchOverrides,
     saveOverrides,
+    setKioskOverrides,
     fetchDeviceConfigVersion,
     triggerUpdate,
     fetchAvailableAgentVersion,

@@ -207,7 +207,7 @@
         </button>
       </div>
       <button type="button" class="link-btn back" @click="$emit('deselect')">
-        ◂ Back to screen settings
+        ◂ Back to page settings
       </button>
     </section>
   </div>

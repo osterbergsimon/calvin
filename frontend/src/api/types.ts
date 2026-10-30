@@ -941,6 +941,10 @@ export interface paths {
     /**
      * Get Kiosk Config
      * @description Return a kiosk's effective (merged) config; records the kiosk + its agent report.
+     *
+     *     ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
+     *     reported at load and on resize) so the layout editor can preview a screen at
+     *     its real aspect ratio (CLV-36).
      */
     get: operations["get_kiosk_config_api_kiosks__kiosk_id__config_get"];
     put?: never;
@@ -3911,6 +3915,8 @@ export interface operations {
         kagent?: string | null;
         kstat?: string | null;
         kmsg?: string | null;
+        vw?: number | null;
+        vh?: number | null;
       };
       header?: never;
       path: {

@@ -48,6 +48,31 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_config_fetch_records_viewport(test_client: TestClient):
+    """The kiosk reports vw/vh on its config fetch; GET /kiosks returns them (CLV-36)."""
+    resp = test_client.get("/api/kiosks/hall-viewport/config?vw=1080&vh=1920")
+    assert resp.status_code == 200
+    listed = test_client.get("/api/kiosks").json()["kiosks"]
+    kiosk = next(k for k in listed if k["id"] == "hall-viewport")
+    assert kiosk["viewport"] == {"w": 1080, "h": 1920}
+
+
+@pytest.mark.integration
+def test_list_kiosks_includes_overrides_without_agent_keys(test_client: TestClient):
+    """GET /kiosks carries each kiosk's overrides, with host-internal keys stripped."""
+    test_client.put(
+        "/api/kiosks/hall-overrides/overrides",
+        json={"overrides": {"displayName": "Hallway", "availableScreens": ["home"]}},
+    )
+    test_client.post("/api/kiosks/hall-overrides/update")
+    listed = test_client.get("/api/kiosks").json()["kiosks"]
+    kiosk = next(k for k in listed if k["id"] == "hall-overrides")
+    assert kiosk["overrides"] == {"displayName": "Hallway", "availableScreens": ["home"]}
+    assert kiosk["agentUpdateRequested"] is True
+    assert "_agentUpdateRequested" not in kiosk["overrides"]
+
+
+@pytest.mark.integration
 def test_effective_config_unknown_kiosk_is_global(test_client: TestClient):
     resp = test_client.get("/api/kiosks/brand-new-abc123/config")
     assert resp.status_code == 200

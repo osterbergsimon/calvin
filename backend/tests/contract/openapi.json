@@ -3179,7 +3179,7 @@
     },
     "/api/kiosks/{kiosk_id}/config": {
       "get": {
-        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.",
+        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36).",
         "operationId": "get_kiosk_config_api_kiosks__kiosk_id__config_get",
         "parameters": [
           {
@@ -3253,6 +3253,38 @@
                 }
               ],
               "title": "Kmsg"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vw",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Vw"
+            }
+          },
+          {
+            "in": "query",
+            "name": "vh",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Vh"
             }
           }
         ],
