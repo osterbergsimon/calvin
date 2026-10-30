@@ -10,7 +10,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-secondary" @click="handleCancel">Cancel</button>
-        <button type="button" class="btn-danger" @click="handleConfirm">
+        <button type="button" :class="danger ? 'btn-danger' : 'btn-primary'" @click="handleConfirm">
           {{ confirmText }}
         </button>
       </div>
@@ -37,6 +37,13 @@ defineProps({
   confirmText: {
     type: String,
     default: "Confirm",
+  },
+  // Destructive actions (delete, reset) keep the red button; a confirming
+  // action that is not destructive (e.g. "Make default") uses the primary
+  // focus style instead, so the colour carries the meaning.
+  danger: {
+    type: Boolean,
+    default: true,
   },
 });
 
@@ -132,6 +139,30 @@ const handleCancel = () => {
 }
 
 .btn-secondary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  padding: 0.5rem 1rem;
+  min-height: var(--touch-target);
+  background: var(--focus);
+  color: var(--focus-ink);
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--focus) 30%, transparent);
+}
+
+.btn-primary:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
