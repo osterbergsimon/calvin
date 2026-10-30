@@ -1,8 +1,10 @@
 [Unit]
 Description=Calvin kiosk (cog + WPE WebKit, DRM/KMS)
-# Same session shape as calvin-x.service/calvin-wayland.service: the unit takes
-# tty1 over from getty and opens a PAM/logind session on it, which is what gives
-# cog DRM master before anything else can claim the KMS device.
+# Unlike calvin-x.service/calvin-wayland.service this unit does NOT open a
+# PAM/logind session: on the owner's Pi 3B+ `PAMName=login` made cog trap
+# (SIGTRAP, "bwrap: Unexpected capabilities but not setuid") before it drew.
+# cog is the first DRM client, so opening /dev/dri/card0 as calvin (video group)
+# makes it DRM master on its own; no logind session is needed for that.
 After=systemd-user-sessions.service network-online.target getty@tty1.service
 Wants=network-online.target
 # Exactly one display owner: starting cog stops X, labwc and getty (and vice
@@ -16,14 +18,16 @@ User=calvin
 Group=calvin
 # DRM master (video) for /dev/dri/card0, GLES (render) and libinput (/dev/input).
 SupplementaryGroups=video render input
-PAMName=login
-UtmpIdentifier=tty1
 StandardInput=tty
 StandardOutput=tty
 StandardError=tty
 TTYPath=/dev/tty1
 TTYReset=yes
 TTYVHangup=yes
+# pam_systemd would normally create /run/user/<uid>; without a PAM session
+# systemd provides this unit-owned dir instead (WPE needs a writable run dir).
+RuntimeDirectory=calvin-cog
+Environment=XDG_RUNTIME_DIR=/run/calvin-cog
 Environment="HOME=/home/calvin"
 # Backend URL / kiosk identity come from the same file Chromium reads; the
 # rotation is written by calvin-cog-panel.sh when the agent changes it.
@@ -43,9 +47,10 @@ ExecStart=/bin/bash -c 'url="$${CALVIN_BACKEND_URL%/}"; \
       --platform-params="renderer=gles,rotation=$${CALVIN_COG_ROTATION:-0}" \
       --webprocess-failure=restart \
       "$${url}"'
-# cog exits with SIGSEGV on SIGTERM (upstream behaviour, harmless); treat that
-# as a clean stop so a screen-off does not look like a crash and restart-loop.
-SuccessExitStatus=SIGSEGV
+# cog aborts on SIGTERM: SIGSEGV when it ran as root, SIGABRT as the calvin
+# user (upstream behaviour, harmless); treat both as a clean stop so a
+# screen-off does not look like a crash and restart-loop.
+SuccessExitStatus=SIGSEGV SIGABRT
 Restart=always
 RestartSec=5
 StandardOutput=journal
