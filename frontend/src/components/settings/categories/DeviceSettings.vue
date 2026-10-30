@@ -101,21 +101,33 @@
     </SettingsSection>
 
     <SettingsSection id="device-keyboard" title="Keyboard">
-      <SettingRow
-        label="On-screen keyboard"
-        description="Shows a keyboard on the screen when you tap a text field. Auto turns it on for touch screens."
-      >
+      <SettingRow label="On-screen keyboard">
+        <template #label-extra><span class="device-chip">This screen</span></template>
+        <template #description>
+          <p class="setting-row__desc">
+            <span>{{ oskDescription }}</span>
+            <button
+              v-if="oskMode === 'auto' && oskHardwareSeen"
+              type="button"
+              class="device-osk-show-again"
+              @click="showOskAgain"
+            >
+              Show it again
+            </button>
+          </p>
+        </template>
         <SegmentedControl
-          :model-value="config.onScreenKeyboard || 'auto'"
+          :model-value="oskMode"
           :options="[
             { value: 'auto', label: 'Auto' },
-            { value: 'on', label: 'Always' },
+            { value: 'on', label: 'On' },
             { value: 'off', label: 'Off' },
           ]"
           aria-label="On-screen keyboard"
-          @update:model-value="v => emit('update:config', { onScreenKeyboard: v })"
+          @update:model-value="setOskMode"
         />
       </SettingRow>
+      <p class="device-live" aria-live="polite">{{ oskLiveMessage }}</p>
       <SettingRow
         class="device-osk-layout"
         :class="{ 'setting-row--muted': oskOff }"
@@ -208,6 +220,8 @@ import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGri
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import { useScreenSetting } from "@/composables/useScreenSetting";
+import { useOskHardwareSeen } from "@/composables/useOnScreenKeyboard";
 import {
   OSK_LAYOUT_CHANGE_EVENT,
   clearStoredOskLayout,
@@ -225,11 +239,32 @@ const emit = defineEmits(["update:config"]);
 
 const { turnDisplayOn, turnDisplayOff } = useSystem();
 
+// --- On-screen keyboard: Auto · On · Off, per screen (CLV-27 §6) -----------
+// The row edits this screen: a kiosk override on a kiosk, localStorage on any
+// other browser. The server key remains the default for screens without one.
+const oskSetting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+const oskMode = computed(() => oskSetting.value.value || "auto");
+const { seen: oskHardwareSeen, forget: forgetOskHardware } = useOskHardwareSeen();
+const oskLiveMessage = ref("");
+const oskDescription = computed(() => {
+  if (oskMode.value === "on") return "Shows whenever you tap a text field.";
+  if (oskMode.value === "off") {
+    return "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it.";
+  }
+  if (oskHardwareSeen.value) return "Hidden here because a keyboard was used.";
+  return "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen.";
+});
+const setOskMode = value => oskSetting.set(value);
+const showOskAgain = () => {
+  forgetOskHardware();
+  oskLiveMessage.value = "On-screen keyboard will show again.";
+};
+
 // --- On-screen keyboard layout (spec §7, K7) -------------------------------
 // The keyboard layout is its own setting. It is never derived from, and never
 // changes, the language Calvin's UI is shown in.
 const layoutOptions = oskLayoutOptions();
-const oskOff = computed(() => (props.config.onScreenKeyboard || "auto") === "off");
+const oskOff = computed(() => oskMode.value === "off");
 // Unset `oskLayout` means the device's one-time browser hint is in effect.
 // Resolve it once: the hint is cached per device and never follows the UI.
 const layoutHint = resolveOskMainLayout(null);
@@ -305,6 +340,53 @@ const onTurnOff = async () => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+/* Slot content is in this component's scope, not SettingRow's. */
+.setting-row__desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+/* "This screen" chip next to the row label (CLV-27 §6). */
+.device-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  color: var(--ink-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  vertical-align: 2px;
+}
+.device-osk-show-again {
+  margin-left: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.device-osk-show-again:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.device-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 .device-actions {
   display: flex;

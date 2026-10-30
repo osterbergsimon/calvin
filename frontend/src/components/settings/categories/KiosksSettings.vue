@@ -284,6 +284,43 @@
       </button>
       <p v-if="savedMsg" class="kiosks__saved" role="status" aria-live="polite">{{ savedMsg }}</p>
     </CollapsibleSection>
+    <CollapsibleSection
+      v-if="selectedId"
+      title="Touch & keyboard"
+      variant="drawer"
+      :expanded="touchKeyboardOpen"
+      @update:expanded="touchKeyboardOpen = $event"
+    >
+      <SettingRow
+        label="On-screen keyboard"
+        :description="oskOverridden ? 'Only this kiosk' : 'Same as all screens'"
+      >
+        <div class="kiosks-osk">
+          <button
+            v-if="oskOverridden"
+            type="button"
+            class="kiosks__link"
+            data-test="osk-use-shared"
+            @click="useSharedOsk"
+          >
+            Use the shared setting
+          </button>
+          <SegmentedControl
+            :model-value="effOsk"
+            aria-label="On-screen keyboard"
+            :options="[
+              { value: 'auto', label: 'Auto' },
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]"
+            @update:model-value="setOsk"
+          />
+        </div>
+      </SettingRow>
+      <p v-if="keyboardMsg" class="kiosks__saved" role="status" aria-live="polite">
+        {{ keyboardMsg }}
+      </p>
+    </CollapsibleSection>
   </div>
 </template>
 
@@ -321,6 +358,8 @@ const savedMsg = ref("");
 const contentMsg = ref("");
 const desiredVersions = ref({});
 const hardwareOpen = ref(false);
+const touchKeyboardOpen = ref(false);
+const keyboardMsg = ref("");
 // Open by default on a fresh install, where adding a kiosk is the only next step.
 const addOpen = ref(false);
 const availableVersion = ref(null);
@@ -540,6 +579,40 @@ function resetOrientation() {
   persist(next);
 }
 
+// --- Touch & keyboard: the kiosk's on-screen keyboard mode (CLV-27 §6) ------
+const oskOverridden = computed(() => "onScreenKeyboard" in overrides.value);
+const effOsk = computed(() =>
+  oskOverridden.value ? overrides.value.onScreenKeyboard : (config.onScreenKeyboard ?? "auto")
+);
+
+async function persistKeyboard(next) {
+  // Snapshot + revert on failure (calvin-dd9.13), see persistContent.
+  const kioskId = selectedId.value;
+  const prior = overrides.value;
+  overrides.value = next;
+  try {
+    await store.saveOverrides(kioskId, next);
+    const online = selectedKiosk() ? isOnline(selectedKiosk()) : false;
+    keyboardMsg.value = online
+      ? "Saved. This kiosk picks up keyboard changes at its next check-in (~30s)."
+      : "Saved. Changes apply when this kiosk reconnects.";
+    await refreshDesiredVersion(kioskId);
+  } catch {
+    if (selectedId.value === kioskId) overrides.value = prior;
+    keyboardMsg.value = "Couldn't save to the server. Check the connection and try again.";
+  }
+}
+
+function setOsk(value) {
+  persistKeyboard({ ...overrides.value, onScreenKeyboard: value });
+}
+
+function useSharedOsk() {
+  const next = { ...overrides.value };
+  delete next.onScreenKeyboard;
+  persistKeyboard(next);
+}
+
 const SCHED_KEYS = ["displayScheduleEnabled", "displaySchedule"];
 const scheduleMsg = ref("");
 
@@ -593,6 +666,8 @@ async function select(id) {
   contentMsg.value = "";
   scheduleMsg.value = "";
   hardwareOpen.value = false;
+  touchKeyboardOpen.value = false;
+  keyboardMsg.value = "";
   const fetched = await store.fetchOverrides(id);
   // Guard the stale-selection race: clicking kiosk A then B before A's fetch
   // resolves must not land A's overrides under B's selection (calvin-vk3).
@@ -763,6 +838,27 @@ onMounted(async () => {
   margin-top: 8px;
   font-size: 0.85em;
   opacity: 0.7;
+}
+.kiosks-osk {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.kiosks__link {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.kiosks__link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .kiosk-row {
   margin-bottom: 8px;
