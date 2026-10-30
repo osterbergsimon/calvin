@@ -181,6 +181,43 @@ Chromium/Mesa that may have fixed it. Narrower flags that keep compositing (for
 example `--disable-gpu-rasterization`) are being measured on hardware in bead
 `calvin-8by7`.
 
+### Crash-page recovery
+
+The GPU flag removes the common cause, but a renderer can still die (memory
+pressure, an OOM kill). When only the renderer dies, Chromium's browser process
+stays up, so the kiosk unit's `Restart=always` never fires and the screen keeps
+showing "Aw, Snap!". Nothing inside that page can reload itself.
+
+`calvin-display-agent.service` (already installed on every kiosk) therefore acts
+as a watchdog: every 30 s it asks Chromium, over the Chrome DevTools Protocol on
+`127.0.0.1:9222`, whether the dashboard page answers a trivial script. After
+three consecutive failures it restarts the kiosk unit — the browser start-up
+path the kiosk already has: a fresh browser, a fresh page, the same backend.
+This is display-stack independent (it talks to Chromium, not to X11 or Wayland),
+so it covers both.
+
+```bash
+journalctl -u calvin-display-agent -f            # watchdog lines
+curl -s http://127.0.0.1:9222/json/list          # what the agent probes
+```
+
+The debugging port is loopback-only (`--remote-debugging-address=127.0.0.1`) and
+exists only for this probe. Settings live in `/etc/default/calvin-kiosk`:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `CALVIN_KIOSK_WATCHDOG` | `1` | `0`/`off` turns recovery off (the browser is then left alone) |
+| `CALVIN_KIOSK_CDP_PORT` | `9222` | loopback DevTools port; the unit and the agent must agree |
+| `CALVIN_KIOSK_WATCHDOG_SECONDS` | `30` | seconds between probes (minimum 5) |
+| `CALVIN_KIOSK_WATCHDOG_FAILURES` | `3` | consecutive failed probes before a restart |
+| `CALVIN_KIOSK_WATCHDOG_COOLDOWN` | `300` | seconds before another restart (stops restart loops) |
+
+`sudo systemctl restart calvin-display-agent` applies a change. Two guards keep
+the watchdog out of the way: it never touches a unit that is not running (systemd
+owns that case) or one that started less than two minutes ago, and it never acts
+when nothing answers on the port — so an older unit file without the port, or a
+non-kiosk host, simply logs `crash recovery is idle` and nothing restarts.
+
 ## Display stack (Wayland, opt-in)
 
 A kiosk normally runs **X11 + openbox**. You can install it on **Wayland + labwc**
