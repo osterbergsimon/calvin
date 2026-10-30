@@ -198,8 +198,15 @@ read `files.include`. No `.vue` sources, no build step on the host.
 **Theming across shadow DOM:** CSS custom properties inherit into shadow
 roots. Style with the shell's semantic tokens — `--ink`, `--ink-2`, `--ink-3`,
 `--bg-0`, `--bg-1`, `--bg-2`, `--line`, `--line-soft`, `--font-ui`,
-`--font-data`, `--ok`/`--warn`/`--err`, `--focus` — plus the plugin-layer
-sizes below, and your component follows Calvin's themes automatically.
+`--font-data`, `--focus` — plus the plugin-layer sizes below, and your
+component follows Calvin's themes automatically.
+
+For the tones, use the pair rather than picking a colour: `--ok`/`--warn`/
+`--err`/`--focus` are fills (`*-ink` is the readable ink to put ON one of
+them, `*-text` is the tone used AS text on a surface). Both clear WCAG AA in
+every built-in theme. Type and spacing come from `--fs-*`, `--space-*` and
+`--radius-*`; don't hard-code a font size.
+
 Reference: the `chromecast` plugin in `calvin-plugins`.
 
 Web components are wrapped by the same region shell: fill the host
