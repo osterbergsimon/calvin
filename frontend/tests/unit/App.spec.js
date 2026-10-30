@@ -59,7 +59,7 @@ vi.mock("@/composables/useUiScale", () => ({
 }));
 
 vi.mock("@/utils/serverUrl", () => ({
-  resolveServerUrl: () => Promise.resolve("http://192.168.1.20:8000"),
+  resolveServerUrl: () => Promise.resolve("http://192.0.2.20:8000"),
   settingsLink: (base, id) => `${base}/settings?setting=${id}`,
 }));
 
@@ -144,7 +144,7 @@ describe("App shell", () => {
     expect(qr.exists()).toBe(true);
     expect(qr.attributes("src")).toBe("data:image/png;base64,QR");
     expect(wrapper.find('[data-test="phone-setup-url"]').text()).toBe(
-      "http://192.168.1.20:8000/settings?setting=content-calendars"
+      "http://192.0.2.20:8000/settings?setting=content-calendars"
     );
 
     wrapper.unmount();

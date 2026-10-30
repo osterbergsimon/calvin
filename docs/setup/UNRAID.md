@@ -31,7 +31,7 @@ at it as kiosk-only displays.
    - **WebUI Port** `8000`. Change this if port 8000 is already taken.
    - **Appdata** `/mnt/user/appdata/calvin`.
    - **Public URL**: the address phones and new kiosks should use, for
-     example `http://192.168.1.10:8000` (the Unraid server's LAN IP and the
+     example `http://192.0.2.10:8000` (the Unraid server's LAN IP and the
      WebUI port). The container can't detect it itself; without it, the
      "set up from your phone" QR codes and the **Add kiosk** install command
      show the container's internal IP whenever Calvin is opened via `localhost`.

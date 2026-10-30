@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - **Design spec:** `docs/superpowers/specs/2026-07-15-csp-allowed-origins-design.md`.
-- **Accepted origin forms** (CSP host-sources): bare host `grafana.lab`, host+port `192.168.1.50:3000`, subdomain wildcard `*.lab.example.com`, scheme+host `https://grafana.lab:3000` (http/https only). **Rejected:** CIDR/IP-range (`10.0.0.0/24`), paths/query/fragment, spaces, empty, bare `*`, non-http(s) schemes.
+- **Accepted origin forms** (CSP host-sources): bare host `grafana.lab`, host+port `192.0.2.50:3000`, subdomain wildcard `*.lab.example.com`, scheme+host `https://grafana.lab:3000` (http/https only). **Rejected:** CIDR/IP-range (`10.0.0.0/24`), paths/query/fragment, spaces, empty, bare `*`, non-http(s) schemes.
 - **An allowlisted origin extends three directives:** `frame-src`, `img-src`, `connect-src`. Auto-derived web-service origins keep extending `frame-src` only.
 - **Config key:** `security_allowed_origins` (JSON list of normalized strings). Global (per-kiosk deferred).
 - **API JSON shape:** both GET response and PUT body use `{ "origins": [...] }`.
@@ -51,7 +51,7 @@ class TestValidateOrigin:
         assert validate_origin("grafana.lab") == "grafana.lab"
 
     def test_host_and_port(self):
-        assert validate_origin("192.168.1.50:3000") == "192.168.1.50:3000"
+        assert validate_origin("192.0.2.50:3000") == "192.0.2.50:3000"
 
     def test_subdomain_wildcard(self):
         assert validate_origin("*.lab.example.com") == "*.lab.example.com"

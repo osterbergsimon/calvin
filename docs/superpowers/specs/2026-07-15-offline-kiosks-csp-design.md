@@ -126,8 +126,8 @@ script-src 'self';
 **Whitelist granularity (browser-enforceable only):**
 - ✅ exact host: `https://grafana.lab:3000`
 - ✅ subdomain wildcard: `https://*.lab.example.com`
-- ✅ explicit IP host: `http://192.168.1.50:3000`
-- ❌ **CIDR / IP ranges** (`192.168.1.0/24`) — **not expressible in CSP; not
+- ✅ explicit IP host: `http://192.0.2.50:3000`
+- ❌ **CIDR / IP ranges** (`192.0.2.0/24`) — **not expressible in CSP; not
   supported.** For a whole subnet, use a wildcard DNS domain. Calvin will not accept
   CIDR entries, to avoid a gap between what is configured and what is enforced.
 
