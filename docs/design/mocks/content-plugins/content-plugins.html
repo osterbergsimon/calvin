@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Content and plugins</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#fff; --ok:#2f8a57; --err:#c4452b; --warn:#b7791f;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } h1 { font-family:var(--font-display); margin:0 0 20px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; height:720px; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; position:relative; }
+.topbar { height:56px; flex:none; background:var(--bg-1); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 20px; font-weight:600; }
+.topbar .sp { flex:1; } .done { height:36px; padding:0 14px; border-radius:8px; background:var(--focus); color:var(--focus-ink); display:flex; align-items:center; font-size:.85rem; }
+.main { flex:1; display:grid; grid-template-columns:232px 1fr; min-height:0; }
+.rail { border-right:1px solid var(--line); padding:14px 10px; display:flex; flex-direction:column; gap:4px; }
+.cat { padding:9px 12px; border-radius:8px; border:1px solid transparent; } .cat b { display:block; font-weight:500; font-size:.88rem; } .cat span { font-size:.72rem; color:var(--ink-3); }
+.cat.on { background:var(--bg-1); border:2px solid var(--focus); }
+.content { padding:18px 24px; overflow:hidden; }
+.sec { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; margin-bottom:14px; }
+.sec h3 { margin:0; padding:13px 18px 6px; font-size:1rem; font-weight:600; display:flex; align-items:center; gap:10px; } .sec h3 .sp { flex:1; }
+.btn { flex:none; display:inline-flex; align-items:center; height:36px; padding:0 14px; border:1px solid var(--line); border-radius:9px; font-size:.85rem; font-weight:500; background:var(--bg-2); color:var(--ink); }
+.btn.primary { background:var(--focus); border-color:var(--focus); color:var(--focus-ink); font-weight:600; }
+.btn.sm { height:32px; padding:0 11px; font-size:.8rem; }
+.btn.danger-t { color:var(--err); }
+.src { display:flex; align-items:center; gap:12px; padding:9px 18px; border-top:1px solid var(--line-soft); min-height:3.4rem; }
+.grip { color:var(--ink-3); font-size:.9rem; width:12px; }
+.dot { width:9px; height:9px; border-radius:50%; background:var(--ok); flex:none; } .dot.err { background:var(--err); } .dot.off { background:var(--line); }
+.txt { flex:1; min-width:0; } .txt b { font-weight:500; font-size:.92rem; } .txt p { margin:2px 0 0; font-size:.78rem; color:var(--ink-2); } .txt p.e { color:var(--err); }
+.tog { width:42px; height:24px; border-radius:12px; background:var(--focus); position:relative; flex:none; } .tog::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:#fff; }
+.tog.off { background:var(--line); } .tog.off::after { right:auto; left:3px; }
+.more { width:32px; height:32px; border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--ink-2); flex:none; }
+.row { display:flex; align-items:center; gap:14px; padding:9px 18px; border-top:1px solid var(--line-soft); min-height:3.2rem; }
+.pill { flex:none; height:34px; padding:0 12px; border:1px solid var(--line); border-radius:9px; display:flex; align-items:center; gap:8px; font-size:.84rem; } .pill::after { content:"▾"; color:var(--ink-3); font-size:.7rem; }
+.scrim { position:absolute; inset:56px 0 0 0; background:rgba(14,19,22,.4); display:flex; align-items:center; justify-content:center; }
+.dlg { width:30rem; background:var(--bg-1); border-radius:14px; padding:20px; box-shadow:0 18px 50px -16px rgba(0,0,0,.4); }
+.dlg h3 { margin:0 0 14px; font-size:1.1rem; display:flex; } .dlg h3 span { margin-left:auto; color:var(--ink-3); font-weight:400; }
+.tile { display:flex; gap:12px; align-items:center; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; min-height:56px; }
+.ic { width:34px; height:34px; border-radius:8px; background:var(--bg-0); display:flex; align-items:center; justify-content:center; font-weight:600; color:var(--ink-2); flex:none; }
+.tile b { font-weight:500; font-size:.92rem; display:block; } .tile small { font-size:.78rem; color:var(--ink-2); }
+.tile.dim { opacity:.55; } .tile .btn { margin-left:auto; }
+.dlg .foot { margin-top:6px; font-size:.85rem; text-decoration:underline; text-underline-offset:3px; color:var(--ink); }
+.chip { font-size:.7rem; font-weight:500; color:var(--ink-2); border:1px solid var(--line); border-radius:6px; padding:1px 7px; }
+.ver { font-family:var(--font-data); font-size:.72rem; color:var(--ink-3); }
+.pcard { display:flex; align-items:center; gap:12px; padding:12px 18px; border-top:1px solid var(--line-soft); }
+.pcard .txt b { display:flex; gap:8px; align-items:center; } .link { text-decoration:underline; text-underline-offset:3px; color:var(--ink); }
+.filters { display:flex; gap:6px; padding:4px 18px 10px; } .filters span { font-size:.8rem; padding:5px 11px; border:1px solid var(--line); border-radius:999px; } .filters .on { background:color-mix(in srgb, var(--focus) 16%, var(--bg-2)); border-color:var(--focus); }
+.search { margin:6px 18px 8px; height:38px; border:1px solid var(--line); border-radius:9px; display:flex; align-items:center; padding:0 12px; color:var(--ink-3); font-size:.88rem; }
+.disc { padding:12px 18px; border-top:1px solid var(--line-soft); font-size:.88rem; color:var(--ink-2); }
+.inst { color:var(--ok); font-size:.82rem; font-weight:500; flex:none; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>Content owns sources, Plugins owns add-ons</h1>
+
+  <figure>
+    <div class="frame">
+      <div class="topbar">Settings<span class="sp"></span><span class="done">Done</span></div>
+      <div class="main">
+        <div class="rail">
+          <div class="cat on"><b>Content</b><span>Calendars · photos · web pages</span></div>
+          <div class="cat"><b>Dashboard</b><span>Pages · clock bar · theme</span></div>
+          <div class="cat"><b>Screens</b><span>Pages · rotation · power · touch</span></div>
+          <div class="cat"><b>Plugins</b><span>Installed · install</span></div>
+          <div class="cat"><b>System</b><span>Updates · backup</span></div>
+          <div class="cat"><b>Security</b><span>Admin password · API keys</span></div>
+        </div>
+        <div class="content">
+          <div class="sec">
+            <h3>Photos<span class="sp"></span><span class="btn primary">Add photos from…</span></h3>
+            <div class="src"><span class="grip">⠿</span><span class="dot"></span><div class="txt"><b>Local photos</b><p>Uploaded · 214 photos</p></div><div class="tog"></div><span class="btn sm">Edit</span><span class="more">⋯</span></div>
+            <div class="src"><span class="grip">⠿</span><span class="dot"></span><div class="txt"><b>Family albums</b><p>Immich · 2 albums</p></div><div class="tog"></div><span class="btn sm">Edit</span><span class="more">⋯</span></div>
+            <div class="src"><span class="grip">⠿</span><span class="dot err"></span><div class="txt"><b>Holiday 2026</b><p class="e">Immich · Couldn't sign in. Check the API key.</p></div><div class="tog"></div><span class="btn sm">Edit</span><span class="more">⋯</span></div>
+            <div class="row"><div class="txt"><b>Show each photo for</b></div><div class="pill">30 s</div></div>
+            <div class="row"><div class="txt"><b>Fit photos</b><p>How a photo fills its space.</p></div><div class="pill">Smart</div></div>
+          </div>
+          <div class="sec">
+            <h3>Web pages &amp; apps<span class="sp"></span><span class="btn">Add a web page or app</span></h3>
+            <div class="src"><span class="grip">⠿</span><span class="dot"></span><div class="txt"><b>Recipes</b><p>Mealie · 12 recipes</p></div><div class="tog"></div><span class="btn sm">Edit</span><span class="more">⋯</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="scrim"><div class="dlg">
+        <h3>Add photos from…<span>×</span></h3>
+        <div class="tile"><span class="ic">↑</span><div><b>Upload from this device</b><small>JPG, PNG, WebP or GIF into Local photos</small></div></div>
+        <div class="tile"><span class="ic">I</span><div><b>Immich</b><small>Albums from your Immich server</small></div></div>
+        <div class="tile dim"><span class="ic">N</span><div><b>Nextcloud Photos</b><small>Installed, turned off</small></div><span class="btn sm">Turn on</span></div>
+        <div class="foot">Get more in Plugins ›</div>
+      </div></div>
+    </div>
+    <figcaption><b>P1 · Content › Photos: one list for every photo source</b>, with toggle, Edit and ⋯ Remove on each row, and errors shown in place. <b>Add photos from…</b> opens the provider picker: what you want first, the plugin second. The same list and picker serve Calendars, Web pages &amp; apps and Clock bar info.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame">
+      <div class="topbar">Settings<span class="sp"></span><span class="done">Done</span></div>
+      <div class="main">
+        <div class="rail">
+          <div class="cat"><b>Content</b><span>Calendars · photos · web pages</span></div>
+          <div class="cat"><b>Dashboard</b><span>Pages · clock bar · theme</span></div>
+          <div class="cat"><b>Screens</b><span>Pages · rotation · power · touch</span></div>
+          <div class="cat on"><b>Plugins</b><span>Installed · install</span></div>
+          <div class="cat"><b>System</b><span>Updates · backup</span></div>
+          <div class="cat"><b>Security</b><span>Admin password · API keys</span></div>
+        </div>
+        <div class="content">
+          <div class="sec">
+            <h3>Installed</h3>
+            <div class="filters"><span class="on">All</span><span>Calendar</span><span>Photos</span><span>Web page &amp; app</span><span>Clock bar</span><span>Theme</span><span>Background</span></div>
+            <div class="pcard"><span class="ic">I</span><div class="txt"><b>Immich <span class="chip">Photos</span> <span class="ver">1.4.0</span></b><p><span class="link">Used by 2 sources</span></p></div><div class="tog"></div><span class="btn sm primary">Update</span><span class="btn sm">Settings</span><span class="btn sm danger-t">Uninstall</span></div>
+            <div class="pcard"><span class="ic">M</span><div class="txt"><b>Mealie <span class="chip">Web page &amp; app</span> <span class="ver">2.0.1</span></b><p><span class="link">Used by 1 source</span></p></div><div class="tog"></div><span class="btn sm danger-t">Uninstall</span></div>
+            <div class="pcard"><span class="ic">W</span><div class="txt"><b>Weather <span class="chip">Clock bar</span> <span class="ver">0.9.0</span></b><p>Not used yet · <span class="link">Add a source</span></p></div><div class="tog"></div><span class="btn sm danger-t">Uninstall</span></div>
+            <div class="pcard"><span class="ic">B</span><div class="txt"><b>Backlit <span class="chip">Theme</span> <span class="ver">1.1.0</span></b><p><span class="link">Choose it in Dashboard › Appearance</span></p></div><div class="tog"></div><span class="btn sm danger-t">Uninstall</span></div>
+            <div class="pcard"><span class="ic">N</span><div class="txt"><b>Nextcloud Photos <span class="chip">Photos</span> <span class="ver">0.3.2</span></b><p>Turned off · not used</p></div><div class="tog off"></div><span class="btn sm danger-t">Uninstall</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>P2 · Plugins › Installed: the add-ons themselves.</b> Plain kind chips instead of raw types, and no source lists. Each card links to where its sources are ("Used by 2 sources" → Content › Photos, highlighted). Update, settings and uninstall stay here.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame">
+      <div class="topbar">Settings<span class="sp"></span><span class="done">Done</span></div>
+      <div class="main">
+        <div class="rail">
+          <div class="cat"><b>Content</b><span>Calendars · photos · web pages</span></div>
+          <div class="cat"><b>Dashboard</b><span>Pages · clock bar · theme</span></div>
+          <div class="cat"><b>Screens</b><span>Pages · rotation · power · touch</span></div>
+          <div class="cat on"><b>Plugins</b><span>Installed · install</span></div>
+          <div class="cat"><b>System</b><span>Updates · backup</span></div>
+          <div class="cat"><b>Security</b><span>Admin password · API keys</span></div>
+        </div>
+        <div class="content">
+          <div class="sec">
+            <h3>Install from the Calvin catalog</h3>
+            <div class="search">Search plugins…</div>
+            <div class="filters"><span class="on">All</span><span>Calendar</span><span>Photos</span><span>Web page &amp; app</span><span>Clock bar</span><span>Theme</span></div>
+            <div class="pcard"><span class="ic">G</span><div class="txt"><b>Google Calendar <span class="chip">Calendar</span></b><p>Your Google calendars, read-only.</p></div><span class="btn sm primary">Install</span></div>
+            <div class="pcard"><span class="ic">I</span><div class="txt"><b>Immich <span class="chip">Photos</span></b><p>Albums from your Immich server.</p></div><span class="btn sm primary">Update</span></div>
+            <div class="pcard"><span class="ic">H</span><div class="txt"><b>Home Assistant <span class="chip">Web page &amp; app</span></b><p>Entity cards and dashboards.</p></div><span class="btn sm primary">Install</span></div>
+            <div class="pcard"><span class="ic">W</span><div class="txt"><b>Weather <span class="chip">Clock bar</span></b><p>Temperature and forecast in the clock bar.</p></div><span class="inst">Installed ✓</span><span class="btn sm">Add a source</span></div>
+            <div class="disc">› From another GitHub repository</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>P3 · Install, catalog first.</b> The official catalog lists on open, with nothing to type. Another GitHub repository sits behind a disclosure, and Local path stays dev-only. After an install, <b>Add a source</b> goes straight to the Content flow. No server-restart box: installs are live.</figcaption>
+  </figure>
+</main>
+</body>
+</html>
