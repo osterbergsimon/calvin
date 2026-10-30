@@ -450,16 +450,27 @@ def temp_themes_dir(tmp_path):
 @pytest.fixture(autouse=True)
 def patch_data_directories(monkeypatch, tmp_path, temp_plugins_dir, temp_themes_dir):
     """Patch plugin/theme installers to write under tmp_path so tests don't touch real data."""
+    from types import SimpleNamespace
+
+    from app.services import plugin_packages
     from app.services.plugin_installer import plugin_installer
     from app.services.theme_installer import theme_installer
 
     original_plugins_dir = plugin_installer.plugins_dir
     original_themes_dir = theme_installer.themes_dir
+    original_package_settings = plugin_packages.settings
 
     plugin_installer.plugins_dir = temp_plugins_dir
     theme_installer.themes_dir = temp_themes_dir
+    # The persistent plugin package target lives under the data dir; keep a
+    # real plugin install in a test from writing site-packages into the repo
+    # (calvin-26c).
+    plugin_packages.settings = SimpleNamespace(
+        data_dir=tmp_path / "data", plugins_dir=temp_plugins_dir
+    )
 
     yield
 
     plugin_installer.plugins_dir = original_plugins_dir
     theme_installer.themes_dir = original_themes_dir
+    plugin_packages.settings = original_package_settings

@@ -18,11 +18,16 @@ makes no difference.
 | `images/` | Local Images uploads and their `thumbnails/` | `IMAGE_DIR` |
 | `plugins/` | Installed plugins, plus per-instance `scan_cache.json` | `PLUGIN_DIR` (or `PLUGINS_DIR`) |
 | `themes/` | Installed themes | `THEMES_DIR` |
+| `python/<major>.<minor>/site-packages/` | Plugin pip dependencies, one target per interpreter version (survives image updates) | — |
 | `image_cache/` | Cached remote image bytes | `IMAGE_CACHE_DIR` |
 | `logs/` | Backend log directory | `LOG_DIR` |
 | `backups/` | Saved and automatic backups | `BACKUP_DIR` |
 | `kiosk-signing.key` | Kiosk manifest signing key | `KIOSK_SIGNING_KEY_PATH` |
 | `admin-auth.json` | Admin password hash and session-signing secret (mode `0600`) | `ADMIN_AUTH_PATH` |
+
+`python/` holds one directory per interpreter version (`3.11`, `3.12`, …).
+After a base-image Python upgrade Calvin builds the new one; the old one is no
+longer imported and is safe to delete by hand.
 
 An override wins over the data dir for that one path; everything else stays
 under the data dir. A relative value (for `CALVIN_DATA_DIR` or an override)
