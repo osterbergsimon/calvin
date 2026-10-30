@@ -6,17 +6,31 @@ const pluginsRef = ref([]);
 const mockLoadPlugins = vi.fn().mockResolvedValue(undefined);
 const mockTogglePlugin = vi.fn().mockResolvedValue(undefined);
 const mockPush = vi.fn();
+const availablePluginsRef = ref([]);
+const mockEnumerate = vi.fn().mockResolvedValue(undefined);
+const mockInstall = vi.fn().mockResolvedValue([]);
+const pluginInstallErrorRef = ref("");
 
 vi.mock("@/composables", () => ({
   usePlugins: () => ({
     plugins: pluginsRef,
     loadPlugins: mockLoadPlugins,
     togglePlugin: mockTogglePlugin,
+    availablePlugins: availablePluginsRef,
+    enumeratePluginsFromGitHub: mockEnumerate,
+    installPluginFromGitHub: mockInstall,
+    pluginInstallError: pluginInstallErrorRef,
   }),
 }));
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockPush }),
+}));
+
+vi.mock("@/stores/config", () => ({
+  useConfigStore: () => ({
+    pluginCatalogRepo: "https://github.com/osterbergsimon/calvin-plugins",
+  }),
 }));
 
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
@@ -61,9 +75,13 @@ const mountButton = async (props = {}) => {
 describe("AddSourceButton provider picker", () => {
   beforeEach(() => {
     pluginsRef.value = [];
+    availablePluginsRef.value = [];
+    pluginInstallErrorRef.value = "";
     mockLoadPlugins.mockClear();
     mockTogglePlugin.mockClear();
     mockPush.mockClear();
+    mockEnumerate.mockReset().mockResolvedValue(undefined);
+    mockInstall.mockReset().mockResolvedValue([]);
   });
 
   it("lists the enabled plugins of the kind, with the iframe page first", async () => {
