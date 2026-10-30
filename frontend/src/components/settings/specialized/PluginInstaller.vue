@@ -387,6 +387,11 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Arrived from a Content picker's "Get more in Plugins ›": open on that kind.
+  initialType: {
+    type: String,
+    default: "all",
+  },
 });
 
 const emit = defineEmits([
@@ -417,6 +422,19 @@ const detecting = ref(false);
 const selectedPluginIds = ref(new Set());
 const searchQuery = ref("");
 const activeTypeTab = ref("all");
+
+// A Content picker's "Get more" link hands over a kind; show the repository
+// list with that filter already applied instead of the zip drop zone.
+watch(
+  () => props.initialType,
+  type => {
+    if (type && type !== "all") {
+      activeTypeTab.value = type;
+      installMethod.value = "github";
+    }
+  },
+  { immediate: true }
+);
 
 // The plugin repo ships fixtures for its own test suite ("test" keyword); end
 // users shouldn't be offered them, developers in dev mode still are (F8).
