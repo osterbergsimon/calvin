@@ -38,6 +38,7 @@ describe("settings registry", () => {
       "dashboard-regions",
       "dashboard-ui",
       "dashboard-kiosk",
+      "dashboard-kiosk-focus",
       "clock-bar-appearance",
       "clock-bar-items",
       "content-calendars",
@@ -88,7 +89,7 @@ describe("settings registry", () => {
     });
     expect(getSettingDestinationById("dashboard-regions")).toMatchObject({
       category: "dashboard",
-      path: "Dashboard / Screens & regions",
+      path: "Dashboard / Pages & regions",
     });
     expect(getSettingDestinationById("clock-bar-appearance")).toMatchObject({
       category: "dashboard",
@@ -110,7 +111,7 @@ describe("settings registry", () => {
     });
     expect(getSettingDestinationById("device-notifications")).toMatchObject({
       category: "device",
-      path: "Screen & keyboard / Key-press feedback",
+      path: "Screen & keyboard / Remote & buttons",
     });
   });
 
@@ -128,7 +129,8 @@ describe("settings registry", () => {
       "clock-bar-appearance",
     ]);
     expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar-items"]);
-    expect(filterSettingsDestinations("github").map(item => item.id)).toEqual(["plugins"]);
+    // "github" is a plugin-install word; the update source now lives in Advanced.
+    expect(filterSettingsDestinations("github").map(item => item.id)).toContain("plugins");
 
     // Old names still find their new home.
     expect(filterSettingsDestinations("clock bar").map(item => item.id)).toContain(

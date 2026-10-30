@@ -4,7 +4,7 @@
     <SettingsSection id="layout" title="Screen orientation">
       <SettingRow
         label="Orientation"
-        description="Physical screen orientation. Per-screen region direction is set under Screens & regions."
+        description="Which way the screen is mounted. Pages & regions decides how regions stack."
       >
         <SegmentedControl
           :model-value="config.orientation"
@@ -16,20 +16,20 @@
           @update:model-value="v => emit('update:config', { orientation: v })"
         />
       </SettingRow>
-      <SettingRow label="Flip 180°" description="Rotate the display a half-turn.">
+      <SettingRow label="Upside down" description="For screens mounted with the cable on top.">
         <ToggleSwitch
           :model-value="config.orientationFlipped"
-          aria-label="Flip 180°"
+          aria-label="Upside down"
           @update:model-value="v => emit('update:config', { orientationFlipped: v })"
         />
       </SettingRow>
       <SettingRow
-        label="Apply display rotation"
-        description="Apply the orientation setting to the OS display output."
+        label="Rotate the screen output"
+        description="On: Calvin turns the Pi's picture itself. Off: leave it to the OS or the screen."
       >
         <ToggleSwitch
           :model-value="config.applyDisplayRotation"
-          aria-label="Apply display rotation"
+          aria-label="Rotate the screen output"
           @update:model-value="v => emit('update:config', { applyDisplayRotation: v })"
         />
       </SettingRow>
@@ -37,12 +37,12 @@
 
     <SettingsSection id="device-power" title="Screen power">
       <SettingRow
-        label="Power schedule"
-        description="Automatically turn the display off and on at set times."
+        label="Screen on/off schedule"
+        description="Turns the screen off and on at set times."
       >
         <ToggleSwitch
           :model-value="config.displayScheduleEnabled"
-          aria-label="Power schedule"
+          aria-label="Screen on/off schedule"
           @update:model-value="v => emit('update:config', { displayScheduleEnabled: v })"
         />
       </SettingRow>
@@ -53,10 +53,7 @@
             @update:model-value="v => emit('update:config', { displaySchedule: v })"
           />
         </SettingRow>
-        <SettingRow
-          label="Timezone"
-          description="Timezone for the schedule. Leave as system default to use the Pi's timezone."
-        >
+        <SettingRow label="Timezone" description="Used by the schedule.">
           <SelectPill
             :model-value="config.timezone || 'system'"
             :options="timezoneOptions"
@@ -67,63 +64,45 @@
         </SettingRow>
       </template>
 
-      <SettingRow
-        label="Screen timeout"
-        description="Turn the display off after a period of inactivity."
-      >
-        <ToggleSwitch
-          :model-value="config.displayTimeoutEnabled"
-          aria-label="Screen timeout"
-          @update:model-value="v => emit('update:config', { displayTimeoutEnabled: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        v-if="config.displayTimeoutEnabled"
-        label="Timeout"
-        description="Seconds of inactivity before the display turns off (0 = never)."
-      >
-        <NumberStepper
-          :model-value="config.displayTimeout || 0"
-          :min="0"
-          :max="3600"
-          :step="60"
-          aria-label="Display timeout in seconds"
-          @update:model-value="v => emit('update:config', { displayTimeout: v })"
+      <SettingRow label="Turn off when idle">
+        <SelectPill
+          :model-value="idleValue"
+          :options="idleOptions"
+          aria-label="Turn off when idle"
+          @update:model-value="setIdle"
         />
       </SettingRow>
 
-      <SettingRow label="Manual control" description="Turn the display on or off right now.">
+      <SettingRow label="Screen now">
         <div class="device-actions">
-          <button type="button" class="device-btn" @click="onTurnOn">Turn on</button>
           <button type="button" class="device-btn" @click="onTurnOff">Turn off</button>
+          <button type="button" class="device-btn" @click="onTurnOn">Turn on</button>
         </div>
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="device-keyboard" title="Keyboard">
-      <SettingRow label="On-screen keyboard">
-        <template #label-extra><span class="device-chip">This screen</span></template>
+    <SettingsSection id="device-keyboard" title="On-screen keyboard">
+      <SettingRow label="Show it">
+        <template #label-extra><ScopeChip /></template>
         <template #description>
           <p class="setting-row__desc">
-            <span>{{ oskDescription }}</span>
-            <button
-              v-if="oskMode === 'auto' && oskHardwareSeen"
-              type="button"
-              class="device-osk-show-again"
-              @click="showOskAgain"
-            >
-              Show it again
-            </button>
+            When you tap a text field. Auto shows it on touchscreens.
+            <template v-if="oskMode === 'auto' && oskHardwareSeen">
+              Hidden here because a keyboard was used.
+              <button type="button" class="device-osk-show-again" @click="showOskAgain">
+                Show it again
+              </button>
+            </template>
           </p>
         </template>
         <SegmentedControl
           :model-value="oskMode"
           :options="[
             { value: 'auto', label: 'Auto' },
-            { value: 'on', label: 'On' },
-            { value: 'off', label: 'Off' },
+            { value: 'on', label: 'Always' },
+            { value: 'off', label: 'Never' },
           ]"
-          aria-label="On-screen keyboard"
+          aria-label="Show it"
           @update:model-value="setOskMode"
         />
       </SettingRow>
@@ -165,44 +144,42 @@
           />
         </div>
       </SettingRow>
-      <KeyboardTab />
-      <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
 
-    <SettingsSection id="device-notifications" title="Key-press feedback">
+    <SettingsSection id="device-buttons" title="Remote & buttons">
       <SettingRow
-        label="Enable feedback"
-        description="Show a visual indicator when keyboard shortcuts are activated."
+        label="Show button presses"
+        description="A short label appears when a remote or keyboard button does something."
       >
         <ToggleSwitch
           :model-value="config.keyboardFeedbackEnabled"
-          aria-label="Enable feedback"
+          aria-label="Show button presses"
           @update:model-value="v => emit('update:config', { keyboardFeedbackEnabled: v })"
         />
       </SettingRow>
-      <SettingRow label="Feedback style" description="Size of the keyboard feedback overlay.">
+      <SettingRow label="Label size">
         <SegmentedControl
           :model-value="config.keyboardFeedbackMode"
           :options="[
             { value: 'normal', label: 'Normal' },
             { value: 'small', label: 'Small' },
           ]"
-          aria-label="Feedback style"
+          aria-label="Label size"
           @update:model-value="v => emit('update:config', { keyboardFeedbackMode: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Auto-hide delay (s)"
-        description="Seconds before the mode indicator fades out automatically."
-      >
+      <SettingRow label="Hide label after">
         <NumberStepper
           :model-value="config.modeIndicatorTimeout"
           :min="0"
           :max="60"
-          aria-label="Auto-hide delay in seconds"
+          unit=" s"
+          aria-label="Hide label after, in seconds"
           @update:model-value="v => emit('update:config', { modeIndicatorTimeout: v })"
         />
       </SettingRow>
+      <KeyboardTab />
+      <RebootCombo :config="config" @update:config="patch => emit('update:config', patch)" />
     </SettingsSection>
   </div>
 </template>
@@ -212,6 +189,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useSystem } from "@/composables";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import ScopeChip from "@/components/settings/shell/ScopeChip.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
@@ -239,21 +217,53 @@ const emit = defineEmits(["update:config"]);
 
 const { turnDisplayOn, turnDisplayOff } = useSystem();
 
-// --- On-screen keyboard: Auto · On · Off, per screen (CLV-27 §6) -----------
+// --- Turning the screen off when idle --------------------------------------
+// One choice instead of a toggle plus a "(0 = never)" number: the option list
+// is the whole story. Never means the timeout is off; any other option turns
+// it on with that many seconds.
+const IDLE_OPTIONS = [
+  { value: 0, label: "Never" },
+  { value: 300, label: "5 min" },
+  { value: 900, label: "15 min" },
+  { value: 1800, label: "30 min" },
+  { value: 3600, label: "1 hour" },
+  { value: 7200, label: "2 hours" },
+];
+const idleLabel = seconds => {
+  if (seconds < 60) return `${seconds} s`;
+  if (seconds % 3600 === 0) {
+    const hours = seconds / 3600;
+    return `${hours} hour${hours === 1 ? "" : "s"}`;
+  }
+  if (seconds % 60 === 0) return `${seconds / 60} min`;
+  return `${seconds} s`;
+};
+const idleValue = computed(() => {
+  if (!props.config.displayTimeoutEnabled) return 0;
+  return Number(props.config.displayTimeout) || 0;
+});
+const idleOptions = computed(() => {
+  const current = idleValue.value;
+  if (IDLE_OPTIONS.some(option => option.value === current)) return IDLE_OPTIONS;
+  return [...IDLE_OPTIONS, { value: current, label: idleLabel(current) }].sort(
+    (a, b) => a.value - b.value
+  );
+});
+const setIdle = seconds => {
+  if (!seconds) {
+    emit("update:config", { displayTimeoutEnabled: false });
+    return;
+  }
+  emit("update:config", { displayTimeoutEnabled: true, displayTimeout: seconds });
+};
+
+// --- On-screen keyboard: Auto · Always · Never, per screen (CLV-27 §6) ------
 // The row edits this screen: a kiosk override on a kiosk, localStorage on any
 // other browser. The server key remains the default for screens without one.
 const oskSetting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
 const oskMode = computed(() => oskSetting.value.value || "auto");
 const { seen: oskHardwareSeen, forget: forgetOskHardware } = useOskHardwareSeen();
 const oskLiveMessage = ref("");
-const oskDescription = computed(() => {
-  if (oskMode.value === "on") return "Shows whenever you tap a text field.";
-  if (oskMode.value === "off") {
-    return "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it.";
-  }
-  if (oskHardwareSeen.value) return "Hidden here because a keyboard was used.";
-  return "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen.";
-});
 const setOskMode = value => oskSetting.set(value);
 const showOskAgain = () => {
   forgetOskHardware();
@@ -304,7 +314,7 @@ onMounted(() => window.addEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLa
 onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
 
 const timezoneOptions = [
-  { value: "system", label: "System default" },
+  { value: "system", label: "Server's timezone" },
   { value: "UTC", label: "UTC" },
   { value: "America/New_York", label: "New York (EST/EDT)" },
   { value: "America/Chicago", label: "Chicago (CST/CDT)" },
@@ -347,18 +357,6 @@ const onTurnOff = async () => {
   font-size: 0.85rem;
   line-height: 1.4;
   color: var(--ink-2);
-}
-/* "This screen" chip next to the row label (CLV-27 §6). */
-.device-chip {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 0 6px;
-  color: var(--ink-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  vertical-align: 2px;
 }
 .device-osk-show-again {
   margin-left: 4px;

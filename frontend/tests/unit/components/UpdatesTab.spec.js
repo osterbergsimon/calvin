@@ -28,10 +28,6 @@ vi.mock("@/composables", () => ({
   useSystem: () => systemMock,
 }));
 
-vi.mock("@/services/configApi", () => ({
-  getGitBranches: vi.fn(() => Promise.resolve({ branches: ["main", "develop", "release"] })),
-}));
-
 describe("UpdatesTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -50,54 +46,6 @@ describe("UpdatesTab", () => {
     systemMock.getBackendHealth.mockResolvedValue({ status: "healthy" });
     systemMock.restartBackend.mockResolvedValue();
     systemMock.restartFrontend.mockResolvedValue();
-  });
-
-  it("does not save repo URL on every keystroke", async () => {
-    const wrapper = mount(UpdatesTab, {
-      props: {
-        gitRepoUrl: "https://github.com/example/calvin.git",
-        gitBranch: "main",
-      },
-    });
-
-    const repoInput = wrapper.find('input[type="text"]');
-    repoInput.element.value = "https://github.com/example/other.git";
-    await repoInput.trigger("input");
-
-    expect(wrapper.emitted("update:gitRepoUrl")).toBeUndefined();
-  });
-
-  it("saves repo URL on change", async () => {
-    const wrapper = mount(UpdatesTab, {
-      props: {
-        gitRepoUrl: "https://github.com/example/calvin.git",
-        gitBranch: "main",
-      },
-    });
-
-    const repoInput = wrapper.find('input[type="text"]');
-    await repoInput.setValue("https://github.com/example/other.git");
-    await repoInput.trigger("change");
-
-    expect(wrapper.emitted("update:gitRepoUrl")).toEqual([
-      ["https://github.com/example/other.git"],
-    ]);
-  });
-
-  it("emits selected branch value", async () => {
-    const wrapper = mount(UpdatesTab, {
-      props: {
-        gitRepoUrl: "https://github.com/example/calvin.git",
-        gitBranch: "main",
-      },
-    });
-
-    await flushPromises();
-
-    const branchSelect = wrapper.find("select");
-    await branchSelect.setValue("develop");
-
-    expect(wrapper.emitted("update:gitBranch")).toEqual([["develop"]]);
   });
 
   it("refreshes backend and update status on mount", async () => {
@@ -171,12 +119,10 @@ describe("UpdatesTab", () => {
       expect(wrapper.text()).toContain("Check for Updates");
     });
 
-    it("skips the git branch and update-script status calls", async () => {
-      const { getGitBranches } = await import("@/services/configApi");
-      mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
+    it("skips the update-script status call", async () => {
+      mount(UpdatesTab, { props: { gitBranch: "main" } });
       await flushPromises();
 
-      expect(getGitBranches).not.toHaveBeenCalled();
       expect(systemMock.getUpdateStatus).not.toHaveBeenCalled();
       expect(systemMock.getBackendHealth).toHaveBeenCalled();
     });

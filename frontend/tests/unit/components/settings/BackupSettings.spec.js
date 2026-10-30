@@ -159,3 +159,23 @@ describe("BackupSettings", () => {
     expect(link.attributes("href")).toBe("/api/backup/files/auto-pi-1.zip");
   });
 });
+
+// Settings copy audit §3.4: labels speak, units sit on the control.
+describe("BackupSettings copy (§3.4)", () => {
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+
+  it("says Back up every and Keep the last, with the unit on the control", async () => {
+    const { wrapper } = mountWith();
+    await flushPromises();
+    await wrapper.find("[data-test='auto-backup-toggle']").trigger("click");
+    await flushPromises();
+
+    const every = row(wrapper, "Back up every");
+    const keep = row(wrapper, "Keep the last");
+    expect(every.props("description")).toBe("");
+    expect(every.find(".stepper__value").text()).toBe("24 hours");
+    expect(keep.props("description")).toBe("");
+    expect(keep.find(".stepper__value").text()).toBe("7 backups");
+  });
+});

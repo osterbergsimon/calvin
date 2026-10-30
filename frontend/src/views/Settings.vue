@@ -99,6 +99,7 @@ import { useConfigForm } from "@/composables/useConfigForm";
 import { useModeStore } from "@/stores/mode";
 import { useAuthStore } from "@/stores/auth";
 import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy";
+import { expandSettingsSection } from "@/utils/settingsSectionExpansion";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
@@ -319,6 +320,7 @@ const SECTION_BY_CATEGORY_TAB = {
     "bar-items": "clock-bar-items",
     appearance: "appearance",
     "kiosk-touch": "kiosk-touch",
+    "kiosk-touch-focus": "kiosk-touch-focus",
   },
   content: {
     calendars: "content-calendars",
@@ -333,16 +335,17 @@ const SECTION_BY_CATEGORY_TAB = {
     layout: "layout",
     power: "device-power",
     keyboard: "device-keyboard",
-    notifications: "device-notifications",
-    // The reboot combo is folded into the Keyboard section.
-    reboot: "device-keyboard",
+    notifications: "device-buttons",
+    // The reboot combo lives with the remote's button rows.
+    reboot: "device-buttons",
   },
   maintenance: {
     updates: "maintenance-updates",
     hardware: "device-hardware",
     system: "maintenance-system",
     backup: "maintenance-backup",
-    diagnostics: "maintenance-diagnostics",
+    // The old Diagnostics rows moved into the closed Advanced disclosure.
+    diagnostics: "maintenance-advanced",
   },
   kiosks: {
     // "Kiosk software" is a row inside the Kiosks list, not a tab.
@@ -376,6 +379,8 @@ function scrollToDestination(destination, attempt = 0) {
   }
   const sectionId = sectionFor(destination);
   if (!sectionId) return;
+  // A closed disclosure (System › Advanced) must open before it can be read.
+  expandSettingsSection(sectionId);
   const el = document.getElementById("section-" + sectionId);
   if (el) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });

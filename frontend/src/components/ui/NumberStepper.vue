@@ -9,7 +9,7 @@
     >
       −
     </button>
-    <span class="stepper__value" aria-live="polite">{{ modelValue }}</span>
+    <span class="stepper__value" aria-live="polite">{{ modelValue }}{{ unit }}</span>
     <button
       type="button"
       class="stepper__btn"
@@ -28,6 +28,9 @@ const props = defineProps({
   min: { type: Number, default: -Infinity },
   max: { type: Number, default: Infinity },
   step: { type: Number, default: 1 },
+  // Unit shown after the value ("30 s", "5 min"). Units live on the control,
+  // never in the label or description (settings copy audit, rule 3).
+  unit: { type: String, default: "" },
   ariaLabel: { type: String, default: null },
 });
 const emit = defineEmits(["update:modelValue"]);

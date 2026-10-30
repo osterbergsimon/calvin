@@ -42,7 +42,7 @@ describe("DeviceSettings", () => {
       props: { config: baseConfig },
       global: { stubs },
     });
-    for (const id of ["layout", "device-power", "device-keyboard", "device-notifications"]) {
+    for (const id of ["layout", "device-power", "device-keyboard", "device-buttons"]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
     // version numbers now live under System › Versions & status
@@ -52,7 +52,7 @@ describe("DeviceSettings", () => {
     expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
   });
 
-  it("orders the sections Screen orientation, Screen power, Keyboard, Key-press feedback", () => {
+  it("orders the sections Screen orientation, Screen power, On-screen keyboard, Remote & buttons", () => {
     const wrapper = mount(DeviceSettings, {
       props: { config: baseConfig },
       global: { stubs },
@@ -61,7 +61,7 @@ describe("DeviceSettings", () => {
       "section-layout",
       "section-device-power",
       "section-device-keyboard",
-      "section-device-notifications",
+      "section-device-buttons",
     ]);
     expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe(
       "Screen orientation"
@@ -69,8 +69,11 @@ describe("DeviceSettings", () => {
     expect(wrapper.find("#section-device-power .settings-section__eyebrow").text()).toBe(
       "Screen power"
     );
-    expect(wrapper.find("#section-device-notifications .settings-section__eyebrow").text()).toBe(
-      "Key-press feedback"
+    expect(wrapper.find("#section-device-keyboard .settings-section__eyebrow").text()).toBe(
+      "On-screen keyboard"
+    );
+    expect(wrapper.find("#section-device-buttons .settings-section__eyebrow").text()).toBe(
+      "Remote & buttons"
     );
   });
 
@@ -98,7 +101,7 @@ describe("DeviceSettings", () => {
     );
   });
 
-  it("offers Auto / On / Off for the on-screen keyboard", () => {
+  it("offers Auto / Always / Never for the on-screen keyboard", () => {
     const config = useConfigStore();
     config.onScreenKeyboard = "auto";
     const wrapper = mount(DeviceSettings, {
@@ -109,23 +112,34 @@ describe("DeviceSettings", () => {
     });
     const control = wrapper
       .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "On-screen keyboard");
+      .find(c => c.props("ariaLabel") === "Show it");
 
     expect(control).toBeTruthy();
-    expect(control.props("options").map(o => o.label)).toEqual(["Auto", "On", "Off"]);
+    expect(control.props("options").map(o => o.label)).toEqual(["Auto", "Always", "Never"]);
 
     control.vm.$emit("update:modelValue", "on");
     expect(window.localStorage.getItem("calvin-osk-mode")).toBe("on");
   });
 
-  it("shows the timeout stepper only when timeout is enabled", async () => {
+  it("offers one Turn off when idle choice instead of a toggle plus seconds", () => {
     const wrapper = mount(DeviceSettings, {
-      props: {
-        config: { ...baseConfig, displayTimeoutEnabled: true },
-      },
+      props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 900 } },
       global: { stubs },
     });
-    expect(wrapper.text()).toContain("Timeout");
+    expect(wrapper.text()).toContain("Turn off when idle");
+    expect(wrapper.text()).not.toContain("(0 = never)");
+    const idle = wrapper
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    expect(idle.props("modelValue")).toBe(900);
+    expect(idle.props("options").map(o => o.label)).toEqual([
+      "Never",
+      "5 min",
+      "15 min",
+      "30 min",
+      "1 hour",
+      "2 hours",
+    ]);
   });
 
   it("passes config through to the folded-in RebootCombo", () => {
@@ -321,21 +335,19 @@ describe("DeviceSettings", () => {
     const modeControl = wrapper =>
       wrapper
         .findAllComponents({ name: "SegmentedControl" })
-        .find(c => c.props("ariaLabel") === "On-screen keyboard");
+        .find(c => c.props("ariaLabel") === "Show it");
 
     it("labels the row with the This screen chip", () => {
       const wrapper = mountRow("auto");
 
       expect(wrapper.find(".device-chip").text()).toBe("This screen");
-      expect(wrapper.find("#section-device-keyboard").text()).toContain("On-screen keyboard");
+      expect(wrapper.find("#section-device-keyboard").text()).toContain("Show it");
     });
 
     it("describes Auto before anything was learned", () => {
       const wrapper = mountRow("auto");
 
-      expect(wrapper.text()).toContain(
-        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
-      );
+      expect(wrapper.text()).toContain("When you tap a text field. Auto shows it on touchscreens.");
       expect(wrapper.find(".device-osk-show-again").exists()).toBe(false);
     });
 
@@ -346,10 +358,12 @@ describe("DeviceSettings", () => {
       expect(wrapper.find(".device-osk-show-again").text()).toBe("Show it again");
     });
 
-    it("describes On and Off", () => {
-      expect(mountRow("on").text()).toContain("Shows whenever you tap a text field.");
+    it("uses the same honest description for Always and Never", () => {
+      expect(mountRow("on").text()).toContain(
+        "When you tap a text field. Auto shows it on touchscreens."
+      );
       expect(mountRow("off").text()).toContain(
-        "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it."
+        "When you tap a text field. Auto shows it on touchscreens."
       );
     });
 
@@ -367,10 +381,89 @@ describe("DeviceSettings", () => {
       await wrapper.find(".device-osk-show-again").trigger("click");
 
       expect(window.localStorage.getItem("calvin-osk-hardware-seen")).toBeNull();
-      expect(wrapper.text()).toContain(
-        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
-      );
+      expect(wrapper.text()).toContain("When you tap a text field. Auto shows it on touchscreens.");
       expect(wrapper.find(".device-live").text()).toBe("On-screen keyboard will show again.");
     });
+  });
+});
+
+// Settings copy audit §3.3 — verbatim.
+describe("DeviceSettings copy (§3.3)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+    forgetOskHardware();
+  });
+
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+
+  const COPY = [
+    ["Orientation", "Which way the screen is mounted. Pages & regions decides how regions stack."],
+    ["Upside down", "For screens mounted with the cable on top."],
+    [
+      "Rotate the screen output",
+      "On: Calvin turns the Pi's picture itself. Off: leave it to the OS or the screen.",
+    ],
+    ["Screen on/off schedule", "Turns the screen off and on at set times."],
+    [
+      "Show button presses",
+      "A short label appears when a remote or keyboard button does something.",
+    ],
+  ];
+
+  it.each(COPY)("%s says exactly what it does", (label, description) => {
+    const w = mount(DeviceSettings, {
+      props: { config: { ...baseConfig, displayScheduleEnabled: true } },
+      global: { stubs },
+    });
+    expect(row(w, label).props("description")).toBe(description);
+  });
+
+  it("calls the Pi's own zone the server's timezone", () => {
+    const w = mount(DeviceSettings, {
+      props: { config: { ...baseConfig, displayScheduleEnabled: true } },
+      global: { stubs },
+    });
+    const timezone = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("label") === undefined && c.props("options")[0].value === "system");
+    expect(timezone.props("options")[0].label).toBe("Server's timezone");
+    expect(row(w, "Timezone").props("description")).toBe("Used by the schedule.");
+  });
+
+  it("writes Never as timeout off and any other choice as seconds", async () => {
+    const w = mount(DeviceSettings, {
+      props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 900 } },
+      global: { stubs },
+    });
+    const idle = () =>
+      w
+        .findAllComponents({ name: "SelectPill" })
+        .find(c => c.props("ariaLabel") === "Turn off when idle");
+
+    idle().vm.$emit("update:modelValue", 0);
+    idle().vm.$emit("update:modelValue", 1800);
+
+    const patches = w.emitted("update:config").map(c => c[0]);
+    expect(patches).toContainEqual({ displayTimeoutEnabled: false });
+    expect(patches).toContainEqual({ displayTimeoutEnabled: true, displayTimeout: 1800 });
+  });
+
+  it("shows an existing value that is not in the list as its own option", () => {
+    const w = mount(DeviceSettings, {
+      props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 420 } },
+      global: { stubs },
+    });
+    const idle = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    expect(idle.props("options").map(o => o.label)).toContain("7 min");
+  });
+
+  it("shows the screen-now buttons in the order Turn off, Turn on", () => {
+    const w = mount(DeviceSettings, { props: { config: baseConfig }, global: { stubs } });
+    const buttons = w.findAll(".device-actions button").map(b => b.text());
+    expect(buttons).toEqual(["Turn off", "Turn on"]);
   });
 });

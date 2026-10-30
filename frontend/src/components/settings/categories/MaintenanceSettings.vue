@@ -1,18 +1,17 @@
 <template>
   <div class="maintenance-settings">
     <SettingsSection id="maintenance-updates" title="Updates">
-      <UpdatesTab
-        :git-repo-url="gitRepoUrl"
-        :git-branch="gitBranch"
-        @update:git-repo-url="v => emit('update:gitRepoUrl', v)"
-        @update:git-branch="v => emit('update:gitBranch', v)"
-      />
+      <UpdatesTab :git-branch="gitBranch" />
       <KioskSoftwarePointer />
     </SettingsSection>
 
     <SettingsSection id="device-hardware" title="Versions & status">
-      <SettingRow label="Backend version" :description="version || 'Unknown'" />
-      <SettingRow label="Frontend version" :description="frontendVersion || 'Unknown'" />
+      <SettingRow label="Version">
+        <span class="maint-version" data-test="version-readout">
+          {{ version || "Unknown" }}
+          <span v-if="screenVersion">(screen {{ screenVersion }})</span>
+        </span>
+      </SettingRow>
       <SettingRow label="System status">
         <span class="maint-status" :class="statusClass">{{ statusText }}</span>
       </SettingRow>
@@ -49,20 +48,28 @@
           </button>
         </SettingRow>
       </template>
-      <SettingRow label="Reload UI" data-test="reload-ui">
+      <SettingRow label="Reload this screen" data-test="reload-ui">
         <template #description>
-          <p class="maint-desc">Reload the browser page.</p>
           <p v-if="isContainer" class="maint-hint" data-test="docker-restart-hint">
             To restart the server, restart the Calvin container from Docker (Unraid: Docker tab).
           </p>
         </template>
-        <button type="button" class="maint-btn" @click="reloadUi">Reload UI</button>
+        <button type="button" class="maint-btn" @click="reloadUi">Reload</button>
       </SettingRow>
     </SettingsSection>
 
     <BackupSettings />
 
-    <SettingsSection id="maintenance-diagnostics" title="Diagnostics">
+    <!-- Advanced: installer-facing rows, closed by default (§4). Search still
+         finds them and opens this section. -->
+    <CollapsibleSettingsSection id="maintenance-advanced" title="Advanced">
+      <UpdateSourceRows
+        v-if="!isContainer"
+        :git-repo-url="gitRepoUrl"
+        :git-branch="gitBranch"
+        @update:git-repo-url="v => emit('update:gitRepoUrl', v)"
+        @update:git-branch="v => emit('update:gitBranch', v)"
+      />
       <SettingRow
         label="Console logging"
         description="Log to the browser console. When off, only errors are shown."
@@ -90,19 +97,20 @@
         />
       </SettingRow>
       <SettingRow
-        label="Config polling interval"
-        description="How often to check for config changes (seconds)."
+        label="Check for setting changes every"
+        description="How fast other screens pick up a change."
       >
         <NumberStepper
           :model-value="config.configPollInterval || 30"
           :min="5"
           :max="300"
           :step="1"
-          aria-label="Config polling interval in seconds"
+          unit=" s"
+          aria-label="Check for setting changes every, in seconds"
           @update:model-value="v => emit('update:config', { configPollInterval: v })"
         />
       </SettingRow>
-    </SettingsSection>
+    </CollapsibleSettingsSection>
 
     <ConfirmModal
       :show="confirm.show"
@@ -121,15 +129,17 @@ import { useSystem } from "@/composables";
 import { useConnectionStore } from "@/stores/connection";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import CollapsibleSettingsSection from "@/components/settings/shell/CollapsibleSettingsSection.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
+import UpdateSourceRows from "@/components/settings/tabs/system/UpdateSourceRows.vue";
 import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";
 import BackupSettings from "@/components/settings/categories/BackupSettings.vue";
 
-defineProps({
+const props = defineProps({
   config: { type: Object, required: true },
   gitRepoUrl: { type: String, default: "" },
   gitBranch: { type: String, default: "develop" },
@@ -140,6 +150,13 @@ const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranc
 
 const { restartBackend, restartFrontend, environment, loadEnvironment } = useSystem();
 const connectionStore = useConnectionStore();
+
+// One version row: the server's version, plus the screen's own bundle only when
+// it differs (a stale cached frontend is worth seeing; a matching one is noise).
+const screenVersion = computed(() => {
+  if (!props.frontendVersion) return null;
+  return props.frontendVersion === props.version ? null : props.frontendVersion;
+});
 
 const statusText = computed(() => (connectionStore.isBackendOnline ? "● Online" : "○ Offline"));
 const statusClass = computed(() => (connectionStore.isBackendOnline ? "is-online" : "is-offline"));
@@ -228,11 +245,9 @@ const reloadUi = () => {
 .maint-status.is-offline {
   color: var(--err);
 }
-.maint-desc {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  color: var(--ink-2);
+.maint-version {
+  font-family: var(--font-data);
+  color: var(--ink);
 }
 .maint-hint {
   margin: 0.2rem 0 0;

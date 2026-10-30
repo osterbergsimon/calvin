@@ -104,7 +104,7 @@ describe("KiosksSettings — orientation editor", () => {
 
   it("shows the global default as effective when no override, tagged inherited", async () => {
     const { w } = await selectFirst(one, {});
-    expect(w.text().toLowerCase()).toContain("inherited from global");
+    expect(w.text()).toContain("Same as all screens");
   });
 
   it("changing orientation saves a merged override and tags it set", async () => {
@@ -117,7 +117,7 @@ describe("KiosksSettings — orientation editor", () => {
       availableScreens: ["a"],
       orientation: "portrait",
     });
-    expect(w.text().toLowerCase()).toContain("set for this kiosk");
+    expect(w.text()).toContain("Only this screen");
   });
 
   it("Reset to global removes only the orientation keys", async () => {
@@ -219,7 +219,7 @@ describe("KiosksSettings — content editor", () => {
     const { w } = await selectContent(one, {});
     const chips = w.findComponent(ChipMultiSelect);
     expect(chips.props("modelValue")).toEqual(["a", "b"]);
-    expect(w.text().toLowerCase()).toContain("inherited from global");
+    expect(w.text()).toContain("Same as all screens");
   });
 
   it("selecting a subset saves availableScreens merged, preserving unrelated keys", async () => {
@@ -230,7 +230,7 @@ describe("KiosksSettings — content editor", () => {
       orientation: "portrait",
       availableScreens: ["a"],
     });
-    expect(w.text().toLowerCase()).toContain("set for this kiosk");
+    expect(w.text()).toContain("Only this screen");
   });
 
   it("selecting all screens normalizes to inherited (removes availableScreens)", async () => {
@@ -262,7 +262,7 @@ describe("KiosksSettings — content editor", () => {
     const oneScreen = { version: 2, activeScreenId: "a", screens: [{ id: "a", name: "Home" }] };
     const { w } = await selectContent(one, {}, oneScreen);
     expect(w.findComponent(ChipMultiSelect).exists()).toBe(false);
-    expect(w.text()).toContain("Add more screens in Dashboard");
+    expect(w.text()).toContain("Add more pages in Dashboard › Pages & regions");
   });
 
   it("shows offline content copy after saving to an offline kiosk", async () => {
@@ -303,19 +303,19 @@ describe("KiosksSettings — content editor", () => {
     const { w } = await selectContent(one, {});
     const pill = w.findComponent(SelectPill);
     expect(pill.props("modelValue")).toBe("a");
-    // find the "Default screen" SettingRow specifically and assert its description prop
-    const defaultRow = w
-      .findAllComponents(SettingRow)
-      .find(r => r.props("label") === "Default screen");
-    expect(defaultRow.props("description")).toBe("‹inherited from global›");
+    // find the "Start page" SettingRow specifically and assert its scope copy
+    const defaultRow = w.findAllComponents(SettingRow).find(r => r.props("label") === "Start page");
+    expect(defaultRow.text()).toContain("Same as all screens");
+    expect(defaultRow.find("[data-test='reset-default-screen']").exists()).toBe(false);
   });
 
-  it("Default screen row description is set for this kiosk when defaultScreenId is overridden", async () => {
+  it("Start page row says Only this screen when defaultScreenId is overridden", async () => {
     const { w } = await selectContent(one, { defaultScreenId: "b" });
-    const defaultRow = w
-      .findAllComponents(SettingRow)
-      .find(r => r.props("label") === "Default screen");
-    expect(defaultRow.props("description")).toBe("‹set for this kiosk›");
+    const defaultRow = w.findAllComponents(SettingRow).find(r => r.props("label") === "Start page");
+    expect(defaultRow.text()).toContain("Only this screen");
+    expect(defaultRow.find("[data-test='reset-default-screen']").text()).toBe(
+      "Use the shared setting"
+    );
   });
 
   it("limits the default-screen options to the available set", async () => {
@@ -448,7 +448,7 @@ describe("KiosksSettings — schedule editor", () => {
   it("shows the global schedule as effective and tagged inherited when no override", async () => {
     const { w } = await selectFirst({});
     const section = w.get("#section-kiosks-schedule");
-    expect(section.text().toLowerCase()).toContain("inherited from global");
+    expect(section.text()).toContain("Same as all screens");
   });
 
   it("editing the grid saves a merged displaySchedule override, preserving unrelated keys", async () => {
@@ -640,11 +640,11 @@ describe("KiosksSettings — Touch & keyboard (CLV-27)", () => {
     expect(w.find("[data-test='osk-use-shared']").exists()).toBe(false);
   });
 
-  it("shows Only this kiosk with a way back when overridden", async () => {
+  it("shows Only this screen with a way back when overridden", async () => {
     const { w } = await selectKeyboard({ onScreenKeyboard: "off" }, "auto");
 
     expect(oskControl(w).props("modelValue")).toBe("off");
-    expect(w.text()).toContain("Only this kiosk");
+    expect(w.text()).toContain("Only this screen");
     expect(w.find("[data-test='osk-use-shared']").text()).toBe("Use the shared setting");
   });
 
@@ -658,7 +658,7 @@ describe("KiosksSettings — Touch & keyboard (CLV-27)", () => {
       orientation: "portrait",
       onScreenKeyboard: "on",
     });
-    expect(w.text()).toContain("Only this kiosk");
+    expect(w.text()).toContain("Only this screen");
   });
 
   it("Use the shared setting removes only the keyboard key", async () => {
@@ -672,5 +672,58 @@ describe("KiosksSettings — Touch & keyboard (CLV-27)", () => {
 
     expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
     expect(w.text()).toContain("Same as all screens");
+  });
+});
+
+// Settings copy audit §3.5 — the kiosk's own rows say where the value came from.
+describe("KiosksSettings copy (§3.5)", () => {
+  const one = [
+    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
+  ];
+
+  async function selectFirst(overrides = {}) {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {
+      store.kiosks = one;
+    });
+    store.fetchOverrides = vi.fn(async () => overrides);
+    store.saveOverrides = vi.fn(async () => {});
+    store.fetchDeviceConfigVersion = vi.fn(async () => null);
+    const cfg = useConfigStore();
+    cfg.orientation = "landscape";
+    cfg.orientationFlipped = false;
+    const w = mount(KiosksSettings);
+    await flushPromises();
+    await w.find("[data-test='kiosk-card']").trigger("click");
+    await flushPromises();
+    return { w, store, cfg };
+  }
+
+  it("titles the schedule section with the kiosk name, in plain words", async () => {
+    const { w } = await selectFirst({});
+    const schedule = w.find("#section-kiosks-schedule");
+    expect(schedule.exists()).toBe(true);
+    expect(schedule.find(".settings-section__eyebrow").text()).toBe("k1 · Screen on/off schedule");
+  });
+
+  it("offers Use the shared setting on an overridden row and drops just that key", async () => {
+    const { w, store } = await selectFirst({ orientation: "portrait", availableScreens: ["a"] });
+    const link = w.find("[data-test='reset-orientation-row']");
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe("Use the shared setting");
+
+    await link.trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
+  });
+
+  it("names the rotation rows the way Screen & keyboard does", async () => {
+    const { w } = await selectFirst({});
+    const labels = w.findAllComponents(SettingRow).map(r => r.props("label"));
+    expect(labels).toContain("Upside down");
+    expect(labels).toContain("Rotate the screen output");
+    expect(labels).not.toContain("Flip 180°");
+    expect(labels).not.toContain("Apply rotation");
   });
 });
