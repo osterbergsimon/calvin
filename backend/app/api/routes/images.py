@@ -11,6 +11,26 @@ from app.utils.errors import ErrorResponse
 
 router = APIRouter()
 
+SUPPORTED_UPLOAD_FORMATS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
+
+
+def validate_upload(filename: str, size: int) -> None:
+    """Raise a 400 unless ``filename`` has a supported extension and ``size`` fits.
+
+    Shared by ``POST /images/upload`` and the MCP ``upload_photo`` tool so both
+    enforce the same limits.
+    """
+    if Path(filename).suffix.lower() not in SUPPORTED_UPLOAD_FORMATS:
+        raise ErrorResponse.validation_error(
+            "file",
+            f"Unsupported file format. Supported formats: {', '.join(SUPPORTED_UPLOAD_FORMATS)}",
+        )
+    if size > MAX_UPLOAD_BYTES:
+        raise ErrorResponse.validation_error(
+            "file", f"File too large. Maximum size is {MAX_UPLOAD_BYTES / (1024 * 1024):.0f}MB"
+        )
+
 
 def _parse_source_ids(source_ids: str | None) -> list[str] | None:
     if not source_ids:
@@ -313,22 +333,8 @@ async def upload_image(file: UploadFile = File(...)):
     Returns:
         Uploaded image metadata
     """
-    # Validate file extension
-    file_ext = Path(file.filename).suffix.lower()
-    supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-    if file_ext not in supported_formats:
-        raise ErrorResponse.validation_error(
-            "file",
-            f"Unsupported file format. Supported formats: {', '.join(supported_formats)}",
-        )
-
-    # Validate file size (max 10MB)
-    max_size = 10 * 1024 * 1024  # 10MB
     file_content = await file.read()
-    if len(file_content) > max_size:
-        raise ErrorResponse.validation_error(
-            "file", f"File too large. Maximum size is {max_size / (1024 * 1024):.0f}MB"
-        )
+    validate_upload(file.filename, len(file_content))
 
     # Upload to plugin service (will try first plugin that supports upload)
     uploaded_image = await plugin_image_service.upload_image(file_content, file.filename)
