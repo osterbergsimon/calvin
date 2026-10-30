@@ -1162,3 +1162,36 @@ class TestZipInstallRestartRequired:
         data = response.json()
         assert data["success"] is True
         assert data["requires_restart"] is expected_restart
+
+
+@pytest.mark.integration
+def test_get_plugins_passes_icon_through(test_client, monkeypatch):
+    """PluginMetadata.icon reaches the settings frontend (§6) so tiles can draw it.
+
+    Contract 1.0 plugins that never set an icon keep working: the field is
+    optional and serializes as null.
+    """
+    from app.api.routes.plugins import management
+
+    with_icon = PluginMetadata(
+        type_id="icon_plugin",
+        name="Icon Plugin",
+        icon="🖼",
+        plugin_type=PluginType.SERVICE,
+        display_schema={"kind": "status"},
+    )
+    without_icon = PluginMetadata(
+        type_id="plain_plugin",
+        name="Plain Plugin",
+        plugin_type=PluginType.SERVICE,
+        display_schema={"kind": "status"},
+    )
+    monkeypatch.setattr(
+        management.plugin_loader, "get_plugin_types", lambda: [with_icon, without_icon]
+    )
+
+    response = test_client.get("/api/plugins?plugin_type=service")
+    assert response.status_code == 200
+    by_id = {plugin["id"]: plugin for plugin in response.json()["plugins"]}
+    assert by_id["icon_plugin"]["icon"] == "🖼"
+    assert by_id["plain_plugin"]["icon"] is None
