@@ -102,7 +102,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   min-width: 0;
   padding: 0 0.45rem;
   font-family: var(--font-display);
-  font-size: 0.64rem;
+  font-size: var(--fs-3xs);
   font-weight: 500;
   line-height: 1;
   color: var(--ink);
@@ -115,7 +115,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   background: color-mix(in srgb, var(--ribbon-hue) 26%, var(--bg-1));
   border: 1px solid color-mix(in srgb, var(--ribbon-hue) 55%, transparent);
   border-left: 2px solid var(--ribbon-hue);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition:
     background 0.15s,
     box-shadow 0.15s;
@@ -129,8 +129,8 @@ const handleFocus = () => emit("focus", props.ribbon);
   border-bottom-left-radius: 0;
   margin-left: -1px;
   padding-left: 0.35rem;
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 10px);
-  mask-image: linear-gradient(90deg, transparent 0, #000 10px);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--mask-opaque) 10px);
+  mask-image: linear-gradient(90deg, transparent 0, var(--mask-opaque) 10px);
 }
 
 .ribbon.continues-right {
@@ -150,7 +150,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   margin-left: auto;
   flex-shrink: 0;
   font-family: var(--font-data);
-  font-size: 0.54rem;
+  font-size: var(--fs-3xs);
   letter-spacing: 0.02em;
   color: var(--ink-2);
 }

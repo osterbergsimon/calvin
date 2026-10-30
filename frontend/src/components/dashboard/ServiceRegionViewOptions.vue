@@ -106,7 +106,7 @@ const setCardSize = value => {
 }
 .svo-label {
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink);
 }
 .svo-seg {
@@ -115,16 +115,16 @@ const setCardSize = value => {
   padding: 2px;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 .svo-seg button {
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   line-height: 1;
   color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 0.2rem 0.4rem;
   min-height: 22px;
   cursor: pointer;
@@ -143,11 +143,11 @@ const setCardSize = value => {
 }
 .svo-seg-btn {
   font-family: var(--font-ui);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   color: var(--ink-2);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.2rem 0.5rem;
   min-height: 22px;
   cursor: pointer;

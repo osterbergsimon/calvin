@@ -157,8 +157,8 @@ const roomLabel = computed(() => configStore.displayName);
 .clock-bar-horizontal.position-between {
   z-index: 100;
   border: none;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border-radius: var(--radius-xs);
 }
 
 .clock-bar-content {
@@ -191,15 +191,15 @@ const roomLabel = computed(() => configStore.displayName);
 .clock-bar-room {
   font-family: var(--font-ui);
   color: var(--ink-3);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
 }
 
 .clock-bar-horizontal.position-between .clock-time {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
 }
 
 .clock-bar-horizontal.position-between .clock-date {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 
 .clock-bar-outer {
