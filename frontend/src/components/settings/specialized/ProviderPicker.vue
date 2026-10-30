@@ -7,15 +7,25 @@
       </div>
       <ul class="pp-list">
         <li v-for="provider in providers" :key="provider.id">
-          <button type="button" class="pp-tile" @click="$emit('select', provider)">
+          <button
+            type="button"
+            class="pp-tile"
+            :class="{ 'pp-tile--off': provider.disabled }"
+            :data-provider-id="provider.id"
+            @click="choose(provider)"
+          >
             <span class="pp-icon" aria-hidden="true">{{ providerLetter(provider) }}</span>
             <span class="pp-text">
               <span class="pp-name">{{ provider.label || provider.name }}</span>
               <span v-if="provider.description" class="pp-desc">{{ provider.description }}</span>
             </span>
+            <span v-if="provider.disabled" class="pp-on">Turn on</span>
           </button>
         </li>
       </ul>
+      <button v-if="moreLabel" type="button" class="pp-more" @click="$emit('more')">
+        {{ moreLabel }}
+      </button>
     </div>
   </div>
 </template>
@@ -23,10 +33,12 @@
 <script setup>
 import IconButton from "@/components/ui/IconButton.vue";
 
-// A small chooser of enabled providers (plugins) for one kind of source. It
-// carries no plugin-specific knowledge: the caller decides which plugins are
-// candidates, in which order, and what each tile is called, then opens that
-// provider's add form on `select`.
+// A small chooser of providers (plugins) for one kind of source. It carries no
+// plugin-specific knowledge: the caller decides which plugins are candidates,
+// in which order, and what each tile is called, then opens that provider's add
+// form on `select`. A provider whose plugin is installed but turned off renders
+// dimmed with Turn on: the click still selects it, and the caller enables it
+// before continuing (§3.2).
 defineProps({
   show: {
     type: Boolean,
@@ -40,11 +52,26 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  moreLabel: {
+    type: String,
+    default: "",
+  },
 });
 
-defineEmits(["select", "close"]);
+const emit = defineEmits(["select", "close", "more"]);
 
-const providerLetter = provider => (provider.label || provider.name || "?").charAt(0).toUpperCase();
+const providerLetter = provider => {
+  const source = provider.label || provider.name || "?";
+  return source.charAt(0).toUpperCase();
+};
+
+const choose = provider => {
+  if (provider.disabled) {
+    emit("select", provider);
+    return;
+  }
+  emit("select", provider);
+};
 </script>
 
 <style scoped>
@@ -125,6 +152,10 @@ const providerLetter = provider => (provider.label || provider.name || "?").char
   outline-offset: 2px;
 }
 
+.pp-tile--off {
+  opacity: 0.55;
+}
+
 .pp-icon {
   display: flex;
   align-items: center;
@@ -154,5 +185,39 @@ const providerLetter = provider => (provider.label || provider.name || "?").char
   font-size: 0.85rem;
   color: var(--ink-2);
   line-height: 1.4;
+}
+
+.pp-on {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--focus-edge);
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pp-more {
+  display: block;
+  width: 100%;
+  padding: 0.9rem 1.5rem;
+  background: transparent;
+  color: var(--ink-2);
+  border: 0;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-ui);
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pp-more:hover {
+  color: var(--ink);
+}
+
+.pp-more:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 </style>

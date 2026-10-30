@@ -48,6 +48,7 @@ describe("settings registry", () => {
       "content-photos",
       "content-images",
       "content-services",
+      "content-clock-bar",
       "plugins",
       "plugins-services",
       "kiosks",
@@ -142,7 +143,7 @@ describe("settings registry", () => {
     });
   });
 
-  it("resolves Add a web page to Content / Web pages & services", () => {
+  it("resolves Add a web page to Content / Web pages & apps", () => {
     expect(getSettingDestinationById("plugins-services")).toMatchObject({
       category: "content",
       tab: "content-services",
@@ -177,6 +178,9 @@ describe("settings registry", () => {
     );
     expect(filterSettingsDestinations("content sources").map(item => item.id)).toContain(
       "content-services"
+    );
+    expect(filterSettingsDestinations("weather").map(item => item.id)).toContain(
+      "content-clock-bar"
     );
     // The old category words still find a screen setting.
     expect(filterSettingsDestinations("kiosk").map(item => item.id)).toContain("kiosks");
