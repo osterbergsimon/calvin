@@ -549,7 +549,7 @@
               <template v-else>Update</template>
             </button>
           </SettingRow>
-          <p v-else class="screens__empty" data-test="screen-software-empty">
+          <p v-else class="screen-software__empty" data-test="screen-software-empty">
             This screen runs in a browser, so there is no kiosk software to update.
           </p>
         </SettingsSection>
@@ -599,6 +599,7 @@
       :title="confirm.title"
       :message="confirm.message"
       :confirm-text="confirm.confirmText"
+      :danger="confirm.mode !== 'use-default'"
       @confirm="onConfirm"
       @cancel="confirm.show = false"
     />
@@ -1399,6 +1400,11 @@ onUnmounted(() => {
   font-size: var(--fs-sm);
   color: var(--ink-2);
 }
+/* The Default card has two prose lines; keep the summary visually separate. */
+.screen-card--default .screen-card__meta {
+  margin-top: 2px;
+  display: block;
+}
 .screen-card__changed {
   font-size: var(--fs-sm);
   font-weight: 500;
@@ -1612,6 +1618,12 @@ onUnmounted(() => {
 .screen-display__caption {
   font-size: var(--fs-xs);
   color: var(--ink-3);
+}
+.screen-software__empty {
+  margin: 0;
+  padding: 0.75rem 1.25rem;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
 }
 .screen-software__desc {
   margin: 0.2rem 0 0;

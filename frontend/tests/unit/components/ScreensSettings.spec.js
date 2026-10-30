@@ -837,9 +837,10 @@ describe("ScreensSettings — software (CLV-19)", () => {
     const { wrapper } = mountScreens({ kiosks: [kiosk({ agentVersion: null })] });
     await flushPromises();
     await selectFirst(wrapper);
-    expect(wrapper.find("[data-test='screen-software-empty']").text()).toContain(
-      "no kiosk software to update"
-    );
+    const empty = wrapper.find("[data-test='screen-software-empty']");
+    expect(empty.text()).toContain("no kiosk software to update");
+    // The note gets the normal row padding instead of sitting on the border.
+    expect(empty.classes()).toContain("screen-software__empty");
   });
 });
 
@@ -1010,6 +1011,7 @@ describe("ScreensSettings — a screen's page against Default (§4)", () => {
       "Its 3 changed settings go back to the default. Its name stays."
     );
     expect(modal.props("confirmText")).toBe("Reset");
+    expect(modal.props("danger")).toBe(true);
 
     modal.vm.$emit("confirm");
     await flushPromises();
@@ -1036,6 +1038,7 @@ describe("ScreensSettings — a screen's page against Default (§4)", () => {
       "Default and every screen that follows it will use Hallway's Orientation and Upside down."
     );
     expect(modal.props("confirmText")).toBe("Make default");
+    expect(modal.props("danger")).toBe(false);
 
     modal.vm.$emit("confirm");
     await flushPromises();
