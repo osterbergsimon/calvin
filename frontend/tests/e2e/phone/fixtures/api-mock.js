@@ -16,7 +16,7 @@ export const HOST_ACTIONS = [
   /^\/api\/system\/restart-backend(?:\/|$)/,
   /^\/api\/system\/restart-frontend(?:\/|$)/,
   /^\/api\/system\/reload-ui(?:\/|$)/,
-  /^\/api\/system\/update(?:\/|$)/,
+  /^\/api\/system\/update$/,
   /^\/api\/system\/display\//,
   /^\/api\/display\//,
   /^\/api\/kiosks\/[^/]+\/update(?:\/|$)/,
@@ -322,6 +322,8 @@ export async function installApiMock(page, options = {}) {
     config: { ...sampleConfig, ...(options.config || {}) },
     instances: JSON.parse(JSON.stringify(sampleInstances)),
     hostActions: [],
+    // Flip to true to simulate a server that stopped answering every route.
+    down: false,
     requests: [],
     unmatched: [],
   };
@@ -332,6 +334,9 @@ export async function installApiMock(page, options = {}) {
     const url = new URL(request.url());
     const path = url.pathname;
     state.requests.push(`${method} ${path}`);
+
+    // A server that went away: every route fails, including /health.
+    if (state.down) return json(route, { detail: "down" }, 503);
 
     // A caller-supplied override always wins (used to simulate failures).
     for (const [pattern, handler] of options.overrides || []) {
@@ -469,7 +474,7 @@ export async function installApiMock(page, options = {}) {
       return json(route, { overrides: {} });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
-      return json(route, { deviceConfigVersion: 3 });
+      return json(route, { deviceConfigVersion: "3" });
     }
 
     if (path === "/api/security/sealed-mode") {
@@ -489,7 +494,13 @@ export async function installApiMock(page, options = {}) {
         platform: "Linux",
         hostname: "calvin-pi",
         uptime: 3600,
+        deployment: "native",
+        host_control: true,
+        capabilities: { restart: true, reboot: true },
       });
+    }
+    if (path === "/api/system/network") {
+      return json(route, { public_url: null, lan_urls: ["http://calvin.local:8000"] });
     }
     if (path === "/api/system/update/status") {
       return json(route, {
@@ -530,6 +541,28 @@ export async function installApiMock(page, options = {}) {
     // hanging on a request that would have hit the real backend.
     return json(route, {});
   });
+
+  // Defence in depth: host-acting routes get their own handlers, registered
+  // after the catch-all so they win. A test can click Reboot/Update at will and
+  // the request is answered here, never sent to a real Calvin.
+  const hostUrlPatterns = [
+    /\/api\/system\/reboot(?:\/|\?|$)/,
+    /\/api\/system\/restart-backend(?:\/|\?|$)/,
+    /\/api\/system\/restart-frontend(?:\/|\?|$)/,
+    /\/api\/system\/reload-ui(?:\/|\?|$)/,
+    /\/api\/system\/update(?:\?|$)/,
+    /\/api\/system\/display\//,
+    /\/api\/display\//,
+    /\/api\/kiosks\/[^/]+\/update(?:\/|\?|$)/,
+  ];
+  for (const pattern of hostUrlPatterns) {
+    await page.route(pattern, async route => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      state.hostActions.push(`${request.method()} ${path}`);
+      return json(route, { ok: true, mocked: true });
+    });
+  }
 
   return state;
 }

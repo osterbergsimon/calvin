@@ -16,9 +16,10 @@ export async function gotoDashboard(page) {
 
 /** Open Settings directly (the address a phone opens from the QR card). */
 export async function gotoSettings(page, category) {
-  await page.goto(category ? `/settings?category=${category}` : "/settings");
+  await page.goto("/settings");
   await expect(page.locator(".settings-page")).toBeVisible();
   await page.waitForLoadState("networkidle");
+  if (category) await selectCategory(page, category);
 }
 
 /** Wait for the unlocked settings shell to be interactive. */
