@@ -4,6 +4,7 @@ import asyncio
 import logging
 import tempfile
 from collections.abc import AsyncGenerator, Generator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import databases
@@ -122,7 +123,6 @@ def _reload_modules(*module_names: str) -> None:
 
 async def _seed_test_data(test_database: databases.Database) -> None:
     """Insert minimal plugin types, plugin instance, and config entries used by tests."""
-    from datetime import datetime
 
     import ormar
 
@@ -147,8 +147,8 @@ async def _seed_test_data(test_database: databases.Database) -> None:
                     description=description,
                     version=version,
                     enabled=enabled,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
 
         await get_or_create_plugin_type(
@@ -192,8 +192,8 @@ async def _seed_test_data(test_database: databases.Database) -> None:
                 name="Local Images",
                 enabled=True,
                 display_order=0,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
         async def get_or_create_config(key, value, value_type):
