@@ -150,7 +150,7 @@ Phase 1 is useful on its own. Phase 2 only moves things.
 
 ## 6. Owner decisions
 
-Approved 2026-10-30: A and B. C is a follow-up to the owner's question "should keyboard really be there?".
+Approved 2026-10-30: A, B and C. C answers the owner's question "should keyboard really be there?".
 
 - **A. Rename dashboard "screens" to "pages" in the UI** (keys unchanged). Recommended: it ends the double meaning
   at its source.
