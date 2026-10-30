@@ -75,71 +75,32 @@ describe("CalendarViewOptions", () => {
     w.unmount();
   });
 
-  // --- Week numbers tri-state (Default / On / Off) ---
+  // --- Week numbers (region toggle) ---
 
-  it("week numbers show Default when the view has no override", async () => {
+  it("week numbers are off when the region has none", async () => {
     const { w } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await openPopover(w);
-    const active = w.find('.cvo-seg [aria-checked="true"]');
-    expect(active.text()).toBe("Default");
+    const toggle = w
+      .findAllComponents({ name: "ToggleSwitch" })
+      .find(c => c.props("ariaLabel") === "Week numbers");
+    expect(toggle.props("modelValue")).toBe(false);
     w.unmount();
   });
 
-  it("selecting On persists weekNumbers=true", async () => {
+  it("turning week numbers on persists weekNumbers=true for that region", async () => {
     const { w, cfg } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await openPopover(w);
-    await w.find('.cvo-seg [aria-label="Week numbers on"]').trigger("click");
+    w.findAllComponents({ name: "ToggleSwitch" })
+      .find(c => c.props("ariaLabel") === "Week numbers")
+      .vm.$emit("update:modelValue", true);
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { weekNumbers: true });
     w.unmount();
   });
 
-  it("selecting Default clears the weekNumbers override", async () => {
-    const { w, cfg } = mountOptions({
-      mode: "month",
-      rolling: false,
-      weeks: 4,
-      days: 7,
-      weekNumbers: true,
-    });
+  it("no longer offers events per day on the dashboard", async () => {
+    const { w } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await openPopover(w);
-    expect(w.find('.cvo-seg [aria-checked="true"]').text()).toBe("On");
-    await w.find('.cvo-seg [aria-label="Week numbers default"]').trigger("click");
-    expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { weekNumbers: undefined });
-    w.unmount();
-  });
-
-  // --- Events/day density (month only) with a Default reset ---
-
-  it("does not show the density row outside month view", async () => {
-    const { w } = mountOptions({ mode: "week", rolling: false, weeks: 4, days: 7 });
-    await openPopover(w);
-    expect(w.find(".cvo-density").exists()).toBe(false);
-    w.unmount();
-  });
-
-  it("density inherits the global value and steps into an override", async () => {
-    const { w, cfg } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
-    await openPopover(w);
-    // No override yet → no reset chip, value is the global default (4).
-    expect(w.find(".cvo-density .cvo-default-chip").exists()).toBe(false);
-    expect(w.find(".cvo-density .cvo-count-value").text()).toBe("4");
-    await w.find('[aria-label="More events per day"]').trigger("click");
-    expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { maxVisibleEvents: 5 });
-    w.unmount();
-  });
-
-  it("an overridden density shows a Default chip that clears the override", async () => {
-    const { w, cfg } = mountOptions({
-      mode: "month",
-      rolling: false,
-      weeks: 4,
-      days: 7,
-      maxVisibleEvents: 2,
-    });
-    await openPopover(w);
-    expect(w.find(".cvo-density .cvo-count-value").text()).toBe("2");
-    await w.find(".cvo-density .cvo-default-chip").trigger("click");
-    expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { maxVisibleEvents: undefined });
+    expect(w.text()).not.toContain("Events/day");
     w.unmount();
   });
 

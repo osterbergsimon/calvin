@@ -263,6 +263,7 @@ import CalendarEventItem from "./CalendarEventItem.vue";
 import CalendarRibbon from "./CalendarRibbon.vue";
 import CalendarTimedEvent from "./CalendarTimedEvent.vue";
 import { buildMonthWeeks } from "../composables/useMonthLayout";
+import { autoVisibleEventCount, DEFAULT_EVENT_ROW_HEIGHT } from "@/utils/calendarDensity";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "./ui/IconButton.vue";
 import EmptyState from "./ui/EmptyState.vue";
@@ -313,12 +314,25 @@ const sourceKey = computed(() =>
 // Base granularity + rolling modifier come from the region's `view` prop.
 const viewMode = computed(() => props.view?.mode ?? "month");
 const rolling = computed(() => props.view?.rolling === true);
-// Display settings can be overridden per region via the view; when the view
-// leaves them unset they inherit the global config (?? only catches
-// null/undefined, so an explicit `false` override still wins).
-const showWeekNumbers = computed(() => props.view?.weekNumbers ?? configStore.showWeekNumbers);
-const maxVisibleEvents = computed(
-  () => props.view?.maxVisibleEvents ?? configStore.maxVisibleEvents ?? 4
+// Display settings belong to the region: no household default layer. Missing
+// weekNumbers means off; missing maxVisibleEvents means Auto (measured below).
+const showWeekNumbers = computed(() => props.view?.weekNumbers === true);
+const eventDensity = computed(() => {
+  const value = Number(props.view?.maxVisibleEvents);
+  return Number.isFinite(value) ? value : "auto";
+});
+
+// Auto: the visible row count follows the day cell's measured height and the
+// rendered chip's height (at least one row). A ResizeObserver watches a day
+// cell so the count follows the actual region shape, not a fixed guess.
+const measuredCellHeight = ref(0);
+const measuredRowHeight = ref(DEFAULT_EVENT_ROW_HEIGHT);
+let densityObserver = null;
+const autoVisibleCount = computed(() =>
+  autoVisibleEventCount(measuredCellHeight.value, measuredRowHeight.value)
+);
+const maxVisibleEvents = computed(() =>
+  eventDensity.value === "auto" ? autoVisibleCount.value : eventDensity.value
 );
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
@@ -507,6 +521,8 @@ onUnmounted(() => {
   if (calendarAutoRefreshInterval) {
     clearInterval(calendarAutoRefreshInterval);
   }
+  densityObserver?.disconnect();
+  densityObserver = null;
   document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 
@@ -891,6 +907,39 @@ const monthWeeks = computed(() => {
     })),
   }));
 });
+
+// Watch one rendered day cell for the Auto row fit. The first `.mv-timed` cell
+// is representative: every row in the month grid shares the same height.
+const observeDensityCell = () => {
+  if (typeof ResizeObserver === "undefined") return;
+  const cell = calendarView.value?.querySelector?.(".calendar-weeks .mv-timed");
+  densityObserver?.disconnect();
+  densityObserver = null;
+  if (!cell) return;
+  densityObserver = new ResizeObserver(entries => {
+    const box = entries[0]?.contentRect;
+    if (!box || !(box.height > 0)) return;
+    measuredCellHeight.value = box.height;
+    const chip = cell.querySelector(".timed-event");
+    const rowHeight = chip?.offsetHeight || chip?.getBoundingClientRect?.().height || 0;
+    if (rowHeight > 0) measuredRowHeight.value = rowHeight;
+  });
+  densityObserver.observe(cell);
+};
+
+watch(
+  [isMonthView, monthWeeks, eventDensity],
+  async () => {
+    if (!isMonthView.value) {
+      densityObserver?.disconnect();
+      densityObserver = null;
+      return;
+    }
+    await nextTick();
+    observeDensityCell();
+  },
+  { flush: "post", immediate: true }
+);
 
 // The strip is a 7-column grid (day columns line up via a left pad for the
 // spine); ribbons place themselves by column span and ride one row per lane.

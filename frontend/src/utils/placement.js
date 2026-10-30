@@ -68,3 +68,25 @@ export const findPlaceableRegion = (config, regionId) => {
   }
   return null;
 };
+
+/**
+ * Put a calendar or photos region on a page (CLV-49 §5 "Put it on a page").
+ * All sources of that kind show, so the region carries no instance filter.
+ */
+export const placeKindInRegion = (screensConfig, kind, regionId) => {
+  if (kind !== "calendar" && kind !== "photos") {
+    return normalizeDashboardScreens(screensConfig);
+  }
+  const screens = normalizeDashboardScreens(screensConfig);
+  let changed = false;
+  const nextScreens = screens.screens.map(screen => {
+    const path = getPathById(screen.layout, regionId);
+    if (!path) return screen;
+    changed = true;
+    return {
+      ...screen,
+      layout: setRegionContentAtPath(screen.layout, path, { kind, instanceIds: [] }),
+    };
+  });
+  return changed ? { ...screens, screens: nextScreens } : screens;
+};

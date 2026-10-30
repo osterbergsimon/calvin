@@ -125,4 +125,36 @@ describe("Pages & regions place mode", () => {
     expect(replaced.instanceIds).toEqual(["mealie-2"]);
     expect(w.emitted("placed")?.length).toBe(1);
   });
+
+  it("fills a region with a calendar when placing a kind", async () => {
+    const w = await mountEditor({
+      placeSource: { id: "calendar", name: "calendars", kind: "calendar" },
+    });
+
+    node(w, "r1").vm.$emit("select", "r1");
+    await flushPromises();
+
+    const patch = w.emitted("update:config")?.[0][0];
+    const placed = patch.dashboardScreens.screens
+      .find(s => s.id === "home")
+      .layout.regions.find(r => r.id === "r1");
+    expect(placed.kind).toBe("calendar");
+    expect(placed.instanceIds).toEqual([]);
+  });
+});
+
+describe("Pages & regions editor deep link", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it("opens with the requested region selected", async () => {
+    const w = await mountEditor({
+      placeSource: null,
+      initialPageId: "home",
+      initialRegionId: "r2",
+    });
+    await flushPromises();
+    expect(node(w, "r2").props("selectedId")).toBe("r2");
+  });
 });

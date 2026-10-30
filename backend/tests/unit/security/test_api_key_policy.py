@@ -148,6 +148,14 @@ def test_read_key_config_write_only_for_display_keys(client):
     secret = _make_key(client, "read")
     headers = _bearer(secret)
     assert client.post("/api/config", json={"showUI": True}, headers=headers).status_code == 200
+    # The one-time CLV-49 display migration is a display-state write: the
+    # dashboard may persist it without an admin session.
+    assert (
+        client.post(
+            "/api/config", json={"displaySettingsMigrated": True}, headers=headers
+        ).status_code
+        == 200
+    )
     refused = client.post("/api/config", json={"gitBranch": "x"}, headers=headers)
     assert refused.status_code in (401, 403)
     admin = _make_key_named(client, "admin", "second-admin")

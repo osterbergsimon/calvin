@@ -411,7 +411,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import { getKioskId } from "@/utils/kioskId";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
-import { findPlaceableRegion, placeServiceInRegion } from "@/utils/placement";
+import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
@@ -453,6 +453,8 @@ const props = defineProps({
   placeSource: { type: Object, default: null },
   // Open on this page (a placement link names the page it lives on).
   initialPageId: { type: String, default: null },
+  // Open with this region selected ("Where it shows" lines from Content).
+  initialRegionId: { type: String, default: null },
 });
 const emit = defineEmits(["update:config", "close", "placed", "place-cancel"]);
 
@@ -852,11 +854,11 @@ const describeRegion = region => {
 
 const commitPlacement = regionId => {
   if (!props.placeSource) return;
-  const next = placeServiceInRegion(
-    configValue.value.dashboardScreens,
-    props.placeSource.id,
-    regionId
-  );
+  const kind = props.placeSource.kind;
+  const next =
+    kind && kind !== "service"
+      ? placeKindInRegion(configValue.value.dashboardScreens, kind, regionId)
+      : placeServiceInRegion(configValue.value.dashboardScreens, props.placeSource.id, regionId);
   emit("update:config", { dashboardScreens: next });
   replaceTarget.value = null;
   emit("placed", props.placeSource.id);
@@ -880,13 +882,38 @@ const confirmReplace = () => {
   if (replaceTarget.value) commitPlacement(replaceTarget.value.regionId);
 };
 
-// A placement link names the page the source is on: open the editor there.
+// A deep link ("Where it shows") may switch pages; remember the region until
+// the page switch settles, because the activeScreenId watcher clears selection.
+const pendingRegionId = ref(null);
+const selectDeepLinkedRegion = id => {
+  if (!id) return;
+  if (getPathById(activeScreen.value.layout, id)) {
+    selectedRegionId.value = id;
+    if (isPhone.value) sheetOpen.value = true;
+  }
+};
+const applyInitialSelection = async () => {
+  if (props.initialPageId) {
+    const pageChanges = props.initialPageId !== activeScreenId.value;
+    if (pageChanges) pendingRegionId.value = props.initialRegionId;
+    selectScreen(props.initialPageId);
+    await nextTick();
+  }
+  if (!pendingRegionId.value) selectDeepLinkedRegion(props.initialRegionId);
+};
+
+// A placement link names the page the source is on: open the editor there. A
+// "Where it shows" line also names the region, so open its inspector too.
 watch(
   () => props.open,
-  open => {
-    if (open && props.initialPageId) selectScreen(props.initialPageId);
-    if (!open) replaceTarget.value = null;
-  }
+  async open => {
+    if (open) await applyInitialSelection();
+    if (!open) {
+      pendingRegionId.value = null;
+      replaceTarget.value = null;
+    }
+  },
+  { immediate: true }
 );
 
 /* --- screen ops --- */
@@ -1152,6 +1179,12 @@ watch(
 
 /* keep selection valid when screen changes */
 watch(activeScreenId, () => {
+  if (pendingRegionId.value) {
+    const id = pendingRegionId.value;
+    pendingRegionId.value = null;
+    selectDeepLinkedRegion(id);
+    return;
+  }
   selectedRegionId.value = null;
   clockSelected.value = false;
 });
