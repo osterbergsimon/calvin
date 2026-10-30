@@ -139,6 +139,39 @@
             @update:model-value="v => $emit('patch-view', { weeks: v })"
           />
         </div>
+        <div class="switch-row">
+          <div>
+            <div class="s-label">Week numbers</div>
+            <div class="s-help">Show the week number beside each week</div>
+          </div>
+          <ToggleSwitch
+            :model-value="region.view?.weekNumbers === true"
+            aria-label="Week numbers"
+            @update:model-value="v => $emit('patch-view', { weekNumbers: v })"
+          />
+        </div>
+        <div class="ins-field row">
+          <span class="ins-label">Events per day</span>
+          <SelectPill
+            :model-value="eventDensityModel"
+            :options="eventDensityOptions"
+            aria-label="Events per day"
+            @update:model-value="setEventDensity"
+          />
+        </div>
+      </section>
+
+      <section v-else-if="region.kind === 'photos'" class="ins-group">
+        <h3 class="ins-h">Photos</h3>
+        <div class="ins-field row">
+          <span class="ins-label">Fit photos</span>
+          <SelectPill
+            :model-value="photoFitModel"
+            :options="photoFitOptions"
+            aria-label="Fit photos"
+            @update:model-value="v => $emit('patch-view', { fit: v })"
+          />
+        </div>
       </section>
 
       <section v-else-if="region.kind === 'service'" class="ins-group">
@@ -219,6 +252,7 @@ import { useRouter } from "vue-router";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import SelectPill from "@/components/ui/SelectPill.vue";
 import { filterComponentOptions } from "@/utils/componentPicker";
 
 const props = defineProps({
@@ -282,6 +316,34 @@ const canRemove = computed(() => {
   if (isTop) return props.screen.layout.regions.length > 1;
   return true; // sub-regions are always removable (min enforced by helper)
 });
+
+// --- Per-region display settings (CLV-49) ----------------------------------
+// Events per day: an explicit count, or Auto (the day cell's measured height
+// decides). Auto is persisted as absent / null, so a new region needs no setup.
+const EVENT_DENSITY_VALUES = [1, 2, 3, 4, 6, 8];
+const eventDensityOptions = [
+  { value: "auto", label: "Auto" },
+  ...EVENT_DENSITY_VALUES.map(value => ({ value, label: String(value) })),
+];
+const eventDensityModel = computed(() => {
+  const value = Number(props.region.view?.maxVisibleEvents);
+  return Number.isFinite(value) ? value : "auto";
+});
+const setEventDensity = value => {
+  emit("patch-view", {
+    maxVisibleEvents: value === "auto" ? undefined : Number(value),
+  });
+};
+
+// Fit photos: Smart is the default (absent). Crop was the same as Fill and is
+// gone from the options.
+const photoFitOptions = [
+  { value: "smart", label: "Smart" },
+  { value: "fit", label: "Whole photo" },
+  { value: "fill", label: "Fill" },
+  { value: "center", label: "Centre" },
+];
+const photoFitModel = computed(() => props.region.view?.fit || "smart");
 </script>
 
 <style scoped>

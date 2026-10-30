@@ -27,45 +27,13 @@
 
     <div v-if="!isDay" class="cvo-row">
       <span class="cvo-label">Week numbers</span>
-      <div class="cvo-seg" role="radiogroup" aria-label="Week numbers">
-        <button
-          v-for="opt in weekNumberOptions"
-          :key="opt.value"
-          type="button"
-          role="radio"
-          :class="{ on: weekNumbers === opt.value }"
-          :aria-checked="weekNumbers === opt.value ? 'true' : 'false'"
-          :aria-label="`Week numbers ${opt.value}`"
-          @click="setWeekNumbers(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
+      <ToggleSwitch
+        :model-value="weekNumbers"
+        aria-label="Week numbers"
+        @update:model-value="setWeekNumbers"
+      />
     </div>
 
-    <div v-if="isMonth" class="cvo-row">
-      <span class="cvo-label">Events/day</span>
-      <div class="cvo-density">
-        <button
-          v-if="densityOverridden"
-          type="button"
-          class="cvo-default-chip"
-          aria-label="Use default events per day"
-          @click="clearDensity"
-        >
-          Default
-        </button>
-        <div class="cvo-stepper">
-          <button type="button" aria-label="Fewer events per day" @click="stepDensity(-1)">
-            −
-          </button>
-          <span class="cvo-count-value" :class="{ inheriting: !densityOverridden }">
-            {{ densityValue }}
-          </span>
-          <button type="button" aria-label="More events per day" @click="stepDensity(1)">+</button>
-        </div>
-      </div>
-    </div>
     <div class="cvo-row">
       <span class="cvo-label">Refresh</span>
       <button
@@ -86,6 +54,7 @@ import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
 import { useCalendarStore } from "@/stores/calendar";
 import RegionViewOptions from "./RegionViewOptions.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const props = defineProps({
   regionId: { type: String, default: null },
@@ -101,6 +70,7 @@ const refreshNow = () => {
 };
 
 const rolling = computed(() => props.view?.rolling === true);
+const weekNumbers = computed(() => props.view?.weekNumbers === true);
 const isWeek = computed(() => props.view?.mode === "week");
 // A non-rolling month always shows the whole month, so its count means "extra
 // look-ahead weeks after the month" (min 0). Every other view's count is the
@@ -135,42 +105,16 @@ const step = delta => {
   if (next !== countValue.value) persist({ [countKey.value]: next });
 };
 
-// --- Per-region display overrides (inherit the global config when unset) ---
-const isMonth = computed(() => props.view?.mode === "month");
+// --- Per-region display settings (CLV-49) ---
 // A day view collapses the popover to just Refresh — no window/grid controls apply.
 const isDay = computed(() => props.view?.mode === "day");
 
-// Week numbers: tri-state where "default" means inherit (persisted as absent).
-const weekNumberOptions = [
-  { value: "default", label: "Default" },
-  { value: "on", label: "On" },
-  { value: "off", label: "Off" },
-];
-const weekNumbers = computed(() => {
-  if (props.view?.weekNumbers === true) return "on";
-  if (props.view?.weekNumbers === false) return "off";
-  return "default";
-});
+// Week numbers are a region setting now: the on-dashboard control toggles this
+// region's value, with no household default behind it.
 const setWeekNumbers = value => {
   if (value === weekNumbers.value) return;
-  const weekNumbersPatch = value === "on" ? true : value === "off" ? false : undefined;
-  persist({ weekNumbers: weekNumbersPatch });
+  persist({ weekNumbers: value });
 };
-
-// Events/day density: an override of config.maxVisibleEvents. The stepper shows
-// the effective value (inherited or overridden); stepping creates/updates the
-// override, and the Default chip clears it back to inherit.
-const densityOverridden = computed(() => Number.isFinite(Number(props.view?.maxVisibleEvents)));
-const densityValue = computed(
-  () => props.view?.maxVisibleEvents ?? configStore.maxVisibleEvents ?? 4
-);
-const stepDensity = delta => {
-  const next = Math.min(20, Math.max(1, densityValue.value + delta));
-  if (next !== densityValue.value || !densityOverridden.value) {
-    persist({ maxVisibleEvents: next });
-  }
-};
-const clearDensity = () => persist({ maxVisibleEvents: undefined });
 </script>
 
 <style scoped>
