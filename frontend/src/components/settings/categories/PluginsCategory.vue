@@ -20,6 +20,8 @@
         :upload-error="uploadError"
         :upload-success="uploadSuccess"
         :show-theme-info="!hasInstalledThemes"
+        :latest-versions="catalogUpdates"
+        :updating-plugin="updatingPlugin"
         @tab-change="activePluginTab = $event"
         @toggle-expand="handleToggleExpand"
         @toggle-enabled="handleToggleEnabled"
@@ -31,6 +33,7 @@
         @custom-action="handleCustomAction"
         @used-by="openSourcesFor"
         @add-source="openSourcesFor"
+        @update="handleUpdate"
         @open-appearance="openAppearance"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
@@ -45,6 +48,11 @@
         :enumerating="enumeratingPlugins"
         :installing="installingPlugin"
         :available-plugins="availablePlugins"
+        :catalog-plugins="catalogPlugins"
+        :catalog-repo-url="catalogRepo"
+        :catalog-branch="catalogBranch"
+        :catalog-enumerating="catalogEnumerating"
+        :catalog-error="catalogError"
         :error="pluginInstallError"
         :success="pluginInstallSuccess"
         :branch-switched="pluginBranchSwitched"
@@ -60,6 +68,7 @@
         @install-local="handleInstallLocal"
         @install-selected-local="handleInstallSelectedLocal"
         @force-update="handleForceUpdate"
+        @add-source="openSourcesFor"
       />
     </SettingsSection>
 
@@ -129,6 +138,8 @@ import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
 import ConfirmModal from "../shared/ConfirmModal.vue";
 import { pluginKindKey } from "@/utils/pluginKind";
+import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
+import { isNewerVersion } from "@/utils/pluginVersions";
 
 // Use composables
 const {
@@ -140,6 +151,9 @@ const {
   githubRepoUrl,
   githubBranch,
   availablePlugins,
+  catalogPlugins,
+  catalogEnumerating,
+  catalogError,
   pluginInstallError,
   pluginInstallSuccess,
   pluginBranchSwitched,
@@ -155,6 +169,7 @@ const {
   loadPlugins,
   installPluginFromZip,
   enumeratePluginsFromGitHub,
+  enumerateCatalogPlugins,
   installPluginFromGitHub,
   installPluginsFromGitHub,
   enumeratePluginsFromLocal,
@@ -194,6 +209,28 @@ const hasInstalledThemes = computed(() => {
 const installKindFilter = computed(() =>
   typeof route?.query?.pluginKind === "string" ? route.query.pluginKind : "all"
 );
+
+// The official catalog (§3.3): listed on open, and the only source of an
+// Update on an Installed card. A non-official repository is never one-click
+// installable — that stays the disclosure's deliberate "List plugins" path.
+const catalogRepo = computed(() => configStore.pluginCatalogRepo || "");
+const officialCatalog = computed(() => isOfficialCatalogRepo(catalogRepo.value));
+const catalogBranch = "main";
+const updatingPlugin = ref("");
+
+const catalogUpdates = computed(() => {
+  if (!officialCatalog.value) return {};
+  const byId = Object.fromEntries(catalogPlugins.value.map(plugin => [plugin.id, plugin]));
+  const updates = {};
+  for (const plugin of plugins.value) {
+    if (!plugin._installed) continue;
+    const entry = byId[plugin.id];
+    if (entry && isNewerVersion(entry.version, plugin.version)) {
+      updates[plugin.id] = entry.version;
+    }
+  }
+  return updates;
+});
 
 // Pip security warning modal state
 const showPipWarningModal = ref(false);
@@ -336,6 +373,23 @@ const handleForceUpdate = async ({ path, repoUrl, branch }) => {
     return;
   }
   await doInstall();
+};
+
+// Update from an Installed card (§3.3): install the catalog's newer version of
+// the same plugin, from the official catalog only.
+const handleUpdate = async pluginId => {
+  const entry = catalogPlugins.value.find(plugin => plugin.id === pluginId);
+  if (!entry || !officialCatalog.value) return;
+  updatingPlugin.value = pluginId;
+  try {
+    await handleInstall({
+      path: entry.path,
+      repoUrl: catalogRepo.value,
+      branch: catalogBranch,
+    });
+  } finally {
+    updatingPlugin.value = "";
+  }
 };
 
 const handleInstallSelected = async ({ plugins: pluginsToInstall, repoUrl, branch }) => {
@@ -581,10 +635,11 @@ onMounted(async () => {
     githubRepoUrl.value = configStore.pluginRepositoryUrl;
   }
 
-  // Show the catalog straight away instead of behind "List plugins" (F8). The
-  // list is module state in usePlugins, so this runs once per page load.
-  if (githubRepoUrl.value && availablePlugins.value.length === 0 && !enumeratingPlugins.value) {
-    void enumeratePluginsFromGitHub(githubRepoUrl.value, githubBranch.value || "main");
+  // Show the official catalog straight away instead of behind "List plugins"
+  // (§3.3). The catalog list is module state in usePlugins, so this runs once
+  // per page load.
+  if (officialCatalog.value && catalogPlugins.value.length === 0 && !catalogEnumerating.value) {
+    void enumerateCatalogPlugins(catalogRepo.value, catalogBranch);
   }
 });
 </script>

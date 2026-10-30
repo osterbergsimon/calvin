@@ -21,6 +21,11 @@ const selectedPluginZip = ref(null);
 const githubRepoUrl = ref("");
 const githubBranch = ref("main");
 const availablePlugins = ref([]);
+// The official add-on catalog, enumerated separately from `availablePlugins`
+// so browsing another repository never puts its rows under "Calvin catalog".
+const catalogPlugins = ref([]);
+const catalogEnumerating = ref(false);
+const catalogError = ref("");
 const pluginInstallError = ref("");
 const pluginInstallSuccess = ref("");
 const pluginBranchSwitched = ref(false);
@@ -249,6 +254,50 @@ export function usePlugins() {
     }
   };
 
+  // Enumerate the official catalog into its own list (§3.3). Independent of the
+  // "another GitHub repository" browse flow; failures leave it empty.
+  const enumerateCatalogPlugins = async (repoUrl, branch = "main") => {
+    catalogEnumerating.value = true;
+    catalogError.value = "";
+    catalogPlugins.value = [];
+    try {
+      const response = await pluginsApi.enumeratePluginsFromGitHub(repoUrl, branch);
+      const allItems = [
+        ...(response.plugins || []),
+        ...(response.themes || []).map(theme => ({ ...theme, type: "theme" })),
+      ];
+      let installedById = {};
+      try {
+        const installedResponse = await pluginsApi.getInstalledPlugins();
+        installedById = Object.fromEntries(
+          (installedResponse.plugins || []).map(plugin => [plugin.id, plugin])
+        );
+      } catch (error) {
+        if (error.response?.status !== 404) {
+          logWarn("[usePlugins]", "Failed to load installed plugins for the catalog:", error);
+        }
+      }
+      catalogPlugins.value = allItems.map(plugin =>
+        installedById[plugin.id]
+          ? {
+              ...plugin,
+              _installed: true,
+              _installedVersion: installedById[plugin.id].version || null,
+            }
+          : { ...plugin, _installed: false, _installedVersion: null }
+      );
+      return response;
+    } catch (error) {
+      logError("[usePlugins]", "Failed to enumerate the plugin catalog:", error);
+      catalogPlugins.value = [];
+      catalogError.value =
+        error.response?.data?.detail || error.message || "Could not reach the plugin catalog";
+      return null;
+    } finally {
+      catalogEnumerating.value = false;
+    }
+  };
+
   // Install plugin from GitHub
   const installPluginFromGitHub = async (repoUrl, pluginPath, branch = "main", force = false) => {
     installingPlugin.value = true;
@@ -262,18 +311,20 @@ export function usePlugins() {
       pluginInstallSuccess.value = "Plugin installed successfully!";
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
-      // Mark the installed plugin in-place so the list stays visible
+      // Mark the installed plugin in-place so both lists stay visible and the
+      // catalog row flips to Installed/Update without a re-enumerate.
       const installedId = response.manifest?.id || pluginPath;
-      const idx = availablePlugins.value.findIndex(
-        p => p.id === installedId || p.path === pluginPath
-      );
-      if (idx !== -1) {
-        availablePlugins.value[idx] = {
-          ...availablePlugins.value[idx],
+      const markInstalled = list => {
+        const idx = list.value.findIndex(p => p.id === installedId || p.path === pluginPath);
+        if (idx === -1) return;
+        list.value[idx] = {
+          ...list.value[idx],
           _installed: true,
-          _installedVersion: response.manifest?.version || availablePlugins.value[idx].version,
+          _installedVersion: response.manifest?.version || list.value[idx].version,
         };
-      }
+      };
+      markInstalled(availablePlugins);
+      markInstalled(catalogPlugins);
 
       await loadPlugins();
 
@@ -822,6 +873,9 @@ export function usePlugins() {
     githubRepoUrl,
     githubBranch,
     availablePlugins,
+    catalogPlugins,
+    catalogEnumerating,
+    catalogError,
     pluginInstallError,
     pluginInstallSuccess,
     pluginBranchSwitched,
@@ -841,6 +895,7 @@ export function usePlugins() {
     loadPlugins,
     installPluginFromZip,
     enumeratePluginsFromGitHub,
+    enumerateCatalogPlugins,
     installPluginFromGitHub,
     installPluginsFromGitHub,
     enumeratePluginsFromLocal,

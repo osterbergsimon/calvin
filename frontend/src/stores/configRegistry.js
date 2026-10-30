@@ -337,6 +337,12 @@ export const CONFIG_FIELD_DEFINITIONS = [
     keys: ["pluginRepositoryUrl", "plugin_repository_url"],
     defaultValue: "https://github.com/osterbergsimon/calvin-plugins",
   },
+  {
+    // The official catalog the Content picker may install from (CLV-45, §6).
+    name: "pluginCatalogRepo",
+    keys: ["pluginCatalogRepo", "plugin_catalog_repo"],
+    defaultValue: "https://github.com/osterbergsimon/calvin-plugins",
+  },
 ];
 
 export const getConfigPayloadValue = (payload, field) => {
