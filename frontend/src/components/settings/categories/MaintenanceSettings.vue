@@ -7,6 +7,7 @@
         @update:git-repo-url="v => emit('update:gitRepoUrl', v)"
         @update:git-branch="v => emit('update:gitBranch', v)"
       />
+      <KioskSoftwarePointer />
     </SettingsSection>
 
     <SettingsSection id="device-hardware" title="Versions & status">
@@ -18,22 +19,43 @@
     </SettingsSection>
 
     <SettingsSection id="maintenance-system" title="Restart">
-      <!-- In Docker the container is restarted from the host (Unraid / compose).
-           A native backend that does not own the machine (CALVIN_HOST_CONTROL
-           off) refuses these too, so don't offer them. -->
-      <template v-if="hostActionsAvailable">
-        <SettingRow label="Restart backend" description="Restart the backend API server.">
-          <button type="button" class="maint-btn" @click="askRestartBackend">
-            Restart backend
+      <!-- Gate on the real capability: a native Pi with host control but no
+           systemctl/helper would answer these with a 500. -->
+      <template v-if="restartAvailable">
+        <SettingRow
+          label="Restart Calvin server"
+          description="Restarts Calvin. Screens reconnect on their own in about 15 seconds."
+        >
+          <button
+            type="button"
+            class="maint-btn"
+            data-test="restart-backend"
+            @click="askRestartBackend"
+          >
+            Restart server
           </button>
         </SettingRow>
-        <SettingRow label="Restart frontend" description="Restart the frontend service.">
-          <button type="button" class="maint-btn" @click="askRestartFrontend">
-            Restart frontend
+        <SettingRow
+          label="Restart kiosk browser"
+          description="Restarts the browser on this Pi's screen. The server keeps running."
+        >
+          <button
+            type="button"
+            class="maint-btn"
+            data-test="restart-frontend"
+            @click="askRestartFrontend"
+          >
+            Restart browser
           </button>
         </SettingRow>
       </template>
-      <SettingRow label="Reload UI" description="Reload the browser page.">
+      <SettingRow label="Reload UI" data-test="reload-ui">
+        <template #description>
+          <p class="maint-desc">Reload the browser page.</p>
+          <p v-if="isContainer" class="maint-hint" data-test="docker-restart-hint">
+            To restart the server, restart the Calvin container from Docker (Unraid: Docker tab).
+          </p>
+        </template>
         <button type="button" class="maint-btn" @click="reloadUi">Reload UI</button>
       </SettingRow>
     </SettingsSection>
@@ -86,7 +108,7 @@
       :show="confirm.show"
       :title="confirm.title"
       :message="confirm.message"
-      confirm-text="Restart"
+      :confirm-text="confirm.confirmText"
       @confirm="onConfirm"
       @cancel="confirm.show = false"
     />
@@ -104,6 +126,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
+import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";
 import BackupSettings from "@/components/settings/categories/BackupSettings.vue";
 
 defineProps({
@@ -121,26 +144,37 @@ const connectionStore = useConnectionStore();
 const statusText = computed(() => (connectionStore.isBackendOnline ? "● Online" : "○ Offline"));
 const statusClass = computed(() => (connectionStore.isBackendOnline ? "is-online" : "is-offline"));
 
-// A missing environment (request failed) keeps the actions visible; the
-// backend guard then answers with the real reason.
-const hostActionsAvailable = computed(() => {
+// Gate on the capability the backend actually reports, not on deployment or
+// host control: a native Pi can control the host yet lack the restart helper.
+// A missing environment (request failed) keeps the rows visible; the backend
+// guard then answers with the real reason.
+const restartAvailable = computed(() => {
   const env = environment.value;
   if (!env) return true;
-  return env.deployment !== "docker" && env.host_control !== false;
+  return env.capabilities?.restart === true;
 });
+const isContainer = computed(() => environment.value?.deployment === "docker");
 onMounted(loadEnvironment);
 
-const confirm = reactive({ show: false, title: "", message: "", action: null });
+const confirm = reactive({
+  show: false,
+  title: "",
+  message: "",
+  confirmText: "Restart",
+  action: null,
+});
 
 const askRestartBackend = () => {
-  confirm.title = "Restart backend?";
-  confirm.message = "The display will briefly disconnect while the backend restarts.";
+  confirm.title = "Restart the Calvin server?";
+  confirm.message = "Settings and screens lose connection for about 15 seconds.";
+  confirm.confirmText = "Restart server";
   confirm.action = "backend";
   confirm.show = true;
 };
 const askRestartFrontend = () => {
-  confirm.title = "Restart frontend?";
-  confirm.message = "The dashboard UI will reload while the frontend restarts.";
+  confirm.title = "Restart the kiosk browser?";
+  confirm.message = "The screen goes blank for a few seconds.";
+  confirm.confirmText = "Restart browser";
   confirm.action = "frontend";
   confirm.show = true;
 };
@@ -193,5 +227,17 @@ const reloadUi = () => {
 }
 .maint-status.is-offline {
   color: var(--err);
+}
+.maint-desc {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+.maint-hint {
+  margin: 0.2rem 0 0;
+  font-size: var(--fs-sm);
+  line-height: 1.4;
+  color: var(--ink-2);
 }
 </style>

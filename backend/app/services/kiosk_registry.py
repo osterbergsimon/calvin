@@ -53,6 +53,7 @@ async def record_kiosk(
     hostname: str | None = None,
     agent_version: str | None = None,
     agent_status: str | None = None,
+    agent_message: str | None = None,
     available_version: str | None = None,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
@@ -63,6 +64,9 @@ async def record_kiosk(
         return
     if hostname is not None and len(hostname) > 255:
         hostname = hostname[:255]
+    # It is free text from the kiosk; the column caps it at 255.
+    if agent_message is not None and len(agent_message) > 255:
+        agent_message = agent_message[:255]
 
     now = datetime.utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
@@ -74,6 +78,7 @@ async def record_kiosk(
                 last_seen=now,
                 agent_version=agent_version,
                 agent_update_status=agent_status,
+                agent_update_message=agent_message,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             return
@@ -95,6 +100,8 @@ async def record_kiosk(
         existing.agent_version = agent_version
     if agent_status is not None:
         existing.agent_update_status = agent_status
+    if agent_message is not None:
+        existing.agent_update_message = agent_message
     # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
     # (target) version — clearing on any reported version would cancel a just-issued
     # request before the agent ever sees it.
@@ -137,6 +144,7 @@ async def list_kiosks() -> list[dict]:
             "lastAppliedVersion": row.last_applied_version,
             "agentVersion": row.agent_version,
             "agentUpdateStatus": row.agent_update_status,
+            "agentUpdateMessage": row.agent_update_message,
             "agentUpdateRequested": agent_update_requested(row.overrides),
         }
         for row in rows

@@ -169,4 +169,7 @@ class KioskDB(ormar.Model):
     )  # running display-agent bundle version, reported by the agent (calvin-lxw)
     agent_update_status: str | None = ormar.String(
         max_length=128, nullable=True
-    )  # ok | updating | error:<reason> (calvin-lxw)
+    )  # ok | updating | error | success (calvin-lxw)
+    agent_update_message: str | None = ormar.String(
+        max_length=255, nullable=True
+    )  # updater's human-readable message for the last agent update (calvin-dvy3)

@@ -212,6 +212,21 @@ def test_config_reports_available_version_and_flag(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_config_stores_agent_update_message(test_client: TestClient):
+    """The agent reports the updater's failure message alongside its status, and
+    the kiosk list exposes it for the software fleet view (CLV-19)."""
+    test_client.get(
+        "/api/kiosks/k-msg/config"
+        "?khost=pi&kagent=oldver&kstat=error"
+        "&kmsg=device%20python%20%3C%203.9%3B%20keeping%20current%20agent"
+    )
+    kiosks = test_client.get("/api/kiosks").json()["kiosks"]
+    row = next(k for k in kiosks if k["id"] == "k-msg")
+    assert row["agentUpdateStatus"] == "error"
+    assert row["agentUpdateMessage"] == "device python < 3.9; keeping current agent"
+
+
+@pytest.mark.integration
 def test_post_update_unknown_kiosk_404(test_client: TestClient):
     assert test_client.post("/api/kiosks/never-seen/update").status_code == 404
 

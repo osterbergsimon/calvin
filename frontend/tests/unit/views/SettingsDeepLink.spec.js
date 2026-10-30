@@ -120,6 +120,26 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
+  it("opens Kiosks and scrolls to Kiosk software for kiosks-software", async () => {
+    route.query = { setting: "kiosks-software" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          KiosksSettings: {
+            template: `<div>${section("kiosks-list", "Kiosks")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("kiosks");
+    expect(document.getElementById("section-kiosks-list").scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
   it("opens Dashboard for clock-bar-items", async () => {
     route.query = { setting: "clock-bar-items" };
     const w = mount(Settings, {
