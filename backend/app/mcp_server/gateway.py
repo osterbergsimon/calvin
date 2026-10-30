@@ -86,7 +86,7 @@ class McpGateway:
         try:
             key = _authenticate_bearer(request)
         except HTTPException as exc:
-            detail = exc.detail if isinstance(exc.detail, dict) else {}
+            detail: dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
             headers = {"WWW-Authenticate": "Bearer", **(exc.headers or {})}
             return _error(
                 exc.status_code,

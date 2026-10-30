@@ -45,8 +45,12 @@ _OVERRIDE_KEYS = {  # tool argument -> kiosk override (config) key
 }
 
 
+def _json_default(value: Any) -> str:
+    return value.isoformat() if isinstance(value, datetime) else str(value)
+
+
 def _dump(data: Any) -> str:
-    return json.dumps(data, separators=(",", ":"), default=str)
+    return json.dumps(data, separators=(",", ":"), default=_json_default)
 
 
 def _http_message(exc: HTTPException) -> str:
@@ -387,8 +391,8 @@ async def set_kiosk_override(
         if page not in known:
             raise ToolError(f"Unknown page {page!r}. Pages: {', '.join(map(str, known))}")
     merged = dict(current)
-    for arg in clear or []:
-        merged.pop(_OVERRIDE_KEYS[arg], None)
+    for cleared in clear or []:
+        merged.pop(_OVERRIDE_KEYS[cleared], None)
     for arg, value in changes.items():
         if value is not None:
             merged[_OVERRIDE_KEYS[arg]] = value
