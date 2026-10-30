@@ -1,5 +1,5 @@
 // frontend/tests/unit/components/settings/AllScreensSettings.spec.js
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
@@ -455,6 +455,83 @@ describe("AllScreensSettings copy (§3.3)", () => {
     const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
     const buttons = w.findAll(".device-actions button").map(b => b.text());
     expect(buttons).toEqual(["Turn off", "Turn on"]);
+  });
+});
+
+// CLV-46 — the schedule editor used to offer 11 hardcoded zones.
+describe("AllScreensSettings — timezone picker (CLV-46)", () => {
+  const realSupportedValuesOf = Intl.supportedValuesOf;
+  const setSupportedValuesOf = impl =>
+    Object.defineProperty(Intl, "supportedValuesOf", {
+      configurable: true,
+      writable: true,
+      value: impl,
+    });
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+  });
+
+  afterEach(() => setSupportedValuesOf(realSupportedValuesOf));
+
+  const mountWithZone = timezone =>
+    mount(AllScreensSettings, {
+      props: { config: { ...baseConfig, displayScheduleEnabled: true, timezone } },
+      global: { stubs },
+    });
+
+  const timezonePill = w =>
+    w.findAllComponents({ name: "SelectPill" }).find(c => c.props("options")?.[0]?.value === "system");
+
+  it("offers the engine's full IANA list in a searchable pill", () => {
+    setSupportedValuesOf(() => ["Europe/Stockholm", "America/New_York", "Asia/Tokyo"]);
+    const pill = timezonePill(mountWithZone(null));
+
+    expect(pill.props("searchable")).toBe(true);
+    expect(pill.props("options")[0].label).toBe("Server's timezone");
+    expect(pill.props("options").map(o => o.value)).toEqual([
+      "system",
+      "UTC",
+      "Europe/Stockholm",
+      "America/New_York",
+      "Asia/Tokyo",
+    ]);
+    expect(pill.props("options").map(o => o.label)).toContain("America/New York");
+  });
+
+  it("falls back to the old list plus the stored zone when the API is missing", () => {
+    setSupportedValuesOf(undefined);
+    const pill = timezonePill(mountWithZone("Europe/Berlin"));
+    const values = pill.props("options").map(o => o.value);
+
+    expect(values).toContain("Europe/Stockholm");
+    expect(values).toContain("Asia/Tokyo");
+    expect(values).toContain("Europe/Berlin");
+  });
+
+  it("keeps the stored zone selected and visible when the list lacks it", () => {
+    setSupportedValuesOf(() => ["Europe/Stockholm"]);
+    const pill = timezonePill(mountWithZone("Antarctica/Troll"));
+
+    expect(pill.props("modelValue")).toBe("Antarctica/Troll");
+    expect(pill.props("options")[1]).toEqual({
+      value: "Antarctica/Troll",
+      label: "Antarctica/Troll",
+    });
+  });
+
+  it("round-trips the stored zone and writes null for Server's timezone", () => {
+    setSupportedValuesOf(() => ["Europe/Stockholm"]);
+    const w = mountWithZone("Europe/Stockholm");
+    const pill = timezonePill(w);
+    expect(pill.props("modelValue")).toBe("Europe/Stockholm");
+
+    pill.vm.$emit("update:modelValue", "Europe/Stockholm");
+    pill.vm.$emit("update:modelValue", "system");
+    const patches = w.emitted("update:config") || [];
+    expect(patches).toContainEqual([{ timezone: "Europe/Stockholm" }]);
+    expect(patches).toContainEqual([{ timezone: null }]);
   });
 });
 
