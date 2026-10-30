@@ -1,5 +1,6 @@
 """Plugin manager for registering and managing plugins."""
 
+import asyncio
 from typing import Any
 
 from loguru import logger
@@ -22,6 +23,22 @@ class PluginManager:
             PluginType.SERVICE: [],
             PluginType.BACKEND: [],
         }
+        # Serialises initialize()/start() for one instance. Concurrent dashboard
+        # polls of a boot-failed plugin must not race each other (calvin-olsx).
+        self._lifecycle_locks: dict[str, asyncio.Lock] = {}
+
+    def get_lifecycle_lock(self, plugin_id: str) -> asyncio.Lock:
+        """Return the per-instance lock guarding initialize()/start().
+
+        Keyed by instance id, so two instances never block each other and a
+        poll that waited on another poll's successful start can re-check
+        ``is_running()`` instead of initializing a second time.
+        """
+        lock = self._lifecycle_locks.get(plugin_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._lifecycle_locks[plugin_id] = lock
+        return lock
 
     async def register(self, plugin: BasePlugin) -> None:
         """
@@ -82,6 +99,7 @@ class PluginManager:
 
         plugin = self._plugins[plugin_id]
         del self._plugins[plugin_id]
+        self._lifecycle_locks.pop(plugin_id, None)
         if plugin.plugin_type in self._plugins_by_type:
             try:
                 self._plugins_by_type[plugin.plugin_type].remove(plugin)
