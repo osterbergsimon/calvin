@@ -1,5 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// E2E_PORT lets a local run use its own dev server instead of an already
+// running stack on 5173 (the owner's dev server may serve another worktree).
+// CI leaves it unset and starts a clean server on 5173.
+const PORT = Number(process.env.E2E_PORT || 5173);
+const BASE_URL = process.env.E2E_BASE_URL || `http://localhost:${PORT}`;
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -18,7 +24,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:5173",
+    baseURL: BASE_URL,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: "on-first-retry",
     /* Screenshot on failure */
@@ -30,13 +36,31 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      // The phone suite is a real 390x844 touch viewport; it lives in
+      // tests/e2e/phone and runs as its own project.
+      testIgnore: "**/phone/**",
+    },
+    {
+      name: "phone",
+      testDir: "./tests/e2e/phone",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 2,
+        hasTouch: true,
+        isMobile: true,
+        // A phone has overlay scrollbars: without this, headless Chromium
+        // reserves a desktop scrollbar and reports innerWidth 429 for a 390px
+        // screen, hiding up to 39px of horizontal overflow.
+        launchOptions: { args: ["--hide-scrollbars"] },
+      },
     },
   ],
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:5173",
+    command: `npm run dev -- --port ${PORT} --strictPort`,
+    url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
