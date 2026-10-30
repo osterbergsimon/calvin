@@ -59,7 +59,9 @@ pass "a screen-off stop is not a crash loop"
 # The hardware helper: root-owned, validates the rotation, and is the only thing
 # the calvin user may run through sudo.
 assert_contains "$helper" '^#!/usr/bin/env bash$' "the panel helper is not a bash script"
+# shellcheck disable=SC2016  # matching the literal script text
 assert_contains "$helper" 'stop "\$UNIT"' "the helper does not stop cog before blanking"
+# shellcheck disable=SC2016  # matching the literal script text
 assert_contains "$helper" 'printf .*%s.*> "\$FB_BLANK"' \
     "the helper does not write the framebuffer blank node"
 assert_contains "$helper" 'rotate\)' "the helper has no rotate verb"
