@@ -47,4 +47,19 @@ describe("PluginInstaller catalog (F8)", () => {
     const w = mountWith({ devMode: false });
     expect(w.text()).toContain("Recipes and meal plans from your Mealie server");
   });
+
+  it("labels the kind in plain words, never the raw type", () => {
+    const w = mountWith({ devMode: false });
+    expect(w.find(".plugin-type-badge-small").text()).toBe("Web page & app");
+  });
+
+  it("never asks for a restart: contract 1.0 installs are live", () => {
+    // The legacy manifest flag used to echo back as requires_restart and raised
+    // a "Server Restart Required" box with a systemctl command, though installs
+    // register the plugin type immediately.
+    const w = mountWith({ devMode: false, requiresRestart: true });
+    expect(w.find(".restart-notice").exists()).toBe(false);
+    expect(w.text().toLowerCase()).not.toContain("restart");
+    expect(w.text()).not.toContain("systemctl");
+  });
 });

@@ -42,7 +42,7 @@ describe("PluginCard status line", () => {
       { id: "a", running: true },
       { id: "b", running: true },
     ]);
-    expect(w.find(".pc-summary").text()).toBe("2 instances · 2/2 running");
+    expect(w.find(".pc-summary").text()).toBe("2 sources · 2/2 running");
     expect(w.find(".pc-dot--ok").exists()).toBe(true);
   });
 
@@ -51,7 +51,7 @@ describe("PluginCard status line", () => {
       { id: "a", running: true },
       { id: "b", running: false },
     ]);
-    expect(w.find(".pc-summary").text()).toBe("2 instances · 1/2 running");
+    expect(w.find(".pc-summary").text()).toBe("2 sources · 1/2 running");
     expect(w.find(".pc-dot--warn").exists()).toBe(true);
   });
 
@@ -73,9 +73,9 @@ describe("PluginCard status line", () => {
     expect(w.emitted("manage-calendar-sources")?.length).toBe(1);
   });
 
-  it("invites the first instance when none exist", () => {
+  it("invites the first source when none exist", () => {
     const w = mountCard(service(), []);
-    expect(w.find(".pc-summary").text()).toBe("No instances yet");
+    expect(w.find(".pc-summary").text()).toBe("No sources yet");
   });
 
   it("labels themes plainly", () => {
