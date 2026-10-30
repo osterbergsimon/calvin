@@ -1,0 +1,53 @@
+name: Release Please
+
+# Releases are cut on main only. develop integrates through
+# promote-develop-to-main.yml, which opens (and keeps updating) the
+# develop -> main PR; merging it runs this workflow, which maintains a
+# "chore(main): release X.Y.Z" PR from the conventional commits.
+# Merging *that* PR is what writes CHANGELOG.md, creates the vX.Y.Z tag and
+# the GitHub Release. Never create or push a release tag by hand.
+#
+# See docs/RELEASING.md for the full flow.
+
+on:
+  push:
+    branches:
+      - main
+  # Recovery hatch: re-run after fixing the config or a failed release PR.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # release-please tags the release with GITHUB_TOKEN, and a tag pushed by
+      # that token does not trigger another workflow's `push: tags` — so
+      # docker-build.yml would never publish the :X.Y.Z / :X.Y / :latest
+      # images. Dispatch it at the new tag instead; docker-build treats a
+      # workflow_dispatch with push_image=true exactly like a tag push.
+      - name: Publish the release image
+        if: ${{ steps.release.outputs.releases_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: >-
+          gh workflow run docker-build.yml
+          --repo "$GITHUB_REPOSITORY"
+          --ref "$TAG"
+          -f push_image=true
