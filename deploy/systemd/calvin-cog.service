@@ -1,0 +1,56 @@
+[Unit]
+Description=Calvin kiosk (cog + WPE WebKit, DRM/KMS)
+# Same session shape as calvin-x.service/calvin-wayland.service: the unit takes
+# tty1 over from getty and opens a PAM/logind session on it, which is what gives
+# cog DRM master before anything else can claim the KMS device.
+After=systemd-user-sessions.service network-online.target getty@tty1.service
+Wants=network-online.target
+# Exactly one display owner: starting cog stops X, labwc and getty (and vice
+# versa for the other stacks).
+Conflicts=getty@tty1.service calvin-x.service calvin-wayland.service
+Before=calvin-display-agent.service
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+# DRM master (video) for /dev/dri/card0, GLES (render) and libinput (/dev/input).
+SupplementaryGroups=video render input
+PAMName=login
+UtmpIdentifier=tty1
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Environment="HOME=/home/calvin"
+# Backend URL / kiosk identity come from the same file Chromium reads; the
+# rotation is written by calvin-cog-panel.sh when the agent changes it.
+EnvironmentFile=-/etc/default/calvin-kiosk
+EnvironmentFile=-/etc/default/calvin-kiosk-cog
+# renderer=gles is required for rotation: the default `modeset` renderer refuses
+# ("Renderer 'modeset' does not support rotation"). 0/1/2/3 = 0/90/180/270 .
+# --webprocess-failure=restart is the cog equivalent of the CDP crash watchdog:
+# a crashed WPE web process is restarted in place (no Chromium DevTools port).
+ExecStart=/bin/bash -c 'url="$${CALVIN_BACKEND_URL%/}"; \
+    q=""; \
+    [ -n "$${CALVIN_KIOSK_ID:-}" ] && q="kiosk=$${CALVIN_KIOSK_ID}"; \
+    [ -n "$${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=$${CALVIN_KIOSK_HOSTNAME}"; \
+    [ -n "$${q}" ] && url="$${url}?$${q}"; \
+    exec /usr/bin/cog \
+      --platform=drm \
+      --platform-params="renderer=gles,rotation=$${CALVIN_COG_ROTATION:-0}" \
+      --webprocess-failure=restart \
+      "$${url}"'
+# cog exits with SIGSEGV on SIGTERM (upstream behaviour, harmless); treat that
+# as a clean stop so a screen-off does not look like a crash and restart-loop.
+SuccessExitStatus=SIGSEGV
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-cog
+
+[Install]
+WantedBy=graphical.target
