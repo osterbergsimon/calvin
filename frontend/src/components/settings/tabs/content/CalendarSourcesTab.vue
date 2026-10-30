@@ -22,14 +22,17 @@
           :title="`Colour for ${row.name}`"
           @change="handleColorChange(row, $event.target.value)"
         />
-        <span class="cal-show-time">
-          <span class="cal-cap">Show times</span>
-          <ToggleSwitch
-            :model-value="row.showTime"
+      </template>
+      <template #meta="{ row }">
+        <label class="cal-show-times">
+          <input
+            type="checkbox"
+            :checked="row.showTime"
             :aria-label="`Show event times for ${row.name}`"
-            @update:model-value="v => handleShowTimeChange(row, v)"
+            @change="handleShowTimeChange(row, $event.target.checked)"
           />
-        </span>
+          Show event times
+        </label>
       </template>
     </SourceList>
 
@@ -77,7 +80,6 @@ import { usePlugins } from "@/composables";
 import * as calendarApi from "@/services/calendarApi";
 import * as pluginsApi from "@/services/pluginsApi";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
-import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
@@ -305,19 +307,29 @@ onMounted(async () => {
   outline-offset: 2px;
 }
 
-.cal-show-time {
-  display: flex;
+/* Show times lives on the row's subline as a small labelled checkbox, so the
+   right-hand controls read exactly like every other source row. */
+.cal-show-times {
+  display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-}
-.cal-cap {
+  margin-top: 0.1rem;
   font-family: var(--font-ui);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-size: 0.8rem;
+  color: var(--ink-2);
+  cursor: pointer;
   white-space: nowrap;
+}
+.cal-show-times input {
+  width: 0.9rem;
+  height: 0.9rem;
+  margin: 0;
+  accent-color: var(--focus);
+  cursor: pointer;
+}
+.cal-show-times input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .cal-refresh {
