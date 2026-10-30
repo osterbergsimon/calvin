@@ -1,16 +1,18 @@
 import { ref, computed, readonly, onScopeDispose } from "vue";
-import { useConfigStore } from "../stores/config";
+import { useScreenSetting } from "./useScreenSetting";
 
 /**
- * Reactive touch-capability detection with a manual override.
+ * Reactive touch-capability detection with a per-screen override.
  *
  * `isTouch` decides whether touch chrome (region controls, screen dots,
- * admin overflow, fullscreen close) renders. It combines a config override
- * with auto-detection:
- *   - config `touchControls: 'on'`   → always true  (force touch chrome)
- *   - config `touchControls: 'off'`  → always false (hide touch chrome)
- *   - config `touchControls: 'auto'` → `(any-pointer: coarse)` matches OR the
- *     device reports touch points (`navigator.maxTouchPoints > 0`)
+ * admin overflow, fullscreen close) renders. It combines a per-screen override
+ * (settings copy audit §2: a mouse PC and a wall panel need opposite answers,
+ * so the choice lives in this browser / this kiosk, seeded from the server's
+ * `touchControls`) with auto-detection:
+ *   - 'on'   → always true  (force touch chrome)
+ *   - 'off'  → always false (hide touch chrome)
+ *   - 'auto' → `(any-pointer: coarse)` matches OR the device reports touch
+ *     points (`navigator.maxTouchPoints > 0`)
  *
  * `hasPointer` additionally counts a fine (mouse) pointer, so mouse desktops
  * get clickable controls while keyboard-only kiosks do not.
@@ -23,7 +25,9 @@ import { useConfigStore } from "../stores/config";
  * is still imperfect, hence the explicit 'on'/'off' override.
  */
 export function useTouchCapability() {
-  const configStore = useConfigStore();
+  const { value: touchControls } = useScreenSetting("touchControls", {
+    storageKey: "calvin-touch-controls",
+  });
   const coarse = ref(false);
   const fine = ref(false);
 
@@ -62,7 +66,7 @@ export function useTouchCapability() {
   }
 
   const isTouch = computed(() => {
-    const mode = configStore.touchControls;
+    const mode = touchControls.value;
     if (mode === "on") return true;
     if (mode === "off") return false;
     return coarse.value; // 'auto'
@@ -72,7 +76,7 @@ export function useTouchCapability() {
   // a keyboard-only kiosk (no fine, no coarse) shows none. Same on/off override
   // as isTouch so an operator can force controls on or off.
   const hasPointer = computed(() => {
-    const mode = configStore.touchControls;
+    const mode = touchControls.value;
     if (mode === "on") return true;
     if (mode === "off") return false;
     return fine.value || coarse.value; // 'auto'

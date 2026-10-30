@@ -66,3 +66,29 @@ describe("SecuritySettings", () => {
     expect(wrapper.find("[data-test='allowlist-inactive']").exists()).toBe(true);
   });
 });
+
+// Settings copy audit §3.6 — verbatim.
+describe("SecuritySettings copy (§3.6)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("calls the allowlist Allowed sites and explains it in plain words", async () => {
+    const { wrapper } = mountWith([]);
+    await flushPromises();
+    const section = wrapper.find("#section-security-origins");
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Allowed sites");
+    expect(section.text()).toContain(
+      "Sites this dashboard may show or load from. Everything else is blocked. Use a domain like grafana.lab or *.lab.example.com, or a full address."
+    );
+    expect(section.text()).toContain("No sites allowed.");
+    // The CIDR caveat belongs to the input's validation error, not the intro.
+    expect(section.text()).not.toContain("CIDR) are not supported");
+  });
+
+  it("describes sealed mode without the word origins", async () => {
+    const { wrapper } = mountWith([], false);
+    await flushPromises();
+    expect(wrapper.text()).toContain(
+      "Only this Calvin server is reachable: no outside embeds, sites or plugins that go online. Calendars, photos and local plugins keep working."
+    );
+  });
+});

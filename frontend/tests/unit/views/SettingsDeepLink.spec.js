@@ -27,6 +27,10 @@ vi.mock("@/utils/serverUrl", () => ({
 import Settings from "@/views/Settings.vue";
 import api from "@/services/api";
 import { useAuthStore } from "@/stores/auth";
+import {
+  collapseSettingsSection,
+  isSettingsSectionExpanded,
+} from "@/utils/settingsSectionExpansion";
 
 function signInAsAdmin() {
   useAuthStore().applyStatus({ configured: true, authenticated: true });
@@ -80,14 +84,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
 
   const activeCategory = w => w.findComponent({ name: "CategoryRail" }).props("activeId");
 
-  it("opens Screen & keyboard and scrolls to Keyboard for device-reboot", async () => {
+  it("opens Screen & keyboard and scrolls to Remote & buttons for device-reboot", async () => {
     route.query = { setting: "device-reboot" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
           DeviceSettings: {
-            template: `<div>${section("device-keyboard", "Keyboard")}</div>`,
+            template: `<div>${section("device-buttons", "Remote & buttons")}</div>`,
           },
         },
       },
@@ -96,7 +100,7 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     await flushPromises();
 
     expect(activeCategory(w)).toBe("device");
-    expect(document.getElementById("section-device-keyboard").scrollIntoView).toHaveBeenCalled();
+    expect(document.getElementById("section-device-buttons").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 
@@ -222,5 +226,39 @@ describe("Settings phone hand-off (F2)", () => {
     expect(w.find('[data-test="phone-setup-url"]').text()).toBe(
       "http://192.168.1.20:8000/settings?setting=content-calendars"
     );
+  });
+});
+
+describe("Settings › Advanced deep links (§4)", () => {
+  const activeCategory = w => w.findComponent({ name: "CategoryRail" }).props("activeId");
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    signInAsAdmin();
+    Element.prototype.scrollIntoView = vi.fn();
+    collapseSettingsSection("maintenance-advanced");
+  });
+
+  it("opens the closed Advanced disclosure when a search destination targets it", async () => {
+    route.query = { setting: "maintenance-diagnostics" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          MaintenanceSettings: {
+            template: `<div>${section("maintenance-advanced", "Advanced")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("maintenance");
+    expect(isSettingsSectionExpanded("maintenance-advanced")).toBe(true);
+    expect(
+      document.getElementById("section-maintenance-advanced").scrollIntoView
+    ).toHaveBeenCalled();
+    w.unmount();
   });
 });

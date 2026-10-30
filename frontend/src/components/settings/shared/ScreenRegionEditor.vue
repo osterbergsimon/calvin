@@ -5,14 +5,14 @@
       class="sre-root"
       role="dialog"
       aria-modal="true"
-      aria-label="Screens and regions"
+      aria-label="Pages and regions"
     >
       <DialogScrim blur @dismiss="$emit('close')" />
       <div class="sre-modal">
         <!-- Header -->
         <header class="sre-header">
           <div class="sre-title">
-            <h2>Screens &amp; regions</h2>
+            <h2>Pages &amp; regions</h2>
             <p class="sre-sub">
               Design the layouts your kiosks display · drag dividers to resize, the clock bar to
               reposition · changes apply live
