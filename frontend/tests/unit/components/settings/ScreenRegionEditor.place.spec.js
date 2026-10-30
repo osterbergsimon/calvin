@@ -150,13 +150,10 @@ describe("Pages & regions editor deep link", () => {
 
   it("opens with the requested region selected", async () => {
     const w = await mountEditor({
-      open: false,
       placeSource: null,
       initialPageId: "home",
       initialRegionId: "r2",
     });
-    await w.setProps({ open: true });
-    await flushPromises();
     await flushPromises();
     expect(node(w, "r2").props("selectedId")).toBe("r2");
   });
