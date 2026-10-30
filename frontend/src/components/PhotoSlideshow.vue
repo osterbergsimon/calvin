@@ -101,7 +101,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useImagesStore } from "../stores/images";
-import { useConfigStore } from "../stores/config";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
@@ -109,7 +108,6 @@ import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { normalizePhotoFit, resolveImageAspect, resolvePhotoFit } from "@/utils/photoFit";
 
-const configStore = useConfigStore();
 const { handleAction } = useKeyboardActions();
 const { hasPointer } = useTouchCapability();
 
