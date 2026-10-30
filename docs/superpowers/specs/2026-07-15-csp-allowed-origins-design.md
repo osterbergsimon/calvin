@@ -49,7 +49,7 @@ A trusted **origin** the kiosk browser may reach, in any CSP host-source form:
 | Form | Example | Accepted |
 |---|---|---|
 | bare host | `grafana.lab` | ✅ |
-| host + port | `192.168.1.50:3000` | ✅ |
+| host + port | `192.0.2.50:3000` | ✅ |
 | subdomain wildcard | `*.lab.example.com` | ✅ |
 | scheme + host [+ port] | `https://grafana.lab:3000` | ✅ |
 | CIDR / IP range | `10.0.0.0/24` | ❌ (message: use a wildcard domain) |
@@ -181,7 +181,7 @@ already present on kiosk requests. No change to the global list's shape is requi
 
 **Backend unit (`test_csp.py` / new `test_csp_origins.py`):**
 - Validator accepts `grafana.lab`, `*.lab.example.com`, `https://grafana.lab:3000`,
-  `192.168.1.50:3000`; rejects `10.0.0.0/24`, `grafana.lab/d/home`, `a b`, ``, `*`.
+  `192.0.2.50:3000`; rejects `10.0.0.0/24`, `grafana.lab/d/home`, `a b`, ``, `*`.
 - `build_csp(frame_origins, allowed)` puts each allowlist origin in `frame-src`,
   `img-src`, and `connect-src`, and dedupes; `build_csp(frame_origins)` (no allowlist)
   is byte-identical to the Phase-1 output.

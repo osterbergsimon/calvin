@@ -19,7 +19,7 @@ class TestOriginFromUrl:
         assert origin_from_url("https://grafana.lab/some/path") == "https://grafana.lab"
 
     def test_keeps_explicit_port(self):
-        assert origin_from_url("http://192.168.1.50:3000/x") == "http://192.168.1.50:3000"
+        assert origin_from_url("http://192.0.2.50:3000/x") == "http://192.0.2.50:3000"
 
     def test_none_for_empty(self):
         assert origin_from_url("") is None
@@ -50,8 +50,8 @@ class TestBuildCsp:
         assert "frame-ancestors 'self'" in csp
 
     def test_frame_src_includes_given_origins(self):
-        csp = build_csp(["https://grafana.lab", "http://192.168.1.50:3000"])
-        assert "frame-src 'self' https://grafana.lab http://192.168.1.50:3000" in csp
+        csp = build_csp(["https://grafana.lab", "http://192.0.2.50:3000"])
+        assert "frame-src 'self' https://grafana.lab http://192.0.2.50:3000" in csp
 
     def test_frame_src_dedupes(self):
         csp = build_csp(["https://a.lab", "https://a.lab"])
@@ -64,7 +64,7 @@ class TestValidateOrigin:
         assert validate_origin("grafana.lab") == "grafana.lab"
 
     def test_host_and_port(self):
-        assert validate_origin("192.168.1.50:3000") == "192.168.1.50:3000"
+        assert validate_origin("192.0.2.50:3000") == "192.0.2.50:3000"
 
     def test_subdomain_wildcard(self):
         assert validate_origin("*.lab.example.com") == "*.lab.example.com"

@@ -20,7 +20,7 @@ vi.mock("@/composables/useConfigForm", () => ({
 }));
 
 vi.mock("@/utils/serverUrl", () => ({
-  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.168.1.20:8000")),
+  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.0.2.20:8000")),
   settingsLink: (base, id) => (id ? `${base}/settings?setting=${id}` : `${base}/settings`),
 }));
 
@@ -269,7 +269,7 @@ describe("Settings phone hand-off (F2)", () => {
     await flushPromises();
 
     expect(w.find('[data-test="phone-setup-url"]').text()).toBe(
-      "http://192.168.1.20:8000/settings?setting=content-calendars"
+      "http://192.0.2.20:8000/settings?setting=content-calendars"
     );
   });
 });

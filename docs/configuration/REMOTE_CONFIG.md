@@ -19,7 +19,7 @@ Point it at the remote dashboard instead:
 
 ```bash
 cd frontend
-VITE_API_PROXY_TARGET=http://192.168.1.100:8000 npm run dev
+VITE_API_PROXY_TARGET=http://192.0.2.100:8000 npm run dev
 ```
 
 To keep the setting, create `frontend/.env.local` (Vite loads it
@@ -27,7 +27,7 @@ automatically; there is no checked-in `frontend/.env.example`):
 
 ```env
 # frontend/.env.local
-VITE_API_PROXY_TARGET=http://192.168.1.100:8000
+VITE_API_PROXY_TARGET=http://192.0.2.100:8000
 ```
 
 The browser keeps calling same-origin `/api`, so no CORS configuration is
@@ -40,7 +40,7 @@ It must include the `/api` suffix:
 
 ```env
 # frontend/.env.local
-VITE_API_URL=http://192.168.1.100:8000/api
+VITE_API_URL=http://192.0.2.100:8000/api
 ```
 
 This applies to `npm run dev`, `npm run build`, and the packaged frontend.
@@ -50,7 +50,7 @@ Restart the dev server (or rebuild) after changing it.
 
 ```bash
 cd frontend
-VITE_API_URL=http://192.168.1.100:8000/api npm run build
+VITE_API_URL=http://192.0.2.100:8000/api npm run build
 ```
 
 The production Docker image serves the frontend from the backend, so the
@@ -67,11 +67,11 @@ settings read from the environment (`backend/app/config.py`):
 - **`CORS_ALLOW_ALL`** — set to `true` to allow every origin (development
   only; never on a network you don't control).
 
-Example for a dev machine at `192.168.1.50:5173`:
+Example for a dev machine at `192.0.2.50:5173`:
 
 ```bash
 # backend/.env or docker/.env
-CORS_ORIGINS=http://localhost:5173,http://localhost:8000,http://192.168.1.50:5173
+CORS_ORIGINS=http://localhost:5173,http://localhost:8000,http://192.0.2.50:5173
 ```
 
 Restart the backend after changing it. If you point the frontend at the
@@ -88,7 +88,7 @@ ip addr show | grep "inet " | grep -v 127.0.0.1
 ```
 
 From your development machine, check your router's client list or scan the
-LAN (`nmap -sn 192.168.1.0/24`).
+LAN (`nmap -sn 192.0.2.0/24`).
 
 ## Verifying the Connection
 
@@ -109,7 +109,7 @@ LAN (`nmap -sn 192.168.1.0/24`).
 
 ### Connection refused
 
-- Check the backend: `curl http://192.168.1.100:8000/api/health`.
+- Check the backend: `curl http://192.0.2.100:8000/api/health`.
 - Check firewall rules and that the backend binds an interface reachable from
   your machine.
 - Verify the IP and port.
