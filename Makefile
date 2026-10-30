@@ -1,4 +1,4 @@
-.PHONY: help install dev dev-logs dev-logs-read dev-down test test-watch test-watch-frontend lint format type-check build clean doctor
+.PHONY: help install dev dev-logs dev-logs-read dev-down test test-watch test-watch-frontend lint format type-check build clean doctor demo-seed demo-clear
 
 # One compose project per checkout, so several worktrees can run `make dev`
 # at once (set CALVIN_PORT / CALVIN_FRONTEND_PORT in docker/.env to avoid
@@ -24,6 +24,8 @@ help:
 	@echo "  make type-check     - Run type checkers (native; vue-tsc covers src/api only)"
 	@echo "  make build          - Build the production docker image"
 	@echo "  make clean          - Tear down dev stack and remove dev data"
+	@echo "  make demo-seed      - Add sample calendar/photos/pages (DATA_DIR=... for the dev stack)"
+	@echo "  make demo-clear     - Remove only the sample data"
 
 install:
 	@if [ ! -f docker/.env ]; then \
@@ -103,6 +105,15 @@ test-watch:
 
 test-watch-frontend:
 	cd frontend && npm run test:watch
+
+# Sample data for demos and screenshots (CLV-67). For the docker dev stack the
+# data dir is docker/.calvin-dev-data: `make demo-seed DATA_DIR=$PWD/docker/.calvin-dev-data`.
+# A running backend loads plugin instances at startup, so restart it afterwards.
+demo-seed:
+	cd backend && uv run python -m app.demo seed $(if $(DATA_DIR),--data-dir "$(DATA_DIR)",)
+
+demo-clear:
+	cd backend && uv run python -m app.demo clear $(if $(DATA_DIR),--data-dir "$(DATA_DIR)",)
 
 doctor:
 	@echo "Calvin dev-environment doctor"
