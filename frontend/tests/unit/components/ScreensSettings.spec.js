@@ -311,7 +311,12 @@ describe("ScreensSettings — one screen's page", () => {
     // The name lives in the status header; the Name section is titled "Name"
     // instead of repeating it (design lead nit on #165).
     expect(wrapper.find("#section-screen-name .settings-section__eyebrow").text()).toBe("Name");
-    expect(wrapper.find("[data-test='screens-detail']").text().match(/Hallway/g)).toHaveLength(1);
+    expect(
+      wrapper
+        .find("[data-test='screens-detail']")
+        .text()
+        .match(/Hallway/g)
+    ).toHaveLength(1);
   });
 
   it("says Same as all screens on inherited rows", async () => {
