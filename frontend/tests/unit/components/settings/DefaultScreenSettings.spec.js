@@ -1,17 +1,15 @@
-// frontend/tests/unit/components/settings/AllScreensSettings.spec.js
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+// frontend/tests/unit/components/settings/DefaultScreenSettings.spec.js
+// Default is a screen (docs/design/2026-10-30-default-screen.md §3).
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
-import AllScreensSettings from "@/components/settings/categories/AllScreensSettings.vue";
+import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import { useConfigStore } from "@/stores/config";
-import { forgetOskHardware, learnHardwareKeyboard } from "@/composables/useOnScreenKeyboard";
+import { useKiosksStore } from "@/stores/kiosks";
+import { forgetOskHardware } from "@/composables/useOnScreenKeyboard";
 
-vi.mock("@/composables", () => ({
-  useSystem: () => ({ turnDisplayOn: vi.fn(), turnDisplayOff: vi.fn() }),
-}));
-
-const stubs = { DisplayScheduleGrid: true, KeyboardTab: true, RebootCombo: true };
+const stubs = { DisplayScheduleGrid: true, RebootCombo: true };
 const baseConfig = {
   orientation: "landscape",
   orientationFlipped: false,
@@ -24,64 +22,66 @@ const baseConfig = {
   rebootComboKey1: "KEY_1",
   rebootComboKey2: "KEY_7",
   rebootComboDuration: 10000,
-  // keyboard-feedback notifications (moved here from Display — calvin-svo IA pass)
-  keyboardFeedbackEnabled: true,
-  keyboardFeedbackMode: "normal",
-  modeIndicatorTimeout: 5,
+  displayName: "",
+  availableScreens: null,
+  defaultScreenId: null,
+  dashboardScreens: {
+    version: 2,
+    activeScreenId: "home",
+    screens: [
+      { id: "home", name: "Home", layout: { version: 1, direction: "row", regions: [] } },
+      { id: "photos", name: "Photos", layout: { version: 1, direction: "row", regions: [] } },
+    ],
+  },
 };
 
-describe("AllScreensSettings", () => {
+const kiosk = (over = {}) => ({ id: "hall", hostname: "hall-pi", overrides: {}, ...over });
+
+const mountDefault = (overrides = {}) =>
+  mount(DefaultScreenSettings, {
+    props: { config: { ...baseConfig, ...overrides } },
+    global: { stubs },
+  });
+
+describe("DefaultScreenSettings", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
     forgetOskHardware();
   });
 
-  it("renders the shared Display, Power and Touch & keyboard sections only", () => {
-    const wrapper = mount(AllScreensSettings, {
-      props: { config: baseConfig },
-      global: { stubs },
-    });
-    for (const id of ["layout", "device-power", "device-keyboard"]) {
-      expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
-    }
-    // Remote & buttons and key-press feedback moved to Dashboard › Focus & remote.
+  it("renders Name, Pages, Display, Power and Touch & keyboard", () => {
+    const wrapper = mountDefault();
+    expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
+      "section-default-name",
+      "section-default-pages",
+      "section-layout",
+      "section-device-power",
+      "section-device-keyboard",
+    ]);
+    expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe("Display");
+    expect(wrapper.find("#section-device-power .settings-section__eyebrow").text()).toBe("Power");
+    expect(wrapper.find("#section-device-keyboard .settings-section__eyebrow").text()).toBe(
+      "Touch & keyboard"
+    );
+    // Remote & buttons and key-press feedback stayed in Dashboard.
     expect(wrapper.find("#section-device-buttons").exists()).toBe(false);
-    // version numbers now live under System › Versions & status
-    expect(wrapper.find("#section-device-hardware").exists()).toBe(false);
-    // the standalone reboot section is gone; RebootCombo now lives under Power
+    // The reboot combo lives under Power.
     expect(wrapper.find("#section-device-reboot").exists()).toBe(false);
     expect(
       wrapper.find("#section-device-power").findComponent({ name: "RebootCombo" }).exists()
     ).toBe(true);
   });
 
-  it("orders the sections All screens · Display, Power, Touch & keyboard", () => {
-    const wrapper = mount(AllScreensSettings, {
-      props: { config: baseConfig },
-      global: { stubs },
-    });
-    expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
-      "section-layout",
-      "section-device-power",
-      "section-device-keyboard",
-    ]);
-    expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe(
-      "All screens · Display"
-    );
-    expect(wrapper.find("#section-device-power .settings-section__eyebrow").text()).toBe(
-      "All screens · Power"
-    );
-    expect(wrapper.find("#section-device-keyboard .settings-section__eyebrow").text()).toBe(
-      "All screens · Touch & keyboard"
-    );
+  it("has no Software section and no status header", () => {
+    const wrapper = mountDefault();
+    expect(wrapper.find("#section-screen-software").exists()).toBe(false);
+    expect(wrapper.find("#section-screen-hardware").exists()).toBe(false);
+    expect(wrapper.findComponent({ name: "KioskStatusHeader" }).exists()).toBe(false);
   });
 
-  it("emits orientation changes from the moved Display section", () => {
-    const wrapper = mount(AllScreensSettings, {
-      props: { config: baseConfig },
-      global: { stubs },
-    });
+  it("emits orientation changes", () => {
+    const wrapper = mountDefault();
     const orientation = wrapper
       .findAllComponents({ name: "SegmentedControl" })
       .find(c => c.props("ariaLabel") === "Orientation");
@@ -89,31 +89,22 @@ describe("AllScreensSettings", () => {
     expect(wrapper.emitted("update:config").some(c => c[0].orientation === "portrait")).toBe(true);
   });
 
-  it("offers Auto / Always / Never for the on-screen keyboard", () => {
+  it("writes the global on-screen keyboard value", () => {
     const config = useConfigStore();
     config.onScreenKeyboard = "auto";
-    const wrapper = mount(AllScreensSettings, {
-      props: {
-        config: { ...baseConfig, onScreenKeyboard: "auto" },
-      },
-      global: { stubs },
-    });
+    const wrapper = mountDefault({ onScreenKeyboard: "auto" });
     const control = wrapper
       .findAllComponents({ name: "SegmentedControl" })
       .find(c => c.props("ariaLabel") === "Show it");
 
-    expect(control).toBeTruthy();
     expect(control.props("options").map(o => o.label)).toEqual(["Auto", "Always", "Never"]);
-
     control.vm.$emit("update:modelValue", "on");
-    expect(window.localStorage.getItem("calvin-osk-mode")).toBe("on");
+    expect(wrapper.emitted("update:config")).toContainEqual([{ onScreenKeyboard: "on" }]);
+    expect(window.localStorage.getItem("calvin-osk-mode")).toBeNull();
   });
 
   it("offers one Turn off when idle choice instead of a toggle plus seconds", () => {
-    const wrapper = mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 900 } },
-      global: { stubs },
-    });
+    const wrapper = mountDefault({ displayTimeoutEnabled: true, displayTimeout: 900 });
     expect(wrapper.text()).toContain("Turn off when idle");
     expect(wrapper.text()).not.toContain("(0 = never)");
     const idle = wrapper
@@ -130,26 +121,35 @@ describe("AllScreensSettings", () => {
     ]);
   });
 
-  it("passes config through to the folded-in RebootCombo", () => {
-    const wrapper = mount(AllScreensSettings, {
-      props: { config: baseConfig },
-      global: { stubs },
-    });
+  it("passes config through to the RebootCombo", () => {
+    const wrapper = mountDefault();
     const reboot = wrapper.findComponent({ name: "RebootCombo" });
-    expect(reboot.exists()).toBe(true);
     expect(reboot.props("config")).toMatchObject({ rebootComboKey1: "KEY_1" });
   });
 
+  describe("default-only rows are marked", () => {
+    it("marks Timezone, the reboot combo and the keyboard layout rows", () => {
+      const wrapper = mountDefault({ displayScheduleEnabled: true });
+      expect(wrapper.findAll("[data-test='default-only-note']")).toHaveLength(4);
+      expect(wrapper.find("[data-test='default-only-reboot']").text()).toContain(
+        "Applies to every screen"
+      );
+      expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
+    });
+
+    it("does not mark the overridable rows", () => {
+      const wrapper = mountDefault({ displayScheduleEnabled: true });
+      const notes = wrapper
+        .findAllComponents({ name: "SettingRow" })
+        .filter(row => row.text().includes("Applies to every screen"))
+        .map(row => row.props("label"));
+      expect(notes).toEqual(["Timezone", "Keyboard layout", "Also switch to"]);
+    });
+  });
+
   describe("on-screen keyboard layout rows (§7)", () => {
-    const mountSettings = (overrides = {}) => {
-      useConfigStore().onScreenKeyboard = overrides.onScreenKeyboard ?? "auto";
-      return mount(AllScreensSettings, {
-        props: {
-          config: { ...baseConfig, onScreenKeyboard: "auto", ...overrides },
-        },
-        global: { stubs },
-      });
-    };
+    const mountSettings = (overrides = {}) =>
+      mountDefault({ onScreenKeyboard: "auto", ...overrides });
 
     const layoutPill = wrapper =>
       wrapper
@@ -199,9 +199,7 @@ describe("AllScreensSettings", () => {
     it("drops (suggested) once a layout is saved", () => {
       Object.defineProperty(navigator, "language", { configurable: true, value: "sv-SE" });
       const wrapper = mountSettings({ oskLayout: "de" });
-      const pill = layoutPill(wrapper);
-
-      expect(pill.props("modelValue")).toBe("de");
+      expect(layoutPill(wrapper).props("modelValue")).toBe("de");
       expect(wrapper.text()).not.toContain("(suggested)");
     });
 
@@ -262,7 +260,6 @@ describe("AllScreensSettings", () => {
 
     it("hides that line when the device has no choice of its own", () => {
       const wrapper = mountSettings({ oskLayout: "sv" });
-
       expect(wrapper.find(".device-osk-device").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
@@ -270,9 +267,7 @@ describe("AllScreensSettings", () => {
     it("ignores and removes the legacy auto-written key", () => {
       window.localStorage.setItem("calvin-osk-layout", "de");
       const wrapper = mountSettings({ oskLayout: "sv" });
-
       expect(wrapper.find(".device-osk-device").exists()).toBe(false);
-      expect(wrapper.text()).not.toContain("chosen on the keyboard");
       expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
     });
 
@@ -303,82 +298,15 @@ describe("AllScreensSettings", () => {
     it("is unaffected by the UI language", () => {
       document.documentElement.lang = "de";
       const wrapper = mountSettings({ oskLayout: "sv" });
-
       expect(layoutPill(wrapper).props("modelValue")).toBe("sv");
       expect(wrapper.text()).not.toContain("(suggested)");
       document.documentElement.removeAttribute("lang");
     });
   });
-
-  describe("on-screen keyboard mode row (CLV-27)", () => {
-    const mountRow = (mode, { learned = false } = {}) => {
-      useConfigStore().onScreenKeyboard = mode;
-      if (learned) learnHardwareKeyboard();
-      return mount(AllScreensSettings, {
-        props: { config: { ...baseConfig, onScreenKeyboard: mode } },
-        global: { stubs },
-      });
-    };
-
-    const modeControl = wrapper =>
-      wrapper
-        .findAllComponents({ name: "SegmentedControl" })
-        .find(c => c.props("ariaLabel") === "Show it");
-
-    it("labels the row with the This screen chip", () => {
-      const wrapper = mountRow("auto");
-
-      expect(wrapper.find(".device-chip").text()).toBe("This screen");
-      expect(wrapper.find("#section-device-keyboard").text()).toContain("Show it");
-    });
-
-    it("describes Auto before anything was learned", () => {
-      const wrapper = mountRow("auto");
-
-      expect(wrapper.text()).toContain(
-        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
-      );
-      expect(wrapper.find(".device-osk-show-again").exists()).toBe(false);
-    });
-
-    it("describes Auto after a keyboard was used, with a way back", () => {
-      const wrapper = mountRow("auto", { learned: true });
-
-      expect(wrapper.text()).toContain("Hidden here because a keyboard was used.");
-      expect(wrapper.find(".device-osk-show-again").text()).toBe("Show it again");
-    });
-
-    it("describes Always and Never", () => {
-      expect(mountRow("on").text()).toContain("Shows whenever you tap a text field.");
-      expect(mountRow("off").text()).toContain(
-        "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it."
-      );
-    });
-
-    it("saves the chosen mode for this browser", () => {
-      const wrapper = mountRow("auto");
-
-      modeControl(wrapper).vm.$emit("update:modelValue", "off");
-
-      expect(window.localStorage.getItem("calvin-osk-mode")).toBe("off");
-    });
-
-    it("Show it again clears the learned flag and announces it", async () => {
-      const wrapper = mountRow("auto", { learned: true });
-
-      await wrapper.find(".device-osk-show-again").trigger("click");
-
-      expect(window.localStorage.getItem("calvin-osk-hardware-seen")).toBeNull();
-      expect(wrapper.text()).toContain(
-        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
-      );
-      expect(wrapper.find(".device-live").text()).toBe("On-screen keyboard will show again.");
-    });
-  });
 });
 
 // Settings copy audit §3.3 — verbatim.
-describe("AllScreensSettings copy (§3.3)", () => {
+describe("DefaultScreenSettings copy (§3.3)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
@@ -403,30 +331,22 @@ describe("AllScreensSettings copy (§3.3)", () => {
   ];
 
   it.each(COPY)("%s says exactly what it does", (label, description) => {
-    const w = mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, displayScheduleEnabled: true } },
-      global: { stubs },
-    });
+    const w = mountDefault({ displayScheduleEnabled: true });
     expect(row(w, label).props("description")).toBe(description);
   });
 
-  it("calls the Pi's own zone the server's timezone", () => {
-    const w = mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, displayScheduleEnabled: true } },
-      global: { stubs },
-    });
+  it("calls the Pi's own zone the server's timezone and marks it default-only", () => {
+    const w = mountDefault({ displayScheduleEnabled: true });
     const timezone = w
       .findAllComponents({ name: "SelectPill" })
       .find(c => c.props("label") === undefined && c.props("options")[0].value === "system");
     expect(timezone.props("options")[0].label).toBe("Server's timezone");
-    expect(row(w, "Timezone").props("description")).toBe("Used by the schedule.");
+    expect(row(w, "Timezone").text()).toContain("Used by the schedule.");
+    expect(row(w, "Timezone").text()).toContain("Applies to every screen");
   });
 
-  it("writes Never as timeout off and any other choice as seconds", async () => {
-    const w = mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 900 } },
-      global: { stubs },
-    });
+  it("writes Never as timeout off and any other choice as seconds", () => {
+    const w = mountDefault({ displayTimeoutEnabled: true, displayTimeout: 900 });
     const idle = () =>
       w
         .findAllComponents({ name: "SelectPill" })
@@ -441,25 +361,22 @@ describe("AllScreensSettings copy (§3.3)", () => {
   });
 
   it("shows an existing value that is not in the list as its own option", () => {
-    const w = mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 420 } },
-      global: { stubs },
-    });
+    const w = mountDefault({ displayTimeoutEnabled: true, displayTimeout: 420 });
     const idle = w
       .findAllComponents({ name: "SelectPill" })
       .find(c => c.props("ariaLabel") === "Turn off when idle");
     expect(idle.props("options").map(o => o.label)).toContain("7 min");
   });
 
-  it("shows the screen-now buttons in the order Turn off, Turn on", () => {
-    const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
-    const buttons = w.findAll(".device-actions button").map(b => b.text());
-    expect(buttons).toEqual(["Turn off", "Turn on"]);
+  it("no longer offers Screen now — it moved to System", () => {
+    const w = mountDefault();
+    expect(w.text()).not.toContain("Screen now");
+    expect(w.findAll(".device-actions")).toHaveLength(0);
   });
 });
 
 // CLV-46 — the schedule editor used to offer 11 hardcoded zones.
-describe("AllScreensSettings — timezone picker (CLV-46)", () => {
+describe("DefaultScreenSettings — timezone picker (CLV-46)", () => {
   const realSupportedValuesOf = Intl.supportedValuesOf;
   const setSupportedValuesOf = impl =>
     Object.defineProperty(Intl, "supportedValuesOf", {
@@ -475,11 +392,7 @@ describe("AllScreensSettings — timezone picker (CLV-46)", () => {
 
   afterEach(() => setSupportedValuesOf(realSupportedValuesOf));
 
-  const mountWithZone = timezone =>
-    mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, displayScheduleEnabled: true, timezone } },
-      global: { stubs },
-    });
+  const mountWithZone = timezone => mountDefault({ displayScheduleEnabled: true, timezone });
 
   const timezonePill = w =>
     w
@@ -537,41 +450,34 @@ describe("AllScreensSettings — timezone picker (CLV-46)", () => {
   });
 });
 
-// Settings copy audit §2 — Touchscreen moved here from Dashboard with
-// decision C (it is a property of the screen, not the dashboard).
-describe("AllScreensSettings — Touchscreen (§2)", () => {
+describe("DefaultScreenSettings — override notes (§5)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
   });
 
-  it("chips Touchscreen and the on-screen keyboard as This screen", () => {
-    const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
-    const chips = w.findAll(".setting-scope-chip");
-    expect(chips.map(chip => chip.text())).toEqual(["This screen", "This screen"]);
-    expect(w.find("#section-device-keyboard").text()).toContain("Touchscreen");
-  });
-
-  it("stores Touchscreen in this browser, not on the server", async () => {
-    const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
-    const touch = w
+  it("keeps no note when no screen overrides the changed key", async () => {
+    useKiosksStore().kiosks = [kiosk({ overrides: { displayName: "Hallway" } })];
+    const w = mountDefault();
+    const orientation = w
       .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Touchscreen");
-    touch.vm.$emit("update:modelValue", "off");
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
     await flushPromises();
-
-    expect(window.localStorage.getItem("calvin-touch-controls")).toBe("off");
-    expect(w.emitted("update:config") || []).not.toContainEqual([{ touchControls: "off" }]);
+    expect(w.find("[data-test='default-override-note']").exists()).toBe(false);
   });
 
-  it("reads the server value while this browser has no choice of its own", () => {
-    const w = mount(AllScreensSettings, {
-      props: { config: { ...baseConfig, touchControls: "on" } },
-      global: { stubs },
-    });
-    const touch = w
+  it("can be dismissed", async () => {
+    useKiosksStore().kiosks = [kiosk({ overrides: { orientation: "portrait" } })];
+    const w = mountDefault();
+    const orientation = w
       .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Touchscreen");
-    expect(touch.props("modelValue")).toBe("on");
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "landscape");
+    await flushPromises();
+    expect(w.find("[data-test='default-override-note']").exists()).toBe(true);
+
+    await w.find(".default-note__dismiss").trigger("click");
+    expect(w.find("[data-test='default-override-note']").exists()).toBe(false);
   });
 });

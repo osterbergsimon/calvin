@@ -67,6 +67,11 @@ export function useScreenSetting(
     return stored.value ?? serverValue.value;
   });
 
+  // A browser choice of its own, as opposed to falling back to the server
+  // (Default) value. Only meaningful in browser scope; a kiosk's choice is an
+  // override on the server and is reported by the screens page instead.
+  const overridden = computed(() => scope === "browser" && stored.value !== null);
+
   const set = async next => {
     if (scope === "kiosk") {
       const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
@@ -86,5 +91,25 @@ export function useScreenSetting(
     }
   };
 
-  return { value, set, scope };
+  // "Reset to default": drop this browser's own choice (or this kiosk's
+  // override) so the Default value applies again.
+  const reset = async () => {
+    if (scope === "kiosk") {
+      const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
+      if (!(key in overrides)) return;
+      const merged = { ...overrides };
+      delete merged[key];
+      await kiosksStore.saveOverrides(kioskId, merged);
+      return;
+    }
+
+    stored.value = null;
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Storage blocked: the fallback only lasted for this page load anyway.
+    }
+  };
+
+  return { value, set, reset, overridden, scope };
 }

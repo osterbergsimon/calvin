@@ -47,9 +47,19 @@ export const settingsCategoryAliases = {
 
 export const settingsDestinations = [
   {
+    // The Default screen (Default-is-a-screen §7): old "All screens" words are
+    // gone from the UI, but people still search for them.
+    id: "screens-default",
+    label: "Default screen settings",
+    path: "Screens / Default",
+    category: "screens",
+    section: "layout",
+    keywords: ["all screens", "default", "shared", "new screens", "browsers", "screens"],
+  },
+  {
     id: "dashboard-layout",
     label: "Screen orientation",
-    path: "Screens / All screens · Display",
+    path: "Screens / Default · Display",
     category: "screens",
     section: "layout",
     keywords: ["display", "orientation", "flip", "rotation", "landscape", "portrait"],
@@ -272,7 +282,7 @@ export const settingsDestinations = [
   {
     id: "device-power",
     label: "Power, display schedule, and timeout",
-    path: "Screens / All screens · Power",
+    path: "Screens / Default · Power",
     category: "screens",
     section: "device-power",
     keywords: ["power", "display", "schedule", "timeout", "screen"],
@@ -280,7 +290,7 @@ export const settingsDestinations = [
   {
     id: "device-keyboard",
     label: "On-screen keyboard and layout",
-    path: "Screens / All screens · Touch & keyboard",
+    path: "Screens / Default · Touch & keyboard",
     category: "screens",
     section: "device-keyboard",
     // "language" stays a search keyword only: people who think of keyboard
@@ -326,7 +336,7 @@ export const settingsDestinations = [
   {
     id: "device-reboot",
     label: "Reboot button combo",
-    path: "Screens / All screens · Power",
+    path: "Screens / Default · Power",
     category: "screens",
     section: "device-power",
     keywords: ["reboot", "restart", "combo", "keys"],

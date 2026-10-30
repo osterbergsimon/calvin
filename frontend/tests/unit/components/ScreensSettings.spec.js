@@ -134,18 +134,67 @@ describe("ScreensSettings — screen list", () => {
     expect(wrapper.findAll("[data-test='add-screen-btn']")).toHaveLength(1);
   });
 
-  it("puts the All screens card first, with the shared summary", async () => {
+  it("puts the Default card first, with the summary", async () => {
     const { wrapper } = mountScreens({
       cfg: config({ orientation: "portrait", onScreenKeyboard: "on" }),
     });
     await flushPromises();
-    const all = wrapper.find("[data-test='screen-all-card']");
-    expect(all.exists()).toBe(true);
-    expect(all.text()).toContain("All screens");
-    expect(all.text()).toContain("Shared settings every screen uses unless it has its own");
-    expect(wrapper.find("[data-test='all-screens-summary']").text()).toBe(
-      "portrait · keyboard Always"
+    const cards = wrapper.findAll(".screens__cards .screen-card");
+    expect(cards[0].attributes("data-test")).toBe("screen-default-card");
+    const def = wrapper.find("[data-test='screen-default-card']");
+    expect(def.text()).toContain("Default");
+    expect(def.text()).toContain(
+      "Used by new screens and by browsers that aren't set up as a screen"
     );
+    expect(wrapper.find("[data-test='default-summary']").text()).toBe("portrait · keyboard Always");
+    // Solid border: it is a screen now, not the dashed "shared" card.
+    expect(def.classes()).toContain("screen-card--default");
+  });
+
+  it("counts the screens that have their own settings on the Default card", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({ id: "hall", overrides: { orientation: "portrait" } }),
+        kiosk({ id: "kitchen", overrides: { displayName: "Kitchen" } }),
+        kiosk({ id: "office", overrides: {} }),
+      ],
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-summary']").text()).toContain(
+      "1 screen has its own settings"
+    );
+  });
+
+  it("says Same as Default on the This browser card with no browser choice", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    expect(wrapper.find("[data-test='screen-browser-card']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='browser-summary']").text()).toBe("Same as Default");
+  });
+
+  it("hides the This browser card on a set-up screen", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    expect(wrapper.find("[data-test='screen-browser-card']").exists()).toBe(false);
+  });
+
+  it("counts the settings changed on a screen's card", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({
+          overrides: {
+            displayName: "Hallway",
+            orientation: "portrait",
+            orientationFlipped: true,
+            displayTimeoutEnabled: true,
+            displayTimeout: 300,
+          },
+        }),
+      ],
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='screen-changed-count']").text()).toBe("3 settings changed");
   });
 
   it("renders a card per screen with its name, id, presence and summary", async () => {
@@ -253,7 +302,7 @@ describe("ScreensSettings — one screen's page", () => {
     ]);
   });
 
-  it("returns to the list, and the shared settings, from the back link", async () => {
+  it("returns to the list from the back link", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
     await selectFirst(wrapper);
@@ -265,7 +314,7 @@ describe("ScreensSettings — one screen's page", () => {
     expect(wrapper.find("[data-test='screens-category']").classes()).not.toContain(
       "screens--detail"
     );
-    expect(wrapper.find("#section-device-keyboard").exists()).toBe(true);
+    expect(wrapper.find("[data-test='screen-default-card']").exists()).toBe(true);
   });
 
   it("is two-pane, list beside detail, on a kiosk-width screen", async () => {
@@ -319,25 +368,26 @@ describe("ScreensSettings — one screen's page", () => {
     ).toHaveLength(1);
   });
 
-  it("says Same as all screens on inherited rows", async () => {
+  it("says Same as Default on inherited rows", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
     await selectFirst(wrapper);
-    expect(wrapper.text()).toContain("Same as all screens");
+    expect(wrapper.text()).toContain("Same as Default");
+    expect(wrapper.text()).not.toContain("Same as all screens");
     expect(wrapper.find("[data-test='reset-orientation-row']").exists()).toBe(false);
   });
 
-  it("says Only this screen · Use the shared setting on an overridden row", async () => {
+  it("says Changed here · Reset to default on an overridden row", async () => {
     const { wrapper } = mountScreens({
       overrides: { orientation: "portrait", availableScreens: ["home"] },
     });
     await flushPromises();
     await selectFirst(wrapper);
 
-    expect(wrapper.text()).toContain("Only this screen");
+    expect(wrapper.text()).toContain("Changed here");
     const link = wrapper.find("[data-test='reset-orientation-row']");
     expect(link.exists()).toBe(true);
-    expect(link.text()).toBe("Use the shared setting");
+    expect(link.text()).toBe("Reset to default");
   });
 });
 
@@ -460,7 +510,7 @@ describe("ScreensSettings — Pages", () => {
     expect(wrapper.findComponent(ScreenRegionEditor).props("initialPreviewKiosk")).toBe("kitchen");
   });
 
-  it("Use the shared setting removes just the pages keys", async () => {
+  it("Reset to default removes just the pages keys", async () => {
     const { wrapper, store } = mountScreens({
       overrides: {
         orientation: "portrait",
@@ -540,7 +590,7 @@ describe("ScreensSettings — Display", () => {
     expect(wrapper.find("[data-test='screen-live-preview']").text()).toContain("1080×1920");
   });
 
-  it("Use the shared setting removes only that display key", async () => {
+  it("Reset to default removes only that display key", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { orientation: "portrait", availableScreens: ["home"] },
     });
@@ -623,7 +673,7 @@ describe("ScreensSettings — Power", () => {
     expect(idle.props("options").map(o => o.label)).toContain("7 min");
   });
 
-  it("Use the shared setting removes only the power keys", async () => {
+  it("Reset to default removes only the power keys", async () => {
     const { wrapper, store } = mountScreens({
       overrides: {
         orientation: "portrait",
@@ -796,11 +846,13 @@ describe("ScreensSettings — software (CLV-19)", () => {
 describe("ScreensSettings — decision C placement", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("keeps screen rows in All screens and moves the remote rows to Dashboard", async () => {
+  it("keeps screen rows on the Default page and leaves remote rows in Dashboard", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
+    await wrapper.find("[data-test='screen-default-card']").trigger("click");
+    await flushPromises();
 
-    // All screens: Display, Power (with the reboot combo) and Touch & keyboard.
+    // Default: Display, Power (with the reboot combo) and Touch & keyboard.
     expect(wrapper.find("#section-layout").exists()).toBe(true);
     expect(wrapper.find("#section-device-power").exists()).toBe(true);
     expect(wrapper.find("#section-device-keyboard").exists()).toBe(true);
@@ -812,5 +864,321 @@ describe("ScreensSettings — decision C placement", () => {
     // Remote & buttons and key-press feedback are not here any more.
     expect(rowByLabel(wrapper, "Show button presses")).toBeUndefined();
     expect(rowByLabel(wrapper, "Button bindings")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// docs/design/2026-10-30-default-screen.md §8
+// ---------------------------------------------------------------------------
+const openDefault = async wrapper => {
+  await wrapper.find("[data-test='screen-default-card']").trigger("click");
+  await flushPromises();
+};
+const openBrowser = async wrapper => {
+  await wrapper.find("[data-test='screen-browser-card']").trigger("click");
+  await flushPromises();
+};
+
+describe("ScreensSettings — Default is a screen (§2, §3)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  });
+
+  it("opens the Default page with the same sections as a screen", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const ids = wrapper
+      .findAll("section.settings-section")
+      .map(s => s.attributes("id"))
+      .filter(id => id !== "section-screens-list");
+    expect(ids).toEqual([
+      "section-default-name",
+      "section-default-pages",
+      "section-layout",
+      "section-device-power",
+      "section-device-keyboard",
+    ]);
+    // No status header, no Software section, no per-row reset links.
+    expect(wrapper.find("#section-screen-software").exists()).toBe(false);
+    expect(wrapper.find("[data-test='reset-orientation-row']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+  });
+
+  it("marks the default-only rows Applies to every screen", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({ displayScheduleEnabled: true }),
+    });
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const notes = wrapper.findAll("[data-test='default-only-note']").map(n => n.text());
+    expect(notes.length).toBe(4);
+    expect(notes.every(text => text === "Applies to every screen")).toBe(true);
+    expect(wrapper.find("#section-device-power").text()).toContain("Applies to every screen");
+    expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
+  });
+
+  it("calls the global name Room name and writes displayName", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    expect(rowByLabel(wrapper, "Room name").props("description")).toBe(
+      "Shown in the clock bar of any browser that isn't set up as a screen."
+    );
+    await wrapper.find("[data-test='default-room-name']").setValue("Lounge");
+    expect(wrapper.emitted("update:config")).toContainEqual([{ displayName: "Lounge" }]);
+  });
+
+  it("writes the global page allowlist and start page", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const rows = wrapper.findAll("[data-test='default-page-row']");
+    await rows[1].find('input[type="radio"]').setValue(true);
+    expect(wrapper.emitted("update:config")).toContainEqual([{ defaultScreenId: "photos" }]);
+
+    await rows[1].find('input[type="checkbox"]').setValue(false);
+    expect(wrapper.emitted("update:config")).toContainEqual([{ availableScreens: ["home"] }]);
+  });
+
+  it("opens the page editor previewing Any browser", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const editor = wrapper.findComponent(ScreenRegionEditor);
+    expect(editor.props("open")).toBe(false);
+    await wrapper.find("[data-test='default-edit-pages-btn']").trigger("click");
+    expect(editor.props("open")).toBe(true);
+    expect(editor.props("initialPreviewKiosk")).toBeNull();
+  });
+
+  it("removes Screen now from Screens entirely", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Screen now");
+    await openDefault(wrapper);
+    expect(wrapper.text()).not.toContain("Screen now");
+  });
+
+  it("opens the Default page from an old All-screens deep link", async () => {
+    setActivePinia(createPinia());
+    const store = useKiosksStore();
+    store.loadKiosks = vi.fn(async () => {});
+    store.fetchAvailableAgentVersion = vi.fn(async () => null);
+    const wrapper = mount(ScreensSettings, {
+      props: { config: config(), initialSection: "device-power" },
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+    expect(wrapper.find("#section-device-power").exists()).toBe(true);
+  });
+});
+
+describe("ScreensSettings — a screen's page against Default (§4)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  });
+
+  it("Reset everything removes every override except the name", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides: { displayName: "Hallway", orientation: "portrait" } })],
+      overrides: {
+        displayName: "Hallway",
+        orientation: "portrait",
+        touchControls: "on",
+        availableScreens: ["home"],
+      },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const footer = wrapper.find("[data-test='screen-override-footer']");
+    expect(footer.exists()).toBe(true);
+    await wrapper.find("[data-test='reset-everything']").trigger("click");
+    const modal = wrapper.findComponent({ name: "ConfirmModal" });
+    expect(modal.props("title")).toBe("Reset Hallway to the default?");
+    expect(modal.props("message")).toBe(
+      "Its 3 changed settings go back to the default. Its name stays."
+    );
+    expect(modal.props("confirmText")).toBe("Reset");
+
+    modal.vm.$emit("confirm");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { displayName: "Hallway" });
+  });
+
+  it("Use these as the default writes the values globally and clears them here", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides: { displayName: "Hallway" } })],
+      overrides: {
+        displayName: "Hallway",
+        orientation: "portrait",
+        orientationFlipped: true,
+        availableScreens: ["home"],
+      },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='use-as-default']").trigger("click");
+    const modal = wrapper.findComponent({ name: "ConfirmModal" });
+    expect(modal.props("title")).toBe("Make Hallway's settings the default?");
+    expect(modal.props("message")).toBe(
+      "Default and every screen that follows it will use Hallway's Orientation and Upside down."
+    );
+    expect(modal.props("confirmText")).toBe("Make default");
+
+    modal.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(wrapper.emitted("update:config")).toContainEqual([
+      { orientation: "portrait", orientationFlipped: true },
+    ]);
+    // Name and pages stay on the screen; the promoted settings are gone.
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      displayName: "Hallway",
+      availableScreens: ["home"],
+    });
+  });
+
+  it("hides the footer when the screen has no setting of its own", async () => {
+    const { wrapper } = mountScreens({
+      overrides: { displayName: "Hallway" },
+      kiosks: [kiosk({ overrides: { displayName: "Hallway" } })],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='screen-override-footer']").exists()).toBe(false);
+  });
+});
+
+describe("ScreensSettings — editing Default when screens differ (§5)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  });
+
+  const mountWithOverrides = () => {
+    const mounted = mountScreens({
+      kiosks: [
+        kiosk({ id: "hall", overrides: { displayName: "Hallway", orientation: "portrait" } }),
+        kiosk({ id: "kitchen", hostname: "kitchen-pi", overrides: { orientation: "portrait" } }),
+        kiosk({ id: "office", hostname: "office-pi", overrides: { orientationFlipped: true } }),
+      ],
+    });
+    return mounted;
+  };
+
+  it("names the screens that keep their own value after a Default edit", async () => {
+    const { wrapper } = mountWithOverrides();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "landscape");
+    await flushPromises();
+
+    const note = wrapper.find("[data-test='default-override-note']");
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain("Hallway and kitchen-pi keep their own Orientation.");
+  });
+
+  it("Change them too removes that key on those screens", async () => {
+    const { wrapper, store } = mountWithOverrides();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "landscape");
+    await flushPromises();
+
+    await wrapper.find("[data-test='default-note-change']").trigger("click");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("hall", { displayName: "Hallway" });
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
+    // The note goes away once handled.
+    expect(wrapper.find("[data-test='default-override-note']").exists()).toBe(false);
+  });
+
+  it("shows no note when no screen overrides the key", async () => {
+    const { wrapper } = mountWithOverrides();
+    await flushPromises();
+    await openDefault(wrapper);
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(c => c.props("ariaLabel") === "Upside down");
+    flip.vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    // The office screen overrides Upside down, so a note names only it …
+    expect(wrapper.find("[data-test='default-override-note']").text()).toContain(
+      "office-pi keeps its own Upside down."
+    );
+
+    // … while the touchscreen row has no screen overriding it.
+    const touch = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Touchscreen");
+    touch.vm.$emit("update:modelValue", "off");
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-override-note']").exists()).toBe(false);
+  });
+});
+
+describe("ScreensSettings — This browser page (§6)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+  });
+
+  it("lists the per-browser rows with Same as Default", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openBrowser(wrapper);
+
+    expect(wrapper.find("[data-test='this-browser-page']").exists()).toBe(true);
+    expect(rowByLabel(wrapper, "Touchscreen")).toBeTruthy();
+    expect(rowByLabel(wrapper, "Show it")).toBeTruthy();
+    expect(rowByLabel(wrapper, "Settings text size")).toBeTruthy();
+    expect(wrapper.text()).toContain("Same as Default");
+  });
+
+  it("stores a browser choice locally and counts it on the card", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openBrowser(wrapper);
+
+    const touch = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Touchscreen");
+    touch.vm.$emit("update:modelValue", "off");
+    await flushPromises();
+    expect(window.localStorage.getItem("calvin-touch-controls")).toBe("off");
+    expect(wrapper.text()).toContain("Changed here");
+
+    await wrapper.find("[data-test='reset-browser-touch']").trigger("click");
+    await flushPromises();
+    expect(window.localStorage.getItem("calvin-touch-controls")).toBeNull();
+
+    await wrapper.find("[data-test='screens-back']").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test='browser-summary']").text()).toBe("Same as Default");
   });
 });

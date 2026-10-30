@@ -36,6 +36,7 @@ describe("settings registry", () => {
 
   it("keeps the destination ids stable", () => {
     expect(settingsDestinations.map(destination => destination.id)).toEqual([
+      "screens-default",
       "dashboard-layout",
       "dashboard-regions",
       "dashboard-ui",
@@ -91,11 +92,24 @@ describe("settings registry", () => {
     expect(isKnownSettingsCategory(null)).toBe(false);
   });
 
+  it("finds the Default page with the old All-screens words", () => {
+    const byId = getSettingDestinationById("screens-default");
+    expect(byId).toMatchObject({
+      category: "screens",
+      section: "layout",
+      path: "Screens / Default",
+    });
+    expect(byId.keywords).toEqual(expect.arrayContaining(["all screens", "default", "shared"]));
+    expect(filterSettingsDestinations("all screens")).toContainEqual(
+      expect.objectContaining({ id: "screens-default" })
+    );
+  });
+
   it("moves destinations to their new categories", () => {
     expect(getSettingDestinationById("dashboard-layout")).toMatchObject({
       category: "screens",
       section: "layout",
-      path: "Screens / All screens · Display",
+      path: "Screens / Default · Display",
     });
     expect(getSettingDestinationById("dashboard-regions")).toMatchObject({
       category: "dashboard",
@@ -128,17 +142,17 @@ describe("settings registry", () => {
     expect(getSettingDestinationById("device-power")).toMatchObject({
       category: "screens",
       section: "device-power",
-      path: "Screens / All screens · Power",
+      path: "Screens / Default · Power",
     });
     expect(getSettingDestinationById("device-reboot")).toMatchObject({
       category: "screens",
       section: "device-power",
-      path: "Screens / All screens · Power",
+      path: "Screens / Default · Power",
     });
     expect(getSettingDestinationById("device-keyboard")).toMatchObject({
       category: "screens",
       section: "device-keyboard",
-      path: "Screens / All screens · Touch & keyboard",
+      path: "Screens / Default · Touch & keyboard",
     });
   });
 

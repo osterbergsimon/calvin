@@ -3,13 +3,13 @@
   <div
     class="screens"
     :class="{
-      'screens--detail': Boolean(selectedId),
-      'screens--two-pane': Boolean(selectedId) && !narrow,
-      'screens--single-pane': Boolean(selectedId) && narrow,
+      'screens--detail': Boolean(selection),
+      'screens--two-pane': Boolean(selection) && !narrow,
+      'screens--single-pane': Boolean(selection) && narrow,
     }"
     data-test="screens-category"
   >
-    <!-- LIST: every screen, then the shared settings below it -->
+    <!-- LIST: Default, every screen, then This browser -->
     <div class="screens__list" data-test="screens-list">
       <SettingsSection id="screens-list" title="Screens">
         <template #action>
@@ -85,22 +85,29 @@
         </SettingRow>
 
         <div class="screens__cards">
-          <div class="screen-card screen-card--all" data-test="screen-all-card">
+          <!-- The Default is a screen too, edited on its own page (§2). -->
+          <button
+            type="button"
+            class="screen-card screen-card--default"
+            :class="{ 'is-selected': defaultOpen }"
+            data-test="screen-default-card"
+            @click="openDefault"
+          >
             <PageThumbnail
               :page="startPage(null)"
               :orientation="orientationFor(null)"
               data-test="all-screens-thumbnail"
             />
             <div class="screen-card__body">
-              <span class="screen-card__name">All screens</span>
+              <span class="screen-card__name" data-test="default-title">Default</span>
               <span class="screen-card__summary"
-                >Shared settings every screen uses unless it has its own</span
+                >Used by new screens and by browsers that aren't set up as a screen</span
               >
-              <span class="screen-card__meta" data-test="all-screens-summary">{{
-                sharedSummary
+              <span class="screen-card__meta" data-test="default-summary">{{
+                defaultSummary
               }}</span>
             </div>
-          </div>
+          </button>
 
           <button
             v-for="k in kiosks"
@@ -138,6 +145,13 @@
               </span>
               <span class="screen-card__id" data-test="screen-id">{{ k.id }}</span>
               <span class="screen-card__meta" data-test="screen-summary">{{ summaryFor(k) }}</span>
+              <span
+                v-if="changedSettingCount(k.overrides) > 0"
+                class="screen-card__changed"
+                data-test="screen-changed-count"
+                >{{ changedSettingCount(k.overrides) }}
+                {{ changedSettingCount(k.overrides) === 1 ? "setting" : "settings" }} changed</span
+              >
               <span
                 v-if="k.agentVersion != null"
                 class="screen-card__software"
@@ -177,24 +191,45 @@
               </span>
             </div>
           </button>
+
+          <!-- Only on a browser that is not itself a set-up screen (§2). -->
+          <button
+            v-if="!kioskId"
+            type="button"
+            class="screen-card screen-card--browser"
+            :class="{ 'is-selected': browserOpen }"
+            data-test="screen-browser-card"
+            @click="openBrowser"
+          >
+            <div class="screen-card__body">
+              <span class="screen-card__name" data-test="browser-title">This browser</span>
+              <span class="screen-card__meta" data-test="browser-summary">{{
+                browserSummary
+              }}</span>
+            </div>
+          </button>
         </div>
       </SettingsSection>
-
-      <!-- Shared settings, only on the list page. A screen's page replaces them. -->
-      <AllScreensSettings
-        v-if="!selectedId"
-        :config="config"
-        @update:config="patch => emit('update:config', patch)"
-      />
     </div>
 
-    <!-- DETAIL: one screen's page -->
-    <div v-if="selectedId" class="screens__detail" data-test="screens-detail">
+    <!-- DETAIL: Default, one screen, or this browser -->
+    <div v-if="selection" class="screens__detail" data-test="screens-detail">
       <button type="button" class="screens__back" data-test="screens-back" @click="closeDetail">
         ‹ Screens
       </button>
 
-      <template v-if="selectedKiosk">
+      <DefaultScreenSettings
+        v-if="defaultOpen"
+        :config="config"
+        @update:config="patch => emit('update:config', patch)"
+      />
+      <ThisBrowserSettings
+        v-else-if="browserOpen"
+        :config="config"
+        @changed="refreshBrowserCount"
+      />
+
+      <template v-else-if="selectedKiosk">
         <KioskStatusHeader
           :kiosk-id="nameFor(selectedKiosk)"
           :online="isOnline(selectedKiosk)"
@@ -519,6 +554,36 @@
           </p>
         </SettingsSection>
 
+        <!-- Page footer: only when this screen differs from Default (§4). -->
+        <div
+          v-if="selectedChangedCount > 0"
+          class="screen-footer"
+          data-test="screen-override-footer"
+        >
+          <p class="screen-footer__copy">{{ footerCopy }}</p>
+          <div class="screen-footer__actions">
+            <button
+              type="button"
+              class="screen-footer__btn"
+              data-test="reset-everything"
+              @click="askResetEverything"
+            >
+              Reset everything to default
+            </button>
+            <button
+              type="button"
+              class="screen-footer__btn screen-footer__btn--ghost"
+              data-test="use-as-default"
+              @click="askUseAsDefault"
+            >
+              Use these as the default
+            </button>
+          </div>
+          <p v-if="footerMsg" class="screens__saved" role="status" aria-live="polite">
+            {{ footerMsg }}
+          </p>
+        </div>
+
         <ScreenRegionEditor
           :config="config"
           :open="editorOpen"
@@ -528,11 +593,20 @@
         />
       </template>
     </div>
+
+    <ConfirmModal
+      :show="confirm.show"
+      :title="confirm.title"
+      :message="confirm.message"
+      :confirm-text="confirm.confirmText"
+      @confirm="onConfirm"
+      @cancel="confirm.show = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
 import {
@@ -544,6 +618,15 @@ import {
   shortVersion,
 } from "@/utils/kioskSoftware";
 import { normalizeDashboardScreens } from "@/utils/layout";
+import { getKioskId } from "@/utils/kioskId";
+import {
+  changedSettingCount,
+  formatSettingList,
+  hasOwnSettings,
+  useAsDefaultPatch,
+  withoutAllOverrides,
+  withoutPromotedSettings,
+} from "@/utils/screenOverrides";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
@@ -555,28 +638,44 @@ import KioskScope from "@/components/settings/shared/KioskScope.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import AllScreensSettings from "@/components/settings/categories/AllScreensSettings.vue";
+import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
+import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 
 const props = defineProps({
   config: { type: Object, required: true },
+  // A ?setting= deep link that lands inside the Default page (§8). The old
+  // All-screens destinations keep working: they open Default at that section.
+  initialSection: { type: String, default: null },
 });
 const emit = defineEmits(["update:config"]);
 
 const store = useKiosksStore();
 const notifications = useNotificationsStore();
 const kiosks = computed(() => store.kiosks);
-const selectedId = ref(null);
-const overrides = ref({});
+// A browser that is itself a set-up screen has no "This browser" card: its
+// settings are that screen's.
+const kioskId = getKioskId();
 const addOpen = ref(false);
 const availableVersion = ref(null);
 const manifestChecking = ref(true);
 const desiredVersions = ref({});
 const editorOpen = ref(false);
 
+// --- which page is open ----------------------------------------------------
+// null (the list) · "default" · "browser" · a screen id on a kiosk selection.
+const DEFAULT_SECTION_IDS = new Set(["layout", "device-power", "device-keyboard"]);
+const selection = ref(
+  props.initialSection && DEFAULT_SECTION_IDS.has(props.initialSection) ? { kind: "default" } : null
+);
+const defaultOpen = computed(() => selection.value?.kind === "default");
+const browserOpen = computed(() => selection.value?.kind === "browser");
+const selectedId = computed(() => (selection.value?.kind === "screen" ? selection.value.id : null));
+
 // The category is two-pane only where there is room for it (kiosk width):
-// list 320px beside the detail. On a phone the list hides while a screen's
-// page is open, and ‹ Screens brings it back. Kept in JS (not only a media
-// query) so the layout mode is testable without a real viewport.
+// list 320px beside the detail. On a phone the list hides while a page is open,
+// and ‹ Screens brings it back. Kept in JS (not only a media query) so the
+// layout mode is testable without a real viewport.
 const NARROW_QUERY = "(max-width: 900px)";
 const narrow = ref(false);
 let narrowMql = null;
@@ -598,6 +697,27 @@ const pagesMsg = ref("");
 const displayMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
+const footerMsg = ref("");
+const overrides = ref({});
+
+// Browser-only choices that make up "{n} settings just for this browser".
+const BROWSER_STORAGE_KEYS = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
+const browserOverrideCount = ref(0);
+function refreshBrowserCount() {
+  try {
+    browserOverrideCount.value = BROWSER_STORAGE_KEYS.filter(key => {
+      const raw = window.localStorage.getItem(key);
+      return raw !== null && raw !== "";
+    }).length;
+  } catch {
+    browserOverrideCount.value = 0;
+  }
+}
+const browserSummary = computed(() => {
+  const count = browserOverrideCount.value;
+  if (!count) return "Same as Default";
+  return `${count} setting${count === 1 ? "" : "s"} just for this browser`;
+});
 
 // Browser-only kiosks have no agent; the software rows ignore them entirely.
 const agentKiosks = computed(() => kiosks.value.filter(k => k.agentVersion != null));
@@ -687,17 +807,28 @@ function summaryFor(k) {
   if (schedule) parts.push(schedule);
   return parts.join(" · ");
 }
-const sharedSummary = computed(() => {
+
+// --- the Default card -----------------------------------------------------
+const defaultSummary = computed(() => {
   const parts = [props.config.orientation || "landscape"];
   if (props.config.orientationFlipped) parts.push("upside down");
   const schedule = scheduleLabel(null);
   if (schedule) parts.push(schedule);
   parts.push(`keyboard ${oskLabel(props.config.onScreenKeyboard)}`);
+  const own = kiosks.value.filter(k => hasOwnSettings(k.overrides)).length;
+  if (own === 1) parts.push("1 screen has its own settings");
+  else if (own > 1) parts.push(`${own} screens have their own settings`);
   return parts.join(" · ");
 });
 
 // --- list / detail -------------------------------------------------------
 const selectedKiosk = computed(() => kiosks.value.find(k => k.id === selectedId.value) || null);
+const selectedChangedCount = computed(() => changedSettingCount(overrides.value));
+const selectedName = computed(() => (selectedKiosk.value ? nameFor(selectedKiosk.value) : ""));
+const footerCopy = computed(() => {
+  const count = selectedChangedCount.value;
+  return `${count} ${count === 1 ? "setting differs" : "settings differ"} from the default.`;
+});
 
 function clearMessages() {
   nameMsg.value = "";
@@ -705,10 +836,26 @@ function clearMessages() {
   displayMsg.value = "";
   powerMsg.value = "";
   touchMsg.value = "";
+  footerMsg.value = "";
+}
+
+function openDefault() {
+  selection.value = { kind: "default" };
+  overrides.value = {};
+  editorOpen.value = false;
+  clearMessages();
+}
+
+function openBrowser() {
+  selection.value = { kind: "browser" };
+  overrides.value = {};
+  editorOpen.value = false;
+  clearMessages();
+  refreshBrowserCount();
 }
 
 async function select(id) {
-  selectedId.value = id;
+  selection.value = { kind: "screen", id };
   clearMessages();
   const fetched = await store.fetchOverrides(id);
   // Guard the stale-selection race: clicking screen A then B before A's fetch
@@ -719,10 +866,11 @@ async function select(id) {
 }
 
 function closeDetail() {
-  selectedId.value = null;
+  selection.value = null;
   overrides.value = {};
   editorOpen.value = false;
   clearMessages();
+  refreshBrowserCount();
 }
 
 // --- effective values on the selected screen -----------------------------
@@ -834,18 +982,18 @@ const effOsk = computed(() =>
 async function persist(next, messageRef, onlineCopy, offlineCopy) {
   // Optimistic set with snapshot revert so a failed save doesn't leave the UI
   // showing apparently-applied values under the error banner (calvin-dd9.13).
-  const kioskId = selectedId.value;
+  const kioskIdToSave = selectedId.value;
   const prior = overrides.value;
   overrides.value = next;
   messageRef.value = "";
   try {
-    await store.saveOverrides(kioskId, next);
-    store.setKioskOverrides(kioskId, next);
+    await store.saveOverrides(kioskIdToSave, next);
+    store.setKioskOverrides(kioskIdToSave, next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
     messageRef.value = online ? onlineCopy : offlineCopy;
-    await refreshDesiredVersion(kioskId);
+    await refreshDesiredVersion(kioskIdToSave);
   } catch {
-    if (selectedId.value === kioskId) overrides.value = prior;
+    if (selectedId.value === kioskIdToSave) overrides.value = prior;
     messageRef.value = "Couldn't save to the server. Check the connection and try again.";
   }
 }
@@ -1010,6 +1158,52 @@ function resetOsk() {
   persistTouch(next);
 }
 
+// --- footer: reset everything · use these as the default (§4) ------------
+const confirm = reactive({ show: false, mode: null, title: "", message: "", confirmText: "" });
+
+function askResetEverything() {
+  const count = selectedChangedCount.value;
+  confirm.mode = "reset";
+  confirm.title = `Reset ${selectedName.value} to the default?`;
+  confirm.message = `Its ${count} changed ${count === 1 ? "setting goes" : "settings go"} back to the default. Its name stays.`;
+  confirm.confirmText = "Reset";
+  confirm.show = true;
+}
+
+function askUseAsDefault() {
+  const patch = useAsDefaultPatch(overrides.value);
+  const list = formatSettingList(Object.keys(patch));
+  if (!list) return;
+  confirm.mode = "use-default";
+  confirm.title = `Make ${selectedName.value}'s settings the default?`;
+  confirm.message = `Default and every screen that follows it will use ${selectedName.value}'s ${list}.`;
+  confirm.confirmText = "Make default";
+  confirm.show = true;
+}
+
+async function onConfirm() {
+  const mode = confirm.mode;
+  confirm.show = false;
+  if (mode === "reset") {
+    await persist(
+      withoutAllOverrides(overrides.value),
+      footerMsg,
+      "Saved. This screen follows the default again.",
+      OFFLINE_COPY
+    );
+  } else if (mode === "use-default") {
+    const patch = useAsDefaultPatch(overrides.value);
+    if (Object.keys(patch).length === 0) return;
+    emit("update:config", patch);
+    await persist(
+      withoutPromotedSettings(overrides.value),
+      footerMsg,
+      "Saved. New screens and screens that follow the default use these settings.",
+      OFFLINE_COPY
+    );
+  }
+}
+
 // --- software ------------------------------------------------------------
 function showUpdateButton(k) {
   return isVersionBehind(k, availableVersion.value) && !isUpdateBlocked(k);
@@ -1071,6 +1265,7 @@ async function refreshDesiredVersion(id) {
 }
 
 onMounted(async () => {
+  refreshBrowserCount();
   await store.loadKiosks();
   if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
@@ -1099,14 +1294,14 @@ onUnmounted(() => {
 .screens {
   display: block;
 }
-/* Kiosk width: the list and the selected screen side by side (list 320px). */
+/* Kiosk width: the list and the selected page side by side (list 320px). */
 .screens--two-pane {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
   gap: var(--space-lg);
   align-items: start;
 }
-/* Phone: one pane at a time — the list hides while a screen's page is open. */
+/* Phone: one pane at a time — the list hides while a page is open. */
 .screens--single-pane {
   display: block;
 }
@@ -1169,9 +1364,13 @@ onUnmounted(() => {
   border-radius: 12px;
   cursor: pointer;
 }
-.screen-card--all {
-  border-style: dashed;
-  cursor: default;
+/* The Default is a real screen now: no dashed "shared" treatment. */
+.screen-card--default {
+  border-style: solid;
+}
+/* This browser is a single column of words, with no thumbnail. */
+.screen-card--browser {
+  grid-template-columns: 1fr;
 }
 .screen-card.is-selected {
   border-color: var(--focus);
@@ -1199,6 +1398,11 @@ onUnmounted(() => {
 .screen-card__summary {
   font-size: var(--fs-sm);
   color: var(--ink-2);
+}
+.screen-card__changed {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--ink);
 }
 .screen-card__status {
   font-size: var(--fs-xs);
@@ -1419,6 +1623,49 @@ onUnmounted(() => {
   margin: 0.2rem 0 0;
   font-size: var(--fs-sm);
   color: var(--ink-2);
+}
+/* Page footer: only a screen with overrides gets the two default actions. */
+.screen-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+.screen-footer__copy {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+.screen-footer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.screen-footer__btn {
+  min-height: var(--touch-target);
+  padding: 0 1rem;
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.screen-footer__btn--ghost {
+  background: none;
+}
+.screen-footer__btn:hover {
+  border-color: var(--focus);
+}
+.screen-footer__btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 /* The summary row stacks its control full-width on phone-sized screens. */
 @media (max-width: 480px) {

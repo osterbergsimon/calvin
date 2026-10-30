@@ -72,6 +72,14 @@ export function useConfigForm(initialConfig = {}) {
         dashboardScreens: normalizeDashboardScreens(
           response.dashboardScreens ?? response.dashboard_screens ?? null
         ),
+        // Global page assignment: what browsers and new screens show (the
+        // Default screen's Pages section).
+        availableScreens: Array.isArray(response.availableScreens)
+          ? response.availableScreens
+          : Array.isArray(response.available_screens)
+            ? response.available_screens
+            : null,
+        defaultScreenId: response.defaultScreenId ?? response.default_screen_id ?? null,
         lastSideViewMode: response.lastSideViewMode ?? response.last_side_view_mode ?? "photos",
         showWebServices: response.showWebServices ?? response.show_web_services ?? false,
         // Photos
