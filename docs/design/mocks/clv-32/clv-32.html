@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>API keys</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#fff; --err:#c4452b; --ok:#2f8a57;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } h1 { font-family:var(--font-display); margin:0 0 20px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:grid; grid-template-columns:1fr 1fr; position:relative; }
+.frame.one { grid-template-columns:1fr; }
+.col { padding:24px 28px; border-right:1px solid var(--line); } .col:last-child { border-right:0; }
+.eyebrow { font-family:var(--font-data); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; }
+.sec { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; }
+.sec h3 { margin:0; padding:16px 20px 2px; font-size:1rem; font-weight:600; }
+.intro { margin:0; padding:0 20px 12px; font-size:.85rem; color:var(--ink-2); }
+.empty { text-align:center; padding:28px 20px 30px; border-top:1px solid var(--line-soft); }
+.empty b { display:block; font-weight:600; margin-bottom:4px; } .empty p { margin:0 0 16px; color:var(--ink-2); font-size:.88rem; }
+.btn { display:inline-flex; align-items:center; height:42px; padding:0 16px; border:1px solid var(--line); border-radius:10px; background:var(--bg-2); font-size:.9rem; font-weight:500; color:var(--ink); }
+.btn.primary { background:var(--focus); border-color:var(--focus); color:var(--focus-ink); font-weight:600; }
+.btn.ghost { border-color:transparent; color:var(--ink-2); }
+.btn.dis { opacity:.45; }
+.btn.danger-t { color:var(--err); }
+.form { border-top:1px solid var(--line-soft); padding:16px 20px 18px; display:flex; flex-direction:column; gap:14px; }
+.lbl { font-weight:500; font-size:.9rem; margin-bottom:6px; display:block; }
+.inp { height:46px; border:1px solid var(--focus); box-shadow:0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); border-radius:9px; padding:0 14px; display:flex; align-items:center; font-size:.95rem; }
+.hint { font-size:.75rem; color:var(--ink-2); margin-top:4px; }
+.cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.card { border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:.8rem; color:var(--ink-2); line-height:1.35; position:relative; }
+.card b { display:flex; align-items:center; gap:7px; color:var(--ink); font-size:.9rem; font-weight:500; margin-bottom:3px; }
+.card b u { width:16px; height:16px; border-radius:50%; border:1.5px solid var(--line); display:inline-block; flex:none; }
+.card.sel b u { border:5px solid var(--focus); }
+.card.host.sel { border-color:var(--err); background:color-mix(in srgb, var(--err) 6%, var(--bg-1)); }
+.card.host.sel b u { border-color:var(--err); }
+.card .warn { display:block; color:var(--err); font-weight:500; font-size:.72rem; margin-top:4px; }
+.card.off { opacity:.55; }
+.check { display:flex; gap:10px; align-items:center; font-size:.88rem; }
+.check i { width:20px; height:20px; border:1.5px solid var(--line); border-radius:5px; }
+.acts { display:flex; gap:8px; align-items:center; }
+legend { font-weight:500; font-size:.9rem; margin-bottom:8px; padding:0; }
+fieldset { border:0; margin:0; padding:0; }
+.result { margin:4px 20px 18px; border:1px solid var(--focus); border-radius:12px; padding:1.25rem; }
+.result h4 { margin:0 0 4px; font-size:1.05rem; } .result p { margin:0 0 12px; font-size:.86rem; color:var(--ink-2); }
+.secret { display:flex; gap:8px; } .secret .s { flex:1; height:46px; border:1px solid var(--line); border-radius:9px; padding:0 14px; display:flex; align-items:center; font-family:var(--font-data); font-size:.92rem; background:color-mix(in srgb, var(--focus) 18%, var(--bg-1)); }
+.use { font-size:.75rem; color:var(--ink-2); margin:10px 0 14px; } code { font-family:var(--font-data); background:var(--bg-0); border:1px solid var(--line); border-radius:5px; padding:1px 6px; font-size:.75rem; }
+.row { display:flex; align-items:center; gap:14px; padding:12px 20px; border-top:1px solid var(--line-soft); min-height:3.6rem; }
+.txt { flex:1; } .txt b { font-weight:500; } .txt p { margin:3px 0 0; font-size:.78rem; color:var(--ink-2); } .txt p.blk { color:var(--ink-3); }
+.mono { font-family:var(--font-data); }
+.chip { margin-left:8px; font-size:.7rem; font-weight:500; color:var(--ink-2); border:1px solid var(--line); border-radius:6px; padding:1px 7px; vertical-align:1px; }
+.chip.h { color:var(--err); border-color:color-mix(in srgb, var(--err) 45%, var(--line)); }
+.foot { padding:12px 20px 16px; border-top:1px solid var(--line-soft); }
+.scrim { position:absolute; inset:0; background:rgba(14,19,22,.42); display:flex; align-items:center; justify-content:center; }
+.dlg { width:420px; background:var(--bg-1); border-radius:14px; padding:22px; box-shadow:0 18px 50px -16px rgba(0,0,0,.4); }
+.dlg h3 { margin:0 0 8px; font-size:1.1rem; } .dlg p { margin:0 0 18px; color:var(--ink-2); font-size:.9rem; }
+.dlg .acts { justify-content:flex-end; } .btn.dg { background:var(--err); border-color:var(--err); color:#fff; font-weight:600; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>CLV-32: API keys</h1>
+
+  <figure>
+    <div class="frame">
+      <div class="col">
+        <p class="eyebrow">Security › API keys · empty</p>
+        <div class="sec">
+          <h3>API keys</h3>
+          <p class="intro">Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each one its own key.</p>
+          <div class="empty"><b>No API keys yet.</b><p>Create one to let Home Assistant or a script read or change Calvin.</p><span class="btn primary">Create key</span></div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="eyebrow">Create · Host control selected</p>
+        <div class="sec">
+          <h3>API keys</h3>
+          <p class="intro">Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each one its own key.</p>
+          <div class="form">
+            <div><span class="lbl">Name</span><div class="inp">Update script</div><div class="hint">So you know which app uses it.</div></div>
+            <fieldset><legend>What it can do</legend>
+              <div class="cards">
+                <div class="card"><b><u></u>Read</b>See calendars, photos, settings and status. Can't change anything.</div>
+                <div class="card"><b><u></u>Admin</b>Everything Read can, plus change settings and content, like signing in as admin.</div>
+                <div class="card host sel"><b><u></u>⚠ Host control</b>Everything Admin can, plus restart Calvin, reboot this machine and install updates.<span class="warn">Anyone with this key can reboot the machine Calvin runs on.</span></div>
+              </div>
+            </fieldset>
+            <label class="check"><i></i>I understand this key can reboot this machine.</label>
+            <div class="acts"><span class="btn primary dis">Create key</span><span class="btn ghost">Cancel</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>A1 · Empty state, and the create form.</b> The scopes are a ladder (Read → Admin → Host control). Host control is styled as dangerous and needs the "I understand" tick before <b>Create key</b> enables. On a server that can't control its machine, that card is greyed out with "Not available: this Calvin doesn't control its machine."</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame one">
+      <div class="col">
+        <p class="eyebrow">Show once</p>
+        <div class="sec" style="max-width:760px">
+          <h3>API keys</h3>
+          <p class="intro">Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each one its own key.</p>
+          <div class="result">
+            <h4>Copy your key now</h4>
+            <p>You won't be able to see it again. If you lose it, revoke it and create a new one.</p>
+            <div class="secret"><span class="s">clv_7Hq2vX9kLmP4tR8wZbN3cF6yJ1sD5gA0</span><span class="btn primary">✓ Copied</span></div>
+            <div class="use">Send it as <code>Authorization: Bearer &lt;key&gt;</code></div>
+            <span class="btn">Done</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>A2 · Shown once.</b> The secret is preselected in a read-only field. <b>Copy</b> uses the clipboard API on HTTPS. On the usual plain-HTTP LAN it falls back to copying the selection, and as a last resort it asks you to press Ctrl+C. <b>Done</b> discards the secret. No QR code.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame">
+      <div class="col">
+        <p class="eyebrow">List</p>
+        <div class="sec">
+          <h3>API keys</h3>
+          <p class="intro">Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each one its own key.</p>
+          <div class="row"><div class="txt"><b>Update script</b><span class="chip h">⚠ Host control</span><p><span class="mono">clv_7Hq2…</span> · Created 30 Oct · Never used</p></div><span class="btn danger-t">Revoke</span></div>
+          <div class="row"><div class="txt"><b>Home Assistant</b><span class="chip">Admin</span><p><span class="mono">clv_Qa81…</span> · Created 12 Oct · Last used 3 min ago</p></div><span class="btn danger-t">Revoke</span></div>
+          <div class="row"><div class="txt"><b>Grafana</b><span class="chip">Read</span><p><span class="mono">clv_b0Zk…</span> · Created 2 Sep · Last used 2 days ago</p></div><span class="btn danger-t">Revoke</span></div>
+          <div class="foot"><span class="btn">Create key</span></div>
+        </div>
+      </div>
+      <div class="col" style="position:relative;min-height:420px">
+        <p class="eyebrow">Revoke</p>
+        <div class="scrim"><div class="dlg"><h3>Revoke “Home Assistant”?</h3><p>Apps using this key stop working right away. This can't be undone.</p><div class="acts"><span class="btn ghost">Cancel</span><span class="btn dg">Revoke key</span></div></div></div>
+      </div>
+    </div>
+    <figcaption><b>A3 · The list and revoke.</b> Each row shows the name, a scope chip (Host control in red with ⚠), the key prefix for telling keys apart, when it was created and when it was last used. Revoke asks once, in plain words.</figcaption>
+  </figure>
+</main>
+</body>
+</html>
