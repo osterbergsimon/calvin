@@ -17,7 +17,7 @@
             <span>{{ getSourceName(event.source) }}</span>
             <template v-if="event.all_day && !isMultiDay">
               <span class="event-detail__sep" aria-hidden="true">·</span>
-              <span class="event-detail__tag">all day</span>
+              <Tag class="event-detail__tag">all day</Tag>
             </template>
           </div>
         </div>
@@ -38,7 +38,7 @@
           </div>
         </div>
         <div class="event-detail__subwhen">
-          <span class="event-detail__tag">{{ durationLabel }}</span>
+          <Tag class="event-detail__tag">{{ durationLabel }}</Tag>
           <template v-if="!event.all_day">
             <span class="event-detail__sep" aria-hidden="true">·</span>
             <span>{{ formatTime(event.start) }} – {{ formatTime(event.end) }}</span>
@@ -51,7 +51,7 @@
             {{ formatTime(event.start) }}–{{ formatTime(event.end) }}
           </span>
           <span v-else class="event-detail__time">All day</span>
-          <span v-if="durationLabel" class="event-detail__tag">{{ durationLabel }}</span>
+          <Tag v-if="durationLabel" class="event-detail__tag">{{ durationLabel }}</Tag>
         </div>
         <div class="event-detail__subwhen">{{ formatFullDay(selectedDate || event.start) }}</div>
       </template>
@@ -110,6 +110,7 @@
 <script setup>
 import { computed } from "vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import Tag from "@/components/ui/Tag.vue";
 import { useConfigStore } from "../stores/config";
 import { useCalendarStore } from "../stores/calendar";
 import { useEventHelpers } from "../composables/useEventHelpers";
@@ -250,8 +251,8 @@ const getSourceName = sourceId => {
   overflow: hidden;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 18px 50px var(--shadow, rgba(0, 0, 0, 0.5));
+  border-radius: var(--radius-xl);
+  box-shadow: 0 18px 50px var(--shadow);
   outline: none;
 }
 
@@ -284,7 +285,7 @@ const getSourceName = sourceId => {
 .event-detail__title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.55rem;
+  font-size: var(--fs-2xl);
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: -0.01em;
@@ -297,7 +298,7 @@ const getSourceName = sourceId => {
   gap: 0.45rem;
   margin-top: 0.5rem;
   font-family: var(--font-data);
-  font-size: 0.68rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.02em;
   color: var(--ink-2);
 }
@@ -305,23 +306,13 @@ const getSourceName = sourceId => {
 .event-detail__dot {
   width: 0.5rem;
   height: 0.5rem;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--event-hue);
   flex: none;
 }
 
 .event-detail__sep {
   color: var(--ink-3);
-}
-
-.event-detail__tag {
-  font-family: var(--font-data);
-  font-size: 0.62rem;
-  letter-spacing: 0.03em;
-  color: var(--ink-3);
-  border: 1px solid var(--line);
-  border-radius: 99px;
-  padding: 0.1rem 0.45rem;
 }
 
 /* When — single day */
@@ -336,7 +327,7 @@ const getSourceName = sourceId => {
 .event-detail__time {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: 1.7rem;
+  font-size: var(--fs-3xl);
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0.01em;
@@ -349,7 +340,7 @@ const getSourceName = sourceId => {
   gap: 0.4rem;
   margin-top: 0.5rem;
   font-family: var(--font-data);
-  font-size: 0.68rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.02em;
   color: var(--ink-2);
 }
@@ -374,7 +365,7 @@ const getSourceName = sourceId => {
 
 .event-detail__range-label {
   font-family: var(--font-data);
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -383,7 +374,7 @@ const getSourceName = sourceId => {
 .event-detail__range-date {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   line-height: 1.1;
   color: var(--ink);
 }
@@ -406,7 +397,7 @@ const getSourceName = sourceId => {
   align-items: center;
   gap: 0.55rem;
   margin-top: 1rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 
@@ -418,7 +409,7 @@ const getSourceName = sourceId => {
 /* Description */
 .event-detail__desc {
   margin: 1rem 0 0;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   line-height: 1.6;
   color: var(--ink-2);
   white-space: pre-wrap;
@@ -434,7 +425,7 @@ const getSourceName = sourceId => {
 .event-detail__also-label {
   margin-bottom: 0.55rem;
   font-family: var(--font-data);
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -447,10 +438,10 @@ const getSourceName = sourceId => {
   width: 100%;
   padding: 0.32rem 0.4rem;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: transparent;
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   text-align: left;
   cursor: pointer;
 }
@@ -465,7 +456,7 @@ const getSourceName = sourceId => {
   flex: none;
   min-width: 3.1rem;
   font-family: var(--font-data);
-  font-size: 0.68rem;
+  font-size: var(--fs-micro);
   font-variant-numeric: tabular-nums;
   color: var(--ink-3);
 }
@@ -474,7 +465,7 @@ const getSourceName = sourceId => {
   flex: none;
   width: 0.4rem;
   height: 0.4rem;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
 }
 
 .event-detail__also-name {
@@ -489,7 +480,7 @@ const getSourceName = sourceId => {
   margin: 1.2rem 0 0;
   padding-top: 0.85rem;
   border-top: 1px solid var(--line);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 </style>

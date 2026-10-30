@@ -3,7 +3,7 @@
     <div class="pi-header">
       <h4 class="pi-title">
         {{ instanceLabelPlural }}
-        <span v-if="instances.length > 0" class="pi-count">{{ instances.length }}</span>
+        <Tag v-if="instances.length > 0" class="pi-count" count>{{ instances.length }}</Tag>
       </h4>
       <button type="button" class="pi-btn-add" @click="$emit('add-instance')">
         + Add {{ instanceLabel.toLowerCase() }}
@@ -68,6 +68,7 @@
 <script setup>
 import { computed } from "vue";
 import draggable from "vuedraggable";
+import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const props = defineProps({
@@ -140,18 +141,9 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
   align-items: center;
   gap: 0.5rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--ink);
-}
-.pi-count {
-  font-weight: 500;
-  font-size: 0.8rem;
-  color: var(--ink-2);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.05rem 0.5rem;
 }
 .pi-btn-add {
   padding: 0.4rem 0.85rem;
@@ -159,9 +151,9 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
   background: var(--bg-1);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   transition: border-color 0.15s;
@@ -179,7 +171,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
   padding: 1rem;
   text-align: center;
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
 }
 
@@ -195,7 +187,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
   padding: 0.6rem 0.85rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   transition: border-color 0.15s;
 }
 .pi-item:hover {
@@ -207,7 +199,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 .pi-drag {
   cursor: grab;
   color: var(--ink-3);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   user-select: none;
 }
@@ -217,7 +209,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 .pi-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   flex-shrink: 0;
 }
 .pi-dot--on {
@@ -235,7 +227,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 }
 .pi-name {
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   overflow: hidden;
@@ -244,7 +236,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 }
 .pi-summary {
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -256,9 +248,9 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
   background: transparent;
   color: var(--ink-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 500;
   cursor: pointer;
   transition:

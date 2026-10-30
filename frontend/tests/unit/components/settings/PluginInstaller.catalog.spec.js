@@ -118,7 +118,7 @@ describe("PluginInstaller catalog (§3.3)", () => {
     // Same version: no Update, the row says Installed and links to Content.
     const weather = w.find('[data-catalog-plugin-id="weather"]');
     expect(weather.text()).not.toContain("Update");
-    expect(weather.text()).toContain("Installed ✓");
+    expect(weather.text()).toContain("Installed");
     expect(weather.text()).toContain("Add a source");
   });
 

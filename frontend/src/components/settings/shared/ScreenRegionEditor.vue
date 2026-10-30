@@ -44,14 +44,18 @@
                 'is-dimmed': isPageDimmed(page.id),
               }"
               :aria-selected="page.id === activeScreenId"
+              :aria-label="pageTabLabel(page)"
+              :title="pageTabTitle(page)"
+              data-test="page-tab"
               @click="selectScreen(page.id)"
             >
-              <span class="sre-tab-body">
-                <span class="sre-tab-name"><span class="sre-tab-dot" />{{ page.name }}</span>
-                <span class="sre-tab-screens" data-test="page-screens">{{
-                  screensLine(page.id)
-                }}</span>
-              </span>
+              <span class="sre-tab-name">{{ page.name }}</span>
+              <span
+                class="sre-tab-screens"
+                :class="{ 'is-not-shown': screensLine(page.id) === NOT_SHOWN }"
+                data-test="page-screens"
+                >{{ screensLine(page.id) }}</span
+              >
             </button>
             <button
               type="button"
@@ -60,7 +64,8 @@
               title="Add page"
               @click="addScreen"
             >
-              +
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="mdiPlus" /></svg>
+              Page
             </button>
           </div>
           <div class="sre-preview-as">
@@ -82,9 +87,13 @@
               aria-label="Preview orientation"
               @update:model-value="setAnyBrowserOrientation"
             />
-            <span class="sre-orient-badge" data-test="orientation-badge">{{
-              orientationBadge
-            }}</span>
+            <Tag
+              v-if="previewScreenId !== ANY_BROWSER"
+              class="sre-orient-badge"
+              data-test="orientation-badge"
+            >
+              {{ orientationBadge }}
+            </Tag>
           </div>
         </div>
 
@@ -369,6 +378,7 @@
                 :screen="activeScreen"
                 :layout-dir="layoutDir"
                 :clock="clock"
+                :clock-selected="clockSelected"
                 :can-delete="screens.screens.length > 1"
                 @rename="renameScreen"
                 @preset="applyPreset"
@@ -409,6 +419,8 @@ import DialogScrim from "@/components/ui/DialogScrim.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import Tag from "@/components/ui/Tag.vue";
+import { mdiPlus } from "@mdi/js";
 import { getKioskId } from "@/utils/kioskId";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
@@ -613,14 +625,24 @@ const kioskShowsPage = (kiosk, pageId) => {
   return !Array.isArray(avail) || avail.includes(pageId);
 };
 const screensShowingPage = pageId => kiosksStore.kiosks.filter(k => kioskShowsPage(k, pageId));
+const NOT_SHOWN = "Not shown";
 const screensLine = pageId => {
   const all = kiosksStore.kiosks;
   if (all.length === 0) return "All screens";
   const showing = screensShowingPage(pageId);
   if (showing.length === all.length) return "All screens";
-  if (showing.length === 0) return "Not on any screen";
-  return showing.map(kioskName).join(" · ");
+  if (showing.length === 0) return NOT_SHOWN;
+  return showing.map(kioskName).join(", ");
 };
+// The tab reads as one sentence for screen readers, including the screens
+// text that is truncated visually at 16ch.
+const pageTabLabel = page => {
+  const line = screensLine(page.id);
+  if (line === "All screens") return `${page.name}, shown on all screens`;
+  if (line === NOT_SHOWN) return `${page.name}, not shown on any screen`;
+  return `${page.name}, shown on ${line}`;
+};
+const pageTabTitle = page => `${page.name} · ${screensLine(page.id)}`;
 const isPageDimmed = pageId =>
   previewScreenId.value !== ANY_BROWSER && !kioskShowsPage(previewKiosk.value, pageId);
 const mismatch = computed(
@@ -1252,7 +1274,7 @@ onUnmounted(() => {
   border: 1px solid var(--line);
   border-radius: var(--radius-2xl);
   overflow: hidden;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 24px 70px var(--shadow-hover);
   animation: sre-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes sre-rise {
@@ -1281,7 +1303,7 @@ onUnmounted(() => {
 .sre-title h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 650;
   color: var(--ink);
 }
@@ -1292,7 +1314,7 @@ onUnmounted(() => {
 }
 .sre-close {
   margin-left: auto;
-  font-size: 1.3rem;
+  font-size: var(--fs-xl);
   line-height: 1;
 }
 
@@ -1300,83 +1322,110 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-lg);
-  padding: var(--space-sm) var(--space-2xl);
+  padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--line);
-  background: var(--bg-0);
+  background: var(--bg-1);
 }
+/* One-line underline tabs. The row scrolls sideways on overflow and fades
+   at the ends instead of wrapping or showing a scrollbar. */
 .sre-tabs {
   display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
+  align-items: stretch;
+  gap: 0;
+  height: var(--tab-height);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--ink) var(--space-lg),
+    var(--ink) calc(100% - var(--space-lg)),
+    transparent
+  );
+}
+.sre-tabs::-webkit-scrollbar {
+  display: none;
 }
 .sre-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  padding: var(--space-2xs) var(--space-md);
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  gap: var(--space-lg);
+  padding: 0 var(--space-lg);
+  border: 0;
   background: transparent;
   color: var(--ink-2);
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
 .sre-tab:hover {
-  background: var(--bg-2);
+  color: var(--ink);
+}
+.sre-tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 .sre-tab.is-active {
-  background: var(--bg-1);
-  border-color: var(--line);
   color: var(--ink);
-  box-shadow: 0 1px 3px var(--shadow);
-  font-weight: 650;
+  font-weight: 600;
 }
-.sre-tab-body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.2;
+.sre-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: var(--space-lg);
+  right: var(--space-lg);
+  bottom: 0;
+  height: var(--tab-indicator);
+  background: var(--focus);
 }
 .sre-tab-name {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
+  display: inline-block;
 }
 .sre-tab-screens {
+  max-width: 16ch;
+  overflow: hidden;
+  color: var(--ink-3);
   font-size: var(--fs-xs);
   font-weight: 400;
-  color: var(--ink-3);
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sre-tab-screens.is-not-shown {
+  color: color-mix(in srgb, var(--warn) 45%, var(--ink));
 }
 .sre-tab.is-dimmed {
   opacity: 0.5;
 }
-.sre-tab-dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: var(--focus);
-  opacity: 0.6;
-}
-.sre-tab.is-active .sre-tab-dot {
-  opacity: 1;
-}
 .sre-tab-add {
-  width: 30px;
-  height: 30px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  height: var(--tab-height);
+  padding: 0 var(--space-lg);
+  border: 0;
   background: transparent;
-  color: var(--ink-3);
-  font-size: 1.05rem;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
+.sre-tab-add svg {
+  width: var(--tab-icon);
+  height: var(--tab-icon);
+  fill: currentColor;
+}
 .sre-tab-add:hover {
-  border-color: var(--focus);
-  color: var(--focus);
+  color: var(--ink);
+}
+.sre-tab-add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 .sre-preview-as {
   margin-left: auto;
@@ -1389,16 +1438,6 @@ onUnmounted(() => {
 .sre-preview-label {
   color: var(--ink-3);
 }
-.sre-orient-badge {
-  font-size: var(--fs-2xs);
-  padding: 0.15rem 0.5rem;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  background: var(--bg-2);
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-}
-
 .sre-body {
   display: grid;
   grid-template-columns: 1fr 340px;
@@ -1416,7 +1455,7 @@ onUnmounted(() => {
   border-top: 1px solid var(--focus-edge, var(--line));
   border-bottom: 1px solid var(--focus-edge, var(--line));
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   color: var(--ink);
 }
 .sre-place__cancel {
@@ -1425,7 +1464,7 @@ onUnmounted(() => {
   background: var(--bg-1);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   font-weight: 600;
   cursor: pointer;
@@ -1444,7 +1483,7 @@ onUnmounted(() => {
   background: radial-gradient(
     120% 120% at 50% 8%,
     var(--bg-0),
-    color-mix(in srgb, var(--bg-0) 60%, #000 6%)
+    color-mix(in srgb, var(--bg-0) 60%, var(--device-shade) 6%)
   );
 }
 .sre-stage-tag {
@@ -1462,7 +1501,7 @@ onUnmounted(() => {
 .sre-stage-tag .dot {
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: var(--ok);
 }
 .sre-mismatch {
@@ -1538,11 +1577,11 @@ onUnmounted(() => {
 .sre-device {
   position: relative;
   padding: 12px;
-  border-radius: 18px;
-  background: linear-gradient(160deg, #33383f, #1b1e24);
+  border-radius: var(--radius-2xl);
+  background: linear-gradient(160deg, var(--device-bezel-a), var(--device-bezel-b));
   box-shadow:
-    0 30px 50px -18px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 30px 50px -18px var(--device-inset),
+    inset 0 1px 0 var(--device-highlight);
   transition:
     width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
     height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1554,11 +1593,11 @@ onUnmounted(() => {
   display: flex;
   gap: 2px;
   padding: 3px;
-  border-radius: 7px;
-  background: #06070a;
+  border-radius: var(--radius-xs);
+  background: var(--device-screen);
   box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
-    inset 0 0 22px rgba(0, 0, 0, 0.5);
+    inset 0 0 0 1px var(--device-highlight-soft),
+    inset 0 0 22px var(--device-inset);
 }
 .sre-regions {
   display: flex;
@@ -1597,7 +1636,7 @@ onUnmounted(() => {
 .sre-resizer .grip {
   width: 4px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--focus) 55%, transparent);
 }
 .sre-resizer.row .grip {
@@ -1619,7 +1658,7 @@ onUnmounted(() => {
   color: var(--bg-1);
   background: var(--ink);
   padding: 0.12rem 0.4rem;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   opacity: 0;
   white-space: nowrap;
   pointer-events: none;
@@ -1636,7 +1675,7 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
   color: var(--focus);
   border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   font-size: var(--fs-micro);
   font-variant-numeric: tabular-nums;
 }
@@ -1666,10 +1705,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--focus) 9%, transparent);
   border: 1px dashed color-mix(in srgb, var(--focus) 50%, transparent);
-  color: color-mix(in srgb, var(--focus) 85%, #fff 15%);
+  color: color-mix(in srgb, var(--focus) 85%, var(--bg-1));
   font-size: var(--fs-micro);
   font-weight: 600;
   transition:
@@ -1785,13 +1824,8 @@ onUnmounted(() => {
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
 }
-.sre-root.size-phone .sre-tab {
-  min-height: 44px;
-}
-.sre-root.size-phone .sre-tab-add {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+.sre-root.size-phone .sre-tab-screens {
+  display: none;
 }
 .sre-root.size-phone .sre-preview-as {
   margin-left: 0;
@@ -1845,9 +1879,9 @@ onUnmounted(() => {
   height: 64px;
   border-left: 0;
   border-top: 1px solid var(--line);
-  border-radius: 16px 16px 0 0;
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
   background: var(--bg-1);
-  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 -12px 32px var(--shadow-hover);
   transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sre-rail.is-sheet.is-open {
@@ -1870,7 +1904,7 @@ onUnmounted(() => {
   width: 40px;
   height: 4px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--line);
   cursor: grab;
 }
@@ -1892,7 +1926,7 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   background: var(--bg-1);
   color: var(--ink-2);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   cursor: pointer;
 }

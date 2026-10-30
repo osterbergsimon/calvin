@@ -42,13 +42,16 @@
               </div>
               <div class="plugin-info">
                 <strong>{{ plugin.name }}</strong>
-                <span
+                <Tag
                   v-if="isMultiInstance(plugin) && pluginInstances[plugin.id]?.length > 0"
                   class="instance-count-badge"
+                  count
+                  :aria-label="`${pluginInstances[plugin.id].length} ${
+                    pluginInstances[plugin.id].length === 1 ? 'instance' : 'instances'
+                  }`"
                 >
                   {{ pluginInstances[plugin.id].length }}
-                  {{ pluginInstances[plugin.id].length === 1 ? "instance" : "instances" }}
-                </span>
+                </Tag>
               </div>
             </div>
 
@@ -116,6 +119,7 @@
 
 <script setup>
 import draggable from "vuedraggable";
+import Tag from "@/components/ui/Tag.vue";
 
 defineProps({
   type: {
@@ -202,7 +206,7 @@ const handleInstanceDragEnd = pluginId => {
 .plugin-tree-item {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
@@ -244,10 +248,10 @@ const handleInstanceDragEnd = pluginId => {
   min-height: 32px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   cursor: grab;
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   line-height: 1;
   color: var(--ink-3);
   user-select: none;
@@ -275,16 +279,6 @@ const handleInstanceDragEnd = pluginId => {
   gap: 0.75rem;
 }
 
-.instance-count-badge {
-  padding: 0.15rem 0.55rem;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: var(--ink-2);
-  font-family: var(--font-data);
-}
-
 .plugin-instances-tree {
   margin-left: 2rem;
   margin-right: 1rem;
@@ -300,7 +294,7 @@ const handleInstanceDragEnd = pluginId => {
   padding: 0.4rem 0.6rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   transition: border-color 0.15s ease;
 }
 
@@ -312,7 +306,7 @@ const handleInstanceDragEnd = pluginId => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .instance-drag-handle {
@@ -323,10 +317,10 @@ const handleInstanceDragEnd = pluginId => {
   min-height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: transparent;
   cursor: grab;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   color: var(--ink-3);
   user-select: none;
@@ -350,7 +344,7 @@ const handleInstanceDragEnd = pluginId => {
 
 .running-indicator {
   display: inline-flex;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   flex-shrink: 0;
 }
@@ -372,7 +366,7 @@ const handleInstanceDragEnd = pluginId => {
 
 .instance-summary {
   color: var(--ink-2);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -389,7 +383,7 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .help-text {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
   margin: 0;
   line-height: 1.4;
@@ -400,7 +394,7 @@ const handleInstanceDragEnd = pluginId => {
   text-align: center;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 
 @media (prefers-reduced-motion: reduce) {

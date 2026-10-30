@@ -313,12 +313,10 @@ onMounted(async () => {
   box-shadow: none;
 }
 .readout-key {
-  font-family: var(--font-data);
-  font-size: var(--fs-micro);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 .readout-val {
   font-family: var(--font-ui);
@@ -349,12 +347,10 @@ onMounted(async () => {
   margin: 0;
 }
 .update-detail dt {
-  font-family: var(--font-data);
-  font-size: var(--fs-micro);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
   font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  color: var(--ink-2);
   padding-top: 0.1rem;
 }
 .update-detail dd {

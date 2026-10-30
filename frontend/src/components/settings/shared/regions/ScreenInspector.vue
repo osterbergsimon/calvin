@@ -1,9 +1,11 @@
 <template>
   <div class="ins">
-    <div class="ins-mode"><span class="chip screen">Page</span> settings</div>
+    <div class="ins-mode">
+      <h3 class="ins-title">{{ clockSelected ? "Clock bar" : "Page" }}</h3>
+      <span class="ins-sub">{{ headingSub }}</span>
+    </div>
 
     <section class="ins-group">
-      <h3 class="ins-h">Page</h3>
       <label class="ins-field">
         <span class="ins-label">Name</span>
         <input
@@ -17,7 +19,7 @@
       </label>
 
       <div class="ins-field">
-        <span class="ins-label">Layout <span v-if="isCustom" class="tag">Custom</span></span>
+        <span class="ins-label">Layout <Tag v-if="isCustom" class="tag">Custom</Tag></span>
         <div class="presets">
           <button
             v-for="p in presets"
@@ -110,12 +112,14 @@ import { computed } from "vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import Tag from "@/components/ui/Tag.vue";
 import { MAX_TOP_REGIONS } from "@/utils/layout";
 
 const props = defineProps({
   screen: { type: Object, required: true },
   layoutDir: { type: String, required: true },
   clock: { type: Object, required: true },
+  clockSelected: { type: Boolean, default: false },
   canDelete: { type: Boolean, default: true },
 });
 defineEmits([
@@ -136,6 +140,9 @@ const presets = [
   { value: "split_three", label: "Three regions", short: "3", cols: 3 },
   { value: "split_four", label: "Four regions", short: "4", cols: 4 },
 ];
+const headingSub = computed(() =>
+  props.clockSelected ? `· on ${props.screen.name}` : `· ${props.screen.name}`
+);
 const isCustom = computed(
   () => !props.screen.layout.preset || props.screen.layout.preset === "custom"
 );
@@ -183,33 +190,30 @@ const positionOptions = computed(() => {
   padding: var(--space-xl) var(--space-xl) var(--space-3xl);
 }
 .ins-mode {
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
   margin-bottom: var(--space-lg);
 }
-.chip {
-  padding: 0.12rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.ins-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
 }
-.chip.screen {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  color: var(--ink-2);
+.ins-sub {
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
 }
 .ins-group {
   margin-bottom: var(--space-3xl);
 }
 .ins-h {
   margin: 0 0 var(--space-lg);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
 }
 .ins-field {
   display: block;
@@ -244,15 +248,7 @@ const positionOptions = computed(() => {
   outline-offset: 2px;
 }
 .tag {
-  font-size: var(--fs-micro);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-left: 0.4rem;
-  padding: 0.08rem 0.4rem;
-  border-radius: var(--radius-pill);
-  background: var(--focus-glow);
-  color: var(--focus);
+  margin-left: var(--space-xs);
 }
 .presets {
   display: grid;
