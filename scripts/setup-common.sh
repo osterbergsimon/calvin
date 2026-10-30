@@ -20,6 +20,16 @@ readonly DEFAULT_CALVIN_DIR="/home/calvin/calvin"
 readonly DEFAULT_CALVIN_USER="calvin"
 readonly DEFAULT_LOG_FILE="/var/log/calvin-setup.log"
 
+# A release ref is a vX.Y.Z tag cut by release-please, not a branch. An install
+# may track one instead of develop: the tag never moves, so it is cloned and
+# then checked out again rather than fast-forwarded.
+is_release_tag() {
+    case "${1:-}" in
+        v[0-9]*.[0-9]*.[0-9]*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Logging functions
 log() {
     local message="$1"
@@ -255,7 +265,7 @@ ensure_git_repo() {
 
     if [ ! -d "${target_dir}" ]; then
         log "Cloning repository to ${target_dir}..."
-        sudo -u "${user}" git clone --branch "${branch}" "${repo_url}" "${target_dir}" \
+        sudo -u "${user}" git -c advice.detachedHead=false clone --branch "${branch}" "${repo_url}" "${target_dir}" \
             || error_exit "Failed to clone ${repo_url} (branch ${branch})" 1
         log "Repository setup complete"
         return 0
@@ -267,6 +277,18 @@ ensure_git_repo() {
 
     if [ -n "$("${g[@]}" status --porcelain --untracked-files=no)" ]; then
         log_warn "${target_dir} has local changes; leaving it as it is (commit or stash them, then re-run to update)"
+        return 0
+    fi
+
+    # A release tag never moves: switch to it (detached) instead of tracking a
+    # branch called vX.Y.Z, which does not exist on the remote.
+    if is_release_tag "${branch}"; then
+        if [ "$("${g[@]}" describe --tags --exact-match 2>/dev/null || true)" != "${branch}" ]; then
+            log "Checking out release tag ${branch}..."
+            "${g[@]}" -c advice.detachedHead=false checkout -q --detach "refs/tags/${branch}" \
+                || error_exit "Failed to check out release tag ${branch}" 1
+        fi
+        log "Repository setup complete (release tag ${branch})"
         return 0
     fi
 

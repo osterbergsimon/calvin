@@ -127,7 +127,9 @@ Usage: setup.sh [--mode prod|dev] [--refresh]
 
 Environment overrides:
   GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_DATA_DIR, CALVIN_IMAGE_TAG
-  (pass them through sudo: sudo GIT_BRANCH=develop bash setup.sh)
+  GIT_BRANCH may be a branch (develop) or a release tag (v0.1.0; the image
+  follows the tag). Pass them through sudo:
+  sudo GIT_BRANCH=v0.1.0 bash setup.sh
 USAGE
 }
 
@@ -267,16 +269,21 @@ create_runtime_data_dirs() {
     chmod -R o-rwx "${CALVIN_DATA_DIR}"
 }
 
-# Every deployable branch runs the :develop image (:latest is only published
-# from v* release tags, and there are none yet). Pin another tag with
+# Every deployable branch runs the :develop image. A release install (a vX.Y.Z
+# tag) runs that release's published image instead. Pin another tag with
 # CALVIN_IMAGE_TAG.
 image_tag_for_branch() {
-    echo develop
+    if is_release_tag "$1"; then
+        echo "$1"
+    else
+        echo develop
+    fi
 }
 
 # Keep CALVIN_IMAGE_TAG in step with the branch. latest/develop/empty are the
-# values setup manages; any other value is an operator pin and is kept. An
-# explicit CALVIN_IMAGE_TAG in setup's environment always wins.
+# values setup manages; any other value is an operator pin and is kept. A
+# release ref owns its tag (so bumping GIT_BRANCH to a newer tag moves the
+# image too). An explicit CALVIN_IMAGE_TAG in setup's environment always wins.
 sync_image_tag() {
     local env_file="$1"
     local branch="$2"
@@ -284,6 +291,8 @@ sync_image_tag() {
     current="$(read_env_value "${env_file}" CALVIN_IMAGE_TAG)"
     if [ -n "${CALVIN_IMAGE_TAG:-}" ]; then
         wanted="${CALVIN_IMAGE_TAG}"
+    elif is_release_tag "${branch}"; then
+        wanted="${branch}"
     else
         case "${current}" in
             ""|latest|develop) wanted="$(image_tag_for_branch "${branch}")" ;;
