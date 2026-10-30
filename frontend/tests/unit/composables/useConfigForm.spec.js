@@ -118,6 +118,28 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value.showUI).toBe(true);
     });
 
+    it("maps the Dashboard and Screens rows the settings categories need", async () => {
+      const mockConfig = {
+        displayName: "Kitchen",
+        focusLightMode: "always",
+        focusLightDimOthers: false,
+        touchControls: "on",
+        touchControlSize: "large",
+        tapAnywhereReveal: true,
+        hotCornerPosition: "top-right",
+        hotCornerOpacity: 40,
+        hotCornerSize: 80,
+        hotCornerLongPressMs: 700,
+      };
+
+      configApi.getConfig.mockResolvedValue(mockConfig);
+
+      const form = useConfigForm();
+      await form.loadConfig();
+
+      expect(form.localConfig.value).toMatchObject(mockConfig);
+    });
+
     it("should handle errors when loading config", async () => {
       const error = new Error("Failed to load config");
       configApi.getConfig.mockRejectedValue(error);
