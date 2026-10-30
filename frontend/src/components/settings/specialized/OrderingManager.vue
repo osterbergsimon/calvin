@@ -42,13 +42,16 @@
               </div>
               <div class="plugin-info">
                 <strong>{{ plugin.name }}</strong>
-                <span
+                <Tag
                   v-if="isMultiInstance(plugin) && pluginInstances[plugin.id]?.length > 0"
                   class="instance-count-badge"
+                  count
+                  :aria-label="`${pluginInstances[plugin.id].length} ${
+                    pluginInstances[plugin.id].length === 1 ? 'instance' : 'instances'
+                  }`"
                 >
                   {{ pluginInstances[plugin.id].length }}
-                  {{ pluginInstances[plugin.id].length === 1 ? "instance" : "instances" }}
-                </span>
+                </Tag>
               </div>
             </div>
 
@@ -116,6 +119,7 @@
 
 <script setup>
 import draggable from "vuedraggable";
+import Tag from "@/components/ui/Tag.vue";
 
 defineProps({
   type: {
@@ -273,16 +277,6 @@ const handleInstanceDragEnd = pluginId => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-}
-
-.instance-count-badge {
-  padding: 0.15rem 0.55rem;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  font-size: 0.75rem;
-  color: var(--ink-2);
-  font-family: var(--font-data);
 }
 
 .plugin-instances-tree {

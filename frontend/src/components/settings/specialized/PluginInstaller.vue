@@ -48,9 +48,7 @@
           </span>
           <div class="catalog-info">
             <strong>{{ plugin.name || plugin.id }}</strong>
-            <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">
-              {{ pluginKindLabel(plugin) }}
-            </span>
+            <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
             <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
             <p v-if="plugin.description" class="plugin-desc-inline">{{ plugin.description }}</p>
           </div>
@@ -65,7 +63,7 @@
               >
                 {{ installing ? "Installing…" : "Update" }}
               </button>
-              <span v-else class="plugin-installed-badge">Installed ✓</span>
+              <Tag v-else tone="ok" class="plugin-installed-badge">Installed</Tag>
               <button
                 v-if="!hasUpdate(plugin) && canAddSource(plugin)"
                 type="button"
@@ -172,23 +170,22 @@
             </div>
             <div class="plugin-info-inline">
               <strong>{{ plugin.name || plugin.id }}</strong>
-              <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">
-                {{ pluginKindLabel(plugin) }}
-              </span>
+              <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
               <span v-if="plugin.version" class="plugin-version-small">
                 v{{ plugin.version }}
               </span>
-              <span
+              <Tag
                 v-if="plugin._installed"
                 class="plugin-installed-badge"
-                :class="{ 'plugin-update-available': hasUpdate(plugin) }"
-              >
-                {{
+                :tone="hasUpdate(plugin) ? 'warn' : 'ok'"
+                :title="
                   hasUpdate(plugin)
                     ? `Installed: v${plugin._installedVersion} → Update to v${plugin.version}`
-                    : `Installed: v${plugin._installedVersion || "?"}`
-                }}
-              </span>
+                    : `Installed: v${plugin._installedVersion || '?'}`
+                "
+              >
+                {{ hasUpdate(plugin) ? "Update" : "Installed" }}
+              </Tag>
               <p v-if="plugin.description" class="plugin-desc-inline">{{ plugin.description }}</p>
             </div>
             <div class="plugin-actions">
@@ -303,13 +300,11 @@
             </div>
             <div class="plugin-info-inline">
               <strong>{{ plugin.name || plugin.id }}</strong>
-              <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">{{
-                pluginKindLabel(plugin)
-              }}</span>
+              <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
               <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
-              <span v-if="plugin._installed" class="plugin-installed-badge">
+              <Tag v-if="plugin._installed" tone="ok" class="plugin-installed-badge">
                 Installed: v{{ plugin._installedVersion || "?" }}
-              </span>
+              </Tag>
               <p v-if="plugin.description" class="plugin-desc-inline">{{ plugin.description }}</p>
             </div>
             <div class="plugin-actions">
@@ -380,6 +375,7 @@
 <script setup>
 import { ref, computed, watch } from "vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import Tag from "@/components/ui/Tag.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { pluginKindFilters, pluginKindKey, pluginKindLabel } from "@/utils/pluginKind";
 import { isNewerVersion } from "@/utils/pluginVersions";
@@ -1092,35 +1088,10 @@ watch(searchQuery, () => {
   flex-shrink: 0;
 }
 
-.plugin-type-badge-small {
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: var(--bg-1);
-  color: var(--ink-2);
-  border: 1px solid var(--line);
-}
-
 .plugin-version-small {
   color: var(--ink-2);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   font-family: var(--font-data);
-}
-
-.plugin-installed-badge {
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.7rem;
-  font-weight: 500;
-  background: color-mix(in srgb, var(--ok) 10%, transparent);
-  color: var(--ok);
-  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
-}
-.plugin-installed-badge.plugin-update-available {
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
-  color: var(--warn);
-  border-color: color-mix(in srgb, var(--warn) 30%, transparent);
 }
 
 /* Notices */

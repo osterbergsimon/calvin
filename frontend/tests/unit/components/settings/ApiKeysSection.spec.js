@@ -361,10 +361,10 @@ describe("ApiKeysSection", () => {
         key({ id: "c", name: "C", scope: "host" }),
       ]);
       const chips = wrapper.findAll("[data-test='api-key-scope']").map(c => c.text());
-      expect(chips).toEqual(["Read", "Admin", "⚠ Host control"]);
-      expect(wrapper.findAll("[data-test='api-key-scope']")[2].classes()).toContain(
-        "api-keys__chip--host"
-      );
+      expect(chips).toEqual(["Read", "Admin", "Host control"]);
+      const host = wrapper.findAll("[data-test='api-key-scope']")[2];
+      expect(host.classes()).toContain("err");
+      expect(host.find("svg.tag__icon").exists()).toBe(true);
     });
 
     it("formats prefix, created and last used", async () => {

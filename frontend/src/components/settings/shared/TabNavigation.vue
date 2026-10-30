@@ -14,13 +14,21 @@
     >
       <span v-if="tab.icon" class="tab-icon">{{ tab.icon }}</span>
       <span class="tab-label">{{ tab.label }}</span>
-      <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
+      <Tag
+        v-if="tab.badge"
+        class="tab-badge"
+        count
+        :tone="activeTab === tab.id ? 'focus' : 'neutral'"
+      >
+        {{ tab.badge }}
+      </Tag>
     </button>
   </div>
 </template>
 
 <script setup>
 import { nextTick, ref } from "vue";
+import Tag from "@/components/ui/Tag.vue";
 
 const props = defineProps({
   tabs: {
@@ -92,9 +100,9 @@ const handleKeydown = event => {
 <style scoped>
 .tab-navigation {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-sm);
   border-bottom: 2px solid var(--line);
-  margin-bottom: 1.5rem;
+  margin-bottom: var(--space-3xl);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -103,14 +111,14 @@ const handleKeydown = event => {
 .tab-button {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
+  gap: var(--space-sm);
+  padding: 0.75rem var(--space-2xl);
   min-height: var(--touch-target);
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
   color: var(--ink-2);
-  font-size: 0.95rem;
+  font-size: var(--fs-control);
   font-family: var(--font-ui);
   font-weight: 500;
   cursor: pointer;
@@ -142,20 +150,6 @@ const handleKeydown = event => {
 
 .tab-label {
   flex: 1;
-}
-
-.tab-badge {
-  padding: 0.125rem 0.5rem;
-  background: var(--bg-2);
-  color: var(--ink-2);
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.tab-button.active .tab-badge {
-  background: var(--focus);
-  color: white;
 }
 
 /* Scrollbar styling for tab navigation */
