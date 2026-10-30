@@ -329,7 +329,7 @@ onUnmounted(() => {
 .connection-status__connected {
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  color: var(--ok);
+  color: var(--ok-text);
   white-space: nowrap;
 }
 
@@ -380,14 +380,14 @@ onUnmounted(() => {
   text-align: left;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 18px 50px -16px var(--shadow-hover);
 }
 
 .connection-popover__title {
   margin: 0 0 8px;
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
 }
 
@@ -402,12 +402,12 @@ onUnmounted(() => {
   min-height: 44px;
   padding: 0 16px;
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 

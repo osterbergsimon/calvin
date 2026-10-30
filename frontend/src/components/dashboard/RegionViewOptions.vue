@@ -109,7 +109,7 @@ defineExpose({ open, close });
   gap: 0.4rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px var(--shadow);
 }
 </style>

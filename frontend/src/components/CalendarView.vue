@@ -1367,7 +1367,7 @@ onActivated(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg-1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: visible; /* let the focused panel glow bloom out */
   outline: none;
   min-height: 0;
@@ -1424,7 +1424,7 @@ onActivated(() => {
 
 .calendar-header__label {
   font-family: var(--font-display);
-  font-size: var(--region-label-fs, 1.25rem);
+  font-size: var(--region-label-fs, var(--fs-xl));
   font-weight: 700;
   color: var(--ink);
   line-height: 1.2;
@@ -1448,12 +1448,12 @@ onActivated(() => {
   height: var(--region-rail-h, 1.75rem);
   padding: 0 0.7rem;
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
     background 0.2s,
@@ -1464,12 +1464,12 @@ onActivated(() => {
   height: var(--region-rail-h, 1.75rem);
   padding: 0 0.75rem;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--focus-ink);
   background: var(--focus);
   border: 1px solid var(--focus);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: filter 0.2s;
 }
@@ -1484,7 +1484,7 @@ onActivated(() => {
 }
 
 .calendar-header__view-caret {
-  font-size: 0.7rem;
+  font-size: var(--fs-micro);
   color: var(--ink-2);
 }
 
@@ -1570,7 +1570,7 @@ onActivated(() => {
 
 .loading-text {
   color: var(--ink-2);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 
@@ -1596,7 +1596,7 @@ onActivated(() => {
   flex-direction: column;
   height: 100%;
   background: var(--bg-1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 0.5rem;
   min-height: 0;
   width: 100%;
@@ -1632,7 +1632,7 @@ onActivated(() => {
 .weekday {
   text-align: center;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink-2);
   padding: 0.5rem;
   min-width: 0;
@@ -1691,7 +1691,7 @@ onActivated(() => {
 
 .calendar-day {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.5rem;
   min-height: 0;
   min-width: 0;
@@ -1752,16 +1752,16 @@ onActivated(() => {
 
 /* Weekend styling - very subtle background tint */
 .calendar-day.weekend:not(.other-month) {
-  background: rgba(0, 0, 0, 0.02) !important;
+  background: color-mix(in srgb, var(--ink) 2%, transparent) !important;
 }
 
 /* Red day (holiday) styling */
 .calendar-day.red-day:not(.other-month) {
-  background: rgba(220, 53, 69, 0.1) !important;
+  background: color-mix(in srgb, var(--err) 10%, transparent) !important;
 }
 
 .calendar-day.red-day:not(.other-month) .day-number {
-  color: #dc3545;
+  color: var(--err-text);
   font-weight: 700;
 }
 
@@ -1788,7 +1788,7 @@ onActivated(() => {
 
 .day-number {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink);
   flex-shrink: 0;
   white-space: nowrap;
@@ -1796,10 +1796,10 @@ onActivated(() => {
 
 .week-number {
   font-family: var(--font-data);
-  font-size: 0.62rem;
+  font-size: var(--fs-3xs);
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--focus);
+  color: var(--focus-text);
   background: color-mix(in srgb, var(--focus) 12%, transparent);
   padding: 0.05rem 0.35rem;
   border-radius: 999px;
@@ -1821,7 +1821,7 @@ onActivated(() => {
   align-items: flex-end;
   justify-content: center;
   font-family: var(--font-data);
-  font-size: 0.55rem;
+  font-size: var(--fs-3xs);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1842,7 +1842,7 @@ onActivated(() => {
 
 .week-spine-num {
   font-family: var(--font-data);
-  font-size: 0.62rem;
+  font-size: var(--fs-3xs);
   font-weight: 600;
   letter-spacing: 0.02em;
   line-height: 1.2;
@@ -1852,7 +1852,7 @@ onActivated(() => {
 }
 
 .week-spine.current-week .week-spine-num {
-  color: var(--focus);
+  color: var(--focus-text);
 }
 
 .day-events {
@@ -1872,11 +1872,11 @@ onActivated(() => {
 }
 
 .event-overflow-indicator {
-  font-size: 0.7rem;
+  font-size: var(--fs-micro);
   padding: 0.15rem 0.35rem;
   background: var(--bg-2);
   color: var(--ink-2);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   text-align: center;
   cursor: default;
   margin-top: 0.1rem;
@@ -1950,7 +1950,7 @@ onActivated(() => {
 }
 .calendar-weeks .calendar-day.today {
   border: 1px solid var(--focus) !important;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 .calendar-weeks .calendar-day .day-header {
   margin-bottom: 0;
@@ -1958,12 +1958,12 @@ onActivated(() => {
 }
 .calendar-weeks .calendar-day .day-number {
   font-family: var(--font-data);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   font-weight: 500;
   color: var(--ink-2);
 }
 .calendar-weeks .calendar-day.today .day-number {
-  color: var(--focus);
+  color: var(--focus-text);
   font-weight: 600;
 }
 
@@ -1981,7 +1981,7 @@ onActivated(() => {
   background: transparent;
   padding: 0.05rem 0.1rem;
   font-family: var(--font-data);
-  font-size: 0.58rem;
+  font-size: var(--fs-3xs);
   letter-spacing: 0.02em;
 }
 
@@ -2034,12 +2034,12 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(0.6rem, 1.5vw, 0.9rem);
+    font-size: clamp(var(--fs-3xs), 1.5vw, var(--fs-md));
     padding: clamp(0.15rem, 0.5vw, 0.5rem);
   }
 
   .day-number {
-    font-size: clamp(0.7rem, 2vw, 0.9rem);
+    font-size: clamp(var(--fs-micro), 2vw, var(--fs-md));
   }
 
   .day-header {
@@ -2047,7 +2047,7 @@ onActivated(() => {
   }
 
   .week-number {
-    font-size: clamp(0.55rem, 1.5vw, 0.7rem);
+    font-size: clamp(var(--fs-3xs), 1.5vw, var(--fs-micro));
     padding: clamp(0.05rem, 0.25vw, 0.125rem) clamp(0.2rem, 0.5vw, 0.375rem);
   }
 }
@@ -2069,7 +2069,7 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(0.5rem, 2vw, 0.75rem);
+    font-size: clamp(var(--fs-3xs), 2vw, var(--fs-2xs));
     padding: clamp(0.1rem, 0.5vw, 0.25rem);
   }
 
@@ -2088,7 +2088,7 @@ onActivated(() => {
   }
 
   .day-number {
-    font-size: clamp(0.6rem, 2.5vw, 0.8rem);
+    font-size: clamp(var(--fs-3xs), 2.5vw, var(--fs-xs));
   }
 }
 
@@ -2124,12 +2124,12 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(0.5rem, 2vh, 0.75rem);
+    font-size: clamp(var(--fs-3xs), 2vh, var(--fs-2xs));
     padding: clamp(0.1rem, 0.5vh, 0.25rem);
   }
 
   .day-number {
-    font-size: clamp(0.6rem, 2.5vh, 0.8rem);
+    font-size: clamp(var(--fs-3xs), 2.5vh, var(--fs-xs));
   }
 }
 
@@ -2151,7 +2151,7 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: 0.5rem;
+    font-size: var(--fs-3xs);
     padding: 0.1rem;
   }
 
@@ -2170,7 +2170,7 @@ onActivated(() => {
   }
 
   .day-number {
-    font-size: 0.6rem;
+    font-size: var(--fs-3xs);
   }
 
   .day-events {
