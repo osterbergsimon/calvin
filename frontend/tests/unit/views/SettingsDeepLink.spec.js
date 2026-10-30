@@ -48,7 +48,7 @@ const stubs = {
   ScreensSettings: true,
   MaintenanceSettings: true,
   ContentSettings: {
-    template: '<div><section id="section-content-images" class="images-section" /></div>',
+    template: '<div><section id="section-content-photos" class="images-section" /></div>',
   },
 };
 
@@ -61,11 +61,11 @@ describe("Settings ?setting= deep link (F3/F4)", () => {
   });
 
   it("opens the destination's category and scrolls its section into view", async () => {
-    route.query = { setting: "content-images" };
+    route.query = { setting: "content-photos" };
     const w = mount(Settings, { global: { stubs }, attachTo: document.body });
     await flushPromises();
 
-    const section = document.getElementById("section-content-images");
+    const section = document.getElementById("section-content-photos");
     expect(section).not.toBeNull();
     expect(section.scrollIntoView).toHaveBeenCalled();
     w.unmount();
@@ -220,11 +220,11 @@ describe("Settings header after a deep link", () => {
   const section = (id, title) =>
     `<section id="section-${id}"><div class="settings-section__eyebrow">${title}</div></section>`;
   const contentStub = {
-    template: `<div>${section("content-photos", "Photos")}${section("content-images", "Image sources")}${section("content-services", "Services")}</div>`,
+    template: `<div>${section("content-photos", "Photos")}${section("content-services", "Services")}</div>`,
   };
 
   it("names the deep-linked section, not whichever short section follows it", async () => {
-    route.query = { setting: "content-images" };
+    route.query = { setting: "content-photos" };
     const w = mount(Settings, {
       global: { stubs: { ...stubs, ContentSettings: contentStub } },
       attachTo: document.body,
@@ -233,7 +233,7 @@ describe("Settings header after a deep link", () => {
     await new Promise(r => requestAnimationFrame(r));
     await flushPromises();
 
-    expect(w.find(".settings-topbar__location").text()).toBe("Image sources");
+    expect(w.find(".settings-topbar__location").text()).toBe("Photos");
 
     // A real user scroll hands the header back to the scroll-spy.
     window.dispatchEvent(new Event("wheel"));

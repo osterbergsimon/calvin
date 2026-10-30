@@ -1,7 +1,12 @@
 <template>
   <div class="content-settings">
     <SettingsSection id="content-calendars" title="Calendars">
-      <CalendarSourcesTab :config="config" @update:config="patch => emit('update:config', patch)" />
+      <CalendarSourcesTab
+        :config="config"
+        :highlight-id="highlightId"
+        :highlight-provider="highlightProvider"
+        @update:config="patch => emit('update:config', patch)"
+      />
     </SettingsSection>
 
     <SettingsSection id="content-calendar-display" title="Calendar display">
@@ -83,6 +88,7 @@
     </SettingsSection>
 
     <SettingsSection id="content-photos" title="Photos">
+      <ImagesTab :highlight-id="highlightId" :highlight-provider="highlightProvider" />
       <SettingRow label="Show each photo for">
         <NumberStepper
           :model-value="config.photoRotationInterval || 30"
@@ -141,22 +147,23 @@
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="content-images" title="Image sources">
-      <PhotoUpload />
-      <ImagesTab />
+    <SettingsSection id="content-services" title="Web pages & apps">
+      <ServicesTab
+        :config="config"
+        :highlight-id="highlightId"
+        :highlight-provider="highlightProvider"
+      />
     </SettingsSection>
 
-    <SettingsSection id="content-services" title="Web pages & services">
-      <div class="content-services-actions">
-        <AddWebPageButton />
-      </div>
-      <ServicesTab />
+    <SettingsSection id="content-clock-bar" title="Clock bar info">
+      <ClockBarSources :highlight-id="highlightId" :highlight-provider="highlightProvider" />
     </SettingsSection>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import { useRoute } from "vue-router";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -166,9 +173,8 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
-import PhotoUpload from "@/components/settings/tabs/content/PhotoUpload.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
-import AddWebPageButton from "@/components/settings/specialized/AddWebPageButton.vue";
+import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 
 // Kept out of the template: the quoted "+N more" would fight the formatter's
 // attribute quoting.
@@ -176,6 +182,17 @@ const EVENTS_PER_DAY_DESCRIPTION = 'How many events fit in one day before it sho
 
 const props = defineProps({ config: { type: Object, required: true } });
 const emit = defineEmits(["update:config"]);
+
+const route = useRoute();
+
+// Plugins' "Used by n sources" links carry the provider id, so its rows pulse
+// once on arrival (§3.3).
+const highlightProvider = computed(() =>
+  typeof route?.query?.highlight === "string" ? route.query.highlight : ""
+);
+const highlightId = computed(() =>
+  typeof route?.query?.source === "string" ? route.query.source : ""
+);
 
 const isSmartFit = computed(() => (props.config.imageDisplayMode || "smart") === "smart");
 
@@ -211,11 +228,6 @@ const photoFrameTimeoutOptions = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-.content-services-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0.875rem 1rem 0;
 }
 /* Slot content is in this component's scope, not SettingRow's. */
 .setting-row__desc {

@@ -42,6 +42,17 @@ describe("PhotoUpload (F3 landing spot for 'Add photos')", () => {
     expect(text).toContain("b.txt: Unsupported file format");
   });
 
+  it("describes uploads as landing in Local photos, with the count", () => {
+    store.images = [{ id: "a" }, { id: "b" }];
+    const wrapper = mount(PhotoUpload);
+
+    const description = wrapper.findComponent({ name: "SettingRow" }).props("description");
+    expect(description).toBe(
+      "Upload JPG, PNG, WebP or GIF files into Local photos. 2 photos so far."
+    );
+    expect(description).not.toContain("Local Images");
+  });
+
   it("the button opens the file picker", async () => {
     const wrapper = mount(PhotoUpload);
     const click = vi.spyOn(wrapper.find('[data-test="photo-upload-input"]').element, "click");

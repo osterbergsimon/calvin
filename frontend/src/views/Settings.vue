@@ -326,10 +326,11 @@ const SECTION_BY_CATEGORY_TAB = {
     calendars: "content-calendars",
     "calendar-display": "content-calendar-display",
     photos: "content-photos",
-    images: "content-images",
+    images: "content-photos",
     services: "content-services",
     // "Add a web page" (plugins-services) lands on the services section.
     "content-services": "content-services",
+    "clock-bar-sources": "content-clock-bar",
   },
   screens: {
     // Screens has no tabs: the list page and each screen's page are sections.

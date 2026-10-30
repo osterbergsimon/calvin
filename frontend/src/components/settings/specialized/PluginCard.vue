@@ -1,39 +1,52 @@
 <template>
-  <div class="pc-card" :class="{ 'pc-card--off': !plugin.enabled && !isCalendarProvider }">
+  <div class="pc-card" :class="{ 'pc-card--off': !plugin.enabled && !isTheme }">
     <!-- Header: identity + enable -->
     <div class="pc-head">
-      <span
-        v-if="statusDot"
-        class="pc-dot"
-        :class="`pc-dot--${statusDot}`"
-        :title="statusSummary"
-        aria-hidden="true"
-      />
       <span class="pc-name">{{ plugin.name }}</span>
       <span class="pc-badge">{{ kindLabel }}</span>
+      <span v-if="plugin.version" class="pc-ver">v{{ plugin.version }}</span>
       <span class="pc-spacer" />
       <ToggleSwitch
-        v-if="!isCalendarProvider"
+        v-if="!isTheme"
         :model-value="plugin.enabled"
         :aria-label="`Enable ${plugin.name}`"
         @update:model-value="$emit('toggle-enabled', plugin.id, $event)"
       />
     </div>
 
-    <!-- Meta: status summary + actions -->
+    <!-- Meta: how many sources use it, and where they live -->
     <div class="pc-meta">
-      <span class="pc-summary">{{ statusSummary }}</span>
+      <span class="pc-summary">
+        <template v-if="isTheme">
+          Choose it in
+          <button type="button" class="pc-link" @click="$emit('open-appearance')">
+            Dashboard › Appearance
+          </button>
+        </template>
+        <template v-else-if="isBackground"> Works in the background. No sources to add. </template>
+        <template v-else-if="!plugin.enabled">
+          Turned off<template v-if="sourceCount">
+            · {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}</template
+          ><template v-else> · not used</template>
+        </template>
+        <template v-else-if="sourceCount">
+          <button type="button" class="pc-link" @click="$emit('used-by', plugin.id)">
+            Used by {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}
+          </button>
+        </template>
+        <template v-else>
+          Not used yet<template v-if="canAddSource">
+            ·
+            <button type="button" class="pc-link" @click="$emit('add-source', plugin.id)">
+              Add a source
+            </button></template
+          >
+        </template>
+      </span>
+
       <div class="pc-actions">
         <button
-          v-if="isCalendarProvider"
-          type="button"
-          class="pc-btn pc-btn--primary"
-          @click="$emit('manage-calendar-sources')"
-        >
-          Manage calendar sources
-        </button>
-        <button
-          v-if="!isCalendarProvider && hasSettings && plugin.enabled"
+          v-if="hasSettings && plugin.enabled"
           type="button"
           class="pc-btn"
           :class="{ 'pc-btn--on': expanded }"
@@ -56,8 +69,8 @@
       </div>
     </div>
 
-    <!-- Body: config (when enabled + expanded) -->
-    <div v-if="!isCalendarProvider && plugin.enabled && expanded" class="pc-body">
+    <!-- Body: plugin-level settings only. Sources live in Content. -->
+    <div v-if="plugin.enabled && expanded" class="pc-body">
       <div v-if="hasGlobalSettings" class="pc-section">
         <h4 class="pc-section-title">Settings</h4>
         <div v-for="(schema, key) in globalConfigSchema" :key="key" class="pc-field">
@@ -100,29 +113,7 @@
         @upload="$emit('upload', $event)"
         @delete-image="$emit('delete-image', $event)"
       />
-
-      <PluginInstances
-        v-if="showInstances"
-        :plugin="plugin"
-        :instances="instances"
-        :get-instance-summary="instance => getInstanceSummary(plugin, instance)"
-        @add-instance="$emit('add-instance', plugin.id)"
-        @edit-instance="handleEditInstance"
-        @delete-instance="$emit('delete-instance', $event)"
-        @toggle-instance="handleToggleInstance"
-        @order-change="handleInstanceOrderChange"
-      />
     </div>
-
-    <p v-else-if="isCalendarProvider" class="pc-provider-note">
-      This provider is available when adding a calendar source. Source name, URL, color, ordering,
-      and event-time display live under Content / Calendars.
-    </p>
-
-    <!-- Disabled note -->
-    <p v-else-if="!plugin.enabled" class="pc-disabled">
-      Disabled — hidden from dropdowns and the dashboard. Existing instances are kept, not deleted.
-    </p>
   </div>
 </template>
 
@@ -133,7 +124,6 @@ import { pluginKindLabel } from "@/utils/pluginKind";
 import PluginFieldRenderer from "../../PluginFieldRenderer.vue";
 import PluginActions from "../../PluginActions.vue";
 import PluginSections from "../../PluginSections.vue";
-import PluginInstances from "./PluginInstances.vue";
 
 const props = defineProps({
   plugin: {
@@ -203,95 +193,25 @@ const emit = defineEmits([
   "test-connection",
   "fetch-now",
   "custom-action",
-  "add-instance",
-  "edit-instance",
-  "delete-instance",
-  "toggle-instance",
-  "instance-order-change",
-  "manage-calendar-sources",
+  "used-by",
+  "add-source",
+  "open-appearance",
   "upload",
   "delete-image",
 ]);
 
-const instanceLabelMap = {
-  calendar: "source",
-  image: "source",
-  service: "source",
-  backend: "source",
-};
-
-const instanceNoun = computed(
-  () =>
-    props.plugin.instance_label?.toLowerCase() || instanceLabelMap[props.plugin.type] || "source"
-);
-
 const kindLabel = computed(() => pluginKindLabel(props.plugin));
 
-const isCalendarProvider = computed(() => props.plugin.type === "calendar");
-
-const hasSettings = computed(
-  () =>
-    !isCalendarProvider.value &&
-    (Object.keys(props.plugin.config_schema || {}).length > 0 ||
-      Object.keys(props.plugin.instance_config_schema || {}).length > 0 ||
-      props.instances.length > 0)
-);
-
-const globalConfigSchema = computed(() => getGlobalConfigSchema(props.plugin));
+const isTheme = computed(() => props.plugin.type === "theme");
+const isBackground = computed(() => props.plugin.type === "backend");
+const sourceCount = computed(() => props.instances.length);
+const canAddSource = computed(() => ["calendar", "image", "service"].includes(props.plugin.type));
 
 const hasGlobalSettings = computed(() => Object.keys(globalConfigSchema.value).length > 0);
 
-const pluginActions = computed(() => {
-  const actions = props.plugin.ui_actions || [];
-  if (actions.length > 0) return actions;
-  if (!hasGlobalSettings.value) return [];
-  return [{ id: "save", type: "save", label: "Save Settings", style: "primary" }];
-});
+const hasSettings = computed(() => hasGlobalSettings.value);
 
-const showInstances = computed(
-  () =>
-    props.plugin.enabled &&
-    props.plugin.type !== "theme" &&
-    props.plugin.supports_multiple_instances !== false
-);
-
-// Whether any instance reports a running flag (services/backends do; calendar
-// sources may not). Drives whether the status line mentions "running".
-const hasRunningInfo = computed(() => props.instances.some(i => i.running !== undefined));
-
-const runningCount = computed(() => props.instances.filter(i => i.running).length);
-
-// The one piece of live information in this view: each plugin's operational
-// state at a glance, without expanding it.
-const statusSummary = computed(() => {
-  if (isCalendarProvider.value) {
-    const n = props.instances.length;
-    if (n === 0) return "Available for new calendar sources";
-    return `${n} source${n === 1 ? "" : "s"} managed in Content`;
-  }
-  if (!props.plugin.enabled) return "Disabled";
-  if (props.plugin.type === "theme") return "Theme";
-  if (!showInstances.value) return hasGlobalSettings.value ? "Ready" : "Active";
-
-  const n = props.instances.length;
-  const noun = instanceNoun.value;
-  if (n === 0) return `No ${noun}s yet`;
-
-  const base = `${n} ${noun}${n === 1 ? "" : "s"}`;
-  if (!hasRunningInfo.value) return base;
-  return `${base} · ${runningCount.value}/${n} running`;
-});
-
-// Header dot reflects aggregate running health; hidden when there's nothing
-// running to report (disabled, no instances, or sources without a run flag).
-const statusDot = computed(() => {
-  if (isCalendarProvider.value) return null;
-  if (!props.plugin.enabled) return null;
-  if (!hasRunningInfo.value || props.instances.length === 0) return null;
-  if (runningCount.value === props.instances.length) return "ok";
-  if (runningCount.value === 0) return "err";
-  return "warn";
-});
+const globalConfigSchema = computed(() => getGlobalConfigSchema(props.plugin));
 
 // Trust schema placement: common_config_schema = global. Skip internal _ fields
 // and fields marked hidden in their UI config.
@@ -302,18 +222,12 @@ const getGlobalConfigSchema = plugin =>
     )
   );
 
-const getInstanceSummary = (plugin, instance) => {
-  const schema = plugin.instance_config_schema || {};
-  const config = instance.config || {};
-  for (const [key, fieldSchema] of Object.entries(schema)) {
-    if (key.startsWith("_") || fieldSchema.type !== "string") continue;
-    const val = config[key];
-    if (val && typeof val === "string" && val.trim()) {
-      return val.length > 60 ? val.slice(0, 57) + "..." : val;
-    }
-  }
-  return null;
-};
+const pluginActions = computed(() => {
+  const actions = props.plugin.ui_actions || [];
+  if (actions.length > 0) return actions;
+  if (!hasGlobalSettings.value) return [];
+  return [{ id: "save", type: "save", label: "Save Settings", style: "primary" }];
+});
 
 const unwrapConfigValue = (value, schema = {}) => {
   if (value && typeof value === "object") {
@@ -329,10 +243,6 @@ const getFormValue = (key, schema) => unwrapConfigValue(props.formData[key], sch
 const handleUpdateFormValue = (key, value) =>
   emit("update-form-value", props.plugin.id, key, value);
 const handleCustomAction = action => emit("custom-action", props.plugin.id, action);
-const handleEditInstance = instance => emit("edit-instance", props.plugin.id, instance);
-const handleToggleInstance = (instanceId, enabled) => emit("toggle-instance", instanceId, enabled);
-const handleInstanceOrderChange = newOrder =>
-  emit("instance-order-change", props.plugin.id, newOrder);
 </script>
 
 <style scoped>
@@ -357,21 +267,6 @@ const handleInstanceOrderChange = newOrder =>
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
 }
-.pc-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.pc-dot--ok {
-  background: var(--ok);
-}
-.pc-dot--warn {
-  background: var(--warn);
-}
-.pc-dot--err {
-  background: var(--err);
-}
 .pc-name {
   font-family: var(--font-ui);
   font-size: 1rem;
@@ -393,6 +288,12 @@ const handleInstanceOrderChange = newOrder =>
   border: 1px solid var(--line);
   flex-shrink: 0;
 }
+.pc-ver {
+  font-family: var(--font-data);
+  font-size: 0.75rem;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
 .pc-spacer {
   flex: 1;
 }
@@ -410,6 +311,23 @@ const handleInstanceOrderChange = newOrder =>
   font-family: var(--font-ui);
   font-size: 0.85rem;
   color: var(--ink-3);
+}
+.pc-link {
+  padding: 0;
+  background: transparent;
+  color: var(--ink-2);
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.pc-link:hover {
+  color: var(--ink);
+}
+.pc-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .pc-actions {
   display: flex;
@@ -446,10 +364,6 @@ const handleInstanceOrderChange = newOrder =>
   border-color: var(--focus);
   background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
 }
-.pc-btn--primary {
-  border-color: var(--focus-edge);
-  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
-}
 .pc-btn--danger {
   color: var(--err);
 }
@@ -474,11 +388,6 @@ const handleInstanceOrderChange = newOrder =>
   padding: 1.25rem;
   border-top: 1px solid var(--line);
 }
-/* A divider sits above the instance list only when settings/sections precede it. */
-.pc-body > :deep(.pi-wrap):not(:first-child) {
-  border-top: 1px solid var(--line);
-  padding-top: 1.5rem;
-}
 .pc-section-title {
   margin: 0 0 1rem;
   font-family: var(--font-ui);
@@ -488,24 +397,6 @@ const handleInstanceOrderChange = newOrder =>
 }
 .pc-field {
   margin-bottom: 1rem;
-}
-
-/* Disabled note */
-.pc-disabled {
-  margin: 0;
-  padding: 0 1.25rem 0.9rem;
-  font-family: var(--font-ui);
-  font-size: 0.85rem;
-  color: var(--ink-3);
-  line-height: 1.5;
-}
-.pc-provider-note {
-  margin: 0;
-  padding: 0 1.25rem 0.9rem;
-  font-family: var(--font-ui);
-  font-size: 0.85rem;
-  color: var(--ink-2);
-  line-height: 1.5;
 }
 
 @media (prefers-reduced-motion: reduce) {

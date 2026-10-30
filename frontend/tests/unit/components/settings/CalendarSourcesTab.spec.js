@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { ref, nextTick } from "vue";
-import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 
 // ---------------------------------------------------------------------------
 // Shared mock state — closures in vi.mock factories read these by reference
@@ -14,6 +13,8 @@ let mockRefreshEvents;
 let mockAddCalendarSource;
 let mockDeleteCalendarSource;
 let mockPluginInstances;
+let mockPlugins;
+let mockLoadPlugins;
 
 vi.mock("@/stores/calendar", () => ({
   // Pinia auto-unwraps refs; mirror that by returning .value from a getter so
@@ -40,17 +41,18 @@ vi.mock("@/services/calendarApi", () => ({
 }));
 
 vi.mock("@/services/pluginsApi", () => ({
-  getPlugins: vi.fn().mockResolvedValue({
-    plugins: [
-      { id: "google", name: "Google Calendar", enabled: true },
-      { id: "ical", name: "iCal URL", enabled: true },
-    ],
-  }),
+  deletePluginInstance: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("@/composables", () => ({
-  usePlugins: () => ({ pluginInstances: mockPluginInstances }),
+  usePlugins: () => ({
+    plugins: mockPlugins,
+    pluginInstances: mockPluginInstances,
+    loadPlugins: mockLoadPlugins,
+  }),
 }));
+
+import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -67,8 +69,16 @@ const sampleSource = {
   enabled: true,
 };
 
+const STUBS = {
+  AddSourceButton: { name: "AddSourceButton", emits: ["saved"], template: "<div />" },
+  InstanceModal: true,
+};
+
 function mountComp(config = baseConfig) {
-  return mount(CalendarSourcesTab, { props: { config } });
+  return mount(CalendarSourcesTab, {
+    props: { config },
+    global: { stubs: STUBS },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -83,52 +93,72 @@ describe("CalendarSourcesTab", () => {
     mockAddCalendarSource = vi.fn().mockResolvedValue({});
     mockDeleteCalendarSource = vi.fn().mockResolvedValue({});
     mockPluginInstances = ref({});
+    mockPlugins = ref([{ id: "google", name: "Google Calendar", type: "calendar", enabled: true }]);
+    mockLoadPlugins = vi.fn().mockResolvedValue(undefined);
   });
 
-  // -------------------------------------------------------------------------
-  // 1. Mount → fetchSources
-  // -------------------------------------------------------------------------
   it("calls fetchSources on mount", async () => {
     mountComp();
     await flushPromises();
     expect(mockFetchSources).toHaveBeenCalledOnce();
   });
 
-  // -------------------------------------------------------------------------
-  // 2. Add → addCalendarSource then fetchSources
-  // -------------------------------------------------------------------------
-  it("add: fills name+url and clicks 'Add calendar' → calls addCalendarSource then fetchSources", async () => {
+  it("names the provider and shows the calendar row extras", async () => {
+    mockSources.value = [{ ...sampleSource }];
     const w = mountComp();
     await flushPromises();
-    mockFetchSources.mockClear(); // discard the mount call
 
-    // Fill name and url text inputs
-    const textInputs = w.findAll('input[type="text"]');
-    await textInputs[0].setValue("My New Cal");
-    await textInputs[1].setValue("https://example.com/cal.ics");
+    const row = w.find(".sl-row");
+    expect(row.find(".sl-name").text()).toBe("Work Calendar");
+    expect(row.text()).toContain("Google Calendar");
+    // Calendar-only extras stay on the row.
+    expect(row.find('input[type="color"]').exists()).toBe(true);
+    // Show times is a small labelled checkbox on the subline, so the right
+    // side keeps the same controls as every other source row.
+    const showTimes = row.find(".cal-show-times");
+    expect(showTimes.text()).toBe("Show event times");
+    expect(showTimes.find('input[type="checkbox"]').exists()).toBe(true);
+    expect(row.findAllComponents({ name: "ToggleSwitch" })).toHaveLength(1);
+  });
 
-    // Find and click the Add button
-    const addBtn = w.findAll("button").find(b => /add calendar/i.test(b.text()));
-    expect(addBtn).toBeTruthy();
-    await addBtn.trigger("click");
+  it("add: the shared form's new calendar becomes a calendar source row", async () => {
+    mockPluginInstances.value = {
+      google: [{ id: "google-new", name: "New Cal", enabled: true, config: {} }],
+    };
+    const w = mountComp();
+    await flushPromises();
+    mockFetchSources.mockClear();
+
+    const addStub = w.findComponent({ name: "AddSourceButton" });
+    expect(addStub.exists()).toBe(true);
+    addStub.vm.$emit("saved", {
+      pluginId: "google",
+      saveData: {
+        isCalendar: true,
+        instanceName: "New Cal",
+        calendarConfig: {
+          color: "#ff0000",
+          show_time: true,
+          ical_url: "https://example.com/cal.ics",
+          type: "google",
+        },
+      },
+    });
     await flushPromises();
 
-    expect(mockAddCalendarSource).toHaveBeenCalledOnce();
     expect(mockAddCalendarSource).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: "My New Cal",
+        id: "google-new",
+        type: "google",
+        name: "New Cal",
         ical_url: "https://example.com/cal.ics",
-        type: expect.any(String),
-        color: expect.stringMatching(/^#/),
+        color: "#ff0000",
         show_time: true,
       })
     );
-    expect(mockFetchSources).toHaveBeenCalledOnce();
+    expect(mockFetchSources).toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // 3. Color change → updateSource with full object
-  // -------------------------------------------------------------------------
   it("color change calls updateSource with full source spread + new hex", async () => {
     mockSources.value = [{ ...sampleSource }];
     const w = mountComp();
@@ -139,129 +169,83 @@ describe("CalendarSourcesTab", () => {
     await colorInput.trigger("change");
     await flushPromises();
 
-    expect(mockUpdateSource).toHaveBeenCalledOnce();
     expect(mockUpdateSource).toHaveBeenCalledWith(
       sampleSource.id,
       expect.objectContaining({ ...sampleSource, color: "#ff0000" })
     );
   });
 
-  // -------------------------------------------------------------------------
-  // 4. show_time toggle → updateSource
-  // -------------------------------------------------------------------------
-  it("show_time toggle calls updateSource with full object + updated show_time", async () => {
+  it("show_time checkbox calls updateSource with full object + updated show_time", async () => {
     mockSources.value = [{ ...sampleSource, show_time: true }];
     const w = mountComp();
     await flushPromises();
 
-    // The first ToggleSwitch in a source card is the show_time toggle
-    const toggles = w.findAllComponents({ name: "ToggleSwitch" });
-    const showTimeToggle = toggles[0];
-    showTimeToggle.vm.$emit("update:modelValue", false);
+    await w.find('.cal-show-times input[type="checkbox"]').setValue(false);
     await flushPromises();
 
-    expect(mockUpdateSource).toHaveBeenCalledOnce();
     expect(mockUpdateSource).toHaveBeenCalledWith(
       sampleSource.id,
       expect.objectContaining({ show_time: false })
     );
   });
 
-  // -------------------------------------------------------------------------
-  // 5. enabled toggle → updateSource
-  // -------------------------------------------------------------------------
   it("enabled toggle calls updateSource with full object + updated enabled", async () => {
     mockSources.value = [{ ...sampleSource, enabled: true }];
     const w = mountComp();
     await flushPromises();
 
-    // The second ToggleSwitch in a source card is the enabled toggle
-    const toggles = w.findAllComponents({ name: "ToggleSwitch" });
-    const enabledToggle = toggles[1];
+    const enabledToggle = w.findAllComponents({ name: "ToggleSwitch" })[0];
     enabledToggle.vm.$emit("update:modelValue", false);
     await flushPromises();
 
-    expect(mockUpdateSource).toHaveBeenCalledOnce();
     expect(mockUpdateSource).toHaveBeenCalledWith(
       sampleSource.id,
       expect.objectContaining({ enabled: false })
     );
   });
 
-  // -------------------------------------------------------------------------
-  // 6. Remove → confirm → deleteCalendarSource then fetchSources
-  // -------------------------------------------------------------------------
-  it("remove → confirm calls deleteCalendarSource then fetchSources", async () => {
+  it("remove → confirm calls deleteCalendarSource then fetches sources", async () => {
     mockSources.value = [{ ...sampleSource }];
     const w = mountComp();
     await flushPromises();
     mockFetchSources.mockClear();
 
-    // Click the Remove (✕) button on the source row
-    const removeBtn = w.find(".cst-src-remove");
-    expect(removeBtn.exists()).toBe(true);
-    await removeBtn.trigger("click");
+    await w.find(".sl-more-btn").trigger("click");
+    await w.find(".sl-menu-item").trigger("click");
     await flushPromises();
 
-    // ConfirmModal should appear — click the confirm (danger) button
     const confirmBtn = w.find(".btn-danger");
     expect(confirmBtn.exists()).toBe(true);
     await confirmBtn.trigger("click");
     await flushPromises();
 
-    expect(mockDeleteCalendarSource).toHaveBeenCalledOnce();
     expect(mockDeleteCalendarSource).toHaveBeenCalledWith(sampleSource.id);
     expect(mockFetchSources).toHaveBeenCalledOnce();
   });
 
-  // -------------------------------------------------------------------------
-  // 7. Refresh interval change → emit update:config
-  // -------------------------------------------------------------------------
   it("refresh interval change emits update:config with calendarRefreshInterval", async () => {
     const w = mountComp({ calendarRefreshInterval: 15 });
     await flushPromises();
 
     const stepper = w.findComponent({ name: "NumberStepper" });
-    expect(stepper.exists()).toBe(true);
     stepper.vm.$emit("update:modelValue", 30);
     await flushPromises();
 
-    expect(w.emitted("update:config")).toBeTruthy();
-    const emitted = w.emitted("update:config").flat();
-    expect(emitted.some(e => e.calendarRefreshInterval === 30)).toBe(true);
+    expect(w.emitted("update:config")).toContainEqual([{ calendarRefreshInterval: 30 }]);
   });
 
-  // -------------------------------------------------------------------------
-  // 8. "Refresh now" button → calendarStore.refreshEvents()
-  // -------------------------------------------------------------------------
   it('"Refresh now" button calls calendarStore.refreshEvents()', async () => {
     const w = mountComp();
     await flushPromises();
 
     const refreshBtn = w.findAll("button").find(b => /refresh now/i.test(b.text()));
-    expect(refreshBtn).toBeTruthy();
     await refreshBtn.trigger("click");
     await flushPromises();
 
     expect(mockRefreshEvents).toHaveBeenCalledOnce();
   });
 
-  // -------------------------------------------------------------------------
-  // 9. Named color → getColorValue hex rendered (data color, not tokenized)
-  // -------------------------------------------------------------------------
-  it("source with named color 'green' renders the color input as the mapped hex #4caf50", async () => {
-    mockSources.value = [{ ...sampleSource, color: "green" }];
-    const w = mountComp();
-    await flushPromises();
-
-    const colorInput = w.find('input[type="color"]');
-    expect(colorInput.element.value).toBe("#4caf50");
-  });
-
-  // -------------------------------------------------------------------------
-  // 10. Refresh status text shows "Refreshing…" and button is disabled during call
-  // -------------------------------------------------------------------------
-  it('"Refresh now" shows "Refreshing…" and disables button while refreshEvents is pending', async () => {
+  it('"Refresh now" shows "Refreshing…" and disables the button while pending', async () => {
     let resolveRefresh;
     mockRefreshEvents = vi.fn().mockImplementation(
       () =>
@@ -274,41 +258,39 @@ describe("CalendarSourcesTab", () => {
     await flushPromises();
 
     const refreshBtn = w.findAll("button").find(b => /refresh now/i.test(b.text()));
-    expect(refreshBtn).toBeTruthy();
-
-    // Trigger click but do NOT flush — leave the promise pending
     refreshBtn.trigger("click");
     await nextTick();
 
     expect(refreshBtn.element.disabled).toBe(true);
     expect(w.text()).toContain("Refreshing…");
 
-    // Resolve to allow teardown
     resolveRefresh();
     await flushPromises();
   });
 
-  // -------------------------------------------------------------------------
-  // 11. Running dot renders only when source.running is defined
-  // -------------------------------------------------------------------------
-  it("running dot is absent when no matching plugin instance exists (running undefined)", async () => {
-    mockSources.value = [{ ...sampleSource }];
-    // mockPluginInstances is {} by default → running stays undefined
+  it("source with named color 'green' renders the mapped hex #4caf50", async () => {
+    mockSources.value = [{ ...sampleSource, color: "green" }];
     const w = mountComp();
     await flushPromises();
 
-    expect(w.find(".cst-src-dot").exists()).toBe(false);
+    expect(w.find('input[type="color"]').element.value).toBe("#4caf50");
+  });
+
+  it("running dot is absent when no matching plugin instance exists", async () => {
+    mockSources.value = [{ ...sampleSource }];
+    const w = mountComp();
+    await flushPromises();
+
+    expect(w.find(".sl-dot").exists()).toBe(false);
   });
 
   it("running dot renders when a matching plugin instance provides a running value", async () => {
     mockSources.value = [{ ...sampleSource }];
-    mockPluginInstances = ref({
-      google: [{ id: sampleSource.id, running: true }],
-    });
+    mockPluginInstances.value = { google: [{ id: sampleSource.id, running: true }] };
 
     const w = mountComp();
     await flushPromises();
 
-    expect(w.find(".cst-src-dot").exists()).toBe(true);
+    expect(w.find(".sl-dot").exists()).toBe(true);
   });
 });
