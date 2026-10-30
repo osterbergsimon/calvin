@@ -482,7 +482,9 @@ describe("AllScreensSettings — timezone picker (CLV-46)", () => {
     });
 
   const timezonePill = w =>
-    w.findAllComponents({ name: "SelectPill" }).find(c => c.props("options")?.[0]?.value === "system");
+    w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("options")?.[0]?.value === "system");
 
   it("offers the engine's full IANA list in a searchable pill", () => {
     setSupportedValuesOf(() => ["Europe/Stockholm", "America/New_York", "Asia/Tokyo"]);
