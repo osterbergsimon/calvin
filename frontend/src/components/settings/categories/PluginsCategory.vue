@@ -140,6 +140,7 @@ import PluginManager from "../specialized/PluginManager.vue";
 import ConfirmModal from "../shared/ConfirmModal.vue";
 import { pluginKindKey } from "@/utils/pluginKind";
 import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
+import { errorDetailMessage } from "@/utils/apiErrors";
 import { isNewerVersion } from "@/utils/pluginVersions";
 
 // Use composables
@@ -604,7 +605,7 @@ const handleUpload = async event => {
     }, 5000);
   } catch (error) {
     console.error("Upload error:", error);
-    uploadError.value = error.response?.data?.detail || error.message || "Failed to upload image";
+    uploadError.value = errorDetailMessage(error, "Failed to upload image");
     setTimeout(() => {
       uploadError.value = "";
     }, 10000);

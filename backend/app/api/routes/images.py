@@ -241,7 +241,11 @@ async def get_image_thumbnail(image_id: str):
             },
         )
     except Exception as e:
-        raise ErrorResponse.internal_error("Failed to generate thumbnail", e)
+        raise ErrorResponse.internal_error(
+            "Could not generate the image thumbnail. Check the server logs for details.",
+            e,
+            code="thumbnail_failed",
+        )
 
 
 @router.post("/images/next")
@@ -339,7 +343,10 @@ async def upload_image(file: UploadFile = File(...)):
     # Upload to plugin service (will try first plugin that supports upload)
     uploaded_image = await plugin_image_service.upload_image(file_content, file.filename)
     if not uploaded_image:
-        raise ErrorResponse.internal_error("Failed to upload image: No plugin supports upload")
+        raise ErrorResponse.internal_error(
+            "Could not upload the image: no image plugin supports uploads.",
+            code="image_upload_unsupported",
+        )
 
     return {
         "message": "Image uploaded successfully",
