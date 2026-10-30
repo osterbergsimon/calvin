@@ -71,8 +71,9 @@ COPY --from=backend-builder /build/app /app/app
 COPY --from=backend-builder /build/alembic /app/alembic
 COPY --from=backend-builder /build/alembic.ini /app/alembic.ini
 
-# uv is what the plugin installer uses to pip-install plugin
-# dependencies into the venv at runtime (the uv venv has no pip).
+# uv is what the plugin installer and the entrypoint use to pip-install
+# plugin dependencies into the persistent target on the data volume (the
+# uv venv has no pip). The image venv is replaced on every image update.
 COPY --from=backend-builder /usr/local/bin/uv /usr/local/bin/uv
 
 # Built-in themes ship with the code (read from <backend>/data/themes, not
@@ -113,10 +114,11 @@ COPY docker/entrypoint.sh /usr/local/bin/calvin-entrypoint
 
 EXPOSE 8000
 
-# Generous start period: the entrypoint re-installs plugin packages (and
-# fixes appdata ownership) before the server starts, which can take a
-# while on a fresh container. Failures during it don't count, and the
-# first success ends it, so a fast start is still reported healthy fast.
+# Generous start period: on a fresh volume the entrypoint restores plugin
+# packages (and, as PUID/PGID, fixes appdata ownership) before the server
+# starts. Later starts find the persistent target current and skip that
+# network work. Failures during it don't count, and the first success ends
+# it, so a fast start is still reported healthy fast.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
     CMD curl -fsS http://localhost:8000/api/health || exit 1
 
