@@ -3,11 +3,7 @@
     <div class="modal-content instance-modal">
       <div class="modal-header">
         <h3>
-          {{
-            editingInstance
-              ? `Edit ${currentPlugin?.name || "Instance"}`
-              : `Add ${currentPlugin?.name || ""} ${instanceLabel}`
-          }}
+          {{ editingInstance ? `Edit ${editingInstance.name || instanceLabel}` : addTitle }}
         </h3>
         <IconButton variant="ghost" label="Close" @click="handleClose">×</IconButton>
       </div>
@@ -16,14 +12,13 @@
           {{ error }}
         </div>
         <form @submit.prevent="handleSave">
-          <!-- Instance Name -->
           <div class="form-group">
-            <label>Instance Name</label>
+            <label>Name</label>
             <input
               v-model="formData.name"
               type="text"
               class="form-input"
-              placeholder="Enter instance name"
+              :placeholder="namePlaceholder"
               required
             />
           </div>
@@ -70,9 +65,7 @@
           <!-- Fallback for plugins without instance_config_schema -->
           <template v-else>
             <div class="form-group">
-              <p class="help-text">
-                This plugin type does not support instance-specific configuration.
-              </p>
+              <p class="help-text">This plugin type has no settings of its own.</p>
             </div>
           </template>
 
@@ -112,7 +105,7 @@
           <div class="form-group">
             <label>
               <input v-model="formData.enabled" type="checkbox" />
-              Enable this instance
+              Enabled
             </label>
           </div>
 
@@ -144,17 +137,19 @@
 
 <script setup>
 import { ref, watch, computed } from "vue";
-
-const instanceLabelMap = {
-  calendar: "Calendar Source",
-  image: "Image Source",
-  backend: "Instance",
-  service: "Instance",
-};
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
+
+// Plain words: the form adds a source, never an "instance". The plugin's own
+// instance_label wins, then the kind's noun.
+const instanceLabelMap = {
+  calendar: "calendar source",
+  image: "photo source",
+  backend: "source",
+  service: "source",
+};
 
 const props = defineProps({
   show: {
@@ -191,9 +186,21 @@ const testStatus = ref(null);
 const geocoding = ref(false);
 const geocodeStatus = ref(null);
 
-const instanceLabel = computed(
-  () =>
-    currentPlugin.value?.instance_label || instanceLabelMap[currentPlugin.value?.type] || "Instance"
+const instanceLabel = computed(() => {
+  const plugin = currentPlugin.value;
+  return plugin?.instance_label || instanceLabelMap[plugin?.type] || "source";
+});
+
+// "Add Recipe list" when the plugin names its instances; otherwise "Add a source".
+const addTitle = computed(() => {
+  const declared = currentPlugin.value?.instance_label;
+  return declared ? `Add ${declared}` : `Add a ${instanceLabel.value}`;
+});
+
+const namePlaceholder = computed(() =>
+  currentPlugin.value?.instance_label
+    ? `e.g. ${currentPlugin.value.instance_label}`
+    : "e.g. Family photos"
 );
 
 // Config values are bare scalars (the backend normalizes legacy wrappers);
@@ -230,46 +237,6 @@ const hasGeocodeAction = computed(() => {
       currentPlugin.value.ui_actions.some(action => action.type === "geocode")
   );
 });
-
-// Watch for plugin/instance changes
-watch(
-  () => props.plugin,
-  newPlugin => {
-    if (newPlugin) {
-      currentPlugin.value = newPlugin;
-      initializeForm();
-    }
-  },
-  { immediate: true }
-);
-
-watch(
-  () => props.instance,
-  newInstance => {
-    editingInstance.value = newInstance;
-    if (newInstance) {
-      initializeForm();
-    }
-  },
-  { immediate: true }
-);
-
-watch(
-  () => props.show,
-  newShow => {
-    if (newShow) {
-      initializeForm();
-    } else {
-      // Reset on close
-      error.value = "";
-      saving.value = false;
-      testing.value = false;
-      testStatus.value = null;
-      geocoding.value = false;
-      geocodeStatus.value = null;
-    }
-  }
-);
 
 const initializeForm = async () => {
   if (!currentPlugin.value) return;
@@ -349,6 +316,47 @@ const initializeForm = async () => {
   formData.value = form;
   error.value = "";
 };
+
+// Watch for plugin/instance changes. These live below initializeForm: an
+// immediate watcher runs during setup, so calling a const declared later threw.
+watch(
+  () => props.plugin,
+  newPlugin => {
+    if (newPlugin) {
+      currentPlugin.value = newPlugin;
+      initializeForm();
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.instance,
+  newInstance => {
+    editingInstance.value = newInstance;
+    if (newInstance) {
+      initializeForm();
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => props.show,
+  newShow => {
+    if (newShow) {
+      initializeForm();
+    } else {
+      // Reset on close
+      error.value = "";
+      saving.value = false;
+      testing.value = false;
+      testStatus.value = null;
+      geocoding.value = false;
+      geocodeStatus.value = null;
+    }
+  }
+);
 
 const getFormValue = (key, schema) => {
   return configValueOrDefault(formData.value[key], schema);

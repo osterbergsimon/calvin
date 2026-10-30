@@ -10,7 +10,7 @@
         aria-hidden="true"
       />
       <span class="pc-name">{{ plugin.name }}</span>
-      <span class="pc-badge">{{ plugin.type }}</span>
+      <span class="pc-badge">{{ kindLabel }}</span>
       <span class="pc-spacer" />
       <ToggleSwitch
         v-if="!isCalendarProvider"
@@ -129,6 +129,7 @@
 <script setup>
 import { computed } from "vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { pluginKindLabel } from "@/utils/pluginKind";
 import PluginFieldRenderer from "../../PluginFieldRenderer.vue";
 import PluginActions from "../../PluginActions.vue";
 import PluginSections from "../../PluginSections.vue";
@@ -215,14 +216,16 @@ const emit = defineEmits([
 const instanceLabelMap = {
   calendar: "source",
   image: "source",
-  service: "instance",
-  backend: "instance",
+  service: "source",
+  backend: "source",
 };
 
 const instanceNoun = computed(
   () =>
-    props.plugin.instance_label?.toLowerCase() || instanceLabelMap[props.plugin.type] || "instance"
+    props.plugin.instance_label?.toLowerCase() || instanceLabelMap[props.plugin.type] || "source"
 );
+
+const kindLabel = computed(() => pluginKindLabel(props.plugin));
 
 const isCalendarProvider = computed(() => props.plugin.type === "calendar");
 
@@ -382,11 +385,9 @@ const handleInstanceOrderChange = newOrder =>
 .pc-badge {
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-family: var(--font-ui);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: 500;
   background: var(--bg-1);
   color: var(--ink-2);
   border: 1px solid var(--line);
