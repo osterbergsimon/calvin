@@ -10,7 +10,6 @@
         :available-plugins="availablePlugins"
         :error="pluginInstallError"
         :success="pluginInstallSuccess"
-        :requires-restart="pluginRequiresRestart"
         :branch-switched="pluginBranchSwitched"
         :actual-branch="pluginActualBranch"
         :dev-mode="configStore.devMode"
@@ -23,7 +22,6 @@
         @install-local="handleInstallLocal"
         @install-selected-local="handleInstallSelectedLocal"
         @force-update="handleForceUpdate"
-        @restart="handleRestart"
       />
     </SettingsSection>
 
@@ -122,7 +120,6 @@
 import { ref, computed, onMounted, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
-import { useSystem } from "@/composables";
 import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
 import { useNotificationsStore } from "@/stores/notifications";
@@ -147,7 +144,6 @@ const {
   availablePlugins,
   pluginInstallError,
   pluginInstallSuccess,
-  pluginRequiresRestart,
   pluginBranchSwitched,
   pluginActualBranch,
   expandedPlugins,
@@ -175,7 +171,6 @@ const {
   togglePlugin,
 } = usePlugins();
 
-const { restartBackend } = useSystem();
 const configStore = useConfigStore();
 const imagesStore = useImagesStore();
 const notificationsStore = useNotificationsStore();
@@ -239,11 +234,11 @@ const afterInstall = async installedIds => {
     .map(id => plugins.value.find(p => p.id === id))
     .filter(Boolean);
   if (installed.length === 0) {
-    if (installedIds?.length && pluginRequiresRestart.value) {
+    if (installedIds?.length) {
       notificationsStore.notify({
         severity: "info",
         eyebrow: "Plugins",
-        message: "Plugin installed — restart the backend to finish setting it up.",
+        message: "Plugin installed — reload this page if it does not appear.",
       });
     }
     return;
@@ -387,10 +382,6 @@ const handleInstallSelectedLocal = async ({ plugins: pluginsToInstall, localPath
     return;
   }
   await doInstall();
-};
-
-const handleRestart = async () => {
-  await restartBackend();
 };
 
 const handleToggleExpand = pluginId => {
