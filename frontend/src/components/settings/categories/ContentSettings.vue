@@ -9,7 +9,7 @@
       />
     </SettingsSection>
 
-    <SettingsSection id="content-calendar-display" title="Calendar display">
+    <SettingsSection id="content-calendar-display" title="Calendar basics">
       <SettingRow label="Week starts on" description="The first day shown in each calendar week.">
         <SelectPill
           :model-value="config.weekStartDay"
@@ -46,16 +46,6 @@
         />
       </SettingRow>
       <SettingRow
-        label="Show week numbers"
-        description="Shows the week number at the start of each week."
-      >
-        <ToggleSwitch
-          :model-value="config.showWeekNumbers"
-          aria-label="Show week numbers"
-          @update:model-value="v => emit('update:config', { showWeekNumbers: v })"
-        />
-      </SettingRow>
-      <SettingRow
         label="Time format"
         description="Whether event times are shown in 24-hour or 12-hour format."
       >
@@ -69,15 +59,6 @@
           @update:model-value="v => emit('update:config', { timeFormat: v })"
         />
       </SettingRow>
-      <SettingRow label="Events per day" :description="EVENTS_PER_DAY_DESCRIPTION">
-        <NumberStepper
-          :model-value="config.maxVisibleEvents"
-          :min="1"
-          :max="20"
-          aria-label="Events per day"
-          @update:model-value="v => emit('update:config', { maxVisibleEvents: v })"
-        />
-      </SettingRow>
       <SettingRow label="Highlight holidays" description="Marks public holidays on the calendar.">
         <ToggleSwitch
           :model-value="config.showRedDays"
@@ -88,7 +69,11 @@
     </SettingsSection>
 
     <SettingsSection id="content-photos" title="Photos">
-      <ImagesTab :highlight-id="highlightId" :highlight-provider="highlightProvider" />
+      <ImagesTab
+        :config="config"
+        :highlight-id="highlightId"
+        :highlight-provider="highlightProvider"
+      />
       <SettingRow label="Show each photo for">
         <NumberStepper
           :model-value="config.photoRotationInterval || 30"
@@ -98,24 +83,6 @@
           unit=" s"
           aria-label="Show each photo for, in seconds"
           @update:model-value="v => emit('update:config', { photoRotationInterval: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Fit photos" description="How a photo fills its space.">
-        <template v-if="isSmartFit" #description>
-          <p class="setting-row__desc">How a photo fills its space.</p>
-          <p class="content-hint">Smart picks Whole photo or Fill per photo.</p>
-        </template>
-        <SelectPill
-          :model-value="config.imageDisplayMode || 'smart'"
-          :options="[
-            { value: 'smart', label: 'Smart' },
-            { value: 'fit', label: 'Whole photo' },
-            { value: 'fill', label: 'Fill' },
-            { value: 'crop', label: 'Crop' },
-            { value: 'center', label: 'Centre' },
-          ]"
-          aria-label="Fit photos"
-          @update:model-value="v => emit('update:config', { imageDisplayMode: v })"
         />
       </SettingRow>
       <SettingRow label="Shuffle photos">
@@ -176,13 +143,8 @@ import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
 import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 
-// Kept out of the template: the quoted "+N more" would fight the formatter's
-// attribute quoting.
-const EVENTS_PER_DAY_DESCRIPTION = 'How many events fit in one day before it shows "+N more".';
-
 const props = defineProps({ config: { type: Object, required: true } });
 const emit = defineEmits(["update:config"]);
-
 const route = useRoute();
 
 // Plugins' "Used by n sources" links carry the provider id, so its rows pulse
@@ -193,8 +155,6 @@ const highlightProvider = computed(() =>
 const highlightId = computed(() =>
   typeof route?.query?.source === "string" ? route.query.source : ""
 );
-
-const isSmartFit = computed(() => (props.config.imageDisplayMode || "smart") === "smart");
 
 // Photo frame "Start after": the idle wait, in seconds. The store's default is
 // 300 s, so a missing value means 5 min (the old `|| 60` fallback showed 1 min
@@ -228,18 +188,5 @@ const photoFrameTimeoutOptions = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-}
-/* Slot content is in this component's scope, not SettingRow's. */
-.setting-row__desc {
-  margin: 0.2rem 0 0;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-.content-hint {
-  margin: 0.15rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-3);
 }
 </style>

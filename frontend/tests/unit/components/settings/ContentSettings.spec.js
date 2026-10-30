@@ -99,6 +99,16 @@ describe("ContentSettings", () => {
     expect(on.text()).toContain("Start after");
   });
 
+  it("labels Calendar basics without the moved display rows", () => {
+    const w = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
+    const section = w.find("#section-content-calendar-display");
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Calendar basics");
+    const labels = w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"));
+    expect(labels).not.toContain("Show week numbers");
+    expect(labels).not.toContain("Events per day");
+    expect(labels).not.toContain("Fit photos");
+  });
+
   it("describes the photo frame as the idle mode it is, and starts at 5 min", () => {
     const w = mount(ContentSettings, {
       props: { config: { ...baseConfig, photoFrameEnabled: true, photoFrameTimeout: undefined } },
@@ -133,28 +143,12 @@ describe("ContentSettings", () => {
     expect(w.emitted("update:config").some(c => c[0].photoFrameTimeout === 600)).toBe(true);
   });
 
-  it("labels the fit options the way a person reads them", () => {
+  it("no longer offers Fit photos in Content", () => {
     const w = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
     const fit = w
       .findAllComponents({ name: "SelectPill" })
       .find(c => c.props("ariaLabel") === "Fit photos");
-    expect(fit.props("options").map(o => o.label)).toEqual([
-      "Smart",
-      "Whole photo",
-      "Fill",
-      "Crop",
-      "Centre",
-    ]);
-  });
-
-  it("shows the Smart hint only while Smart is selected", () => {
-    const smart = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
-    expect(smart.text()).toContain("Smart picks Whole photo or Fill per photo.");
-    const crop = mount(ContentSettings, {
-      props: { config: { ...baseConfig, imageDisplayMode: "crop" } },
-      global: { stubs },
-    });
-    expect(crop.text()).not.toContain("Smart picks Whole photo or Fill per photo.");
+    expect(fit).toBeFalsy();
   });
 });
 
@@ -164,14 +158,11 @@ describe("ContentSettings copy (§3.1)", () => {
     w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
 
   const COPY = [
-    ["Events per day", 'How many events fit in one day before it shows "+N more".'],
     ["Highlight holidays", "Marks public holidays on the calendar."],
-    ["Show week numbers", "Shows the week number at the start of each week."],
     [
       "Photo frame when idle",
       "After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back.",
     ],
-    ["Fit photos", "How a photo fills its space."],
   ];
 
   it.each(COPY)("%s says exactly what it does", (label, description) => {

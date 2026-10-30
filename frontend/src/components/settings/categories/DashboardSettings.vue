@@ -18,6 +18,7 @@
         :open="editorOpen"
         :place-source="placement"
         :initial-page-id="initialPageId"
+        :initial-region-id="initialRegionId"
         @update:config="patch => emit('update:config', patch)"
         @close="closeEditor"
         @placed="handlePlaced"
@@ -279,6 +280,7 @@ import { normalizeDashboardScreens } from "@/utils/layout";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
+import { useRegionEditorRequest } from "@/composables/useRegionEditorRequest";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -293,12 +295,15 @@ const ROOM_NAME_DESCRIPTION = 'Shown in the clock bar, e.g. "Kitchen".';
 const editorOpen = ref(false);
 const route = useRoute();
 const { placement, clearPlacement } = usePlacementRequest();
+const { regionRequest, clearRegionRequest } = useRegionEditorRequest();
 
 // A placement link names the page the source already shows on; open the editor
 // on that page.
-const initialPageId = computed(() =>
-  typeof route?.query?.page === "string" ? route.query.page : null
-);
+const initialPageId = computed(() => {
+  if (regionRequest.value?.pageId) return regionRequest.value.pageId;
+  return typeof route?.query?.page === "string" ? route.query.page : null;
+});
+const initialRegionId = computed(() => regionRequest.value?.regionId || null);
 
 // "Put it on a page" arrives from Content: open the editor straight into place
 // mode instead of making the user hunt for the button.
@@ -310,13 +315,24 @@ watch(
   { immediate: true }
 );
 
+// A "Where it shows" line opens the editor on its page with the region selected.
+watch(
+  () => regionRequest.value,
+  next => {
+    if (next) editorOpen.value = true;
+  },
+  { immediate: true }
+);
+
 const closeEditor = () => {
   editorOpen.value = false;
   clearPlacement();
+  clearRegionRequest();
 };
 
 const handlePlaced = () => {
   clearPlacement();
+  clearRegionRequest();
 };
 const screenSummary = computed(() => {
   const screens = normalizeDashboardScreens(props.config.dashboardScreens).screens;

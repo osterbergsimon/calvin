@@ -24,6 +24,13 @@
       @upload="openUpload"
     />
 
+    <WhereItShows
+      kind="photos"
+      title="photos"
+      :config="config"
+      :sources="rows.map(row => ({ id: row.id, name: row.name }))"
+    />
+
     <PhotoUpload ref="photoUpload" />
 
     <InstanceModal
@@ -45,12 +52,17 @@ import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
 import PhotoUpload from "@/components/settings/tabs/content/PhotoUpload.vue";
+import WhereItShows from "@/components/settings/specialized/WhereItShows.vue";
 import { buildSourceRow } from "@/utils/instanceSummary";
 import { logError } from "@/utils/logger";
 
 // Every photo source in one list, in the order photos rotate (§3.1). Local
 // uploads are a source like any other; the picker offers them first.
 defineProps({
+  config: {
+    type: Object,
+    default: () => ({}),
+  },
   highlightId: {
     type: String,
     default: "",

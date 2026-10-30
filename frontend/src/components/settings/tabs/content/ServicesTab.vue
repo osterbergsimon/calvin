@@ -41,6 +41,13 @@
 
     <AddSourceButton ref="addButton" kind="services" @saved="handleSaved" />
 
+    <WhereItShows
+      kind="service"
+      title="web pages & apps"
+      :config="config"
+      :sources="rows.map(row => ({ id: row.id, name: row.name }))"
+    />
+
     <InstanceModal
       :show="showModal"
       :plugin="editingPlugin"
@@ -60,6 +67,7 @@ import * as pluginsApi from "@/services/pluginsApi";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
+import WhereItShows from "@/components/settings/specialized/WhereItShows.vue";
 import { buildSourceRow } from "@/utils/instanceSummary";
 import { pageNamesLabel, pagesUsingService } from "@/utils/placement";
 import { logError } from "@/utils/logger";

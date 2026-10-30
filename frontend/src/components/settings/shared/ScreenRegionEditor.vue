@@ -411,7 +411,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import { getKioskId } from "@/utils/kioskId";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
-import { findPlaceableRegion, placeServiceInRegion } from "@/utils/placement";
+import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
@@ -453,6 +453,8 @@ const props = defineProps({
   placeSource: { type: Object, default: null },
   // Open on this page (a placement link names the page it lives on).
   initialPageId: { type: String, default: null },
+  // Open with this region selected ("Where it shows" lines from Content).
+  initialRegionId: { type: String, default: null },
 });
 const emit = defineEmits(["update:config", "close", "placed", "place-cancel"]);
 
@@ -852,11 +854,11 @@ const describeRegion = region => {
 
 const commitPlacement = regionId => {
   if (!props.placeSource) return;
-  const next = placeServiceInRegion(
-    configValue.value.dashboardScreens,
-    props.placeSource.id,
-    regionId
-  );
+  const kind = props.placeSource.kind;
+  const next =
+    kind && kind !== "service"
+      ? placeKindInRegion(configValue.value.dashboardScreens, kind, regionId)
+      : placeServiceInRegion(configValue.value.dashboardScreens, props.placeSource.id, regionId);
   emit("update:config", { dashboardScreens: next });
   replaceTarget.value = null;
   emit("placed", props.placeSource.id);
@@ -880,11 +882,22 @@ const confirmReplace = () => {
   if (replaceTarget.value) commitPlacement(replaceTarget.value.regionId);
 };
 
-// A placement link names the page the source is on: open the editor there.
+// A placement link names the page the source is on: open the editor there. A
+// "Where it shows" line also names the region, so open its inspector too.
 watch(
   () => props.open,
-  open => {
-    if (open && props.initialPageId) selectScreen(props.initialPageId);
+  async open => {
+    if (open && props.initialPageId) {
+      selectScreen(props.initialPageId);
+      await nextTick();
+    }
+    if (open && props.initialRegionId) {
+      const exists = getPathById(activeScreen.value.layout, props.initialRegionId);
+      if (exists) {
+        selectedRegionId.value = props.initialRegionId;
+        if (isPhone.value) sheetOpen.value = true;
+      }
+    }
     if (!open) replaceTarget.value = null;
   }
 );
