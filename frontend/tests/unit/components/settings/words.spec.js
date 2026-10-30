@@ -57,7 +57,10 @@ describe("Settings words: a source, not an instance", () => {
   });
 
   it("counts sources on a card with providers", () => {
-    const w = mountCard(service(), [{ id: "a", running: true }, { id: "b", running: true }]);
+    const w = mountCard(service(), [
+      { id: "a", running: true },
+      { id: "b", running: true },
+    ]);
     expect(w.find(".pc-summary").text()).toBe("2 sources · 2/2 running");
   });
 
@@ -82,7 +85,10 @@ describe("Settings words: the source modal", () => {
 
   it("titles the add form with the plugin's own label", () => {
     const w = mountModal(
-      service({ instance_config_schema: { url: { type: "string" } }, instance_label: "Recipe list" })
+      service({
+        instance_config_schema: { url: { type: "string" } },
+        instance_label: "Recipe list",
+      })
     );
     expect(w.find(".modal-header h3").text()).toBe("Add Recipe list");
     expect(w.find('input[type="text"]').attributes("placeholder")).toBe("e.g. Recipe list");
