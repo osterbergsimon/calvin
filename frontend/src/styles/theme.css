@@ -8,17 +8,30 @@
   --line-soft: #e8edf1;
   --ink: #1b242b;
   --ink-2: #5d6b75;
-  --ink-3: #93a0a9;
+  --ink-3: #636e77;
   /* Accent that drives the focus-light + all shell highlights. Themeable:
      useTheme sets --focus from the selected theme's accent; the edge/glow are
      derived from it so a theme only needs to change --focus. */
   --focus: #e08a1e;
-  --focus-ink: #ffffff;
+  /* Text and glyphs that sit ON a solid tone fill. `--*-ink` is the readable
+     ink for each filled tone (button, badge, toggle knob, active tab) and
+     `--*-text` is the readable ink when the tone itself is used as TEXT on a
+     surface. The theme contrast test pins both to WCAG AA in every theme and
+     mode, so components never pick a colour for a tone by hand.
+     One pair per tone: focus, ok, warn, err. */
+  --focus-ink: #1b242b;
+  --focus-text: #875c24;
+  --ok: #2e9e6b;
+  --ok-ink: #1b242b;
+  --ok-text: #25674e;
+  --warn: #c8860a;
+  --warn-ink: #1b242b;
+  --warn-text: #7a5a19;
+  --err: #c0392b;
+  --err-ink: #ffffff;
+  --err-text: #76302b;
   --focus-glow: color-mix(in srgb, var(--focus) 36%, transparent);
   --focus-edge: color-mix(in srgb, var(--focus) 75%, transparent);
-  --ok: #2e9e6b;
-  --warn: #c8860a;
-  --err: #c0392b;
   --shadow: rgba(0, 0, 0, 0.1);
   --shadow-hover: rgba(0, 0, 0, 0.15);
 
@@ -35,7 +48,8 @@
 
   /* switch knob tokens */
   --switch-knob: #cdd6dc;
-  --switch-knob-on: #ffffff;
+  /* Knob on the "on" track: the track is --focus, so it takes the tone ink. */
+  --switch-knob-on: var(--focus-ink);
 
   /* ------------------------------------------------------------------ *
    * UI sizing tokens. See docs/design/2026-07-04-ui-sizing-tokens.md.
@@ -84,6 +98,7 @@
   --space-3xl: 1.5rem;
 
   /* Type scale */
+  --fs-3xs: 0.6rem; /* dense calendar chrome (week spine, ribbon times) */
   --fs-micro: 0.72rem;
   --fs-2xs: 0.75rem;
   --fs-xs: 0.8rem;
@@ -140,6 +155,28 @@
   --device-highlight: rgba(255, 255, 255, 0.06);
   --device-highlight-soft: rgba(255, 255, 255, 0.04);
   --device-inset: rgba(0, 0, 0, 0.5);
+  /* Ink drawn on the mockup's screen, i.e. on --device-screen. */
+  --device-ink: #f0f4f8;
+  --device-ink-2: rgba(240, 244, 248, 0.55);
+
+  /* ------------------------------------------------------------------ *
+   * Non-themed surfaces. These are NOT theme surfaces: they sit over user
+   * content (photos, embeds, QR codes) or outside the UI (mask stops), and
+   * must stay legible/predictable whatever theme is selected. They live here
+   * rather than in the per-theme palettes on purpose.
+   * ------------------------------------------------------------------ */
+  /* Fullscreen photo/film backdrop and the scrim gradients drawn on it. */
+  --scrim-solid: #000000;
+  --scrim-strong: rgba(0, 0, 0, 0.75);
+  --on-scrim: #ffffff;
+  /* Calendar chips are painted in a user-chosen calendar colour, so their
+     ink and separators are fixed light-on-colour (see CalendarEventItem). */
+  --on-event-ink: #ffffff;
+  --on-event-edge: color-mix(in srgb, var(--on-event-ink) 30%, transparent);
+  /* QR codes are read by cameras: always dark modules on a light quiet zone. */
+  --qr-surface: #ffffff;
+  /* mask-image needs a fully opaque stop; it is alpha, not colour. */
+  --mask-opaque: #000000;
 }
 
 .dark {
@@ -151,14 +188,21 @@
   --line-soft: #1e272e;
   --ink: #eaf0f3;
   --ink-2: #9aa7b0;
-  --ink-3: #62707a;
+  --ink-3: #818d96;
   --focus: #f3b052;
-  --focus-ink: #1a130a;
+  --focus-ink: #151c21;
+  --focus-text: #efcd9a;
   --focus-glow: color-mix(in srgb, var(--focus) 32%, transparent);
   --focus-edge: color-mix(in srgb, var(--focus) 68%, transparent);
   --ok: #5bd0a0;
+  --ok-ink: #151c21;
+  --ok-text: #9bdec5;
   --warn: #f3b052;
+  --warn-ink: #151c21;
+  --warn-text: #efcd9a;
   --err: #ef6b5e;
+  --err-ink: #151c21;
+  --err-text: #eda7a1;
   --shadow: rgba(0, 0, 0, 0.3);
   --shadow-hover: rgba(0, 0, 0, 0.4);
 }
