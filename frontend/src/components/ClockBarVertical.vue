@@ -70,7 +70,7 @@
     </div>
 
     <div class="clock-bar-bottom">
-      <PluginStatusbarItems v-if="showStatusbar" orientation="vertical" :size="pluginItemSize" />
+      <PluginStatusbarItems orientation="vertical" :size="pluginItemSize" />
 
       <BarActionCluster v-if="!previewMode" class="clock-bar-actions" :compact="true" />
     </div>
@@ -139,7 +139,6 @@ const props = defineProps({
 const {
   shouldShow,
   showDate,
-  showStatusbar,
   formattedTime,
   compactTimeParts,
   formattedDate,

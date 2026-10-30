@@ -34,6 +34,19 @@ describe("settings registry", () => {
     expect(defaultSettingsCategoryId).toBe("content");
   });
 
+  it("resolves the Plugins deep links the Content picker sends", () => {
+    // "Get more in Plugins ›" and "See details in Plugins ›" both navigate with
+    // ?setting=plugins-install; without a destination they opened no category.
+    expect(getSettingDestinationById("plugins-install")).toMatchObject({
+      category: "plugins",
+      section: "plugins-install",
+    });
+    expect(getSettingDestinationById("plugins-installed")).toMatchObject({
+      category: "plugins",
+      section: "plugins-installed",
+    });
+  });
+
   it("keeps the destination ids stable", () => {
     expect(settingsDestinations.map(destination => destination.id)).toEqual([
       "screens-default",
@@ -51,6 +64,8 @@ describe("settings registry", () => {
       "content-services",
       "content-clock-bar",
       "plugins",
+      "plugins-install",
+      "plugins-installed",
       "plugins-services",
       "kiosks",
       "kiosks-software",

@@ -43,6 +43,8 @@
         :uploading="uploading"
         :upload-error="uploadError"
         :upload-success="uploadSuccess"
+        :latest-version="(latestVersions || {})[plugin.id] || ''"
+        :updating="updatingPlugin === plugin.id"
         @toggle-expand="handleToggleExpand"
         @toggle-enabled="handleToggleEnabled"
         @uninstall="handleUninstall"
@@ -54,6 +56,7 @@
         @used-by="pluginId => emit('used-by', pluginId)"
         @add-source="pluginId => emit('add-source', pluginId)"
         @open-appearance="emit('open-appearance')"
+        @update="pluginId => emit('update', pluginId)"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
       />
@@ -137,6 +140,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // plugin id -> newer catalog version (§3.3).
+  latestVersions: {
+    type: Object,
+    default: () => ({}),
+  },
+  updatingPlugin: {
+    type: String,
+    default: "",
+  },
 });
 
 const emit = defineEmits([
@@ -152,6 +164,7 @@ const emit = defineEmits([
   "used-by",
   "add-source",
   "open-appearance",
+  "update",
   "upload",
   "delete-image",
 ]);

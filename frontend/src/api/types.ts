@@ -2282,6 +2282,8 @@ export interface components {
       photoFrameTimeout?: number | null;
       /** Photorotationinterval */
       photoRotationInterval?: number | null;
+      /** Plugincatalogrepo */
+      pluginCatalogRepo?: string | null;
       /** Randomizeimages */
       randomizeImages?: boolean | null;
       /** Rebootcomboduration */

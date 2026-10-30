@@ -22,16 +22,6 @@
           @update:model-value="v => emit('update:config', { clockBarShowLogo: v })"
         />
       </SettingRow>
-      <SettingRow
-        label="Show plugin info"
-        description="Weather and other plugin readouts. Turn each on in its own settings."
-      >
-        <ToggleSwitch
-          :model-value="config.clockBarShowPluginItems !== false"
-          aria-label="Show plugin info"
-          @update:model-value="v => emit('update:config', { clockBarShowPluginItems: v })"
-        />
-      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="clock-bar-layout" title="Clock bar layout">
