@@ -20,6 +20,7 @@ PATH_ENV_VARS = (
     "BACKUP_DIR",
     "CALVIN_HOST_CONTROL",
     "CALVIN_DEPLOYMENT",
+    "PLUGIN_CATALOG_REPO",
 )
 
 
@@ -37,6 +38,23 @@ def test_plugins_dir_honors_plugin_dir_env(monkeypatch, tmp_path):
     target = tmp_path / "vol-plugins"
     monkeypatch.setenv("PLUGIN_DIR", str(target))
     assert Settings(_env_file=None).plugins_dir == target
+
+
+def test_plugin_catalog_repo_defaults_to_the_official_catalog(monkeypatch):
+    # The provider picker and Plugins › Install list the catalog on open, so a
+    # fresh install must have one without configuration (CLV-45, §6).
+    monkeypatch.delenv("PLUGIN_CATALOG_REPO", raising=False)
+    assert (
+        Settings(_env_file=None).plugin_catalog_repo
+        == "https://github.com/osterbergsimon/calvin-plugins"
+    )
+
+
+def test_plugin_catalog_repo_honors_env(monkeypatch):
+    monkeypatch.setenv("PLUGIN_CATALOG_REPO", "https://github.com/someone/catalog-mirror")
+    assert (
+        Settings(_env_file=None).plugin_catalog_repo == "https://github.com/someone/catalog-mirror"
+    )
 
 
 def test_plugins_dir_honors_plugins_dir_env(monkeypatch, tmp_path):

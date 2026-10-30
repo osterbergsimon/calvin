@@ -14,6 +14,13 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 # was read (app.utils.legacy_data migrates it when the root moves).
 LEGACY_DATA_DIR = BACKEND_DIR / "data"
 
+# The official add-on catalog (the calvin-plugins repository). Plugins ›
+# Install lists it on open and the Content provider picker may install from it
+# (design 2026-10-30-content-and-plugins §3.3/§3.7); PLUGIN_CATALOG_REPO
+# overrides it. The picker only ever installs from this one catalog: another
+# repository is a deliberate visit in Plugins, never a one-click add.
+DEFAULT_PLUGIN_CATALOG_REPO = "https://github.com/osterbergsimon/calvin-plugins"
+
 # Path settings that default to <data_dir>/<default> unless set explicitly.
 _DATA_PATHS = (
     "log_dir",
@@ -99,6 +106,10 @@ class Settings(BaseSettings):
 
     # Installed (uploaded) themes. Built-in themes ship with the code.
     themes_dir: Path = Path("themes")
+
+    # The repository Plugins › Install and the Content provider picker treat as
+    # the add-on catalog. Defaults to the official calvin-plugins repo.
+    plugin_catalog_repo: str = DEFAULT_PLUGIN_CATALOG_REPO
 
     # Photo Frame Mode
     photo_frame_enabled: bool = False

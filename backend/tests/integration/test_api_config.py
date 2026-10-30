@@ -77,6 +77,7 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "consoleLogLevel",
         "configPollInterval",
         "devMode",
+        "pluginCatalogRepo",
     }
     response = test_client.get("/api/config")
     assert response.status_code == 200
@@ -123,6 +124,27 @@ def test_ui_size_defaults_and_round_trips(test_client: TestClient):
     persisted = test_client.get("/api/config")
     assert persisted.status_code == 200
     assert persisted.json().get("uiSize") == "large"
+
+
+@pytest.mark.integration
+def test_plugin_catalog_repo_defaults_and_round_trips(test_client: TestClient):
+    """The add-on catalog is served as camelCase and persists as snake_case (§6)."""
+    default = test_client.get("/api/config")
+    assert default.status_code == 200
+    assert (
+        default.json().get("pluginCatalogRepo")
+        == "https://github.com/osterbergsimon/calvin-plugins"
+    )
+
+    update = test_client.post(
+        "/api/config", json={"pluginCatalogRepo": "https://github.com/someone/mirror"}
+    )
+    assert update.status_code == 200
+    assert update.json().get("pluginCatalogRepo") == "https://github.com/someone/mirror"
+
+    persisted = test_client.get("/api/config")
+    assert persisted.status_code == 200
+    assert persisted.json().get("pluginCatalogRepo") == "https://github.com/someone/mirror"
 
 
 @pytest.mark.integration

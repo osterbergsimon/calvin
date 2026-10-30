@@ -27,6 +27,7 @@ Declared as a class attribute; validated by Pydantic at class-definition time
 | `type_id` | `str`, required | Unique plugin type id. Keep it equal to `plugin.json` `id`: the `calvin-plugins` validator checks this, though the host itself does not cross-check. |
 | `name` | `str`, required | Human-readable name. |
 | `description` | `str \| None` | One-line description. |
+| `icon` | `str \| None` | Optional tile icon (CLV-45): an emoji (`"🖼"`) or a file in the plugin's own `frontend/` dir (`"icon.svg"`, served from `/api/plugins/{id}/static/`). Absent → the UI shows the plugin name's first letter. Optional addition to contract 1.0 — plugins that never set it load unchanged. |
 | `version` | `str = "1.0.0"` | Release label (not a contract signal — that's `api_version` in `plugin.json`). |
 | `supports_multiple_instances` | `bool = True` | `False` for single-instance plugins. |
 | `instance_label` | `str \| None` | Noun for one instance in the settings UI (e.g. `"Server"`). |
