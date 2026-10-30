@@ -86,13 +86,15 @@
         <template #label-extra><ScopeChip /></template>
         <template #description>
           <p class="setting-row__desc">
-            When you tap a text field. Auto shows it on touchscreens.
-            <template v-if="oskMode === 'auto' && oskHardwareSeen">
-              Hidden here because a keyboard was used.
-              <button type="button" class="device-osk-show-again" @click="showOskAgain">
-                Show it again
-              </button>
-            </template>
+            <span>{{ oskDescription }}</span>
+            <button
+              v-if="oskMode === 'auto' && oskHardwareSeen"
+              type="button"
+              class="device-osk-show-again"
+              @click="showOskAgain"
+            >
+              Show it again
+            </button>
           </p>
         </template>
         <SegmentedControl
@@ -264,6 +266,16 @@ const oskSetting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-os
 const oskMode = computed(() => oskSetting.value.value || "auto");
 const { seen: oskHardwareSeen, forget: forgetOskHardware } = useOskHardwareSeen();
 const oskLiveMessage = ref("");
+// Each mode says what it will actually do here, including the fallback after a
+// real keyboard was used (CLV-27 §6) — the row's value alone can't say that.
+const oskDescription = computed(() => {
+  if (oskMode.value === "on") return "Shows whenever you tap a text field.";
+  if (oskMode.value === "off") {
+    return "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it.";
+  }
+  if (oskHardwareSeen.value) return "Hidden here because a keyboard was used.";
+  return "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen.";
+});
 const setOskMode = value => oskSetting.set(value);
 const showOskAgain = () => {
   forgetOskHardware();

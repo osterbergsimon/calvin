@@ -347,7 +347,9 @@ describe("DeviceSettings", () => {
     it("describes Auto before anything was learned", () => {
       const wrapper = mountRow("auto");
 
-      expect(wrapper.text()).toContain("When you tap a text field. Auto shows it on touchscreens.");
+      expect(wrapper.text()).toContain(
+        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
+      );
       expect(wrapper.find(".device-osk-show-again").exists()).toBe(false);
     });
 
@@ -358,12 +360,10 @@ describe("DeviceSettings", () => {
       expect(wrapper.find(".device-osk-show-again").text()).toBe("Show it again");
     });
 
-    it("uses the same honest description for Always and Never", () => {
-      expect(mountRow("on").text()).toContain(
-        "When you tap a text field. Auto shows it on touchscreens."
-      );
+    it("describes Always and Never", () => {
+      expect(mountRow("on").text()).toContain("Shows whenever you tap a text field.");
       expect(mountRow("off").text()).toContain(
-        "When you tap a text field. Auto shows it on touchscreens."
+        "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it."
       );
     });
 
@@ -381,7 +381,9 @@ describe("DeviceSettings", () => {
       await wrapper.find(".device-osk-show-again").trigger("click");
 
       expect(window.localStorage.getItem("calvin-osk-hardware-seen")).toBeNull();
-      expect(wrapper.text()).toContain("When you tap a text field. Auto shows it on touchscreens.");
+      expect(wrapper.text()).toContain(
+        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
+      );
       expect(wrapper.find(".device-live").text()).toBe("On-screen keyboard will show again.");
     });
   });
