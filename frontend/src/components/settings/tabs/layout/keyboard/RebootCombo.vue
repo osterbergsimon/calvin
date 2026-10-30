@@ -137,21 +137,21 @@ const onDuration = secs => {
 .rc-key-cap {
   font-family: var(--font-data);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   color: var(--ink);
 }
 .rc-key-hint {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   color: var(--ink-2);
 }
 .rc-plus {
   color: var(--ink-3);
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
 }
 .rc-warn {
   margin: 12px 0 0;
-  font-size: 0.8rem;
-  color: var(--warn);
+  font-size: var(--fs-xs);
+  color: var(--warn-text);
 }
 .rc-duration {
   display: flex;
@@ -160,6 +160,6 @@ const onDuration = secs => {
 }
 .rc-dur-unit {
   color: var(--ink-2);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 </style>

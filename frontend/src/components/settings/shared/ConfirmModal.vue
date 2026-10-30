@@ -74,7 +74,7 @@ const handleCancel = () => {
 
 .modal-content {
   background: var(--bg-1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 4px 20px color-mix(in srgb, var(--ink) 30%, transparent);
   max-width: 500px;
   width: 90%;
@@ -97,7 +97,7 @@ const handleCancel = () => {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--ink);
 }
@@ -126,8 +126,8 @@ const handleCancel = () => {
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -149,8 +149,8 @@ const handleCancel = () => {
   background: var(--focus);
   color: var(--focus-ink);
   border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -171,17 +171,17 @@ const handleCancel = () => {
   padding: 0.5rem 1rem;
   min-height: var(--touch-target);
   background: var(--err);
-  color: white;
+  color: var(--err-ink);
   border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-danger:hover {
-  background: color-mix(in srgb, var(--err) 85%, black);
+  background: color-mix(in srgb, var(--err) 88%, var(--ink));
   transform: translateY(-1px);
   box-shadow: 0 2px 4px color-mix(in srgb, var(--err) 30%, transparent);
 }

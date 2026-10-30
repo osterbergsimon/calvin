@@ -70,11 +70,11 @@ const toggle = () => {
 .collapsible-settings-section__chevron {
   margin-top: 0.75rem;
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 .settings-section__eyebrow {
   font-family: var(--font-data);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -83,7 +83,7 @@ const toggle = () => {
 .settings-section__panel {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
 }
 </style>

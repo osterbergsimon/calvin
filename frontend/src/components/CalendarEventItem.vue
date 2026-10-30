@@ -10,7 +10,7 @@
       'event-middle': event._isMiddle,
       'event-multi-day': event._isMultiDay,
     }"
-    :style="{ backgroundColor: eventColor }"
+    :style="{ backgroundColor: eventColor, '--on-event': eventInk }"
     :title="eventTitle"
     tabindex="0"
     @click="handleClick"
@@ -61,7 +61,8 @@ const props = defineProps({
 
 const emit = defineEmits(["click", "focus"]);
 
-const { getEventColor, getEventTitle, getEventDisplayText, truncateEventTitle } = useEventHelpers();
+const { getEventColor, getEventInk, getEventTitle, getEventDisplayText, truncateEventTitle } =
+  useEventHelpers();
 
 const eventItemRef = ref(null);
 
@@ -75,6 +76,7 @@ defineExpose({
 
 // Computed properties
 const eventColor = computed(() => getEventColor(props.event));
+const eventInk = computed(() => getEventInk?.(props.event) || "var(--on-event-ink)");
 const eventTitle = computed(() => getEventTitle(props.event));
 const displayText = computed(() => getEventDisplayText(props.event));
 const truncatedTitle = computed(() => truncateEventTitle(props.event.title, 15));
@@ -94,10 +96,10 @@ const handleFocus = () => {
 
 <style scoped>
 .event-item {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   padding: 0.25rem 0.5rem;
-  border-radius: clamp(2px, 0.3vw, 4px);
-  color: #fff;
+  border-radius: var(--radius-xs);
+  color: var(--on-event, var(--on-event-ink));
   white-space: normal;
   overflow-wrap: break-word;
   word-wrap: break-word;
@@ -122,27 +124,27 @@ const handleFocus = () => {
 /* Multi-day events get special styling via event-start, event-end, event-middle classes */
 
 .event-item.event-start {
-  border-top-left-radius: clamp(2px, 0.3vw, 4px);
-  border-bottom-left-radius: clamp(2px, 0.3vw, 4px);
+  border-top-left-radius: var(--radius-xs);
+  border-bottom-left-radius: var(--radius-xs);
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
   /* Reduce negative margin to prevent grid expansion */
   margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
-  border-right: 1px dashed rgba(255, 255, 255, 0.3);
+  border-right: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margin doesn't cause cell expansion */
   position: relative;
 }
 
 .event-item.event-end {
-  border-top-right-radius: clamp(2px, 0.3vw, 4px);
-  border-bottom-right-radius: clamp(2px, 0.3vw, 4px);
+  border-top-right-radius: var(--radius-xs);
+  border-bottom-right-radius: var(--radius-xs);
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
   /* Reduce negative margin to prevent grid expansion */
   margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
-  border-left: 1px dashed rgba(255, 255, 255, 0.3);
+  border-left: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margin doesn't cause cell expansion */
   position: relative;
 }
@@ -153,8 +155,8 @@ const handleFocus = () => {
   margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   z-index: 1;
-  border-left: 1px dashed rgba(255, 255, 255, 0.3);
-  border-right: 1px dashed rgba(255, 255, 255, 0.3);
+  border-left: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margins don't cause cell expansion */
   position: relative;
 }
@@ -204,18 +206,18 @@ const handleFocus = () => {
 }
 
 .event-item:focus {
-  outline: 2px solid #fff; /* Keep white for contrast on colored event backgrounds */
+  outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
-  border-color: #fff; /* Keep white for contrast on colored event backgrounds */
+  border-color: var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 2px var(--focus);
   z-index: 10;
   position: relative;
 }
 
 .event-item.focused {
-  outline: 2px solid #fff; /* Keep white for contrast on colored event backgrounds */
+  outline: 2px solid var(--on-event, var(--on-event-ink));
   outline-offset: -2px;
-  border-color: #fff; /* Keep white for contrast on colored event backgrounds */
+  border-color: var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 2px var(--focus);
   z-index: 10;
   position: relative;
@@ -228,14 +230,14 @@ const handleFocus = () => {
 }
 
 .event-item.selected {
-  border: 2px solid #fff;
+  border: 2px solid var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 80%, transparent);
 }
 
 /* Responsive styles for smaller screens and portrait mode */
 @media (max-width: 768px), (orientation: portrait) {
   .event-item {
-    font-size: clamp(0.55rem, 1.5vw, 0.75rem);
+    font-size: clamp(var(--fs-3xs), 1.5vw, var(--fs-2xs));
     padding: clamp(0.1rem, 0.5vw, 0.25rem) clamp(0.2rem, 0.75vw, 0.5rem);
     line-height: 1.2;
   }
@@ -261,7 +263,7 @@ const handleFocus = () => {
 /* Extra small screens - more aggressive scaling */
 @media (max-width: 480px) {
   .event-item {
-    font-size: clamp(0.5rem, 1.8vw, 0.65rem);
+    font-size: clamp(var(--fs-3xs), 1.8vw, var(--fs-micro));
     padding: clamp(0.05rem, 0.5vw, 0.15rem) clamp(0.15rem, 0.75vw, 0.35rem);
   }
 
@@ -286,7 +288,7 @@ const handleFocus = () => {
 /* Portrait mode with limited height - ensure everything fits */
 @media (orientation: portrait) and (max-height: 800px) {
   .event-item {
-    font-size: clamp(0.5rem, 1.8vh, 0.65rem);
+    font-size: clamp(var(--fs-3xs), 1.8vh, var(--fs-micro));
     padding: clamp(0.05rem, 0.5vh, 0.15rem) clamp(0.15rem, 0.75vh, 0.35rem);
   }
 
@@ -311,7 +313,7 @@ const handleFocus = () => {
 /* Very small portrait screens - maximum compression */
 @media (orientation: portrait) and (max-height: 600px) {
   .event-item {
-    font-size: 0.5rem;
+    font-size: var(--fs-3xs);
     padding: 0.05rem 0.15rem;
   }
 

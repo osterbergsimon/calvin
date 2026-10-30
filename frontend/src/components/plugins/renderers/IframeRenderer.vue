@@ -146,25 +146,25 @@ onUnmounted(clearTimer);
   margin: 0 0 0.75rem 0;
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 700;
 }
 
 .iframe-renderer__error-content p {
   margin: 0.4rem 0;
   color: var(--ink-2);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
 }
 
 .iframe-renderer__url {
   font-family: var(--font-data);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   word-break: break-all;
   color: var(--ink-2);
   background: var(--bg-2);
   border: 1px solid var(--line-soft);
   padding: 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   margin: 1rem 0;
 }
 
@@ -177,9 +177,9 @@ onUnmounted(clearTimer);
 
 .iframe-renderer__btn {
   padding: 0.6rem 1.25rem;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   border: 1px solid var(--line);

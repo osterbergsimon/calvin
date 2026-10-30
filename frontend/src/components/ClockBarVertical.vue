@@ -200,8 +200,8 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 .clock-bar-vertical.position-between {
   z-index: 100;
   border: none;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border-radius: var(--radius-xs);
 }
 
 .clock-bar-top {
@@ -309,11 +309,11 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 }
 
 .clock-bar-vertical.position-between .clock-time {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
 }
 
 .clock-bar-vertical.position-between .clock-date {
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
 }
 
 .clock-bar-actions {

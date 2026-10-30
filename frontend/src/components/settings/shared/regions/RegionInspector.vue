@@ -490,7 +490,7 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
 .picker-option--add .picker-option-label {
-  color: var(--focus);
+  color: var(--focus-text);
   font-weight: 600;
 }
 .picker-empty {
@@ -546,11 +546,11 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
 }
 .link-btn:hover:not(:disabled) {
   border-color: var(--focus);
-  color: var(--focus);
+  color: var(--focus-text);
 }
 .link-btn.danger:hover:not(:disabled) {
   border-color: var(--err);
-  color: var(--err);
+  color: var(--err-text);
 }
 .link-btn:disabled {
   opacity: 0.4;

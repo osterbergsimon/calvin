@@ -272,12 +272,12 @@ const reloadUi = () => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .maint-btn:hover {
@@ -292,10 +292,10 @@ const reloadUi = () => {
   font-weight: 600;
 }
 .maint-status.is-online {
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .maint-status.is-offline {
-  color: var(--err);
+  color: var(--err-text);
 }
 .maint-version {
   font-family: var(--font-data);

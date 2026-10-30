@@ -65,12 +65,12 @@ const handleFocus = () => emit("focus", props.event, props.date);
   min-width: 0;
   padding: 0.05rem 0.1rem;
   font-family: var(--font-display);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   line-height: 1.25;
   color: var(--ink);
   cursor: pointer;
   outline: none;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   box-sizing: border-box;
 }
 
@@ -85,7 +85,7 @@ const handleFocus = () => emit("focus", props.event, props.date);
 .timed-time {
   flex-shrink: 0;
   font-family: var(--font-data);
-  font-size: 0.6rem;
+  font-size: var(--fs-3xs);
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }

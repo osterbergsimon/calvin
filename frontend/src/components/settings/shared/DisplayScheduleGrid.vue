@@ -64,7 +64,7 @@ const emitChange = () => {
   padding: 0.75rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
 }
 .schedule-day-header {
   margin-bottom: 0.5rem;
@@ -88,14 +88,14 @@ const emitChange = () => {
   gap: 0.5rem;
 }
 .schedule-time label {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-family: var(--font-ui);
   color: var(--ink-2);
 }
 .schedule-time input {
   padding: 0.5rem;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--bg-1);
   color: var(--ink);
   font-family: var(--font-data);

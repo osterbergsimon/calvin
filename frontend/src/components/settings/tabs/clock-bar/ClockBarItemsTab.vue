@@ -140,7 +140,7 @@ onMounted(async () => {
 .section-description {
   margin: 0 0 1rem;
   color: var(--ink-2);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   line-height: 1.5;
 }
 
@@ -148,14 +148,14 @@ onMounted(async () => {
   padding: 0.05rem 0.35rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: 0.85em;
 }
 
 .state-message {
   padding: 1rem;
   color: var(--ink-3);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .empty-state p {
@@ -170,7 +170,7 @@ onMounted(async () => {
   border: 0;
   border-radius: var(--radius-md);
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
 }
@@ -225,14 +225,14 @@ onMounted(async () => {
 
 .meta .subtitle {
   margin-top: 0.15rem;
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-family: var(--font-ui);
   color: var(--ink-2);
 }
 
 .items-summary {
   margin: 0 0 0.6rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 
@@ -249,7 +249,7 @@ onMounted(async () => {
   align-items: center;
   gap: 0.55rem;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-family: var(--font-ui);
   color: var(--ink);
   user-select: none;
@@ -313,8 +313,8 @@ onMounted(async () => {
   padding: 0.6rem 0.85rem;
   background: color-mix(in srgb, var(--err) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   color: var(--ink);
-  font-size: 0.88rem;
+  font-size: var(--fs-md);
 }
 </style>

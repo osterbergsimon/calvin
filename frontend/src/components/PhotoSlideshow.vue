@@ -343,8 +343,8 @@ watch(sourceKey, async () => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #000;
-  border-radius: 8px;
+  background: var(--scrim-solid);
+  border-radius: var(--radius-sm);
   overflow: visible; /* let the focused panel glow bloom out */
   min-height: 0;
   min-width: 0;
@@ -376,8 +376,8 @@ watch(sourceKey, async () => {
 }
 
 .error-message {
-  color: var(--err);
-  font-size: 0.9rem;
+  color: var(--err-text);
+  font-size: var(--fs-md);
   margin: 0;
   padding: 0;
   display: flex;
@@ -395,7 +395,7 @@ watch(sourceKey, async () => {
 
 .loading {
   text-align: center;
-  color: #fff; /* Keep white for contrast on dark photo background */
+  color: var(--on-scrim); /* Keep white for contrast on dark photo background */
 }
 
 .photo-placeholder {

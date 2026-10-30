@@ -139,8 +139,8 @@ const handleKeydown = event => {
 }
 
 .tab-button.active {
-  color: var(--focus);
-  border-bottom-color: var(--focus);
+  color: var(--focus-text);
+  border-bottom-color: var(--focus-text);
   font-weight: 600;
 }
 
