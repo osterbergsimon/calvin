@@ -1,6 +1,7 @@
 import { computed, inject, nextTick, onScopeDispose, readonly, ref, watch } from "vue";
 import { routeLocationKey } from "vue-router";
 import { useConfigStore } from "../stores/config";
+import { useScreenSetting } from "./useScreenSetting";
 import { useTouchCapability } from "./useTouchCapability";
 import {
   DEFAULT_OSK_LAYOUT,
@@ -26,16 +27,23 @@ import {
  * does not use simple-keyboard's input buffer: those edits lose the caret on
  * mid-string changes.
  *
- * Show rules (docs/design/2026-10-29-on-screen-keyboard.md §3):
- *   - config `onScreenKeyboard: 'on'` always, `'auto'` on touch screens at
- *     least 720px wide, `'off'` never;
+ * Show rules (docs/design/2026-10-29-on-screen-keyboard.md §3, amended by
+ * docs/design/2026-10-30-osk-hardware-keyboard.md):
+ *   - `onScreenKeyboard` is per screen: Auto · On · Off. Auto shows on touch
+ *     screens at least 720px wide until a real keyboard is used there; On
+ *     always; Off never by itself;
  *   - text-like inputs and textareas, never native pickers/readonly fields,
- *     never inside `[data-osk="off"]`.
+ *     never inside `[data-osk="off"]`;
+ *   - on a touchscreen with a field focused and the keyboard hidden, a
+ *     "⌨ Keyboard" button always opens it.
  *
  * Layout rules (§4): the keyboard layout is its own setting (`oskLayout` plus
  * `oskExtraLayouts`). It is independent of the language Calvin's UI is shown
  * in — nothing here reads or follows the UI/app language.
  */
+
+export const OSK_MODE_STORAGE_KEY = "calvin-osk-mode";
+export const OSK_HARDWARE_SEEN_KEY = "calvin-osk-hardware-seen";
 
 const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "password", "number"]);
 const CARETLESS_TYPES = new Set(["number", "email"]);
@@ -97,6 +105,56 @@ export const layoutForTarget = el => {
 export const isTrustedKeyInTarget = (event, target) =>
   !!event?.isTrusted && !!target && event.target === target;
 
+/**
+ * Physical typing, as opposed to a remote, a button box or the OSK itself
+ * (CLV-27 §2): a trusted, printable, non-space key in an OSK target field with
+ * no Ctrl, Alt or Meta. Arrows, Enter, Escape, media/F-keys and the OSK's
+ * synthetic events never count.
+ */
+export const isPhysicalTyping = (event, target = event?.target) => {
+  if (!event?.isTrusted) return false;
+  if (!isOskTarget(event.target)) return false;
+  if (target && event.target !== target) return false;
+  if (event.ctrlKey || event.altKey || event.metaKey) return false;
+  return typeof event.key === "string" && event.key.length === 1 && event.key !== " ";
+};
+
+// Auto learns that this screen has a keyboard. The flag is per browser and
+// survives reloads; when storage is blocked it lasts for this page load.
+const hardwareSeen = ref(false);
+
+const readHardwareSeen = () => {
+  try {
+    return window.localStorage.getItem(OSK_HARDWARE_SEEN_KEY) === "1";
+  } catch {
+    return hardwareSeen.value;
+  }
+};
+
+export const learnHardwareKeyboard = () => {
+  hardwareSeen.value = true;
+  try {
+    window.localStorage.setItem(OSK_HARDWARE_SEEN_KEY, "1");
+  } catch {
+    // Storage blocked: the flag lasts for this page load.
+  }
+};
+
+export const forgetHardwareKeyboard = () => {
+  hardwareSeen.value = false;
+  try {
+    window.localStorage.removeItem(OSK_HARDWARE_SEEN_KEY);
+  } catch {
+    // Nothing to clean up when storage is blocked.
+  }
+};
+
+export const forgetOskHardware = forgetHardwareKeyboard;
+
+export function useOskHardwareSeen() {
+  return { seen: readonly(hardwareSeen), forget: forgetHardwareKeyboard };
+}
+
 const isVisible = el => {
   if (!el || el.hidden) return false;
   if (el.closest("[hidden]")) return false;
@@ -129,10 +187,18 @@ const cancelRaf = id => {
 export function useOnScreenKeyboard() {
   const configStore = useConfigStore();
   const { isTouch } = useTouchCapability();
+  // The existing key, now per screen: kiosk override on a kiosk, localStorage
+  // on any other browser, server default while neither is set (CLV-27 §6).
+  const screenSetting = useScreenSetting("onScreenKeyboard", {
+    storageKey: OSK_MODE_STORAGE_KEY,
+  });
 
   const visible = ref(false);
   const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
   const target = ref(null);
+  // The OSK target that has focus even when the keyboard is hidden. The
+  // "⌨ Keyboard" button needs it while `target` is cleared.
+  const focusedTarget = ref(null);
   const layout = ref("default");
   // The letter layout to return to from the symbols/accents layers.
   const baseLayout = ref("default");
@@ -215,7 +281,7 @@ export function useOnScreenKeyboard() {
   let hideFrame = null;
   let started = false;
 
-  const mode = () => configStore.onScreenKeyboard || "auto";
+  const mode = () => screenSetting.value.value || "auto";
 
   const enabled = computed(() => {
     const value = mode();
@@ -223,6 +289,20 @@ export function useOnScreenKeyboard() {
     if (value === "off") return false;
     if (typeof window === "undefined") return false;
     return isTouch.value && viewportWidth.value >= MIN_AUTO_WIDTH;
+  });
+
+  // Auto stops showing the keyboard on a screen after someone typed on a real
+  // keyboard there. On and Off are unaffected.
+  const canShowFor = el =>
+    isTargetElement(el) && enabled.value && !(mode() === "auto" && hardwareSeen.value);
+
+  // Touchscreen, an OSK field has focus, keyboard hidden: there must always be
+  // a way back (CLV-27 §4). Non-touch screens have a keyboard already, and
+  // Auto keeps its no-keyboard rule for narrow viewports (§3).
+  const showKeyboardButton = computed(() => {
+    if (!isTouch.value || !focusedTarget.value || visible.value) return false;
+    if (mode() === "auto") return enabled.value;
+    return true;
   });
 
   const currentHeight = () => {
@@ -424,14 +504,12 @@ export function useOnScreenKeyboard() {
     });
   };
 
-  const showFor = el => {
+  const showFor = (el, { force = false } = {}) => {
     if (!isTargetElement(el)) return;
-    if (!enabled.value) {
-      hide();
-      return;
-    }
+    if (!force && !canShowFor(el)) return;
 
     target.value = el;
+    focusedTarget.value = el;
     baseLayout.value = layoutForTarget(el);
     layout.value = baseLayout.value;
     enterLabel.value = enterLabelFor(el);
@@ -440,6 +518,22 @@ export function useOnScreenKeyboard() {
     visible.value = true;
     syncHeight();
     scrollTargetIntoView(el);
+  };
+
+  /**
+   * The "⌨ Keyboard" button. Opens the keyboard for the field that already has
+   * focus even in Off mode or after Auto learned a hardware keyboard. In Auto
+   * it also forgets the learned keyboard, so focusing a field shows it again.
+   */
+  const showKeyboard = () => {
+    const el =
+      focusedTarget.value ||
+      (typeof document !== "undefined" && isTargetElement(document.activeElement)
+        ? document.activeElement
+        : null);
+    if (!el) return;
+    if (mode() === "auto") forgetHardwareKeyboard();
+    showFor(el, { force: true });
   };
 
   const hide = () => {
@@ -455,13 +549,21 @@ export function useOnScreenKeyboard() {
   };
 
   const scheduleHideCheck = () => {
-    if (!visible.value) return;
     if (hideFrame !== null) cancelRaf(hideFrame);
     hideFrame = raf(() => {
       hideFrame = null;
-      if (!visible.value) return;
-      const active = document.activeElement;
-      if (!enabled.value || !isTargetElement(active)) hide();
+      const active = typeof document !== "undefined" ? document.activeElement : null;
+      if (isTargetElement(active)) {
+        focusedTarget.value = active;
+        if (canShowFor(active)) {
+          if (!visible.value || target.value !== active) showFor(active);
+        } else if (visible.value) {
+          hide();
+        }
+        return;
+      }
+      focusedTarget.value = null;
+      if (visible.value) hide();
     });
   };
 
@@ -535,7 +637,9 @@ export function useOnScreenKeyboard() {
   const onFocusIn = event => {
     const el = event.target;
     if (isTargetElement(el)) {
-      if (enabled.value) showFor(el);
+      focusedTarget.value = el;
+      if (canShowFor(el)) showFor(el);
+      else if (visible.value) hide();
       return;
     }
     scheduleHideCheck();
@@ -546,17 +650,22 @@ export function useOnScreenKeyboard() {
   };
 
   const onPointerDown = event => {
-    if (visible.value || !enabled.value) return;
-    if (isTargetElement(event.target)) showFor(event.target);
+    if (visible.value) return;
+    const el = event.target;
+    if (!isTargetElement(el)) return;
+    focusedTarget.value = el;
+    // Auto after learning, and Off, only open from the ⌨ Keyboard button.
+    if (canShowFor(el)) showFor(el);
   };
 
   const onKeyDown = event => {
-    if (!visible.value) return;
     if (event.key === "Escape") {
-      hide();
+      if (visible.value) hide();
       return;
     }
-    if (isTrustedKeyInTarget(event, target.value)) hide();
+    if (!isPhysicalTyping(event, event.target)) return;
+    if (mode() === "auto") learnHardwareKeyboard();
+    if (visible.value) hide();
   };
 
   const onResize = () => {
@@ -574,6 +683,8 @@ export function useOnScreenKeyboard() {
     started = true;
     viewportWidth.value = window.innerWidth;
     height.value = 0;
+    hardwareSeen.value = readHardwareSeen();
+    focusedTarget.value = isTargetElement(document.activeElement) ? document.activeElement : null;
     publishHeight();
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
@@ -583,7 +694,10 @@ export function useOnScreenKeyboard() {
     if (route) {
       stopRouteWatch = watch(
         () => route.fullPath,
-        () => hide()
+        () => {
+          focusedTarget.value = null;
+          hide();
+        }
       );
     }
   };
@@ -604,6 +718,7 @@ export function useOnScreenKeyboard() {
     stopRouteWatch = null;
     visible.value = false;
     target.value = null;
+    focusedTarget.value = null;
     height.value = 0;
     sharedVisible.value = false;
     sharedHeight.value = 0;
@@ -614,11 +729,16 @@ export function useOnScreenKeyboard() {
     if (!value) hide();
   });
 
+  watch(hardwareSeen, seen => {
+    if (seen && mode() === "auto" && visible.value) hide();
+  });
+
   onScopeDispose(stop);
 
   return {
     visible,
     target,
+    focusedTarget,
     layout,
     baseLayout,
     height,
@@ -628,6 +748,8 @@ export function useOnScreenKeyboard() {
     capsLock,
     enterLabel,
     enabled,
+    showKeyboardButton,
+    showKeyboard,
     // Letter layout state and switching.
     mainLayout,
     mainLayoutName,
@@ -649,6 +771,7 @@ export function useOnScreenKeyboard() {
     stop,
     hide,
     showFor,
+    onKeyDown,
     setMeasuredHeight,
     handleKeyPress,
   };

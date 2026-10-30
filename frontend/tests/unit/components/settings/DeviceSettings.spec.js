@@ -4,6 +4,8 @@ import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import DeviceSettings from "@/components/settings/categories/DeviceSettings.vue";
+import { useConfigStore } from "@/stores/config";
+import { forgetOskHardware, learnHardwareKeyboard } from "@/composables/useOnScreenKeyboard";
 
 vi.mock("@/composables", () => ({
   useSystem: () => ({ turnDisplayOn: vi.fn(), turnDisplayOff: vi.fn() }),
@@ -29,7 +31,11 @@ const baseConfig = {
 };
 
 describe("DeviceSettings", () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+    forgetOskHardware();
+  });
 
   it("renders Screen & keyboard sections; hardware moved to System", () => {
     const wrapper = mount(DeviceSettings, {
@@ -92,7 +98,9 @@ describe("DeviceSettings", () => {
     );
   });
 
-  it("offers Auto / Always / Off for the on-screen keyboard", () => {
+  it("offers Auto / On / Off for the on-screen keyboard", () => {
+    const config = useConfigStore();
+    config.onScreenKeyboard = "auto";
     const wrapper = mount(DeviceSettings, {
       props: {
         config: { ...baseConfig, onScreenKeyboard: "auto" },
@@ -104,10 +112,10 @@ describe("DeviceSettings", () => {
       .find(c => c.props("ariaLabel") === "On-screen keyboard");
 
     expect(control).toBeTruthy();
-    expect(control.props("options").map(o => o.label)).toEqual(["Auto", "Always", "Off"]);
+    expect(control.props("options").map(o => o.label)).toEqual(["Auto", "On", "Off"]);
 
     control.vm.$emit("update:modelValue", "on");
-    expect(wrapper.emitted("update:config").some(c => c[0].onScreenKeyboard === "on")).toBe(true);
+    expect(window.localStorage.getItem("calvin-osk-mode")).toBe("on");
   });
 
   it("shows the timeout stepper only when timeout is enabled", async () => {
@@ -131,13 +139,15 @@ describe("DeviceSettings", () => {
   });
 
   describe("on-screen keyboard layout rows (§7)", () => {
-    const mountSettings = (overrides = {}) =>
-      mount(DeviceSettings, {
+    const mountSettings = (overrides = {}) => {
+      useConfigStore().onScreenKeyboard = overrides.onScreenKeyboard ?? "auto";
+      return mount(DeviceSettings, {
         props: {
           config: { ...baseConfig, onScreenKeyboard: "auto", ...overrides },
         },
         global: { stubs },
       });
+    };
 
     const layoutPill = wrapper =>
       wrapper
@@ -150,6 +160,7 @@ describe("DeviceSettings", () => {
 
     beforeEach(() => {
       window.localStorage.clear();
+      forgetOskHardware();
       Object.defineProperty(navigator, "language", { configurable: true, value: "en-US" });
     });
 
@@ -294,6 +305,72 @@ describe("DeviceSettings", () => {
       expect(layoutPill(wrapper).props("modelValue")).toBe("sv");
       expect(wrapper.text()).not.toContain("(suggested)");
       document.documentElement.removeAttribute("lang");
+    });
+  });
+
+  describe("on-screen keyboard mode row (CLV-27)", () => {
+    const mountRow = (mode, { learned = false } = {}) => {
+      useConfigStore().onScreenKeyboard = mode;
+      if (learned) learnHardwareKeyboard();
+      return mount(DeviceSettings, {
+        props: { config: { ...baseConfig, onScreenKeyboard: mode } },
+        global: { stubs },
+      });
+    };
+
+    const modeControl = wrapper =>
+      wrapper
+        .findAllComponents({ name: "SegmentedControl" })
+        .find(c => c.props("ariaLabel") === "On-screen keyboard");
+
+    it("labels the row with the This screen chip", () => {
+      const wrapper = mountRow("auto");
+
+      expect(wrapper.find(".device-chip").text()).toBe("This screen");
+      expect(wrapper.find("#section-device-keyboard").text()).toContain("On-screen keyboard");
+    });
+
+    it("describes Auto before anything was learned", () => {
+      const wrapper = mountRow("auto");
+
+      expect(wrapper.text()).toContain(
+        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
+      );
+      expect(wrapper.find(".device-osk-show-again").exists()).toBe(false);
+    });
+
+    it("describes Auto after a keyboard was used, with a way back", () => {
+      const wrapper = mountRow("auto", { learned: true });
+
+      expect(wrapper.text()).toContain("Hidden here because a keyboard was used.");
+      expect(wrapper.find(".device-osk-show-again").text()).toBe("Show it again");
+    });
+
+    it("describes On and Off", () => {
+      expect(mountRow("on").text()).toContain("Shows whenever you tap a text field.");
+      expect(mountRow("off").text()).toContain(
+        "Never shows by itself. On a touchscreen, tap Keyboard by a field to open it."
+      );
+    });
+
+    it("saves the chosen mode for this browser", () => {
+      const wrapper = mountRow("auto");
+
+      modeControl(wrapper).vm.$emit("update:modelValue", "off");
+
+      expect(window.localStorage.getItem("calvin-osk-mode")).toBe("off");
+    });
+
+    it("Show it again clears the learned flag and announces it", async () => {
+      const wrapper = mountRow("auto", { learned: true });
+
+      await wrapper.find(".device-osk-show-again").trigger("click");
+
+      expect(window.localStorage.getItem("calvin-osk-hardware-seen")).toBeNull();
+      expect(wrapper.text()).toContain(
+        "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
+      );
+      expect(wrapper.find(".device-live").text()).toBe("On-screen keyboard will show again.");
     });
   });
 });
