@@ -21,6 +21,9 @@ npm run test
 # Lint
 npm run lint
 
+# Type-check the typed API layer (src/api; .vue files are not covered yet)
+npm run type-check
+
 # Format
 npm run format
 
