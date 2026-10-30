@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Settings copy audit</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --err:#c4452b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; }
+h1 { font-family:var(--font-display); margin:0 0 20px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:grid; grid-template-columns:1fr 1fr; }
+.col { padding:24px 28px; border-right:1px solid var(--line); }
+.col:last-child { border-right:0; }
+.eyebrow { font-family:var(--font-data); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; }
+.sec { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; margin-bottom:16px; }
+.sec h3 { margin:0; padding:14px 18px 6px; font-size:1rem; font-weight:600; }
+.row { display:flex; align-items:center; gap:16px; padding:11px 18px; border-top:1px solid var(--line-soft); min-height:3.5rem; }
+.sec h3 + .row { border-top:0; }
+.txt { flex:1; min-width:0; } .txt b { font-weight:500; font-size:.95rem; } .txt p { margin:2px 0 0; font-size:.8rem; color:var(--ink-2); line-height:1.35; }
+.bad { background:color-mix(in srgb, var(--err) 9%, var(--bg-1)); }
+.bad .txt p { color:color-mix(in srgb, var(--err) 75%, var(--ink)); }
+.chip { display:inline-block; margin-left:8px; font-size:.7rem; font-weight:500; color:var(--ink-2); border:1px solid var(--line); border-radius:6px; padding:0 6px; vertical-align:2px; }
+.tog { width:44px; height:26px; border-radius:13px; background:var(--focus); position:relative; flex:none; }
+.tog::after { content:""; position:absolute; right:3px; top:3px; width:20px; height:20px; border-radius:50%; background:#fff; }
+.tog.off { background:var(--line); } .tog.off::after { right:auto; left:3px; }
+.pill { flex:none; height:40px; padding:0 14px; display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:10px; font-size:.88rem; background:var(--bg-2); }
+.pill::after { content:"▾"; color:var(--ink-3); font-size:.75rem; }
+.seg { flex:none; display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:.85rem; }
+.seg span { padding:9px 12px; border-left:1px solid var(--line); } .seg span:first-child { border-left:0; }
+.seg .on { background:color-mix(in srgb, var(--focus) 16%, var(--bg-2)); font-weight:500; }
+.slider { flex:none; width:150px; display:flex; align-items:center; gap:8px; font-family:var(--font-data); font-size:.8rem; color:var(--ink-2); }
+.slider i { flex:1; height:4px; background:var(--line); border-radius:2px; position:relative; }
+.slider i::after { content:""; position:absolute; left:40%; top:-6px; width:16px; height:16px; border-radius:50%; background:var(--focus); }
+.note { font-size:.75rem; color:var(--ink-3); padding:0 18px 12px; }
+.src { color:var(--ink-3); font-size:.78rem; }
+.own { color:var(--ink); font-weight:600; }
+.link { flex:none; font-size:.85rem; color:var(--ink); text-decoration:underline; text-underline-offset:3px; }
+.btn { flex:none; height:40px; padding:0 14px; border:1px solid var(--line); border-radius:10px; display:flex; align-items:center; font-size:.88rem; background:var(--bg-2); }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>Settings copy: before → after</h1>
+
+  <figure>
+    <div class="frame">
+      <div class="col">
+        <p class="eyebrow">Today · Dashboard › Touch &amp; controls</p>
+        <div class="sec">
+          <h3>Touch &amp; controls</h3>
+          <div class="row"><div class="txt"><b>Hide controls in kiosk mode</b><p>Suppress on-screen controls (the ⋯ menu, headers) for a clean wall display.</p></div><div class="tog off"></div></div>
+          <div class="row"><div class="txt"><b>Keep clock bar visible</b><p>Keep the clock bar on-screen even when controls are hidden — it still shows the time and any status items.</p></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Focus light</b><p>Highlights the active region. 'Only while controls are shown' turns it off when controls are hidden (e.g. a calm wall).</p></div><div class="pill">Only while controls shown</div></div>
+          <div class="row"><div class="txt"><b>Dim other regions</b><p>Reduce brightness of non-focused regions while the focus light is active.</p></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Reveal corner</b><p>Which screen corner reveals the controls on a press-and-hold while they're hidden.</p></div><div class="pill">Bottom right</div></div>
+          <div class="row"><div class="txt"><b>Reveal corner opacity</b><p>How visible the reveal corner is at rest (0 = invisible, but press-and-hold still reveals).</p></div><div class="slider"><i></i>40%</div></div>
+          <div class="row"><div class="txt"><b>Reveal corner size</b><p>Size of the corner target and its press-and-hold hit area.</p></div><div class="slider"><i></i>64</div></div>
+          <div class="row"><div class="txt"><b>Reveal hold time</b><p>How long to press-and-hold the corner before the controls appear.</p></div><div class="slider"><i></i>1.5s</div></div>
+          <div class="row"><div class="txt"><b>Tap anywhere to show controls</b><p>When controls are hidden, tapping the calendar or photos brings them back. Off by default — use the reveal corner instead.</p></div><div class="tog off"></div></div>
+          <div class="row bad"><div class="txt"><b>Touchscreen</b><p>Whether this device is treated as a touchscreen … Auto-detects; force on/off for hybrid setups. <i>(Actually changes every screen.)</i></p></div><div class="pill">Auto</div></div>
+          <div class="row"><div class="txt"><b>Dashboard size</b><p>Scales the dashboard region labels and touch controls (calendar, photos, services). Independent of Settings UI size and the clock bar.</p></div><div class="pill">Medium</div></div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="eyebrow">Proposed · two sections, corner rows only when hiding</p>
+        <div class="sec">
+          <h3>Controls</h3>
+          <div class="row"><div class="txt"><b>Hide controls</b><p>Hides the ⋯ menu and region headers for a calm wall display.</p></div><div class="tog off"></div></div>
+          <div class="row"><div class="txt"><b>Keep the clock bar when hidden</b></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Tap anywhere to show controls</b><p>A tap on calendar or photos brings controls back.</p></div><div class="tog off"></div></div>
+          <p class="note">Show-controls corner, Corner visibility, Corner size and Hold for appear here when Hide controls is on.</p>
+        </div>
+        <div class="sec">
+          <h3>Touch &amp; focus</h3>
+          <div class="row"><div class="txt"><b>Touchscreen<span class="chip">This screen</span></b><p>Shows touch buttons: arrows, screen dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse.</p></div><div class="seg"><span class="on">Auto</span><span>On</span><span>Off</span></div></div>
+          <div class="row"><div class="txt"><b>Dashboard size</b><p>Size of labels and touch buttons on the dashboard.</p></div><div class="pill">Medium</div></div>
+          <div class="row"><div class="txt"><b>Focus light</b><p>Outlines the region the remote or arrow keys will act on.</p></div><div class="pill">Only while controls show</div></div>
+          <div class="row"><div class="txt"><b>Dim other regions</b><p>Dims the rest while the focus light is on.</p></div><div class="tog"></div></div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>C1 · Dashboard › Touch &amp; controls.</b> Left: today, 11 rows; red marks the row whose copy is misleading. Right: split into Controls and Touch &amp; focus. The four corner rows only show while controls are hidden. Touchscreen carries the <b>This screen</b> chip (§2).</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame">
+      <div class="col">
+        <p class="eyebrow">Proposed · Screen &amp; keyboard › Screen power</p>
+        <div class="sec">
+          <h3>Screen power</h3>
+          <div class="row"><div class="txt"><b>Screen on/off schedule</b><p>Turns the screen off and on at set times.</p></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Timezone</b><p>Used by the schedule.</p></div><div class="pill">Server's timezone</div></div>
+          <div class="row"><div class="txt"><b>Turn off when idle</b></div><div class="pill">15 min</div></div>
+          <div class="row"><div class="txt"><b>Screen now</b></div><div class="btn">Turn off</div><div class="btn">Turn on</div></div>
+        </div>
+        <div class="sec">
+          <h3>Content › Photos</h3>
+          <div class="row"><div class="txt"><b>Photo frame when idle</b><p>After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back.</p></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Start after</b></div><div class="pill">5 min</div></div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="eyebrow">Proposed · Kiosks › Hallway</p>
+        <div class="sec">
+          <h3>Hallway · Screen on/off schedule</h3>
+          <div class="row"><div class="txt"><b>Screen on/off schedule</b><p class="src">Same as all screens</p></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Daily schedule</b><p class="own">Only this kiosk</p></div><span class="link">Use the shared setting</span><div class="btn">Edit</div></div>
+        </div>
+        <div class="sec">
+          <h3>Display hardware</h3>
+          <div class="row"><div class="txt"><b>Orientation</b><p class="src">Same as all screens</p></div><div class="seg"><span class="on">Landscape</span><span>Portrait</span></div></div>
+          <div class="row"><div class="txt"><b>Upside down</b><p class="own">Only this kiosk</p></div><span class="link">Use the shared setting</span><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Rotate the screen output</b><p class="src">Same as all screens</p></div><div class="tog"></div></div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>C2 · One idle control, honest photo-frame copy, plain override labels.</b> Left: "Screen timeout" + "Timeout (0 = never)" become one <b>Turn off when idle</b> choice. Photo-frame copy says what it does (idle → full screen). Right: Kiosks replaces ‹inherited from global› / ‹set for this kiosk› with <b>Same as all screens</b> / <b>Only this kiosk</b> and a way back.</figcaption>
+  </figure>
+</main>
+</body>
+</html>
