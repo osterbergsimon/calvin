@@ -116,9 +116,9 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function setup(password) {
+  async function setup(password, code) {
     try {
-      await api.post("/auth/setup", { password });
+      await api.post("/auth/setup", { password, code });
     } catch (err) {
       if (authErrorCode(err) === "already_configured") {
         configured.value = true;
@@ -130,6 +130,21 @@ export const useAuthStore = defineStore("auth", () => {
     configured.value = true;
     authenticated.value = true;
     status.value = "authenticated";
+  }
+
+  /**
+   * The one-time setup code, only when the server allows it (loopback). A kiosk
+   * on the same machine shows it on its setup screen; anywhere else this
+   * returns null and the screen says where to look instead.
+   */
+  async function fetchSetupCode() {
+    try {
+      const { data } = await api.get("/auth/setup-code");
+      const code = typeof data?.code === "string" ? data.code.trim() : "";
+      return code || null;
+    } catch {
+      return null;
+    }
   }
 
   async function login(password) {
@@ -211,6 +226,7 @@ export const useAuthStore = defineStore("auth", () => {
     applyStatus,
     fetchStatus,
     setup,
+    fetchSetupCode,
     login,
     logout,
     changePassword,
