@@ -212,10 +212,14 @@ flags, and the same agent watches it.
 
 It fails safe. If nothing that is Chromium answers on the port — recovery
 disabled, an older unit file without the flag, or a Chromium that ignores it —
-the agent logs `crash recovery is idle` once and restarts nothing, and it only
-restarts after the port has answered *and* reported a dead page. Repeated
-restarts back off (300 s, 600 s, 1200 s …) up to
-`CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX`, and a healthy page resets that.
+the agent logs `crash recovery is idle` once and restarts nothing: an
+`unreachable` probe never triggers a restart. Once the endpoint answers as
+Chromium, however, a page that probes dead counts as crashed **even if it was
+never seen alive** (the renderer can die during the first load, leaving an empty
+target list), and a probe or two of endpoint flapping does not discard that
+evidence. Repeated restarts back off (300 s, 600 s, 900 s …) up to
+`CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX` (15 min by default), each restart after the
+first is logged as a `crash loop`, and a healthy page resets that.
 
 ```bash
 journalctl -u calvin-display-agent -f            # watchdog lines
@@ -232,7 +236,7 @@ exists only for this probe. Settings live in `/etc/default/calvin-kiosk`:
 | `CALVIN_KIOSK_WATCHDOG_SECONDS` | `30` | seconds between probes (minimum 5) |
 | `CALVIN_KIOSK_WATCHDOG_FAILURES` | `3` | consecutive failed probes before a restart |
 | `CALVIN_KIOSK_WATCHDOG_COOLDOWN` | `300` | seconds before the first, and after a recovered, restart |
-| `CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX` | `3600` | cap for the doubling wait between repeated restarts |
+| `CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX` | `900` | cap for the doubling wait between repeated restarts (15 min) |
 
 `sudo systemctl restart calvin-display-agent` applies a change. Two guards keep
 the watchdog out of the way: it never touches a unit that is not running (systemd
