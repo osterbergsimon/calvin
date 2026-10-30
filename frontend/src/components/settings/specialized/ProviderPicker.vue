@@ -15,8 +15,11 @@
             @click="choose(provider)"
           >
             <span class="pp-icon" aria-hidden="true">
+              <svg v-if="provider.svg" class="pp-icon-svg" viewBox="0 0 24 24">
+                <path :d="provider.svg" fill="currentColor" />
+              </svg>
               <img
-                v-if="isIconFile(provider.icon)"
+                v-else-if="isIconFile(provider.icon)"
                 class="pp-icon-img"
                 :src="iconUrl(provider)"
                 alt=""
@@ -244,6 +247,11 @@ const choose = provider => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.pp-icon-svg {
+  width: 60%;
+  height: 60%;
 }
 
 .pp-text {

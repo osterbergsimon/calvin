@@ -190,8 +190,7 @@ onMounted(async () => {
 }
 
 .item-row {
-  display: grid;
-  grid-template-columns: minmax(80px, auto) 1fr auto;
+  display: flex;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
@@ -204,7 +203,18 @@ onMounted(async () => {
 .preview {
   display: flex;
   align-items: center;
+  min-width: 80px;
   min-height: 32px;
+}
+
+/* A tile with no live preview yet leaves no empty slot (CLV-45 review). */
+.preview:empty {
+  display: none;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
 }
 
 .meta .title {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
+import { mdiUpload } from "@mdi/js";
 import ProviderPicker from "@/components/settings/specialized/ProviderPicker.vue";
 
 const mountPicker = (props = {}) =>
@@ -23,6 +24,15 @@ describe("ProviderPicker tile icons (§6)", () => {
   it("renders an emoji icon as text", () => {
     const w = mountPicker({ providers: [{ id: "immich", name: "Immich", icon: "🖼" }] });
     expect(w.find(".pp-icon").text()).toBe("🖼");
+  });
+
+  it("renders an SVG glyph for a non-plugin choice (Upload), not a letter", () => {
+    const w = mountPicker({
+      providers: [{ id: "__upload", label: "Upload from this device", svg: mdiUpload }],
+    });
+    expect(w.find(".pp-icon svg").exists()).toBe(true);
+    expect(w.find(".pp-icon svg path").attributes("d")).toBe(mdiUpload);
+    expect(w.find(".pp-icon").text()).toBe("");
   });
 
   it("serves a file icon from the plugin's static route", () => {

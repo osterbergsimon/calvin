@@ -14,12 +14,14 @@
         />
       </div>
 
-      <TabNavigation
-        v-if="catalogTypeTabs.length > 1"
-        :tabs="catalogTypeTabs"
-        :active-tab="activeTypeTab"
-        @tab-change="activeTypeTab = $event"
-      />
+      <div v-if="catalogTypeOptions.length > 1" class="catalog-filters">
+        <SegmentedControl
+          :model-value="activeTypeTab"
+          :options="catalogTypeOptions"
+          aria-label="Plugin kind"
+          @update:model-value="activeTypeTab = $event"
+        />
+      </div>
 
       <p v-if="catalogEnumerating" class="catalog-status">Loading the catalog…</p>
       <p v-else-if="catalogError" class="catalog-status">{{ catalogError }}</p>
@@ -57,7 +59,7 @@
               <button
                 v-if="hasUpdate(plugin)"
                 type="button"
-                class="btn-install btn-update"
+                class="btn-install"
                 :disabled="installing"
                 @click="handleInstallFromCatalog(plugin.path)"
               >
@@ -193,7 +195,7 @@
               <button
                 v-if="hasUpdate(plugin)"
                 type="button"
-                class="btn-install btn-update"
+                class="btn-install"
                 :disabled="installing"
                 @click="handleInstall(plugin.path)"
               >
@@ -377,7 +379,7 @@
 
 <script setup>
 import { ref, computed, watch } from "vue";
-import TabNavigation from "../shared/TabNavigation.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { pluginKindFilters, pluginKindKey, pluginKindLabel } from "@/utils/pluginKind";
 import { isNewerVersion } from "@/utils/pluginVersions";
@@ -525,8 +527,8 @@ const enrichedCatalog = computed(() => {
 const catalogList = computed(() => withoutTestFixtures(enrichedCatalog.value));
 
 const catalogFilters = computed(() => pluginKindFilters(catalogList.value));
-const catalogTypeTabs = computed(() =>
-  catalogFilters.value.map(option => ({ id: option.id, label: option.label }))
+const catalogTypeOptions = computed(() =>
+  catalogFilters.value.map(option => ({ value: option.id, label: option.label }))
 );
 
 const catalogRows = computed(() => {
@@ -776,6 +778,12 @@ watch(searchQuery, () => {
   color: var(--ink);
 }
 
+.catalog-filters {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
 .catalog-status {
   margin: 0;
   padding: 0.5rem 0;
@@ -961,13 +969,8 @@ watch(searchQuery, () => {
   border-color: var(--focus);
 }
 
-.btn-update {
-  background: var(--warn);
-  color: var(--ink);
-}
-.btn-update:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--warn), black 12%);
-}
+/* "Update" is an install action: it uses .btn-install's primary style, with no
+   separate amber fill. */
 
 /* Inputs */
 .github-input-compact,

@@ -81,6 +81,18 @@ describe("PluginInstaller catalog (§3.3)", () => {
     expect(w.find('[data-catalog-plugin-id="mealie"]').text()).toContain("Web page & app");
   });
 
+  it("filters kinds with the same SegmentedControl the Installed list uses", () => {
+    const w = mountWith({ devMode: false });
+    const segmented = w.findComponent({ name: "SegmentedControl" });
+    expect(segmented.exists()).toBe(true);
+    expect(segmented.props("options").map(option => option.label)).toEqual([
+      "All",
+      "Photos",
+      "Web page & app",
+    ]);
+    expect(w.findComponent({ name: "TabNavigation" }).exists()).toBe(false);
+  });
+
   it("installs from the catalog repository, not the other-repository field", async () => {
     const w = mountWith({ devMode: false });
     await w.find('[data-catalog-plugin-id="mealie"] button.btn-install').trigger("click");
@@ -97,6 +109,11 @@ describe("PluginInstaller catalog (§3.3)", () => {
 
     const immich = w.find('[data-catalog-plugin-id="immich"]');
     expect(immich.text()).toContain("Update");
+    // Update is an install action: the same primary button as Install, not a
+    // separate amber look (CLV-45 review).
+    const updateButton = immich.find("button.btn-install");
+    expect(updateButton.exists()).toBe(true);
+    expect(updateButton.classes()).not.toContain("btn-update");
 
     // Same version: no Update, the row says Installed and links to Content.
     const weather = w.find('[data-catalog-plugin-id="weather"]');
