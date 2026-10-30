@@ -1,4 +1,5 @@
 import importlib.util
+import io
 import os
 from datetime import datetime, time
 from types import SimpleNamespace
@@ -1092,7 +1093,7 @@ def test_watchdog_config_defaults(monkeypatch):
         "interval": 30,
         "failures": 3,
         "cooldown": 300,
-        "backoff_max": 3600,
+        "backoff_max": 900,
     }
 
 
@@ -1336,6 +1337,25 @@ def test_probe_page_dead_without_a_page_target():
     assert agent.probe_page(9222, fetch=lambda u, t: targets) == agent.PAGE_DEAD
 
 
+def test_probe_page_dead_for_an_empty_chromium_target_list():
+    # CLV-35: the renderer can die before it ever appears as a page target, so
+    # Chromium answers with an empty list. That is still Chromium answering, and
+    # the page is dead - it must not be mistaken for "nothing listens here".
+    assert agent.probe_page(9222, fetch=lambda u, t: []) == agent.PAGE_DEAD
+
+
+def test_probe_page_unreachable_for_a_json_array_that_is_not_chromium():
+    # Only Chromium's target list (objects with a `type`) is evidence; some other
+    # server returning a JSON array must stay fail-safe.
+    assert (
+        agent.probe_page(9222, fetch=lambda u, t: ["hello"]) == agent.PAGE_UNREACHABLE
+    )
+    assert (
+        agent.probe_page(9222, fetch=lambda u, t: [{"hello": "world"}])
+        == agent.PAGE_UNREACHABLE
+    )
+
+
 def test_probe_page_dead_when_evaluate_fails():
     targets = [{"type": "page", "webSocketDebuggerUrl": PAGE_WS}]
     assert (
@@ -1428,16 +1448,49 @@ def test_watchdog_step_healthy_probe_clears_the_count():
     assert state["failures"] == 1
 
 
-def test_watchdog_step_unreachable_does_not_count_against_the_page():
-    # The browser process itself is gone: systemd's Restart=always owns that case.
-    state = {"failures": 2, "last_restart": None}
+def test_watchdog_step_arms_on_a_page_that_was_never_alive():
+    # CLV-35: the renderer crashed before the watchdog ever saw the page alive,
+    # so no PAGE_OK ever arrives. Three dead probes must still arm recovery.
+    state = agent.new_watchdog_state()
+    restarted = []
+
+    def restart(unit):
+        restarted.append(unit)
+        return True
+
+    actions = [
+        agent.watchdog_step(state, agent.PAGE_DEAD, _unit(), restart=restart, now=now)
+        for now in (1000.0, 1030.0, 1060.0)
+    ]
+    assert actions == ["waiting", "waiting", "restarted"]
+    assert restarted == ["calvin-kiosk-remote.service"]
+
+
+def test_watchdog_step_unreachable_never_restarts_but_keeps_the_evidence():
+    # A crashed renderer can stall Chromium's DevTools endpoint for a probe or
+    # two. That must never trigger a restart on its own (fail-safe), but it must
+    # not erase the dead-page evidence either: the page may never have answered.
+    state = {"failures": 1, "last_restart": None}
+    assert (
+        agent.watchdog_step(state, agent.PAGE_DEAD, _unit(), restart=_never, now=0)
+        == "waiting"
+    )
+    assert state["failures"] == 2
     assert (
         agent.watchdog_step(
-            state, agent.PAGE_UNREACHABLE, _unit(), restart=_never, now=0
+            state, agent.PAGE_UNREACHABLE, _unit(), restart=_never, now=30
         )
         == "unreachable"
     )
-    assert state["failures"] == 0
+    assert state["failures"] == 2
+    restarted = []
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(), restart=_recorder(restarted), now=60
+        )
+        == "restarted"
+    )
+    assert restarted == ["calvin-kiosk-remote.service"]
 
 
 def test_watchdog_step_respects_the_cooldown():
@@ -1793,6 +1846,98 @@ def test_run_watchdog_restarts_only_after_cdp_reports_a_dead_page():
         clock=lambda: 1000.0,
     )
     assert restarted == ["calvin-kiosk-remote.service"]
+
+
+def test_run_watchdog_restarts_a_page_that_was_never_alive():
+    # CLV-35: DevTools only came up after the renderer had already crashed, and
+    # it flapped in and out. Recovery must still arm on the dead probes.
+    probes = iter(
+        [
+            agent.PAGE_UNREACHABLE,
+            agent.PAGE_DEAD,
+            agent.PAGE_UNREACHABLE,
+            agent.PAGE_DEAD,
+            agent.PAGE_DEAD,
+        ]
+    )
+    restarted = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=5,
+        probe=lambda: next(probes),
+        state=lambda unit: _unit(),
+        restart=_recorder(restarted),
+        sleep=lambda s: None,
+        clock=lambda: 1000.0,
+    )
+    assert restarted == ["calvin-kiosk-remote.service"]
+
+
+def test_watchdog_crash_loop_backs_off_to_fifteen_minutes(capsys):
+    # A page that crashes on every load must not restart-loop: the wait doubles
+    # from the base cooldown and stops at the 15-minute default cap, and every
+    # restart after the first says so loudly.
+    state = agent.new_watchdog_state()
+    restarted = []
+    waits = []
+    now = 0.0
+    for _ in range(5):
+        state["failures"] = 3
+        assert (
+            agent.watchdog_step(
+                state,
+                agent.PAGE_DEAD,
+                _unit(),
+                restart=_recorder(restarted),
+                now=now,
+            )
+            == "restarted"
+        )
+        wait = agent.next_cooldown(
+            state["restarts"],
+            agent.WATCHDOG_DEFAULT_COOLDOWN,
+            agent.WATCHDOG_DEFAULT_BACKOFF_MAX,
+        )
+        waits.append(wait)
+        now += wait + 1
+    assert waits == [300, 600, 900, 900, 900]
+    out = capsys.readouterr().out
+    assert "crash loop" in out
+    assert out.count("crash loop") == 4  # every restart after the first
+
+
+def test_http_json_never_sends_the_loopback_probe_through_a_proxy(monkeypatch):
+    # A proxy in the kiosk's environment must not swallow the DevTools probe:
+    # that would look like "no endpoint" forever and disarm recovery.
+    seen = {}
+
+    class FakeResponse(io.StringIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    class FakeOpener:
+        def open(self, url, timeout=None):
+            seen["url"] = url
+            seen["timeout"] = timeout
+            return FakeResponse('["ok"]')
+
+    monkeypatch.setattr(agent, "_LOOPBACK_OPENER", FakeOpener())
+    assert agent._http_json("http://127.0.0.1:9222/json/list", 3) == ["ok"]
+    assert seen == {"url": "http://127.0.0.1:9222/json/list", "timeout": 3}
+
+
+def test_cdp_targets_returns_none_for_a_non_chromium_array():
+    assert agent.cdp_targets(9222, fetch=lambda u, t: ["nope"]) is None
+
+
+def test_cdp_targets_accepts_an_empty_target_list():
+    assert agent.cdp_targets(9222, fetch=lambda u, t: []) == []
 
 
 def test_run_watchdog_survives_probe_errors():
