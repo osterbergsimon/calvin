@@ -120,3 +120,32 @@ assert_contains "$tmp/out6" 'release-only' "no note that main was replaced"
 assert_eq develop "$(state branch)"
 sed -i 's/^GIT_BRANCH=main$/GIT_BRANCH=develop/' "$tmp/calvin-update"
 pass "recorded main updates from develop"
+
+# --- 6. default state/log live outside the app user's checkout ---------------
+# update-calvin.sh runs as root; a state file in REPO_DIR/backend/logs lets the
+# app user plant a symlink for root to follow (calvin-1g25).
+reset_host
+(
+    unset UPDATE_STATE_FILE UPDATE_LOG_FILE
+    export CALVIN_UPDATE_DIR="$tmp/update-default"
+    export CALVIN_UPDATE_STATUS_DIR="$tmp/update-status"
+    bash "$SCRIPT" > "$tmp/out7" 2>&1 || { cat "$tmp/out7" >&2; exit 1; }
+)
+new_state="$tmp/update-status/calvin-update-state.json"
+[ -f "$new_state" ] || fail "update state not written under the root-owned update-status dir"
+assert_mode "$tmp/update-status" 755
+assert_eq success "$(grep -oE '"status": "[^"]*"' "$new_state" | cut -d'"' -f4)" "default run did not finish"
+[ ! -e "$tmp/repo/backend/logs/calvin-update-state.json" ] || fail "update state written inside the app user's checkout"
+assert_mode "$tmp/update-default" 700
+pass "default update state lives outside the checkout"
+
+# --- 7. a symlink planted at the fixed temp name is replaced, not followed ----
+reset_host
+victim="$tmp/victim"; printf 'VICTIM\n' > "$victim"
+rm -f "$UPDATE_STATE_FILE" "${UPDATE_STATE_FILE}.tmp"
+ln -s "$victim" "${UPDATE_STATE_FILE}.tmp"   # the old code wrote through this
+bash "$SCRIPT" > "$tmp/out8" 2>&1 || fail "update failed with a planted symlink: $(cat "$tmp/out8")"
+assert_eq VICTIM "$(cat "$victim")" "root wrote through a symlink planted at <state>.tmp"
+[ ! -L "$UPDATE_STATE_FILE" ] || fail "state file is still a symlink"
+assert_eq success "$(state status)"
+pass "planted state temp symlink not followed"
