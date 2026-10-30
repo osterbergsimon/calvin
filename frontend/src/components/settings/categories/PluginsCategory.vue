@@ -220,16 +220,15 @@ const cancelPipInstall = () => {
   pendingInstallAction.value = null;
 };
 
-// Mirrors what PluginCard renders when expanded: global settings, actions,
-// custom sections or an instance list. A single-instance plugin with none of
-// these (e.g. Picsum) would expand into an empty box.
+// Mirrors what PluginCard renders when expanded: plugin-level settings,
+// actions or custom sections. Sources are added in Content now, so a plugin
+// with only an instance schema has nothing to expand into.
 const cardHasBody = plugin =>
   Object.entries(plugin.common_config_schema || {}).some(
     ([key, schema]) => !key.startsWith("_") && !schema?.ui?.hidden
   ) ||
   (plugin.ui_actions || []).length > 0 ||
-  (plugin.ui_sections || []).length > 0 ||
-  plugin.supports_multiple_instances !== false;
+  (plugin.ui_sections || []).length > 0;
 
 // After an install (F5): a new plugin type lands disabled and on whatever tab
 // was open, so switch it on, jump to it and say what to do next.
@@ -280,7 +279,7 @@ const afterInstall = async installedIds => {
         ? `${names} installed — pick it under Dashboard › Appearance.`
         : hasSetup
           ? `${names} installed and enabled — finish its setup below.`
-          : `${names} installed and enabled — it's ready to use.`,
+          : `${names} installed and enabled — add a source from Content when you need it.`,
   });
 };
 
