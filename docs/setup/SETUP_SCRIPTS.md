@@ -284,8 +284,9 @@ The scripts have been refactored with the following improvements:
    # Linux
    sudo cat /var/log/calvin-setup.log
    
-   # Or check the repository log
-   cat /home/calvin/calvin/backend/logs/calvin-update.log
+   # Or check the updater log (root-owned, outside the checkout)
+   sudo cat /var/lib/calvin-update-status/calvin-update.log
+   # Older installs: /home/calvin/calvin/backend/logs/calvin-update.log
    ```
 
 2. **Verify prerequisites:**
@@ -363,7 +364,10 @@ In production mode it:
    and the previous `/etc/calvin/docker-compose.yml` and `.env`, restarts on them,
    and exits with an error. A failed refresh or pull restores the host files and
    restarts nothing. The state (including `previous_image`) is in
-   `calvin-update-state.json` next to the update log.
+   `/var/lib/calvin-update-status/calvin-update-state.json` next to the update
+   log (`CALVIN_UPDATE_STATUS_DIR` or `UPDATE_STATE_FILE`/`UPDATE_LOG_FILE`
+   override both). The dir is root-owned, so the app user cannot plant a
+   symlink for root to write through.
 
 Root does that clone, so `GIT_REPO` must be readable without the calvin user's
 credentials (an `https://` URL). Hosts set up before this behaviour existed run

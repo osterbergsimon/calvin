@@ -22,6 +22,7 @@ from app.plugins.utils.secrets import (
 )
 from app.services.event_system import event_system
 from app.utils.db_retry import retry_on_db_locked
+from app.utils.errors import internal_error
 
 
 @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
@@ -183,12 +184,9 @@ async def start_plugin_instance(instance_id: str):
             plugin.enabled = db_plugin.enabled
             await plugin_manager.register(plugin)
         else:
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"Failed to create plugin instance {instance_id}. "
-                    f"Plugin type {db_plugin.type_id} may not be available."
-                ),
+            raise internal_error(
+                "plugin_instance_create_failed",
+                "Could not create the plugin instance: its plugin type is not available.",
             )
 
     if plugin.is_running():
@@ -224,7 +222,10 @@ async def start_plugin_instance(instance_id: str):
             "running": plugin.is_running(),
         }
     else:
-        raise HTTPException(status_code=500, detail=f"Failed to start plugin {instance_id}")
+        raise internal_error(
+            "plugin_start_failed",
+            "Could not start the plugin instance. Check the server logs for details.",
+        )
 
 
 @router.post("/plugins/instances/{instance_id}/stop", response_model=PluginInstanceActionResponse)
@@ -294,7 +295,10 @@ async def stop_plugin_instance(instance_id: str):
             "running": False,
         }
     else:
-        raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
+        raise internal_error(
+            "plugin_stop_failed",
+            "Could not stop the plugin instance. Check the server logs for details.",
+        )
 
 
 @router.get("/plugins/{plugin_id}/instances", response_model=PluginInstanceListResponse)
@@ -393,11 +397,18 @@ async def create_plugin_instance(
     try:
         result = await apply_plugin_config_update(plugin_id, instance_config, None, db_plugin_type)
     except Exception as e:
-        logger.exception("Instance creation failed for plugin type {}", plugin_id)
-        raise HTTPException(status_code=500, detail=f"Failed to create instance: {e}")
+        raise internal_error(
+            "plugin_instance_create_failed",
+            "Could not create the plugin instance. Check the server logs for details.",
+            error=e,
+        ) from e
 
     if result and result.get("error"):
-        raise HTTPException(status_code=500, detail=f"Failed to create instance: {result['error']}")
+        logger.error("Instance creation failed for {}: {}", plugin_id, result["error"])
+        raise internal_error(
+            "plugin_instance_create_failed",
+            "Could not create the plugin instance. Check the required settings and the logs.",
+        )
     created_instance_id = result.get("instance_id") if result else None
     if not created_instance_id:
         raise HTTPException(
@@ -407,7 +418,10 @@ async def create_plugin_instance(
 
     db_plugin = await PluginDB.objects.get_or_none(id=created_instance_id)
     if not db_plugin:
-        raise HTTPException(status_code=500, detail="Created plugin instance not found in database")
+        raise internal_error(
+            "plugin_instance_create_failed",
+            "The plugin instance was created but could not be read back. Check the server logs.",
+        )
 
     plugin = plugin_manager.get_plugin(created_instance_id)
     instance = _build_instance_response(db_plugin, plugin.is_running() if plugin else False)

@@ -31,6 +31,7 @@
 import { computed, onMounted, ref } from "vue";
 import { useImagesStore } from "@/stores/images";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import { errorDetailMessage } from "@/utils/apiErrors";
 
 // The landing spot for the dashboard's "Add photos" button (F3): upload right
 // here instead of hunting for the Local Images card under Plugins.
@@ -56,7 +57,7 @@ const onFiles = async event => {
       await imagesStore.uploadImage(file);
       ok += 1;
     } catch (err) {
-      failed.push(`${file.name}: ${err.response?.data?.detail || err.message || "failed"}`);
+      failed.push(`${file.name}: ${errorDetailMessage(err, "failed")}`);
     }
   }
   uploading.value = false;

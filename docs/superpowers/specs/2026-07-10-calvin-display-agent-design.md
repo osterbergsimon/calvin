@@ -153,7 +153,7 @@ exists in `/etc/default/calvin-kiosk`, so the agent needs no extra config.
 
 This session's Pi is an older native install (units `calvin-backend`/`calvin-frontend`, no
 `/etc/default/calvin-kiosk`). Manual deploy of the same artifact:
-1. Create `/etc/default/calvin-kiosk` with `CALVIN_BACKEND_URL=https://calvin.wholab.xyz`.
+1. Create `/etc/default/calvin-kiosk` with `CALVIN_BACKEND_URL=https://calvin.example.com`.
 2. Install `calvin_display_agent.py` to `/usr/local/bin/`, install+enable the timer.
 3. Update the openbox autostart to the corrected `xset` block.
 4. Files transferred via `base64 -d | sudo tee` one-liners (the Pi's terminal truncates

@@ -660,3 +660,40 @@ export CALVIN_UPDATE_HEALTH_TIMEOUT=4
 CALVIN_AGENT_STATE_DIR="$tmp/state_al2" bash "$SCRIPT" || { echo "FAIL a0c-decommission: exited non-zero"; exit 1; }
 [ -f "$KEEP" ] || { echo "FAIL a0c-decommission: removed out-of-allowlist path"; exit 1; }
 echo "PASS a0c-decommission-skipped"
+
+# ===== calvin-g4w6: an empty restart_unit must not shift the TSV fields =====
+# read(1) collapses runs of IFS whitespace, so a bare empty field followed by
+# "enable=1" used to put "1" into the unit field ("restart unit not allowed: 1").
+mkdir -p "$tmp/state_g4w6"
+printf '[Unit]\nDescription=g4w6\n' > "$tmp/srv/calvin-kiosk-update.service"
+G4_UNIT_SHA="$(sha256sum "$tmp/srv/calvin-kiosk-update.service" | cut -d' ' -f1)"
+G4_AGENT_SHA="$(sha256sum "$tmp/local/calvin_display_agent.py" | cut -d' ' -f1)"
+cat > "$tmp/srv/manifest.json" <<EOF
+{"version":"g4w6000000000000","min_python":"3.9","files":[
+ {"name":"calvin_display_agent.py","sha256":"$G4_AGENT_SHA","mode":"0755",
+  "target_path":"$tmp/local/calvin_display_agent.py","restart_unit":"calvin-display-agent.service"},
+ {"name":"calvin-kiosk-update.service","sha256":"$G4_UNIT_SHA","mode":"0644",
+  "target_path":"$tmp/systemd/calvin-kiosk-update.service","restart_unit":"","enable":true}]}
+EOF
+cat > "$tmp/bin/curl" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do case "\$a" in
+  */agent/manifest) cat "$tmp/srv/manifest.json"; exit 0;;
+  */agent/files/calvin-kiosk-update.service) cat "$tmp/srv/calvin-kiosk-update.service"; exit 0;;
+esac; done
+exit 22
+EOF
+chmod +x "$tmp/bin/curl"
+: > "$tmp/systemctl.log"
+if ! CALVIN_AGENT_STATE_DIR="$tmp/state_g4w6" bash "$SCRIPT"; then
+  echo "FAIL g4w6-empty-unit: updater refused an enabled file with no restart_unit"
+  echo "--- state ---"; cat "$tmp/state_g4w6/agent-update-state.json" 2>/dev/null || true
+  exit 1
+fi
+[ -f "$tmp/systemd/calvin-kiosk-update.service" ] || {
+  echo "FAIL g4w6-empty-unit: unit not installed"; exit 1; }
+grep -q 'enable calvin-kiosk-update.service' "$tmp/systemctl.log" || {
+  echo "FAIL g4w6-empty-unit: unit not enabled"; exit 1; }
+grep -q 'restart unit not allowed' "$tmp/state_g4w6/agent-update-state.json" && {
+  echo "FAIL g4w6-empty-unit: empty restart_unit was shifted into the unit field"; exit 1; }
+echo "PASS g4w6-empty-restart-unit"

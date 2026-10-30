@@ -14,8 +14,8 @@ def _resolve(**overrides):
     values = {
         "public_url": "",
         "request_scheme": "http",
-        "request_host": "calvin.wholab.xyz",
-        "client_host": "192.168.1.50",
+        "request_host": "calvin.example.com",
+        "client_host": "192.0.2.50",
         "forwarded_proto": None,
         "forwarded_host": None,
         "trusted_proxies": "",
@@ -27,11 +27,11 @@ def _resolve(**overrides):
 def test_public_url_wins_even_behind_a_plain_http_request():
     assert (
         _resolve(
-            public_url="https://calvin.wholab.xyz/",
+            public_url="https://calvin.example.com/",
             forwarded_proto="http",
             forwarded_host="internal.example",
         )
-        == "https://calvin.wholab.xyz"
+        == "https://calvin.example.com"
     )
 
 
@@ -41,9 +41,9 @@ def test_forwarded_headers_from_a_trusted_proxy():
             trusted_proxies="127.0.0.1",
             client_host="127.0.0.1",
             forwarded_proto="https",
-            forwarded_host="calvin.wholab.xyz",
+            forwarded_host="calvin.example.com",
         )
-        == "https://calvin.wholab.xyz"
+        == "https://calvin.example.com"
     )
 
 
@@ -55,7 +55,7 @@ def test_forwarded_proto_alone_keeps_the_request_host():
             client_host="127.0.0.1",
             forwarded_proto="https",
         )
-        == "https://calvin.wholab.xyz"
+        == "https://calvin.example.com"
     )
 
 
@@ -67,25 +67,25 @@ def test_forwarded_headers_from_an_untrusted_client_are_ignored():
             forwarded_proto="https",
             forwarded_host="evil.example",
         )
-        == "http://calvin.wholab.xyz"
+        == "http://calvin.example.com"
     )
 
 
 def test_forwarded_headers_ignored_when_no_proxy_is_configured():
     assert (
-        _resolve(forwarded_proto="https", forwarded_host="calvin.wholab.xyz")
-        == "http://calvin.wholab.xyz"
+        _resolve(forwarded_proto="https", forwarded_host="calvin.example.com")
+        == "http://calvin.example.com"
     )
 
 
 def test_plain_request_uses_the_request_url():
-    assert _resolve() == "http://calvin.wholab.xyz"
+    assert _resolve() == "http://calvin.example.com"
 
 
 def test_trusted_cidr_and_wildcard_entries():
     proxy = {"client_host": "10.4.5.6", "forwarded_proto": "https"}
-    assert _resolve(trusted_proxies="10.0.0.0/8", **proxy) == "https://calvin.wholab.xyz"
-    assert _resolve(trusted_proxies="*", **proxy) == "https://calvin.wholab.xyz"
+    assert _resolve(trusted_proxies="10.0.0.0/8", **proxy) == "https://calvin.example.com"
+    assert _resolve(trusted_proxies="*", **proxy) == "https://calvin.example.com"
 
 
 def test_malformed_forwarded_values_are_ignored():
@@ -98,7 +98,7 @@ def test_malformed_forwarded_values_are_ignored():
             forwarded_proto="javascript",
             forwarded_host="host'$(reboot)'",
         )
-        == "http://calvin.wholab.xyz"
+        == "http://calvin.example.com"
     )
     assert (
         _resolve(
@@ -111,14 +111,14 @@ def test_malformed_forwarded_values_are_ignored():
     )
 
 
-def _request(headers: dict[str, str], client: tuple[str, int] | None = ("192.168.1.50", 1234)):
+def _request(headers: dict[str, str], client: tuple[str, int] | None = ("192.0.2.50", 1234)):
     raw = [(k.lower().encode(), v.encode()) for k, v in headers.items()]
-    raw.append((b"host", b"calvin.wholab.xyz"))
+    raw.append((b"host", b"calvin.example.com"))
     return Request(
         {
             "type": "http",
             "scheme": "http",
-            "server": ("calvin.wholab.xyz", 80),
+            "server": ("calvin.example.com", 80),
             "path": "/api/kiosks/install.sh",
             "query_string": b"",
             "headers": raw,
@@ -134,16 +134,16 @@ def test_public_base_url_reads_settings_and_request(monkeypatch):
     monkeypatch.setattr(module.settings, "trusted_proxies", "127.0.0.1", raising=False)
 
     trusted = _request(
-        {"x-forwarded-proto": "https", "x-forwarded-host": "calvin.wholab.xyz"},
+        {"x-forwarded-proto": "https", "x-forwarded-host": "calvin.example.com"},
         client=("127.0.0.1", 5000),
     )
-    assert public_base_url(trusted) == "https://calvin.wholab.xyz"
+    assert public_base_url(trusted) == "https://calvin.example.com"
 
     untrusted = _request(
-        {"x-forwarded-proto": "https", "x-forwarded-host": "calvin.wholab.xyz"},
+        {"x-forwarded-proto": "https", "x-forwarded-host": "calvin.example.com"},
         client=("203.0.113.9", 5000),
     )
-    assert public_base_url(untrusted) == "http://calvin.wholab.xyz"
+    assert public_base_url(untrusted) == "http://calvin.example.com"
 
-    monkeypatch.setattr(module.settings, "public_url", "https://calvin.wholab.xyz/", raising=False)
-    assert public_base_url(untrusted) == "https://calvin.wholab.xyz"
+    monkeypatch.setattr(module.settings, "public_url", "https://calvin.example.com/", raising=False)
+    assert public_base_url(untrusted) == "https://calvin.example.com"

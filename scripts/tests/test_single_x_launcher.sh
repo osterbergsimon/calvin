@@ -40,6 +40,22 @@ assert_contains "$tmp/home/calvin/.xinitrc" 'openbox-session'
 assert_contains "$tmp/systemctl.log" 'disable getty@tty1.service' "getty@tty1 not disabled"
 pass "configure_display leaves calvin-x.service as the only X launcher"
 
+# calvin-1g25: a symlink the app user planted at a dotfile must not be followed
+# by root (cat > ~calvin/.xprofile used to write through it).
+for f in .xprofile .xinitrc; do
+    victim="$tmp/victim$f"; printf 'KEEP\n' > "$victim"
+    rm -f "$tmp/home/calvin/$f"
+    ln -s "$victim" "$tmp/home/calvin/$f"
+done
+configure_display calvin
+for f in .xprofile .xinitrc; do
+    assert_eq 'KEEP' "$(cat "$tmp/victim$f")" "configure_display wrote through a planted $f symlink"
+    [ ! -L "$tmp/home/calvin/$f" ] || fail "$f is still a symlink after configure_display"
+done
+assert_contains "$tmp/home/calvin/.xprofile" 'xset s off'
+assert_contains "$tmp/home/calvin/.xinitrc" 'openbox-session'
+pass "planted dotfile symlinks replaced, not followed"
+
 # An operator's own autologin (another user) is not ours to delete.
 mkdir -p "$tmp/systemd/getty@tty1.service.d"
 cat > "$tmp/systemd/getty@tty1.service.d/autologin.conf" <<'EOF'

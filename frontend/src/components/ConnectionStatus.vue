@@ -26,7 +26,12 @@
       <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path :d="iconPath" />
       </svg>
-      <span v-if="!compact" class="connection-status__text">{{ pillText }}</span>
+      <span v-if="!compact" class="connection-status__text"
+        >{{ pillBaseText
+        }}<span v-if="dataFrom" class="connection-status__from">
+          · data from {{ dataFrom }}</span
+        ></span
+      >
     </button>
     <span
       v-else-if="showConnecting"
@@ -153,9 +158,14 @@ const iconPath = computed(() =>
   status.value === "offline" ? mdiLanDisconnect : mdiCloudOffOutline
 );
 
+const pillBaseText = computed(() =>
+  status.value === "offline" ? "No network" : "Can't reach Calvin"
+);
+
 const pillText = computed(() => {
-  const base = status.value === "offline" ? "No network" : "Can't reach Calvin";
-  return dataFrom.value ? `${base} · data from ${dataFrom.value}` : base;
+  return dataFrom.value
+    ? `${pillBaseText.value} · data from ${dataFrom.value}`
+    : pillBaseText.value;
 });
 
 const floatingCorner = computed(() =>
@@ -310,6 +320,14 @@ onUnmounted(() => {
 .connection-status__pill:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* On a phone-width clock bar the age of the data is the first thing that does
+   not fit; the popover still spells it out (CLV-66). */
+@media (max-width: 600px) {
+  .connection-status__from {
+    display: none;
+  }
 }
 
 .connection-status__icon {

@@ -561,7 +561,7 @@ Expected: PASS (all tests).
 
 Run:
 ```bash
-CALVIN_BACKEND_URL=http://10.10.1.25:8000 CALVIN_DISPLAY_REFRESH_SECONDS=5 \
+CALVIN_BACKEND_URL=http://192.0.2.25:8000 CALVIN_DISPLAY_REFRESH_SECONDS=5 \
   timeout 3 python3 deploy/kiosk-agent/calvin_display_agent.py; true
 ```
 Expected: logs `starting: backend=... refresh=5s`; `vcgencmd`/`xset` absent on the dev box so it logs a `none (...)` apply method but does not crash. (Schedule currently disabled ⇒ desired ON.)
@@ -765,7 +765,7 @@ git commit -m "docs(kiosk): document Mode-B screen scheduling agent"
 
 ## Task 9: Deploy to the existing Pi + live verification (operational, not code)
 
-This task runs against the live kiosk (`calvin@calvin`, backend `https://calvin.wholab.xyz`). It is the acceptance test for the whole plan. Commands are delivered to the Pi as base64 one-liners because that terminal truncates multi-line pastes.
+This task runs against the live kiosk (`calvin@calvin`, backend `https://calvin.example.com`). It is the acceptance test for the whole plan. Commands are delivered to the Pi as base64 one-liners because that terminal truncates multi-line pastes.
 
 **Files:** none in the repo. Creates on the Pi: `/etc/default/calvin-kiosk`, `/usr/local/bin/calvin_display_agent.py`, `/etc/systemd/system/calvin-display-agent.service`, updated `~/.config/openbox/autostart`.
 
@@ -782,7 +782,7 @@ Record which command actually blanked the panel. (The agent tries both; this jus
 - [ ] **Step 2: Create `/etc/default/calvin-kiosk`**
 
 ```bash
-printf 'CALVIN_BACKEND_URL=https://calvin.wholab.xyz\nCALVIN_DISPLAY_REFRESH_SECONDS=900\n' | sudo tee /etc/default/calvin-kiosk >/dev/null
+printf 'CALVIN_BACKEND_URL=https://calvin.example.com\nCALVIN_DISPLAY_REFRESH_SECONDS=900\n' | sudo tee /etc/default/calvin-kiosk >/dev/null
 ```
 
 - [ ] **Step 3: Install the agent script**
