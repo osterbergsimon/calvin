@@ -22,6 +22,7 @@ from app.plugins.loader import plugin_loader
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.services.plugin_installer import plugin_installer, run_installer_op
 from app.services.theme_installer import theme_installer
+from app.utils.errors import internal_error
 
 router = APIRouter()
 
@@ -142,9 +143,11 @@ async def enumerate_plugins_from_github(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to enumerate plugins from GitHub")
-        error_detail = str(e) if str(e) else "Unknown error occurred"
-        raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {error_detail}")
+        raise internal_error(
+            "plugin_source_enumerate_failed",
+            "Could not read that repository. Check the URL and the server logs.",
+            error=e,
+        ) from e
     finally:
         # Clean up temp files
         if temp_path and temp_path.exists():
@@ -348,12 +351,19 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")
+            raise internal_error(
+                "plugin_install_failed",
+                "Could not install the plugin. Check the server logs for details.",
+                error=e,
+            ) from e
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to install plugin from GitHub")
-        raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+        raise internal_error(
+            "plugin_install_failed",
+            "Could not install the plugin. Check the server logs for details.",
+            error=e,
+        ) from e
     finally:
         # Clean up temp files
         if temp_path and temp_path.exists():
@@ -552,5 +562,8 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Failed to install plugin from local path")
-        raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")
+        raise internal_error(
+            "plugin_install_failed",
+            "Could not install the plugin. Check the server logs for details.",
+            error=e,
+        ) from e

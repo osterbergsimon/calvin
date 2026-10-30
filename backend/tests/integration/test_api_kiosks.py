@@ -203,7 +203,9 @@ def test_agent_manifest_503_on_broken_checkout(test_client: TestClient):
     with patch.object(kiosk_bundle.settings, "repo_dir", Path("/nonexistent-checkout")):
         r = test_client.get("/api/kiosks/agent/manifest")
     assert r.status_code == 503
-    assert "unavailable" in r.json()["detail"].lower()
+    detail = r.json()["detail"]
+    assert detail["code"] == "kiosk_bundle_unavailable"
+    assert "unavailable" in detail["message"].lower()
 
 
 @pytest.mark.integration
