@@ -16,6 +16,7 @@ from app.services.kiosk_registry import (
     merge_overrides,
     set_overrides,
 )
+from app.utils.public_url import public_base_url
 
 router = APIRouter()
 
@@ -100,7 +101,7 @@ async def get_install_script(request: Request):
     Usage on a fresh Pi: ``curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash``
     """
     try:
-        script = kiosk_bundle.render_install_script(str(request.base_url))
+        script = kiosk_bundle.render_install_script(public_base_url(request))
     except OSError as exc:
         raise HTTPException(
             status_code=503, detail="Kiosk installer unavailable on server"
