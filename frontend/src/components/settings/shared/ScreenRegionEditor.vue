@@ -44,14 +44,18 @@
                 'is-dimmed': isPageDimmed(page.id),
               }"
               :aria-selected="page.id === activeScreenId"
+              :aria-label="pageTabLabel(page)"
+              :title="pageTabTitle(page)"
+              data-test="page-tab"
               @click="selectScreen(page.id)"
             >
-              <span class="sre-tab-body">
-                <span class="sre-tab-name"><span class="sre-tab-dot" />{{ page.name }}</span>
-                <span class="sre-tab-screens" data-test="page-screens">{{
-                  screensLine(page.id)
-                }}</span>
-              </span>
+              <span class="sre-tab-name">{{ page.name }}</span>
+              <span
+                class="sre-tab-screens"
+                :class="{ 'is-not-shown': screensLine(page.id) === NOT_SHOWN }"
+                data-test="page-screens"
+                >{{ screensLine(page.id) }}</span
+              >
             </button>
             <button
               type="button"
@@ -60,7 +64,8 @@
               title="Add page"
               @click="addScreen"
             >
-              +
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="mdiPlus" /></svg>
+              Page
             </button>
           </div>
           <div class="sre-preview-as">
@@ -367,6 +372,7 @@
                 :screen="activeScreen"
                 :layout-dir="layoutDir"
                 :clock="clock"
+                :clock-selected="clockSelected"
                 :can-delete="screens.screens.length > 1"
                 @rename="renameScreen"
                 @preset="applyPreset"
@@ -408,6 +414,7 @@ import IconButton from "@/components/ui/IconButton.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import Tag from "@/components/ui/Tag.vue";
+import { mdiPlus } from "@mdi/js";
 import { getKioskId } from "@/utils/kioskId";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
@@ -612,14 +619,24 @@ const kioskShowsPage = (kiosk, pageId) => {
   return !Array.isArray(avail) || avail.includes(pageId);
 };
 const screensShowingPage = pageId => kiosksStore.kiosks.filter(k => kioskShowsPage(k, pageId));
+const NOT_SHOWN = "Not shown";
 const screensLine = pageId => {
   const all = kiosksStore.kiosks;
   if (all.length === 0) return "All screens";
   const showing = screensShowingPage(pageId);
   if (showing.length === all.length) return "All screens";
-  if (showing.length === 0) return "Not on any screen";
-  return showing.map(kioskName).join(" · ");
+  if (showing.length === 0) return NOT_SHOWN;
+  return showing.map(kioskName).join(", ");
 };
+// The tab reads as one sentence for screen readers, including the screens
+// text that is truncated visually at 16ch.
+const pageTabLabel = page => {
+  const line = screensLine(page.id);
+  if (line === "All screens") return `${page.name}, shown on all screens`;
+  if (line === NOT_SHOWN) return `${page.name}, not shown on any screen`;
+  return `${page.name}, shown on ${line}`;
+};
+const pageTabTitle = page => `${page.name} · ${screensLine(page.id)}`;
 const isPageDimmed = pageId =>
   previewScreenId.value !== ANY_BROWSER && !kioskShowsPage(previewKiosk.value, pageId);
 const mismatch = computed(
@@ -1299,83 +1316,110 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-lg);
-  padding: var(--space-sm) var(--space-2xl);
+  padding: 0 var(--space-lg);
   border-bottom: 1px solid var(--line);
-  background: var(--bg-0);
+  background: var(--bg-1);
 }
+/* One-line underline tabs. The row scrolls sideways on overflow and fades
+   at the ends instead of wrapping or showing a scrollbar. */
 .sre-tabs {
   display: flex;
-  align-items: center;
-  gap: var(--space-2xs);
+  align-items: stretch;
+  gap: 0;
+  height: var(--tab-height);
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    var(--ink) var(--space-lg),
+    var(--ink) calc(100% - var(--space-lg)),
+    transparent
+  );
+}
+.sre-tabs::-webkit-scrollbar {
+  display: none;
 }
 .sre-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  padding: var(--space-2xs) var(--space-md);
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
+  gap: var(--space-lg);
+  padding: 0 var(--space-lg);
+  border: 0;
   background: transparent;
   color: var(--ink-2);
+  font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  font-weight: 550;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
 }
 .sre-tab:hover {
-  background: var(--bg-2);
+  color: var(--ink);
+}
+.sre-tab:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 .sre-tab.is-active {
-  background: var(--bg-1);
-  border-color: var(--line);
   color: var(--ink);
-  box-shadow: 0 1px 3px var(--shadow);
-  font-weight: 650;
+  font-weight: 600;
 }
-.sre-tab-body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  line-height: 1.2;
+.sre-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: var(--space-lg);
+  right: var(--space-lg);
+  bottom: 0;
+  height: var(--tab-indicator);
+  background: var(--focus);
 }
 .sre-tab-name {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
+  display: inline-block;
 }
 .sre-tab-screens {
+  max-width: 16ch;
+  overflow: hidden;
+  color: var(--ink-3);
   font-size: var(--fs-xs);
   font-weight: 400;
-  color: var(--ink-3);
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+.sre-tab-screens.is-not-shown {
+  color: color-mix(in srgb, var(--warn) 45%, var(--ink));
 }
 .sre-tab.is-dimmed {
   opacity: 0.5;
 }
-.sre-tab-dot {
-  flex: 0 0 auto;
-  width: 7px;
-  height: 7px;
-  border-radius: 2px;
-  background: var(--focus);
-  opacity: 0.6;
-}
-.sre-tab.is-active .sre-tab-dot {
-  opacity: 1;
-}
 .sre-tab-add {
-  width: 30px;
-  height: 30px;
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  height: var(--tab-height);
+  padding: 0 var(--space-lg);
+  border: 0;
   background: transparent;
-  color: var(--ink-3);
-  font-size: 1.05rem;
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
 }
+.sre-tab-add svg {
+  width: var(--tab-icon);
+  height: var(--tab-icon);
+  fill: currentColor;
+}
 .sre-tab-add:hover {
-  border-color: var(--focus);
-  color: var(--focus);
+  color: var(--ink);
+}
+.sre-tab-add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 .sre-preview-as {
   margin-left: auto;
@@ -1774,13 +1818,8 @@ onUnmounted(() => {
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
 }
-.sre-root.size-phone .sre-tab {
-  min-height: 44px;
-}
-.sre-root.size-phone .sre-tab-add {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
+.sre-root.size-phone .sre-tab-screens {
+  display: none;
 }
 .sre-root.size-phone .sre-preview-as {
   margin-left: 0;
