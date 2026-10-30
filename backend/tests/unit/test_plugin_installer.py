@@ -415,6 +415,14 @@ class TestPluginInstaller:
         plugins = plugin_installer.get_installed_plugins()
         assert plugins == []
 
+    def test_get_installed_plugins_skips_non_object_manifest(self, plugin_installer):
+        """A plugin.json holding a JSON array is skipped, not raised as TypeError (CLV-23)."""
+        bad_dir = plugin_installer.plugins_dir / "bad"
+        bad_dir.mkdir()
+        (bad_dir / "plugin.json").write_text("[]")
+
+        assert plugin_installer.get_installed_plugins() == []
+
     def test_get_installed_plugins(self, plugin_installer, valid_plugin_package):
         """Test getting list of installed plugins."""
         plugin_installer.install_plugin(valid_plugin_package)
