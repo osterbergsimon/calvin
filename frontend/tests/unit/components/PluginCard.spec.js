@@ -101,3 +101,43 @@ describe("PluginCard controls", () => {
     expect(builtin.find(".pc-btn--danger").exists()).toBe(false);
   });
 });
+
+describe("PluginCard update (§3.3)", () => {
+  it("offers Update when the catalog has a newer version", async () => {
+    const w = mountCard(service({ version: "1.0.0" }), [], { latestVersion: "2.0.0" });
+    const button = w.find(".pc-btn--update");
+    expect(button.exists()).toBe(true);
+    expect(button.text()).toBe("Update to v2.0.0");
+
+    await button.trigger("click");
+    expect(w.emitted("update")?.[0]).toEqual(["svc"]);
+  });
+
+  it("compares versions as semver, not as strings", () => {
+    expect(
+      mountCard(service({ version: "1.9.0" }), [], { latestVersion: "1.10.0" })
+        .find(".pc-btn--update")
+        .exists()
+    ).toBe(true);
+    expect(
+      mountCard(service({ version: "1.10.0" }), [], { latestVersion: "1.9.0" })
+        .find(".pc-btn--update")
+        .exists()
+    ).toBe(false);
+  });
+
+  it("does not offer Update for the same version", () => {
+    const w = mountCard(service({ version: "1.0.0" }), [], { latestVersion: "1.0.0" });
+    expect(w.find(".pc-btn--update").exists()).toBe(false);
+  });
+
+  it("shows progress while the update installs", () => {
+    const w = mountCard(service({ version: "1.0.0" }), [], {
+      latestVersion: "2.0.0",
+      updating: true,
+    });
+    const button = w.find(".pc-btn--update");
+    expect(button.text()).toBe("Updating…");
+    expect(button.attributes("disabled")).toBeDefined();
+  });
+});
