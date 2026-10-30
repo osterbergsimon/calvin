@@ -28,6 +28,10 @@ ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1
 ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "/home/calvin/.cache/chromium/Default/Code Cache"/* 2>/dev/null || true'
+# The display agent recovers from a renderer crash ("Aw, Snap!") by probing the
+# page over the Chrome DevTools Protocol: the crash leaves Chromium's browser
+# process alive, so Restart= alone never fires. Loopback only; the agent reads the
+# same CALVIN_KIOSK_CDP_PORT (default 9222) from the environment.
 ExecStart=/bin/bash -c 'q=""; \
     [ -n "${CALVIN_KIOSK_ID:-}" ] && q="kiosk=${CALVIN_KIOSK_ID}"; \
     [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
@@ -36,6 +40,8 @@ ExecStart=/bin/bash -c 'q=""; \
     $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
     --kiosk \
     --noerrdialogs \
+    --remote-debugging-port=$${CALVIN_KIOSK_CDP_PORT:-9222} \
+    --remote-debugging-address=127.0.0.1 \
     --disable-infobars \
     --autoplay-policy=no-user-gesture-required \
     --disable-features=TranslateUI,AudioServiceOutOfProcess \

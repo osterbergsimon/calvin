@@ -24,6 +24,8 @@ ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.cache/chromium/Default/Cache/* "
 ExecStart=/bin/bash -c 'exec /usr/bin/chromium \
     --kiosk \
     --noerrdialogs \
+    --remote-debugging-port=${CALVIN_KIOSK_CDP_PORT:-9222} \
+    --remote-debugging-address=127.0.0.1 \
     --disable-infobars \
     --autoplay-policy=no-user-gesture-required \
     --disable-features=TranslateUI \
