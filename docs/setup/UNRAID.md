@@ -98,7 +98,7 @@ using the line above.
 bake-the-SD-card option with no SSH at all.
 
 Use a stable hostname or IP for `<unraid-host>` so the kiosk URL does not
-change. To update a Pi's display agent later, use **Settings → Kiosks →
+change. To update a Pi's display agent later, use **Settings → Screens →
 Update**: the Unraid container serves the kiosk bundle that matches its
 own build. See [Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
 

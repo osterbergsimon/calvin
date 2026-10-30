@@ -65,13 +65,12 @@
               @update:config="handleConfigUpdate"
             />
             <PluginsCategory v-if="activeCategory === 'plugins'" :key="categoryRenderKey" />
-            <DeviceSettings
-              v-if="activeCategory === 'device' && localConfig"
+            <ScreensSettings
+              v-if="activeCategory === 'screens' && localConfig"
               :key="categoryRenderKey"
               :config="localConfig"
               @update:config="handleConfigUpdate"
             />
-            <KiosksSettings v-if="activeCategory === 'kiosks'" :key="categoryRenderKey" />
             <MaintenanceSettings
               v-if="activeCategory === 'maintenance' && localConfig"
               :key="categoryRenderKey"
@@ -123,14 +122,11 @@ const DashboardSettings = defineAsyncComponent(
 const PluginsCategory = defineAsyncComponent(
   () => import("@/components/settings/categories/PluginsCategory.vue")
 );
-const DeviceSettings = defineAsyncComponent(
-  () => import("@/components/settings/categories/DeviceSettings.vue")
+const ScreensSettings = defineAsyncComponent(
+  () => import("@/components/settings/categories/ScreensSettings.vue")
 );
 const MaintenanceSettings = defineAsyncComponent(
   () => import("@/components/settings/categories/MaintenanceSettings.vue")
-);
-const KiosksSettings = defineAsyncComponent(
-  () => import("@/components/settings/categories/KiosksSettings.vue")
 );
 const SecuritySettings = defineAsyncComponent(
   () => import("@/components/settings/categories/SecuritySettings.vue")
@@ -331,13 +327,9 @@ const SECTION_BY_CATEGORY_TAB = {
     // "Add a web page" (plugins-services) lands on the services section.
     "content-services": "content-services",
   },
-  device: {
-    layout: "layout",
-    power: "device-power",
-    keyboard: "device-keyboard",
-    notifications: "device-buttons",
-    // The reboot combo lives with the remote's button rows.
-    reboot: "device-buttons",
+  screens: {
+    // Screens has no tabs: the list page and each screen's page are sections.
+    // Destinations point at a section id directly (see settingsRegistry.js).
   },
   maintenance: {
     updates: "maintenance-updates",
@@ -346,10 +338,6 @@ const SECTION_BY_CATEGORY_TAB = {
     backup: "maintenance-backup",
     // The old Diagnostics rows moved into the closed Advanced disclosure.
     diagnostics: "maintenance-advanced",
-  },
-  kiosks: {
-    // "Kiosk software" is a row inside the Kiosks list, not a tab.
-    software: "kiosks-list",
   },
   security: {
     admin: "security-admin",
