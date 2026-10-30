@@ -1,0 +1,17 @@
+# Issue chooser configuration
+# https://docs.github.com/communities/configuring-your-repository/configuring-your-repository-for-community-contributions
+blank_issues_enabled: false
+
+contact_links:
+  - name: 🔒 Report a security vulnerability (private)
+    url: https://github.com/osterbergsimon/calvin/security/advisories/new
+    about: Please never report security problems in a public issue. See SECURITY.md for scope and what to include.
+  - name: 📖 Setup, kiosk, and configuration help
+    url: https://github.com/osterbergsimon/calvin/blob/develop/docs/setup/GETTING_STARTED.md
+    about: Installation, topologies, kiosk provisioning, and troubleshooting — check the docs before opening a bug.
+  - name: 🔌 Plugin idea or plugin bug
+    url: https://github.com/osterbergsimon/calvin-plugins/issues
+    about: Plugins live in their own repository. Integration requests that need no core change belong there.
+  - name: 💬 Contributing and development questions
+    url: https://github.com/osterbergsimon/calvin/blob/develop/CONTRIBUTING.md
+    about: Branch model, quality gates, and commit conventions for pull requests.
