@@ -754,7 +754,7 @@ onUnmounted(() => {
   font-family: var(--font-ui);
 }
 .layout-unlock-banner__text {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink);
   white-space: nowrap;
 }
@@ -762,7 +762,7 @@ onUnmounted(() => {
   min-height: 36px;
   padding: 0 0.9rem;
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--focus-ink);
   background: var(--focus);

@@ -53,8 +53,8 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
   position: absolute;
   inset: auto 0 0 0;
   padding: 1rem 1.25rem;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), transparent);
-  color: white;
+  background: linear-gradient(to top, var(--scrim-strong), transparent);
+  color: var(--on-scrim);
   display: flex;
   flex-direction: column;
   gap: 0.25rem;

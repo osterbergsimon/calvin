@@ -219,7 +219,7 @@ onMounted(async () => {
 
 .svc-place {
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
 }
 .svc-unplaced {
@@ -233,7 +233,7 @@ onMounted(async () => {
   border: 0;
   border-bottom: 1px dotted currentColor;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   cursor: pointer;
 }
 .svc-link:hover {
@@ -244,7 +244,7 @@ onMounted(async () => {
   outline-offset: 2px;
 }
 .svc-link--primary {
-  color: var(--focus);
+  color: var(--focus-text);
 }
 .svc-link--cta {
   display: inline-block;
@@ -253,7 +253,7 @@ onMounted(async () => {
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-weight: 600;
 }
 </style>

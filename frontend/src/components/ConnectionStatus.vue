@@ -26,7 +26,12 @@
       <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path :d="iconPath" />
       </svg>
-      <span v-if="!compact" class="connection-status__text">{{ pillText }}</span>
+      <span v-if="!compact" class="connection-status__text"
+        >{{ pillBaseText
+        }}<span v-if="dataFrom" class="connection-status__from">
+          · data from {{ dataFrom }}</span
+        ></span
+      >
     </button>
     <span
       v-else-if="showConnecting"
@@ -153,9 +158,14 @@ const iconPath = computed(() =>
   status.value === "offline" ? mdiLanDisconnect : mdiCloudOffOutline
 );
 
+const pillBaseText = computed(() =>
+  status.value === "offline" ? "No network" : "Can't reach Calvin"
+);
+
 const pillText = computed(() => {
-  const base = status.value === "offline" ? "No network" : "Can't reach Calvin";
-  return dataFrom.value ? `${base} · data from ${dataFrom.value}` : base;
+  return dataFrom.value
+    ? `${pillBaseText.value} · data from ${dataFrom.value}`
+    : pillBaseText.value;
 });
 
 const floatingCorner = computed(() =>
@@ -312,6 +322,14 @@ onUnmounted(() => {
   outline-offset: 2px;
 }
 
+/* On a phone-width clock bar the age of the data is the first thing that does
+   not fit; the popover still spells it out (CLV-66). */
+@media (max-width: 600px) {
+  .connection-status__from {
+    display: none;
+  }
+}
+
 .connection-status__icon {
   width: 16px;
   height: 16px;
@@ -329,7 +347,7 @@ onUnmounted(() => {
 .connection-status__connected {
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  color: var(--ok);
+  color: var(--ok-text);
   white-space: nowrap;
 }
 
@@ -380,14 +398,14 @@ onUnmounted(() => {
   text-align: left;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 18px 50px -16px var(--shadow-hover);
 }
 
 .connection-popover__title {
   margin: 0 0 8px;
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
 }
 
@@ -402,12 +420,12 @@ onUnmounted(() => {
   min-height: 44px;
   padding: 0 16px;
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 

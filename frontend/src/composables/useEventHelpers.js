@@ -66,6 +66,26 @@ export function useEventHelpers() {
   };
 
   /**
+   * Ink for text drawn on an event chip.
+   *
+   * A chip is painted in the calendar's own colour, not in a theme surface, so
+   * the ink cannot come from the theme: pick the light or dark chip ink by the
+   * colour's luminance (WCAG threshold: white needs L <= 0.183). Both inks are
+   * theme tokens (`--on-event-ink`, `--on-event-ink-dark`) so this only decides
+   * which of the two applies.
+   */
+  const getEventInk = event => {
+    const hex = String(getEventColor(event) || "").replace("#", "");
+    if (!/^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(hex)) return "var(--on-event-ink)";
+    const full = hex.length === 3 ? [...hex].map(c => c + c).join("") : hex;
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16) / 255);
+    const linear = channel =>
+      channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    const luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+    return luminance > 0.183 ? "var(--on-event-ink-dark)" : "var(--on-event-ink)";
+  };
+
+  /**
    * Get event title with time for tooltip
    */
   const getEventTitle = event => {
@@ -116,6 +136,7 @@ export function useEventHelpers() {
 
   return {
     getEventColor,
+    getEventInk,
     formatEventTime,
     formatEventStartTime,
     getEventTitle,

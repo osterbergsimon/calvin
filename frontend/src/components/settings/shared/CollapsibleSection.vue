@@ -68,7 +68,7 @@ const toggle = () => {
 .settings-section {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-bottom: 1.5rem;
   overflow: hidden;
   transition: all 0.2s ease;
@@ -103,7 +103,7 @@ const toggle = () => {
 
 .section-header h2 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   font-family: var(--font-ui);
   color: var(--ink);
@@ -113,11 +113,11 @@ const toggle = () => {
 }
 
 .section-icon {
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
 }
 
 .toggle-icon {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
   transition: transform 0.2s ease;
 }
@@ -132,7 +132,7 @@ const toggle = () => {
 }
 
 .settings-section.is-drawer {
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   margin-bottom: 0;
 }
 </style>

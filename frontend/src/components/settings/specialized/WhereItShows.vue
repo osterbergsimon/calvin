@@ -92,7 +92,7 @@ const place = () => {
 }
 .where-shows__row:hover .where-shows__where,
 .where-shows__row:focus-visible .where-shows__where {
-  color: var(--focus);
+  color: var(--focus-text);
 }
 .where-shows__row:focus-visible {
   outline: 2px solid var(--focus);
@@ -119,7 +119,7 @@ const place = () => {
   padding: 0 var(--space-md);
   border: 0;
   background: transparent;
-  color: var(--focus);
+  color: var(--focus-text);
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
   font-weight: 600;

@@ -55,7 +55,7 @@
               <div
                 v-if="key === 'location' && geocodeStatus"
                 :class="geocodeStatus.success ? 'success-message' : 'error-message'"
-                style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+                style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
               >
                 {{ geocodeStatus.message }}
               </div>
@@ -117,7 +117,7 @@
             <div
               v-if="testStatus"
               :class="testStatus.success ? 'success-message' : 'error-message'"
-              style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+              style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
             >
               {{ testStatus.message }}
             </div>
@@ -615,7 +615,7 @@ const handleSave = async () => {
 
 .instance-modal {
   background: var(--bg-1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 4px 12px var(--shadow);
   max-width: 600px;
   width: 90%;
@@ -633,7 +633,7 @@ const handleSave = async () => {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 600;
   color: var(--ink);
 }
@@ -651,7 +651,7 @@ const handleSave = async () => {
   font-weight: 600;
   color: var(--ink);
   margin-bottom: 0.5rem;
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-family: var(--font-ui);
 }
 
@@ -661,8 +661,8 @@ const handleSave = async () => {
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-family: inherit;
   transition: all 0.2s;
 }
@@ -679,7 +679,7 @@ const handleSave = async () => {
 }
 
 .help-text {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
   margin-top: 0.25rem;
   line-height: 1.4;
@@ -688,18 +688,18 @@ const handleSave = async () => {
 .error-message {
   padding: 0.75rem 1rem;
   background: color-mix(in srgb, var(--err) 10%, transparent);
-  color: var(--err);
+  color: var(--err-text);
   border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   margin-bottom: 1rem;
 }
 
 .success-message {
   padding: 0.75rem 1rem;
   background: color-mix(in srgb, var(--ok) 10%, transparent);
-  color: var(--ok);
+  color: var(--ok-text);
   border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
 }
 
 .modal-actions {
@@ -724,8 +724,8 @@ const handleSave = async () => {
   padding: 0.75rem 1.5rem;
   min-height: var(--touch-target);
   border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -733,12 +733,12 @@ const handleSave = async () => {
 
 .btn-primary {
   background: var(--focus);
-  color: white;
+  color: var(--focus-ink);
   border: 1px solid var(--focus);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus), black 12%);
+  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }
@@ -779,17 +779,17 @@ const handleSave = async () => {
   padding: 0.5rem 1rem;
   min-height: var(--touch-target);
   background: var(--focus);
-  color: white;
+  color: var(--focus-ink);
   border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-control);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .btn-geocode:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus), black 12%);
+  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
   transform: translateY(-1px);
   box-shadow: 0 2px 4px var(--shadow);
 }

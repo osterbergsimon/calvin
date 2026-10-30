@@ -86,7 +86,7 @@ const conflictHint = computed(() => {
   border-style: dashed;
 }
 .kbt--conflict {
-  border-color: var(--warn);
+  border-color: var(--warn-text);
 }
 .kbt-key {
   font-family: var(--font-data);

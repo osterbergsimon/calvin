@@ -313,7 +313,7 @@ defineExpose({
   flex: none;
   width: 1.5rem;
   height: 1.5rem;
-  color: var(--focus);
+  color: var(--focus-text);
 }
 
 .hud__label {

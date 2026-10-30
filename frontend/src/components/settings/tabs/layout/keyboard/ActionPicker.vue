@@ -105,7 +105,7 @@ const visibleGroups = computed(() => {
   max-width: 440px;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -124,7 +124,7 @@ const visibleGroups = computed(() => {
   font-weight: 700;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 3px 12px;
   color: var(--ink);
 }
@@ -140,7 +140,7 @@ const visibleGroups = computed(() => {
   padding: 7px 10px;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   color: var(--ink);
   font-family: var(--font-ui);
 }
@@ -162,7 +162,7 @@ const visibleGroups = computed(() => {
   gap: var(--space-xs);
 }
 .ap-star {
-  color: var(--warn);
+  color: var(--warn-text);
 }
 .ap-group-toggle {
   display: flex;
@@ -211,7 +211,7 @@ const visibleGroups = computed(() => {
   margin-bottom: 4px;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   color: var(--ink);
   cursor: pointer;
   min-height: var(--touch-target);
@@ -231,7 +231,7 @@ const visibleGroups = computed(() => {
   outline-offset: 1px;
 }
 .ap-opt-desc {
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   color: var(--ink-2);
 }
 .ap-empty {

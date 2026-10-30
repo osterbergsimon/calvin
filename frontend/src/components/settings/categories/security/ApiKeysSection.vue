@@ -508,7 +508,7 @@ async function revoke() {
 .api-keys__row-error {
   margin: 0.4rem 0 0;
   font-size: var(--fs-xs);
-  color: var(--err);
+  color: var(--err-text);
 }
 .api-keys__empty {
   padding: 0.75rem 1.25rem 1.25rem;
@@ -617,7 +617,7 @@ async function revoke() {
   color: var(--ink);
 }
 .api-keys__card--host .api-keys__card-label {
-  color: var(--err);
+  color: var(--err-text);
 }
 .api-keys__card-desc {
   font-size: var(--fs-sm);
@@ -626,7 +626,7 @@ async function revoke() {
 .api-keys__card-warn {
   font-size: var(--fs-xs);
   font-weight: 500;
-  color: var(--err);
+  color: var(--err-text);
 }
 .api-keys__ack {
   display: flex;
@@ -677,6 +677,6 @@ async function revoke() {
   font-family: var(--font-data);
 }
 .api-keys__revoke {
-  color: var(--err);
+  color: var(--err-text);
 }
 </style>
