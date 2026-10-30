@@ -5,7 +5,7 @@
     <SettingsSection id="security-sealed" title="Sealed mode">
       <SettingRow
         label="Sealed mode"
-        description="Locks the kiosk to your Calvin server only — no external embeds, allowed origins, or plugins that reach outside. Calendars, photos, and local-data plugins keep working."
+        description="Only this Calvin server is reachable: no outside embeds, sites or plugins that go online. Calendars, photos and local plugins keep working."
       >
         <ToggleSwitch
           :model-value="sealed"
@@ -16,15 +16,14 @@
       </SettingRow>
     </SettingsSection>
 
-    <SettingsSection id="security-origins" title="Allowed origins">
+    <SettingsSection id="security-origins" title="Allowed sites">
       <div class="security-origins">
         <p v-if="sealed" data-test="allowlist-inactive" class="security-origins__inactive">
           Ignored while sealed mode is on.
         </p>
         <p class="security-origins__intro">
-          Origins the kiosk may embed, load images from, or connect to. Everything else is blocked.
-          Use a domain (grafana.lab), a wildcard (*.lab.example.com), a host:port, or an http(s)://
-          URL. IP ranges (CIDR) are not supported.
+          Sites this dashboard may show or load from. Everything else is blocked. Use a domain like
+          grafana.lab or *.lab.example.com, or a full address.
         </p>
 
         <ul class="security-origins__list">
@@ -39,7 +38,7 @@
               Remove
             </button>
           </li>
-          <li v-if="origins.length === 0" class="security-origins__empty">No allowed origins.</li>
+          <li v-if="origins.length === 0" class="security-origins__empty">No sites allowed.</li>
         </ul>
 
         <div class="security-origins__add">
