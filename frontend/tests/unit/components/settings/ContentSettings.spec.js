@@ -6,7 +6,7 @@ const stubs = {
   CalendarSourcesTab: true,
   ImagesTab: true,
   ServicesTab: true,
-  AddWebPageButton: true,
+  ClockBarSources: true,
 };
 const baseConfig = {
   photoRotationInterval: 30,
@@ -25,25 +25,29 @@ const baseConfig = {
 };
 
 describe("ContentSettings", () => {
-  it("renders the five sections incl. the moved calendar-display", () => {
+  it("renders one section per thing you see, including clock bar info", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
     for (const id of [
       "content-calendars",
       "content-calendar-display",
       "content-photos",
-      "content-images",
       "content-services",
+      "content-clock-bar",
     ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
   });
 
-  it("renames content-services and puts Add a web page above the services list", () => {
+  it("puts the photo sources in Photos and names the service section plainly", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
     const section = wrapper.find("#section-content-services");
     expect(section.exists()).toBe(true);
-    expect(section.find(".settings-section__eyebrow").text()).toBe("Web pages & services");
-    expect(wrapper.findComponent({ name: "AddWebPageButton" }).exists()).toBe(true);
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Web pages & apps");
+    expect(
+      wrapper.find("#section-content-photos .images-tab-stub, #section-content-photos").exists()
+    ).toBe(true);
+    expect(wrapper.findComponent({ name: "ImagesTab" }).exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "ServicesTab" }).exists()).toBe(true);
   });
 
   it("emits update:config when a weekend-day chip is toggled (calendar display)", () => {

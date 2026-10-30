@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import PluginCard from "@/components/settings/specialized/PluginCard.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
+import SourceList from "@/components/settings/specialized/SourceList.vue";
 
 setActivePinia(createPinia());
 
@@ -51,9 +52,11 @@ describe("Settings words: plain kind chips", () => {
 });
 
 describe("Settings words: a source, not an instance", () => {
-  it("says 'No sources yet' on an empty service card", () => {
+  it("invites a first source on an empty service card", () => {
     const w = mountCard(service());
-    expect(w.find(".pc-summary").text()).toBe("No sources yet");
+    expect(w.find(".pc-summary").text().replace(/\s+/g, " ").trim()).toBe(
+      "Not used yet · Add a source"
+    );
   });
 
   it("counts sources on a card with providers", () => {
@@ -61,7 +64,7 @@ describe("Settings words: a source, not an instance", () => {
       { id: "a", running: true },
       { id: "b", running: true },
     ]);
-    expect(w.find(".pc-summary").text()).toBe("2 sources · 2/2 running");
+    expect(w.find(".pc-summary").text()).toBe("Used by 2 sources");
   });
 
   it("uses plain words throughout a plugin card", () => {
@@ -97,5 +100,27 @@ describe("Settings words: the source modal", () => {
   it("never says instance", () => {
     const w = mountModal(service({ instance_config_schema: { url: { type: "string" } } }));
     expect(w.text()).not.toMatch(/instance/i);
+  });
+});
+
+describe("Settings words: Content source lists", () => {
+  it("never says instance or a raw plugin type on a row", () => {
+    const w = mount(SourceList, {
+      props: {
+        rows: [
+          {
+            id: "a",
+            providerId: "immich",
+            providerName: "Immich",
+            name: "Family albums",
+            summary: "2 albums",
+            enabled: true,
+            running: true,
+          },
+        ],
+      },
+    });
+    expect(w.text()).not.toMatch(/instance/i);
+    expect(w.text()).not.toMatch(/\bimage\b/i);
   });
 });
