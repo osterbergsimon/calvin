@@ -396,11 +396,14 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   background: color-mix(in srgb, var(--err) 10%, transparent);
 }
 .pc-btn--update {
-  border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
-  background: color-mix(in srgb, var(--warn) 14%, var(--bg-1));
+  background: var(--focus);
+  color: var(--focus-ink);
+  border-color: var(--focus);
+  font-weight: 600;
 }
 .pc-btn--update:hover {
-  border-color: var(--warn);
+  background: color-mix(in srgb, var(--focus), black 12%);
+  border-color: var(--focus);
 }
 .pc-btn--update:disabled {
   opacity: 0.6;

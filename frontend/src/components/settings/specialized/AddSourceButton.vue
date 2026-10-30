@@ -35,6 +35,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import { useConfigStore } from "@/stores/config";
+import { mdiUpload } from "@mdi/js";
 import InstanceModal from "./InstanceModal.vue";
 import ProviderPicker from "./ProviderPicker.vue";
 import ConfirmModal from "../shared/ConfirmModal.vue";
@@ -125,6 +126,8 @@ const providers = computed(() => {
       action: "upload",
       label: "Upload from this device",
       description: "JPG, PNG, WebP or GIF into Local photos",
+      // Not a plugin: a real upload glyph beats the "U" letter fallback.
+      svg: mdiUpload,
     });
   }
   return [...list, ...pluginProviders.value];

@@ -137,6 +137,8 @@ describe("AddSourceButton provider picker", () => {
 
     const providers = w.findComponent({ name: "ProviderPicker" }).props("providers");
     expect(providers[0]).toMatchObject({ id: "__upload", action: "upload" });
+    // Not a plugin: an upload glyph, not the letter fallback "U".
+    expect(providers[0].svg).toBeTruthy();
 
     w.findComponent({ name: "ProviderPicker" }).vm.$emit("select", providers[0]);
     await flushPromises();
