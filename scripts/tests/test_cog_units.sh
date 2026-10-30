@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # cog display unit (opt-in, Pi 3-class): cog runs directly on DRM/KMS as the
-# calvin user, takes tty1 over exactly like calvin-x/calvin-wayland, rotates with
-# the gles renderer only, and treats its SIGSEGV-on-SIGTERM exit as a clean stop.
+# calvin user, takes tty1 over without a PAM/logind session (unlike calvin-x/
+# calvin-wayland), rotates with the gles renderer only, and treats its
+# SIGSEGV/SIGABRT-on-SIGTERM exit as a clean stop.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -13,11 +14,20 @@ helper="$REPO/deploy/kiosk-agent/calvin-cog-panel.sh"
 [ -f "$cog" ] || fail "calvin-cog.service is missing"
 [ -f "$helper" ] || fail "calvin-cog-panel.sh is missing"
 
-# Same PAM/logind/tty session shape as calvin-x.service: no session, no DRM master.
+# cog owns tty1 WITHOUT a PAM/logind session: PAMName=login makes cog trap
+# (SIGTRAP, "bwrap: Unexpected capabilities but not setuid") on the Pi 3B+.
+# As a plain service in video/render/input it opens card0 as the first DRM
+# client and gets DRM master itself; systemd creates the runtime dir.
 assert_contains "$cog" '^User=calvin$' "calvin-cog.service does not run as calvin"
-assert_contains "$cog" '^PAMName=login$' "calvin-cog.service opens no login session"
+assert_not_contains "$cog" '^PAMName=' "calvin-cog.service must not open a PAM/logind session"
+assert_not_contains "$cog" '^UtmpIdentifier=' "calvin-cog.service must not register a utmp login"
+assert_contains "$cog" '^RuntimeDirectory=calvin-cog$' "cog has no unit-owned runtime dir"
+assert_contains "$cog" '^Environment=.*XDG_RUNTIME_DIR=/run/calvin-cog' \
+    "XDG_RUNTIME_DIR does not point at the unit's runtime dir"
 assert_contains "$cog" '^TTYPath=/dev/tty1$' "calvin-cog.service does not own tty1"
+assert_contains "$cog" '^StandardInput=tty$' "cog does not read from tty1"
 assert_contains "$cog" '^TTYReset=yes$' "tty1 is not reset between restarts"
+assert_contains "$cog" '^TTYVHangup=yes$' "tty1 is not released between restarts"
 assert_contains "$cog" '^SupplementaryGroups=.*video' "calvin cannot open /dev/dri/card0"
 assert_contains "$cog" '^SupplementaryGroups=.*render' "calvin cannot open the render node"
 assert_contains "$cog" '^SupplementaryGroups=.*input' "calvin cannot read /dev/input"
@@ -29,7 +39,7 @@ assert_contains "$cog" '^Before=.*calvin-display-agent\.service' \
     "the display agent may start before cog"
 assert_contains "$cog" '^After=.*network-online\.target' "cog may start before the network"
 assert_contains "$cog" '^WantedBy=graphical\.target$' "calvin-cog.service starts at boot"
-pass "calvin-cog.service has the calvin-x/x session shape"
+pass "calvin-cog.service owns tty1 without a PAM/logind session"
 
 # DRM launch line: the gles renderer is mandatory for rotation, rotation comes
 # from the file the display agent's helper writes, and cog restarts its own web
@@ -49,9 +59,10 @@ assert_contains "$cog" 'CALVIN_KIOSK_ID' "the kiosk id query parameter was dropp
 assert_contains "$cog" 'CALVIN_KIOSK_HOSTNAME' "the kiosk hostname query parameter was dropped"
 pass "cog launches on DRM with the gles renderer and the agent-managed rotation"
 
-# SIGSEGV on SIGTERM is cog's normal exit; without this a screen-off looks like a
-# crash and Restart=always restarts it forever.
-assert_contains "$cog" '^SuccessExitStatus=SIGSEGV$' "cog's SIGSEGV stop is treated as a crash"
+# SIGSEGV on SIGTERM is cog's normal exit as root, SIGABRT as the calvin user;
+# without both a screen-off looks like a crash and Restart=always loops.
+assert_contains "$cog" '^SuccessExitStatus=.*SIGSEGV' "cog's SIGSEGV stop is treated as a crash"
+assert_contains "$cog" '^SuccessExitStatus=.*SIGABRT' "cog's SIGABRT stop is treated as a crash"
 assert_contains "$cog" '^Restart=always$' "a crashed cog would not come back"
 assert_contains "$cog" '^RestartSec=5$' "cog restarts without a backoff"
 pass "a screen-off stop is not a crash loop"
