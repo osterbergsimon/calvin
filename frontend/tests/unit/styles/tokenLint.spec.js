@@ -185,7 +185,7 @@ describe("token lint: all of frontend/src", () => {
       "--scrim-strong",
       "--on-scrim",
       "--on-event-ink",
-      "--on-event-edge",
+      "--on-event-ink-dark",
       "--device-ink",
       "--device-ink-2",
       "--qr-surface",
