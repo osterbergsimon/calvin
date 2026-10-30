@@ -29,7 +29,7 @@ function Show-Help {
     Write-Host "  .\Makefile.ps1 test-scripts   - Test setup scripts" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 lint           - Run linters (native)" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 format         - Format code (native)" -ForegroundColor White
-    Write-Host "  .\Makefile.ps1 type-check     - Run type checkers (native)" -ForegroundColor White
+    Write-Host "  .\Makefile.ps1 type-check     - Run type checkers (native; vue-tsc covers src/api only)" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 build          - Build the production docker image" -ForegroundColor White
     Write-Host "  .\Makefile.ps1 clean          - Tear down dev stack and remove dev data" -ForegroundColor White
 }
