@@ -33,26 +33,62 @@ This shared approach reduces code duplication and makes the scripts more maintai
 **Usage:**
 
 ```bash
-# Standard installation (develop branch)
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+# Stable release (recommended): pin the latest tag from
+# https://github.com/osterbergsimon/calvin/releases
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
 
-# Or using curl
+# Testers / latest changes (develop branch)
 curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
-**Using another branch or a fork:** put the variables *after* `sudo` so they
-reach the script (`sudo` drops your environment, and `VAR=x curl ...` only sets
-them for `curl`):
+**Using another branch, a release tag, or a fork:** put the variables *after*
+`sudo` so they reach the script (`sudo` drops your environment, and
+`VAR=x curl ...` only sets them for `curl`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<branch>/scripts/setup.sh \
-  | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<branch> bash
+curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<ref>/scripts/setup.sh \
+  | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<ref> bash
 ```
 
 The default branch is `develop`. `main` is release-only and cannot be deployed
 (setup uses `develop` instead, also on hosts that still record `main`). Every
-branch runs the `:develop` image; pin another one the same way with
-`CALVIN_IMAGE_TAG=<tag>`.
+branch runs the `:develop` image; a release tag (`vX.Y.Z`) runs that release's
+`:X.Y.Z` image instead. Pin any other image tag with `CALVIN_IMAGE_TAG=<tag>`.
+
+### Installing a release versus develop
+
+A **release** is a `vX.Y.Z` tag cut on `main` (see
+[RELEASING.md](../RELEASING.md)). Pin the tag in both places — the URL the
+script is fetched from and `GIT_BRANCH`, which the script uses to clone the
+checkout and choose the image:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
+```
+
+No `CALVIN_IMAGE_TAG` is needed: a tag ref selects `:v0.1.0`. To upgrade later,
+re-run setup with the newer tag — the checkout moves to the new tag, the image
+tag follows it, and the data directory is untouched. `update-calvin.sh` on a
+tag-pinned host keeps that tag (it does not jump to a newer release), so a
+deliberate re-run is the upgrade step.
+
+`develop` stays available for testers:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+```
+
+It tracks the newest code and publishes `:develop` on every push, so a
+`update-calvin.sh` or a setup re-run picks up whatever is on `develop` at that
+moment — useful, but not a stable version. Before the first release exists,
+`develop` is the only installable ref.
+
+`CALVIN_IMAGE_TAG` still wins over both when you want a specific image (for
+example `CALVIN_IMAGE_TAG=sha-<commit>` for a rollback) while running setup from
+a branch.
+
 
 **What Happens:**
 1. System packages are updated

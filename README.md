@@ -45,14 +45,27 @@ One Pi runs the backend, the frontend, and the kiosk browser. Simplest option,
 and the one to pick for a single display.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+# Stable release: pin the latest tag from
+# https://github.com/osterbergsimon/calvin/releases
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
 sudo reboot
 ```
 
-The script installs Docker, the published runtime image, the kiosk
-dependencies, and the systemd units. The dashboard comes up at
+The script installs Docker, the published runtime image for that release, the
+kiosk dependencies, and the systemd units. The dashboard comes up at
 `http://<pi>:8000` after reboot. Details:
-[docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md).
+[docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md) and
+[docs/setup/SETUP_SCRIPTS.md](docs/setup/SETUP_SCRIPTS.md#installing-a-release-versus-develop).
+
+Testers can track `develop` instead (the `:develop` image, rebuilt on every
+push). It is also the only installable ref until the first release is cut — use
+this command until `vX.Y.Z` shows up on the releases page:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+sudo reboot
+```
 
 ### 2. Remote backend + kiosk Pi
 
@@ -174,6 +187,7 @@ The reference plugins live in
 ## 📚 Documentation
 
 - **Online documentation**: <https://osterbergsimon.github.io/calvin/>
+- **Releases**: <https://github.com/osterbergsimon/calvin/releases> · process in [docs/RELEASING.md](docs/RELEASING.md)
 - **Getting started**: [docs/setup/GETTING_STARTED.md](docs/setup/GETTING_STARTED.md)
 - **Deployment topologies**: [docs/setup/DEPLOYMENT_TOPOLOGIES.md](docs/setup/DEPLOYMENT_TOPOLOGIES.md)
 - **Documentation index**: [docs/index.md](docs/index.md)

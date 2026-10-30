@@ -33,6 +33,17 @@ into the compose YAML and exported to the container.
 Calvin keeps its database, images, and installed plugins under
 `${CALVIN_DATA_DIR}` (defaults to `/var/lib/calvin`).
 
+Image tags: `:develop` follows the integration branch (published on every
+push), while `:X.Y.Z`, `:X.Y` and `:latest` are published from release tags
+(see [../docs/RELEASING.md](../docs/RELEASING.md)). Production installs should
+pin a release in `/etc/calvin/.env`:
+
+```bash
+CALVIN_IMAGE_TAG=v0.1.0
+```
+
+`setup.sh` does this for you when it installs from a release tag.
+
 Updating:
 
 ```bash

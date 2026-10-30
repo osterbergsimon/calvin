@@ -8,7 +8,7 @@ at it as kiosk-only displays.
 | | |
 |---|---|
 | Image | `ghcr.io/osterbergsimon/calvin:develop` (public, amd64 + arm64 + arm/v7) |
-| Built from | the `develop` branch: every push to `develop` publishes a new `:develop` image |
+| Built from | the `develop` branch: every push to `develop` publishes a new `:develop` image. Releases are published from `vX.Y.Z` tags (see [RELEASING.md](../RELEASING.md)). |
 | Port | `8000` (UI and API on the same port) |
 | Data | `/mnt/user/appdata/calvin` → `/var/lib/calvin` (database, images, plugins, themes, kiosk signing key) |
 | Runs as | `PUID=99` / `PGID=100` (Unraid's `nobody:users`) |
@@ -68,11 +68,19 @@ restart, update and display-power actions are refused inside Docker, and
 updates and restarts. See
 [Host control](../configuration/HOST_CONTROL.md).
 
-To stay on a known-good build, change **Repository** to a pinned tag such
-as `ghcr.io/osterbergsimon/calvin:sha-1a2b3c4`. Every published build also
-gets a `sha-<commit>` tag; the list is at
-<https://github.com/osterbergsimon/calvin/pkgs/container/calvin>. To go
-back to following `develop`, switch the tag back to `:develop`.
+To stay on a known-good build, change **Repository** to a pinned tag. The
+template ships `:develop` because it is the only tag that exists before the
+first release; once a `vX.Y.Z` release is out, use that (or `:latest`):
+
+```text
+ghcr.io/osterbergsimon/calvin:v0.1.0
+```
+
+Every published build also gets a `sha-<commit>` tag; the tag list is at
+<https://github.com/osterbergsimon/calvin/pkgs/container/calvin>. To go back
+to following `develop`, switch the tag back to `:develop`. A pinned release
+only moves when you change the Repository tag — Check for Updates finds
+nothing new on the same tag.
 
 ## Plugins
 
