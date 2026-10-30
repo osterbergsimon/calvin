@@ -47,9 +47,19 @@ export const settingsCategoryAliases = {
 
 export const settingsDestinations = [
   {
+    // The Default screen (Default-is-a-screen §7): old "All screens" words are
+    // gone from the UI, but people still search for them.
+    id: "screens-default",
+    label: "Default screen settings",
+    path: "Screens / Default",
+    category: "screens",
+    section: "layout",
+    keywords: ["all screens", "default", "shared", "new screens", "browsers", "screens"],
+  },
+  {
     id: "dashboard-layout",
     label: "Screen orientation",
-    path: "Screens / All screens · Display",
+    path: "Screens / Default · Display",
     category: "screens",
     section: "layout",
     keywords: ["display", "orientation", "flip", "rotation", "landscape", "portrait"],
@@ -202,8 +212,8 @@ export const settingsDestinations = [
   },
   {
     id: "content-images",
-    label: "Upload photos and order image sources",
-    path: "Content / Image sources",
+    label: "Photo sources",
+    path: "Content / Photos",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "images",
@@ -220,12 +230,21 @@ export const settingsDestinations = [
   },
   {
     id: "content-services",
-    label: "Web pages and services",
-    path: "Content / Web pages & services",
+    label: "Web pages and apps",
+    path: "Content / Web pages & apps",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "content-services",
-    keywords: ["services", "web services", "web pages", "ordering", "content sources"],
+    keywords: ["services", "web services", "web pages", "apps", "ordering", "content sources"],
+  },
+  {
+    id: "content-clock-bar",
+    label: "Clock bar info",
+    path: "Content / Clock bar info",
+    category: "content",
+    tabKey: "settings_tab_content_sources",
+    tab: "clock-bar-sources",
+    keywords: ["clock bar", "status bar", "weather", "tile", "clock bar info", "content sources"],
   },
   {
     id: "plugins",
@@ -272,7 +291,7 @@ export const settingsDestinations = [
   {
     id: "device-power",
     label: "Power, display schedule, and timeout",
-    path: "Screens / All screens · Power",
+    path: "Screens / Default · Power",
     category: "screens",
     section: "device-power",
     keywords: ["power", "display", "schedule", "timeout", "screen"],
@@ -280,7 +299,7 @@ export const settingsDestinations = [
   {
     id: "device-keyboard",
     label: "On-screen keyboard and layout",
-    path: "Screens / All screens · Touch & keyboard",
+    path: "Screens / Default · Touch & keyboard",
     category: "screens",
     section: "device-keyboard",
     // "language" stays a search keyword only: people who think of keyboard
@@ -326,7 +345,7 @@ export const settingsDestinations = [
   {
     id: "device-reboot",
     label: "Reboot button combo",
-    path: "Screens / All screens · Power",
+    path: "Screens / Default · Power",
     category: "screens",
     section: "device-power",
     keywords: ["reboot", "restart", "combo", "keys"],

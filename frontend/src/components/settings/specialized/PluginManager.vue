@@ -1,11 +1,11 @@
 <template>
   <div class="plugin-manager">
-    <!-- Plugin type tabs -->
+    <!-- Plain-kind filters, All first (§3.3) -->
     <div class="pm-tabs">
       <SegmentedControl
         :model-value="activeTab"
-        :options="tabOptions"
-        aria-label="Plugin type"
+        :options="filterOptions"
+        aria-label="Plugin kind"
         @update:model-value="handleTabChange"
       />
     </div>
@@ -51,12 +51,9 @@
         @test-connection="handleTestConnection"
         @fetch-now="handleFetchNow"
         @custom-action="handleCustomAction"
-        @add-instance="handleAddInstance"
-        @edit-instance="handleEditInstance"
-        @delete-instance="handleDeleteInstance"
-        @toggle-instance="handleToggleInstance"
-        @instance-order-change="handleInstanceOrderChange"
-        @manage-calendar-sources="$emit('manage-calendar-sources')"
+        @used-by="pluginId => emit('used-by', pluginId)"
+        @add-source="pluginId => emit('add-source', pluginId)"
+        @open-appearance="emit('open-appearance')"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
       />
@@ -68,6 +65,7 @@
 import { computed } from "vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import PluginCard from "./PluginCard.vue";
+import { pluginKindFilters, pluginKindKey } from "@/utils/pluginKind";
 
 const props = defineProps({
   plugins: {
@@ -85,7 +83,7 @@ const props = defineProps({
   },
   activeTab: {
     type: String,
-    default: "calendar",
+    default: "all",
   },
   expandedPlugins: {
     type: Object,
@@ -151,38 +149,27 @@ const emit = defineEmits([
   "test-connection",
   "fetch-now",
   "custom-action",
-  "add-instance",
-  "edit-instance",
-  "delete-instance",
-  "toggle-instance",
-  "instance-order-change",
-  "manage-calendar-sources",
+  "used-by",
+  "add-source",
+  "open-appearance",
   "upload",
   "delete-image",
 ]);
 
-// Backend + theme tabs are always offered (they can be installed from a repo);
-// the rest appear once at least one plugin of that type is installed.
-const TAB_LABELS = {
-  calendar: "Calendar",
-  image: "Image",
-  service: "Service",
-  backend: "Backend",
-  theme: "Theme",
-};
-
-const tabOptions = computed(() =>
-  Object.entries(TAB_LABELS)
-    .filter(([id]) => id === "backend" || id === "theme" || props.plugins.some(p => p.type === id))
-    .map(([value, label]) => ({ value, label }))
+const filterOptions = computed(() =>
+  pluginKindFilters(props.plugins).map(option => ({ value: option.id, label: option.label }))
 );
 
-const activePlugins = computed(() => props.plugins.filter(p => p.type === props.activeTab));
+const activePlugins = computed(() =>
+  props.activeTab === "all"
+    ? props.plugins
+    : props.plugins.filter(plugin => pluginKindKey(plugin) === props.activeTab)
+);
 
 const emptyMessage = computed(() =>
   props.activeTab === "theme"
     ? "No themes installed yet. Install one from a repository above."
-    : `No ${props.activeTab} plugins installed yet.`
+    : "No add-ons of this kind are installed yet."
 );
 
 const handleTabChange = tabId => emit("tab-change", tabId);
@@ -195,12 +182,6 @@ const handleSaveConfig = pluginId => emit("save-config", pluginId);
 const handleTestConnection = pluginId => emit("test-connection", pluginId);
 const handleFetchNow = pluginId => emit("fetch-now", pluginId);
 const handleCustomAction = (pluginId, action) => emit("custom-action", pluginId, action);
-const handleAddInstance = pluginId => emit("add-instance", pluginId);
-const handleEditInstance = (pluginId, instance) => emit("edit-instance", pluginId, instance);
-const handleDeleteInstance = instanceId => emit("delete-instance", instanceId);
-const handleToggleInstance = (instanceId, enabled) => emit("toggle-instance", instanceId, enabled);
-const handleInstanceOrderChange = (pluginId, newOrder) =>
-  emit("instance-order-change", pluginId, newOrder);
 const handleUpload = file => emit("upload", file);
 const handleDeleteImage = imageId => emit("delete-image", imageId);
 </script>

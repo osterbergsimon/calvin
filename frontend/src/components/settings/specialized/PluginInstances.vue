@@ -97,12 +97,12 @@ const emit = defineEmits([
 const instanceLabelMap = {
   calendar: "Source",
   image: "Source",
-  backend: "Instance",
-  service: "Instance",
+  backend: "Source",
+  service: "Source",
 };
 
 const instanceLabel = computed(
-  () => props.plugin.instance_label || instanceLabelMap[props.plugin.type] || "Instance"
+  () => props.plugin.instance_label || instanceLabelMap[props.plugin.type] || "Source"
 );
 
 const instanceLabelPlural = computed(() => {
