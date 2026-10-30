@@ -30,13 +30,17 @@ def test_kiosk_viewport_migration_upgrade_and_downgrade(tmp_path):
 
     # A reported viewport survives as JSON.
     with engine.begin() as conn:
-        conn.execute(sa.text("INSERT INTO kiosks (id, last_seen) VALUES ('kitchen-1', '2026-10-30')"))
+        conn.execute(
+            sa.text("INSERT INTO kiosks (id, last_seen) VALUES ('kitchen-1', '2026-10-30')")
+        )
         conn.execute(
             sa.text("UPDATE kiosks SET viewport = :vp WHERE id = 'kitchen-1'"),
             {"vp": '{"w": 800, "h": 480}'},
         )
     with engine.connect() as conn:
-        stored = conn.execute(sa.text("SELECT viewport FROM kiosks WHERE id = 'kitchen-1'")).scalar()
+        stored = conn.execute(
+            sa.text("SELECT viewport FROM kiosks WHERE id = 'kitchen-1'")
+        ).scalar()
     assert stored == '{"w": 800, "h": 480}'
 
     command.downgrade(cfg, _PREVIOUS)

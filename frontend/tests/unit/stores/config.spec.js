@@ -1,6 +1,6 @@
 /** Tests for config store. */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigStore } from "@/stores/config";
 import api from "@/services/api";
@@ -470,5 +470,53 @@ describe("config store — offline cache (audit R7)", () => {
 
     expect(store.error).toBe("Network Error");
     expect(store.stale).toBe(false);
+  });
+});
+
+describe("Config Store kiosk viewport reporting (CLV-36)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    api.get.mockResolvedValue({ data: {} });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    sessionStorage.clear();
+  });
+
+  it("adds vw/vh to a kiosk's config fetch", async () => {
+    sessionStorage.setItem("calvin_kiosk_id", "kitchen-3f9a2c");
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(api.get).toHaveBeenCalledTimes(1);
+    expect(api.get.mock.calls[0][0]).toContain("/kiosks/kitchen-3f9a2c/config?");
+    expect(api.get.mock.calls[0][0]).toMatch(/vw=\d+&vh=\d+$/);
+  });
+
+  it("does not report from a plain browser", async () => {
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(api.get).toHaveBeenCalledWith("/config");
+  });
+
+  it("re-fetches once, debounced 2s, after a resize", async () => {
+    vi.useFakeTimers();
+    sessionStorage.setItem("calvin_kiosk_id", "kitchen-3f9a2c");
+    const store = useConfigStore();
+    await store.fetchConfig();
+    expect(api.get).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("resize"));
+    await vi.advanceTimersByTimeAsync(1999);
+    expect(api.get).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(api.get).toHaveBeenCalledTimes(2);
   });
 });

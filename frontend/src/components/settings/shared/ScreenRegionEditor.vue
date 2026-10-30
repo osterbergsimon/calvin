@@ -14,7 +14,7 @@
           <div class="sre-title">
             <h2>Pages &amp; regions</h2>
             <p class="sre-sub">
-              Design the layouts your kiosks display · drag dividers to resize, the clock bar to
+              Design the pages your screens display · drag dividers to resize, the clock bar to
               reposition · changes apply live
             </p>
           </div>
@@ -29,41 +29,61 @@
           </IconButton>
         </header>
 
-        <!-- Context strip: screen tabs + preview-as -->
+        <!-- Context strip: page tabs + preview-on -->
         <div class="sre-context">
-          <div class="sre-tabs" role="tablist" aria-label="Screens">
+          <div class="sre-tabs" role="tablist" aria-label="Pages">
             <button
-              v-for="screen in screens.screens"
-              :key="screen.id"
+              v-for="page in screens.screens"
+              :key="page.id"
               type="button"
               role="tab"
               class="sre-tab"
-              :class="{ 'is-active': screen.id === activeScreenId }"
-              :aria-selected="screen.id === activeScreenId"
-              @click="selectScreen(screen.id)"
+              :class="{
+                'is-active': page.id === activeScreenId,
+                'is-dimmed': isPageDimmed(page.id),
+              }"
+              :aria-selected="page.id === activeScreenId"
+              @click="selectScreen(page.id)"
             >
-              <span class="sre-tab-dot" />
-              {{ screen.name }}
+              <span class="sre-tab-body">
+                <span class="sre-tab-name"><span class="sre-tab-dot" />{{ page.name }}</span>
+                <span class="sre-tab-screens" data-test="page-screens">{{
+                  screensLine(page.id)
+                }}</span>
+              </span>
             </button>
             <button
               type="button"
               class="sre-tab-add"
-              aria-label="Add screen"
-              title="Add screen"
+              aria-label="Add page"
+              title="Add page"
               @click="addScreen"
             >
               +
             </button>
           </div>
           <div class="sre-preview-as">
-            <span class="sre-preview-label">Preview as</span>
+            <span class="sre-preview-label">Preview on</span>
             <SelectPill
-              :model-value="previewKioskId"
-              :options="kioskOptions"
-              aria-label="Preview as kiosk"
-              @update:model-value="setPreviewKiosk"
+              :model-value="previewScreenId"
+              :options="screenOptions"
+              aria-label="Preview on screen"
+              @update:model-value="setPreviewScreen"
             />
-            <span class="sre-orient-badge">{{ orientationBadge }}</span>
+            <SegmentedControl
+              v-if="previewScreenId === ANY_BROWSER"
+              class="sre-orient-toggle"
+              :model-value="anyBrowserOrientation"
+              :options="[
+                { value: 'landscape', label: 'Landscape' },
+                { value: 'portrait', label: 'Portrait' },
+              ]"
+              aria-label="Preview orientation"
+              @update:model-value="setAnyBrowserOrientation"
+            />
+            <span class="sre-orient-badge" data-test="orientation-badge">{{
+              orientationBadge
+            }}</span>
           </div>
         </div>
 
@@ -73,14 +93,26 @@
           <div class="sre-stage">
             <div class="sre-stage-tag"><span class="dot" /> {{ stageTag }}</div>
 
-            <div v-if="mismatch" class="sre-mismatch">
-              ⚠️ <strong>{{ previewKioskName }}</strong> isn’t set to show “{{
-                activeScreen.name
-              }}”. You can still design it here — assign it in <span class="link">Kiosks</span> to
-              make it appear.
+            <div v-if="mismatch" class="sre-mismatch" data-test="mismatch">
+              <span class="sre-mismatch__text"
+                >⚠️ <strong>{{ previewScreenName }}</strong> doesn’t show “{{
+                  activeScreen.name
+                }}”.</span
+              >
+              <button
+                type="button"
+                class="sre-mismatch__btn"
+                :disabled="showItBusy"
+                @click="showItOnScreen"
+              >
+                Show it on {{ previewScreenName }}
+              </button>
+              <span v-if="showItError" class="sre-mismatch__error" role="alert">{{
+                showItError
+              }}</span>
             </div>
 
-            <div class="sre-device-wrap" :class="{ dimmed: mismatch, flip: previewFlipped }">
+            <div class="sre-device-wrap" :class="{ dimmed: mismatch }">
               <div class="sre-device" :class="orientation" :style="deviceSize">
                 <div
                   :ref="el => (screenEl = el)"
@@ -217,10 +249,10 @@
               </div>
             </div>
 
-            <div v-if="!mismatch && previewKioskId !== GLOBAL" class="sre-preview-note">
-              Previewing on {{ previewKioskName }} · edits save to the shared “{{
+            <div v-if="!mismatch && previewScreenId !== ANY_BROWSER" class="sre-preview-note">
+              Previewing on {{ previewScreenName }} · edits change the shared “{{
                 activeScreen.name
-              }}” screen
+              }}” page
             </div>
           </div>
 
@@ -277,7 +309,9 @@ import { usePlugins } from "@/composables";
 import { buildComponentOptions } from "@/utils/componentPicker";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import { getKioskId } from "@/utils/kioskId";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
@@ -311,17 +345,23 @@ import {
 const props = defineProps({
   config: { type: Object, required: true, default: () => ({}) },
   open: { type: Boolean, default: false },
+  // A screen to preview when the editor opens ("Edit pages" on a screen). A
+  // kiosk preselects itself; otherwise the editor starts on Any browser.
+  initialPreviewKiosk: { type: String, default: null },
 });
 const emit = defineEmits(["update:config", "close"]);
 
-const GLOBAL = "__global";
+const ANY_BROWSER = "__global";
 const webServicesStore = useWebServicesStore();
 const calendarStore = useCalendarStore();
 const kiosksStore = useKiosksStore();
 const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
 
 const selectedRegionId = ref(null);
-const previewKioskId = ref(GLOBAL);
+const previewScreenId = ref(ANY_BROWSER);
+const anyBrowserOrientation = ref("landscape");
+const showItBusy = ref(false);
+const showItError = ref("");
 const screenEl = ref(null);
 const regionsEl = ref(null);
 const dragState = ref(null);
@@ -342,41 +382,87 @@ const activeIndex = computed(() =>
   screens.value.screens.findIndex(s => s.id === activeScreenId.value)
 );
 
-/* --- preview-as kiosk --- */
-const kioskOptions = computed(() => [
-  { value: GLOBAL, label: "Global default" },
-  ...kiosksStore.kiosks.map(k => ({
-    value: k.id,
-    label: k.hostname || k.id,
-  })),
-]);
+/* --- preview on a screen --- */
+// A screen's name is its `displayName` override (§3.3); without one, its
+// hostname, then its install id.
+const kioskName = kiosk => kiosk?.overrides?.displayName || kiosk?.hostname || kiosk?.id || "";
+const screenOptions = computed(() => {
+  const options = [
+    { value: ANY_BROWSER, label: "Any browser" },
+    ...kiosksStore.kiosks.map(k => ({ value: k.id, label: kioskName(k) })),
+  ];
+  // A kiosk preselected before the list loaded (or one that is not registered
+  // yet) still needs a label, or the pill would read blank.
+  if (
+    previewScreenId.value !== ANY_BROWSER &&
+    !options.some(o => o.value === previewScreenId.value)
+  ) {
+    options.push({ value: previewScreenId.value, label: previewScreenId.value });
+  }
+  return options;
+});
 const previewKiosk = computed(
-  () => kiosksStore.kiosks.find(k => k.id === previewKioskId.value) || null
+  () => kiosksStore.kiosks.find(k => k.id === previewScreenId.value) || null
 );
-// GET /kiosks carries no overrides, so they're fetched when a kiosk is picked.
-const previewOverrides = ref({});
-const previewKioskName = computed(
-  () => previewKiosk.value?.hostname || previewKiosk.value?.id || ""
+// GET /kiosks already carries each kiosk's override layer, so previewing one
+// needs no extra request (CLV-36). A preselected id that is not in the list yet
+// still gets an option so the picker shows its id.
+const previewOverrides = computed(() => previewKiosk.value?.overrides || {});
+const previewScreenName = computed(() => kioskName(previewKiosk.value) || previewScreenId.value);
+const orientation = computed(() =>
+  previewScreenId.value === ANY_BROWSER
+    ? anyBrowserOrientation.value
+    : previewOverrides.value.orientation || orientationConfig.value
 );
-const orientation = computed(() => previewOverrides.value.orientation || orientationConfig.value);
 const previewFlipped = computed(
   () => previewOverrides.value.orientationFlipped ?? configValue.value.orientationFlipped ?? false
 );
-const orientationBadge = computed(
-  () =>
-    orientation.value.charAt(0).toUpperCase() +
-    orientation.value.slice(1) +
-    (previewFlipped.value ? " · 180°" : "")
-);
-const mismatch = computed(() => {
-  const avail = previewOverrides.value.availableScreens;
-  return Array.isArray(avail) && !avail.includes(activeScreenId.value);
+const previewViewport = computed(() => {
+  if (previewScreenId.value === ANY_BROWSER) return null;
+  const vp = previewKiosk.value?.viewport;
+  return vp && vp.w > 0 && vp.h > 0 ? vp : null;
 });
-const stageTag = computed(() =>
-  previewKioskId.value === GLOBAL
-    ? `Live preview · “${activeScreen.value.name}”`
-    : `Preview on ${previewKioskName.value} · “${activeScreen.value.name}”`
+const orientationBadge = computed(() =>
+  [
+    orientation.value === "portrait" ? "Portrait" : "Landscape",
+    previewViewport.value ? `${previewViewport.value.w}×${previewViewport.value.h}` : "",
+    previewFlipped.value ? "mounted upside down" : "",
+  ]
+    .filter(Boolean)
+    .join(" · ")
 );
+// A kiosk shows every page unless it has an explicit allowlist; an empty
+// allowlist means it shows none.
+const kioskShowsPage = (kiosk, pageId) => {
+  const avail = kiosk?.overrides?.availableScreens;
+  return !Array.isArray(avail) || avail.includes(pageId);
+};
+const screensShowingPage = pageId => kiosksStore.kiosks.filter(k => kioskShowsPage(k, pageId));
+const screensLine = pageId => {
+  const all = kiosksStore.kiosks;
+  if (all.length === 0) return "All screens";
+  const showing = screensShowingPage(pageId);
+  if (showing.length === all.length) return "All screens";
+  if (showing.length === 0) return "Not on any screen";
+  return showing.map(kioskName).join(" · ");
+};
+const isPageDimmed = pageId =>
+  previewScreenId.value !== ANY_BROWSER && !kioskShowsPage(previewKiosk.value, pageId);
+const mismatch = computed(
+  () =>
+    previewScreenId.value !== ANY_BROWSER &&
+    Array.isArray(previewOverrides.value.availableScreens) &&
+    !previewOverrides.value.availableScreens.includes(activeScreenId.value)
+);
+const stageTag = computed(() =>
+  previewScreenId.value === ANY_BROWSER
+    ? `Live preview · “${activeScreen.value.name}”`
+    : `Preview on ${previewScreenName.value} · “${activeScreen.value.name}”`
+);
+const setAnyBrowserOrientation = next => {
+  // Preview-only: never emitted, never saved.
+  anyBrowserOrientation.value = next;
+};
 
 /* --- layout direction + clock bar --- */
 const layoutDir = computed(() => getLayoutDirection(activeScreen.value.layout, orientation.value));
@@ -392,11 +478,16 @@ const clockAxisStyle = computed(() => {
 });
 
 /* --- device sizing --- */
-const deviceSize = computed(() =>
-  orientation.value === "landscape"
-    ? { width: "560px", height: "336px" }
-    : { width: "352px", height: "580px" }
-);
+// The device box follows the screen's real aspect ratio when it has reported
+// one; otherwise a 16:9 / 9:16 stand-in for its orientation.
+const DEVICE_MAX = 560;
+const deviceSize = computed(() => {
+  const vp = previewViewport.value;
+  const aspect = vp ? vp.w / vp.h : orientation.value === "portrait" ? 9 / 16 : 16 / 9;
+  return aspect >= 1
+    ? { width: `${DEVICE_MAX}px`, height: `${Math.round(DEVICE_MAX / aspect)}px` }
+    : { width: `${Math.round(DEVICE_MAX * aspect)}px`, height: `${DEVICE_MAX}px` };
+});
 
 /* --- selection --- */
 const selectedPath = computed(() =>
@@ -469,7 +560,7 @@ const patchActiveScreen = patch => {
 const addScreen = () => {
   const next = JSON.parse(JSON.stringify(screens.value));
   const screen = createDashboardScreenFromPreset("split_two", {
-    name: `Screen ${next.screens.length + 1}`,
+    name: `Page ${next.screens.length + 1}`,
   });
   next.screens.push(screen);
   next.activeScreenId = screen.id;
@@ -662,17 +753,50 @@ const stopResize = () => {
   window.removeEventListener("pointermove", onResizeMove);
 };
 
-const setPreviewKiosk = async id => {
-  previewKioskId.value = id;
-  previewOverrides.value = {};
-  if (id === GLOBAL) return;
+const setPreviewScreen = id => {
+  previewScreenId.value = id;
+  showItError.value = "";
+  if (id === ANY_BROWSER) anyBrowserOrientation.value = orientationConfig.value;
+};
+// Add the active page to the previewed screen's allowlist (GET, merge, PUT).
+// No allowlist means it already shows every page, so there is nothing to save.
+const showItOnScreen = async () => {
+  const kiosk = previewKiosk.value;
+  if (!kiosk) return;
+  showItBusy.value = true;
+  showItError.value = "";
   try {
-    const overrides = await kiosksStore.fetchOverrides(id);
-    if (previewKioskId.value === id) previewOverrides.value = overrides || {};
+    const fresh = await kiosksStore.fetchOverrides(kiosk.id);
+    const next = { ...fresh };
+    if (
+      !Array.isArray(fresh.availableScreens) ||
+      fresh.availableScreens.includes(activeScreenId.value)
+    ) {
+      // It already shows every page (or this one): only the local copy was stale.
+      kiosksStore.setKioskOverrides(kiosk.id, next);
+      return;
+    }
+    next.availableScreens = [...fresh.availableScreens, activeScreenId.value];
+    await kiosksStore.saveOverrides(kiosk.id, next);
+    kiosksStore.setKioskOverrides(kiosk.id, next);
   } catch (err) {
-    logError("[ScreenRegionEditor]", "Failed to load kiosk overrides:", err);
+    logError("[ScreenRegionEditor]", "Failed to assign page to screen:", err);
+    showItError.value = `Couldn't update ${previewScreenName.value}. Try again.`;
+  } finally {
+    showItBusy.value = false;
   }
 };
+
+/* --- opening: on a kiosk → that screen; from Edit pages → that screen --- */
+const applyInitialPreview = () => {
+  setPreviewScreen(props.initialPreviewKiosk || getKioskId() || ANY_BROWSER);
+};
+watch(
+  () => props.open,
+  open => {
+    if (open) applyInitialPreview();
+  }
+);
 
 /* keep selection valid when screen changes */
 watch(activeScreenId, () => (selectedRegionId.value = null));
@@ -694,6 +818,7 @@ const previewClock = computed(
 );
 
 onMounted(async () => {
+  if (props.open) applyInitialPreview();
   clockTimer = setInterval(() => (now.value = new Date()), 30000);
   if (webServicesStore.services.length === 0 && !webServicesStore.loading)
     webServicesStore.fetchServices();
@@ -789,7 +914,6 @@ onUnmounted(() => {
 .sre-tab {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2xs);
   padding: var(--space-2xs) var(--space-md);
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
@@ -810,7 +934,28 @@ onUnmounted(() => {
   box-shadow: 0 1px 3px var(--shadow);
   font-weight: 650;
 }
+.sre-tab-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+.sre-tab-name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.sre-tab-screens {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.sre-tab.is-dimmed {
+  opacity: 0.5;
+}
 .sre-tab-dot {
+  flex: 0 0 auto;
   width: 7px;
   height: 7px;
   border-radius: 2px;
@@ -898,6 +1043,11 @@ onUnmounted(() => {
   transform: translateX(-50%);
   z-index: 4;
   max-width: 78%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
   font-size: var(--fs-xs);
   line-height: 1.35;
   color: var(--ink);
@@ -906,9 +1056,28 @@ onUnmounted(() => {
   padding: var(--space-sm) var(--space-lg);
   border-radius: var(--radius-sm);
 }
-.sre-mismatch .link {
+.sre-mismatch__btn {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--focus) 55%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--focus) 16%, transparent);
   color: var(--focus);
+  font-size: var(--fs-xs);
   font-weight: 600;
+  padding: 0.2rem 0.65rem;
+  cursor: pointer;
+}
+.sre-mismatch__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--focus) 28%, transparent);
+}
+.sre-mismatch__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.sre-mismatch__error {
+  flex-basis: 100%;
+  color: var(--ink-2);
+  text-align: center;
 }
 .sre-preview-note {
   position: absolute;
@@ -925,9 +1094,6 @@ onUnmounted(() => {
 
 .sre-device-wrap {
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.sre-device-wrap.flip {
-  transform: rotate(180deg);
 }
 .sre-device-wrap.dimmed {
   opacity: 0.45;
