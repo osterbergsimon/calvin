@@ -94,6 +94,12 @@ The script installs Docker, the kiosk dependencies, the published
 runtime image, and three systemd units. The dashboard comes up at
 `http://localhost:8000` after reboot.
 
+On Pi 3-class boards (Pi 3/3B+, Zero 2 W, CM3) the kiosk runs Chromium without
+its GPU path, because that path crashes the dashboard renderer on their VC4
+graphics; Pi 4/5 keep it. The flags live in
+`/etc/default/calvin-kiosk-display`; see
+[Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu) for the override.
+
 This installs the `develop` branch (`main` is release-only). Pass
 `GIT_BRANCH=<branch>` after `sudo` (`... | sudo GIT_BRANCH=<branch> bash`) to
 track another one, or `--mode dev` for a hot-reload Pi. Details in

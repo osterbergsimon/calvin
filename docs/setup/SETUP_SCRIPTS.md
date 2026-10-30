@@ -25,6 +25,7 @@ This shared approach reduces code duplication and makes the scripts more maintai
 - Clones/configures Git repository
 - Creates runtime data directories under `/var/lib/calvin`
 - Installs `/etc/calvin/docker-compose.yml` and `/etc/calvin/.env` (compose auto-loads the latter)
+- Writes the kiosk session env `/etc/default/calvin-kiosk-display` (DISPLAY/XAUTHORITY plus the board's Chromium flags — `--disable-gpu` on Pi 3-class boards, see [Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu))
 - Configures `calvin-app.service`, `calvin-x.service`, and `calvin-kiosk.service`
 - Sets up display and kiosk mode
 - Configures auto-start on boot
