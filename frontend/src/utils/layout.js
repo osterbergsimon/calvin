@@ -73,10 +73,11 @@ const clampViewInt = (value, lo, hi, fallback) => {
  * mode ∈ {month,week,day}, rolling boolean, weeks 1–12, days 1–14,
  * extraWeeks 0–8 (look-ahead weeks after a non-rolling month).
  *
- * The display-override fields (`weekNumbers`, `maxVisibleEvents`) are OPTIONAL:
- * a valid value is kept as a per-region override; anything else is omitted so
- * the region inherits the global setting. Absent = inherit, so there is no
- * migration for existing regions.
+ * The display fields (`weekNumbers`, `maxVisibleEvents`) belong to the region:
+ * a valid value is kept, anything else is omitted. Missing weekNumbers means
+ * off; missing maxVisibleEvents means Auto (fit the measured day cell), so the
+ * region never reads a household-wide default (CLV-49 migration copies the old
+ * globals in once).
  */
 export function clampCalendarView(view = {}) {
   const out = {
@@ -98,6 +99,20 @@ export function clampCalendarView(view = {}) {
 
 const SERVICE_LINK_ACTIONS = ["handoff", "embed", "off"];
 
+const PHOTO_FIT_VALUES = ["smart", "fit", "fill", "center"];
+
+/**
+ * Coerce a photos region's `view` block. Recognises `fit` (Smart · Whole photo ·
+ * Fill · Centre; the retired `crop` was Fill). Missing fit means Smart, so the
+ * region carries no global default layer.
+ */
+export function clampPhotosView(view = {}) {
+  const out = {};
+  const fit = view?.fit === "crop" ? "fill" : view?.fit;
+  if (PHOTO_FIT_VALUES.includes(fit)) out.fit = fit;
+  return out;
+}
+
 /**
  * Coerce a service region's `view` block. Recognises `linkAction` (handoff/
  * embed/off) and `cardSize` (one of the five card-size keys); anything else (or
@@ -111,13 +126,18 @@ export function clampServiceView(view = {}) {
   return out;
 }
 
-// Calendar and service regions carry a `view`; other kinds get no such key.
+// Calendar and service regions carry a `view`; photos regions get one once a
+// fit is chosen. Other kinds get no such key.
 const viewForKind = (region, kind) => {
   if (kind === "calendar") {
     return { view: clampCalendarView({ ...DEFAULT_CALENDAR_VIEW, ...(region?.view || {}) }) };
   }
   if (kind === "service") {
     return { view: clampServiceView(region?.view || {}) };
+  }
+  if (kind === "photos") {
+    const view = clampPhotosView(region?.view || {});
+    return region?.view ? { view } : {};
   }
   return {};
 };
@@ -148,6 +168,10 @@ export function setRegionView(screens, regionId, patch, activeScreenId = null) {
       }
       if (region.id === regionId && region.kind === "service") {
         region.view = clampServiceView({ ...(region.view || {}), ...patch });
+        return true;
+      }
+      if (region.id === regionId && region.kind === "photos") {
+        region.view = clampPhotosView({ ...(region.view || {}), ...patch });
         return true;
       }
       if (region.split && visit(region.split.regions)) return true;

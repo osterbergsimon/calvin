@@ -15,6 +15,7 @@ describe("Config Store", () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     localStorage.clear();
+    api.post.mockResolvedValue({ data: {} });
   });
 
   it("should initialize with default values", () => {
@@ -175,6 +176,99 @@ describe("Config Store", () => {
     ]);
     expect(store.dashboardScreens.activeScreenId).toBe("services");
     expect(store.dashboardScreens.screens[0].activeRegionId).toBe("region-2");
+  });
+
+  it("migrates the old household display settings into regions once (CLV-49)", async () => {
+    const oldScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "cal",
+          layout: {
+            regions: [
+              { id: "cal", kind: "calendar", size: 50, instanceIds: [] },
+              { id: "photos", kind: "photos", size: 50, instanceIds: [] },
+            ],
+          },
+        },
+      ],
+    };
+    api.get.mockResolvedValueOnce({
+      data: {
+        showWeekNumbers: true,
+        maxVisibleEvents: 6,
+        imageDisplayMode: "crop",
+        dashboardScreens: oldScreens,
+      },
+    });
+    api.post.mockResolvedValue({ data: {} });
+
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    expect(store.dashboardScreens.screens[0].layout.regions[0].view).toMatchObject({
+      weekNumbers: true,
+      maxVisibleEvents: 6,
+    });
+    expect(store.dashboardScreens.screens[0].layout.regions[1].view).toEqual({ fit: "fill" });
+    expect(api.post).toHaveBeenCalledWith(
+      "/config",
+      expect.objectContaining({ displaySettingsMigrated: true })
+    );
+
+    // The second load sees the flag: no migration, no second write.
+    api.get.mockResolvedValueOnce({
+      data: {
+        displaySettingsMigrated: true,
+        dashboardScreens: JSON.parse(JSON.stringify(store.dashboardScreens)),
+      },
+    });
+    await store.fetchConfig();
+    expect(api.post).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves regions with their own display values untouched during migration", async () => {
+    api.get.mockResolvedValueOnce({
+      data: {
+        showWeekNumbers: true,
+        maxVisibleEvents: 6,
+        imageDisplayMode: "fit",
+        dashboardScreens: {
+          version: 2,
+          activeScreenId: "home",
+          screens: [
+            {
+              id: "home",
+              name: "Home",
+              activeRegionId: "cal",
+              layout: {
+                regions: [
+                  {
+                    id: "cal",
+                    kind: "calendar",
+                    size: 50,
+                    view: { mode: "month", weekNumbers: false, maxVisibleEvents: 2 },
+                  },
+                  { id: "photos", kind: "photos", size: 50, view: { fit: "center" } },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    });
+    api.post.mockResolvedValue({ data: {} });
+
+    const store = useConfigStore();
+    await store.fetchConfig();
+
+    const [cal, photos] = store.dashboardScreens.screens[0].layout.regions;
+    expect(cal.view.weekNumbers).toBe(false);
+    expect(cal.view.maxVisibleEvents).toBe(2);
+    expect(photos.view.fit).toBe("center");
   });
 
   it("should apply defaults for missing values after fetch", async () => {

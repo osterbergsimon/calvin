@@ -66,6 +66,7 @@ HOST_ROUTES = frozenset(
 CONFIG_DISPLAY_KEYS = frozenset(
     {
         "dashboardScreens",
+        "displaySettingsMigrated",  # one-time CLV-49 display migration flag
         "regionsLocked",
         "showUI",
         "themeMode",
