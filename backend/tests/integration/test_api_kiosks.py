@@ -269,6 +269,43 @@ def test_install_script_served_with_server_url(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_install_script_prefers_public_url(test_client: TestClient, monkeypatch):
+    """A server behind a TLS proxy bakes PUBLIC_URL, not the plain-http request (CLV-34)."""
+    from app.services import kiosk_bundle
+    from app.utils import public_url as public_url_module
+
+    monkeypatch.setattr(public_url_module.settings, "public_url", "https://calvin.wholab.xyz/")
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get("/api/kiosks/install.sh")
+    assert r.status_code == 200
+    assert "SERVER_URL='https://calvin.wholab.xyz'" in r.text
+    assert "http://testserver" not in r.text
+
+
+@pytest.mark.integration
+def test_install_script_ignores_forwarded_headers_from_untrusted_client(
+    test_client: TestClient, monkeypatch
+):
+    """X-Forwarded-* from an arbitrary client must not choose the baked URL (CLV-34)."""
+    from app.services import kiosk_bundle
+    from app.utils import public_url as public_url_module
+
+    monkeypatch.setattr(public_url_module.settings, "public_url", "")
+    monkeypatch.setattr(public_url_module.settings, "trusted_proxies", "127.0.0.1")
+    with patch.object(kiosk_bundle.settings, "repo_dir", _REPO_ROOT):
+        r = test_client.get(
+            "/api/kiosks/install.sh",
+            headers={
+                "X-Forwarded-Proto": "https",
+                "X-Forwarded-Host": "evil.example",
+            },
+        )
+    assert r.status_code == 200
+    assert "SERVER_URL='http://testserver'" in r.text
+    assert "evil.example" not in r.text
+
+
+@pytest.mark.integration
 def test_installer_files_served_and_allowlisted(test_client: TestClient):
     from app.services import kiosk_bundle
 

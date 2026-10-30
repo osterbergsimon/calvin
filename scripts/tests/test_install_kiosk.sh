@@ -128,6 +128,15 @@ grep -qx 'SETUP --backend-url http://10.0.0.5:8000' "$RUN_LOG" \
     || { echo "FAIL: --backend-url not honored"; cat "$RUN_LOG"; exit 1; }
 echo "PASS install-template-needs-backend-url"
 
+# --- 4b. On a served copy, an explicit --backend-url overrides the baked default. ---
+reset
+bash "$tmp/served.sh" --no-reboot --backend-url https://calvin.example.org/ >/dev/null
+grep -qx 'SETUP --backend-url https://calvin.example.org' "$RUN_LOG" \
+    || { echo "FAIL: baked default beat an explicit --backend-url"; cat "$RUN_LOG"; exit 1; }
+grep -q '^https://calvin.example.org/api/kiosks/agent/manifest$' "$tmp/curl.log" \
+    || { echo "FAIL: downloads did not follow the explicit --backend-url"; exit 1; }
+echo "PASS install-explicit-backend-url-overrides-baked"
+
 # --- 5. Installer file hash mismatch => abort, setup never runs. ---
 write_manifest "$tmp/manifest-badsha.json" "" "$(printf '0%.0s' {1..64})"
 reset

@@ -29,6 +29,9 @@ services:
       # Address phones and new kiosks use to reach this server (QR codes, the
       # "Add kiosk" command). The container only sees its own IP — set it.
       PUBLIC_URL: ${PUBLIC_URL:-}
+      # Peers allowed to set X-Forwarded-Proto/X-Forwarded-Host when PUBLIC_URL
+      # is unset (comma-separated IPs/CIDRs, "*" for any). Empty = trust none.
+      CALVIN_TRUSTED_PROXIES: ${CALVIN_TRUSTED_PROXIES:-}
       # Owner of the files under CALVIN_DATA_DIR. 0/0 runs as root;
       # Unraid's appdata convention is 99/100 (nobody:users).
       PUID: ${PUID:-0}
