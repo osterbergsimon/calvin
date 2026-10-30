@@ -908,6 +908,59 @@ class TestServicePluginDataAPI:
             await db_plugin.delete()
 
     @pytest.mark.asyncio
+    async def test_concurrent_polls_retry_initialize_only_once(self, test_db):
+        """Two dashboard polls must not run initialize() in parallel (calvin-olsx)."""
+        import asyncio
+
+        from app.api.routes.plugins.management import get_plugin_data
+        from app.models.db_models import PluginDB
+
+        class SlowInitializePlugin(self.MockServicePluginForAPI):
+            def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+                super().__init__(plugin_id, name, enabled)
+                self.concurrent_initializes = 0
+                self.max_concurrent_initializes = 0
+
+            async def initialize(self) -> None:
+                self.initialize_calls += 1
+                self.concurrent_initializes += 1
+                self.max_concurrent_initializes = max(
+                    self.max_concurrent_initializes, self.concurrent_initializes
+                )
+                try:
+                    await asyncio.sleep(0.05)
+                finally:
+                    self.concurrent_initializes -= 1
+
+        plugin_id = "test-service-concurrent-boot"
+        plugin = SlowInitializePlugin(
+            plugin_id=plugin_id, name="Test Service Instance", enabled=True
+        )
+        await plugin_manager.register(plugin)
+        db_plugin = await PluginDB.objects.create(
+            id=plugin_id,
+            type_id="test-service",
+            plugin_type="service",
+            name="Test Service Instance",
+            enabled=True,
+            config={},
+        )
+
+        try:
+            results = await asyncio.gather(
+                get_plugin_data(plugin_id, start_date=None, end_date=None),
+                get_plugin_data(plugin_id, start_date=None, end_date=None),
+            )
+
+            assert all(result["success"] is True for result in results)
+            assert plugin.max_concurrent_initializes == 1
+            assert plugin.initialize_calls == 1
+            assert plugin.is_running() is True
+        finally:
+            await plugin_manager.unregister(plugin_id)
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
     async def test_get_plugin_data_disabled_instance_is_409(self, test_client):
         plugin, db_plugin = await self._register(
             "test-service-disabled", enabled=False, running=False
