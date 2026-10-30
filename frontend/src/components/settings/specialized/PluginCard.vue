@@ -403,7 +403,7 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   cursor: progress;
 }
 .pc-chevron {
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   line-height: 1;
   transition: transform 0.15s;
 }
