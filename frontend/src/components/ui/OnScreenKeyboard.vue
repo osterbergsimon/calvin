@@ -1,6 +1,21 @@
 <!-- frontend/src/components/ui/OnScreenKeyboard.vue -->
 <template>
   <Teleport to="body">
+    <button
+      v-if="osk.showKeyboardButton.value"
+      type="button"
+      class="osk-open"
+      aria-label="Show on-screen keyboard"
+      @pointerdown.prevent
+      @click="osk.showKeyboard()"
+    >
+      <svg class="osk-open__ic" aria-hidden="true" viewBox="0 0 24 24">
+        <path
+          d="M4,5A2,2 0 0,0 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7A2,2 0 0,0 20,5H4M4,7H20V17H4V7M5,8V10H7V8H5M8,8V10H10V8H8M11,8V10H13V8H11M14,8V10H16V8H14M17,8V10H19V8H17M5,11V13H7V11H5M8,11V13H10V11H8M11,11V13H13V11H11M14,11V13H16V11H14M17,11V13H19V11H17M8,14V16H16V14H8Z"
+        />
+      </svg>
+      <span>Keyboard</span>
+    </button>
     <div
       v-if="!failed"
       ref="panel"
@@ -328,6 +343,53 @@ defineExpose({
 </script>
 
 <style scoped>
+/* The way back to the keyboard (CLV-27 §4). Same layer as the OSK panel, so it
+   sits above dialogs and their scrim (1000). */
+.osk-open {
+  position: fixed;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  z-index: 1100;
+  height: 48px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  background: var(--bg-1);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 18px -8px var(--shadow-hover);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: osk-open-in 120ms ease-out;
+}
+.osk-open__ic {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: var(--ink-2);
+}
+.osk-open:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@keyframes osk-open-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .osk-open {
+    animation: none;
+  }
+}
 .osk {
   position: fixed;
   left: 0;
