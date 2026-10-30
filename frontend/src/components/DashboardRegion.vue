@@ -55,6 +55,7 @@
         :rotation-interval="photoRotationInterval * 1000"
         :source-ids="region.instanceIds || []"
         :region-id="region.id"
+        :fit="region.view?.fit"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
       />
