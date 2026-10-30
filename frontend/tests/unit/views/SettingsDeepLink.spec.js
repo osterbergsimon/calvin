@@ -104,6 +104,31 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
+  it("hands the All-screens deep link to Screens so the Default page opens", async () => {
+    route.query = { setting: "device-power" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          ScreensSettings: {
+            props: ["initialSection"],
+            template: `<div><span data-test="screens-initial">{{ initialSection }}</span>${section(
+              "device-power",
+              "Power"
+            )}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("screens");
+    expect(w.find("[data-test='screens-initial']").text()).toBe("device-power");
+    expect(document.getElementById("section-device-power").scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
   it("opens System › Versions & status for device-hardware", async () => {
     route.query = { setting: "device-hardware" };
     const w = mount(Settings, {

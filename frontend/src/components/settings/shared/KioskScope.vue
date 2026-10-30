@@ -3,7 +3,7 @@
     <span
       class="kiosk-scope__label"
       :class="overridden ? 'kiosk-scope__label--own' : 'kiosk-scope__label--shared'"
-      >{{ overridden ? "Only this screen" : "Same as all screens" }}</span
+      >{{ overridden ? "Changed here" : "Same as Default" }}</span
     >
     <template v-if="overridden">
       <span class="kiosk-scope__sep" aria-hidden="true">·</span>
@@ -13,16 +13,16 @@
         :data-test="resetTest"
         @click="emit('reset')"
       >
-        Use the shared setting
+        Reset to default
       </button>
     </template>
   </p>
 </template>
 
 <script setup>
-// Where a kiosk row's value comes from, in plain words (settings copy audit
-// §3.5): "Same as all screens" when it inherits, "Only this screen" plus a way
-// back when it has its own override. Slotted into SettingRow's description.
+// Where a row's value comes from (Default-is-a-screen §4/§7): "Same as
+// Default" when it inherits, "Changed here" plus a way back when it has its own
+// override. Slotted into SettingRow's description.
 defineProps({
   overridden: { type: Boolean, default: false },
   // data-test id for the reset button, so tests can target one row's link.

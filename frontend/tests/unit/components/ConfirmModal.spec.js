@@ -195,5 +195,21 @@ describe("ConfirmModal", () => {
       expect(cancelButton.classes()).toContain("btn-secondary");
       expect(confirmButton.classes()).toContain("btn-danger");
     });
+
+    it("uses the primary style for a confirm that is not destructive", () => {
+      const wrapper = mount(ConfirmModal, {
+        props: {
+          show: true,
+          message: "Make these the default?",
+          confirmText: "Make default",
+          danger: false,
+        },
+      });
+
+      const confirmButton = wrapper.find(".modal-footer button:last-child");
+      expect(confirmButton.text()).toBe("Make default");
+      expect(confirmButton.classes()).toContain("btn-primary");
+      expect(confirmButton.classes()).not.toContain("btn-danger");
+    });
   });
 });
