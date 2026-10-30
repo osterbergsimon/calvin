@@ -12,7 +12,8 @@ This is for **Mode B** (remote backend + kiosk Pi). See
 
 - A Raspberry Pi and an SD card / SSD.
 - Raspberry Pi Imager.
-- The Calvin repo checked out on your workstation (Linux/macOS); `develop` is fine.
+- The Calvin repo checked out on your workstation (Linux/macOS) at the release
+  your server runs — a `vX.Y.Z` tag; `develop` is fine to test the next one.
   Only the bake script and the installer it embeds come from this checkout. The
   Pi gets everything else from your Calvin server, never from GitHub.
 - Your backend URL, e.g. `http://homeserver.local:8000`.
