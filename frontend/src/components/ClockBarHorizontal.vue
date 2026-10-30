@@ -194,6 +194,19 @@ const roomLabel = computed(() => configStore.displayName);
   font-size: 0.95rem;
 }
 
+/* On a phone the bar cannot hold the wordmark, the room, the clock, the
+   connection pill and the ⋯ menu on one line: the row ran past the screen and
+   scrolled sideways, cutting the clock (CLV-66). The room name is the least
+   load-bearing piece there and still shows in Settings. */
+@media (max-width: 600px) {
+  .clock-bar-horizontal .clock-bar-room {
+    display: none;
+  }
+  .clock-bar-outer {
+    gap: 0.5rem;
+  }
+}
+
 .clock-bar-horizontal.position-between .clock-time {
   font-size: 0.875rem;
 }

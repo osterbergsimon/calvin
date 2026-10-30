@@ -13,7 +13,7 @@ import {
 } from "@/composables/useSetupPrompt";
 
 vi.mock("@/utils/serverUrl", () => ({
-  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.168.1.20:8000")),
+  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.0.2.20:8000")),
   settingsLink: (base, id) => `${base}/settings${id ? `?setting=${id}` : ""}`,
 }));
 

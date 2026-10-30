@@ -179,6 +179,23 @@ The reference plugins live in
 - **Documentation index**: [docs/index.md](docs/index.md)
 - **Locally**: `mkdocs serve` from the project root
 
+## 🤝 Contributing
+
+Calvin is an open project and contributions of every size are welcome.
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — development setup, the branch model
+  (branch from `develop`, pull requests into `develop`), conventional commit
+  messages, and the quality gates (`make lint`, `make type-check`, `make test`)
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** — Contributor Covenant 2.1; this is
+  how we expect people to treat each other here
+- **[SECURITY.md](SECURITY.md)** — report a vulnerability privately through
+  GitHub; please never open a public issue for a security problem
+- **[Issue templates](.github/ISSUE_TEMPLATE/)** — bug reports ask for your
+  deployment, Pi model, and logs; feature requests are welcome too
+- **Plugin work** belongs in
+  [osterbergsimon/calvin-plugins](https://github.com/osterbergsimon/calvin-plugins),
+  not in this repository
+
 ## 📄 License
 
 GPLv3 — see [LICENSE](LICENSE).

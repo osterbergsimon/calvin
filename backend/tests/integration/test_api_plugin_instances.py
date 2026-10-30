@@ -121,7 +121,7 @@ class TestPluginInstanceEndpoints:
         assert data["instance"]["running"] is True
 
     def test_create_plugin_instance_surfaces_creation_error(self, test_client: TestClient):
-        """A failed creation is an HTTP error carrying the cause, not a success (audit R6)."""
+        """A failed creation is a coded 500, not a success and not a leaked cause (R6/S9)."""
         with patch(
             "app.api.routes.plugins.instances.apply_plugin_config_update",
             new=AsyncMock(return_value={"instance_created": False, "error": "boom"}),
@@ -132,7 +132,8 @@ class TestPluginInstanceEndpoints:
             )
 
         assert response.status_code == 500
-        assert "boom" in response.json()["detail"]
+        assert response.json()["detail"]["code"] == "plugin_instance_create_failed"
+        assert "boom" not in response.text
 
     def test_create_plugin_instance_rejects_when_nothing_created(self, test_client: TestClient):
         """Config the plugin refuses (validation failed) is a 400, not a success."""
@@ -156,4 +157,5 @@ class TestPluginInstanceEndpoints:
             response = test_client.put("/api/plugins/iframe", json={"display_order": "3"})
 
         assert response.status_code == 500
-        assert "kaput" in response.json()["detail"]
+        assert response.json()["detail"]["code"] == "plugin_config_apply_failed"
+        assert "kaput" not in response.text

@@ -26,9 +26,11 @@ defineProps({
 <style scoped>
 .setting-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
+  row-gap: 0.75rem;
   min-height: 4.5rem; /* 72px */
   padding: 0.75rem 1.25rem;
 }
@@ -60,7 +62,12 @@ defineProps({
   color: var(--ink-2);
 }
 .setting-row__control {
-  flex-shrink: 0;
+  /* A control with intrinsic width (a row of chips, a stepper) must be allowed
+     to shrink on a phone: flex-shrink: 0 sized it to max-content and pushed the
+     whole settings page 55px wider than a 390px screen (CLV-66). */
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .setting-row--stacked {

@@ -3,7 +3,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
 
 vi.mock("@/utils/serverUrl", () => ({
-  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.168.1.20:8000")),
+  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.0.2.20:8000")),
   settingsLink: (base, id) => `${base}/settings?setting=${id}`,
 }));
 
@@ -16,7 +16,7 @@ describe("AddKioskPanel (F6)", () => {
     const w = mount(AddKioskPanel);
     await flushPromises();
     expect(w.find('[data-test="add-kiosk-command"]').text()).toBe(
-      "curl -fsSL http://192.168.1.20:8000/api/kiosks/install.sh | sudo bash"
+      "curl -fsSL http://192.0.2.20:8000/api/kiosks/install.sh | sudo bash"
     );
   });
 
@@ -26,7 +26,7 @@ describe("AddKioskPanel (F6)", () => {
     await w.find('[data-test="add-kiosk-name"]').setValue("Living room/TV");
     await flushPromises();
     expect(w.find('[data-test="phone-setup-url"]').text()).toBe(
-      "http://192.168.1.20:8000/?kiosk=Living-roomTV"
+      "http://192.0.2.20:8000/?kiosk=Living-roomTV"
     );
     expect(w.find(".phone-setup__qr").exists()).toBe(true);
   });
@@ -39,7 +39,7 @@ describe("AddKioskPanel (F6)", () => {
     await w.find('[data-test="add-kiosk-copy"]').trigger("click");
     await flushPromises();
     expect(writeText).toHaveBeenCalledWith(
-      "curl -fsSL http://192.168.1.20:8000/api/kiosks/install.sh | sudo bash"
+      "curl -fsSL http://192.0.2.20:8000/api/kiosks/install.sh | sudo bash"
     );
     expect(w.find('[data-test="add-kiosk-copy"]').text()).toBe("Copied");
   });

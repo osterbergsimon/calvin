@@ -87,6 +87,11 @@ const dotClass = computed(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  /* Must be allowed to shrink: the right cluster (save state, phone hand-off,
+     Done) is fixed-width, and without this a 390px phone ran 39px wide
+     (CLV-66). The location label already carries an ellipsis. */
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .settings-topbar__wordmark {
@@ -96,6 +101,7 @@ const dotClass = computed(() => {
   letter-spacing: 0.08em;
   color: var(--ink);
   user-select: none;
+  flex-shrink: 0;
 }
 
 .settings-topbar__wordmark-dot {
@@ -191,6 +197,14 @@ const dotClass = computed(() => {
   .settings-topbar__done,
   .settings-topbar__phone {
     min-height: var(--touch-target, 2.75rem);
+  }
+}
+
+/* You are already on the phone: the hand-off lives on a touch kiosk, and the
+   button only squeezes the bar on a 390px screen. */
+@media (max-width: 600px) {
+  .settings-topbar__phone {
+    display: none;
   }
 }
 

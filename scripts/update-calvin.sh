@@ -36,12 +36,17 @@ GIT_REPO="${GIT_REPO:-https://github.com/osterbergsimon/calvin.git}"
 # Root-only state: the source snapshot the host files are refreshed from and
 # this run's rollback copies. Never inside calvin's home or the data volume.
 UPDATE_DIR="${CALVIN_UPDATE_DIR:-/var/lib/calvin-update}"
+# Status the app reads (calvin-1g25): root-owned and not writable by the app
+# user, so a symlink planted in the checkout can never redirect root's write.
+# It is a sibling of UPDATE_DIR because that one stays 0700: the rollback copy
+# of .env must not be readable by other local users.
+UPDATE_STATUS_DIR="${CALVIN_UPDATE_STATUS_DIR:-/var/lib/calvin-update-status}"
 # auto: refresh when running as root on a host set up by setup.sh (not inside
 # the dev container, which has no /etc/calvin compose file).
 REFRESH_HOST="${CALVIN_REFRESH_HOST:-auto}"
 CONTAINER="${CALVIN_CONTAINER:-calvin}"
-UPDATE_LOG_FILE="${UPDATE_LOG_FILE:-${REPO_DIR}/backend/logs/calvin-update.log}"
-UPDATE_STATE_FILE="${UPDATE_STATE_FILE:-${REPO_DIR}/backend/logs/calvin-update-state.json}"
+UPDATE_LOG_FILE="${UPDATE_LOG_FILE:-${UPDATE_STATUS_DIR}/calvin-update.log}"
+UPDATE_STATE_FILE="${UPDATE_STATE_FILE:-${UPDATE_STATUS_DIR}/calvin-update-state.json}"
 UPDATE_STARTED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 ROLLBACK_DIR="$UPDATE_DIR/rollback"
 SNAPSHOT_DIR="$UPDATE_DIR/src"
@@ -106,7 +111,14 @@ write_update_state() {
   lines+=("  \"backend_restarted\": $BACKEND_RESTARTED")
   [[ -n "$error" ]] && lines+=("$(_json_field error "$error")")
 
-  mkdir -p "$(dirname "$UPDATE_STATE_FILE")"
+  local state_dir tmp
+  state_dir="$(dirname "$UPDATE_STATE_FILE")"
+  (umask 022 && mkdir -p "$state_dir")
+  # mktemp gives an unpredictable name, so a symlink planted at a fixed
+  # "<state>.tmp" is never opened, and rename replaces the destination
+  # instead of writing through it. The status dir is root-owned 0755 (the
+  # state holds commit info only; the rollback copies stay in 0700 UPDATE_DIR).
+  tmp="$(mktemp "${state_dir}/.calvin-update-state.XXXXXX")"
   {
     printf '{\n'
     local i last=$((${#lines[@]} - 1))
@@ -118,8 +130,9 @@ write_update_state() {
       fi
     done
     printf '}\n'
-  } >"${UPDATE_STATE_FILE}.tmp"
-  mv "${UPDATE_STATE_FILE}.tmp" "$UPDATE_STATE_FILE"
+  } >"$tmp"
+  chmod 0644 "$tmp"
+  mv -fT "$tmp" "$UPDATE_STATE_FILE"
 }
 
 # git in the checkout as its owner: root never leaves root-owned files there,

@@ -6,6 +6,7 @@
 import { ref, computed } from "vue";
 import * as pluginsApi from "../services/pluginsApi";
 import { useWebServicesStore } from "../stores/webServices";
+import { errorDetailMessage } from "../utils/apiErrors";
 import { logError, logWarn } from "../utils/logger";
 
 // Shared state (singleton pattern)
@@ -170,8 +171,7 @@ export function usePlugins() {
       await loadPlugins();
       return response.manifest?.id ? [response.manifest.id] : [];
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to install plugin";
+      pluginInstallError.value = errorDetailMessage(error, "Failed to install plugin");
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -244,8 +244,10 @@ export function usePlugins() {
       pluginActualBranch.value = response.branch || branch;
     } catch (error) {
       logError("[usePlugins]", "Failed to enumerate plugins from GitHub:", error);
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to enumerate plugins from GitHub";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to enumerate plugins from GitHub"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -290,8 +292,7 @@ export function usePlugins() {
     } catch (error) {
       logError("[usePlugins]", "Failed to enumerate the plugin catalog:", error);
       catalogPlugins.value = [];
-      catalogError.value =
-        error.response?.data?.detail || error.message || "Could not reach the plugin catalog";
+      catalogError.value = errorDetailMessage(error, "Could not reach the plugin catalog");
       return null;
     } finally {
       catalogEnumerating.value = false;
@@ -333,7 +334,7 @@ export function usePlugins() {
       }, 5000);
       return [installedId];
     } catch (error) {
-      const errorDetail = error.response?.data?.detail || error.message || "";
+      const errorDetail = errorDetailMessage(error, "");
       if (errorDetail.includes("older than") || errorDetail.includes("version")) {
         pluginInstallError.value = errorDetail;
       } else {
@@ -383,7 +384,7 @@ export function usePlugins() {
           results.failed.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
-            error: error.response?.data?.detail || error.message || "Unknown error",
+            error: errorDetailMessage(error, "Unknown error"),
           });
         }
       }
@@ -429,8 +430,7 @@ export function usePlugins() {
         pluginInstallError.value = "";
       }, 10000);
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to install plugins from GitHub";
+      pluginInstallError.value = errorDetailMessage(error, "Failed to install plugins from GitHub");
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -487,10 +487,10 @@ export function usePlugins() {
       });
     } catch (error) {
       logError("[usePlugins]", "Failed to enumerate plugins from local path:", error);
-      pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to enumerate plugins from local path";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to enumerate plugins from local path"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -528,8 +528,10 @@ export function usePlugins() {
       }, 5000);
       return [installedId];
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to install plugin from local path";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to install plugin from local path"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -560,7 +562,7 @@ export function usePlugins() {
           results.failed.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
-            error: error.response?.data?.detail || error.message || "Unknown error",
+            error: errorDetailMessage(error, "Unknown error"),
           });
         }
       }
@@ -595,10 +597,10 @@ export function usePlugins() {
         pluginInstallError.value = "";
       }, 10000);
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to install plugins from local path";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to install plugins from local path"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -661,7 +663,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to save config for plugin ${pluginId}:`, error);
       pluginSaveStatus.value[pluginId] = {
         success: false,
-        message: error.response?.data?.detail || error.message || "Failed to save configuration",
+        message: errorDetailMessage(error, "Failed to save configuration"),
       };
       throw error;
     } finally {
@@ -685,7 +687,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to test plugin ${pluginId}:`, error);
       pluginTestStatus.value[pluginId] = {
         success: false,
-        message: error.response?.data?.detail || error.message || "Test failed",
+        message: errorDetailMessage(error, "Test failed"),
       };
       throw error;
     } finally {
@@ -708,7 +710,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to fetch plugin ${pluginId}:`, error);
       pluginFetchStatus.value[pluginId] = {
         success: false,
-        message: error.response?.data?.detail || error.message || "Failed to initiate fetch",
+        message: errorDetailMessage(error, "Failed to initiate fetch"),
       };
       throw error;
     } finally {
