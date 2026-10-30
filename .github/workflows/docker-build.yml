@@ -3,7 +3,11 @@ name: Build and Push Docker Image
 # Publishes ghcr.io/<owner>/calvin. develop is the deploy branch:
 #   push to develop  -> :develop + :sha-<commit>   (what Unraid / Pi run)
 #   push of a v* tag -> :X.Y.Z + :X.Y + :latest + :sha-<commit>
-#   pull request     -> amd64 build only, nothing pushed
+#   pull request     -> amd64 build, nothing pushed. When the PR touches
+#                       anything that can change the image (backend deps,
+#                       docker/, this workflow) it ALSO builds arm64 and
+#                       arm/v7 under QEMU, so arm-only breakage is caught
+#                       before merge instead of after (CLV-40).
 #   manual dispatch  -> build; push :sha-<commit> (and :develop when run
 #                       on develop) only if push_image is ticked
 #
@@ -46,6 +50,31 @@ env:
   PUBLISH: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.push_image) }}
 
 jobs:
+  # Decides whether a PR can affect the built image. Deliberately a JOB-level
+  # filter rather than a `paths:` trigger: a job skipped by `if` reports
+  # "skipped", which satisfies a required status check, while a workflow
+  # filtered out at the trigger level stays "pending" and blocks the merge.
+  changes:
+    name: Detect image-affecting changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      arm: ${{ steps.filter.outputs.arm }}
+    steps:
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            arm:
+              - 'backend/pyproject.toml'
+              - 'backend/uv.lock'
+              - 'docker/**'
+              - '.github/workflows/docker-build.yml'
+
   build:
     name: Build Calvin Runtime Image
     runs-on: ubuntu-latest
@@ -141,3 +170,44 @@ jobs:
             echo '```'
             echo "Digest: \`$DIGEST\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Arm targets are what a PR can break silently: a dependency without an
+  # armv7 wheel (cffi 2.1.1) builds fine on amd64 and only fails on the
+  # post-merge multi-arch publish. Runs only for PRs that touch the image
+  # inputs; nothing is pushed and nothing is loaded locally.
+  build-arm:
+    name: Build Calvin Runtime Image (arm64, arm/v7)
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.arm == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build arm64 + arm/v7 runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            VITE_API_URL=/api
+          platforms: linux/arm64,linux/arm/v7
+          push: false
+          # Shares the amd64 build's GHA cache for platform-independent
+          # layers (the frontend stage builds on $BUILDPLATFORM) and keeps
+          # its own scope for arm layers so the two jobs never fight over
+          # the same cache record.
+          cache-from: |
+            type=gha
+            type=gha,scope=pr-arm
+          cache-to: type=gha,mode=max,scope=pr-arm
