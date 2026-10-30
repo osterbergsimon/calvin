@@ -29,10 +29,19 @@ def require_host_control(action: str) -> None:
     """
     if host_control_enabled():
         return
-    message = (
-        f"{action} is disabled on this deployment. "
-        "Set CALVIN_HOST_CONTROL=1 if Calvin owns this machine."
-    )
+    if settings.deployment == "docker":
+        # A container can never drive its host: the machine Calvin acts on is
+        # outside the container, so CALVIN_HOST_CONTROL=1 would be a lie here.
+        message = (
+            f"{action} is not available in a container deployment. "
+            "Calvin in a container cannot control the host machine; "
+            "run Calvin natively on the host to enable this."
+        )
+    else:
+        message = (
+            f"{action} is disabled on this deployment. "
+            "Set CALVIN_HOST_CONTROL=1 if Calvin owns this machine."
+        )
     logger.info("Host action blocked (CALVIN_HOST_CONTROL is off): {}", action)
     raise HTTPException(
         status_code=409,

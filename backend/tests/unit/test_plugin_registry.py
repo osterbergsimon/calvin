@@ -1,11 +1,13 @@
 """Tests for plugin registry."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from app.plugins.base import PluginType
 from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import BackendPlugin
 from app.plugins.registry import PluginRegistry
 
 
@@ -448,6 +450,129 @@ class TestPluginRegistry:
         assert db_type.name == "New Name"
         assert db_type.description == "Updated description"
         assert db_type.version == "2.0.0"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestRegisterBackendPluginLifecycle:
+    """A newly created backend plugin must start like start_plugin() does (calvin-qq4l)."""
+
+    class DummyBackendPlugin(BackendPlugin):
+        metadata = PluginMetadata(type_id="test-backend", name="Test Backend")
+
+        def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+            super().__init__(plugin_id, name, enabled)
+            self.worker_started = False
+            self.initialize_calls = 0
+
+        async def initialize(self) -> None:
+            self.initialize_calls += 1
+
+        async def start_worker(self) -> None:
+            self.worker_started = True
+
+        async def get_schedule_config(self) -> dict[str, Any] | None:
+            return {"interval": 60, "enabled": True}
+
+    async def _register(
+        self,
+        plugin_registry_instance,
+        plugin,
+        plugin_id: str,
+        *,
+        enabled: bool = True,
+        scheduler_error: Exception | None = None,
+    ):
+        with (
+            patch("app.plugins.registry.manager.plugin_loader") as mock_loader,
+            patch("app.plugins.registry.manager.instance_manager") as mock_instance_manager,
+            patch("app.services.backend_scheduler.backend_plugin_scheduler") as mock_scheduler,
+        ):
+            mock_loader.create_plugin_instance.return_value = plugin
+            mock_instance_manager.register = AsyncMock(return_value=None)
+            mock_scheduler.register_plugin_tasks = AsyncMock(side_effect=scheduler_error)
+
+            await plugin_registry_instance.register_plugin(
+                plugin_id=plugin_id,
+                type_id="test-backend",
+                name="New Backend Instance",
+                config={},
+                enabled=enabled,
+            )
+
+        return mock_scheduler
+
+    async def test_register_backend_plugin_starts_worker_and_schedules_tasks(
+        self, plugin_registry_instance, test_db
+    ):
+        from app.models.db_models import PluginDB
+
+        plugin_id = "backend-new-instance"
+        await PluginDB.objects.delete(id=plugin_id)
+        plugin = self.DummyBackendPlugin(plugin_id=plugin_id, name="New Backend")
+
+        mock_scheduler = await self._register(plugin_registry_instance, plugin, plugin_id)
+
+        try:
+            assert plugin.worker_started is True
+            assert plugin.is_running() is True
+            mock_scheduler.register_plugin_tasks.assert_awaited_once_with(plugin)
+            stored = await PluginDB.objects.get(id=plugin_id)
+            assert stored.enabled is True
+        finally:
+            await PluginDB.objects.delete(id=plugin_id)
+
+    async def test_register_disabled_backend_plugin_does_not_start(
+        self, plugin_registry_instance, test_db
+    ):
+        from app.models.db_models import PluginDB
+
+        plugin_id = "backend-new-disabled"
+        await PluginDB.objects.delete(id=plugin_id)
+        plugin = self.DummyBackendPlugin(plugin_id=plugin_id, name="New Backend", enabled=False)
+
+        mock_scheduler = await self._register(
+            plugin_registry_instance, plugin, plugin_id, enabled=False
+        )
+
+        try:
+            assert plugin.worker_started is False
+            assert plugin.is_running() is False
+            mock_scheduler.register_plugin_tasks.assert_not_awaited()
+        finally:
+            await PluginDB.objects.delete(id=plugin_id)
+
+    async def test_register_backend_plugin_worker_error_keeps_going(
+        self, plugin_registry_instance, test_db
+    ):
+        """A worker/scheduler error must not stop registration (mirrors start_plugin)."""
+        from app.models.db_models import PluginDB
+
+        plugin_id = "backend-new-worker-error"
+        await PluginDB.objects.delete(id=plugin_id)
+        plugin = self.DummyBackendPlugin(plugin_id=plugin_id, name="New Backend")
+
+        async def failing_worker() -> None:
+            raise RuntimeError("worker boom")
+
+        plugin.start_worker = failing_worker  # type: ignore[method-assign]
+
+        mock_scheduler = await self._register(
+            plugin_registry_instance,
+            plugin,
+            plugin_id,
+            scheduler_error=RuntimeError("scheduler boom"),
+        )
+
+        try:
+            # The worker and scheduler failures were logged; the plugin still
+            # started and the row stays enabled instead of failing registration.
+            assert plugin.worker_started is False
+            assert plugin.is_running() is True
+            mock_scheduler.register_plugin_tasks.assert_awaited_once_with(plugin)
+            assert (await PluginDB.objects.get(id=plugin_id)).enabled is True
+        finally:
+            await PluginDB.objects.delete(id=plugin_id)
 
 
 @pytest.mark.unit
