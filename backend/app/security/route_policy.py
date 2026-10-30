@@ -172,10 +172,21 @@ async def enforce_route_policy(request: Request) -> None:
     if key is not None:
         request.state.api_key = key
         rank = SCOPE_RANK[key["scope"]]
-        if (method, path) in HOST_ROUTES and rank < SCOPE_RANK["host"]:
-            raise _insufficient_scope("host")
-        if method in UNSAFE_METHODS and rank < SCOPE_RANK["admin"]:
-            raise _insufficient_scope("admin")
+        route_id = (method, path)
+        # A valid key never gets less than an anonymous caller: viewer writes
+        # stay open to every scope (host-acting ones still hit
+        # ``require_host_control`` in the handler).
+        if route_id in PUBLIC_WRITES:
+            pass
+        elif route_id in HOST_ROUTES:
+            if rank < SCOPE_RANK["host"]:
+                raise _insufficient_scope("host")
+        elif method in UNSAFE_METHODS:
+            if rank < SCOPE_RANK["admin"]:
+                raise _insufficient_scope("admin")
+        elif method in ("GET", "HEAD") and path in ADMIN_READS:
+            if rank < SCOPE_RANK["admin"]:
+                raise _insufficient_scope("admin")
         return
     if method in UNSAFE_METHODS:
         if (method, path) in PUBLIC_WRITES:

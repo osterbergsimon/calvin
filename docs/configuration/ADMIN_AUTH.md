@@ -118,13 +118,14 @@ Scopes form a ladder, `host` ⊇ `admin` ⊇ `read`:
 
 | Scope | May do |
 |---|---|
-| `read` | Every `GET`, including the admin-only reads (backup export and files, scans). Never an unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`), not even the viewer writes. |
+| `read` | Every public `GET`, but not the admin-only reads (backup export and files, scans, git branches, update stream): those need `admin`. The viewer writes anonymous callers have (next/previous photo, calendar refresh, display power, display settings in `POST /api/config`) work too. Every other unsafe method (`POST`/`PUT`/`PATCH`/`DELETE`) is refused. |
 | `admin` | Everything a signed-in admin may do, except the host-acting routes below. |
-| `host` | `admin`, plus the host-acting routes: `POST /api/system/update`, `/reboot`, `/restart-backend`, `/restart-frontend`, `/reload-ui`, `/display/power/on|off`, `/display/timeout/configure`. |
+| `host` | `admin`, plus the host-acting routes that anonymous viewers can't call: `POST /api/system/update`, `/reboot`, `/restart-backend`, `/restart-frontend`, `/reload-ui`, `/display/timeout/configure`. |
 
 A `host` key does not bypass `CALVIN_HOST_CONTROL`: with it off, host routes
 answer `409 host_control_disabled` for everyone, keys included, and creating a
-`host` key is refused with `403 host_control_disabled`. A key of too low a scope
+`host` key is refused with `403 host_control_disabled`. A key never gets less than an anonymous caller (display power on/off stay open
+to every key, subject to `CALVIN_HOST_CONTROL`). A key of too low a scope
 gets `403 insufficient_scope`.
 
 Rules:

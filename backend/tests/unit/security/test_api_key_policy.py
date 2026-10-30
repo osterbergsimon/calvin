@@ -6,7 +6,7 @@ test here can reach a real reboot/restart handler.
 """
 
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 from loguru import logger
 
@@ -18,7 +18,8 @@ from app.security.route_policy import ADMIN_READS, HOST_ROUTES, enforce_route_po
 
 PASSWORD = "test-admin-password"
 ADMIN_READ_PATH = "/api/backup/files"  # in ADMIN_READS
-HOST_PATH = "/api/system/reboot"  # in HOST_ROUTES
+HOST_PATH = "/api/system/reboot"  # in HOST_ROUTES only
+DISPLAY_PATH = "/api/system/display/power/on"  # in HOST_ROUTES and PUBLIC_WRITES
 
 
 @pytest.fixture
@@ -38,6 +39,10 @@ def client(tmp_path, monkeypatch):
     async def public():
         return {"ok": True}
 
+    @app.get("/api/backup/export")
+    async def backup_export():
+        return {"ok": True}
+
     @app.get(ADMIN_READ_PATH)
     async def admin_read():
         return {"ok": True}
@@ -48,6 +53,21 @@ def client(tmp_path, monkeypatch):
 
     @app.post("/api/images/next")  # a PUBLIC_WRITES route
     async def public_write():
+        return {"ok": True}
+
+    @app.post(DISPLAY_PATH)  # host-acting AND a viewer write
+    async def display_on():
+        from app.utils.host_control import require_host_control
+
+        require_host_control("Turning the display on")
+        return {"ok": True}
+
+    @app.post("/api/config")
+    async def config_write(request: Request, body: dict):
+        from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
+
+        if not is_admin(request) and not body.keys() <= CONFIG_DISPLAY_KEYS:
+            raise admin_error(True)
         return {"ok": True}
 
     @app.post(HOST_PATH)
@@ -66,8 +86,12 @@ def _session(client: TestClient) -> None:
 
 
 def _make_key(client: TestClient, scope: str) -> str:
+    return _make_key_named(client, scope, f"k-{scope}")
+
+
+def _make_key_named(client: TestClient, scope: str, name: str) -> str:
     _session(client)
-    response = client.post("/api/auth/keys", json={"name": f"k-{scope}", "scope": scope})
+    response = client.post("/api/auth/keys", json={"name": name, "scope": scope})
     assert response.status_code == 201, response.text
     client.cookies.clear()
     return response.json()["secret"]
@@ -80,15 +104,19 @@ def _bearer(secret: str) -> dict[str, str]:
 # (scope, request, expected status with host control on)
 MATRIX = [
     ("read", ("GET", "/api/public"), 200),
-    ("read", ("GET", ADMIN_READ_PATH), 200),
+    ("read", ("GET", ADMIN_READ_PATH), 403),
+    ("read", ("GET", "/api/backup/export"), 403),
     ("read", ("POST", "/api/calendar/sources"), 403),
-    ("read", ("POST", "/api/images/next"), 403),
+    ("read", ("POST", "/api/images/next"), 200),
+    ("read", ("POST", DISPLAY_PATH), 200),
     ("read", ("POST", HOST_PATH), 403),
     ("admin", ("GET", "/api/public"), 200),
     ("admin", ("GET", ADMIN_READ_PATH), 200),
     ("admin", ("POST", "/api/calendar/sources"), 200),
     ("admin", ("POST", "/api/images/next"), 200),
     ("admin", ("POST", HOST_PATH), 403),
+    ("admin", ("POST", DISPLAY_PATH), 200),
+    ("admin", ("GET", "/api/backup/export"), 200),
     ("host", ("GET", "/api/public"), 200),
     ("host", ("GET", ADMIN_READ_PATH), 200),
     ("host", ("POST", "/api/calendar/sources"), 200),
@@ -105,6 +133,28 @@ def test_scope_matrix_host_control_on(client, scope, request_line, expected):
     assert response.status_code == expected, response.text
     if expected == 403:
         assert response.json()["detail"]["code"] == "insufficient_scope"
+
+
+def test_read_key_display_power_matches_anonymous(client, monkeypatch):
+    secret = _make_key(client, "read")
+    for enabled in (True, False):
+        monkeypatch.setattr(settings, "host_control", enabled)
+        anonymous = client.post(DISPLAY_PATH).status_code
+        with_key = client.post(DISPLAY_PATH, headers=_bearer(secret)).status_code
+        assert with_key == anonymous == (200 if enabled else 409)
+
+
+def test_read_key_config_write_only_for_display_keys(client):
+    secret = _make_key(client, "read")
+    headers = _bearer(secret)
+    assert client.post("/api/config", json={"showUI": True}, headers=headers).status_code == 200
+    refused = client.post("/api/config", json={"gitBranch": "x"}, headers=headers)
+    assert refused.status_code in (401, 403)
+    admin = _make_key_named(client, "admin", "second-admin")
+    assert (
+        client.post("/api/config", json={"gitBranch": "x"}, headers=_bearer(admin)).status_code
+        == 200
+    )
 
 
 @pytest.mark.parametrize("scope", ["read", "admin", "host"])
@@ -202,7 +252,7 @@ def test_keys_cannot_manage_keys(client, scope):
     )
     assert client.delete(f"/api/auth/keys/{key_id}", headers=headers).status_code == 403
     # Still active afterwards.
-    assert client.get(ADMIN_READ_PATH, headers=headers).status_code == 200
+    assert client.get("/api/public", headers=headers).status_code == 200
 
 
 def test_keys_cannot_change_the_admin_password(client):
