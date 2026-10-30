@@ -14,7 +14,15 @@
             :data-provider-id="provider.id"
             @click="choose(provider)"
           >
-            <span class="pp-icon" aria-hidden="true">{{ providerLetter(provider) }}</span>
+            <span class="pp-icon" aria-hidden="true">
+              <img
+                v-if="isIconFile(provider.icon)"
+                class="pp-icon-img"
+                :src="iconUrl(provider)"
+                alt=""
+              />
+              <template v-else>{{ providerLetter(provider) }}</template>
+            </span>
             <span class="pp-text">
               <span class="pp-name">{{ provider.label || provider.name }}</span>
               <span v-if="provider.description" class="pp-desc">{{ provider.description }}</span>
@@ -26,6 +34,50 @@
       <p v-if="providers.length === 0" class="pp-empty">
         No add-ons of this kind are installed yet.
       </p>
+
+      <!-- §3.7: discovering an add-on is bridged here, installing stays the
+           official catalog's job and management stays in Plugins. -->
+      <section v-if="catalogProviders.length > 0" class="pp-catalog">
+        <h4 class="pp-group">From the Calvin catalog</h4>
+        <ul class="pp-list">
+          <li v-for="item in catalogProviders" :key="`catalog-${item.id}`">
+            <div
+              class="pp-tile pp-tile--catalog"
+              :class="{ 'pp-tile--off': item.status === 'installing' }"
+              :data-catalog-id="item.id"
+            >
+              <span class="pp-icon" aria-hidden="true">
+                <img v-if="isIconFile(item.icon)" class="pp-icon-img" :src="iconUrl(item)" alt="" />
+                <template v-else>{{ providerLetter(item) }}</template>
+              </span>
+              <span class="pp-text">
+                <span class="pp-name">{{ item.label || item.name }}</span>
+                <span v-if="item.description" class="pp-desc">{{ item.description }}</span>
+                <span v-if="item.error" class="pp-error">
+                  {{ item.error }}
+                  <button type="button" class="pp-error-link" @click="$emit('more')">
+                    See details in Plugins ›
+                  </button>
+                </span>
+              </span>
+              <span v-if="item.status === 'installing'" class="pp-install pp-install--busy">
+                Installing…
+              </span>
+              <span v-else-if="item.status === 'installed'" class="pp-installed">Installed ✓</span>
+              <button
+                v-else
+                type="button"
+                class="pp-install"
+                :data-install-id="item.id"
+                @click="$emit('install', item)"
+              >
+                Install
+              </button>
+            </div>
+          </li>
+        </ul>
+      </section>
+
       <button v-if="moreLabel" type="button" class="pp-more" @click="$emit('more')">
         {{ moreLabel }}
       </button>
@@ -42,6 +94,10 @@ import IconButton from "@/components/ui/IconButton.vue";
 // form on `select`. A provider whose plugin is installed but turned off renders
 // dimmed with Turn on: the click still selects it, and the caller enables it
 // before continuing (§3.2).
+//
+// `catalogProviders` are not installed yet: they come from the official add-on
+// catalog (§3.7). Their lifecycle (confirm, Installing…, error) is owned by the
+// caller, which is why each row only renders the caller's status.
 defineProps({
   show: {
     type: Boolean,
@@ -55,24 +111,34 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  catalogProviders: {
+    type: Array,
+    default: () => [],
+  },
   moreLabel: {
     type: String,
     default: "",
   },
 });
 
-const emit = defineEmits(["select", "close", "more"]);
+const emit = defineEmits(["select", "install", "close", "more"]);
 
 const providerLetter = provider => {
   const source = provider.label || provider.name || "?";
   return source.charAt(0).toUpperCase();
 };
 
+// `icon` is an emoji string or a file from the plugin's own `frontend/` dir
+// (§6). A file is served from the plugin's static route.
+const isIconFile = icon =>
+  typeof icon === "string" && icon.trim() !== "" && /[/.]/.test(icon) && icon.length > 2;
+
+const iconUrl = provider => {
+  if (/^https?:\/\//i.test(provider.icon)) return provider.icon;
+  return `/api/plugins/${provider.id}/static/${String(provider.icon).replace(/^\/+/, "")}`;
+};
+
 const choose = provider => {
-  if (provider.disabled) {
-    emit("select", provider);
-    return;
-  }
   emit("select", provider);
 };
 </script>
@@ -159,6 +225,16 @@ const choose = provider => {
   opacity: 0.55;
 }
 
+/* Catalog rows are not a single click target: Install is the action. */
+.pp-tile--catalog {
+  cursor: default;
+}
+
+.pp-tile--catalog:hover {
+  border-color: var(--line);
+  background: var(--bg-2);
+}
+
 .pp-icon {
   display: flex;
   align-items: center;
@@ -170,6 +246,13 @@ const choose = provider => {
   background: var(--bg-0);
   color: var(--ink-2);
   font-weight: 600;
+  overflow: hidden;
+}
+
+.pp-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .pp-text {
@@ -190,6 +273,23 @@ const choose = provider => {
   line-height: 1.4;
 }
 
+.pp-error {
+  font-size: 0.8rem;
+  color: var(--err);
+  line-height: 1.4;
+}
+
+.pp-error-link {
+  padding: 0;
+  background: transparent;
+  color: var(--err);
+  border: 0;
+  border-bottom: 1px dotted currentColor;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
 .pp-on {
   margin-left: auto;
   flex-shrink: 0;
@@ -198,6 +298,60 @@ const choose = provider => {
   border-radius: 6px;
   color: var(--ink);
   font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.pp-catalog {
+  border-top: 1px solid var(--line);
+}
+
+.pp-group {
+  margin: 0;
+  padding: 0.9rem 1.5rem 0;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.pp-install {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-height: var(--touch-target);
+  padding: 0.4rem 1rem;
+  background: var(--focus);
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pp-install:hover {
+  background: color-mix(in srgb, var(--focus), black 12%);
+}
+
+.pp-install:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.pp-install--busy {
+  background: transparent;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  cursor: progress;
+}
+
+.pp-installed {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--ok);
+  font-size: 0.85rem;
   font-weight: 600;
 }
 
