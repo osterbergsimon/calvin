@@ -13,6 +13,7 @@
         :branch-switched="pluginBranchSwitched"
         :actual-branch="pluginActualBranch"
         :dev-mode="configStore.devMode"
+        :initial-type="installKindFilter"
         @update:repoUrl="githubRepoUrl = $event"
         @update:branch="githubBranch = $event"
         @zip-select="handleZipSelect"
@@ -26,7 +27,7 @@
     </SettingsSection>
 
     <!-- Plugin Management -->
-    <SettingsSection id="plugins-installed" title="Installed Plugins">
+    <SettingsSection id="plugins-installed" title="Installed">
       <PluginManager
         :plugins="plugins"
         :instances="pluginInstances"
@@ -54,30 +55,28 @@
         @test-connection="handleTestConnection"
         @fetch-now="handleFetchNow"
         @custom-action="handleCustomAction"
-        @add-instance="handleAddInstance"
-        @edit-instance="handleEditInstance"
-        @delete-instance="handleDeleteInstance"
-        @toggle-instance="handleToggleInstance"
-        @instance-order-change="handleInstanceOrderChange"
-        @manage-calendar-sources="handleManageCalendarSources"
+        @used-by="openSourcesFor"
+        @add-source="openSourcesFor"
+        @open-appearance="openAppearance"
         @upload="handleUpload"
         @delete-image="handleDeleteImage"
       />
     </SettingsSection>
 
-    <!-- Instance Modal -->
-    <InstanceModal
-      :show="showInstanceModal"
-      :plugin="currentPlugin"
-      :instance="editingInstance"
-      @close="handleCloseInstanceModal"
-      @save="handleInstanceModalSave"
+    <!-- Turn-off Confirm Modal -->
+    <ConfirmModal
+      :show="showDisableModal"
+      :title="`Turn off ${pendingDisable?.name || 'this add-on'}?`"
+      :message="disableMessage"
+      confirm-text="Turn off"
+      @confirm="confirmDisable"
+      @cancel="cancelDisable"
     />
 
     <!-- Uninstall Confirm Modal -->
     <ConfirmModal
       :show="showUninstallModal"
-      title="Uninstall Plugin"
+      title="Uninstall plugin"
       :message="uninstallMessage"
       confirm-text="Uninstall"
       @confirm="confirmUninstall"
@@ -124,13 +123,12 @@ import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
 import { useNotificationsStore } from "@/stores/notifications";
 import * as pluginsApi from "@/services/pluginsApi";
-import * as calendarApi from "@/services/calendarApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
-import InstanceModal from "../specialized/InstanceModal.vue";
 import ConfirmModal from "../shared/ConfirmModal.vue";
+import { pluginKindKey } from "@/utils/pluginKind";
 
 // Use composables
 const {
@@ -174,11 +172,11 @@ const {
 const configStore = useConfigStore();
 const imagesStore = useImagesStore();
 const notificationsStore = useNotificationsStore();
-const route = useRoute();
 const router = useRouter();
+const route = useRoute();
 
 // Local state
-const activePluginTab = ref("calendar");
+const activePluginTab = ref("all");
 const uploading = ref(false);
 const uploadError = ref("");
 const uploadSuccess = ref("");
@@ -190,6 +188,12 @@ const imagesList = computed(() => imagesStore.images);
 const hasInstalledThemes = computed(() => {
   return plugins.value.some(p => p.type === "theme" && p._installed);
 });
+
+// "Get more in Plugins ›" from a Content picker arrives with the kind it was
+// shopping for, so Install opens on that filter.
+const installKindFilter = computed(() =>
+  typeof route?.query?.pluginKind === "string" ? route.query.pluginKind : "all"
+);
 
 // Pip security warning modal state
 const showPipWarningModal = ref(false);
@@ -257,7 +261,7 @@ const afterInstall = async installedIds => {
 
   const first = installed[0];
   const hasSetup = first.type !== "theme" && cardHasBody(first);
-  activePluginTab.value = first.type;
+  activePluginTab.value = pluginKindKey(first);
   if (hasSetup) {
     expandedPlugins.value[first.id] = true;
     void Promise.resolve(loadPluginConfig(first.id)).catch(() => {});
@@ -395,17 +399,64 @@ const handleToggleExpand = pluginId => {
 };
 
 const handleToggleEnabled = async (pluginId, enabled) => {
+  const plugin = plugins.value.find(p => p.id === pluginId);
+  const count = (pluginInstances.value[pluginId] || []).length;
+  // Turning an add-on off hides every source it provides; say how many first.
+  if (!enabled && plugin && count > 0) {
+    pendingDisable.value = { pluginId, name: plugin.name };
+    showDisableModal.value = true;
+    return;
+  }
   await togglePlugin(pluginId, enabled);
 };
 
-const handleManageCalendarSources = () => {
-  router.replace({ query: { ...route.query, setting: "content-calendars" } });
+const showDisableModal = ref(false);
+const pendingDisable = ref(null);
+const disableMessage = computed(() => {
+  const pending = pendingDisable.value;
+  if (!pending) return "";
+  const count = (pluginInstances.value[pending.pluginId] || []).length;
+  return `Its ${count} source${count === 1 ? "" : "s"} stop${count === 1 ? "s" : ""} showing until you turn it back on.`;
+});
+
+const confirmDisable = async () => {
+  const pending = pendingDisable.value;
+  showDisableModal.value = false;
+  pendingDisable.value = null;
+  if (pending) await togglePlugin(pending.pluginId, false);
+};
+
+const cancelDisable = () => {
+  showDisableModal.value = false;
+  pendingDisable.value = null;
+};
+
+// Sources live in Content (§3.1): both "Used by n sources" and "Add a source"
+// open that section with this provider's rows highlighted.
+const CONTENT_SECTION_BY_KIND = {
+  calendar: "content-calendars",
+  image: "content-photos",
+  service: "content-services",
+  clock: "content-clock-bar",
+};
+
+const openSourcesFor = pluginId => {
+  const plugin = plugins.value.find(p => p.id === pluginId);
+  const section = CONTENT_SECTION_BY_KIND[pluginKindKey(plugin)] || "content-services";
+  router.replace({ query: { setting: section, highlight: pluginId } });
+};
+
+const openAppearance = () => {
+  router.replace({ query: { setting: "dashboard-ui" } });
 };
 
 const handleUninstall = (pluginId, pluginType) => {
   const plugin = plugins.value.find(p => p.id === pluginId);
   const pluginName = plugin?.name || pluginId;
-  uninstallMessage.value = `Are you sure you want to uninstall "${pluginName}"? This action cannot be undone.`;
+  const count = (pluginInstances.value[pluginId] || []).length;
+  uninstallMessage.value = count
+    ? `Uninstall ${pluginName}? Its ${count} source${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} removed too.`
+    : `Uninstall ${pluginName}?`;
   pendingUninstall.value = { pluginId, pluginType };
   showUninstallModal.value = true;
 };
@@ -448,105 +499,10 @@ const handleCustomAction = async (_pluginId, _action) => {
   // Handle custom plugin actions
 };
 
-// Instance modal state
-const showInstanceModal = ref(false);
-const currentPlugin = ref(null);
-const editingInstance = ref(null);
-
 // Uninstall confirm modal state
 const showUninstallModal = ref(false);
 const pendingUninstall = ref({ pluginId: null, pluginType: null });
 const uninstallMessage = ref("");
-
-const handleAddInstance = pluginId => {
-  const plugin = plugins.value.find(p => p.id === pluginId);
-  if (!plugin) return;
-
-  currentPlugin.value = plugin;
-  editingInstance.value = null;
-  showInstanceModal.value = true;
-};
-
-const handleEditInstance = (pluginId, instance) => {
-  const plugin = plugins.value.find(p => p.id === pluginId);
-  if (!plugin) return;
-
-  currentPlugin.value = plugin;
-  editingInstance.value = instance;
-  showInstanceModal.value = true;
-};
-
-const handleCloseInstanceModal = () => {
-  showInstanceModal.value = false;
-  currentPlugin.value = null;
-  editingInstance.value = null;
-};
-
-const handleInstanceModalSave = async calendarData => {
-  await loadPlugins();
-
-  // If a new calendar instance was created, create the calendar source
-  if (calendarData?.isCalendar && currentPlugin.value) {
-    try {
-      const pluginTypeId = currentPlugin.value.id;
-
-      // Wait a bit for plugins to fully reload
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Find the instance that was just created by name
-      const instances = pluginInstances.value[pluginTypeId] || [];
-      const newInstance = instances.find(inst => inst.name === calendarData.instanceName);
-
-      if (newInstance) {
-        // Create calendar source with the instance ID
-        await calendarApi.addCalendarSource({
-          id: newInstance.id,
-          type: pluginTypeId,
-          name: calendarData.instanceName,
-          ical_url: calendarData.calendarConfig.ical_url,
-          enabled: newInstance.enabled,
-          color: calendarData.calendarConfig.color,
-          show_time: calendarData.calendarConfig.show_time,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to create calendar source:", error);
-      // Don't show error to user - the instance was created successfully
-    }
-  }
-};
-
-const handleDeleteInstance = async instanceId => {
-  try {
-    await pluginsApi.deletePluginInstance(instanceId);
-    await loadPlugins();
-  } catch (error) {
-    console.error("Failed to delete instance:", error);
-  }
-};
-
-const handleToggleInstance = async (instanceId, enabled) => {
-  try {
-    await pluginsApi.updatePluginInstance(instanceId, { enabled });
-    await loadPlugins();
-  } catch (error) {
-    console.error("Failed to toggle instance:", error);
-  }
-};
-
-const handleInstanceOrderChange = async (pluginId, newOrder) => {
-  try {
-    // Convert array of instances to order map { instanceId: order }
-    const instanceOrders = {};
-    newOrder.forEach((instance, index) => {
-      instanceOrders[instance.id] = index;
-    });
-    await pluginsApi.updatePluginInstanceOrder(pluginId, instanceOrders);
-    await loadPlugins();
-  } catch (error) {
-    console.error("Failed to update instance order:", error);
-  }
-};
 
 const handleUpload = async event => {
   uploading.value = true;
@@ -617,15 +573,9 @@ onMounted(async () => {
   await loadPlugins();
   await imagesStore.fetchImages();
 
-  // No plugin destination names a tab any more (plugins-services moved to
-  // Content), so open the first plugin type that has an installed plugin.
-  if (plugins.value.length > 0) {
-    const types = ["calendar", "image", "service", "backend", "theme"];
-    const firstType = types.find(type => plugins.value.some(p => p.type === type));
-    if (firstType) {
-      activePluginTab.value = firstType;
-    }
-  }
+  // Installed opens on All: the filters are plain kinds, and All shows the
+  // whole add-on list.
+  activePluginTab.value = "all";
 
   // Prefill the GitHub install field with the configured repo when empty.
   if (!githubRepoUrl.value && configStore.pluginRepositoryUrl) {

@@ -1,7 +1,7 @@
 /**
- * Unit tests for the shell-native PluginCard (calvin-svo).
- * Focus: the operational status line + dot, the one piece of live
- * information surfaced without expanding the card.
+ * Unit tests for the shell-native PluginCard (calvin-svo, CLV-44).
+ * Plugins is about the add-ons themselves: a card counts its sources and links
+ * to Content instead of listing them (§3.3).
  */
 
 import { describe, it, expect } from "vitest";
@@ -12,8 +12,9 @@ const STUBS = {
   PluginFieldRenderer: true,
   PluginActions: true,
   PluginSections: true,
-  PluginInstances: true,
 };
+
+const normalized = text => text.replace(/\s+/g, " ").trim();
 
 const mountCard = (plugin, instances = [], extra = {}) =>
   mount(PluginCard, {
@@ -30,57 +31,49 @@ const service = (over = {}) => ({
   ...over,
 });
 
-describe("PluginCard status line", () => {
-  it("reads 'Disabled' and hides the dot when the plugin is off", () => {
+describe("PluginCard source count", () => {
+  it("says the add-on is turned off and how many sources it hides", () => {
     const w = mountCard(service({ enabled: false }), [{ id: "a", running: true }]);
-    expect(w.find(".pc-summary").text()).toBe("Disabled");
+    expect(w.find(".pc-summary").text()).toBe("Turned off · 1 source");
     expect(w.find(".pc-dot").exists()).toBe(false);
   });
 
-  it("summarizes running services and shows an ok dot when all are up", () => {
-    const w = mountCard(service(), [
-      { id: "a", running: true },
-      { id: "b", running: true },
-    ]);
-    expect(w.find(".pc-summary").text()).toBe("2 sources · 2/2 running");
-    expect(w.find(".pc-dot--ok").exists()).toBe(true);
+  it("links a used add-on to its sources in Content", async () => {
+    const w = mountCard(service(), [{ id: "a" }, { id: "b" }]);
+    const link = w.find(".pc-summary .pc-link");
+    expect(link.text()).toBe("Used by 2 sources");
+    await link.trigger("click");
+    expect(w.emitted("used-by")?.[0]).toEqual(["svc"]);
   });
 
-  it("shows a warn dot when only some instances are running", () => {
-    const w = mountCard(service(), [
-      { id: "a", running: true },
-      { id: "b", running: false },
-    ]);
-    expect(w.find(".pc-summary").text()).toBe("2 sources · 1/2 running");
-    expect(w.find(".pc-dot--warn").exists()).toBe(true);
-  });
-
-  it("shows an err dot when nothing is running", () => {
-    const w = mountCard(service(), [{ id: "a", running: false }]);
-    expect(w.find(".pc-dot--err").exists()).toBe(true);
-  });
-
-  it("shows calendar providers as managed from Content", async () => {
+  it("counts calendar providers as sources too", () => {
     const cal = { id: "ical", name: "iCal", type: "calendar", enabled: true, _installed: true };
-    const w = mountCard(cal, [
-      { id: "a", enabled: true },
-      { id: "b", enabled: true },
-    ]);
-    expect(w.find(".pc-summary").text()).toBe("2 sources managed in Content");
-    expect(w.find(".pc-dot").exists()).toBe(false);
-    expect(w.find(".pc-provider-note").text()).toContain("Content / Calendars");
-    await w.find(".pc-btn--primary").trigger("click");
-    expect(w.emitted("manage-calendar-sources")?.length).toBe(1);
+    const w = mountCard(cal, [{ id: "a" }, { id: "b" }]);
+    expect(w.find(".pc-summary").text()).toBe("Used by 2 sources");
   });
 
-  it("invites the first source when none exist", () => {
+  it("invites the first source when none exist", async () => {
     const w = mountCard(service(), []);
-    expect(w.find(".pc-summary").text()).toBe("No sources yet");
+    expect(normalized(w.find(".pc-summary").text())).toBe("Not used yet · Add a source");
+    await w.find(".pc-summary .pc-link").trigger("click");
+    expect(w.emitted("add-source")?.[0]).toEqual(["svc"]);
   });
 
-  it("labels themes plainly", () => {
+  it("says a theme is chosen in Appearance", async () => {
     const w = mountCard({ id: "ocean", name: "Ocean", type: "theme", enabled: true });
-    expect(w.find(".pc-summary").text()).toBe("Theme");
+    expect(normalized(w.find(".pc-summary").text())).toBe("Choose it in Dashboard › Appearance");
+    await w.find(".pc-summary .pc-link").trigger("click");
+    expect(w.emitted("open-appearance")?.length).toBe(1);
+  });
+
+  it("says a background add-on has no sources", () => {
+    const w = mountCard({ id: "imap", name: "IMAP", type: "backend", enabled: true });
+    expect(w.find(".pc-summary").text()).toBe("Works in the background. No sources to add.");
+  });
+
+  it("never lists the sources themselves", () => {
+    const w = mountCard(service(), [{ id: "a", name: "Family albums", running: true }]);
+    expect(w.text()).not.toContain("Family albums");
   });
 });
 
@@ -92,12 +85,12 @@ describe("PluginCard controls", () => {
   });
 
   it("hides the Settings disclosure when the plugin is disabled", () => {
-    const w = mountCard(service({ enabled: false }), [{ id: "a" }]);
+    const w = mountCard(service({ enabled: false, common_config_schema: { x: {} } }), []);
     expect(w.find("[aria-expanded]").exists()).toBe(false);
   });
 
-  it("shows the Settings disclosure when enabled with settings", () => {
-    const w = mountCard(service({ instance_config_schema: { url: { type: "string" } } }), []);
+  it("shows the Settings disclosure when the add-on has plugin-level settings", () => {
+    const w = mountCard(service({ common_config_schema: { api_key: { type: "string" } } }), []);
     expect(w.find("[aria-expanded]").exists()).toBe(true);
   });
 
