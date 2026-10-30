@@ -2,13 +2,14 @@
   <teleport to="body">
     <div
       v-if="open"
-      class="sre-root"
+      class="sre-root dialog-above-osk"
+      :class="[`size-${sizeClass}`, { 'is-coarse': coarsePointer }]"
       role="dialog"
       aria-modal="true"
       aria-label="Pages and regions"
     >
       <DialogScrim blur @dismiss="$emit('close')" />
-      <div class="sre-modal">
+      <div ref="modalEl" class="sre-modal">
         <!-- Header -->
         <header class="sre-header">
           <div class="sre-title">
@@ -88,9 +89,9 @@
         </div>
 
         <!-- Body: stage + rail -->
-        <div class="sre-body">
+        <div class="sre-body" :class="{ 'is-sheet-open': isPhone && sheetOpen }">
           <!-- STAGE -->
-          <div class="sre-stage">
+          <div ref="stageEl" class="sre-stage" @click="onStageClick">
             <div class="sre-stage-tag"><span class="dot" /> {{ stageTag }}</div>
 
             <div v-if="mismatch" class="sre-mismatch" data-test="mismatch">
@@ -112,140 +113,177 @@
               }}</span>
             </div>
 
-            <div class="sre-device-wrap" :class="{ dimmed: mismatch }">
-              <div class="sre-device" :class="orientation" :style="deviceSize">
+            <div class="sre-stage-focus">
+              <div class="sre-device-wrap" :class="{ dimmed: mismatch }">
                 <div
-                  :ref="el => (screenEl = el)"
-                  class="sre-screen"
-                  :class="`dir-${layoutDir}`"
-                  :style="clockAxisStyle"
+                  class="sre-device"
+                  :class="[orientation, { 'is-narrow': deviceNarrow }]"
+                  :style="deviceSize"
                 >
-                  <!-- perimeter drop zones (only while dragging the clock bar) -->
-                  <template v-if="clock.enabled && clockDrag">
-                    <div
-                      v-if="clock.position !== 'top'"
-                      class="sre-drop perim top"
-                      @dragenter.prevent
-                      @dragover.prevent
-                      @drop.prevent="dropClock('top')"
-                    >
-                      <span>Top</span>
-                    </div>
-                    <div
-                      v-if="clock.position !== 'bottom'"
-                      class="sre-drop perim bottom"
-                      @dragenter.prevent
-                      @dragover.prevent
-                      @drop.prevent="dropClock('bottom')"
-                    >
-                      <span>Bottom</span>
-                    </div>
-                    <div
-                      v-if="clock.position !== 'left'"
-                      class="sre-drop perim left"
-                      @dragenter.prevent
-                      @dragover.prevent
-                      @drop.prevent="dropClock('left')"
-                    >
-                      <span>Left</span>
-                    </div>
-                    <div
-                      v-if="clock.position !== 'right'"
-                      class="sre-drop perim right"
-                      @dragenter.prevent
-                      @dragover.prevent
-                      @drop.prevent="dropClock('right')"
-                    >
-                      <span>Right</span>
-                    </div>
-                  </template>
-
-                  <!-- clock bar: top/left (leading perimeter) -->
                   <div
-                    v-if="clock.enabled && clock.position === leadingPerimeter"
-                    class="sre-clockbar drag"
-                    :class="clock.mode === 'vertical' ? 'v' : 'h'"
-                    draggable="true"
-                    title="Drag to reposition the clock bar"
-                    aria-label="Clock bar — drag to reposition"
-                    @dragstart="beginClockDrag"
-                    @dragend="endClockDrag"
-                  >
-                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
-                  </div>
-
-                  <div
-                    :ref="el => (regionsEl = el)"
-                    class="sre-regions"
+                    :ref="el => (screenEl = el)"
+                    class="sre-screen"
                     :class="`dir-${layoutDir}`"
+                    :style="clockAxisStyle"
                   >
-                    <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
-                      <!-- clock drop zone at the gap before region i -->
+                    <!-- perimeter drop zones (only while dragging the clock bar) -->
+                    <template v-if="clock.enabled && clockDrag && clockDraggable">
                       <div
-                        v-if="clock.enabled && clockDrag && i > 0 && betweenIndex !== i - 1"
-                        class="sre-drop gap"
-                        :class="layoutDir === 'row' ? 'v' : 'h'"
+                        v-if="clock.position !== 'top'"
+                        class="sre-drop perim top"
                         @dragenter.prevent
                         @dragover.prevent
-                        @drop.prevent="dropClock(i - 1 === 0 ? 'between' : `between:${i - 1}`)"
+                        @drop.prevent="dropClock('top')"
                       >
-                        <span class="sre-drop-plus">+</span>
+                        <span>Top</span>
                       </div>
-
-                      <!-- clock bar between region i-1 and i -->
                       <div
-                        v-if="clock.enabled && betweenIndex === i - 1"
-                        class="sre-clockbar between drag"
-                        :class="layoutDir === 'row' ? 'v' : 'h'"
-                        draggable="true"
-                        title="Drag to reposition the clock bar"
-                        aria-label="Clock bar — drag to reposition"
-                        @dragstart="beginClockDrag"
-                        @dragend="endClockDrag"
+                        v-if="clock.position !== 'bottom'"
+                        class="sre-drop perim bottom"
+                        @dragenter.prevent
+                        @dragover.prevent
+                        @drop.prevent="dropClock('bottom')"
                       >
-                        <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewTime }}
+                        <span>Bottom</span>
                       </div>
-
-                      <RegionNode
-                        :region="region"
-                        :path="[i]"
-                        :parent-direction="layoutDir"
-                        :selected-id="selectedRegionId"
-                        :layout-dir="layoutDir"
-                        @select="selectRegion"
-                        @resize="onNodeResize"
-                      />
-
-                      <button
-                        v-if="i < activeScreen.layout.regions.length - 1"
-                        type="button"
-                        class="sre-resizer"
-                        :class="layoutDir === 'row' ? 'col' : 'row'"
-                        aria-label="Resize regions"
-                        @pointerdown="startResize(i, $event)"
+                      <div
+                        v-if="clock.position !== 'left'"
+                        class="sre-drop perim left"
+                        @dragenter.prevent
+                        @dragover.prevent
+                        @drop.prevent="dropClock('left')"
                       >
-                        <span class="grip" />
-                        <span class="pill"
-                          >{{ region.size }} / {{ activeScreen.layout.regions[i + 1].size }}</span
-                        >
-                      </button>
+                        <span>Left</span>
+                      </div>
+                      <div
+                        v-if="clock.position !== 'right'"
+                        class="sre-drop perim right"
+                        @dragenter.prevent
+                        @dragover.prevent
+                        @drop.prevent="dropClock('right')"
+                      >
+                        <span>Right</span>
+                      </div>
                     </template>
-                  </div>
 
-                  <!-- clock bar: bottom/right (trailing perimeter) -->
-                  <div
-                    v-if="clock.enabled && clock.position === trailingPerimeter"
-                    class="sre-clockbar drag"
-                    :class="clock.mode === 'vertical' ? 'v' : 'h'"
-                    draggable="true"
-                    title="Drag to reposition the clock bar"
-                    aria-label="Clock bar — drag to reposition"
-                    @dragstart="beginClockDrag"
-                    @dragend="endClockDrag"
-                  >
-                    <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
+                    <!-- clock bar: top/left (leading perimeter) -->
+                    <div
+                      v-if="clock.enabled && clock.position === leadingPerimeter"
+                      class="sre-clockbar drag"
+                      :class="clock.mode === 'vertical' ? 'v' : 'h'"
+                      :draggable="clockDraggable"
+                      role="button"
+                      tabindex="0"
+                      :title="clockTitle"
+                      :aria-label="clockAria"
+                      @dragstart="beginClockDrag"
+                      @dragend="endClockDrag"
+                      @click.stop="selectClockBar"
+                      @keydown.enter.prevent="selectClockBar"
+                      @keydown.space.prevent="selectClockBar"
+                    >
+                      <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
+                    </div>
+
+                    <div
+                      :ref="el => (regionsEl = el)"
+                      class="sre-regions"
+                      :class="`dir-${layoutDir}`"
+                    >
+                      <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
+                        <!-- clock drop zone at the gap before region i -->
+                        <div
+                          v-if="
+                            clock.enabled &&
+                            clockDrag &&
+                            clockDraggable &&
+                            i > 0 &&
+                            betweenIndex !== i - 1
+                          "
+                          class="sre-drop gap"
+                          :class="layoutDir === 'row' ? 'v' : 'h'"
+                          @dragenter.prevent
+                          @dragover.prevent
+                          @drop.prevent="dropClock(i - 1 === 0 ? 'between' : `between:${i - 1}`)"
+                        >
+                          <span class="sre-drop-plus">+</span>
+                        </div>
+
+                        <!-- clock bar between region i-1 and i -->
+                        <div
+                          v-if="clock.enabled && betweenIndex === i - 1"
+                          class="sre-clockbar between drag"
+                          :class="layoutDir === 'row' ? 'v' : 'h'"
+                          :draggable="clockDraggable"
+                          role="button"
+                          tabindex="0"
+                          :title="clockTitle"
+                          :aria-label="clockAria"
+                          @dragstart="beginClockDrag"
+                          @dragend="endClockDrag"
+                          @click.stop="selectClockBar"
+                          @keydown.enter.prevent="selectClockBar"
+                          @keydown.space.prevent="selectClockBar"
+                        >
+                          <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewTime }}
+                        </div>
+
+                        <RegionNode
+                          :region="region"
+                          :path="[i]"
+                          :parent-direction="layoutDir"
+                          :selected-id="selectedRegionId"
+                          :layout-dir="layoutDir"
+                          :coarse="coarsePointer"
+                          @select="selectRegion"
+                          @resize="onNodeResize"
+                        />
+
+                        <button
+                          v-if="i < activeScreen.layout.regions.length - 1"
+                          type="button"
+                          class="sre-resizer"
+                          :class="layoutDir === 'row' ? 'col' : 'row'"
+                          :style="coarseResizerStyle"
+                          aria-label="Resize regions"
+                          @pointerdown="startResize(i, $event)"
+                        >
+                          <span class="grip" />
+                          <span class="pill"
+                            >{{ region.size }} / {{ activeScreen.layout.regions[i + 1].size }}</span
+                          >
+                        </button>
+                      </template>
+                    </div>
+
+                    <!-- clock bar: bottom/right (trailing perimeter) -->
+                    <div
+                      v-if="clock.enabled && clock.position === trailingPerimeter"
+                      class="sre-clockbar drag"
+                      :class="clock.mode === 'vertical' ? 'v' : 'h'"
+                      :draggable="clockDraggable"
+                      role="button"
+                      tabindex="0"
+                      :title="clockTitle"
+                      :aria-label="clockAria"
+                      @dragstart="beginClockDrag"
+                      @dragend="endClockDrag"
+                      @click.stop="selectClockBar"
+                      @keydown.enter.prevent="selectClockBar"
+                      @keydown.space.prevent="selectClockBar"
+                    >
+                      <span class="sre-clock-grip" aria-hidden="true">⠿</span> {{ previewClock }}
+                    </div>
                   </div>
                 </div>
+              </div>
+
+              <div
+                v-if="sizeClass === 'compact'"
+                class="sre-orient-caption"
+                data-test="orientation-caption"
+              >
+                {{ orientationBadge }}
               </div>
             </div>
 
@@ -256,42 +294,73 @@
             </div>
           </div>
 
-          <!-- RAIL -->
-          <aside class="sre-rail">
-            <RegionInspector
-              v-if="selectedRegion"
-              :region="selectedRegion"
-              :screen="activeScreen"
-              :layout-dir="layoutDir"
-              :component-options="componentOptions"
-              :source-options="sourceOptionsFor(selectedRegion.kind)"
-              :context="selectionContext"
-              @patch-view="patchSelectedView"
-              @set-component="setSelectedComponent"
-              @toggle-source="toggleSelectedSource"
-              @clear-sources="clearSelectedSources"
-              @toggle-split="toggleSplitSelected"
-              @toggle-sub-direction="toggleSubDirSelected"
-              @add-sub="addSubToSelected"
-              @remove="removeSelected"
-              @deselect="selectedRegionId = null"
-            />
-            <ScreenInspector
-              v-else
-              :screen="activeScreen"
-              :layout-dir="layoutDir"
-              :clock="clock"
-              :can-delete="screens.screens.length > 1"
-              @rename="renameScreen"
-              @preset="applyPreset"
-              @add-region="addRegion"
-              @toggle-direction="toggleLayoutDir"
-              @clock-enabled="setClockEnabled"
-              @clock-position="setClockPosition"
-              @clock-inherit="clearClock"
-              @duplicate="duplicateScreen"
-              @delete="deleteActiveScreen"
-            />
+          <!-- RAIL (a bottom sheet on phones) -->
+          <aside
+            class="sre-rail"
+            :class="{
+              'is-sheet': isPhone,
+              'is-open': isPhone && sheetOpen,
+              'no-motion': isPhone && reduceMotion,
+            }"
+            :role="isPhone ? 'region' : null"
+            :aria-label="isPhone ? 'Inspector' : null"
+          >
+            <div v-if="isPhone" class="sre-sheet-peek" data-test="sheet-peek" @click="toggleSheet">
+              <span
+                class="sre-sheet-handle"
+                data-test="sheet-handle"
+                @pointerdown.stop="startSheetDrag"
+              />
+              <span class="sre-sheet-label" data-test="sheet-selection">{{
+                sheetSelectionLabel
+              }}</span>
+              <button
+                type="button"
+                class="sre-sheet-chevron"
+                data-test="sheet-chevron"
+                :aria-label="sheetOpen ? 'Hide settings' : 'Show settings'"
+                :aria-expanded="sheetOpen"
+                @click.stop="toggleSheet"
+              >
+                {{ sheetOpen ? "⌄" : "⌃" }}
+              </button>
+            </div>
+            <div class="sre-rail-scroll">
+              <RegionInspector
+                v-if="selectedRegion"
+                :region="selectedRegion"
+                :screen="activeScreen"
+                :layout-dir="layoutDir"
+                :component-options="componentOptions"
+                :source-options="sourceOptionsFor(selectedRegion.kind)"
+                :context="selectionContext"
+                @patch-view="patchSelectedView"
+                @set-component="setSelectedComponent"
+                @toggle-source="toggleSelectedSource"
+                @clear-sources="clearSelectedSources"
+                @toggle-split="toggleSplitSelected"
+                @toggle-sub-direction="toggleSubDirSelected"
+                @add-sub="addSubToSelected"
+                @remove="removeSelected"
+                @deselect="selectedRegionId = null"
+              />
+              <ScreenInspector
+                v-else
+                :screen="activeScreen"
+                :layout-dir="layoutDir"
+                :clock="clock"
+                :can-delete="screens.screens.length > 1"
+                @rename="renameScreen"
+                @preset="applyPreset"
+                @add-region="addRegion"
+                @toggle-direction="toggleLayoutDir"
+                @clock-enabled="setClockEnabled"
+                @clock-position="setClockPosition"
+                @clock-inherit="clearClock"
+                @duplicate="duplicateScreen"
+                @delete="deleteActiveScreen"
+              />
+            </div>
           </aside>
         </div>
       </div>
@@ -300,7 +369,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { useKiosksStore } from "@/stores/kiosks";
@@ -365,6 +434,74 @@ const showItError = ref("");
 const screenEl = ref(null);
 const regionsEl = ref(null);
 const dragState = ref(null);
+
+/* --- size class + touch capability --------------------------------------- */
+// The editor's layout follows the MODAL's own size, not a viewport media
+// query: a kiosk with the on-screen keyboard open has a full-size viewport but
+// only the space above the keyboard to draw in. ResizeObserver gives that
+// directly, so the OSK shrinking the modal re-evaluates the class too.
+const modalEl = ref(null);
+const stageEl = ref(null);
+const modalSize = ref({ width: 0, height: 0 });
+const stageSize = ref({ width: 0, height: 0 });
+const WIDE_MIN_WIDTH = 1024;
+const WIDE_MIN_HEIGHT = 640;
+const COMPACT_MIN_WIDTH = 600;
+
+const sizeClass = computed(() => {
+  const { width, height } = modalSize.value;
+  // Unmeasured (first paint, or a test host without ResizeObserver): keep
+  // today's layout until the observer reports.
+  if (!width || !height) return "wide";
+  if (width >= WIDE_MIN_WIDTH && height >= WIDE_MIN_HEIGHT) return "wide";
+  if (width >= COMPACT_MIN_WIDTH) return "compact";
+  return "phone";
+});
+const isPhone = computed(() => sizeClass.value === "phone");
+
+const coarsePointer = ref(false);
+const reduceMotion = ref(false);
+const mediaCleanups = [];
+const watchMedia = (query, target) => {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+  const mql = window.matchMedia(query);
+  target.value = Boolean(mql.matches);
+  const handler = event => {
+    target.value = Boolean(event.matches);
+  };
+  if (typeof mql.addEventListener === "function") {
+    mql.addEventListener("change", handler);
+    mediaCleanups.push(() => mql.removeEventListener("change", handler));
+  } else if (typeof mql.addListener === "function") {
+    mql.addListener(handler);
+    mediaCleanups.push(() => mql.removeListener(handler));
+  }
+};
+watchMedia("(any-pointer: coarse)", coarsePointer);
+watchMedia("(prefers-reduced-motion: reduce)", reduceMotion);
+
+let modalObserver = null;
+let stageObserver = null;
+const stopObserving = () => {
+  modalObserver?.disconnect();
+  stageObserver?.disconnect();
+  modalObserver = null;
+  stageObserver = null;
+};
+const startObserving = () => {
+  if (typeof ResizeObserver === "undefined") return;
+  stopObserving();
+  modalObserver = new ResizeObserver(entries => {
+    const box = entries[0]?.contentRect;
+    if (box) modalSize.value = { width: box.width, height: box.height };
+  });
+  stageObserver = new ResizeObserver(entries => {
+    const box = entries[0]?.contentRect;
+    if (box) stageSize.value = { width: box.width, height: box.height };
+  });
+  if (modalEl.value) modalObserver.observe(modalEl.value);
+  if (stageEl.value) stageObserver.observe(stageEl.value);
+};
 
 /* --- model --- */
 const configValue = computed(() => props.config || {});
@@ -483,15 +620,57 @@ const clockAxisStyle = computed(() => {
 
 /* --- device sizing --- */
 // The device box follows the screen's real aspect ratio when it has reported
-// one; otherwise a 16:9 / 9:16 stand-in for its orientation.
-const DEVICE_MAX = 560;
-const deviceSize = computed(() => {
+// one; otherwise a 16:9 / 9:16 stand-in for its orientation. Its size is the
+// largest box of that ratio that fits the stage (§2), never the old fixed 560.
+const DEVICE_FALLBACK_MAX = 560;
+const DEVICE_MIN_LONG_SIDE = 200;
+const STAGE_PADDING = 16;
+const STAGE_CHROME_HEIGHT = 72; // the stage tag above + the caption/note below
+
+const sheetOpen = ref(false);
+const clockSelected = ref(false);
+
+const deviceBox = computed(() => {
   const vp = previewViewport.value;
   const aspect = vp ? vp.w / vp.h : orientation.value === "portrait" ? 9 / 16 : 16 / 9;
-  return aspect >= 1
-    ? { width: `${DEVICE_MAX}px`, height: `${Math.round(DEVICE_MAX / aspect)}px` }
-    : { width: `${Math.round(DEVICE_MAX * aspect)}px`, height: `${DEVICE_MAX}px` };
+  const stageW = stageSize.value.width;
+  const stageH = stageSize.value.height;
+  let width;
+  let height;
+  if (!stageW || !stageH) {
+    // Before the stage is measured (or in a host without ResizeObserver).
+    width = aspect >= 1 ? DEVICE_FALLBACK_MAX : DEVICE_FALLBACK_MAX * aspect;
+    height = aspect >= 1 ? DEVICE_FALLBACK_MAX / aspect : DEVICE_FALLBACK_MAX;
+  } else {
+    const availW = Math.max(0, stageW - STAGE_PADDING * 2);
+    const availH = Math.max(0, stageH - STAGE_PADDING * 2 - STAGE_CHROME_HEIGHT);
+    if (aspect >= 1) {
+      width = Math.min(availW, availH * aspect);
+      height = width / aspect;
+    } else {
+      height = Math.min(availH, availW / aspect);
+      width = height * aspect;
+    }
+  }
+  const longSide = Math.max(width, height);
+  if (longSide <= 0) {
+    // A stage too small even for the minimum: still show the minimum box.
+    width = aspect >= 1 ? DEVICE_MIN_LONG_SIDE : DEVICE_MIN_LONG_SIDE * aspect;
+    height = aspect >= 1 ? DEVICE_MIN_LONG_SIDE / aspect : DEVICE_MIN_LONG_SIDE;
+  } else if (longSide < DEVICE_MIN_LONG_SIDE) {
+    const scale = DEVICE_MIN_LONG_SIDE / longSide;
+    width *= scale;
+    height *= scale;
+  }
+  return { width: Math.round(width), height: Math.round(height) };
 });
+const deviceSize = computed(() => ({
+  width: `${deviceBox.value.width}px`,
+  height: `${deviceBox.value.height}px`,
+}));
+// Under 320px the region labels step down to --fs-xs so they still fit.
+const deviceNarrow = computed(() => Math.max(deviceBox.value.width, deviceBox.value.height) < 320);
+const coarseResizerStyle = computed(() => (coarsePointer.value ? { flex: "0 0 28px" } : null));
 
 /* --- selection --- */
 const selectedPath = computed(() =>
@@ -516,11 +695,63 @@ const selectionContext = computed(() => {
     splitDir: owner?.split ? getSplitDirection(owner.split, layoutDir.value) : layoutDir.value,
   };
 });
+const regionLabel = region =>
+  region?.kind === "calendar" ? "Calendar" : region?.kind === "photos" ? "Photos" : "Service";
 const selectRegion = id => {
-  selectedRegionId.value = selectedRegionId.value === id ? null : id;
+  const next = selectedRegionId.value === id ? null : id;
+  selectedRegionId.value = next;
+  if (next) {
+    clockSelected.value = false;
+    if (isPhone.value) sheetOpen.value = true;
+  }
+};
+// Tapping the clock bar (touch or compact/phone, where it does not drag) shows
+// its settings; Position in ScreenInspector is the way to move it (§4).
+const selectClockBar = () => {
+  selectedRegionId.value = null;
+  clockSelected.value = true;
+  if (isPhone.value) sheetOpen.value = true;
+};
+const toggleSheet = () => {
+  sheetOpen.value = !sheetOpen.value;
+};
+const sheetSelectionLabel = computed(() => {
+  if (selectedRegion.value) return `Region · ${regionLabel(selectedRegion.value)}`;
+  if (clockSelected.value) return "Clock bar";
+  return `Page · ${activeScreen.value.name}`;
+});
+// Tapping the stage's empty area closes the sheet to its peek (§3).
+const onStageClick = event => {
+  if (!isPhone.value || !sheetOpen.value) return;
+  const target = event?.target;
+  if (target?.closest?.(".sre-region, .sre-resizer, .sre-clockbar, .sre-drop, .sre-mismatch")) {
+    return;
+  }
+  sheetOpen.value = false;
+};
+// Dragging the sheet handle down past a threshold closes it (§3).
+let sheetDrag = null;
+const stopSheetDrag = () => {
+  sheetDrag = null;
+  window.removeEventListener("pointermove", onSheetDragMove);
+};
+const onSheetDragMove = event => {
+  if (!sheetDrag) return;
+  if ((event.clientY ?? 0) - sheetDrag.startY > 40) {
+    sheetOpen.value = false;
+    stopSheetDrag();
+  }
+};
+const startSheetDrag = event => {
+  if (!event) return;
+  sheetDrag = { startY: event.clientY ?? 0 };
+  window.addEventListener("pointermove", onSheetDragMove);
+  window.addEventListener("pointerup", stopSheetDrag, { once: true });
 };
 const selectScreen = id => {
   selectedRegionId.value = null;
+  clockSelected.value = false;
+  sheetOpen.value = false;
   emitScreens({ ...screens.value, activeScreenId: id });
 };
 
@@ -701,7 +932,17 @@ const clearClock = () => patchActiveScreen({ clockBar: null });
 /* --- clock bar drag-to-reposition (HTML5 DnD; keyboard users use the rail's
    Position picker, which enumerates every gap) --- */
 const clockDrag = ref(false);
+// HTML5 drag is not available to touch, and the compact/phone stage has no
+// room for drop zones. Everywhere else Position in the inspector moves it.
+const clockDraggable = computed(() => !coarsePointer.value && sizeClass.value === "wide");
+const clockTitle = computed(() =>
+  clockDraggable.value ? "Drag to reposition the clock bar" : "Tap to change the clock bar"
+);
+const clockAria = computed(() =>
+  clockDraggable.value ? "Clock bar — drag to reposition" : "Clock bar — tap to change its position"
+);
 const beginClockDrag = event => {
+  if (!clockDraggable.value) return;
   clockDrag.value = true;
   if (event?.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
@@ -797,13 +1038,30 @@ const applyInitialPreview = () => {
 };
 watch(
   () => props.open,
-  open => {
-    if (open) applyInitialPreview();
+  async open => {
+    if (open) {
+      applyInitialPreview();
+      await nextTick();
+      startObserving();
+    } else {
+      stopObserving();
+      modalSize.value = { width: 0, height: 0 };
+      stageSize.value = { width: 0, height: 0 };
+      sheetOpen.value = false;
+    }
   }
 );
 
 /* keep selection valid when screen changes */
-watch(activeScreenId, () => (selectedRegionId.value = null));
+watch(activeScreenId, () => {
+  selectedRegionId.value = null;
+  clockSelected.value = false;
+});
+// Leaving the phone layout closes the sheet; it only exists there.
+watch(isPhone, phone => {
+  if (!phone) sheetOpen.value = false;
+  else if (selectedRegionId.value) sheetOpen.value = true;
+});
 
 // The clock-bar stand-in shows the real time in the dashboard's format, not a
 // frozen sample (F8). Minute resolution is plenty for a preview.
@@ -822,7 +1080,10 @@ const previewClock = computed(
 );
 
 onMounted(async () => {
-  if (props.open) applyInitialPreview();
+  if (props.open) {
+    applyInitialPreview();
+    startObserving();
+  }
   clockTimer = setInterval(() => (now.value = new Date()), 30000);
   if (webServicesStore.services.length === 0 && !webServicesStore.loading)
     webServicesStore.fetchServices();
@@ -832,6 +1093,9 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   window.removeEventListener("pointermove", onResizeMove);
+  window.removeEventListener("pointermove", onSheetDragMove);
+  stopObserving();
+  mediaCleanups.forEach(cleanup => cleanup());
   clearInterval(clockTimer);
 });
 </script>
@@ -849,8 +1113,8 @@ onUnmounted(() => {
 .sre-modal {
   position: relative;
   z-index: 1001;
-  width: min(1240px, 97vw);
-  height: min(820px, 95vh);
+  width: min(1240px, 100%);
+  height: min(820px, 100%);
   display: grid;
   grid-template-rows: auto auto 1fr;
   background: var(--bg-1);
@@ -1099,6 +1363,13 @@ onUnmounted(() => {
 .sre-device-wrap {
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
+.sre-stage-focus {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+  min-width: 0;
+}
 .sre-device-wrap.dimmed {
   opacity: 0.45;
   filter: saturate(0.6);
@@ -1296,9 +1567,196 @@ onUnmounted(() => {
 }
 
 .sre-rail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   border-left: 1px solid var(--line);
   background: var(--bg-0);
+  overflow: hidden;
+}
+.sre-rail-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+}
+
+/* --- size classes (§1) ----------------------------------------------------
+   The class comes from the measured modal, never a viewport media query, so a
+   kiosk whose on-screen keyboard shrinks the dialog re-evaluates it too. */
+.sre-root.size-compact,
+.sre-root.size-phone {
+  padding: 0;
+}
+.sre-root.size-compact .sre-modal,
+.sre-root.size-phone .sre-modal {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+.sre-root.size-compact .sre-body {
+  grid-template-columns: 1fr 280px;
+}
+.sre-root.size-compact .sre-sub,
+.sre-root.size-phone .sre-sub {
+  display: none;
+}
+/* The orientation badge moves under the device as a caption in Compact. */
+.sre-root.size-compact .sre-orient-badge,
+.sre-root.size-phone .sre-orient-badge {
+  display: none;
+}
+.sre-orient-caption {
+  margin-top: var(--space-md);
+  font-size: var(--fs-2xs);
+  color: var(--ink-2);
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  padding: var(--space-2xs) var(--space-md);
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Phone: one column, the inspector becomes a bottom sheet (§3). */
+.sre-root.size-phone .sre-context {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+}
+.sre-root.size-phone .sre-tab {
+  min-height: 44px;
+}
+.sre-root.size-phone .sre-tab-add {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+}
+.sre-root.size-phone .sre-preview-as {
+  margin-left: 0;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.sre-root.size-phone .sre-preview-label {
+  white-space: nowrap;
+}
+.sre-root.size-phone .sre-body {
+  position: relative;
+  display: block;
+  min-height: 0;
+  --sre-sheet-height: 64px;
+}
+.sre-root.size-phone .sre-body.is-sheet-open {
+  --sre-sheet-height: 65%;
+}
+.sre-root.size-phone .sre-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: var(--sre-sheet-height);
+  padding: var(--space-lg);
+}
+.sre-root.size-phone .sre-stage-tag {
+  top: var(--space-md);
+  left: var(--space-lg);
+}
+.sre-root.size-phone .sre-preview-note {
+  display: none;
+}
+/* The mismatch banner stacks its button under the text. */
+.sre-root.size-phone .sre-mismatch {
+  flex-direction: column;
+  max-width: 92%;
+  top: var(--space-sm);
+}
+.sre-root.size-phone .sre-mismatch__btn {
+  width: 100%;
+}
+
+/* The rail turns into the sheet: peek 64px, open 65% of the stage height. */
+.sre-rail.is-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  height: 64px;
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 16px 16px 0 0;
+  background: var(--bg-1);
+  box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.35);
+  transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sre-rail.is-sheet.is-open {
+  height: 65%;
+}
+.sre-rail.is-sheet.no-motion {
+  transition: none;
+}
+.sre-sheet-peek {
+  flex: 0 0 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 0 var(--space-lg);
+  cursor: pointer;
+  touch-action: none;
+}
+.sre-sheet-handle {
+  width: 40px;
+  height: 4px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: var(--line);
+  cursor: grab;
+}
+.sre-sheet-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+}
+.sre-sheet-chevron {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--bg-1);
+  color: var(--ink-2);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.sre-sheet-chevron:hover {
+  border-color: var(--focus);
+  color: var(--focus);
+}
+.sre-rail.is-sheet .sre-rail-scroll {
+  min-height: 0;
+}
+
+/* Region labels shrink under 320px (§2). */
+.sre-device.is-narrow :deep(.sre-region-name) {
+  font-size: var(--fs-xs);
+}
+
+/* Coarse pointer: bigger divider hit areas with the same 4x34 grip (§4). */
+.sre-root.is-coarse .sre-resizer {
+  flex: 0 0 28px;
+}
+
+.sre-sheet-chevron:focus-visible,
+.sre-sheet-peek:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .sre-tab:focus-visible,
