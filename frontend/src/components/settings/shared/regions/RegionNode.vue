@@ -19,6 +19,7 @@
           :parent-direction="splitDir"
           :selected-id="selectedId"
           :layout-dir="layoutDir"
+          :coarse="coarse"
           @select="emit('select', $event)"
           @resize="emit('resize', $event)"
         />
@@ -27,6 +28,7 @@
           type="button"
           class="sre-resizer"
           :class="splitDir === 'row' ? 'col' : 'row'"
+          :style="coarse ? { flex: '0 0 28px' } : null"
           aria-label="Resize sub-regions"
           @pointerdown.stop="onResize(i, $event)"
         >
@@ -52,6 +54,8 @@ const props = defineProps({
   parentDirection: { type: String, default: "row" },
   selectedId: { type: String, default: null },
   layoutDir: { type: String, required: true },
+  // Coarse pointers get a 28px-across resizer hit area (§4).
+  coarse: { type: Boolean, default: false },
 });
 const emit = defineEmits(["select", "resize"]);
 
