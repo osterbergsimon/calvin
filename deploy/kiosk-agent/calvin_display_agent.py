@@ -760,7 +760,7 @@ WATCHDOG_DEFAULT_PORT = 9222
 WATCHDOG_DEFAULT_SECONDS = 30
 WATCHDOG_DEFAULT_FAILURES = 3
 WATCHDOG_DEFAULT_COOLDOWN = 300
-WATCHDOG_DEFAULT_BACKOFF_MAX = 3600
+WATCHDOG_DEFAULT_BACKOFF_MAX = 900
 WATCHDOG_WARMUP_SECONDS = 120
 WATCHDOG_TIMEOUT = 10
 WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
@@ -965,16 +965,32 @@ def cdp_eval(ws_url, expression="1+1", timeout=WATCHDOG_TIMEOUT, connect=None, k
                 pass
 
 
+# Loopback only: a proxy in the kiosk's environment must never swallow the
+# DevTools probe, which would look like "no endpoint" forever.
+_LOOPBACK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _http_json(url, timeout):
-    with urllib.request.urlopen(url, timeout=timeout) as response:
+    with _LOOPBACK_OPENER.open(url, timeout=timeout) as response:
         return json.load(response)
+
+
+def _target_list_evidence(targets):
+    """True when `targets` is Chromium's /json/list shape (a target list).
+
+    An empty list still counts: a renderer that died before it ever became a
+    page target leaves Chromium serving no targets at all.
+    """
+    if not isinstance(targets, list):
+        return False
+    return all(isinstance(t, dict) and isinstance(t.get("type"), str) for t in targets)
 
 
 def cdp_targets(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
     """Chromium's target list, or None when this is not a Chromium DevTools port.
 
-    Only a JSON array is accepted: another server on the port, an old Chromium, or
-    a disabled port must never look like a dead page, or the watchdog would
+    Only a target list is accepted: another server on the port, an old Chromium,
+    or a disabled port must never look like a dead page, or the watchdog would
     restart the kiosk for no reason.
     """
     if fetch is None:
@@ -983,7 +999,7 @@ def cdp_targets(port, timeout=WATCHDOG_TIMEOUT, fetch=None):
         targets = fetch(f"http://127.0.0.1:{port}/json/list", timeout)
     except (OSError, ValueError):
         return None
-    return targets if isinstance(targets, list) else None
+    return targets if _target_list_evidence(targets) else None
 
 
 def _page_ws_url(targets):
@@ -1005,7 +1021,8 @@ def probe_page(port, timeout=WATCHDOG_TIMEOUT, fetch=None, evaluate=None):
 
     PAGE_UNREACHABLE means no Chromium answered on the debugging port (port
     disabled, an older unit file, a foreign server): never act on it. PAGE_DEAD
-    means Chromium answered and the page behind the dashboard did not.
+    means Chromium answered - even with an empty target list - and the page
+    behind the dashboard did not, whether or not it was ever alive.
     """
     if evaluate is None:
         evaluate = cdp_eval
@@ -1225,10 +1242,11 @@ def watchdog_step(
         state["restarts"] = 0  # the page recovered: the next crash gets the base wait
         return "ok"
     if health == PAGE_UNREACHABLE:
-        # Nothing that is Chromium answered on the debugging port: the browser is
-        # gone (systemd restarts it), the port is disabled, or it is an old
-        # Chromium. Either way, never our call.
-        state["failures"] = 0
+        # Nothing that is Chromium answered on the debugging port this time: the
+        # browser is gone (systemd restarts it), the port is disabled, or it is
+        # an old Chromium. Never our call - and never a restart here. Keep the
+        # dead-page evidence though: a crashed renderer can stall the endpoint
+        # for a probe or two, and a page that was never alive must still arm.
         return "unreachable"
     if unit_state is None or not unit_state.get("active"):
         state["failures"] = 0
@@ -1253,8 +1271,16 @@ def watchdog_step(
     except Exception as e:
         log(f"watchdog: restarting {unit} failed ({e})")
     state["restarts"] = restarts + 1  # back off even when the signal failed
+    wait = next_cooldown(state["restarts"], cooldown, backoff_max)
     if ok:
-        log(f"watchdog: {unit} restarted because the page stopped answering")
+        if state["restarts"] > 1:
+            log(
+                f"watchdog: crash loop: {unit} has been restarted "
+                f"{state['restarts']} times because the page keeps crashing; "
+                f"the next restart waits at least {wait}s (cap {backoff_max}s)"
+            )
+        else:
+            log(f"watchdog: {unit} restarted because the page stopped answering")
         return "restarted"
     return "restart-failed"
 
