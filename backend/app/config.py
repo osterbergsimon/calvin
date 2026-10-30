@@ -143,6 +143,15 @@ class Settings(BaseSettings):
     # (e.g. http://calvin.lan:8000). Unset = auto-detect from the LAN address,
     # which is wrong behind Docker NAT or a reverse proxy — set it there.
     public_url: str = ""
+    # Peers allowed to set X-Forwarded-Proto/X-Forwarded-Host for the public
+    # base URL the kiosk installer bakes in (CLV-34): comma-separated IPs/CIDRs,
+    # "*" for any. Empty = trust no one, so a forwarded header from an arbitrary
+    # client can never choose the URL. Forwarded headers are also ignored when
+    # PUBLIC_URL is set, because that setting wins.
+    trusted_proxies: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_trusted_proxies", "trusted_proxies"),
+    )
 
     # Backups (calvin-8gx)
     backup_dir: Path = Path("backups")
