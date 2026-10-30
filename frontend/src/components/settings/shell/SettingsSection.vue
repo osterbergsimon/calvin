@@ -24,7 +24,7 @@ defineProps({ id: { type: String, required: true }, title: { type: String, requi
   flex: 1;
   min-width: 0;
   font-family: var(--font-data);
-  font-size: 0.72rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -32,7 +32,7 @@ defineProps({ id: { type: String, required: true }, title: { type: String, requi
 .settings-section__panel {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   overflow: hidden;
 }
 </style>

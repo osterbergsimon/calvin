@@ -292,7 +292,7 @@ async function submit() {
   margin: 0.2rem 0 0;
   font-size: var(--fs-md);
   font-weight: 500;
-  color: var(--ok);
+  color: var(--ok-text);
 }
 .admin-access__banner {
   display: flex;

@@ -91,7 +91,7 @@ const dotClass = computed(() => {
 
 .settings-topbar__wordmark {
   font-family: var(--font-display);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--ink);
@@ -99,12 +99,12 @@ const dotClass = computed(() => {
 }
 
 .settings-topbar__wordmark-dot {
-  color: var(--focus);
+  color: var(--focus-text);
 }
 
 .settings-topbar__location {
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 500;
   color: var(--ink);
   padding-left: 16px;
@@ -127,13 +127,13 @@ const dotClass = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius-2xl);
   background: var(--bg-0);
   border: 1px solid var(--line);
 }
 
 .settings-topbar__pill-label {
-  font-size: 0.8125rem;
+  font-size: var(--fs-xs);
   color: var(--ink-2);
 }
 
@@ -160,10 +160,10 @@ const dotClass = computed(() => {
   background: var(--focus);
   color: var(--focus-ink);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   padding: 6px 16px;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -172,12 +172,12 @@ const dotClass = computed(() => {
 .settings-topbar__phone {
   padding: 6px 12px;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-weight: 600;
   color: var(--ink);
   background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
 }
 

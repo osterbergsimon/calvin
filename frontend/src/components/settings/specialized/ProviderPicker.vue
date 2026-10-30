@@ -156,7 +156,7 @@ const choose = provider => {
   overflow-y: auto;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   box-shadow: 0 4px 20px var(--shadow);
 }
 
@@ -172,7 +172,7 @@ const choose = provider => {
 .pp-title {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ink);
 }
@@ -196,7 +196,7 @@ const choose = provider => {
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   text-align: left;
   cursor: pointer;
@@ -236,7 +236,7 @@ const choose = provider => {
   flex-shrink: 0;
   width: 2rem;
   height: 2rem;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   background: var(--bg-0);
   color: var(--ink-2);
   font-weight: 600;
@@ -262,30 +262,30 @@ const choose = provider => {
 }
 
 .pp-name {
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 
 .pp-desc {
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
   line-height: 1.4;
 }
 
 .pp-error {
-  font-size: 0.8rem;
-  color: var(--err);
+  font-size: var(--fs-xs);
+  color: var(--err-text);
   line-height: 1.4;
 }
 
 .pp-error-link {
   padding: 0;
   background: transparent;
-  color: var(--err);
+  color: var(--err-text);
   border: 0;
   border-bottom: 1px dotted currentColor;
   font-family: var(--font-ui);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   cursor: pointer;
 }
 
@@ -294,9 +294,9 @@ const choose = provider => {
   flex-shrink: 0;
   padding: 0.25rem 0.75rem;
   border: 1px solid var(--focus-edge);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   color: var(--ink);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 
@@ -319,17 +319,17 @@ const choose = provider => {
   min-height: var(--touch-target);
   padding: 0.4rem 1rem;
   background: var(--focus);
-  color: white;
+  color: var(--focus-ink);
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
 }
 
 .pp-install:hover {
-  background: color-mix(in srgb, var(--focus), black 12%);
+  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
 }
 
 .pp-install:focus-visible {
@@ -347,8 +347,8 @@ const choose = provider => {
 .pp-installed {
   margin-left: auto;
   flex-shrink: 0;
-  color: var(--ok);
-  font-size: 0.85rem;
+  color: var(--ok-text);
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -356,7 +356,7 @@ const choose = provider => {
   margin: 0;
   padding: 0 1.5rem 1rem;
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink-3);
 }
 
@@ -369,7 +369,7 @@ const choose = provider => {
   border: 0;
   border-top: 1px solid var(--line);
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   text-align: left;
   cursor: pointer;
 }

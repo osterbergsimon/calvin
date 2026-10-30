@@ -663,7 +663,7 @@ onMounted(async () => {
 
 .modal-content {
   background: var(--bg-1);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   box-shadow: 0 4px 20px var(--shadow);
   max-width: 480px;
   width: 90%;
@@ -683,7 +683,7 @@ onMounted(async () => {
 
 .modal-header h3 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ink);
 }
@@ -699,7 +699,7 @@ onMounted(async () => {
   margin: 0;
   color: var(--ink);
   line-height: 1.5;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
 }
 
 .pip-package-list {
@@ -711,24 +711,24 @@ onMounted(async () => {
 }
 
 .pip-package-list li {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
 }
 
 .pip-package-list code {
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.1rem 0.4rem;
   font-family: monospace;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink);
 }
 
 .pip-warning-text {
-  color: var(--warn) !important;
+  color: var(--warn-text) !important;
   background: color-mix(in srgb, var(--warn) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.6rem 0.75rem;
 }
 
@@ -745,8 +745,8 @@ onMounted(async () => {
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
@@ -760,10 +760,10 @@ onMounted(async () => {
 .btn-danger {
   padding: 0.5rem 1rem;
   background: var(--err);
-  color: white;
+  color: var(--err-ink);
   border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -771,7 +771,7 @@ onMounted(async () => {
 }
 
 .btn-danger:hover {
-  background: color-mix(in srgb, var(--err), black 12%);
+  background: color-mix(in srgb, var(--err) 88%, var(--ink));
 }
 
 .btn-secondary:focus-visible,

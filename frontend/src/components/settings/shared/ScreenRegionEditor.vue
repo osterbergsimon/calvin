@@ -1529,7 +1529,7 @@ onUnmounted(() => {
   border: 1px solid color-mix(in srgb, var(--focus) 55%, transparent);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--focus) 16%, transparent);
-  color: var(--focus);
+  color: var(--focus-text);
   font-size: var(--fs-xs);
   font-weight: 600;
   padding: 0.2rem 0.65rem;
@@ -1673,7 +1673,7 @@ onUnmounted(() => {
   justify-content: center;
   flex: 0 0 auto;
   background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
-  color: var(--focus);
+  color: var(--focus-text);
   border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
   border-radius: var(--radius-xs);
   font-size: var(--fs-micro);
@@ -1708,7 +1708,7 @@ onUnmounted(() => {
   border-radius: var(--radius-xs);
   background: color-mix(in srgb, var(--focus) 9%, transparent);
   border: 1px dashed color-mix(in srgb, var(--focus) 50%, transparent);
-  color: color-mix(in srgb, var(--focus) 85%, var(--bg-1));
+  color: var(--focus-text);
   font-size: var(--fs-micro);
   font-weight: 600;
   transition:
@@ -1932,7 +1932,7 @@ onUnmounted(() => {
 }
 .sre-sheet-chevron:hover {
   border-color: var(--focus);
-  color: var(--focus);
+  color: var(--focus-text);
 }
 .sre-rail.is-sheet .sre-rail-scroll {
   min-height: 0;

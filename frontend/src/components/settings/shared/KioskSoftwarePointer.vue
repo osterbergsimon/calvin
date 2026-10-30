@@ -45,7 +45,7 @@ onMounted(async () => {
 <style scoped>
 .pointer__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -56,12 +56,12 @@ onMounted(async () => {
   min-height: var(--touch-target);
   padding: 0 1rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .pointer__btn:hover {

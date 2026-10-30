@@ -292,7 +292,7 @@ const positionOptions = computed(() => {
   color: var(--ink-2);
 }
 .preset.active .preset-label {
-  color: var(--focus);
+  color: var(--focus-text);
   font-weight: 650;
 }
 .switch-row {
@@ -339,11 +339,11 @@ const positionOptions = computed(() => {
 }
 .link-btn:hover:not(:disabled) {
   border-color: var(--focus);
-  color: var(--focus);
+  color: var(--focus-text);
 }
 .link-btn.danger:hover:not(:disabled) {
   border-color: var(--err);
-  color: var(--err);
+  color: var(--err-text);
 }
 .link-btn:disabled {
   opacity: 0.4;

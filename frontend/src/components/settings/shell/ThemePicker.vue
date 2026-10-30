@@ -171,7 +171,7 @@ onUnmounted(() => {
 .theme-picker__swatch {
   width: 1rem; /* 16px */
   height: 1rem;
-  border-radius: 0.3125rem; /* 5px */
+  border-radius: var(--radius-xs);
   background: var(--focus);
 }
 
@@ -181,7 +181,7 @@ onUnmounted(() => {
 
 .theme-picker__chevron {
   color: var(--ink-3);
-  font-size: 0.75rem; /* 12px */
+  font-size: var(--fs-2xs); /* 12px */
 }
 
 .theme-picker__popover {

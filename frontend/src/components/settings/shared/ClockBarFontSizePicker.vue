@@ -305,7 +305,7 @@ const handlePluginItemInput = event => {
 }
 
 .control-label {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-family: var(--font-ui);
   font-weight: 500;
   color: var(--ink);
@@ -320,7 +320,7 @@ const handlePluginItemInput = event => {
 .font-size-slider {
   flex: 1;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--bg-2);
   outline: none;
   -webkit-appearance: none;
@@ -367,8 +367,8 @@ const handlePluginItemInput = event => {
   background: var(--bg-2);
   color: var(--ink);
   border: 1px solid var(--line);
-  border-radius: 4px;
-  font-size: 0.9rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-md);
   font-family: var(--font-data);
   text-align: center;
   /* Strip the browser's native spinner chrome — the up/down arrows read as
@@ -391,7 +391,7 @@ const handlePluginItemInput = event => {
 }
 
 .font-size-unit {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   color: var(--ink-2);
 }
 
@@ -402,7 +402,7 @@ const handlePluginItemInput = event => {
 }
 
 .preview-label {
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-family: var(--font-ui);
   font-weight: 500;
   color: var(--ink-2);
@@ -410,7 +410,7 @@ const handlePluginItemInput = event => {
 
 .preview-wrapper {
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: var(--bg-1);
   overflow: hidden;
 }
