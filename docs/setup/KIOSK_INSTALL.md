@@ -82,7 +82,7 @@ server's address on your LAN.
    Either way, the install takes a few minutes, mostly package installs, and the Pi
    then reboots.
 3. **Done.** After the reboot the Pi starts Chromium in kiosk mode on the dashboard.
-   Within a minute it appears in **Settings → Kiosks** on the server.
+   Within a minute it appears in **Settings → Screens** on the server.
 
 The quick form bakes in the URL the server saw the request on. Behind a reverse proxy
 that can be an internal or `http://` address. If the Pi should use a different URL, add
@@ -133,7 +133,7 @@ install-kiosk.sh (over SSH, piped  ◀──── GET /api/kiosks/install.sh  (
        │                            display stack; other keys kept)
        └─ update-kiosk.sh --bootstrap ◀─── GET /api/kiosks/agent/files/*  (verified)
             └─ display agent + calvin-x / calvin-kiosk-remote / calvin-display-agent units
-reboot → Chromium shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Kiosks
+reboot → Chromium shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Screens
 ```
 
 **Trust boundary:** with a key, every file after the installer is verified against the
@@ -305,7 +305,7 @@ cog --platform=drm \
     "http://tower:8000/?kiosk=..."
 ```
 
-- **Rotation** comes from the Kiosks display setting. The display agent maps
+- **Rotation** comes from the Screens display setting. The display agent maps
   Calvin's xrandr names to cog's counter-clockwise quarter turns:
   `normal` → `0`, `left` (90° CCW) → `1`, `inverted` → `2`, `right` → `3`.
   It persists the value in `/etc/default/calvin-kiosk-cog` and restarts
@@ -405,7 +405,7 @@ A re-run of the installer with no flag keeps whatever the config file says.
 
 ## Updating a kiosk later
 
-Use **Settings → Kiosks → Update** for that kiosk. The Pi pulls the new agent from the
+Use **Settings → Screens → Update** for that kiosk. The Pi pulls the new agent from the
 server, verifies it, swaps it in, and rolls back if it doesn't come up healthy. See
 [Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update). To pick up a new
 Calvin version, update the server container; the kiosk follows when you press Update.
@@ -421,6 +421,6 @@ Calvin version, update the server container; the kiosk follows when you press Up
   Update the server container.
 - **Install log:** `/var/log/calvin-setup.log`. For a baked card, run
   `journalctl -u calvin-kiosk-firstboot` (`ssh calvin-admin@<kiosk>` with the baked key).
-- **Kiosk missing from Settings → Kiosks:** `systemctl status calvin-display-agent` on the Pi.
+- **Kiosk missing from Settings → Screens:** `systemctl status calvin-display-agent` on the Pi.
 - **Wrong server later:** edit `CALVIN_BACKEND_URL` in `/etc/default/calvin-kiosk`, then
   `sudo systemctl restart calvin-kiosk-remote calvin-display-agent`.

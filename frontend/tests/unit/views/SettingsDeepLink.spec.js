@@ -45,7 +45,7 @@ const stubs = {
   SettingsSearch: true,
   CategoryRail: true,
   DashboardSettings: true,
-  DeviceSettings: true,
+  ScreensSettings: true,
   MaintenanceSettings: true,
   ContentSettings: {
     template: '<div><section id="section-content-images" class="images-section" /></div>',
@@ -84,14 +84,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
 
   const activeCategory = w => w.findComponent({ name: "CategoryRail" }).props("activeId");
 
-  it("opens Screen & keyboard and scrolls to Remote & buttons for device-reboot", async () => {
+  it("opens Screens and scrolls to Power for device-reboot", async () => {
     route.query = { setting: "device-reboot" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
-          DeviceSettings: {
-            template: `<div>${section("device-buttons", "Remote & buttons")}</div>`,
+          ScreensSettings: {
+            template: `<div>${section("device-power", "All screens · Power")}</div>`,
           },
         },
       },
@@ -99,8 +99,8 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     });
     await flushPromises();
 
-    expect(activeCategory(w)).toBe("device");
-    expect(document.getElementById("section-device-buttons").scrollIntoView).toHaveBeenCalled();
+    expect(activeCategory(w)).toBe("screens");
+    expect(document.getElementById("section-device-power").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 
@@ -124,14 +124,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
-  it("opens Kiosks and scrolls to Kiosk software for kiosks-software", async () => {
+  it("opens Screens and scrolls to the list for kiosks-software", async () => {
     route.query = { setting: "kiosks-software" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
-          KiosksSettings: {
-            template: `<div>${section("kiosks-list", "Kiosks")}</div>`,
+          ScreensSettings: {
+            template: `<div>${section("screens-list", "Screens")}</div>`,
           },
         },
       },
@@ -139,8 +139,8 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     });
     await flushPromises();
 
-    expect(activeCategory(w)).toBe("kiosks");
-    expect(document.getElementById("section-kiosks-list").scrollIntoView).toHaveBeenCalled();
+    expect(activeCategory(w)).toBe("screens");
+    expect(document.getElementById("section-screens-list").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 
@@ -161,6 +161,26 @@ describe("Settings ?setting= deep links after the category reorg", () => {
 
     expect(activeCategory(w)).toBe("dashboard");
     expect(document.getElementById("section-clock-bar-items").scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens Dashboard › Focus & remote for device-notifications", async () => {
+    route.query = { setting: "device-notifications" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          DashboardSettings: {
+            template: `<div>${section("kiosk-touch-focus", "Focus & remote")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("dashboard");
+    expect(document.getElementById("section-kiosk-touch-focus").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 });

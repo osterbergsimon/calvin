@@ -41,7 +41,7 @@ const stubs = {
   },
   DashboardSettings: { template: '<div class="dashboard-stub" />' },
   ContentSettings: { template: '<div class="content-settings-stub" />' },
-  DeviceSettings: { template: '<div class="device-settings-stub" />' },
+  ScreensSettings: { template: '<div class="screens-settings-stub" />' },
   MaintenanceSettings: { template: '<div class="maintenance-settings-stub" />' },
   PluginsCategory: true,
 };
@@ -67,10 +67,24 @@ describe("Settings shell", () => {
     expect(w.find(".content-settings-stub").exists()).toBe(false);
   });
 
-  it("renders DeviceSettings for the device category", () => {
+  it("renders ScreensSettings for the screens category", () => {
+    sessionStorage.setItem("settings_active_category", "screens");
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".screens-settings-stub").exists()).toBe(true);
+    expect(w.find(".content-settings-stub").exists()).toBe(false);
+  });
+
+  it("resolves a stored retired device category to screens", () => {
     sessionStorage.setItem("settings_active_category", "device");
     const w = mount(Settings, { global: { stubs } });
-    expect(w.find(".device-settings-stub").exists()).toBe(true);
+    expect(w.find(".screens-settings-stub").exists()).toBe(true);
+    expect(w.find(".content-settings-stub").exists()).toBe(false);
+  });
+
+  it("resolves a stored retired kiosks category to screens", () => {
+    sessionStorage.setItem("settings_active_category", "kiosks");
+    const w = mount(Settings, { global: { stubs } });
+    expect(w.find(".screens-settings-stub").exists()).toBe(true);
     expect(w.find(".content-settings-stub").exists()).toBe(false);
   });
 

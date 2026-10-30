@@ -1,740 +1,792 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
-import KiosksSettings from "@/components/settings/categories/KiosksSettings.vue";
+import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
 import { useKiosksStore } from "@/stores/kiosks";
-import { useConfigStore } from "@/stores/config";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
-import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
-import CollapsibleSection from "@/components/settings/shared/CollapsibleSection.vue";
+import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
+import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 
-function mountWithKiosks(list) {
+const AVAILABLE = "e4f5a6b7c8d9e0f1";
+const OLD = "a1b2c3d4e5f6a7b8";
+
+const layout = (ids = ["r1", "r2"]) => ({
+  version: 1,
+  direction: "row",
+  regions: ids.map(id => ({ id, kind: "calendar", size: 100 / ids.length })),
+});
+
+const config = (over = {}) => ({
+  orientation: "landscape",
+  orientationFlipped: false,
+  applyDisplayRotation: true,
+  dashboardScreens: {
+    version: 2,
+    activeScreenId: "home",
+    screens: [
+      { id: "home", name: "Home", layout: layout() },
+      { id: "photos", name: "Photos", layout: layout(["r1", "r2", "r3"]) },
+    ],
+  },
+  displayScheduleEnabled: false,
+  displaySchedule: [],
+  displayTimeoutEnabled: false,
+  displayTimeout: 0,
+  touchControls: "auto",
+  onScreenKeyboard: "auto",
+  ...over,
+});
+
+const kiosk = (over = {}) => ({
+  id: "kitchen",
+  hostname: "kitchen-pi",
+  lastSeen: new Date().toISOString(),
+  lastAppliedVersion: null,
+  agentVersion: null,
+  agentUpdateStatus: "ok",
+  agentUpdateMessage: null,
+  agentUpdateRequested: false,
+  overrides: {},
+  viewport: null,
+  ...over,
+});
+
+function mountScreens({
+  kiosks = [kiosk()],
+  overrides = {},
+  cfg = config(),
+  availableVersion = null,
+  narrow,
+} = {}) {
   setActivePinia(createPinia());
+  if (narrow === undefined) {
+    delete window.matchMedia;
+  } else {
+    window.matchMedia = vi.fn(() => ({
+      matches: narrow,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+  }
   const store = useKiosksStore();
   store.loadKiosks = vi.fn(async () => {
-    store.kiosks = list;
+    store.kiosks = kiosks;
   });
-  store.fetchOverrides = vi.fn(async () => ({}));
+  store.fetchOverrides = vi.fn(async () => overrides);
+  store.saveOverrides = vi.fn(async () => {});
+  store.setKioskOverrides = vi.fn((id, next) => {
+    const target = store.kiosks.find(k => k.id === id);
+    if (target) target.overrides = next;
+  });
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
-  return mount(KiosksSettings);
+  store.fetchAvailableAgentVersion = vi.fn(async () => availableVersion);
+  return { wrapper: mount(ScreensSettings, { props: { config: cfg } }), store, cfg };
 }
 
-describe("KiosksSettings — list", () => {
+async function selectFirst(wrapper) {
+  await wrapper.find("[data-test='screen-card']").trigger("click");
+  await flushPromises();
+}
+
+const rowByLabel = (w, label) =>
+  w.findAllComponents(SettingRow).find(r => r.props("label") === label);
+
+describe("ScreensSettings — screen list", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("shows the empty state when there are no kiosks", async () => {
-    const w = mountWithKiosks([]);
+  it("shows the empty state and opens Add a screen on a fresh install", async () => {
+    const { wrapper } = mountScreens({ kiosks: [] });
     await flushPromises();
-    expect(w.text()).toContain("No kiosks have connected yet");
-    // F6: the copy must not claim any dashboard load registers a kiosk
-    expect(w.text()).not.toContain("registers itself the first time it loads the dashboard");
-    expect(w.text()).toContain("?kiosk=<name>");
+    expect(wrapper.find("[data-test='screens-empty']").text()).toContain(
+      "No screens have connected yet"
+    );
+    expect(wrapper.find("[data-test='screens-empty']").text()).toContain("?kiosk=<name>");
+    expect(wrapper.find("[data-test='add-kiosk-panel']").exists()).toBe(true);
   });
 
-  it("opens the Add kiosk instructions on a fresh install (F6)", async () => {
-    const w = mountWithKiosks([]);
+  it("keeps Add a screen collapsed behind a button once screens exist", async () => {
+    const { wrapper } = mountScreens();
     await flushPromises();
-    expect(w.find('[data-test="add-kiosk-panel"]').exists()).toBe(true);
+    expect(wrapper.find("[data-test='add-kiosk-panel']").exists()).toBe(false);
+    const btn = wrapper.find("[data-test='add-screen-btn']");
+    expect(btn.text()).toBe("+ Add a screen");
+    await btn.trigger("click");
+    expect(wrapper.find("[data-test='add-kiosk-panel']").exists()).toBe(true);
   });
 
-  it("keeps Add kiosk collapsed behind a button once kiosks exist (F6)", async () => {
-    const w = mountWithKiosks([
-      { id: "kitchen-1", hostname: "pi", lastSeen: new Date().toISOString() },
-    ]);
-    await flushPromises();
-    expect(w.find('[data-test="add-kiosk-panel"]').exists()).toBe(false);
-    await w.find('[data-test="add-kiosk-btn"]').trigger("click");
-    expect(w.find('[data-test="add-kiosk-panel"]').exists()).toBe(true);
-  });
-
-  it("renders a card per kiosk with id and hostname", async () => {
-    const now = new Date().toISOString();
-    const w = mountWithKiosks([
-      { id: "kitchen-1", hostname: "raspberrypi", lastSeen: now, lastAppliedVersion: null },
-    ]);
-    await flushPromises();
-    expect(w.text()).toContain("kitchen-1");
-    expect(w.text()).toContain("raspberrypi");
-  });
-
-  it("marks a recently-seen kiosk Online and a stale one Offline", async () => {
-    const recent = new Date().toISOString();
-    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    const w = mountWithKiosks([
-      { id: "on", hostname: "a", lastSeen: recent, lastAppliedVersion: null },
-      { id: "off", hostname: "b", lastSeen: stale, lastAppliedVersion: null },
-    ]);
-    await flushPromises();
-    const cards = w.findAll("[data-test='kiosk-card']");
-    expect(cards[0].text()).toContain("Online");
-    expect(cards[1].text()).toContain("Offline");
-  });
-});
-
-describe("KiosksSettings — orientation editor", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  async function selectFirst(list, overrides = {}) {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = list;
+  it("puts the All screens card first, with the shared summary", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({ orientation: "portrait", onScreenKeyboard: "on" }),
     });
-    store.fetchOverrides = vi.fn(async () => overrides);
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.orientation = "landscape";
-    cfg.orientationFlipped = false;
-    const w = mount(KiosksSettings);
     await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    return { w, store, cfg };
-  }
-
-  const one = [
-    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-  ];
-
-  it("shows the global default as effective when no override, tagged inherited", async () => {
-    const { w } = await selectFirst(one, {});
-    expect(w.text()).toContain("Same as all screens");
-  });
-
-  it("changing orientation saves a merged override and tags it set", async () => {
-    const { w, store } = await selectFirst(one, { availableScreens: ["a"] });
-    // Emit SegmentedControl's event to exercise the parent's @update:model-value handler
-    // without depending on SegmentedControl's internal button markup.
-    w.findComponent(SegmentedControl).vm.$emit("update:modelValue", "portrait");
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
-      availableScreens: ["a"],
-      orientation: "portrait",
-    });
-    expect(w.text()).toContain("Only this screen");
-  });
-
-  it("Use the shared setting on Orientation removes only that key", async () => {
-    const { w, store } = await selectFirst(one, {
-      orientation: "portrait",
-      availableScreens: ["a"],
-    });
-    await w.find("[data-test='reset-orientation-row']").trigger("click");
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
-  });
-
-  it("offers no Use the shared setting link while the row inherits", async () => {
-    const { w } = await selectFirst(one, {});
-    expect(w.find("[data-test='reset-orientation-row']").exists()).toBe(false);
-  });
-
-  it("shows save-failure copy and no success copy when saveOverrides rejects", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = one;
-    });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.saveOverrides = vi.fn(async () => {
-      throw new Error("network error");
-    });
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    w.findComponent(SegmentedControl).vm.$emit("update:modelValue", "portrait");
-    await flushPromises();
-    expect(w.text()).toContain("Couldn't save to the server. Check the connection and try again.");
-    expect(w.text()).not.toContain("Saved.");
-  });
-
-  it("shows offline post-save copy when the kiosk is not recently seen", async () => {
-    const stale = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const offline = [{ id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: null }];
-    const { w } = await selectFirst(offline, {});
-    w.findComponent(SegmentedControl).vm.$emit("update:modelValue", "portrait");
-    await flushPromises();
-    expect(w.text()).toContain("Saved. Changes apply when this kiosk reconnects.");
-  });
-
-  it("setFlipped preserves unrelated override keys alongside orientationFlipped", async () => {
-    const { w, store } = await selectFirst(one, { availableScreens: ["a"] });
-    // ToggleSwitch[1] is the Flip 180° control (index 0 is the Power schedule toggle in the schedule section)
-    w.findAllComponents(ToggleSwitch)[1].vm.$emit("update:modelValue", true);
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
-      availableScreens: ["a"],
-      orientationFlipped: true,
-    });
-  });
-});
-
-describe("KiosksSettings — content editor", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  const one = [
-    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-  ];
-
-  const twoScreens = {
-    version: 2,
-    activeScreenId: "a",
-    screens: [
-      { id: "a", name: "Home" },
-      { id: "b", name: "Agenda" },
-    ],
-  };
-
-  // Mounts the view, seeds a screen catalog, selects the first kiosk with the given overrides.
-  async function selectContent(list, overrides = {}, screens = twoScreens) {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = list;
-    });
-    store.fetchOverrides = vi.fn(async () => overrides);
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.orientation = "landscape";
-    cfg.orientationFlipped = false;
-    cfg.dashboardScreens = screens;
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    return { w, store, cfg };
-  }
-
-  it("shows all screens selected and tagged inherited when there is no override", async () => {
-    const { w } = await selectContent(one, {});
-    const chips = w.findComponent(ChipMultiSelect);
-    expect(chips.props("modelValue")).toEqual(["a", "b"]);
-    expect(w.text()).toContain("Same as all screens");
-  });
-
-  it("selecting a subset saves availableScreens merged, preserving unrelated keys", async () => {
-    const { w, store } = await selectContent(one, { orientation: "portrait" });
-    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a"]);
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
-      orientation: "portrait",
-      availableScreens: ["a"],
-    });
-    expect(w.text()).toContain("Only this screen");
-  });
-
-  it("selecting all screens normalizes to inherited (removes availableScreens)", async () => {
-    const { w, store } = await selectContent(one, { availableScreens: ["a"] });
-    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a", "b"]);
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {});
-  });
-
-  it("rejecting an empty selection shows a hint and does not save", async () => {
-    const { w, store } = await selectContent(one, { availableScreens: ["a"] });
-    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", []);
-    await flushPromises();
-    expect(store.saveOverrides).not.toHaveBeenCalled();
-    expect(w.text()).toContain("Pick at least one page");
-  });
-
-  it("dropping the default's screen from the set clears defaultScreenId", async () => {
-    const { w, store } = await selectContent(one, {
-      availableScreens: ["a", "b"],
-      defaultScreenId: "b",
-    });
-    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a"]);
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
-  });
-
-  it("renders a hint and no chips when the catalog has fewer than two screens", async () => {
-    const oneScreen = { version: 2, activeScreenId: "a", screens: [{ id: "a", name: "Home" }] };
-    const { w } = await selectContent(one, {}, oneScreen);
-    expect(w.findComponent(ChipMultiSelect).exists()).toBe(false);
-    expect(w.text()).toContain("Add more pages in Dashboard › Pages & regions");
-  });
-
-  it("shows offline content copy after saving to an offline kiosk", async () => {
-    const stale = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    const offline = [{ id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: null }];
-    const { w } = await selectContent(offline, {});
-    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a"]);
-    await flushPromises();
-    expect(w.text()).toContain("Saved. Changes apply when this kiosk reconnects.");
-  });
-
-  it("shows save-failure copy and no success copy when persistContent's saveOverrides rejects", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = one;
-    });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.saveOverrides = vi.fn(async () => {
-      throw new Error("network error");
-    });
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.orientation = "landscape";
-    cfg.orientationFlipped = false;
-    cfg.dashboardScreens = twoScreens;
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    w.findComponent(ChipMultiSelect).vm.$emit("update:modelValue", ["a"]);
-    await flushPromises();
-    expect(w.text()).toContain("Couldn't save to the server. Check the connection and try again.");
-    expect(w.text()).not.toContain("Saved.");
-  });
-
-  it("shows the global active screen as the effective default, tagged inherited", async () => {
-    const { w } = await selectContent(one, {});
-    const pill = w.findComponent(SelectPill);
-    expect(pill.props("modelValue")).toBe("a");
-    // find the "Start page" SettingRow specifically and assert its scope copy
-    const defaultRow = w.findAllComponents(SettingRow).find(r => r.props("label") === "Start page");
-    expect(defaultRow.text()).toContain("Same as all screens");
-    expect(defaultRow.find("[data-test='reset-default-screen']").exists()).toBe(false);
-  });
-
-  it("Start page row says Only this screen when defaultScreenId is overridden", async () => {
-    const { w } = await selectContent(one, { defaultScreenId: "b" });
-    const defaultRow = w.findAllComponents(SettingRow).find(r => r.props("label") === "Start page");
-    expect(defaultRow.text()).toContain("Only this screen");
-    expect(defaultRow.find("[data-test='reset-default-screen']").text()).toBe(
-      "Use the shared setting"
+    const all = wrapper.find("[data-test='screen-all-card']");
+    expect(all.exists()).toBe(true);
+    expect(all.text()).toContain("All screens");
+    expect(all.text()).toContain("Shared settings every screen uses unless it has its own");
+    expect(wrapper.find("[data-test='all-screens-summary']").text()).toBe(
+      "portrait · keyboard Always"
     );
   });
 
-  it("limits the default-screen options to the available set", async () => {
-    const { w } = await selectContent(one, { availableScreens: ["b"] });
-    const pill = w.findComponent(SelectPill);
-    expect(pill.props("options")).toEqual([{ value: "b", label: "Agenda" }]);
+  it("renders a card per screen with its name, id, presence and summary", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({
+          id: "kitchen",
+          hostname: "kitchen-pi",
+          overrides: { displayName: "Kitchen" },
+        }),
+        kiosk({
+          id: "hall",
+          hostname: "hall-pi",
+          lastSeen: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+          overrides: {
+            orientation: "portrait",
+            orientationFlipped: true,
+            availableScreens: ["home"],
+          },
+        }),
+      ],
+    });
+    await flushPromises();
+    const cards = wrapper.findAll("[data-test='screen-card']");
+    expect(cards).toHaveLength(2);
+    expect(cards[0].text()).toContain("Kitchen");
+    expect(cards[0].text()).toContain("kitchen");
+    expect(cards[0].text()).toContain("Online");
+    expect(cards[1].text()).toContain("hall-pi");
+    expect(cards[1].text()).toContain("Offline");
+    expect(cards[1].find("[data-test='screen-summary']").text()).toBe(
+      "1 page · portrait · upside down"
+    );
   });
 
-  it("choosing a default saves defaultScreenId merged, preserving unrelated keys", async () => {
-    const { w, store } = await selectContent(one, { orientation: "portrait" });
-    w.findComponent(SelectPill).vm.$emit("update:modelValue", "b");
-    await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
-      orientation: "portrait",
-      defaultScreenId: "b",
+  it("falls back to the hostname, then the id, when no name is set", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({ id: "kitchen", hostname: "kitchen-pi" }),
+        kiosk({ id: "nohost", hostname: "" }),
+      ],
     });
+    await flushPromises();
+    const cards = wrapper.findAll("[data-test='screen-card']");
+    expect(cards[0].text()).toContain("kitchen-pi");
+    expect(cards[1].text()).toContain("nohost");
   });
 
-  it("Use the shared setting on Pages shown removes only availableScreens", async () => {
-    const { w, store } = await selectContent(one, {
-      orientation: "portrait",
-      defaultScreenId: "a",
-      availableScreens: ["a"],
+  it("draws each card's start page thumbnail in that screen's orientation", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({ id: "kitchen", overrides: {} }),
+        kiosk({ id: "hall", overrides: { orientation: "portrait", defaultScreenId: "photos" } }),
+      ],
     });
-    await w.find("[data-test='reset-screens-shown']").trigger("click");
     await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
-      orientation: "portrait",
-      defaultScreenId: "a",
-    });
+    const cards = wrapper.findAll("[data-test='screen-card']");
+    expect(cards[0].findComponent(PageThumbnail).props("orientation")).toBe("landscape");
+    expect(cards[1].findComponent(PageThumbnail).props("orientation")).toBe("portrait");
+    expect(cards[1].findComponent(PageThumbnail).props("page").id).toBe("photos");
   });
 
-  it("Use the shared setting on Start page removes only defaultScreenId", async () => {
-    const { w, store } = await selectContent(one, {
-      orientation: "portrait",
-      defaultScreenId: "a",
+  it("summarises the schedule on the card", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({
+          overrides: {
+            displayScheduleEnabled: true,
+            displaySchedule: [{ day: 1, enabled: true, onTime: "06:30", offTime: "23:00" }],
+          },
+        }),
+      ],
     });
-    await w.find("[data-test='reset-default-screen']").trigger("click");
     await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
-  });
-});
-
-describe("KiosksSettings — pending badge", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("shows the pending badge for an offline kiosk whose applied != desired", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [{ id: "off", hostname: "b", lastSeen: stale, lastAppliedVersion: "old" }];
-    });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.fetchDeviceConfigVersion = vi.fn(async () => "new");
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    expect(w.find("[data-test='kiosk-pending-badge']").exists()).toBe(true);
-  });
-
-  it("hides the badge when online, when versions match, or when desired is unknown", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    const recent = new Date().toISOString();
-    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [
-        { id: "online-mismatch", hostname: "a", lastSeen: recent, lastAppliedVersion: "old" },
-        { id: "offline-match", hostname: "b", lastSeen: stale, lastAppliedVersion: "same" },
-        { id: "offline-unknown", hostname: "c", lastSeen: stale, lastAppliedVersion: "old" },
-      ];
-    });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.fetchDeviceConfigVersion = vi.fn(async id => {
-      if (id === "online-mismatch") return "new";
-      if (id === "offline-match") return "same";
-      return null; // offline-unknown → desired unknown → fail-open, no badge
-    });
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    expect(w.findAll("[data-test='kiosk-pending-badge']").length).toBe(0);
+    expect(wrapper.find("[data-test='screen-summary']").text()).toBe(
+      "2 pages · landscape · off 23:00–06:30"
+    );
   });
 });
 
-describe("KiosksSettings — status header", () => {
+describe("ScreensSettings — one screen's page", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("renders KioskStatusHeader for the selected kiosk with applied and desired versions", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [
-        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: "old" },
-      ];
+  it("opens the sub-view with a back link and sections 1-6", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.find("[data-test='screens-category']").classes()).toContain("screens--detail");
+    expect(wrapper.find("[data-test='screens-list']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='screens-back']").text()).toBe("‹ Screens");
+
+    const ids = wrapper
+      .findAll("section.settings-section")
+      .map(s => s.attributes("id"))
+      .filter(id => id.startsWith("section-screen-"));
+    expect(ids).toEqual([
+      "section-screen-name",
+      "section-screen-pages",
+      "section-screen-display",
+      "section-screen-power",
+      "section-screen-touch",
+      "section-screen-software",
+    ]);
+  });
+
+  it("returns to the list, and the shared settings, from the back link", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("#section-device-keyboard").exists()).toBe(false);
+
+    await wrapper.find("[data-test='screens-back']").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screens-category']").classes()).not.toContain(
+      "screens--detail"
+    );
+    expect(wrapper.find("#section-device-keyboard").exists()).toBe(true);
+  });
+
+  it("is two-pane, list beside detail, on a kiosk-width screen", async () => {
+    const { wrapper } = mountScreens({ narrow: false });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const root = wrapper.find("[data-test='screens-category']");
+    expect(root.classes()).toContain("screens--two-pane");
+    expect(root.classes()).not.toContain("screens--single-pane");
+    expect(wrapper.find("[data-test='screens-list']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+  });
+
+  it("hides the list and shows one pane at a time on a phone", async () => {
+    const { wrapper } = mountScreens({ narrow: true });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const root = wrapper.find("[data-test='screens-category']");
+    expect(root.classes()).toContain("screens--single-pane");
+    expect(root.classes()).not.toContain("screens--two-pane");
+    // The list stays in the DOM (so state survives) but is hidden by layout.
+    expect(wrapper.find("[data-test='screens-list']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='screens-back']").exists()).toBe(true);
+
+    await wrapper.find("[data-test='screens-back']").trigger("click");
+    expect(wrapper.find("[data-test='screens-category']").classes()).not.toContain(
+      "screens--single-pane"
+    );
+  });
+
+  it("shows the screen's name and hardware-status header", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ overrides: { displayName: "Hallway" } })],
+      overrides: { displayName: "Hallway" },
     });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => "new");
-    const w = mount(KiosksSettings);
     await flushPromises();
-    // No selection yet → no header.
-    expect(w.findComponent(KioskStatusHeader).exists()).toBe(false);
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    const header = w.findComponent(KioskStatusHeader);
+    await selectFirst(wrapper);
+    const header = wrapper.findComponent(KioskStatusHeader);
     expect(header.exists()).toBe(true);
-    expect(header.props("appliedVersion")).toBe("old");
-    expect(header.props("desiredVersion")).toBe("new");
-    expect(header.props("kioskId")).toBe("k1");
+    expect(header.props("kioskId")).toBe("Hallway");
+  });
+
+  it("says Same as all screens on inherited rows", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.text()).toContain("Same as all screens");
+    expect(wrapper.find("[data-test='reset-orientation-row']").exists()).toBe(false);
+  });
+
+  it("says Only this screen · Use the shared setting on an overridden row", async () => {
+    const { wrapper } = mountScreens({
+      overrides: { orientation: "portrait", availableScreens: ["home"] },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.text()).toContain("Only this screen");
+    const link = wrapper.find("[data-test='reset-orientation-row']");
+    expect(link.exists()).toBe(true);
+    expect(link.text()).toBe("Use the shared setting");
   });
 });
 
-describe("KiosksSettings — schedule editor", () => {
+describe("ScreensSettings — Name", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  async function selectFirst(overrides = {}) {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [
-        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-      ];
-    });
-    store.fetchOverrides = vi.fn(async () => overrides);
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.displayScheduleEnabled = true;
-    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
-    const w = mount(KiosksSettings);
+  it("writes the displayName override", async () => {
+    const { wrapper, store } = mountScreens();
     await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    return { w, store };
-  }
+    await selectFirst(wrapper);
 
-  it("shows the global schedule as effective and tagged inherited when no override", async () => {
-    const { w } = await selectFirst({});
-    const section = w.get("#section-kiosks-schedule");
-    expect(section.text()).toContain("Same as all screens");
+    await wrapper.find("[data-test='screen-name-input']").setValue("Hallway");
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { displayName: "Hallway" });
   });
 
-  it("editing the grid saves a merged displaySchedule override, preserving unrelated keys", async () => {
-    const { w, store } = await selectFirst({ orientation: "portrait" });
-    const next = [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }];
-    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", next);
+  it("clearing the name drops the override (falls back to hostname, then id)", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { displayName: "Hallway", orientation: "portrait" },
+    });
     await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='screen-name-input']").setValue("");
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
+  });
+});
+
+describe("ScreensSettings — Pages", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("lists every page with Show and Start here, marking the effective start page", async () => {
+    const { wrapper } = mountScreens({ overrides: { defaultScreenId: "photos" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const rows = wrapper.findAll("[data-test='screen-page-row']");
+    expect(rows).toHaveLength(2);
+    const radios = rows.map(row => row.find('input[type="radio"]').element);
+    expect(radios[0].checked).toBe(false);
+    expect(radios[1].checked).toBe(true);
+  });
+
+  it("unchecking Show saves an availableScreens allowlist", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const row = wrapper.findAll("[data-test='screen-page-row']")[1];
+    await row.find('input[type="checkbox"]').setValue(false);
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
-      displaySchedule: next,
+      availableScreens: ["home"],
     });
   });
 
-  it("Use the shared setting on the schedule removes only the schedule keys", async () => {
-    const { w, store } = await selectFirst({
+  it("checking every page again removes the allowlist override", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { availableScreens: ["home"] } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const row = wrapper.findAll("[data-test='screen-page-row']")[1];
+    await row.find('input[type="checkbox"]').setValue(true);
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
+  });
+
+  it("refuses to hide the last shown page", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { availableScreens: ["home"] } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const row = wrapper.findAll("[data-test='screen-page-row']")[0];
+    await row.find('input[type="checkbox"]').setValue(false);
+
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain("Pick at least one page.");
+  });
+
+  it("writes defaultScreenId from Start here", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const row = wrapper.findAll("[data-test='screen-page-row']")[1];
+    await row.find('input[type="radio"]').setValue(true);
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
+      defaultScreenId: "photos",
+    });
+  });
+
+  it("says Only one page so far and still offers Edit pages", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        dashboardScreens: {
+          version: 2,
+          activeScreenId: "home",
+          screens: [{ id: "home", name: "Home", layout: layout() }],
+        },
+      }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='only-one-page']").text()).toBe("Only one page so far.");
+    expect(wrapper.find("[data-test='edit-pages-btn']").text()).toBe("Edit pages");
+  });
+
+  it("Edit pages opens the editor already previewing this screen", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.findComponent(ScreenRegionEditor).props("open")).toBe(false);
+    await wrapper.find("[data-test='edit-pages-btn']").trigger("click");
+    expect(wrapper.findComponent(ScreenRegionEditor).props("open")).toBe(true);
+    expect(wrapper.findComponent(ScreenRegionEditor).props("initialPreviewKiosk")).toBe("kitchen");
+  });
+
+  it("Use the shared setting removes just the pages keys", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: {
+        orientation: "portrait",
+        availableScreens: ["home"],
+        defaultScreenId: "home",
+      },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='reset-default-screen']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      availableScreens: ["home"],
+    });
+
+    await wrapper.find("[data-test='reset-screens-shown']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      orientation: "portrait",
+    });
+  });
+});
+
+describe("ScreensSettings — Display", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("saves orientation, upside down and rotation as overrides", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
+
+    const toggles = wrapper.findAllComponents(ToggleSwitch);
+    const flip = toggles.find(t => t.props("ariaLabel") === "Upside down");
+    flip.vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      orientationFlipped: true,
+    });
+
+    const apply = toggles.find(t => t.props("ariaLabel") === "Rotate the screen output");
+    apply.vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      orientationFlipped: true,
+      applyDisplayRotation: false,
+    });
+  });
+
+  it("updates the live preview orientation as Orientation changes", async () => {
+    const { wrapper } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const preview = () => wrapper.find("[data-test='screen-live-thumbnail']");
+    expect(preview().attributes("data-orientation")).toBe("portrait");
+    expect(wrapper.find("[data-test='screen-live-preview']").text()).toContain("Home");
+  });
+
+  it("shows the reported viewport beside the preview", async () => {
+    const { wrapper } = mountScreens({
+      overrides: { orientation: "portrait" },
+      kiosks: [kiosk({ viewport: { w: 1080, h: 1920 } })],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='screen-live-preview']").text()).toContain("1080×1920");
+  });
+
+  it("Use the shared setting removes only that display key", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { orientation: "portrait", availableScreens: ["home"] },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='reset-orientation-row']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { availableScreens: ["home"] });
+  });
+});
+
+describe("ScreensSettings — Power", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("saves the schedule toggle and grid, and the idle timeout", async () => {
+    const { wrapper, store } = mountScreens({
+      cfg: config({ displayScheduleEnabled: false }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const schedule = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Screen on/off schedule");
+    schedule.vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       displayScheduleEnabled: true,
-      displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
     });
-    await w.find("[data-test='reset-schedule-enabled']").trigger("click");
+
+    // The grid appears once the effective schedule is on.
+    const { wrapper: w2, store: store2 } = mountScreens({
+      cfg: config({
+        displayScheduleEnabled: true,
+        displaySchedule: [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }],
+      }),
+    });
     await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+    await selectFirst(w2);
+    const next = [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }];
+    w2.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", next);
+    await flushPromises();
+    expect(store2.saveOverrides).toHaveBeenCalledWith("kitchen", { displaySchedule: next });
+  });
+
+  it("writes Never as timeout off and any other choice as seconds", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const idle = () =>
+      wrapper
+        .findAllComponents(SelectPill)
+        .find(c => c.props("ariaLabel") === "Turn off when idle");
+
+    idle().vm.$emit("update:modelValue", 0);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      displayTimeoutEnabled: false,
+    });
+
+    idle().vm.$emit("update:modelValue", 1800);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      displayTimeoutEnabled: true,
+      displayTimeout: 1800,
+    });
+  });
+
+  it("offers an existing value that is not in the list as its own option", async () => {
+    const { wrapper } = mountScreens({
+      overrides: { displayTimeoutEnabled: true, displayTimeout: 420 },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    const idle = wrapper
+      .findAllComponents(SelectPill)
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    expect(idle.props("options").map(o => o.label)).toContain("7 min");
+  });
+
+  it("Use the shared setting removes only the power keys", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: {
+        orientation: "portrait",
+        displayScheduleEnabled: true,
+        displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
+      },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='reset-schedule-enabled']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
       displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
     });
   });
-
-  it("has no section-wide Reset to global button left", async () => {
-    const { w } = await selectFirst({ orientation: "portrait" });
-    expect(w.text()).not.toContain("Reset");
-    expect(w.text()).not.toContain("global");
-  });
-
-  it("shows save-failure copy when saveOverrides rejects", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [
-        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-      ];
-    });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.saveOverrides = vi.fn(async () => {
-      throw new Error("boom");
-    });
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.displayScheduleEnabled = true;
-    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", [
-      { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
-    ]);
-    await flushPromises();
-    expect(w.get("#section-kiosks-schedule").text()).toContain("Couldn't save to the server");
-  });
-
-  it("refreshes desiredVersion after a schedule save so Applied becomes Pending", async () => {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    const stale = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [{ id: "k1", hostname: "pi", lastSeen: stale, lastAppliedVersion: "v1" }];
-    });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.saveOverrides = vi.fn(async () => {});
-    // onMounted prefetch → "v1"; select() call → "v1"; post-save refetch → "v2"
-    store.fetchDeviceConfigVersion = vi
-      .fn()
-      .mockResolvedValueOnce("v1") // onMounted prefetch for k1
-      .mockResolvedValueOnce("v1") // select() call
-      .mockResolvedValueOnce("v2"); // post-save refreshDesiredVersion
-    const cfg = useConfigStore();
-    cfg.displayScheduleEnabled = true;
-    cfg.displaySchedule = [{ day: 0, enabled: true, onTime: "06:00", offTime: "22:00" }];
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    // Before save: desiredVersion === "v1", appliedVersion === "v1" → Applied
-    const header = w.findComponent(KioskStatusHeader);
-    expect(header.props("desiredVersion")).toBe("v1");
-    expect(header.props("appliedVersion")).toBe("v1");
-    // Trigger a schedule edit and save
-    w.findComponent(DisplayScheduleGrid).vm.$emit("update:modelValue", [
-      { day: 0, enabled: false, onTime: "07:00", offTime: "23:00" },
-    ]);
-    await flushPromises();
-    // After save: desiredVersion should have been refreshed to "v2" → Pending
-    expect(w.findComponent(KioskStatusHeader).props("desiredVersion")).toBe("v2");
-  });
 });
 
-describe("KiosksSettings — detail order and hardware drawer", () => {
+describe("ScreensSettings — Touch & keyboard", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  async function selectFirst() {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = [
-        { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-        { id: "k2", hostname: "pi2", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-      ];
+  it("saves the touchscreen override and can go back to the shared setting", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const touch = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Touchscreen");
+    touch.vm.$emit("update:modelValue", "off");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      touchControls: "off",
     });
-    store.fetchOverrides = vi.fn(async () => ({}));
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.orientation = "landscape";
-    cfg.orientationFlipped = false;
-    const w = mount(KiosksSettings);
-    await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    return { w };
-  }
 
-  it("orders detail sections Content, then Schedule, then the hardware drawer", async () => {
-    const { w } = await selectFirst();
-    const html = w.html();
-    const iContent = html.indexOf("section-kiosks-content");
-    const iSchedule = html.indexOf("section-kiosks-schedule");
-    const iHardware = html.indexOf("Display hardware");
-    expect(iContent).toBeGreaterThan(-1);
-    expect(iContent).toBeLessThan(iSchedule);
-    expect(iSchedule).toBeLessThan(iHardware);
+    await wrapper.find("[data-test='reset-touchscreen']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { orientation: "portrait" });
   });
 
-  it("puts the orientation editor inside a collapsed drawer that starts closed", async () => {
-    const { w } = await selectFirst();
-    const drawer = w.findComponent(CollapsibleSection);
-    expect(drawer.exists()).toBe(true);
-    expect(drawer.get("section").classes()).not.toContain("expanded");
-    // orientation controls are still present (v-show keeps them mounted)
-    expect(w.find("[data-test='reset-orientation-row']").exists()).toBe(false);
-    expect(w.findComponent({ name: "SegmentedControl" }).exists()).toBe(true);
-  });
-
-  it("re-collapses the drawer when switching kiosks", async () => {
-    const { w } = await selectFirst();
-    const drawer = w.findComponent(CollapsibleSection);
-    await drawer.get("button.section-header").trigger("click"); // expand
-    expect(drawer.get("section").classes()).toContain("expanded");
-    await w.findAll("[data-test='kiosk-card']")[1].trigger("click"); // switch kiosk
+  it("saves the on-screen keyboard override and can go back", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
     await flushPromises();
-    expect(w.findComponent(CollapsibleSection).get("section").classes()).not.toContain("expanded");
-  });
-});
+    await selectFirst(wrapper);
 
-describe("KiosksSettings — Touch & keyboard (CLV-27)", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  const one = [
-    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-  ];
-
-  async function selectKeyboard(overrides = {}, globalMode = "auto") {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = one;
-    });
-    store.fetchOverrides = vi.fn(async () => overrides);
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.onScreenKeyboard = globalMode;
-    const w = mount(KiosksSettings);
+    const osk = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "On-screen keyboard");
+    osk.vm.$emit("update:modelValue", "on");
     await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    return { w, store, cfg };
-  }
-
-  const oskControl = w =>
-    w.findAllComponents(SegmentedControl).find(c => c.props("ariaLabel") === "On-screen keyboard");
-
-  it("adds a Touch & keyboard drawer after Display hardware", async () => {
-    const { w } = await selectKeyboard();
-    const titles = w.findAllComponents(CollapsibleSection).map(c => c.props("title"));
-
-    expect(titles).toEqual(["Display hardware", "Touch & keyboard"]);
-  });
-
-  it("inherits the shared setting and says so", async () => {
-    const { w } = await selectKeyboard({}, "on");
-
-    expect(oskControl(w).props("modelValue")).toBe("on");
-    expect(w.text()).toContain("Same as all screens");
-    expect(w.find("[data-test='osk-use-shared']").exists()).toBe(false);
-  });
-
-  it("shows Only this screen with a way back when overridden", async () => {
-    const { w } = await selectKeyboard({ onScreenKeyboard: "off" }, "auto");
-
-    expect(oskControl(w).props("modelValue")).toBe("off");
-    expect(w.text()).toContain("Only this screen");
-    expect(w.find("[data-test='osk-use-shared']").text()).toBe("Use the shared setting");
-  });
-
-  it("saves an override without dropping other keys", async () => {
-    const { w, store } = await selectKeyboard({ orientation: "portrait" }, "auto");
-
-    oskControl(w).vm.$emit("update:modelValue", "on");
-    await flushPromises();
-
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", {
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
       onScreenKeyboard: "on",
     });
-    expect(w.text()).toContain("Only this screen");
-  });
 
-  it("Use the shared setting removes only the keyboard key", async () => {
-    const { w, store } = await selectKeyboard(
-      { orientation: "portrait", onScreenKeyboard: "off" },
-      "auto"
-    );
-
-    await w.find("[data-test='osk-use-shared']").trigger("click");
+    await wrapper.find("[data-test='osk-use-shared']").trigger("click");
     await flushPromises();
-
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { orientation: "portrait" });
-    expect(w.text()).toContain("Same as all screens");
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { orientation: "portrait" });
   });
 });
 
-// Settings copy audit §3.5 — the kiosk's own rows say where the value came from.
-describe("KiosksSettings copy (§3.5)", () => {
-  const one = [
-    { id: "k1", hostname: "pi", lastSeen: new Date().toISOString(), lastAppliedVersion: null },
-  ];
+describe("ScreensSettings — save failures", () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  async function selectFirst(overrides = {}) {
-    setActivePinia(createPinia());
-    const store = useKiosksStore();
-    store.loadKiosks = vi.fn(async () => {
-      store.kiosks = one;
+  it("shows the failure copy and not Saved. when saveOverrides rejects", async () => {
+    const { wrapper, store } = mountScreens();
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("network error");
     });
-    store.fetchOverrides = vi.fn(async () => overrides);
-    store.saveOverrides = vi.fn(async () => {});
-    store.fetchDeviceConfigVersion = vi.fn(async () => null);
-    const cfg = useConfigStore();
-    cfg.orientation = "landscape";
-    cfg.orientationFlipped = false;
-    const w = mount(KiosksSettings);
+    store.setKioskOverrides = vi.fn();
     await flushPromises();
-    await w.find("[data-test='kiosk-card']").trigger("click");
-    await flushPromises();
-    return { w, store, cfg };
-  }
+    await selectFirst(wrapper);
 
-  it("titles the schedule section with the kiosk name, in plain words", async () => {
-    const { w } = await selectFirst({});
-    const schedule = w.find("#section-kiosks-schedule");
-    expect(schedule.exists()).toBe(true);
-    expect(schedule.find(".settings-section__eyebrow").text()).toBe("k1 · Screen on/off schedule");
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+
+    expect(wrapper.text()).toContain(
+      "Couldn't save to the server. Check the connection and try again."
+    );
+    expect(wrapper.text()).not.toContain("Saved.");
+  });
+});
+
+describe("ScreensSettings — software (CLV-19)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the fleet summary and Update all", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD })],
+      availableVersion: AVAILABLE,
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='kiosk-software-state']").text()).toBe(
+      "1 kiosk can be updated to e4f5a6b."
+    );
+    const updateAll = wrapper.find("[data-test='kiosk-software-update-all']");
+    expect(updateAll.text()).toBe("Update all");
+    store.triggerUpdate = vi.fn(async () => {});
+    await updateAll.trigger("click");
+    await flushPromises();
+    expect(store.triggerUpdate).toHaveBeenCalledWith("kitchen");
   });
 
-  it("offers Use the shared setting on an overridden row and drops just that key", async () => {
-    const { w, store } = await selectFirst({ orientation: "portrait", availableScreens: ["a"] });
-    const link = w.find("[data-test='reset-orientation-row']");
-    expect(link.exists()).toBe(true);
-    expect(link.text()).toBe("Use the shared setting");
-
-    await link.trigger("click");
+  it("shows the per-card software line", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD })],
+      availableVersion: AVAILABLE,
+    });
     await flushPromises();
-    expect(store.saveOverrides).toHaveBeenCalledWith("k1", { availableScreens: ["a"] });
+    expect(wrapper.find("[data-test='kiosk-version-line']").text()).toBe(
+      "Kiosk software a1b2c3d · e4f5a6b available"
+    );
   });
 
-  it("names the rotation rows the way Screen & keyboard does", async () => {
-    const { w } = await selectFirst({});
-    const labels = w.findAllComponents(SettingRow).map(r => r.props("label"));
-    expect(labels).toContain("Upside down");
-    expect(labels).toContain("Rotate the screen output");
-    expect(labels).not.toContain("Flip 180°");
-    expect(labels).not.toContain("Apply rotation");
+  it("moves Update into the screen's Software section and calls triggerUpdate", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD })],
+      availableVersion: AVAILABLE,
+    });
+    store.triggerUpdate = vi.fn(async () => {});
+    await flushPromises();
+    // No update action in the list before a screen is opened.
+    expect(wrapper.find("[data-test='kiosk-update-btn']").exists()).toBe(false);
+
+    await selectFirst(wrapper);
+    const btn = wrapper.find("[data-test='kiosk-update-btn']");
+    expect(btn.text()).toBe("Update");
+    await btn.trigger("click");
+    await flushPromises();
+    expect(store.triggerUpdate).toHaveBeenCalledWith("kitchen");
+  });
+
+  it("explains a python-too-old failure with no Update button", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({
+          agentVersion: OLD,
+          agentUpdateStatus: "error",
+          agentUpdateMessage: "device python < 3.9; keeping current agent",
+        }),
+      ],
+      availableVersion: AVAILABLE,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='screen-software-state']").text()).toContain(
+      "update needs a newer OS"
+    );
+    expect(wrapper.text()).toContain(
+      "Reinstall this kiosk with a current Raspberry Pi OS, then update."
+    );
+    expect(wrapper.find("[data-test='kiosk-update-btn']").exists()).toBe(false);
+  });
+
+  it("says a browser-only screen has no kiosk software", async () => {
+    const { wrapper } = mountScreens({ kiosks: [kiosk({ agentVersion: null })] });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='screen-software-empty']").text()).toContain(
+      "no kiosk software to update"
+    );
+  });
+});
+
+describe("ScreensSettings — decision C placement", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("keeps screen rows in All screens and moves the remote rows to Dashboard", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+
+    // All screens: Display, Power (with the reboot combo) and Touch & keyboard.
+    expect(wrapper.find("#section-layout").exists()).toBe(true);
+    expect(wrapper.find("#section-device-power").exists()).toBe(true);
+    expect(wrapper.find("#section-device-keyboard").exists()).toBe(true);
+    expect(rowByLabel(wrapper, "Touchscreen")).toBeTruthy();
+    expect(rowByLabel(wrapper, "Orientation")).toBeTruthy();
+    expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
+    expect(wrapper.find("#section-device-power").text()).toContain("Power");
+
+    // Remote & buttons and key-press feedback are not here any more.
+    expect(rowByLabel(wrapper, "Show button presses")).toBeUndefined();
+    expect(rowByLabel(wrapper, "Button bindings")).toBeUndefined();
   });
 });

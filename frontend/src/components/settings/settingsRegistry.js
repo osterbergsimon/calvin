@@ -13,15 +13,14 @@ export const settingsCategories = [
     id: "dashboard",
     label: "Dashboard",
     icon: "📐",
-    subtitle: "Pages · clock bar · theme · touch",
+    subtitle: "Pages · clock bar · theme",
   },
   {
-    id: "device",
-    label: "Screen & keyboard",
-    icon: "🖥️",
-    subtitle: "Orientation · power · keyboard",
+    id: "screens",
+    label: "Screens",
+    icon: "📺",
+    subtitle: "Pages · rotation · power · touch",
   },
-  { id: "kiosks", label: "Kiosks", icon: "📺", subtitle: "Per-device settings" },
   { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage" },
   {
     id: "maintenance",
@@ -38,19 +37,21 @@ export const settingsCategories = [
 ];
 
 // A retired category still resolves, so a stored session value or an old link
-// never falls back to the default. Clock Bar is now part of Dashboard.
+// never falls back to the default. Clock Bar is now part of Dashboard; Kiosks
+// and Screen & keyboard are now one Screens category.
 export const settingsCategoryAliases = {
   "clock-bar": "dashboard",
+  device: "screens",
+  kiosks: "screens",
 };
 
 export const settingsDestinations = [
   {
     id: "dashboard-layout",
     label: "Screen orientation",
-    path: "Screen & keyboard / Screen orientation",
-    category: "device",
-    tabKey: "settings_tab_device",
-    tab: "layout",
+    path: "Screens / All screens · Display",
+    category: "screens",
+    section: "layout",
     keywords: ["display", "orientation", "flip", "rotation", "landscape", "portrait"],
   },
   {
@@ -104,20 +105,26 @@ export const settingsDestinations = [
   },
   {
     id: "dashboard-kiosk-focus",
-    label: "Touch and focus",
-    path: "Dashboard / Touch & focus",
+    label: "Focus and remote",
+    path: "Dashboard / Focus & remote",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "kiosk-touch-focus",
     keywords: [
       "touch",
-      "touchscreen",
       "focus light",
       "spotlight",
       "dim",
       "focus",
       "dashboard size",
       "touch size",
+      "remote",
+      "buttons",
+      "button bindings",
+      "key-press",
+      "key press",
+      "keyboard feedback",
+      "notifications",
     ],
   },
   {
@@ -238,35 +245,44 @@ export const settingsDestinations = [
   },
   {
     id: "kiosks",
-    label: "Add and manage kiosks",
-    path: "Kiosks",
-    category: "kiosks",
-    keywords: ["kiosk", "add kiosk", "install", "raspberry pi", "screen", "device", "qr"],
+    label: "Add and manage screens",
+    path: "Screens",
+    category: "screens",
+    section: "screens-list",
+    keywords: [
+      "kiosk",
+      "kiosks",
+      "screen",
+      "screens",
+      "add screen",
+      "install",
+      "raspberry pi",
+      "device",
+      "qr",
+    ],
   },
   {
     id: "kiosks-software",
     label: "Update kiosk software",
-    path: "Kiosks / Kiosk software",
-    category: "kiosks",
-    section: "kiosks-list",
+    path: "Screens / Kiosk software",
+    category: "screens",
+    section: "screens-list",
     keywords: ["kiosk", "agent", "update", "software", "version", "bundle", "fleet"],
   },
   {
     id: "device-power",
     label: "Power, display schedule, and timeout",
-    path: "Screen & keyboard / Screen power",
-    category: "device",
-    tabKey: "settings_tab_device",
-    tab: "power",
+    path: "Screens / All screens · Power",
+    category: "screens",
+    section: "device-power",
     keywords: ["power", "display", "schedule", "timeout", "screen"],
   },
   {
     id: "device-keyboard",
     label: "On-screen keyboard and layout",
-    path: "Screen & keyboard / On-screen keyboard",
-    category: "device",
-    tabKey: "settings_tab_device",
-    tab: "keyboard",
+    path: "Screens / All screens · Touch & keyboard",
+    category: "screens",
+    section: "device-keyboard",
     // "language" stays a search keyword only: people who think of keyboard
     // layouts as languages still find it, but the setting is a layout.
     keywords: [
@@ -276,6 +292,8 @@ export const settingsDestinations = [
       "osk",
       "layout",
       "keyboard layout",
+      "touchscreen",
+      "touch",
       "language",
       "svenska",
       "åäö",
@@ -290,10 +308,9 @@ export const settingsDestinations = [
   {
     id: "device-notifications",
     label: "Remote and buttons",
-    path: "Screen & keyboard / Remote & buttons",
-    category: "device",
-    tabKey: "settings_tab_device",
-    tab: "notifications",
+    path: "Dashboard / Focus & remote",
+    category: "dashboard",
+    section: "kiosk-touch-focus",
     keywords: [
       "notifications",
       "key-press",
@@ -301,15 +318,17 @@ export const settingsDestinations = [
       "keyboard feedback",
       "mode indicator",
       "auto-hide",
+      "remote",
+      "buttons",
+      "button bindings",
     ],
   },
   {
     id: "device-reboot",
     label: "Reboot button combo",
-    path: "Screen & keyboard / Remote & buttons",
-    category: "device",
-    tabKey: "settings_tab_device",
-    tab: "reboot",
+    path: "Screens / All screens · Power",
+    category: "screens",
+    section: "device-power",
     keywords: ["reboot", "restart", "combo", "keys"],
   },
   {

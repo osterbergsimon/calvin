@@ -5,15 +5,17 @@
       :class="overridden ? 'kiosk-scope__label--own' : 'kiosk-scope__label--shared'"
       >{{ overridden ? "Only this screen" : "Same as all screens" }}</span
     >
-    <button
-      v-if="overridden"
-      type="button"
-      class="kiosk-scope__reset"
-      :data-test="resetTest"
-      @click="emit('reset')"
-    >
-      Use the shared setting
-    </button>
+    <template v-if="overridden">
+      <span class="kiosk-scope__sep" aria-hidden="true">·</span>
+      <button
+        type="button"
+        class="kiosk-scope__reset"
+        :data-test="resetTest"
+        @click="emit('reset')"
+      >
+        Use the shared setting
+      </button>
+    </template>
   </p>
 </template>
 
@@ -41,7 +43,7 @@ const emit = defineEmits(["reset"]);
 .kiosk-scope {
   display: flex;
   align-items: baseline;
-  gap: 0.75rem;
+  gap: 0.25rem 0.4rem;
   flex-wrap: wrap;
 }
 .kiosk-scope__label--shared {

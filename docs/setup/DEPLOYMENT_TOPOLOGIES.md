@@ -33,7 +33,7 @@ The screen on/off schedule needs `vcgencmd`/`xset` on the host, which the
 container does not have, so setup also installs the same
 `calvin-display-agent.service` the kiosk Pis use, pointed at
 `http://localhost:$CALVIN_PORT` (it reads the global config; it does not show up
-under Settings → Kiosks). Rotation and output settings go in
+under Settings → Screens). Rotation and output settings go in
 `/etc/default/calvin-kiosk` exactly as on a kiosk Pi.
 
 ## Mode B — Remote backend + kiosk Pi
@@ -176,8 +176,8 @@ old backend-side `display_orientation_service`, which cannot reach a remote kios
 The small Python display-agent and its systemd units that `setup-kiosk.sh`
 installs can be updated remotely without re-running setup or SSHing into the Pi.
 
-**Flow:** Settings → Kiosks → Kiosk software → **Update all** (or **Update** on
-one kiosk) → the backend sets a per-kiosk `agentUpdateRequested` flag → the
+**Flow:** Settings → Screens → Kiosk software → **Update all** (or **Update** in one screen's
+**Software** section) → the backend sets a per-kiosk `agentUpdateRequested` flag → the
 kiosk picks it up on its next config poll → it fires the root oneshot
 `calvin-kiosk-update.service` →
 `update-kiosk.sh` fetches the bundle from
@@ -191,7 +191,7 @@ access and carries no full repo checkout. Six files make up the bundle: the
 display-agent script, three systemd units, the updater script, and the oneshot
 update service unit.
 
-The Kiosks list summarises the fleet in a **Kiosk software** row: how many
+The Screens list summarises the fleet in a **Kiosk software** row: how many
 kiosks can be updated to the available bundle, with **Update all** in one click.
 Each kiosk card shows its running version and the outcome of its last update; a
 kiosk whose OS/Python is too old is marked "update needs a newer OS" and is
@@ -249,13 +249,13 @@ Set a kiosk's orientation with `PUT /api/kiosks/<id>/overrides`. The device-loca
 `CALVIN_DISPLAY_ROTATION` env still **wins** as a break-glass override; the schedule is likewise
 now per-kiosk (each kiosk reads its own effective config).
 
-**Managing kiosks from the UI.** Settings → **Kiosks** lists every kiosk that has connected (id,
-hostname, last-seen, Online/Offline). Select one to set its **orientation** override; the change
-saves immediately and the kiosk applies it at its next check-in (~30s). "Reset to global" clears the
-override so the kiosk inherits the global orientation again. Below orientation, **Content** lets you
-pick which dashboard screens that kiosk may show (a per-kiosk allowlist) and which screen it boots
-into; leaving it untouched means the kiosk shows all global screens. "Reset content to global"
-clears the per-kiosk selection.
+**Managing screens from the UI.** Settings → **Screens** lists every screen that has connected
+(name, id, last-seen, Online/Offline). Select one to open its page: **Name** and **Pages** (which
+pages it shows and which one it starts on), **Display** (orientation, upside down, rotation),
+**Power**, **Touch & keyboard** and **Software**. Every row says **Same as all screens** or **Only
+this screen**, and **Use the shared setting** clears that one override so the screen inherits again.
+The shared defaults live under the **All screens** card on the same page. Changes save immediately
+and the screen applies them at its next check-in (~30s).
 
 ### Changing the backend URL later
 
@@ -280,7 +280,7 @@ at the home server). For that case the backend already exposes
 ### Public URL (phone setup and Add kiosk)
 
 Settings shows the server's address as a QR code ("set up from your phone"),
-and **Kiosks › Add kiosk** prints `curl -fsSL <server>/api/kiosks/install.sh | sudo bash`.
+and **Screens › + Add a screen** prints `curl -fsSL <server>/api/kiosks/install.sh | sudo bash`.
 The address comes from `PUBLIC_URL` when set, otherwise from the browser's own
 address, falling back to the LAN IP the backend detects for itself. That last
 guess is wrong in Docker (it sees the container IP), so on Docker/Unraid set

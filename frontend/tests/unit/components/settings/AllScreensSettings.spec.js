@@ -1,9 +1,9 @@
-// frontend/tests/unit/components/settings/DeviceSettings.spec.js
+// frontend/tests/unit/components/settings/AllScreensSettings.spec.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
-import DeviceSettings from "@/components/settings/categories/DeviceSettings.vue";
+import AllScreensSettings from "@/components/settings/categories/AllScreensSettings.vue";
 import { useConfigStore } from "@/stores/config";
 import { forgetOskHardware, learnHardwareKeyboard } from "@/composables/useOnScreenKeyboard";
 
@@ -30,30 +30,34 @@ const baseConfig = {
   modeIndicatorTimeout: 5,
 };
 
-describe("DeviceSettings", () => {
+describe("AllScreensSettings", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
     forgetOskHardware();
   });
 
-  it("renders Screen & keyboard sections; hardware moved to System", () => {
-    const wrapper = mount(DeviceSettings, {
+  it("renders the shared Display, Power and Touch & keyboard sections only", () => {
+    const wrapper = mount(AllScreensSettings, {
       props: { config: baseConfig },
       global: { stubs },
     });
-    for (const id of ["layout", "device-power", "device-keyboard", "device-buttons"]) {
+    for (const id of ["layout", "device-power", "device-keyboard"]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+    // Remote & buttons and key-press feedback moved to Dashboard › Focus & remote.
+    expect(wrapper.find("#section-device-buttons").exists()).toBe(false);
     // version numbers now live under System › Versions & status
     expect(wrapper.find("#section-device-hardware").exists()).toBe(false);
-    // the standalone reboot section is gone; RebootCombo now lives in Keyboard
+    // the standalone reboot section is gone; RebootCombo now lives under Power
     expect(wrapper.find("#section-device-reboot").exists()).toBe(false);
-    expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
+    expect(
+      wrapper.find("#section-device-power").findComponent({ name: "RebootCombo" }).exists()
+    ).toBe(true);
   });
 
-  it("orders the sections Screen orientation, Screen power, On-screen keyboard, Remote & buttons", () => {
-    const wrapper = mount(DeviceSettings, {
+  it("orders the sections All screens · Display, Power, Touch & keyboard", () => {
+    const wrapper = mount(AllScreensSettings, {
       props: { config: baseConfig },
       global: { stubs },
     });
@@ -61,24 +65,20 @@ describe("DeviceSettings", () => {
       "section-layout",
       "section-device-power",
       "section-device-keyboard",
-      "section-device-buttons",
     ]);
     expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe(
-      "Screen orientation"
+      "All screens · Display"
     );
     expect(wrapper.find("#section-device-power .settings-section__eyebrow").text()).toBe(
-      "Screen power"
+      "All screens · Power"
     );
     expect(wrapper.find("#section-device-keyboard .settings-section__eyebrow").text()).toBe(
-      "On-screen keyboard"
-    );
-    expect(wrapper.find("#section-device-buttons .settings-section__eyebrow").text()).toBe(
-      "Remote & buttons"
+      "All screens · Touch & keyboard"
     );
   });
 
-  it("emits orientation changes from the moved Screen orientation section", () => {
-    const wrapper = mount(DeviceSettings, {
+  it("emits orientation changes from the moved Display section", () => {
+    const wrapper = mount(AllScreensSettings, {
       props: { config: baseConfig },
       global: { stubs },
     });
@@ -89,22 +89,10 @@ describe("DeviceSettings", () => {
     expect(wrapper.emitted("update:config").some(c => c[0].orientation === "portrait")).toBe(true);
   });
 
-  it("emits update:config when keyboard feedback is toggled (notifications)", () => {
-    const wrapper = mount(DeviceSettings, {
-      props: { config: baseConfig },
-      global: { stubs },
-    });
-    const toggles = wrapper.findAllComponents({ name: "ToggleSwitch" });
-    for (const t of toggles) t.vm.$emit("update:modelValue", false);
-    expect(wrapper.emitted("update:config").some(c => c[0].keyboardFeedbackEnabled === false)).toBe(
-      true
-    );
-  });
-
   it("offers Auto / Always / Never for the on-screen keyboard", () => {
     const config = useConfigStore();
     config.onScreenKeyboard = "auto";
-    const wrapper = mount(DeviceSettings, {
+    const wrapper = mount(AllScreensSettings, {
       props: {
         config: { ...baseConfig, onScreenKeyboard: "auto" },
       },
@@ -122,7 +110,7 @@ describe("DeviceSettings", () => {
   });
 
   it("offers one Turn off when idle choice instead of a toggle plus seconds", () => {
-    const wrapper = mount(DeviceSettings, {
+    const wrapper = mount(AllScreensSettings, {
       props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 900 } },
       global: { stubs },
     });
@@ -143,7 +131,7 @@ describe("DeviceSettings", () => {
   });
 
   it("passes config through to the folded-in RebootCombo", () => {
-    const wrapper = mount(DeviceSettings, {
+    const wrapper = mount(AllScreensSettings, {
       props: { config: baseConfig },
       global: { stubs },
     });
@@ -155,7 +143,7 @@ describe("DeviceSettings", () => {
   describe("on-screen keyboard layout rows (§7)", () => {
     const mountSettings = (overrides = {}) => {
       useConfigStore().onScreenKeyboard = overrides.onScreenKeyboard ?? "auto";
-      return mount(DeviceSettings, {
+      return mount(AllScreensSettings, {
         props: {
           config: { ...baseConfig, onScreenKeyboard: "auto", ...overrides },
         },
@@ -326,7 +314,7 @@ describe("DeviceSettings", () => {
     const mountRow = (mode, { learned = false } = {}) => {
       useConfigStore().onScreenKeyboard = mode;
       if (learned) learnHardwareKeyboard();
-      return mount(DeviceSettings, {
+      return mount(AllScreensSettings, {
         props: { config: { ...baseConfig, onScreenKeyboard: mode } },
         global: { stubs },
       });
@@ -390,7 +378,7 @@ describe("DeviceSettings", () => {
 });
 
 // Settings copy audit §3.3 — verbatim.
-describe("DeviceSettings copy (§3.3)", () => {
+describe("AllScreensSettings copy (§3.3)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
@@ -409,13 +397,13 @@ describe("DeviceSettings copy (§3.3)", () => {
     ],
     ["Screen on/off schedule", "Turns the screen off and on at set times."],
     [
-      "Show button presses",
-      "A short label appears when a remote or keyboard button does something.",
+      "Touchscreen",
+      "Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse.",
     ],
   ];
 
   it.each(COPY)("%s says exactly what it does", (label, description) => {
-    const w = mount(DeviceSettings, {
+    const w = mount(AllScreensSettings, {
       props: { config: { ...baseConfig, displayScheduleEnabled: true } },
       global: { stubs },
     });
@@ -423,7 +411,7 @@ describe("DeviceSettings copy (§3.3)", () => {
   });
 
   it("calls the Pi's own zone the server's timezone", () => {
-    const w = mount(DeviceSettings, {
+    const w = mount(AllScreensSettings, {
       props: { config: { ...baseConfig, displayScheduleEnabled: true } },
       global: { stubs },
     });
@@ -435,7 +423,7 @@ describe("DeviceSettings copy (§3.3)", () => {
   });
 
   it("writes Never as timeout off and any other choice as seconds", async () => {
-    const w = mount(DeviceSettings, {
+    const w = mount(AllScreensSettings, {
       props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 900 } },
       global: { stubs },
     });
@@ -453,7 +441,7 @@ describe("DeviceSettings copy (§3.3)", () => {
   });
 
   it("shows an existing value that is not in the list as its own option", () => {
-    const w = mount(DeviceSettings, {
+    const w = mount(AllScreensSettings, {
       props: { config: { ...baseConfig, displayTimeoutEnabled: true, displayTimeout: 420 } },
       global: { stubs },
     });
@@ -464,8 +452,47 @@ describe("DeviceSettings copy (§3.3)", () => {
   });
 
   it("shows the screen-now buttons in the order Turn off, Turn on", () => {
-    const w = mount(DeviceSettings, { props: { config: baseConfig }, global: { stubs } });
+    const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
     const buttons = w.findAll(".device-actions button").map(b => b.text());
     expect(buttons).toEqual(["Turn off", "Turn on"]);
+  });
+});
+
+// Settings copy audit §2 — Touchscreen moved here from Dashboard with
+// decision C (it is a property of the screen, not the dashboard).
+describe("AllScreensSettings — Touchscreen (§2)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+  });
+
+  it("chips Touchscreen and the on-screen keyboard as This screen", () => {
+    const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
+    const chips = w.findAll(".setting-scope-chip");
+    expect(chips.map(chip => chip.text())).toEqual(["This screen", "This screen"]);
+    expect(w.find("#section-device-keyboard").text()).toContain("Touchscreen");
+  });
+
+  it("stores Touchscreen in this browser, not on the server", async () => {
+    const w = mount(AllScreensSettings, { props: { config: baseConfig }, global: { stubs } });
+    const touch = w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Touchscreen");
+    touch.vm.$emit("update:modelValue", "off");
+    await flushPromises();
+
+    expect(window.localStorage.getItem("calvin-touch-controls")).toBe("off");
+    expect(w.emitted("update:config") || []).not.toContainEqual([{ touchControls: "off" }]);
+  });
+
+  it("reads the server value while this browser has no choice of its own", () => {
+    const w = mount(AllScreensSettings, {
+      props: { config: { ...baseConfig, touchControls: "on" } },
+      global: { stubs },
+    });
+    const touch = w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Touchscreen");
+    expect(touch.props("modelValue")).toBe("on");
   });
 });

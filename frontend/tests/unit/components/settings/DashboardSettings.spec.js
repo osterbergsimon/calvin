@@ -25,6 +25,7 @@ const stubs = {
   TypefacePicker: true,
   ClockBarFontSizePicker: true,
   ClockBarItemsTab: true,
+  KeyboardTab: true,
 };
 
 const sectionIds = wrapper =>
@@ -78,23 +79,28 @@ describe("DashboardSettings", () => {
     expect(w.emitted("update:config").some(c => c[0].showUI === false)).toBe(true);
   });
 
-  it("splits the touch story into Controls and Touch & focus", () => {
+  it("splits the touch story into Controls and Focus & remote", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const labels = w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"));
     // Controls: what the wall shows.
     expect(labels).toContain("Hide controls");
     expect(labels).toContain("Keep the clock bar when hidden");
     expect(labels).toContain("Tap anywhere to show controls");
-    // Touch & focus: what reacts to touches and which region is active.
-    expect(labels).toContain("Touchscreen");
+    // Focus & remote: focus, dashboard size and the remote (decision C).
     expect(labels).toContain("Dashboard size");
     expect(labels).toContain("Focus light");
     expect(labels).toContain("Dim other regions");
+    expect(labels).toContain("Show button presses");
+    expect(labels).toContain("Label size");
+    expect(labels).toContain("Hide label after");
+    // Touchscreen moved to Screens › All screens · Touch & keyboard.
+    expect(labels).not.toContain("Touchscreen");
     expect(labels).not.toContain("Touch controls");
     expect(w.find("#section-kiosk-touch .settings-section__eyebrow").text()).toBe("Controls");
     expect(w.find("#section-kiosk-touch-focus .settings-section__eyebrow").text()).toBe(
-      "Touch & focus"
+      "Focus & remote"
     );
+    expect(w.findComponent({ name: "KeyboardTab" }).exists()).toBe(true);
   });
 
   it("emits clockBarShowInKiosk from the moved keep-clock-bar toggle", () => {
@@ -122,13 +128,13 @@ describe("DashboardSettings copy (§3.2)", () => {
     ["Room name", 'Shown in the clock bar, e.g. "Kitchen".'],
     ["Hide controls", "Hides the ⋯ menu and region headers for a calm wall display."],
     ["Tap anywhere to show controls", "A tap on calendar or photos brings controls back."],
-    [
-      "Touchscreen",
-      "Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse.",
-    ],
     ["Dashboard size", "Size of labels and touch buttons on the dashboard."],
     ["Focus light", "Outlines the region the remote or arrow keys will act on."],
     ["Dim other regions", "Dims the rest while the focus light is on."],
+    [
+      "Show button presses",
+      "A short label appears when a remote or keyboard button does something.",
+    ],
   ];
 
   it.each(COPY)("%s says exactly what it does", (label, description) => {
@@ -201,18 +207,19 @@ describe("DashboardSettings copy (§3.2)", () => {
   });
 });
 
-// Settings copy audit §2 — the two per-screen rows.
+// Settings copy audit §2 — the per-screen Settings text size row stays here.
+// Touchscreen moved to Screens with decision C.
 describe("DashboardSettings per-screen settings (§2)", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
   });
 
-  it("chips Settings text size and Touchscreen as This screen", () => {
+  it("chips Settings text size as This screen", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const chips = w.findAll(".setting-scope-chip");
-    expect(chips).toHaveLength(2);
-    expect(chips.every(c => c.text() === "This screen")).toBe(true);
+    expect(chips).toHaveLength(1);
+    expect(chips[0].text()).toBe("This screen");
   });
 
   it("stores Settings text size in this browser, not on the server", async () => {
@@ -228,27 +235,11 @@ describe("DashboardSettings per-screen settings (§2)", () => {
     expect(w.emitted("update:config") || []).not.toContainEqual([{ uiSize: "large" }]);
   });
 
-  it("stores Touchscreen in this browser, not on the server", async () => {
-    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    const touch = w
-      .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Touchscreen");
-    touch.vm.$emit("update:modelValue", "off");
-    await flushPromises();
-
-    expect(window.localStorage.getItem("calvin-touch-controls")).toBe("off");
-    expect(w.emitted("update:config") || []).not.toContainEqual([{ touchControls: "off" }]);
-  });
-
   it("reads the server value while this browser has no choice of its own", () => {
     const w = mount(DashboardSettings, {
-      props: { config: { ...baseConfig(), touchControls: "on", uiSize: "compact" } },
+      props: { config: { ...baseConfig(), uiSize: "compact" } },
       global: { stubs },
     });
-    const touch = w
-      .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Touchscreen");
-    expect(touch.props("modelValue")).toBe("on");
     const size = w
       .findAllComponents({ name: "SegmentedControl" })
       .find(c => c.props("ariaLabel") === "Settings text size");
