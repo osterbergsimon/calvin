@@ -56,6 +56,7 @@ describe("settings registry", () => {
       "device-reboot",
       "device-hardware",
       "security-admin",
+      "security-api-keys",
       "maintenance-updates",
       "maintenance-backup",
       "maintenance-diagnostics",

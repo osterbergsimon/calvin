@@ -4,9 +4,11 @@ All endpoints here are same-origin-checked by the Host/Origin middleware and are
 registered by :func:`app.security.install.install_security` at prefix ``/api``.
 """
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from typing import Literal
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.security.admin_auth import (
     COOKIE_MAX_AGE,
@@ -15,7 +17,9 @@ from app.security.admin_auth import (
     get_admin_store,
     login_limiter,
 )
-from app.security.route_policy import admin_error, is_admin
+from app.security.api_keys import MAX_NAME_LEN, DuplicateKeyName, get_api_key_store
+from app.security.route_policy import admin_error, is_admin_session, request_api_key
+from app.utils.host_control import host_control_enabled
 
 router = APIRouter()
 
@@ -62,7 +66,7 @@ def _set_admin_cookie(response: Response, value: str) -> None:
 async def auth_status(request: Request):
     """Whether an admin password exists and whether this client has a session."""
     store = get_admin_store()
-    return {"configured": store.is_configured(), "authenticated": is_admin(request)}
+    return {"configured": store.is_configured(), "authenticated": is_admin_session(request)}
 
 
 @router.post("/auth/setup")
@@ -132,7 +136,9 @@ async def auth_change_password(body: ChangePasswordBody, request: Request, respo
     if wait:
         raise _rate_limited(wait)
     store = get_admin_store()
-    if not is_admin(request):
+    if not is_admin_session(request):
+        if request_api_key(request) is not None:
+            raise _session_required()
         raise admin_error(store.is_configured())
     if not store.verify_password(body.current):
         login_limiter.record_failure(ip)
@@ -155,3 +161,82 @@ async def auth_change_password(body: ChangePasswordBody, request: Request, respo
     logger.info("Admin password changed; other sessions signed out")
     _set_admin_cookie(response, store.issue_cookie())
     return {"ok": True}
+
+
+# -- API keys (CLV-32) --------------------------------------------------------
+
+
+class CreateKeyBody(BaseModel):
+    name: str
+    scope: Literal["read", "admin", "host"]
+
+    @field_validator("name")
+    @classmethod
+    def _name_ok(cls, value: str) -> str:
+        value = value.strip()
+        if not value or len(value) > MAX_NAME_LEN:
+            raise ValueError(f"Name must be 1 to {MAX_NAME_LEN} characters")
+        return value
+
+
+def _session_required() -> HTTPException:
+    return HTTPException(
+        status_code=403,
+        detail={
+            "code": "session_required",
+            "message": "API keys can only be managed from an admin session, not with a key.",
+        },
+    )
+
+
+async def require_admin_session(request: Request) -> None:
+    """Key management needs the admin cookie; no key, whatever its scope, qualifies."""
+    if request_api_key(request) is not None:
+        raise _session_required()
+    if not is_admin_session(request):
+        raise admin_error(get_admin_store().is_configured())
+
+
+@router.get("/auth/keys", dependencies=[Depends(require_admin_session)])
+async def list_api_keys():
+    """Active keys, newest first. Never the secret or its hash."""
+    return {"keys": get_api_key_store().list()}
+
+
+@router.post("/auth/keys", status_code=201, dependencies=[Depends(require_admin_session)])
+async def create_api_key(body: CreateKeyBody):
+    """Mint a key. The response is the only time the secret is ever sent."""
+    if body.scope == "host" and not host_control_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "host_control_disabled",
+                "message": "Host control keys are unavailable: this Calvin doesn't control its machine.",
+            },
+        )
+    try:
+        record, secret = get_api_key_store().create(body.name, body.scope)
+    except DuplicateKeyName:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "duplicate_name",
+                "message": f"You already have a key called {body.name}.",
+            },
+        ) from None
+    logger.info("API key created: {} ({}, {})", record["name"], record["scope"], record["prefix"])
+    return {"key": record, "secret": secret}
+
+
+@router.delete(
+    "/auth/keys/{key_id}", status_code=204, dependencies=[Depends(require_admin_session)]
+)
+async def revoke_api_key(key_id: str):
+    """Revoke at once; the next request with that key is a 401."""
+    if not get_api_key_store().revoke(key_id):
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "key_not_found", "message": "No such API key."},
+        )
+    logger.info("API key revoked: {}", key_id)
+    return Response(status_code=204)

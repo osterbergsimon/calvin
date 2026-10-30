@@ -2,6 +2,8 @@
   <div class="security-settings">
     <AdminAccessSection />
 
+    <ApiKeysSection />
+
     <SettingsSection id="security-sealed" title="Sealed mode">
       <SettingRow
         label="Sealed mode"
@@ -77,6 +79,7 @@ import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import AdminAccessSection from "@/components/settings/categories/security/AdminAccessSection.vue";
+import ApiKeysSection from "@/components/settings/categories/security/ApiKeysSection.vue";
 
 const store = useSecurityStore();
 const origins = ref([]);

@@ -164,7 +164,16 @@ class HostOriginMiddleware:
 
         method = scope.get("method", "GET").upper()
         path = scope.get("path", "")
-        if method in UNSAFE_METHODS and path.startswith("/api") and not settings.cors_allow_all:
+        # A bearer key can't be forged cross-site (the header needs a CORS
+        # preflight, and the route policy then ignores any cookie), so only the
+        # cookie path needs the Origin check. The Host check above still applies.
+        has_bearer = headers.get("authorization", "").lower().startswith("bearer ")
+        if (
+            method in UNSAFE_METHODS
+            and path.startswith("/api")
+            and not settings.cors_allow_all
+            and not has_bearer
+        ):
             cors_origins = [
                 value.strip() for value in settings.cors_origins.split(",") if value.strip()
             ]

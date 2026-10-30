@@ -108,3 +108,19 @@ def test_policy_tables_reference_real_routes():
     missing_reads = sorted(path for path in ADMIN_READS if ("GET", path) not in index)
     assert missing_writes == []
     assert missing_reads == []
+
+
+def test_host_routes_match_the_routes_that_call_require_host_control():
+    """A new host-acting route must be added to HOST_ROUTES, or API keys of lesser scope reach it."""
+    import inspect
+
+    from app.security.route_policy import HOST_ROUTES
+
+    guarded = {
+        (method, route.path_format)
+        for route in main_app.routes
+        if isinstance(route, APIRoute)
+        and "require_host_control(" in inspect.getsource(route.endpoint)
+        for method in route.methods
+    }
+    assert guarded == set(HOST_ROUTES)

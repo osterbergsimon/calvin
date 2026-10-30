@@ -24,6 +24,50 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/keys": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Api Keys
+     * @description Active keys, newest first. Never the secret or its hash.
+     */
+    get: operations["list_api_keys_api_auth_keys_get"];
+    put?: never;
+    /**
+     * Create Api Key
+     * @description Mint a key. The response is the only time the secret is ever sent.
+     */
+    post: operations["create_api_key_api_auth_keys_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/keys/{key_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Revoke Api Key
+     * @description Revoke at once; the next request with that key is a 401.
+     */
+    delete: operations["revoke_api_key_api_auth_keys__key_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/auth/login": {
     parameters: {
       query?: never;
@@ -2265,6 +2309,16 @@ export interface components {
     } & {
       [key: string]: unknown;
     };
+    /** CreateKeyBody */
+    CreateKeyBody: {
+      /** Name */
+      name: string;
+      /**
+       * Scope
+       * @enum {string}
+       */
+      scope: "read" | "admin" | "host";
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -2477,6 +2531,88 @@ export interface operations {
         };
         content: {
           "application/json": unknown;
+        };
+      };
+    };
+  };
+  list_api_keys_api_auth_keys_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  create_api_key_api_auth_keys_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateKeyBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revoke_api_key_api_auth_keys__key_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        key_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
