@@ -109,6 +109,13 @@ jobs:
           fi
           echo "All scripts/tests/*.sh passed ✓"
 
+      - name: Run kiosk agent unit tests
+        # deploy/kiosk-agent/test_display_agent.py is stdlib-only + pytest, and
+        # covers the display agent (display power, rotation, crash recovery).
+        run: |
+          python3 -m pip install --quiet pytest
+          python3 -m pytest -q deploy/kiosk-agent/test_display_agent.py
+
   test-dependency-installation:
     name: Test Dependency Installation
     runs-on: ubuntu-latest

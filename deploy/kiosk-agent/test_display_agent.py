@@ -901,3 +901,799 @@ def test_apply_mode_dispatches_on_stack(monkeypatch):
     assert agent.apply_mode("HDMI-1", "1920x1080") == ["wlr-randr"]
     # Neither configured: no-op on both stacks.
     assert agent.apply_mode(None, None) is None
+
+
+# --- crash-page recovery (CLV-25) -------------------------------------------
+# Only the renderer died on the Pi 3B+, not the browser, so systemd's Restart=
+# never fired and the kiosk stayed on "Aw, Snap!". The agent probes Chromium's
+# remote-debugging endpoint on localhost and restarts the kiosk unit when the
+# page stops answering. Every helper takes its I/O as an argument so the suite
+# never opens a socket, runs systemctl or signals a process.
+
+import signal  # noqa: E402  (kept next to the tests that assert on signals)
+
+WATCHDOG_ENV = (
+    "CALVIN_KIOSK_WATCHDOG",
+    "CALVIN_KIOSK_CDP_PORT",
+    "CALVIN_KIOSK_WATCHDOG_SECONDS",
+    "CALVIN_KIOSK_WATCHDOG_FAILURES",
+    "CALVIN_KIOSK_WATCHDOG_COOLDOWN",
+)
+PAGE_WS = "ws://127.0.0.1:9222/devtools/page/1"
+
+
+def _clear_watchdog_env(monkeypatch):
+    for key in WATCHDOG_ENV:
+        monkeypatch.delenv(key, raising=False)
+
+
+def _unit(active=True, pid=4242, uptime=600, unit="calvin-kiosk-remote.service"):
+    return {
+        "unit": unit,
+        "active": active,
+        "main_pid": pid,
+        "uptime_seconds": uptime,
+    }
+
+
+def _never(unit):  # a restart that must not happen
+    raise AssertionError(f"restarted {unit} unexpectedly")
+
+
+def _recorder(store):
+    """A restart stub that records the unit and reports success."""
+
+    def restart(unit):
+        store.append(unit)
+        return True
+
+    return restart
+
+
+def test_watchdog_config_defaults(monkeypatch):
+    _clear_watchdog_env(monkeypatch)
+    assert agent.kiosk_watchdog_config() == {
+        "enabled": True,
+        "port": 9222,
+        "interval": 30,
+        "failures": 3,
+        "cooldown": 300,
+        "backoff_max": 3600,
+    }
+
+
+def test_watchdog_config_reads_environment(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG", "0")
+    monkeypatch.setenv("CALVIN_KIOSK_CDP_PORT", "9333")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_SECONDS", "15")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_FAILURES", "5")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_COOLDOWN", "60")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX", "900")
+    assert agent.kiosk_watchdog_config() == {
+        "enabled": False,
+        "port": 9333,
+        "interval": 15,
+        "failures": 5,
+        "cooldown": 60,
+        "backoff_max": 900,
+    }
+
+
+@pytest.mark.parametrize("value", ["off", "false", "no", "0", "OFF"])
+def test_watchdog_enabled_accepts_false_spellings(monkeypatch, value):
+    _clear_watchdog_env(monkeypatch)
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG", value)
+    assert agent.kiosk_watchdog_config()["enabled"] is False
+
+
+def test_watchdog_enabled_by_default_and_when_blank(monkeypatch):
+    _clear_watchdog_env(monkeypatch)
+    assert agent.kiosk_watchdog_config()["enabled"] is True
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG", "")
+    assert agent.kiosk_watchdog_config()["enabled"] is True
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG", "1")
+    assert agent.kiosk_watchdog_config()["enabled"] is True
+
+
+def test_watchdog_backoff_cap_never_shrinks_below_the_base_cooldown(monkeypatch):
+    _clear_watchdog_env(monkeypatch)
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_COOLDOWN", "300")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX", "30")
+    assert agent.kiosk_watchdog_config()["backoff_max"] == 300
+
+
+def test_watchdog_config_ignores_garbage(monkeypatch):
+    _clear_watchdog_env(monkeypatch)
+    monkeypatch.setenv("CALVIN_KIOSK_CDP_PORT", "99999")  # not a port
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_SECONDS", "0")  # too eager
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_FAILURES", "many")
+    monkeypatch.setenv("CALVIN_KIOSK_WATCHDOG_COOLDOWN", "-5")
+    cfg = agent.kiosk_watchdog_config()
+    assert cfg["port"] == 9222
+    assert cfg["interval"] == 5
+    assert cfg["failures"] == 3
+    assert cfg["cooldown"] == 0
+
+
+# --- the CDP probe: WebSocket framing ---------------------------------------
+def test_ws_accept_key_matches_the_rfc6455_vector():
+    assert (
+        agent.ws_accept_key("dGhlIHNhbXBsZSBub25jZQ==")
+        == "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+    )
+
+
+def test_ws_encode_text_is_masked_and_framed():
+    frame = agent.ws_encode_text(b"hi", mask=b"\x01\x02\x03\x04")
+    assert frame[0] == 0x81  # FIN + text
+    assert frame[1] == 0x80 | 2  # MASK + length
+    assert frame[2:6] == b"\x01\x02\x03\x04"
+    assert frame[6:] == bytes([ord("h") ^ 1, ord("i") ^ 2])
+
+
+def test_ws_encode_text_uses_the_extended_length_fields():
+    two_byte = agent.ws_encode_text(b"x" * 126, mask=b"\0\0\0\0")
+    assert two_byte[1] == 0x80 | 126
+    assert int.from_bytes(two_byte[2:4], "big") == 126
+    eight_byte = agent.ws_encode_text(b"x" * 70000, mask=b"\0\0\0\0")
+    assert eight_byte[1] == 0x80 | 127
+    assert int.from_bytes(eight_byte[2:10], "big") == 70000
+    assert len(eight_byte) == 10 + 4 + 70000
+
+
+def _reader(data):
+    """A _WSReader over a scripted byte stream (recv hands out what is left)."""
+    buf = {"left": data}
+
+    def recv(n):
+        out, buf["left"] = buf["left"][:n], buf["left"][n:]
+        return out
+
+    return agent._WSReader(recv)
+
+
+def test_ws_read_frame_decodes_text():
+    assert agent.ws_read_frame(_reader(b"\x81\x02hi")) == (0x1, b"hi")
+
+
+def test_ws_read_frame_unmasks_and_spans_recv_calls():
+    payload = bytes([ord("h") ^ 5, ord("i") ^ 6])
+    frame = b"\x81\x82\x05\x06\x07\x08" + payload
+    # _WSReader.exact() asks for small chunks, so the frame arrives in pieces.
+    assert agent.ws_read_frame(_reader(frame)) == (0x1, b"hi")
+
+
+def test_ws_read_frame_returns_control_frames():
+    assert agent.ws_read_frame(_reader(b"\x89\x00")) == (0x9, b"")
+
+
+def test_ws_read_frame_raises_on_truncated_stream():
+    with pytest.raises(EOFError):
+        agent.ws_read_frame(_reader(b"\x81\x05h"))
+
+
+class _FakeSocket:
+    """Scripted stand-in for socket.create_connection()'s return value."""
+
+    def __init__(self, chunks):
+        self.chunks = list(chunks)
+        self.sent = b""
+        self.timeouts = []
+        self.closed = False
+
+    def settimeout(self, timeout):
+        self.timeouts.append(timeout)
+
+    def sendall(self, data):
+        self.sent += data
+
+    def recv(self, n):
+        return self.chunks.pop(0) if self.chunks else b""
+
+    def close(self):
+        self.closed = True
+
+
+def _server_text(payload):
+    return b"\x81" + bytes([len(payload)]) + payload
+
+
+HANDSHAKE_OK = (
+    b"HTTP/1.1 101 Switching Protocols\r\n"
+    b"Upgrade: websocket\r\n"
+    b"Connection: Upgrade\r\n"
+    b"Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n"
+)
+
+
+def _cdp_socket(*replies):
+    import json as _json  # local: only the tests build CDP payloads
+
+    chunks = [HANDSHAKE_OK] + [_server_text(_json.dumps(r).encode()) for r in replies]
+    return _FakeSocket(chunks)
+
+
+def _cdp(sock, expression="1+1"):
+    return agent.cdp_eval(
+        PAGE_WS,
+        expression,
+        connect=lambda host, port, timeout: sock,
+        key="dGhlIHNhbXBsZSBub25jZQ==",
+    )
+
+
+def _sent_text(sock):
+    """The client's text frame, unmasked (clients mask their frames)."""
+    frame = sock.sent.split(b"\r\n\r\n", 1)[1]
+    length = frame[1] & 0x7F
+    mask = frame[2:6]
+    payload = frame[6 : 6 + length]
+    return bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+
+
+def test_cdp_eval_true_when_the_page_answers():
+    sock = _cdp_socket({"id": 1, "result": {"result": {"type": "number", "value": 2}}})
+    assert _cdp(sock) is True
+    assert b'"Runtime.evaluate"' in _sent_text(sock)
+    assert b"GET /devtools/page/1 HTTP/1.1" in sock.sent
+    assert sock.closed is True
+
+
+def test_cdp_eval_false_on_a_refused_handshake():
+    sock = _FakeSocket([b"HTTP/1.1 403 Forbidden\r\n\r\n"])
+    assert _cdp(sock) is False
+
+
+def test_cdp_eval_false_on_a_wrong_accept_key():
+    bad = HANDSHAKE_OK.replace(b"s3pPLMBiTxaQ9kYGzzhZRbK+xOo=", b"not-the-accept")
+    sock = _FakeSocket([bad])
+    assert _cdp(sock) is False
+
+
+def test_cdp_eval_false_on_a_target_error():
+    sock = _cdp_socket({"id": 1, "error": {"code": -32000, "message": "Target closed"}})
+    assert _cdp(sock) is False
+
+
+def test_cdp_eval_false_when_the_stream_ends():
+    sock = _FakeSocket([HANDSHAKE_OK])  # no frame ever arrives
+    assert _cdp(sock) is False
+
+
+def test_cdp_eval_false_when_the_host_refuses():
+    def refuse(host, port, timeout):
+        raise OSError("connection refused")
+
+    assert agent.cdp_eval(PAGE_WS, connect=refuse) is False
+
+
+def test_cdp_page_target_picks_the_page():
+    targets = [
+        {"type": "browser", "webSocketDebuggerUrl": "ws://x/browser"},
+        {"type": "service_worker", "webSocketDebuggerUrl": "ws://x/sw"},
+        {"type": "page", "url": "http://tower:8000/", "webSocketDebuggerUrl": PAGE_WS},
+    ]
+    assert agent.cdp_page_target(9222, fetch=lambda u, t: targets) == PAGE_WS
+
+
+def test_cdp_page_target_none_without_a_page():
+    assert agent.cdp_page_target(9222, fetch=lambda u, t: []) is None
+    assert agent.cdp_page_target(9222, fetch=lambda u, t: "nonsense") is None
+
+
+# --- the health verdict ------------------------------------------------------
+def test_probe_page_unreachable_when_nothing_listens():
+    def closed(url, timeout):
+        raise OSError("connection refused")
+
+    assert agent.probe_page(9222, fetch=closed) == agent.PAGE_UNREACHABLE
+
+
+def test_probe_page_unreachable_for_a_non_chromium_json_response():
+    # Only a JSON *array* (Chromium's target list) is evidence of Chromium. Some
+    # other server answering with a JSON object must not make us kill the kiosk.
+    assert agent.probe_page(9222, fetch=lambda u, t: {"hello": "world"}) == (
+        agent.PAGE_UNREACHABLE
+    )
+
+
+def test_probe_page_dead_without_a_page_target():
+    targets = [{"type": "browser", "webSocketDebuggerUrl": "ws://x/browser"}]
+    assert agent.probe_page(9222, fetch=lambda u, t: targets) == agent.PAGE_DEAD
+
+
+def test_probe_page_dead_when_evaluate_fails():
+    targets = [{"type": "page", "webSocketDebuggerUrl": PAGE_WS}]
+    assert (
+        agent.probe_page(
+            9222, fetch=lambda u, t: targets, evaluate=lambda ws, timeout: False
+        )
+        == agent.PAGE_DEAD
+    )
+
+
+def test_probe_page_ok_when_evaluate_answers():
+    targets = [{"type": "page", "webSocketDebuggerUrl": PAGE_WS}]
+    seen = []
+
+    def evaluate(ws, timeout):
+        seen.append((ws, timeout))
+        return True
+
+    assert (
+        agent.probe_page(9222, fetch=lambda u, t: targets, evaluate=evaluate)
+        == agent.PAGE_OK
+    )
+    assert seen == [(PAGE_WS, agent.WATCHDOG_TIMEOUT)]
+
+
+def test_probe_page_dead_when_evaluate_raises():
+    targets = [{"type": "page", "webSocketDebuggerUrl": PAGE_WS}]
+
+    def boom(ws, timeout):
+        raise OSError("target closed")
+
+    assert agent.probe_page(9222, fetch=lambda u, t: targets, evaluate=boom) == (
+        agent.PAGE_DEAD
+    )
+
+
+# --- the decision: one probe at a time ---------------------------------------
+def test_watchdog_step_healthy_page_resets_the_count():
+    state = {"failures": 2, "last_restart": None}
+    assert agent.watchdog_step(state, agent.PAGE_OK, None, restart=_never, now=1.0) == (
+        "ok"
+    )
+    assert state["failures"] == 0
+
+
+def test_watchdog_step_never_restarts_without_a_cdp_endpoint():
+    # No remote-debugging endpoint (older unit file, non-kiosk host): the port
+    # never answers, so the watchdog must stay out of the way forever.
+    state = agent.new_watchdog_state()
+    for i in range(10):
+        action = agent.watchdog_step(
+            state,
+            agent.PAGE_UNREACHABLE,
+            _unit(),
+            restart=_never,
+            now=float(i),
+        )
+        assert action == "unreachable"
+    assert state["failures"] == 0
+
+
+def test_watchdog_step_restarts_after_consecutive_dead_probes():
+    state = {"failures": 0, "last_restart": None}
+    restarted = []
+    steps = [
+        (1000.0, "waiting"),
+        (1030.0, "waiting"),
+        (1060.0, "restarted"),
+    ]
+    for now, expected in steps:
+        action = agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(), restart=_recorder(restarted), now=now
+        )
+        assert action == expected
+    assert restarted == ["calvin-kiosk-remote.service"]
+    assert state["failures"] == 0
+    assert state["last_restart"] == 1060.0
+
+
+def test_watchdog_step_healthy_probe_clears_the_count():
+    state = {"failures": 2, "last_restart": None}
+    assert agent.watchdog_step(state, agent.PAGE_OK, None, restart=_never, now=0) == (
+        "ok"
+    )
+    assert state["failures"] == 0
+    assert (
+        agent.watchdog_step(state, agent.PAGE_DEAD, _unit(), restart=_never, now=5)
+        == "waiting"
+    )
+    assert state["failures"] == 1
+
+
+def test_watchdog_step_unreachable_does_not_count_against_the_page():
+    # The browser process itself is gone: systemd's Restart=always owns that case.
+    state = {"failures": 2, "last_restart": None}
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_UNREACHABLE, _unit(), restart=_never, now=0
+        )
+        == "unreachable"
+    )
+    assert state["failures"] == 0
+
+
+def test_watchdog_step_respects_the_cooldown():
+    state = {"failures": 3, "last_restart": 1000.0}
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(), restart=_never, now=1100.0
+        )
+        == "cooldown"
+    )
+    assert state["failures"] == 3
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(), restart=lambda u: True, now=1300.0
+        )
+        == "restarted"
+    )
+
+
+def _fail_until_restart(state, restart, now, **over):
+    """Give the state the failures a dead page needs, then take one step."""
+    state["failures"] = 3
+    return agent.watchdog_step(
+        state, agent.PAGE_DEAD, _unit(), restart=restart, now=now, **over
+    )
+
+
+def test_watchdog_restart_backoff_doubles_and_caps():
+    state = {"failures": 0, "last_restart": None, "restarts": 0}
+    restarted = []
+    restart = _recorder(restarted)
+
+    # 1st restart, then the wait is one base cooldown (300s).
+    assert _fail_until_restart(state, restart, 1000.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 1
+    assert (
+        _fail_until_restart(state, restart, 1299.0, backoff_max=1000.0) == "cooldown"
+    )
+    assert _fail_until_restart(state, restart, 1300.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 2
+
+    # 2nd restart doubles the wait to 600s, so 1600 is still too early.
+    assert (
+        _fail_until_restart(state, restart, 1899.0, backoff_max=1000.0) == "cooldown"
+    )
+    assert _fail_until_restart(state, restart, 1900.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 3
+
+    # 3rd restart would wait 1200s; the cap holds it at 1000s.
+    assert (
+        _fail_until_restart(state, restart, 2899.0, backoff_max=1000.0) == "cooldown"
+    )
+    assert _fail_until_restart(state, restart, 2900.0, backoff_max=1000.0) == (
+        "restarted"
+    )
+    assert state["restarts"] == 4
+    assert restarted == ["calvin-kiosk-remote.service"] * 4
+
+
+def test_watchdog_healthy_page_resets_the_backoff():
+    state = {"failures": 2, "last_restart": 1000.0, "restarts": 3}
+    assert agent.watchdog_step(state, agent.PAGE_OK, None, restart=_never, now=1100) == (
+        "ok"
+    )
+    assert state["restarts"] == 0
+    # The next crash waits one base cooldown again, not 4x.
+    assert _fail_until_restart(state, _recorder([]), 1299.0) == "cooldown"
+    assert _fail_until_restart(state, _recorder([]), 1300.0) == "restarted"
+
+
+def test_watchdog_step_leaves_a_stopped_or_starting_unit_alone():
+    state = {"failures": 0, "last_restart": None}
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(active=False), restart=_never, now=0
+        )
+        == "idle"
+    )
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(uptime=30), restart=_never, now=0
+        )
+        == "warmup"
+    )
+    assert (
+        agent.watchdog_step(state, agent.PAGE_DEAD, None, restart=_never, now=0)
+        == "idle"
+    )
+    assert state["failures"] == 0
+
+
+def test_watchdog_step_backs_off_when_the_restart_fails():
+    state = {"failures": 3, "last_restart": None}
+    assert (
+        agent.watchdog_step(
+            state, agent.PAGE_DEAD, _unit(), restart=lambda u: False, now=50.0
+        )
+        == "restart-failed"
+    )
+    assert state["last_restart"] == 50.0  # no hammering: the cooldown applies
+    assert state["failures"] == 0
+
+
+def test_watchdog_step_honours_a_custom_threshold():
+    state = {"failures": 0, "last_restart": None}
+    restarted = []
+    for now in (0.0, 10.0):
+        agent.watchdog_step(
+            state,
+            agent.PAGE_DEAD,
+            _unit(),
+            restart=_recorder(restarted),
+            now=now,
+            failures_needed=2,
+        )
+    assert restarted == ["calvin-kiosk-remote.service"]
+
+
+# --- systemd: which unit, is it healthy, restart it -------------------------
+def test_unit_state_parses_systemctl_show():
+    out = (
+        "ActiveState=active\n"
+        "MainPID=4242\n"
+        "ActiveEnterTimestampMonotonic=1000000000\n"
+    )
+    argv_seen = []
+
+    def run(argv):
+        argv_seen.append(argv)
+        return SimpleNamespace(returncode=0, stdout=out, stderr="")
+
+    state = agent.kiosk_unit_state(
+        "calvin-kiosk-remote.service", run=run, monotonic=lambda: 1001.0
+    )
+    assert state["active"] is True
+    assert state["main_pid"] == 4242
+    assert state["uptime_seconds"] == pytest.approx(1.0)
+    assert argv_seen[0][:2] == ["systemctl", "show"]
+    assert "calvin-kiosk-remote.service" in argv_seen[0]
+
+
+def test_unit_state_inactive_and_without_a_pid():
+    out = "ActiveState=inactive\nMainPID=0\nActiveEnterTimestampMonotonic=0\n"
+
+    def run(argv):
+        return SimpleNamespace(returncode=0, stdout=out, stderr="")
+
+    state = agent.kiosk_unit_state("u", run=run, monotonic=lambda: 5.0)
+    assert state["active"] is False
+    assert state["main_pid"] == 0
+    assert state["uptime_seconds"] is None
+
+
+def test_unit_state_systemctl_failure_is_inactive():
+    def missing(argv):
+        raise FileNotFoundError("systemctl")
+
+    assert agent.kiosk_unit_state("u", run=missing)["active"] is False
+
+    def failed(argv):
+        return SimpleNamespace(returncode=1, stdout="", stderr="no such unit")
+
+    assert agent.kiosk_unit_state("u", run=failed)["active"] is False
+
+
+def test_watched_kiosk_unit_falls_back_to_the_all_in_one_unit():
+    def state(unit):
+        return _unit(unit=unit, active=unit == "calvin-kiosk.service")
+
+    assert agent.watched_kiosk_unit(state=state)["unit"] == "calvin-kiosk.service"
+    assert agent.watched_kiosk_unit(state=lambda u: _unit(active=False)) is None
+
+
+def test_pid_in_unit_reads_the_cgroup():
+    def read(path):
+        return "0::/system.slice/calvin-kiosk-remote.service\n"
+
+    assert agent.pid_in_unit(42, "calvin-kiosk-remote.service", read=read) is True
+    assert agent.pid_in_unit(42, "calvin-kiosk.service", read=read) is False
+
+
+def test_pid_in_unit_false_when_proc_is_gone():
+    def read(path):
+        raise FileNotFoundError(path)
+
+    assert agent.pid_in_unit(42, "calvin-kiosk-remote.service", read=read) is False
+
+
+def test_pid_alive_reads_the_proc_state():
+    assert agent.pid_alive(42, read=lambda p: "42 (chromium) S 1 2 3") is True
+    assert agent.pid_alive(42, read=lambda p: "42 (chromium) Z 1 2 3") is False
+    assert agent.pid_alive(42, read=lambda p: "42 (my (yes)) R 1 2 3") is True
+    assert agent.pid_alive(42, read=lambda p: "malformed") is True
+
+
+def test_pid_alive_false_when_proc_is_gone():
+    def gone(path):
+        raise FileNotFoundError(path)
+
+    assert agent.pid_alive(42, read=gone) is False
+
+
+def _signals():
+    calls = []
+
+    def kill(pid, sig):
+        calls.append(("kill", pid, sig))
+
+    def killpg(pid, sig):
+        calls.append(("killpg", pid, sig))
+
+    return calls, kill, killpg
+
+
+def test_restart_refuses_a_stopped_unit():
+    calls, kill, killpg = _signals()
+    ok = agent.restart_kiosk_unit(
+        "u",
+        state=lambda unit: _unit(active=False, pid=0),
+        kill=kill,
+        killpg=killpg,
+        sleep=lambda s: None,
+    )
+    assert ok is False
+    assert calls == []
+
+
+def test_restart_refuses_a_pid_outside_the_unit():
+    calls, kill, killpg = _signals()
+    ok = agent.restart_kiosk_unit(
+        "u",
+        state=lambda unit: _unit(),
+        in_unit=lambda pid, unit: False,
+        kill=kill,
+        killpg=killpg,
+        sleep=lambda s: None,
+    )
+    assert ok is False
+    assert calls == []
+
+
+def test_restart_signals_the_whole_service_group():
+    calls, kill, killpg = _signals()
+    ok = agent.restart_kiosk_unit(
+        "u",
+        state=lambda unit: _unit(),
+        in_unit=lambda pid, unit: True,
+        getpgid=lambda pid: pid,
+        kill=kill,
+        killpg=killpg,
+        alive=lambda pid: not calls,  # dies once signalled
+        sleep=lambda s: None,
+    )
+    assert ok is True
+    assert calls == [("killpg", 4242, signal.SIGTERM)]
+
+
+def test_restart_escalates_to_sigkill_when_the_browser_ignores_sigterm():
+    calls, kill, killpg = _signals()
+    ok = agent.restart_kiosk_unit(
+        "u",
+        state=lambda unit: _unit(),
+        in_unit=lambda pid, unit: True,
+        getpgid=lambda pid: pid,
+        kill=kill,
+        killpg=killpg,
+        alive=lambda pid: True,  # never dies
+        sleep=lambda s: None,
+        grace_seconds=2.0,
+    )
+    assert ok is True
+    assert calls[0] == ("killpg", 4242, signal.SIGTERM)
+    assert calls[-1] == ("killpg", 4242, signal.SIGKILL)
+
+
+def test_restart_signals_only_the_pid_without_its_own_group():
+    calls, kill, killpg = _signals()
+    agent.restart_kiosk_unit(
+        "u",
+        state=lambda unit: _unit(),
+        in_unit=lambda pid, unit: True,
+        getpgid=lambda pid: 999,  # shared with something else: never killpg
+        kill=kill,
+        killpg=killpg,
+        alive=lambda pid: not calls,  # dies once signalled
+        sleep=lambda s: None,
+    )
+    assert calls == [("kill", 4242, signal.SIGTERM)]
+
+
+# --- the loop ---------------------------------------------------------------
+def test_run_watchdog_restarts_the_unit_after_three_dead_probes():
+    probes = iter([agent.PAGE_DEAD] * 3 + [agent.PAGE_OK])
+    restarted = []
+    slept = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=4,
+        probe=lambda: next(probes, agent.PAGE_OK),
+        state=lambda unit: _unit(unit=unit),
+        restart=_recorder(restarted),
+        sleep=slept.append,
+        clock=lambda: 1000.0,
+        watchdog_state={"failures": 0, "last_restart": None},
+    )
+    assert restarted == ["calvin-kiosk-remote.service"]
+    assert slept == [30, 30, 30, 30]
+
+
+def test_run_watchdog_never_restarts_when_cdp_never_answers(capsys):
+    restarted = []
+    slept = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=50,
+        probe=lambda: agent.PAGE_UNREACHABLE,  # disabled, missing flag, old Chromium
+        state=lambda unit: _unit(),
+        restart=_recorder(restarted),
+        sleep=slept.append,
+        clock=lambda: 1.0,
+    )
+    assert restarted == []
+    assert len(slept) == 50
+    out = capsys.readouterr().out
+    assert out.count("crash recovery is idle") == 1
+
+
+def test_run_watchdog_restarts_only_after_cdp_reports_a_dead_page():
+    probes = iter([agent.PAGE_UNREACHABLE] * 5 + [agent.PAGE_DEAD] * 3)
+    restarted = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=8,
+        probe=lambda: next(probes, agent.PAGE_OK),
+        state=lambda unit: _unit(),
+        restart=_recorder(restarted),
+        sleep=lambda s: None,
+        clock=lambda: 1000.0,
+    )
+    assert restarted == ["calvin-kiosk-remote.service"]
+
+
+def test_run_watchdog_survives_probe_errors():
+    def boom():
+        raise OSError("socket timeout")
+
+    slept = []
+    agent.run_watchdog(
+        9222,
+        30,
+        failures_needed=3,
+        cooldown=300,
+        iterations=2,
+        probe=boom,
+        state=lambda unit: _unit(),
+        restart=_never,
+        sleep=slept.append,
+    )
+    assert slept == [30, 30]
+
+
+def test_start_watchdog_runs_in_a_daemon_thread():
+    seen = []
+    thread = agent.start_watchdog(
+        9222,
+        5,
+        failures_needed=3,
+        cooldown=300,
+        iterations=1,
+        probe=lambda: seen.append("probe") or agent.PAGE_OK,
+        state=lambda unit: _unit(),
+        restart=_never,
+        sleep=lambda s: None,
+    )
+    thread.join(2)
+    assert seen == ["probe"]
+    assert thread.daemon is True
+    assert not thread.is_alive()
