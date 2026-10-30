@@ -931,6 +931,112 @@ def test_apply_mode_dispatches_on_stack(monkeypatch):
     assert agent.apply_mode(None, None) is None
 
 
+# --- cog stack (WPE WebKit on DRM/KMS) ---------------------------------------
+# cog has no X/Wayland session to talk to. Panel power and rotation go through
+# /usr/local/bin/calvin-cog-panel.sh via sudo; the unit is stopped before the
+# framebuffer is blanked because cog holds DRM master.
+
+
+def test_display_stack_accepts_cog():
+    assert agent.display_stack({"CALVIN_DISPLAY_STACK": "cog"}) == "cog"
+    # An explicit setting still wins over a stale session environment.
+    assert agent.display_stack(
+        {"CALVIN_DISPLAY_STACK": "cog", "XDG_SESSION_TYPE": "wayland",
+         "WAYLAND_DISPLAY": "wayland-0"}
+    ) == "cog"
+
+
+def test_apply_on_dispatches_to_cog(monkeypatch):
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "cog")
+    monkeypatch.setattr(agent, "apply_on_cog", lambda on, env=None: "cog")
+    assert agent.apply_on(False) == "cog"
+    assert agent.apply_on(True) == "cog"
+
+
+def test_apply_on_cog_runs_the_root_helper(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    assert agent.apply_on_cog(False) == "cog"
+    assert calls == [["sudo", "-n", agent.COG_PANEL_HELPER, "off"]]
+    calls.clear()
+    assert agent.apply_on_cog(True) == "cog"
+    assert calls == [["sudo", "-n", agent.COG_PANEL_HELPER, "on"]]
+
+
+def test_apply_on_cog_reports_none_when_helper_fails(monkeypatch):
+    monkeypatch.setattr(
+        agent.subprocess, "run",
+        lambda cmd, **kw: SimpleNamespace(returncode=1, stdout="", stderr="nope"),
+    )
+    assert agent.apply_on_cog(True) == "none"
+
+
+def test_cog_rotation_mapping_is_xrandr_ccw():
+    # Calvin rotation names are xrandr's: left = 90 degrees counter-clockwise.
+    # cog's rotation parameter is also counter-clockwise quarter turns.
+    assert agent.COG_ROTATIONS["normal"] == 0
+    assert agent.COG_ROTATIONS["left"] == 1
+    assert agent.COG_ROTATIONS["inverted"] == 2
+    assert agent.COG_ROTATIONS["right"] == 3
+
+
+def test_apply_rotation_cog_runs_helper_for_each_rotation(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    for rotation, value in (
+        ("normal", "0"), ("left", "1"), ("inverted", "2"), ("right", "3")
+    ):
+        assert agent.apply_rotation_cog(rotation) == "cog"
+    assert calls == [
+        ["sudo", "-n", agent.COG_PANEL_HELPER, "rotate", value]
+        for value in ("0", "1", "2", "3")
+    ]
+
+
+def test_apply_rotation_cog_ignores_invalid(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        agent.subprocess, "run", lambda *a, **k: calls.append(a)
+    )
+    assert agent.apply_rotation_cog("sideways") is None
+    assert calls == []
+
+
+def test_apply_rotation_dispatches_to_cog(monkeypatch):
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "cog")
+    monkeypatch.setattr(agent, "apply_rotation_cog", lambda r, env=None: "cog")
+    assert agent.apply_rotation("left") == "cog"
+
+
+def test_apply_mode_is_a_noop_on_cog(monkeypatch):
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "cog")
+
+    def boom(*a, **k):  # xrandr/wlr-randr must never run on cog
+        raise AssertionError("mode tool called on the cog stack")
+
+    monkeypatch.setattr(agent.subprocess, "run", boom)
+    assert agent.apply_mode("HDMI-1", "1920x1080") is None
+    assert agent.apply_mode(None, None) is None
+
+
+def test_cog_skips_the_cdp_watchdog():
+    # cog restarts its own web process (--webprocess-failure=restart) and has no
+    # Chromium DevTools endpoint, so the CLV-25 watchdog must not run there.
+    assert agent.watchdog_applies("cog") is False
+    assert agent.watchdog_applies("x11") is True
+    assert agent.watchdog_applies("wayland") is True
+
+
 # --- crash-page recovery (CLV-25) -------------------------------------------
 # Only the renderer died on the Pi 3B+, not the browser, so systemd's Restart=
 # never fired and the kiosk stayed on "Aw, Snap!". The agent probes Chromium's

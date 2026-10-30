@@ -14,10 +14,12 @@ vi.mock("@/composables", () => ({
 }));
 
 import MaintenanceSettings from "@/components/settings/categories/MaintenanceSettings.vue";
+import { collapseSettingsSection, expandSettingsSection } from "@/utils/settingsSectionExpansion";
+import { filterSettingsDestinations } from "@/components/settings/settingsRegistry";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";
 
-const stubs = { UpdatesTab: true, BackupSettings: true };
+const stubs = { UpdatesTab: true, BackupSettings: true, UpdateSourceRows: true };
 const baseConfig = { consoleLogEnabled: true, consoleLogLevel: "info", configPollInterval: 30 };
 
 describe("MaintenanceSettings", () => {
@@ -30,12 +32,12 @@ describe("MaintenanceSettings", () => {
     loadEnvironment.mockResolvedValue(null);
   });
 
-  it("defaults the update branch to develop, not the release-only main", () => {
+  it("defaults the tracked branch to develop, not the release-only main", () => {
     const wrapper = mount(MaintenanceSettings, {
       props: { config: baseConfig, gitRepoUrl: "" },
       global: { stubs },
     });
-    expect(wrapper.findComponent({ name: "UpdatesTab" }).props("gitBranch")).toBe("develop");
+    expect(wrapper.findComponent({ name: "UpdateSourceRows" }).props("gitBranch")).toBe("develop");
   });
 
   it("renders its sections and the backup & restore block", () => {
@@ -47,7 +49,7 @@ describe("MaintenanceSettings", () => {
       "maintenance-updates",
       "device-hardware",
       "maintenance-system",
-      "maintenance-diagnostics",
+      "maintenance-advanced",
     ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
@@ -63,7 +65,7 @@ describe("MaintenanceSettings", () => {
       "section-maintenance-updates",
       "section-device-hardware",
       "section-maintenance-system",
-      "section-maintenance-diagnostics",
+      "section-maintenance-advanced",
     ]);
     expect(wrapper.find("#section-device-hardware .settings-section__eyebrow").text()).toBe(
       "Versions & status"
@@ -127,7 +129,8 @@ describe("MaintenanceSettings", () => {
     expect(restartFrontend).toHaveBeenCalled();
   });
 
-  it("shows the log level only when console logging is on", () => {
+  it("shows the log level only when console logging is on", async () => {
+    expandSettingsSection("maintenance-advanced");
     const on = mount(MaintenanceSettings, {
       props: {
         config: { ...baseConfig, consoleLogEnabled: true },
@@ -260,5 +263,88 @@ describe("MaintenanceSettings", () => {
     await flushPromises();
     const updates = wrapper.find("#section-maintenance-updates");
     expect(updates.findComponent(KioskSoftwarePointer).exists()).toBe(true);
+  });
+});
+
+// Settings copy audit §3.4 + §4.
+describe("System copy (§3.4) and the Advanced disclosure (§4)", () => {
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    environment.value = null;
+    collapseSettingsSection("maintenance-advanced");
+  });
+
+  it("shows one Version row, and the screen's bundle only when it differs", async () => {
+    const same = mount(MaintenanceSettings, {
+      props: { config: baseConfig, version: "1.2.3", frontendVersion: "1.2.3" },
+      global: { stubs },
+    });
+    expect(row(same, "Version").text()).toContain("1.2.3");
+    expect(row(same, "Version").text()).not.toContain("screen");
+    expect(row(same, "Backend version")).toBeUndefined();
+
+    const differ = mount(MaintenanceSettings, {
+      props: { config: baseConfig, version: "1.2.3", frontendVersion: "4.5.6" },
+      global: { stubs },
+    });
+    expect(row(differ, "Version").text()).toContain("1.2.3 (screen 4.5.6)");
+  });
+
+  it("offers Reload this screen", () => {
+    const w = mount(MaintenanceSettings, {
+      props: { config: baseConfig },
+      global: { stubs },
+    });
+    expect(row(w, "Reload this screen")).toBeTruthy();
+    expect(row(w, "Reload this screen").text()).toContain("Reload");
+  });
+
+  it("keeps Advanced closed by default, last in the category", () => {
+    const w = mount(MaintenanceSettings, {
+      props: { config: baseConfig },
+      global: { stubs },
+    });
+    const sections = w.findAll("section.settings-section").map(s => s.attributes("id"));
+    expect(sections.at(-1)).toBe("section-maintenance-advanced");
+    const advanced = w.find("#section-maintenance-advanced");
+    expect(advanced.find(".settings-section__eyebrow").text()).toBe("Advanced");
+    expect(advanced.find(".settings-section__panel").isVisible()).toBe(false);
+    expect(row(w, "Console logging").isVisible()).toBe(false);
+  });
+
+  it("opens Advanced for a search hit and shows the installer rows", async () => {
+    // Searching "branch" resolves to the Advanced destination (§4).
+    const [hit] = filterSettingsDestinations("branch");
+    expect(hit.id).toBe("maintenance-diagnostics");
+
+    const w = mount(MaintenanceSettings, {
+      props: { config: baseConfig },
+      global: { stubs },
+    });
+    expandSettingsSection("maintenance-advanced");
+    await flushPromises();
+
+    expect(w.find("#section-maintenance-advanced .settings-section__panel").isVisible()).toBe(true);
+    expect(row(w, "Console logging")).toBeTruthy();
+    expect(row(w, "Check for setting changes every").props("description")).toBe(
+      "How fast other screens pick up a change."
+    );
+    expect(w.findComponent({ name: "UpdateSourceRows" }).exists()).toBe(true);
+  });
+
+  it("keeps the update source out of a Docker install", async () => {
+    environment.value = { deployment: "docker", capabilities: {} };
+    const w = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+      global: { stubs },
+    });
+    await flushPromises();
+    expandSettingsSection("maintenance-advanced");
+    await flushPromises();
+    expect(w.findComponent({ name: "UpdateSourceRows" }).exists()).toBe(false);
+    expect(row(w, "Check for setting changes every")).toBeTruthy();
   });
 });

@@ -66,4 +66,19 @@ assert_contains "$f" '^After=.*calvin-wayland\.service' \
     "calvin-kiosk-remote.service does not order after calvin-wayland.service"
 pass "calvin-kiosk-remote.service keeps the compositor dependency without the cycle"
 
+# The display agent starts after whichever display owner runs, so its first
+# reconcile acts on a live session (and on cog, after the unit it may restart).
+agent="$REPO/deploy/systemd/calvin-display-agent.service"
+for unit in calvin-kiosk-remote.service calvin-x.service calvin-wayland.service calvin-cog.service; do
+    assert_contains "$agent" "^After=.*${unit//./\\.}" \
+        "calvin-display-agent.service does not order after $unit"
+done
+pass "the display agent is ordered after every kiosk/display unit"
+
+# cog replaces the compositor: it is WantedBy=graphical.target like calvin-x and
+# calvin-wayland (the generic loop above rejects an After=multi-user.target cycle).
+assert_contains "$REPO/deploy/systemd/calvin-cog.service" '^WantedBy=graphical\.target$' \
+    "calvin-cog.service is not started by graphical.target"
+pass "cog is a graphical.target display owner"
+
 echo "PASS"

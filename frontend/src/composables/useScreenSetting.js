@@ -38,9 +38,16 @@ const localRef = storageKey => {
 
 /**
  * @param {string} key config key, e.g. "onScreenKeyboard"
- * @param {{ storageKey?: string }} options localStorage key for browser scope
+ * @param {{ storageKey?: string, serverValue?: () => any }} options
+ *   storageKey: localStorage key for browser scope
+ *   serverValue: where the seed comes from when this screen has no choice of
+ *   its own (defaults to the config store; pass the Settings form's own value
+ *   when the row must reflect what Settings loaded)
  */
-export function useScreenSetting(key, { storageKey = `calvin-screen-${key}` } = {}) {
+export function useScreenSetting(
+  key,
+  { storageKey = `calvin-screen-${key}`, serverValue: readServerValue } = {}
+) {
   const configStore = useConfigStore();
   const kiosksStore = useKiosksStore();
   const kioskId = getKioskId();
@@ -51,7 +58,9 @@ export function useScreenSetting(key, { storageKey = `calvin-screen-${key}` } = 
   const stored = localRef(storageKey);
   if (scope === "browser") stored.value = readStorage(storageKey);
 
-  const serverValue = computed(() => configStore[key] ?? null);
+  const serverValue = computed(() =>
+    readServerValue ? readServerValue() : (configStore[key] ?? null)
+  );
 
   const value = computed(() => {
     if (scope === "kiosk") return serverValue.value;

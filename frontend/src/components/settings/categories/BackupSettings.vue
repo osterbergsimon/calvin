@@ -171,21 +171,23 @@
           @update:model-value="v => saveSchedule({ enabled: v })"
         />
       </SettingRow>
-      <SettingRow v-if="schedule.enabled" label="Every" description="Hours between backups.">
+      <SettingRow v-if="schedule.enabled" label="Back up every">
         <NumberStepper
           :model-value="schedule.interval_hours"
           :min="1"
           :max="720"
-          aria-label="Hours between backups"
+          unit=" hours"
+          aria-label="Back up every, in hours"
           @update:model-value="v => saveSchedule({ interval_hours: v })"
         />
       </SettingRow>
-      <SettingRow v-if="schedule.enabled" label="Keep" description="Automatic backups to keep.">
+      <SettingRow v-if="schedule.enabled" label="Keep the last">
         <NumberStepper
           :model-value="schedule.retention"
           :min="1"
           :max="365"
-          aria-label="Automatic backups to keep"
+          unit=" backups"
+          aria-label="Keep the last, in backups"
           @update:model-value="v => saveSchedule({ retention: v })"
         />
       </SettingRow>
