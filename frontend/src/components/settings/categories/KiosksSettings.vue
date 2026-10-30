@@ -154,7 +154,11 @@
       :applied-version="selectedKiosk()?.lastAppliedVersion ?? null"
       :desired-version="desiredVersions[selectedId] ?? null"
     />
-    <SettingsSection v-if="selectedId" id="kiosks-content" :title="`${selectedId} · Content`">
+    <SettingsSection
+      v-if="selectedId"
+      id="kiosks-content"
+      :title="`${selectedKioskName} · Content`"
+    >
       <p v-if="!hasEnoughScreens" class="kiosks__hint">
         Add more pages in Dashboard › Pages & regions to assign different content per kiosk.
       </p>
@@ -206,7 +210,7 @@
     <SettingsSection
       v-if="selectedId"
       id="kiosks-schedule"
-      :title="`${selectedId} · Screen on/off schedule`"
+      :title="`${selectedKioskName} · Screen on/off schedule`"
     >
       <SettingRow label="Screen on/off schedule">
         <template #description>
@@ -368,6 +372,9 @@ const config = useConfigStore();
 const notifications = useNotificationsStore();
 const kiosks = computed(() => store.kiosks);
 const selectedId = ref(null);
+// Section titles use the screen's own name once one is set, else the install id
+// (screens-and-kiosks setup §3.3/§7). The name is the displayName override.
+const selectedKioskName = computed(() => overrides.value.displayName || selectedId.value);
 const overrides = ref({});
 const savedMsg = ref("");
 const contentMsg = ref("");
