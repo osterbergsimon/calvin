@@ -155,6 +155,12 @@ describe("ScreenRegionEditor inspector headings", () => {
     expect(w.find(".ins-mode .ins-sub").text()).toBe("· Home");
   });
 
+  it("does not repeat Page as a group label under the heading", async () => {
+    const w = await mountEditor();
+    const groupLabels = w.findAll(".ins-h").map(n => n.text());
+    expect(groupLabels).not.toContain("Page");
+  });
+
   it("heads the region inspector Region · in Home", async () => {
     const w = await mountEditor();
     const node = w.findAllComponents({ name: "RegionNode" })[0];
