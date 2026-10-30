@@ -34,7 +34,16 @@
           class="catalog-row"
           :data-catalog-plugin-id="plugin.id"
         >
-          <span class="catalog-icon" aria-hidden="true">{{ catalogLetter(plugin) }}</span>
+          <span class="catalog-icon" aria-hidden="true">
+            <img
+              v-if="isIconFile(plugin.icon)"
+              class="catalog-icon-img"
+              :src="pluginIconUrl(plugin)"
+              alt=""
+            />
+            <template v-else-if="plugin.icon">{{ plugin.icon }}</template>
+            <template v-else>{{ catalogLetter(plugin) }}</template>
+          </span>
           <div class="catalog-info">
             <strong>{{ plugin.name || plugin.id }}</strong>
             <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">
@@ -372,6 +381,7 @@ import TabNavigation from "../shared/TabNavigation.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { pluginKindFilters, pluginKindKey, pluginKindLabel } from "@/utils/pluginKind";
 import { isNewerVersion } from "@/utils/pluginVersions";
+import { isIconFile, pluginIconUrl } from "@/utils/pluginIcon";
 
 const props = defineProps({
   installing: {
@@ -408,6 +418,12 @@ const props = defineProps({
   catalogRepoUrl: {
     type: String,
     default: "",
+  },
+  // Installed plugin metadata, so a catalog row for an installed plugin gets
+  // its plain kind (e.g. Weather is "Clock bar", not "Web page & app").
+  knownPlugins: {
+    type: Array,
+    default: () => [],
   },
   catalogBranch: {
     type: String,
@@ -492,7 +508,21 @@ const canAddSource = plugin => ["calendar", "image", "service"].includes(plugin.
 
 // --- catalog panel ---------------------------------------------------------
 
-const catalogList = computed(() => withoutTestFixtures(props.catalogPlugins));
+const enrichedCatalog = computed(() => {
+  const knownById = Object.fromEntries((props.knownPlugins || []).map(item => [item.id, item]));
+  return props.catalogPlugins.map(item => {
+    const known = knownById[item.id];
+    if (!known) return item;
+    return {
+      ...item,
+      icon: item.icon ?? known.icon,
+      display_schema: item.display_schema ?? known.display_schema,
+      statusbar_schema: item.statusbar_schema ?? known.statusbar_schema,
+    };
+  });
+});
+
+const catalogList = computed(() => withoutTestFixtures(enrichedCatalog.value));
 
 const catalogFilters = computed(() => pluginKindFilters(catalogList.value));
 const catalogTypeTabs = computed(() =>
@@ -787,6 +817,12 @@ watch(searchQuery, () => {
   color: var(--ink-2);
   font-family: var(--font-ui);
   font-weight: 600;
+}
+
+.catalog-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .catalog-info {

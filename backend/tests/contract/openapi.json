@@ -751,6 +751,17 @@
             ],
             "title": "Photorotationinterval"
           },
+          "pluginCatalogRepo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plugincatalogrepo"
+          },
           "randomizeImages": {
             "anyOf": [
               {

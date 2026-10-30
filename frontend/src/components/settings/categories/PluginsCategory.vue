@@ -53,6 +53,7 @@
         :catalog-branch="catalogBranch"
         :catalog-enumerating="catalogEnumerating"
         :catalog-error="catalogError"
+        :known-plugins="plugins"
         :error="pluginInstallError"
         :success="pluginInstallSuccess"
         :branch-switched="pluginBranchSwitched"

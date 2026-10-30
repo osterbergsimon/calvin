@@ -21,6 +21,7 @@
                 :src="iconUrl(provider)"
                 alt=""
               />
+              <template v-else-if="provider.icon">{{ provider.icon }}</template>
               <template v-else>{{ providerLetter(provider) }}</template>
             </span>
             <span class="pp-text">
@@ -48,6 +49,7 @@
             >
               <span class="pp-icon" aria-hidden="true">
                 <img v-if="isIconFile(item.icon)" class="pp-icon-img" :src="iconUrl(item)" alt="" />
+                <template v-else-if="item.icon">{{ item.icon }}</template>
                 <template v-else>{{ providerLetter(item) }}</template>
               </span>
               <span class="pp-text">
@@ -87,6 +89,7 @@
 
 <script setup>
 import IconButton from "@/components/ui/IconButton.vue";
+import { isIconFile, pluginIconLetter, pluginIconUrl } from "@/utils/pluginIcon";
 
 // A small chooser of providers (plugins) for one kind of source. It carries no
 // plugin-specific knowledge: the caller decides which plugins are candidates,
@@ -123,20 +126,8 @@ defineProps({
 
 const emit = defineEmits(["select", "install", "close", "more"]);
 
-const providerLetter = provider => {
-  const source = provider.label || provider.name || "?";
-  return source.charAt(0).toUpperCase();
-};
-
-// `icon` is an emoji string or a file from the plugin's own `frontend/` dir
-// (§6). A file is served from the plugin's static route.
-const isIconFile = icon =>
-  typeof icon === "string" && icon.trim() !== "" && /[/.]/.test(icon) && icon.length > 2;
-
-const iconUrl = provider => {
-  if (/^https?:\/\//i.test(provider.icon)) return provider.icon;
-  return `/api/plugins/${provider.id}/static/${String(provider.icon).replace(/^\/+/, "")}`;
-};
+const providerLetter = provider => pluginIconLetter(provider);
+const iconUrl = provider => pluginIconUrl(provider);
 
 const choose = provider => {
   emit("select", provider);
