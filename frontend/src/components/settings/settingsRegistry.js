@@ -254,6 +254,22 @@ export const settingsDestinations = [
     keywords: ["plugins", "install", "github", "zip", "themes", "instances"],
   },
   {
+    id: "plugins-install",
+    label: "Install add-ons",
+    path: "Plugins / Install",
+    category: "plugins",
+    section: "plugins-install",
+    keywords: ["plugins", "install", "catalog", "calvin catalog", "add-ons", "github", "zip"],
+  },
+  {
+    id: "plugins-installed",
+    label: "Installed add-ons",
+    path: "Plugins / Installed",
+    category: "plugins",
+    section: "plugins-installed",
+    keywords: ["plugins", "installed", "updates", "uninstall", "settings", "add-ons"],
+  },
+  {
     id: "plugins-services",
     label: "Add a web page",
     path: "Content / Web pages & services",

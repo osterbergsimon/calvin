@@ -37,7 +37,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import * as pluginsApi from "@/services/pluginsApi";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
@@ -61,6 +61,7 @@ defineProps({
 });
 
 const router = useRouter();
+const route = useRoute();
 const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
 
 const addButton = ref(null);
@@ -162,6 +163,9 @@ const openClockBarItems = () =>
 
 onMounted(async () => {
   if (plugins.value.length === 0 && !loadingPlugins.value) await loadPlugins();
+  // Dashboard › Clock bar items' empty state links here to add the first tile
+  // (§3.5), so arrival with add=clock opens the provider picker for that kind.
+  if (route?.query?.add === "clock") addButton.value?.open();
 });
 </script>
 

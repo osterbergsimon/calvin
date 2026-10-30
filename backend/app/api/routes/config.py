@@ -169,6 +169,8 @@ class ConfigUpdate(BaseModel):
         None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
     )
     gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
+    # The add-on catalog the provider picker may install from (§3.7).
+    pluginCatalogRepo: str | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -191,6 +193,11 @@ class ConfigUpdate(BaseModel):
     @classmethod
     def _check_git_branch(cls, value: str | None) -> str | None:
         return None if value is None else validate_git_branch(value)
+
+    @field_validator("pluginCatalogRepo")
+    @classmethod
+    def _check_plugin_catalog_repo(cls, value: str | None) -> str | None:
+        return None if value is None else validate_git_repo_url(value)
 
     configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
     # Calendar cache refresh interval in minutes (default: 15). Must never be
@@ -559,6 +566,13 @@ async def build_global_config() -> dict:
         config["gitBranch"] = "develop"  # main is release-only and far behind
     elif "git_branch" in config and "gitBranch" not in config:
         config["gitBranch"] = config["git_branch"]
+    # The add-on catalog the provider picker may install from (§3.7). An unset
+    # value falls back to the shipped official repository, so the picker works
+    # on a fresh install without configuration.
+    if "pluginCatalogRepo" not in config and "plugin_catalog_repo" not in config:
+        config["pluginCatalogRepo"] = settings.plugin_catalog_repo
+    elif "plugin_catalog_repo" in config and "pluginCatalogRepo" not in config:
+        config["pluginCatalogRepo"] = config["plugin_catalog_repo"]
     if "consoleLogEnabled" not in config and "console_log_enabled" not in config:
         config["consoleLogEnabled"] = True  # Default to enabled for backwards compatibility
     elif "console_log_enabled" in config and "consoleLogEnabled" not in config:
@@ -719,6 +733,8 @@ async def update_config(config_update: ConfigUpdate, request: Request):
     if "gitBranch" in update_dict:
         update_dict["git_branch"] = update_dict.pop("gitBranch")
         _write_update_setting("GIT_BRANCH", update_dict["git_branch"])
+    if "pluginCatalogRepo" in update_dict:
+        update_dict["plugin_catalog_repo"] = update_dict.pop("pluginCatalogRepo")
     if "consoleLogEnabled" in update_dict:
         update_dict["console_log_enabled"] = update_dict.pop("consoleLogEnabled")
     if "consoleLogLevel" in update_dict:

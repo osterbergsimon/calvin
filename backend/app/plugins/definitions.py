@@ -131,6 +131,10 @@ class PluginMetadata(BaseModel):
     type_id: str
     name: str
     description: str | None = None
+    # Optional tile icon (design 2026-10-30-content-and-plugins §6): an emoji
+    # string, or a file served from the plugin's own static assets. Absent means
+    # the UI falls back to the plugin name's first letter.
+    icon: str | None = None
     version: str = "1.0.0"
     supports_multiple_instances: bool = True
     instance_label: str | None = None

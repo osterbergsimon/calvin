@@ -37,7 +37,10 @@ export function useClockBar(opts) {
   });
 
   const showDate = computed(() => !!configStore.clockShowDate);
-  const showStatusbar = computed(() => configStore.clockBarShowPluginItems !== false);
+  // Plugin tiles are rendered unconditionally: each one is gated by its own
+  // toggle in Dashboard › Clock bar items. Decision C removed the global "Show
+  // plugin info" switch, so a stale master flag can no longer hide every tile
+  // with no control to bring it back.
   const showSeconds = computed(() => !!configStore.clockShowSeconds);
   // Reject anything Intl can't accept as a time zone. The backend persists an
   // unset timezone as the literal string "None" (str(None)), which would make
@@ -271,7 +274,6 @@ export function useClockBar(opts) {
   return {
     shouldShow,
     showDate,
-    showStatusbar,
     formattedTime,
     compactTimeParts,
     formattedDate,
