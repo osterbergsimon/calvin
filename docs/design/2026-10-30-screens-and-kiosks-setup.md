@@ -56,13 +56,18 @@ The editor itself is solid. The problems are around it.
 ### 3.2 One place per screen (owner decision B)
 
 **Kiosks and Screen & keyboard merge into one category, Screens** (📺, subtitle "Pages · rotation · power ·
-keyboard"). That makes 6 categories: Content · Dashboard · Screens · Plugins · System · Security.
+touch"). That makes 6 categories: Content · Dashboard · Screens · Plugins · System · Security.
 
 The Screens category (mock S1):
-- **All screens** card first: the shared settings every screen uses unless it has its own. It holds orientation,
-  upside down, rotate output, power schedule, turn off when idle, touchscreen, on-screen keyboard, keyboard layout,
-  remote & buttons, key-press feedback, and the reboot combo. Today's Screen & keyboard rows move here unchanged
-  (with the audit's copy).
+- **All screens** card first: the shared settings every screen uses unless it has its own. Today's Screen & keyboard
+  rows split by what they're about (decision C):
+  - **here, things about the screen itself:** orientation, upside down, rotate output; power schedule, turn off when
+    idle, reboot combo (it restarts the Pi, so it sits under Power); touchscreen, on-screen keyboard, keyboard
+    layout (how text is typed *on this screen*, and per-screen per CLV-21/27);
+  - **to Dashboard, things about operating the dashboard:** Remote & buttons (button bindings) and key-press
+    feedback move to a Dashboard section **Focus & remote**, next to Focus light and Dim other regions. Those rows
+    only matter to someone driving the dashboard with a remote or arrow keys, and the focus light is what those
+    buttons move. They're the same on every screen, and no screen overrides them.
 - Then one card per screen:
   - its **name** (§3.3) and the id in `--font-data` `--ink-3`;
   - online/offline;
@@ -145,8 +150,12 @@ Phase 1 is useful on its own. Phase 2 only moves things.
 
 ## 6. Owner decisions
 
+Approved 2026-10-30: A and B. C is a follow-up to the owner's question "should keyboard really be there?".
+
 - **A. Rename dashboard "screens" to "pages" in the UI** (keys unchanged). Recommended: it ends the double meaning
   at its source.
+- **C. Keyboard placement** (§3.2): the on-screen keyboard and its layout stay with Screens; remote buttons and
+  key-press feedback go to Dashboard › Focus & remote; the reboot combo goes under Screens › Power.
 - **B. Merge Kiosks + Screen & keyboard into one Screens category** (7 → 6) with an "All screens" card and a page per
   screen. Recommended: one Pi's settings end up in one place.
 
