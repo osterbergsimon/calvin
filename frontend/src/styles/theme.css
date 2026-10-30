@@ -103,6 +103,40 @@
   --radius-xl: 0.75rem; /* 12px */
   --radius-2xl: 1rem; /* 16px */
   --radius-pill: 999px;
+
+  /* ------------------------------------------------------------------ *
+   * Tag — the one non-interactive label behind chips, badges and counts.
+   * See docs/design/2026-10-30-chips-and-tags.md. Components use only
+   * these knobs plus the semantic colour tokens, so a theme only needs
+   * to change --ok / --warn / --err / --focus / --ink / --line.
+   * ------------------------------------------------------------------ */
+  --tag-height: 1.25rem; /* 20px */
+  --tag-pad-x: var(--space-xs);
+  --tag-gap: var(--space-2xs);
+  --tag-radius: var(--radius-sm);
+  --tag-fs: var(--fs-2xs);
+  --tag-weight: 500;
+  --tag-icon: 0.75rem; /* 12px */
+  --tag-tint: 10%; /* tone background mix */
+  --tag-edge: 35%; /* tone border mix */
+  /* Share of the tone in the text mix; the rest is --ink. 45% is the
+     most tinted value that still clears 4.5:1 on --bg-0/-1/-2 in all five
+     built-in themes (light, dark, ocean, forest, sunset × dark mode). */
+  --tag-ink: 45%;
+
+  /* Editor page tabs (one-line underline tabs) */
+  --tab-height: var(--touch-target); /* 44px */
+  --tab-indicator: 2px;
+  --tab-icon: 1rem; /* 16px */
+
+  /* Device mockup chrome — deliberately dark in every theme so the
+     preview reads as a physical screen, not a theme surface. */
+  --device-bezel-a: #33383f;
+  --device-bezel-b: #1b1e24;
+  --device-screen: #06070a;
+  --device-shade: #000000;
+  --device-highlight: rgba(255, 255, 255, 0.06);
+  --device-inset: rgba(0, 0, 0, 0.5);
 }
 
 .dark {
