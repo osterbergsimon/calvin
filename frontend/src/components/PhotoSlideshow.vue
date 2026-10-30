@@ -1,7 +1,7 @@
 <template>
   <div class="photo-slideshow" :class="{ fullscreen: isFullscreen }">
     <IconButton
-      v-if="isFullscreen && isTouch"
+      v-if="isFullscreen"
       class="fs-close"
       size="lg"
       shape="circle"
@@ -99,7 +99,7 @@ import { useTouchCapability } from "@/composables/useTouchCapability";
 
 const configStore = useConfigStore();
 const { handleAction } = useKeyboardActions();
-const { isTouch, hasPointer } = useTouchCapability();
+const { hasPointer } = useTouchCapability();
 
 const props = defineProps({
   focused: {
@@ -231,7 +231,17 @@ const stopAutoRotation = () => {
   }
 };
 
+// Escape leaves fullscreen, like the calendar and web-page viewers.
+const handleKeydown = event => {
+  if (event.key === "Escape" && props.isFullscreen) {
+    handleAction("photos_exit_fullscreen");
+    event.preventDefault();
+  }
+};
+
 onMounted(async () => {
+  window.addEventListener("keydown", handleKeydown);
+
   // Fetch images and current image
   try {
     await imagesStore.fetchImages(props.sourceIds);
@@ -249,6 +259,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("keydown", handleKeydown);
   stopAutoRotation();
 });
 
