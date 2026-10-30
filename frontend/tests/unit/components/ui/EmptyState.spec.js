@@ -8,7 +8,7 @@ import { useModeStore } from "@/stores/mode";
 import { _resetSetupPromptForTests, useSetupPrompt } from "@/composables/useSetupPrompt";
 
 vi.mock("@/utils/serverUrl", () => ({
-  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.168.1.20:8000")),
+  resolveServerUrl: vi.fn(() => Promise.resolve("http://192.0.2.20:8000")),
   settingsLink: (base, id) => `${base}/settings${id ? `?setting=${id}` : ""}`,
 }));
 
@@ -70,7 +70,7 @@ describe("EmptyState (F3/F4)", () => {
     const { wrapper } = await mountEmpty();
     expect(wrapper.find('[data-test="phone-setup"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="phone-setup-url"]').text()).toBe(
-      "http://192.168.1.20:8000/settings?setting=content-calendars"
+      "http://192.0.2.20:8000/settings?setting=content-calendars"
     );
   });
 });
@@ -142,7 +142,7 @@ describe("EmptyState setup prompt (CLV-20)", () => {
     expect(photos.find('[data-test="phone-setup"]').text()).toContain("Typing is easier there.");
     // Two gaps: the phone opens Settings' landing page, not one guess.
     expect(photos.find('[data-test="phone-setup-url"]').text()).toBe(
-      "http://192.168.1.20:8000/settings"
+      "http://192.0.2.20:8000/settings"
     );
     // The normal empty state (message, help, button) stays in gaps mode.
     expect(cal.find('[data-test="empty-state-action"]').exists()).toBe(true);
@@ -156,7 +156,7 @@ describe("EmptyState setup prompt (CLV-20)", () => {
     await flushPromises();
 
     expect(photos.find('[data-test="phone-setup-url"]').text()).toBe(
-      "http://192.168.1.20:8000/settings?setting=content-images"
+      "http://192.0.2.20:8000/settings?setting=content-images"
     );
   });
 
