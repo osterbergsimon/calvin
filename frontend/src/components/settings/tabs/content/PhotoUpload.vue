@@ -1,7 +1,7 @@
 <template>
   <SettingRow
     label="Add photos"
-    :description="`Upload JPG, PNG, WebP or GIF files to the built-in Local Images source. ${countLabel}`"
+    :description="`Upload JPG, PNG, WebP or GIF files into Local photos. ${countLabel}`"
   >
     <input
       ref="fileInput"
