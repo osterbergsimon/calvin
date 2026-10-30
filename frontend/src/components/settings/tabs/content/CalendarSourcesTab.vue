@@ -38,6 +38,13 @@
 
     <AddSourceButton ref="addButton" kind="calendar" @saved="handleAddSaved" />
 
+    <WhereItShows
+      kind="calendar"
+      title="calendars"
+      :config="config"
+      :sources="rows.map(row => ({ id: row.id, name: row.name }))"
+    />
+
     <SettingRow label="Check for new events every">
       <div class="cal-refresh">
         <NumberStepper
@@ -84,6 +91,7 @@ import NumberStepper from "@/components/ui/NumberStepper.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
+import WhereItShows from "@/components/settings/specialized/WhereItShows.vue";
 import { getInstanceSummary } from "@/utils/instanceSummary";
 import { logError } from "@/utils/logger";
 
