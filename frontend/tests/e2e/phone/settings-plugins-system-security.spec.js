@@ -61,7 +61,9 @@ test.describe("phone: System", () => {
     await selectCategory(page, "System");
 
     const system = page.locator(".maintenance-settings");
-    await expect(system.locator(".settings-section__eyebrow", { hasText: "Updates" }).first()).toBeVisible();
+    await expect(
+      system.locator(".settings-section__eyebrow", { hasText: "Updates" }).first()
+    ).toBeVisible();
     await expect(
       system.locator(".settings-section__eyebrow", { hasText: "Versions & status" }).first()
     ).toBeVisible();
@@ -80,9 +82,7 @@ test.describe("phone: System", () => {
     await expect(confirm).toBeVisible();
     await expectPhoneLayout(page, "restart confirmation", { scope: ".confirm-modal" });
     await confirm.getByRole("button", { name: "Restart" }).click();
-    await expect
-      .poll(() => api.hostActions)
-      .toContain("POST /api/system/restart-backend");
+    await expect.poll(() => api.hostActions).toContain("POST /api/system/restart-backend");
     await expect(page.getByText(/Backend restarting/)).toBeVisible();
 
     expect(api.hostActions.every(call => call.startsWith("POST /api/system/"))).toBe(true);
@@ -98,8 +98,12 @@ test.describe("phone: Security", () => {
     await selectCategory(page, "Security");
 
     const security = page.locator(".security-settings");
-    await expect(security.locator(".settings-section__eyebrow", { hasText: "Admin access" })).toBeVisible();
-    await expect(security.locator(".settings-section__eyebrow", { hasText: "API keys" })).toBeVisible();
+    await expect(
+      security.locator(".settings-section__eyebrow", { hasText: "Admin access" })
+    ).toBeVisible();
+    await expect(
+      security.locator(".settings-section__eyebrow", { hasText: "API keys" })
+    ).toBeVisible();
     await expect(
       security.locator('[data-test="api-key-row"]', { hasText: "Home Assistant" })
     ).toBeVisible();

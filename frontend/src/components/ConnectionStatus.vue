@@ -28,7 +28,9 @@
       </svg>
       <span v-if="!compact" class="connection-status__text"
         >{{ pillBaseText
-        }}<span v-if="dataFrom" class="connection-status__from"> · data from {{ dataFrom }}</span></span
+        }}<span v-if="dataFrom" class="connection-status__from">
+          · data from {{ dataFrom }}</span
+        ></span
       >
     </button>
     <span
@@ -156,10 +158,14 @@ const iconPath = computed(() =>
   status.value === "offline" ? mdiLanDisconnect : mdiCloudOffOutline
 );
 
-const pillBaseText = computed(() => (status.value === "offline" ? "No network" : "Can't reach Calvin"));
+const pillBaseText = computed(() =>
+  status.value === "offline" ? "No network" : "Can't reach Calvin"
+);
 
 const pillText = computed(() => {
-  return dataFrom.value ? `${pillBaseText.value} · data from ${dataFrom.value}` : pillBaseText.value;
+  return dataFrom.value
+    ? `${pillBaseText.value} · data from ${dataFrom.value}`
+    : pillBaseText.value;
 });
 
 const floatingCorner = computed(() =>
