@@ -57,8 +57,8 @@ test.describe("phone: Content", () => {
     await modal.getByRole("button", { name: "Save" }).click();
 
     await expect(modal).toBeHidden();
-    expect(api.requests).toContain("POST /api/plugins/calendar-ics/instances");
-    expect(api.requests).toContain("POST /api/calendar/sources");
+    await expect.poll(() => api.requests).toContain("POST /api/plugins/calendar-ics/instances");
+    await expect.poll(() => api.requests).toContain("POST /api/calendar/sources");
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
@@ -82,7 +82,7 @@ test.describe("phone: Content", () => {
     await modal.getByRole("button", { name: "Save" }).click();
 
     await expect(modal).toBeHidden();
-    expect(api.requests).toContain("PUT /api/plugins/instances/src-family");
+    await expect.poll(() => api.requests).toContain("PUT /api/plugins/instances/src-family");
     expect(consoleErrors).toEqual([]);
   });
 
@@ -110,7 +110,7 @@ test.describe("phone: Content", () => {
       ),
     });
     await expect(page.getByText(/Uploaded 1 photo/)).toBeVisible();
-    expect(api.requests).toContain("POST /api/images/upload");
+    await expect.poll(() => api.requests).toContain("POST /api/images/upload");
 
     // And a photo source itself can be added from the picker's other tile.
     await page.getByRole("button", { name: "Add photos from…" }).click();
@@ -121,7 +121,7 @@ test.describe("phone: Content", () => {
     await expectPhoneLayout(page, "add photo source form", { scope: ".instance-modal" });
     await modal.getByRole("button", { name: "Save" }).click();
     await expect(modal).toBeHidden();
-    expect(api.requests).toContain("POST /api/plugins/image-local/instances");
+    await expect.poll(() => api.requests).toContain("POST /api/plugins/image-local/instances");
 
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
@@ -153,7 +153,7 @@ test.describe("phone: Content", () => {
     await modal.getByRole("button", { name: "Save" }).click();
 
     await expect(modal).toBeHidden();
-    expect(api.requests).toContain("POST /api/plugins/web-embed/instances");
+    await expect.poll(() => api.requests).toContain("POST /api/plugins/web-embed/instances");
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });

@@ -95,12 +95,30 @@ async function collectProblems(page, scope) {
         if (style.display === "none" || style.visibility === "hidden") return false;
         if (Number(style.opacity) === 0) return false;
         const rect = el.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
+        if (rect.width <= 0 || rect.height <= 0) return false;
+        // Clipped away by a scrolling/collapsing ancestor (a collapsed sheet,
+        // the category rail): it cannot be seen or tapped.
+        for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+          const s = getComputedStyle(node);
+          if (s.overflowX === "visible" && s.overflowY === "visible") continue;
+          const nr = node.getBoundingClientRect();
+          if (
+            rect.bottom <= nr.top + 1 ||
+            rect.top >= nr.bottom - 1 ||
+            rect.right <= nr.left + 1 ||
+            rect.left >= nr.right - 1
+          ) {
+            return false;
+          }
+        }
+        return true;
       };
 
-      const dialogs = [...document.querySelectorAll('[aria-modal="true"], [role="dialog"]')].filter(
-        isVisible
-      );
+      const dialogs = [
+        ...document.querySelectorAll(
+          '[aria-modal="true"], [role="dialog"], .pill__panel'
+        ),
+      ].filter(isVisible);
       const scopeEl = scopeSelector
         ? document.querySelector(scopeSelector)
         : dialogs.length
@@ -229,7 +247,15 @@ async function collectProblems(page, scope) {
  * the exact element.
  */
 export async function expectPhoneLayout(page, label, options = {}) {
-  const problems = await collectProblems(page, options.scope);
+  // Layout settles over a transition or two (the pages editor animates its
+  // device preview from a 560px stand-in to the measured stage). Judge the
+  // resting layout, not the first frame after opening a dialog.
+  const deadline = Date.now() + (options.settleMs ?? 1200);
+  let problems = await collectProblems(page, options.scope);
+  while (problems.length > 0 && Date.now() < deadline) {
+    await page.waitForTimeout(150);
+    problems = await collectProblems(page, options.scope);
+  }
   if (problems.length > 0) {
     throw new Error(`${label}:\n- ${problems.join("\n- ")}`);
   }
