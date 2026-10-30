@@ -166,34 +166,131 @@ describe("PhotoSlideshow", () => {
   });
 
   describe("Display Modes", () => {
-    it("should apply display mode class", () => {
+    it("should apply fit class passed by the region", () => {
       const image = createImage();
       imagesStore.currentImage = image;
-      configStore.imageDisplayMode = "fill";
-      const wrapper = createWrapper();
+      const wrapper = createWrapper({ fit: "fill" });
 
       expect(wrapper.find(".photo-image").classes()).toContain("photo-image-fill");
     });
 
-    it("should apply smart mode class", () => {
+    it("defaults to smart when the region has no fit", () => {
       const image = createImage();
       imagesStore.currentImage = image;
-      configStore.imageDisplayMode = "smart";
       const wrapper = createWrapper();
 
       expect(wrapper.find(".photo-image").classes()).toContain("photo-image-smart");
     });
+  });
 
-    it("should calculate smart mode styling for landscape images", () => {
-      const image = createImage({ width: 1920, height: 1080 }); // 16:9 landscape
-      imagesStore.currentImage = image;
-      configStore.imageDisplayMode = "smart";
-      configStore.orientation = "landscape";
-      const wrapper = createWrapper();
+  describe("Smart fit measures the region (CLV-49)", () => {
+    let observers;
+
+    beforeEach(() => {
+      observers = [];
+      globalThis.ResizeObserver = class {
+        constructor(callback) {
+          this.callback = callback;
+          this.observe = vi.fn();
+          this.disconnect = vi.fn();
+          this.unobserve = vi.fn();
+          observers.push(this);
+        }
+      };
+    });
+
+    afterEach(() => {
+      delete globalThis.ResizeObserver;
+    });
+
+    const setContainer = async (wrapper, width, height) => {
+      // Mount's async hook observes the container after its image fetch settles.
+      for (let i = 0; i < 10 && observers.length === 0; i += 1) {
+        await Promise.resolve();
+      }
+      await wrapper.vm.$nextTick();
+      // The component's own observer is the one watching the photo container.
+      const observer = observers[observers.length - 1];
+      observer.callback([{ contentRect: { width, height } }]);
+      await wrapper.vm.$nextTick();
+    };
+
+    it("fills a 16:9 region with a 3:2 photo", async () => {
+      imagesStore.currentImage = createImage({ width: 1500, height: 1000 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
 
       const img = wrapper.find(".photo-image");
-      // Smart mode should return objectFit based on aspect ratio
-      expect(img.classes()).toContain("photo-image-smart");
+      expect(img.attributes("style")).toContain("object-fit: cover");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
+    });
+
+    it("shows a portrait photo whole over a blurred backdrop in a full-width region", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      const img = wrapper.find(".photo-image");
+      expect(img.attributes("style")).toContain("object-fit: contain");
+      const backdrop = wrapper.find(".photo-backdrop");
+      expect(backdrop.exists()).toBe(true);
+      expect(backdrop.attributes("src")).toBe("/api/images/1");
+      expect(backdrop.attributes("aria-hidden")).toBe("true");
+    });
+
+    it("shows a landscape photo whole in a 9:16 region", async () => {
+      imagesStore.currentImage = createImage({ width: 1600, height: 900 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 900, 1600);
+
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(true);
+    });
+
+    it("recomputes the decision when the region is resized", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+
+      await setContainer(wrapper, 1600, 900); // 16:9 → whole photo
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+
+      await setContainer(wrapper, 1000, 1500); // portrait → fill
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: cover");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
+    });
+
+    it("uses naturalWidth/naturalHeight when stored dimensions are missing", async () => {
+      imagesStore.currentImage = createImage({ width: undefined, height: undefined });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      // Unknown shape: contain until the photo reports its own size.
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+
+      const img = wrapper.find(".photo-image");
+      Object.defineProperty(img.element, "naturalWidth", { value: 1600 });
+      Object.defineProperty(img.element, "naturalHeight", { value: 900 });
+      await img.trigger("load");
+      await wrapper.vm.$nextTick();
+
+      expect(img.attributes("style")).toContain("object-fit: cover");
+    });
+
+    it("Whole photo renders the backdrop", async () => {
+      imagesStore.currentImage = createImage({ width: 1500, height: 1000 });
+      const wrapper = createWrapper({ fit: "fit" });
+
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(true);
+    });
+
+    it("photo frame uses Smart whatever the region's fit is", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "fill", isFullscreen: true });
+      await setContainer(wrapper, 1600, 900);
+
+      expect(wrapper.find(".photo-image").classes()).toContain("photo-image-smart");
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
     });
   });
 
