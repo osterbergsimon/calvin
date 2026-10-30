@@ -222,6 +222,7 @@ async def get_plugins(
                 if hasattr(plugin_type_enum, "value")
                 else str(plugin_type_enum),
                 "description": type_info.description or "",
+                "icon": type_info.icon,
                 "config_schema": merged_schema,  # Legacy name
                 "common_config_schema": merged_schema,  # Also send as common_config_schema for frontend
                 "instance_config_schema": type_info.instance_config_schema,

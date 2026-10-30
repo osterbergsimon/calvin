@@ -48,6 +48,13 @@ class TestPluginMetadataDefaults:
         )
         assert metadata.plugin_type == PluginType.IMAGE
 
+    def test_icon_is_optional_and_defaults_to_none(self):
+        # §6: an optional contract addition — an emoji or a file in the plugin's
+        # own frontend/ dir. Contract 1.0 plugins that never set it load as-is,
+        # and the UI falls back to the first letter.
+        assert PluginMetadata(type_id="test_plugin", name="Test Plugin").icon is None
+        assert PluginMetadata(type_id="test_plugin", name="Test Plugin", icon="🖼").icon == "🖼"
+
 
 @pytest.mark.unit
 class TestBrowserOrigins:
