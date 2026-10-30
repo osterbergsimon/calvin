@@ -1,6 +1,9 @@
 <template>
   <div class="ins">
-    <div class="ins-mode"><span class="chip region">Region</span> in “{{ screen.name }}”</div>
+    <div class="ins-mode">
+      <h3 class="ins-title">Region</h3>
+      <span class="ins-sub">· in {{ screen.name }}</span>
+    </div>
 
     <template v-if="region.split">
       <section class="ins-group">
@@ -351,32 +354,30 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
   padding: var(--space-xl) var(--space-xl) var(--space-3xl);
 }
 .ins-mode {
-  font-size: var(--fs-2xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2xs);
   margin-bottom: var(--space-lg);
 }
-.chip {
-  padding: 0.12rem 0.5rem;
-  border-radius: var(--radius-pill);
-  font-weight: 700;
-  letter-spacing: 0.04em;
+.ins-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
 }
-.chip.region {
-  background: var(--focus-glow);
-  color: var(--focus);
+.ins-sub {
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
 }
 .ins-group {
   margin-bottom: var(--space-3xl);
 }
 .ins-h {
   margin: 0 0 var(--space-lg);
-  font-size: var(--fs-2xs);
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
 }
 .ins-field {
   display: block;

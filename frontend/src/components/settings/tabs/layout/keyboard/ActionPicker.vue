@@ -153,14 +153,13 @@ const visibleGroups = computed(() => {
   padding: 4px 14px 12px;
 }
 .ap-group-title {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-2);
-  margin: 12px 0 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
+  margin: var(--space-lg) 0 var(--space-xs);
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 .ap-star {
   color: var(--warn);
@@ -175,11 +174,10 @@ const visibleGroups = computed(() => {
   background: none;
   border: none;
   border-top: 1px solid var(--line);
-  color: var(--ink-2);
+  color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: var(--fs-sm);
+  font-weight: 600;
   cursor: pointer;
   min-height: var(--touch-target);
 }

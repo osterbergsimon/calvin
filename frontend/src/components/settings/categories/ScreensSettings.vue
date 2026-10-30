@@ -1530,11 +1530,10 @@ onUnmounted(() => {
 }
 .screen-pages__scope-label {
   margin: 0;
-  font-family: var(--font-data);
-  font-size: var(--fs-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--ink);
 }
 .screen-pages__start-scope {
   display: flex;

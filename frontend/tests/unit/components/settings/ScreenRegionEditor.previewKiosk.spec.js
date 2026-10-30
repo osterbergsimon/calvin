@@ -178,7 +178,7 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
       ],
     });
     const lines = w.findAll('[data-test="page-screens"]').map(n => n.text());
-    expect(lines).toEqual(["Kitchen · Hallway", "Office"]);
+    expect(lines).toEqual(["Kitchen, Hallway", "Office"]);
   });
 
   it("says All screens when every screen shows the page", async () => {
@@ -204,8 +204,8 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
       kiosks: [{ id: "hall", overrides: { availableScreens: [] } }],
     });
     expect(w.findAll('[data-test="page-screens"]').map(n => n.text())).toEqual([
-      "Not on any screen",
-      "Not on any screen",
+      "Not shown",
+      "Not shown",
     ]);
   });
 
