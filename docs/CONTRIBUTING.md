@@ -29,6 +29,7 @@ See the [Development Setup Guide](setup/QUICKSTART_DEVELOP.md) for detailed inst
 - Follow Vue style guide
 - Use **ESLint** for linting
 - Run `npm run lint` before committing
+- Run `npm run type-check` for the typed API layer (`src/api/`); `.vue` files are not covered yet
 
 ## Testing
 
