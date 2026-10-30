@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Connection status</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --line:#dde3e8; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#fff; --warn:#b7791f; --ok:#2f8a57;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } h1 { font-family:var(--font-display); margin:0 0 20px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; height:720px; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; position:relative; }
+.bar { height:64px; background:var(--bg-1); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 20px; gap:16px; }
+.time { font-family:var(--font-display); font-size:1.9rem; } .date { color:var(--ink-2); } .sp { flex:1; }
+.pill { height:32px; padding:0 12px; display:flex; align-items:center; gap:8px; border:1px solid color-mix(in srgb, var(--warn) 55%, var(--line)); border-radius:999px; background:var(--bg-1); font-size:.85rem; }
+.pill svg { width:16px; height:16px; fill:var(--warn); }
+.regions { flex:1; display:grid; grid-template-columns:2fr 1fr; gap:12px; padding:12px; }
+.r { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; padding:16px; color:var(--ink-3); }
+.pop { position:absolute; top:76px; right:20px; width:20rem; background:var(--bg-1); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:0 18px 50px -16px rgba(0,0,0,.25); }
+.pop h3 { margin:0 0 8px; font-size:1rem; } .pop p { margin:0 0 10px; font-size:.86rem; color:var(--ink-2); line-height:1.4; }
+.btn { display:inline-flex; align-items:center; height:44px; padding:0 16px; border:1px solid var(--line); border-radius:10px; font-weight:500; font-size:.9rem; }
+.float { position:absolute; left:16px; bottom:16px; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>Connection status</h1>
+  <svg width="0" height="0" style="position:absolute"><symbol id="off" viewBox="0 0 24 24"><path d="M19.8,22.6L17.15,20H6.5Q4.2,20 2.6,18.4Q1,16.8 1,14.5Q1,12.6 2.18,11.1Q3.35,9.6 5.2,9.18L1.4,5.4L2.8,4L21.2,22.4M6.5,18H15.15L7.1,9.95Q6.85,10.03 6.66,10.05Q6.47,10.08 6.5,10.08Q5.05,10.08 4.03,11.07Q3,12.05 3,13.5Q3,14.95 4.03,15.97Q5.05,17 6.5,18M21.6,18.75L20.15,17.35Q20.55,17.05 20.78,16.6Q21,16.15 21,15.5Q21,14.45 20.28,13.73Q19.55,13 18.5,13H17V11Q17,8.93 15.54,7.46Q14.08,6 12,6Q11.3,6 10.67,6.17Q10.03,6.35 9.5,6.68L8.05,5.23Q8.93,4.63 9.91,4.31Q10.9,4 12,4Q14.93,4 16.96,6.04Q19,8.08 19,11Q20.73,11.2 21.86,12.5Q23,13.8 23,15.5Q23,16.48 22.63,17.31Q22.25,18.15 21.6,18.75Z"/></symbol></svg>
+  <figure>
+    <div class="frame">
+      <div class="bar"><span class="time">09:07</span><span class="date">Thu 30 Oct</span><span class="sp"></span><span class="pill"><svg><use href="#off"/></svg>Can't reach Calvin · data from 08:41</span></div>
+      <div class="regions"><div class="r">Calendar (last data)</div><div class="r">Photos (last data)</div></div>
+      <div class="pop">
+        <h3>Can't reach Calvin</h3>
+        <p>This screen is showing what it last got at 08:41. It keeps trying on its own.</p>
+        <p>Check that the Calvin server is on and that this screen is on the same network.</p>
+        <span class="btn">Try now</span>
+      </div>
+    </div>
+    <figcaption><b>N1 · One indicator, explained on tap.</b> It replaces "⚠️ No Connection" + "● Error". The pill says what's wrong and how old the data is, and a tap explains it with <b>Try now</b>. With the clock bar hidden, the same pill floats bottom-left. When all is well, nothing shows.</figcaption>
+  </figure>
+</main>
+</body>
+</html>
