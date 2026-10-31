@@ -227,6 +227,9 @@ const roomLabel = computed(() => configStore.displayName);
   flex: 1;
   display: flex;
   align-items: center;
+  /* One spacing token for both sides: the wordmark, room name and screen dots
+     (left) and the plugin tiles and actions (right) never touch. */
+  gap: var(--gap-inline);
   min-width: 0;
 }
 
@@ -236,8 +239,6 @@ const roomLabel = computed(() => configStore.displayName);
 
 .clock-bar-right {
   justify-content: flex-end;
-  /* Keep plugin statusbar items from crowding the ⋯ action cluster. */
-  gap: 0.5rem;
 }
 
 .clock-bar-content {
