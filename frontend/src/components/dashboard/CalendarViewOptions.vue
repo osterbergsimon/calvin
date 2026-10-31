@@ -232,7 +232,7 @@ const setWeekNumbers = value => {
   flex: none;
   border: 0;
   border-radius: var(--radius-pill);
-  background: var(--line);
+  background: var(--switch-track-off);
   position: relative;
   cursor: pointer;
   transition: background 0.2s;
@@ -247,6 +247,7 @@ const setWeekNumbers = value => {
   height: 14px;
   border-radius: var(--radius-pill);
   background: var(--switch-knob);
+  box-shadow: var(--switch-knob-shadow);
   transition: transform 0.2s;
 }
 
