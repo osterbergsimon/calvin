@@ -1,21 +1,25 @@
 <template>
-  <SettingRow label="Repository" description="GitHub repository to pull updates from." stacked>
+  <SettingRow
+    label="Update source"
+    description="Where Calvin downloads updates from. Leave as is unless you run your own copy."
+    stacked
+  >
     <input
       v-model="localGitRepoUrl"
       class="field-input"
       type="text"
       placeholder="https://github.com/user/repo.git"
-      aria-label="Git repository URL"
+      aria-label="Update source address"
       @change="handleGitRepoChange"
       @blur="handleGitRepoChange"
     />
   </SettingRow>
 
-  <SettingRow label="Branch" description="Which branch to track." stacked>
+  <SettingRow label="Release channel" description="Which line of updates to follow." stacked>
     <select
       class="field-select"
       :value="gitBranch"
-      aria-label="Git branch"
+      aria-label="Release channel"
       @change="handleGitBranchChange"
     >
       <option v-for="branch in availableBranches" :key="branch" :value="branch">

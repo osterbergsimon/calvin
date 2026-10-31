@@ -67,10 +67,10 @@ describe("usePlugins", () => {
       const { sortedPluginCategories, loadPlugins } = usePlugins();
       await loadPlugins();
 
-      // Check that backend category exists
+      // Check that background plugin category exists
       const backendCategory = sortedPluginCategories.value.find(cat => cat.type === "backend");
       expect(backendCategory).toBeDefined();
-      expect(backendCategory.label).toBe("Backend");
+      expect(backendCategory.label).toBe("Background");
       expect(backendCategory.plugins).toHaveLength(1);
       expect(backendCategory.plugins[0].id).toBe("imap");
     });

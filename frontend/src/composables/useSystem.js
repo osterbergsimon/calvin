@@ -5,6 +5,7 @@
 import { ref } from "vue";
 import * as systemApi from "../services/systemApi";
 import { errorDetailMessage } from "../utils/apiErrors";
+import { friendlyError } from "../utils/friendlyError";
 
 // Singleton refs so any component using useSystem() shares the same status
 const updating = ref(false);
@@ -97,7 +98,10 @@ export function useSystem() {
       backendHealth.value = {
         status: "unhealthy",
         data: null,
-        error: errorDetailMessage(error, error.message || "Backend health check failed"),
+        // `error` is the raw detail (Settings shows it behind Details); the
+        // readout itself only ever shows the friendly sentence.
+        error: errorDetailMessage(error, error.message || ""),
+        errorText: friendlyError(error, "check on Calvin"),
       };
       backendHealthCheckedAt.value = new Date().toISOString();
       return backendHealth.value;
@@ -140,7 +144,7 @@ export function useSystem() {
   // System restart
   const restartBackend = async () => {
     _cancelMessageClear();
-    updateMessage.value = "Restarting backend…";
+    updateMessage.value = "Restarting Calvin…";
     updateMessageClass.value = "info";
     try {
       await systemApi.restartBackend();
@@ -148,7 +152,11 @@ export function useSystem() {
       // A network error here means the backend killed itself before sending the
       // response (old behaviour). Treat it the same as a successful initiation.
       if (error.response) {
-        updateMessage.value = errorDetailMessage(error, "Failed to restart backend");
+        updateMessage.value = friendlyError(error, "restart Calvin", {
+          // A 409 here is usually a deliberate host-control refusal; that
+          // message is written for people, so show it as it is.
+          conflict: errorDetailMessage(error, ""),
+        });
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
         console.error("Failed to restart backend:", error);
@@ -156,17 +164,18 @@ export function useSystem() {
       }
       // No response → likely the process died mid-request; fall through.
     }
-    updateMessage.value = "Backend restarting — waiting for it to come back…";
+    updateMessage.value = "Calvin is restarting. This takes about 15 seconds.";
     updateMessageClass.value = "info";
     await sleep(2000); // give systemctl time to stop the service
     const healthy = await waitForBackendHealthy({ timeoutMs: 60000 });
     if (healthy) {
-      updateMessage.value = "Backend restarted successfully! Reloading…";
+      updateMessage.value = "Calvin is back. Reloading…";
       updateMessageClass.value = "success";
       await sleep(1500);
       window.location.reload();
     } else {
-      updateMessage.value = "Backend not responding after restart. Check the service manually.";
+      updateMessage.value =
+        "Calvin hasn't come back yet. If it stays down, restart the machine it runs on.";
       updateMessageClass.value = "warning";
       _scheduleMessageClear(12000);
     }
@@ -174,30 +183,32 @@ export function useSystem() {
 
   const restartFrontend = async () => {
     _cancelMessageClear();
-    updateMessage.value = "Restarting frontend…";
+    updateMessage.value = "Restarting this screen…";
     updateMessageClass.value = "info";
     try {
       await systemApi.restartFrontend();
     } catch (error) {
       if (error.response) {
-        updateMessage.value = errorDetailMessage(error, "Failed to restart frontend");
+        updateMessage.value = friendlyError(error, "restart this screen", {
+          conflict: errorDetailMessage(error, ""),
+        });
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
         console.error("Failed to restart frontend:", error);
         return;
       }
     }
-    updateMessage.value = "Frontend restarting — waiting for it to come back…";
+    updateMessage.value = "Restarting this screen…";
     updateMessageClass.value = "info";
     await sleep(2000); // give systemctl time to stop the service
     const healthy = await waitForBackendHealthy({ timeoutMs: 60000 });
     if (healthy) {
-      updateMessage.value = "Frontend restarted successfully! Reloading…";
+      updateMessage.value = "Reloading…";
       updateMessageClass.value = "success";
       await sleep(1500);
       window.location.reload();
     } else {
-      updateMessage.value = "Frontend not responding after restart. Check the service manually.";
+      updateMessage.value = "This screen hasn't come back. Turn it off and on again.";
       updateMessageClass.value = "warning";
       _scheduleMessageClear(12000);
     }
@@ -222,16 +233,16 @@ export function useSystem() {
             };
             const line = data.line.toLowerCase();
             if (line.includes("pulling latest code") || line.includes("fetching latest")) {
-              updateMessage.value = "Pulling latest code...";
+              updateMessage.value = "Downloading the update…";
             } else if (line.includes("updating") && line.includes("dependenc")) {
-              updateMessage.value = "Updating dependencies...";
+              updateMessage.value = "Installing…";
             } else if (
               line.includes("building frontend") ||
               (line.includes("vite") && line.includes("build"))
             ) {
-              updateMessage.value = "Building frontend... (this may take a few minutes)";
+              updateMessage.value = "Preparing the screens. This can take a few minutes.";
             } else if (line.includes("restarting")) {
-              updateMessage.value = "Restarting services...";
+              updateMessage.value = "Restarting Calvin…";
             }
             updateMessageClass.value = "info";
           } else if (data.type === "status") {
@@ -275,7 +286,7 @@ export function useSystem() {
     try {
       const response = await systemApi.triggerUpdate();
       const logOffset = response.log_offset ?? 0;
-      updateMessage.value = "Update started...";
+      updateMessage.value = "Update started.";
       updateMessageClass.value = "info";
       updateStatus.value = {
         status: "running",
@@ -286,30 +297,30 @@ export function useSystem() {
       const result = await streamUpdateStatus(logOffset);
 
       if (result.status === "complete" || result.status === "disconnected") {
-        updateMessage.value = "Update complete. Waiting for backend to come back\u2026";
+        updateMessage.value = "Update installed. Waiting for Calvin to restart…";
         updateMessageClass.value = "info";
         const healthy = await waitForBackendHealthy();
         if (healthy) {
-          updateMessage.value = "Update completed successfully!";
+          updateMessage.value = "Calvin is up to date.";
           updateMessageClass.value = "success";
         } else {
           updateMessage.value =
-            "Update completed, but backend is not responding yet. Please wait or check logs.";
+            "Update installed, but Calvin hasn't restarted yet. Give it a minute.";
           updateMessageClass.value = "warning";
         }
       } else if (result.status === "error") {
-        updateMessage.value = `Update failed: ${result.message || "Check logs for details."}`;
+        updateMessage.value = "The update didn't finish. Calvin is still on the previous version.";
         updateMessageClass.value = "error";
         _scheduleMessageClear(8000);
       } else {
         updateMessage.value =
-          "Update is taking longer than expected. Please check logs or try again later.";
+          "The update is taking longer than usual. Leave it running and check back later.";
         updateMessageClass.value = "warning";
         _scheduleMessageClear(12000);
       }
     } catch (error) {
       console.error("Failed to trigger update:", error);
-      updateMessage.value = errorDetailMessage(error, error.message || "Failed to start update");
+      updateMessage.value = friendlyError(error, "start the update");
       updateMessageClass.value = "error";
       _scheduleMessageClear(8000);
     } finally {
@@ -329,24 +340,25 @@ export function useSystem() {
 
         if (isUpdateDoneStatus(status.status)) {
           // Script says update is complete; confirm backend is reachable after restart.
-          updateMessage.value = "Update complete. Waiting for backend to come back…";
+          updateMessage.value = "Update installed. Waiting for Calvin to restart…";
           updateMessageClass.value = "info";
 
           const healthy = await waitForBackendHealthy();
           if (!healthy) {
             updateMessage.value =
-              "Update completed, but backend is not responding yet. Please wait or check logs.";
+              "Update installed, but Calvin hasn't restarted yet. Give it a minute.";
             updateMessageClass.value = "warning";
             return;
           }
 
-          updateMessage.value = "Update completed successfully!";
+          updateMessage.value = "Calvin is up to date.";
           updateMessageClass.value = "success";
           return;
         }
 
         if (isUpdateErrorStatus(status.status)) {
-          updateMessage.value = `Update failed: ${status.message || "Unknown error"}`;
+          updateMessage.value =
+            "The update didn't finish. Calvin is still on the previous version.";
           updateMessageClass.value = "error";
           _scheduleMessageClear(8000);
           return;
@@ -359,7 +371,7 @@ export function useSystem() {
       } catch (error) {
         // During restarts, the backend may be down; treat this as "waiting for health"
         console.warn("Update status unavailable (backend may be restarting):", error);
-        updateMessage.value = "Backend restarting… waiting for /api/health";
+        updateMessage.value = "Calvin is restarting. This takes about 15 seconds.";
         updateMessageClass.value = "warning";
         await waitForBackendHealthy({ timeoutMs: 60000, intervalMs: 2000 });
       }
@@ -368,7 +380,7 @@ export function useSystem() {
     }
 
     updateMessage.value =
-      "Update is taking longer than expected. Please check logs or try again later.";
+      "The update is taking longer than usual. Leave it running and check back later.";
     updateMessageClass.value = "warning";
     _scheduleMessageClear(12000);
   };

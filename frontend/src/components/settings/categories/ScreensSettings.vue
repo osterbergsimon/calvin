@@ -139,8 +139,8 @@
                   tone="warn"
                   data-test="kiosk-pending-badge"
                   role="img"
-                  :aria-label="`${k.id}: offline, hardware config not yet applied`"
-                  title="Offline — this screen hasn't applied the current hardware config yet"
+                  :aria-label="`${nameFor(k)}: offline, display settings waiting`"
+                  title="Offline. It will apply the new display settings when it's back."
                   >⚠</Tag
                 >
               </span>
@@ -1229,14 +1229,15 @@ async function onUpdate(id) {
 }
 async function updateAll() {
   // Offline kiosks get the request too: the flag waits for their next poll.
-  const ids = behind.value.map(k => k.id);
-  const results = await Promise.allSettled(ids.map(id => store.triggerUpdate(id)));
+  const targets = behind.value;
+  const results = await Promise.allSettled(targets.map(k => store.triggerUpdate(k.id)));
   results.forEach((result, index) => {
     if (result.status === "rejected") {
       notifications.notify({
         severity: "error",
         eyebrow: "Screens",
-        message: `Couldn't start the update on ${ids[index]}.`,
+        // The name on the card, never the internal id (CLV-63).
+        message: `Couldn't start the update on ${nameFor(targets[index])}.`,
       });
     }
   });

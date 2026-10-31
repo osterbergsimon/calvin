@@ -87,14 +87,11 @@
       </div>
     </section>
 
-    <!-- Another GitHub repository stays a deliberate visit (§3.3). -->
+    <!-- Another GitHub source stays a deliberate visit (§3.3). -->
     <details class="install-disclosure">
-      <summary>From another GitHub repository</summary>
+      <summary>From another GitHub address</summary>
       <div class="plugin-install-content">
-        <p class="help-text-compact">
-          Enter a GitHub repository URL and click "List plugins" to see available plugins and
-          themes.
-        </p>
+        <p class="help-text-compact">Paste a GitHub address and choose List plugins.</p>
         <div class="install-compact-row">
           <input
             :value="repoUrl"
@@ -126,7 +123,7 @@
           v-if="branchSwitched && availablePlugins.length > 0"
           class="branch-switch-notice-compact"
         >
-          Using branch <strong>{{ actualBranch }}</strong>
+          Version: <strong>{{ actualBranch }}</strong>
         </div>
 
         <div v-if="filteredPlugins.length > 0" class="available-plugins-compact">
@@ -228,7 +225,7 @@
       <summary>Local path (development)</summary>
       <div class="plugin-install-content">
         <p class="help-text-compact">
-          Install directly from a local cloned repository. Enter an absolute path to the repo root.
+          For plugin developers: install from a folder on the Calvin server.
         </p>
         <div class="install-compact-row">
           <input
@@ -370,9 +367,6 @@
     </div>
     <div v-if="success" class="success-message">
       {{ success }}
-      <div v-if="branchSwitched" class="branch-switch-notice">
-        ℹ️ Branch switched from 'main' to 'master' (main branch not found)
-      </div>
     </div>
   </div>
 </template>
@@ -880,6 +874,15 @@ watch(searchQuery, () => {
   outline-offset: 2px;
 }
 
+/* Closed disclosures must take no room: Chromium keeps a skipped
+   `::details-content` subtree's last layout boxes around, which leaves
+   invisible inputs behind the next summary (and makes them hit-testable).
+   A descendant selector, because `details > *` no longer matches through
+   Chromium's `::details-content` wrapper. */
+.install-disclosure:not([open]) .plugin-install-content {
+  display: none;
+}
+
 .plugin-install-content {
   padding: 1rem 0 0;
 }
@@ -1100,8 +1103,7 @@ watch(searchQuery, () => {
 }
 
 /* Notices */
-.branch-switch-notice-compact,
-.branch-switch-notice {
+.branch-switch-notice-compact {
   margin-top: 1rem;
   padding: 0.6rem 0.75rem;
   background: color-mix(in srgb, var(--ink-2) 8%, transparent);

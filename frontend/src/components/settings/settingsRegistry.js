@@ -304,7 +304,7 @@ export const settingsDestinations = [
   },
   {
     id: "device-power",
-    label: "Power, display schedule, and timeout",
+    label: "Screen on/off schedule and idle",
     path: "Screens / Default · Power",
     category: "screens",
     section: "device-power",

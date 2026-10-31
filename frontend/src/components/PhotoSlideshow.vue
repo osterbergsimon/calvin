@@ -20,9 +20,6 @@
       :dim="dim"
     >
       <template #actions>
-        <div v-if="imagesStore.error" class="error-message">
-          {{ imagesStore.error }}
-        </div>
         <template v-if="focused && hasPointer">
           <IconButton
             size="custom"
@@ -373,15 +370,6 @@ watch(sourceKey, async () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.error-message {
-  color: var(--err-text);
-  font-size: var(--fs-md);
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
 }
 
 .slideshow-content {

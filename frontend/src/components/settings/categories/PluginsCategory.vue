@@ -112,8 +112,8 @@
             </li>
           </ul>
           <p class="pip-warning-text">
-            Only install plugins from sources you trust. A malicious pip package can execute
-            arbitrary code on your server.
+            Only install plugins from people you trust. A plugin runs on your Calvin server and can
+            do anything Calvin can.
           </p>
         </div>
         <div class="modal-footer">
@@ -280,7 +280,7 @@ const afterInstall = async installedIds => {
       notificationsStore.notify({
         severity: "info",
         eyebrow: "Plugins",
-        message: "Plugin installed — reload this page if it does not appear.",
+        message: "Plugin installed.",
       });
     }
     return;

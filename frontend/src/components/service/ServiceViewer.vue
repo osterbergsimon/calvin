@@ -16,11 +16,12 @@
         :schema="service.display_schema"
         :data="schemaData"
         :plugin-id="service.id"
+        :plugin-name="service.plugin_name || service.name"
         :link-action="linkAction"
       />
       <div v-else class="unknown-service">
-        <p>This service can't be shown.</p>
-        <p class="error-text">Its plugin doesn't declare a display schema — update the plugin.</p>
+        <p>This can't be shown here.</p>
+        <p class="error-text">Its plugin needs an update.</p>
       </div>
     </DashboardPanel>
   </div>

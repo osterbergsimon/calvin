@@ -125,6 +125,15 @@ describe("NotificationSystem (input-echo HUD)", () => {
 
       expect(wrapper.find(".hud__label").text()).toBe("Next Image");
     });
+
+    it("should say Button pressed when the action has no label", async () => {
+      const wrapper = mount(NotificationSystem);
+
+      wrapper.vm.showKeyboardFeedback("KEY_9", "");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".hud__label").text()).toBe("Button pressed");
+    });
   });
 
   describe("Mode Change Echo", () => {

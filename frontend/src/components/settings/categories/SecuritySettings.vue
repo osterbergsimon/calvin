@@ -75,6 +75,7 @@
 import { onMounted, ref } from "vue";
 import { useSecurityStore } from "@/stores/security";
 import { logError } from "@/utils/logger";
+import { friendlyError } from "@/utils/friendlyError";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -102,7 +103,7 @@ async function onSealedToggle(value) {
   try {
     await store.saveSealedMode(value);
   } catch (err) {
-    error.value = err?.response?.data?.detail || "Failed to save sealed mode.";
+    error.value = friendlyError(err, "change sealed mode");
     logError("[SecuritySettings]", "sealed save failed", err);
     sealed.value = !value; // revert optimistic toggle on failure
   }
@@ -142,7 +143,7 @@ async function save() {
   try {
     await store.saveAllowedOrigins(origins.value);
   } catch (err) {
-    error.value = err?.response?.data?.detail || "Failed to save.";
+    error.value = friendlyError(err, "save the allowed sites");
     logError("[SecuritySettings]", "save failed", err);
   } finally {
     saving.value = false;

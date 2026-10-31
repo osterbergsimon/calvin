@@ -105,6 +105,10 @@ describe("Images Store", () => {
 
       await expect(store.fetchImages()).rejects.toThrow("Network error");
       expect(store.error).toBe("Network error");
+      // CLV-63: the raw text stays for logs; the screen gets a friendly line.
+      expect(store.errorText).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(store.loading).toBe(false);
     });
 

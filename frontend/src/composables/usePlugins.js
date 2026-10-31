@@ -50,7 +50,7 @@ const sortedPluginCategories = computed(() => {
     { type: "calendar", label: "Calendar", plugins: [] },
     { type: "image", label: "Image", plugins: [] },
     { type: "service", label: "Service", plugins: [] },
-    { type: "backend", label: "Backend", plugins: [] },
+    { type: "backend", label: "Background", plugins: [] },
     { type: "theme", label: "Theme", plugins: [] },
   ];
 
@@ -654,7 +654,7 @@ export function usePlugins() {
       await useWebServicesStore().fetchServices();
       pluginSaveStatus.value[pluginId] = {
         success: true,
-        message: "Configuration saved successfully",
+        message: "Saved.",
       };
       setTimeout(() => {
         pluginSaveStatus.value[pluginId] = null;

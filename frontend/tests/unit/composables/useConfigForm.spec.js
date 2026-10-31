@@ -235,10 +235,13 @@ describe("useConfigForm", () => {
         "Update failed"
       );
 
-      expect(form.error.value).toBe("Update failed");
+      // CLV-63: one friendly sentence, never the raw error text.
+      expect(form.error.value).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(form.saveStatus.value).toEqual({
         state: "error",
-        message: "Update failed",
+        message: "Couldn't reach Calvin. Check that it's running and on the same network.",
       });
       expect(form.saving.value).toBe(false);
       expect(logErrorMock).toHaveBeenCalledWith("[useConfigForm]", "Failed to save config:", error);
@@ -249,6 +252,7 @@ describe("useConfigForm", () => {
       configApi.getConfig.mockResolvedValue(mockConfig);
       const error = {
         response: {
+          status: 422,
           data: {
             detail: "Validation error",
           },
