@@ -83,6 +83,63 @@ describe("RegionInspector split toggle", () => {
   });
 });
 
+describe("RegionInspector sources", () => {
+  const sources = [
+    { id: "family", name: "Family" },
+    { id: "work", name: "Work" },
+  ];
+  const mountSources = region =>
+    mount(RegionInspector, {
+      props: {
+        region,
+        screen: { name: "Home", layout: { regions: [region] } },
+        layoutDir: "row",
+        componentOptions: [],
+        sourceOptions: sources,
+        context: { depth: 1, isSub: false, canSplit: false, canAddSub: false, splitDir: "row" },
+      },
+      global: {
+        stubs: {
+          SegmentedControl: true,
+          ToggleSwitch: true,
+          NumberStepper: true,
+          SelectPill: true,
+        },
+      },
+    });
+  const chips = w => w.findAllComponents({ name: "ChipMultiSelect" })[0];
+
+  it("marks All sources while the region inherits every source", () => {
+    const w = mountSources({ id: "r1", kind: "calendar", size: 100, instanceIds: [] });
+    expect(chips(w).props("modelValue")).toEqual(["__all__"]);
+  });
+
+  it("narrows to a picked source while All sources is on", () => {
+    const w = mountSources({ id: "r1", kind: "calendar", size: 100, instanceIds: [] });
+    chips(w).vm.$emit("update:modelValue", ["__all__", "family"]);
+    expect(w.emitted("toggle-source")[0]).toEqual(["family", true]);
+    expect(w.emitted("clear-sources")).toBeUndefined();
+  });
+
+  it("goes back to every source when All sources is picked", () => {
+    const w = mountSources({ id: "r1", kind: "calendar", size: 100, instanceIds: ["family"] });
+    chips(w).vm.$emit("update:modelValue", ["__all__"]);
+    expect(w.emitted("clear-sources")?.length).toBe(1);
+    expect(w.emitted("toggle-source")).toBeUndefined();
+  });
+
+  it("toggles one source off an explicit list", () => {
+    const w = mountSources({
+      id: "r1",
+      kind: "calendar",
+      size: 100,
+      instanceIds: ["family", "work"],
+    });
+    chips(w).vm.$emit("update:modelValue", ["work"]);
+    expect(w.emitted("toggle-source")[0]).toEqual(["family", false]);
+  });
+});
+
 describe("RegionInspector display settings (CLV-49)", () => {
   const context = { depth: 1, isSub: false, canSplit: false, canAddSub: false, splitDir: "row" };
   const calendar = (view = {}) => ({

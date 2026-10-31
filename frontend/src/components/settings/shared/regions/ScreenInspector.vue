@@ -5,114 +5,111 @@
       <span class="ins-sub">{{ headingSub }}</span>
     </div>
 
-    <section class="ins-group">
-      <label class="ins-field">
-        <span class="ins-label">Name</span>
-        <input
-          class="ins-input"
-          type="text"
-          :value="screen.name"
-          aria-label="Page name"
-          @focus="keepInView"
-          @change="$emit('rename', $event.target.value)"
-        />
-      </label>
+    <SettingRow label="Name" stacked>
+      <TextField
+        data-test="page-name"
+        :model-value="draftName"
+        label="Page name"
+        hide-label
+        @update:model-value="draftName = $event"
+        @focus="keepInView"
+        @blur="commitName"
+        @keydown.enter.prevent="commitName"
+      />
+    </SettingRow>
 
-      <div class="ins-field">
-        <span class="ins-label">Layout <Tag v-if="isCustom" class="tag">Custom</Tag></span>
-        <div class="presets">
-          <button
-            v-for="p in presets"
-            :key="p.value"
-            type="button"
-            class="preset"
-            :class="{ active: screen.layout.preset === p.value }"
-            :aria-label="p.label.includes(p.short) ? p.label : `${p.label}, ${p.short}`"
-            @click="$emit('preset', p.value)"
-          >
-            <span class="mini"><i v-for="n in p.cols" :key="n" /></span>
-            <span class="preset-label">{{ p.short }}</span>
-          </button>
-        </div>
-      </div>
+    <SettingRow label="Layout" stacked>
+      <template #label-extra>
+        <Tag v-if="isCustom" class="ins-tag">Custom</Tag>
+      </template>
+      <SegmentedControl
+        :model-value="screen.layout.preset || ''"
+        :options="presets"
+        aria-label="Layout"
+        @update:model-value="$emit('preset', $event)"
+      />
+    </SettingRow>
 
-      <div class="ins-field">
-        <span class="ins-label">Region direction</span>
-        <SegmentedControl
-          :model-value="layoutDir"
-          :options="[
-            { value: 'row', label: 'Side-by-side' },
-            { value: 'column', label: 'Stacked' },
-          ]"
-          aria-label="Region direction"
-          @update:model-value="$emit('toggle-direction')"
-        />
-        <p class="ins-help">
+    <SettingRow label="Region direction" stacked>
+      <template #description>
+        <InlineNote>
           How this page’s regions are cut — independent of the physical orientation.
-        </p>
-      </div>
-    </section>
+        </InlineNote>
+      </template>
+      <SegmentedControl
+        :model-value="layoutDir"
+        :options="[
+          { value: 'row', label: 'Side-by-side' },
+          { value: 'column', label: 'Stacked' },
+        ]"
+        aria-label="Region direction"
+        @update:model-value="$emit('toggle-direction')"
+      />
+    </SettingRow>
 
-    <section class="ins-group">
-      <h3 class="ins-h">Clock bar</h3>
-      <div class="switch-row">
-        <div>
-          <div class="s-label">Show clock bar</div>
-          <div class="s-help">A slim time strip on this page</div>
-        </div>
+    <SettingGroup title="Clock bar">
+      <SettingRow label="Show clock bar" description="A slim time strip on this page">
         <ToggleSwitch
           :model-value="clock.enabled"
           aria-label="Show clock bar"
           @update:model-value="v => $emit('clock-enabled', v)"
         />
-      </div>
-      <div v-if="clock.enabled" class="ins-field">
-        <span class="ins-label">Position</span>
+      </SettingRow>
+      <SettingRow v-if="clock.enabled" label="Position" stacked>
+        <template #description>
+          <InlineNote>
+            Or drag the bar in the preview onto any edge or gap. With 3+ regions, each gap is listed
+            so you can pick exactly where it sits.
+          </InlineNote>
+        </template>
         <SelectPill
           :model-value="positionValue"
           :options="positionOptions"
           aria-label="Clock bar position"
           @update:model-value="v => $emit('clock-position', v)"
         />
-        <p class="ins-help">
-          Or drag the bar in the preview onto any edge or gap. With 3+ regions, each gap is listed
-          so you can pick exactly where it sits.
-        </p>
-      </div>
-      <button v-if="hasOverride" type="button" class="link-btn" @click="$emit('clock-inherit')">
-        Inherit global clock bar
-      </button>
-    </section>
+      </SettingRow>
+      <ScopeLine
+        v-if="hasOverride"
+        class="ins-scope"
+        overridden
+        reset-test="clock-inherit"
+        @reset="$emit('clock-inherit')"
+      />
+    </SettingGroup>
 
-    <section class="ins-group">
-      <h3 class="ins-h">This page</h3>
-      <p class="ins-empty">
-        Select a region in the preview to set what it shows and how big it is.
-      </p>
-      <div class="btn-row">
-        <button type="button" class="link-btn" :disabled="atMax" @click="$emit('add-region')">
-          ＋ Add region
-        </button>
-        <button type="button" class="link-btn" @click="$emit('duplicate')">Duplicate</button>
-        <button
-          type="button"
-          class="link-btn danger"
-          :disabled="!canDelete"
-          @click="$emit('delete')"
-        >
-          Delete page
-        </button>
+    <SettingGroup title="This page">
+      <div class="ins-note">
+        <InlineNote>
+          Select a region in the preview to set what it shows and how big it is.
+        </InlineNote>
       </div>
-    </section>
+      <div class="ins-actions">
+        <Button size="sm" :icon="mdiPlus" :disabled="atMax" @click="$emit('add-region')">
+          Add region
+        </Button>
+        <Button size="sm" @click="$emit('duplicate')">Duplicate</Button>
+        <Button size="sm" variant="danger" :disabled="!canDelete" @click="$emit('delete')">
+          Delete page
+        </Button>
+      </div>
+    </SettingGroup>
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
+import { mdiPlus } from "@mdi/js";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ScopeLine from "@/components/ui/ScopeLine.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
-import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
 import Tag from "@/components/ui/Tag.vue";
+import TextField from "@/components/ui/TextField.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import { MAX_TOP_REGIONS } from "@/utils/layout";
 
 const props = defineProps({
@@ -122,7 +119,7 @@ const props = defineProps({
   clockSelected: { type: Boolean, default: false },
   canDelete: { type: Boolean, default: true },
 });
-defineEmits([
+const emit = defineEmits([
   "rename",
   "preset",
   "add-region",
@@ -135,10 +132,10 @@ defineEmits([
 ]);
 
 const presets = [
-  { value: "single", label: "Single region", short: "Single", cols: 1 },
-  { value: "split_two", label: "Two regions", short: "2", cols: 2 },
-  { value: "split_three", label: "Three regions", short: "3", cols: 3 },
-  { value: "split_four", label: "Four regions", short: "4", cols: 4 },
+  { value: "single", label: "Single" },
+  { value: "split_two", label: "Two" },
+  { value: "split_three", label: "Three" },
+  { value: "split_four", label: "Four" },
 ];
 const headingSub = computed(() =>
   props.clockSelected ? `· on ${props.screen.name}` : `· ${props.screen.name}`
@@ -148,6 +145,17 @@ const isCustom = computed(
 );
 const atMax = computed(() => props.screen.layout.regions.length >= MAX_TOP_REGIONS);
 const hasOverride = computed(() => Boolean(props.screen.clockBar));
+
+// The name commits on blur or Enter, like the old `@change` input, so typing
+// does not write the config on every character.
+const draftName = ref(props.screen.name);
+watch(
+  () => props.screen.name,
+  name => (draftName.value = name)
+);
+const commitName = () => {
+  if (draftName.value !== props.screen.name) emit("rename", draftName.value);
+};
 
 // On a kiosk the on-screen keyboard can cover the field being edited; keep it
 // in view without scrolling the whole dialog to the top (§5).
@@ -186,167 +194,37 @@ const positionOptions = computed(() => {
 </script>
 
 <style scoped>
-.ins {
-  padding: var(--space-xl) var(--space-xl) var(--space-3xl);
-}
 .ins-mode {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2xs);
-  margin-bottom: var(--space-lg);
+  gap: var(--gap-1);
+  padding: var(--gap-4) var(--panel-pad-x) 0;
+  margin-bottom: var(--gap-3);
 }
 .ins-title {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 .ins-sub {
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink-3);
 }
-.ins-group {
-  margin-bottom: var(--space-3xl);
+.ins-tag {
+  margin-left: var(--gap-1);
 }
-.ins-h {
-  margin: 0 0 var(--space-lg);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
+.ins-scope {
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
-.ins-field {
-  display: block;
-  margin-bottom: var(--space-lg);
+.ins-note {
+  padding: 0 var(--panel-pad-x) var(--gap-3);
 }
-.ins-label {
-  display: block;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: var(--space-sm);
-}
-.ins-help {
-  margin: var(--space-sm) 0 0;
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  line-height: 1.35;
-}
-.ins-input {
-  width: 100%;
-  height: var(--control-height);
-  padding: 0 0.75rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--bg-1);
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-}
-.ins-input:focus {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.tag {
-  margin-left: var(--space-xs);
-}
-.presets {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-sm);
-}
-.preset {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2xs);
-  padding: var(--space-sm) var(--space-2xs) var(--space-2xs);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg-1);
-  cursor: pointer;
-}
-.preset:hover {
-  border-color: var(--focus);
-}
-.preset.active {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px var(--focus-glow);
-}
-.preset .mini {
-  display: flex;
-  gap: 2px;
-  width: 100%;
-  height: 30px;
-  padding: 2px;
-  border-radius: var(--radius-xs);
-  background: var(--bg-2);
-}
-.preset .mini i {
-  flex: 1;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--ink-3) 45%, transparent);
-}
-.preset-label {
-  font-size: var(--fs-micro);
-  color: var(--ink-2);
-}
-.preset.active .preset-label {
-  color: var(--focus-text);
-  font-weight: 650;
-}
-.switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-lg);
-  padding: var(--space-sm) 0;
-}
-.s-label {
-  font-size: var(--fs-sm);
-  font-weight: 550;
-  color: var(--ink);
-}
-.s-help {
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  margin-top: 0.1rem;
-}
-.ins-empty {
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  background: var(--bg-2);
-  border: 1px dashed var(--line);
-  border-radius: var(--radius-sm);
-  padding: var(--space-md) var(--space-lg);
-  line-height: 1.4;
-  margin: 0 0 var(--space-lg);
-}
-.btn-row {
+.ins-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
-}
-.link-btn {
-  font-size: var(--fs-xs);
-  font-weight: 550;
-  padding: var(--space-2xs) var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg-1);
-  color: var(--ink-2);
-  cursor: pointer;
-}
-.link-btn:hover:not(:disabled) {
-  border-color: var(--focus);
-  color: var(--focus-text);
-}
-.link-btn.danger:hover:not(:disabled) {
-  border-color: var(--err);
-  color: var(--err-text);
-}
-.link-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
+  gap: var(--gap-2);
+  padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-5);
 }
 </style>

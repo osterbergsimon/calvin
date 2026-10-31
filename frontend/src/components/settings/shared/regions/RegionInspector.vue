@@ -6,10 +6,8 @@
     </div>
 
     <template v-if="region.split">
-      <section class="ins-group">
-        <h3 class="ins-h">Split region</h3>
-        <div class="ins-field">
-          <span class="ins-label">Sub-region direction</span>
+      <SettingGroup title="Split region">
+        <SettingRow label="Sub-region direction" stacked>
           <SegmentedControl
             :model-value="splitDir"
             :options="[
@@ -19,97 +17,90 @@
             aria-label="Sub-region direction"
             @update:model-value="$emit('toggle-sub-direction')"
           />
+        </SettingRow>
+        <div v-if="canAddSub" class="ins-actions">
+          <Button size="sm" :icon="mdiPlus" @click="$emit('add-sub')">{{ addSubLabel }}</Button>
         </div>
-        <div class="btn-row">
-          <button v-if="canAddSub" type="button" class="link-btn" @click="$emit('add-sub')">
-            {{ addSubLabel }}
-          </button>
+        <div class="ins-note">
+          <InlineNote>
+            This region is split into sub-regions. Select a sub-region to set its content.
+          </InlineNote>
         </div>
-        <p class="ins-help">
-          This region is split into sub-regions. Select a sub-region to set its content.
-        </p>
-      </section>
+      </SettingGroup>
     </template>
 
     <template v-else>
-      <section class="ins-group">
-        <h3 class="ins-h">Shows</h3>
-        <div class="picker">
-          <button
-            type="button"
-            class="picker-trigger"
-            :aria-expanded="pickerOpen"
-            @click="pickerOpen = !pickerOpen"
-          >
-            <span class="picker-emoji">{{ kindEmoji }}</span>
-            {{ componentLabel }}
-            <span class="picker-caret">▾</span>
-          </button>
-          <div v-if="pickerOpen" class="picker-menu">
-            <input
-              v-model="search"
-              class="picker-search"
-              type="search"
-              placeholder="Filter components"
-            />
-            <button
-              v-for="opt in filtered"
-              :key="opt.value"
-              type="button"
-              class="picker-option"
-              @click="choose(opt)"
+      <SettingGroup title="Shows">
+        <SettingRow label="Component" stacked>
+          <div class="picker">
+            <Button
+              class="picker-trigger"
+              variant="secondary"
+              :icon="kindIcon"
+              :aria-expanded="pickerOpen"
+              @click="pickerOpen = !pickerOpen"
             >
-              <span class="picker-option-label">{{ opt.label }}</span>
-              <span
-                v-if="opt.pluginName && opt.pluginName !== opt.label"
-                class="picker-option-type"
+              {{ componentLabel }}
+              <span class="picker-caret" aria-hidden="true">▾</span>
+            </Button>
+            <Card v-if="pickerOpen" class="picker-menu">
+              <TextField
+                v-model="search"
+                class="picker-search"
+                label="Filter components"
+                type="search"
+                hide-label
+                placeholder="Filter components"
+              />
+              <Button
+                v-for="opt in filtered"
+                :key="opt.value"
+                variant="ghost"
+                size="sm"
+                class="picker-option"
+                @click="choose(opt)"
               >
-                {{ opt.pluginName }}
-              </span>
-            </button>
-            <p v-if="filtered.length === 0" class="picker-empty">No matches</p>
-            <!-- F4: with no services yet the menu only offers Calendar/Photos;
-                 say where web services come from instead of hiding them. -->
-            <button
-              v-if="!hasServices"
-              type="button"
-              class="picker-option picker-option--add"
-              data-test="picker-add-service"
-              @click="addService"
-            >
-              <span class="picker-option-label">＋ Add a web service…</span>
-              <span class="picker-option-type"
-                >Web pages and dashboards, from Content › Web pages &amp; services</span
-              >
-            </button>
+                <span class="picker-option-label">{{ opt.label }}</span>
+                <span
+                  v-if="opt.pluginName && opt.pluginName !== opt.label"
+                  class="picker-option-type"
+                >
+                  {{ opt.pluginName }}
+                </span>
+              </Button>
+              <InlineNote v-if="filtered.length === 0">No matches</InlineNote>
+              <!-- F4: with no services yet the menu only offers Calendar/Photos;
+                   say where web services come from instead of hiding them. -->
+              <div v-if="!hasServices" class="picker-add">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="picker-option"
+                  data-test="picker-add-service"
+                  @click="addService"
+                >
+                  <span class="picker-option-label">＋ Add a web service…</span>
+                  <span class="picker-option-type">
+                    Web pages and dashboards, from Content › Web pages &amp; services
+                  </span>
+                </Button>
+              </div>
+            </Card>
           </div>
-        </div>
+        </SettingRow>
 
-        <div v-if="sourceOptions.length" class="sources">
-          <span class="ins-label">Sources</span>
-          <label class="source">
-            <input
-              type="checkbox"
-              :checked="(region.instanceIds || []).length === 0"
-              @change="$emit('clear-sources')"
-            />
-            All sources
-          </label>
-          <label v-for="src in sourceOptions" :key="src.id" class="source">
-            <input
-              type="checkbox"
-              :checked="(region.instanceIds || []).includes(src.id)"
-              @change="$emit('toggle-source', src.id, $event.target.checked)"
-            />
-            {{ src.name }}
-          </label>
-        </div>
-      </section>
+        <SettingRow v-if="sourceOptions.length" label="Sources" stacked>
+          <ChipMultiSelect
+            :model-value="sourceSelection"
+            :options="sourceChipOptions"
+            aria-label="Sources"
+            @update:model-value="onSourcesChange"
+          />
+        </SettingRow>
+      </SettingGroup>
 
-      <section v-if="region.kind === 'calendar'" class="ins-group">
-        <h3 class="ins-h">Calendar</h3>
-        <div class="ins-field">
-          <span class="ins-label">View</span>
+      <SettingGroup v-if="region.kind === 'calendar'" title="Calendar">
+        <SettingRow label="View" stacked>
           <SegmentedControl
             :model-value="region.view?.mode || 'month'"
             :options="[
@@ -120,20 +111,18 @@
             aria-label="Calendar view"
             @update:model-value="v => $emit('patch-view', { mode: v })"
           />
-        </div>
-        <div class="switch-row">
-          <div>
-            <div class="s-label">Rolling window</div>
-            <div class="s-help">Start from today instead of the calendar month</div>
-          </div>
+        </SettingRow>
+        <SettingRow
+          label="Rolling window"
+          description="Start from today instead of the calendar month"
+        >
           <ToggleSwitch
             :model-value="region.view?.rolling === true"
             aria-label="Rolling window"
             @update:model-value="v => $emit('patch-view', { rolling: v })"
           />
-        </div>
-        <div v-if="region.view?.rolling" class="ins-field row">
-          <span class="ins-label">Weeks ahead</span>
+        </SettingRow>
+        <SettingRow v-if="region.view?.rolling" label="Weeks ahead">
           <NumberStepper
             :model-value="region.view?.weeks ?? 4"
             :min="1"
@@ -141,46 +130,37 @@
             aria-label="Weeks ahead"
             @update:model-value="v => $emit('patch-view', { weeks: v })"
           />
-        </div>
-        <div class="switch-row">
-          <div>
-            <div class="s-label">Week numbers</div>
-            <div class="s-help">Show the week number beside each week</div>
-          </div>
+        </SettingRow>
+        <SettingRow label="Week numbers" description="Show the week number beside each week">
           <ToggleSwitch
             :model-value="region.view?.weekNumbers === true"
             aria-label="Week numbers"
             @update:model-value="v => $emit('patch-view', { weekNumbers: v })"
           />
-        </div>
-        <div class="ins-field row">
-          <span class="ins-label">Events per day</span>
+        </SettingRow>
+        <SettingRow label="Events per day">
           <SelectPill
             :model-value="eventDensityModel"
             :options="eventDensityOptions"
             aria-label="Events per day"
             @update:model-value="setEventDensity"
           />
-        </div>
-      </section>
+        </SettingRow>
+      </SettingGroup>
 
-      <section v-else-if="region.kind === 'photos'" class="ins-group">
-        <h3 class="ins-h">Photos</h3>
-        <div class="ins-field row">
-          <span class="ins-label">Fit photos</span>
+      <SettingGroup v-else-if="region.kind === 'photos'" title="Photos">
+        <SettingRow label="Fit photos">
           <SelectPill
             :model-value="photoFitModel"
             :options="photoFitOptions"
             aria-label="Fit photos"
             @update:model-value="v => $emit('patch-view', { fit: v })"
           />
-        </div>
-      </section>
+        </SettingRow>
+      </SettingGroup>
 
-      <section v-else-if="region.kind === 'service'" class="ins-group">
-        <h3 class="ins-h">Service</h3>
-        <div class="ins-field">
-          <span class="ins-label">When tapped</span>
+      <SettingGroup v-else-if="region.kind === 'service'" title="Service">
+        <SettingRow label="When tapped" stacked>
           <SegmentedControl
             :model-value="region.view?.linkAction || 'handoff'"
             :options="[
@@ -191,14 +171,12 @@
             aria-label="Service link action"
             @update:model-value="v => $emit('patch-view', { linkAction: v })"
           />
-        </div>
-      </section>
+        </SettingRow>
+      </SettingGroup>
     </template>
 
-    <section v-if="isSub" class="ins-group">
-      <h3 class="ins-h">Split</h3>
-      <div class="ins-field">
-        <span class="ins-label">Sub-region direction</span>
+    <SettingGroup v-if="isSub" title="Split">
+      <SettingRow label="Sub-region direction" stacked>
         <SegmentedControl
           :model-value="splitDir"
           :options="[
@@ -208,54 +186,55 @@
           aria-label="Sub-region direction"
           @update:model-value="$emit('toggle-sub-direction')"
         />
+      </SettingRow>
+      <div v-if="canAddSub" class="ins-actions">
+        <Button size="sm" :icon="mdiPlus" @click="$emit('add-sub')">{{ addSubLabel }}</Button>
       </div>
-      <div class="btn-row">
-        <button v-if="canAddSub" type="button" class="link-btn" @click="$emit('add-sub')">
-          {{ addSubLabel }}
-        </button>
+      <div class="ins-note">
+        <InlineNote>
+          This region is one cell of a split. Add more to build rows and columns.
+        </InlineNote>
       </div>
-      <p class="ins-help">
-        This region is one cell of a split. Add more to build rows and columns.
-      </p>
-    </section>
+    </SettingGroup>
 
-    <section class="ins-group">
-      <h3 class="ins-h">Arrange</h3>
-      <p class="ins-help sz">
-        Size <strong>{{ region.size }}%</strong> — drag the divider in the preview to resize.
-      </p>
-      <div class="btn-row">
-        <button
-          v-if="splittable || region.split"
-          type="button"
-          class="link-btn"
-          @click="$emit('toggle-split')"
-        >
-          {{ region.split ? "Unsplit" : "Split region" }}
-        </button>
-        <button
-          type="button"
-          class="link-btn danger"
-          :disabled="!canRemove"
-          @click="$emit('remove')"
-        >
-          Remove region
-        </button>
+    <SettingGroup title="Arrange">
+      <div class="ins-note">
+        <InlineNote>
+          Size <strong>{{ region.size }}%</strong> — drag the divider in the preview to resize.
+        </InlineNote>
       </div>
-      <button type="button" class="link-btn back" @click="$emit('deselect')">
-        ◂ Back to page settings
-      </button>
-    </section>
+      <div class="ins-actions">
+        <Button v-if="splittable || region.split" size="sm" @click="$emit('toggle-split')">
+          {{ region.split ? "Unsplit" : "Split region" }}
+        </Button>
+        <Button variant="danger" size="sm" :disabled="!canRemove" @click="$emit('remove')">
+          Remove region
+        </Button>
+      </div>
+      <div class="ins-actions ins-actions--back">
+        <Button variant="link" size="sm" :icon="mdiChevronLeft" @click="$emit('deselect')">
+          Back to page settings
+        </Button>
+      </div>
+    </SettingGroup>
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import SegmentedControl from "@/components/ui/SegmentedControl.vue";
-import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { mdiCalendarBlankOutline, mdiChevronLeft, mdiImageOutline, mdiPlus, mdiWeb } from "@mdi/js";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
+import TextField from "@/components/ui/TextField.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import { filterComponentOptions } from "@/utils/componentPicker";
 
 const props = defineProps({
@@ -294,8 +273,12 @@ const choose = opt => {
   search.value = "";
 };
 
-const kindEmoji = computed(() =>
-  props.region.kind === "calendar" ? "📅" : props.region.kind === "photos" ? "🖼️" : "🌐"
+const kindIcon = computed(() =>
+  props.region.kind === "calendar"
+    ? mdiCalendarBlankOutline
+    : props.region.kind === "photos"
+      ? mdiImageOutline
+      : mdiWeb
 );
 const componentLabel = computed(() => {
   if (props.region.kind === "calendar") return "Calendar";
@@ -305,6 +288,46 @@ const componentLabel = computed(() => {
   );
   return opt?.label || "Service";
 });
+
+/* --- sources -------------------------------------------------------------
+ * An empty `instanceIds` means "all sources"; an explicit list means only
+ * those. The chip group mirrors that: the All sources chip is selected while
+ * the list is empty. Every interaction still emits at most one toggle, because
+ * each update rebuilds the layout from the current config. */
+const ALL_SOURCES = "__all__";
+const sourceSelection = computed(() =>
+  (props.region.instanceIds || []).length ? props.region.instanceIds : [ALL_SOURCES]
+);
+const sourceChipOptions = computed(() => [
+  { value: ALL_SOURCES, label: "All sources" },
+  ...props.sourceOptions.map(source => ({ value: source.id, label: source.name })),
+]);
+const onSourcesChange = next => {
+  const currentIds = props.region.instanceIds || [];
+  const currentAll = currentIds.length === 0;
+  const nextAll = next.includes(ALL_SOURCES);
+  if (currentAll) {
+    if (!nextAll) {
+      // Deselecting All sources keeps the shared default (all sources).
+      emit("clear-sources");
+      return;
+    }
+    const picked = next.filter(value => value !== ALL_SOURCES);
+    // Picking a specific source while All is on narrows to that source.
+    picked.forEach(id => emit("toggle-source", id, true));
+    return;
+  }
+  if (nextAll) {
+    emit("clear-sources");
+    return;
+  }
+  const nextIds = next.filter(value => value !== ALL_SOURCES);
+  for (const source of props.sourceOptions) {
+    const was = currentIds.includes(source.id);
+    const now = nextIds.includes(source.id);
+    if (was !== now) emit("toggle-source", source.id, now);
+  }
+};
 
 // Context-driven computed properties — provided by ScreenRegionEditor via the
 // `context` prop so this component no longer needs to walk the tree itself.
@@ -350,214 +373,85 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
 </script>
 
 <style scoped>
-.ins {
-  padding: var(--space-xl) var(--space-xl) var(--space-3xl);
-}
 .ins-mode {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2xs);
-  margin-bottom: var(--space-lg);
+  gap: var(--gap-1);
+  padding: var(--gap-4) var(--panel-pad-x) 0;
+  margin-bottom: var(--gap-3);
 }
 .ins-title {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 .ins-sub {
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink-3);
 }
-.ins-group {
-  margin-bottom: var(--space-3xl);
-}
-.ins-h {
-  margin: 0 0 var(--space-lg);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-.ins-field {
-  display: block;
-  margin-bottom: var(--space-lg);
-}
-.ins-field.row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-lg);
-}
-.ins-label {
-  display: block;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: var(--space-sm);
-}
-.ins-field.row .ins-label {
-  margin-bottom: 0;
-}
-.ins-help {
-  margin: var(--space-sm) 0 0;
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  line-height: 1.35;
-}
-.ins-help.sz {
-  margin: 0 0 var(--space-md);
-}
-.ins-help.sz strong {
-  color: var(--ink);
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-}
-
 .picker {
   position: relative;
+  width: 100%;
 }
 .picker-trigger {
   width: 100%;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: 0.55rem 0.7rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--bg-1);
-  color: var(--ink);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-}
-.picker-trigger:focus {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  justify-content: flex-start;
 }
 .picker-caret {
-  margin-left: auto;
+  margin-left: var(--gap-2);
   color: var(--ink-3);
-  font-size: var(--fs-2xs);
 }
 .picker-menu {
   position: absolute;
-  z-index: 30;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + var(--gap-1));
   left: 0;
   right: 0;
+  z-index: var(--z-raised);
   max-height: 260px;
   overflow: auto;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  background: var(--bg-1);
-  box-shadow: 0 12px 32px var(--shadow);
-}
-.picker-search {
-  width: 100%;
-  margin-bottom: 6px;
-  padding: 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  color: var(--ink);
-}
-.picker-option {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--gap-1);
+}
+.picker-search {
+  margin-bottom: var(--gap-1);
+}
+.picker-option {
   width: 100%;
-  padding: 0.5rem 0.6rem;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--ink);
-  cursor: pointer;
+  justify-content: flex-start;
   text-align: left;
 }
-.picker-option:hover {
-  background: var(--bg-2);
+.picker-option :deep(.btn__label) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--gap-tight);
 }
 .picker-option-type {
-  font-size: var(--fs-micro);
+  font-size: var(--text-caption);
   color: var(--ink-3);
 }
-.picker-option--add {
-  margin-top: var(--space-2xs);
+.picker-add {
+  padding-top: var(--gap-1);
   border-top: 1px solid var(--line-soft);
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
 }
-.picker-option--add .picker-option-label {
-  color: var(--focus-text);
-  font-weight: 600;
+.ins-note {
+  padding: 0 var(--panel-pad-x) var(--gap-3);
 }
-.picker-empty {
-  padding: 0.5rem;
-  color: var(--ink-3);
-  font-size: var(--fs-2xs);
+.ins-note strong {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
 }
-
-.sources {
-  margin-top: var(--space-lg);
-}
-.source {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  padding: 0.3rem 0;
-  font-size: var(--fs-sm);
-  color: var(--ink);
-}
-
-.switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-lg);
-  padding: var(--space-sm) 0;
-}
-.s-label {
-  font-size: var(--fs-sm);
-  font-weight: 550;
-  color: var(--ink);
-}
-.s-help {
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  margin-top: 0.1rem;
-}
-
-.btn-row {
+.ins-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  gap: var(--gap-2);
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
-.link-btn {
-  font-size: var(--fs-xs);
-  font-weight: 550;
-  padding: var(--space-2xs) var(--space-md);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--bg-1);
-  color: var(--ink-2);
-  cursor: pointer;
-}
-.link-btn:hover:not(:disabled) {
-  border-color: var(--focus);
-  color: var(--focus-text);
-}
-.link-btn.danger:hover:not(:disabled) {
-  border-color: var(--err);
-  color: var(--err-text);
-}
-.link-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.link-btn.back {
-  margin-top: var(--space-md);
-  width: 100%;
+.ins-actions--back {
+  padding-top: 0;
+  padding-bottom: var(--gap-5);
 }
 </style>

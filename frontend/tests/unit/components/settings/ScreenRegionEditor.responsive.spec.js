@@ -326,12 +326,12 @@ describe("ScreenRegionEditor touch behaviour", () => {
     setMedia({ coarse: true });
     const w = await mountEditor();
     await w.find(".sre-region").trigger("click"); // region settings first
-    expect(w.find('[aria-label="Page name"]').exists()).toBe(false);
+    expect(w.find('[data-test="page-name"]').exists()).toBe(false);
 
     await w.find(".sre-clockbar").trigger("click");
 
     // Page settings are shown, where the clock bar's Position lives.
-    expect(w.find('[aria-label="Page name"]').exists()).toBe(true);
+    expect(w.find('[data-test="page-name"]').exists()).toBe(true);
     const position = w.find('[aria-label^="Clock bar position"]');
     expect(position.exists()).toBe(true);
     await position.trigger("click");
