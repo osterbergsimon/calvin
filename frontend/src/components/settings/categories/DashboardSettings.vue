@@ -86,15 +86,6 @@
           @update:model-value="setUiSize"
         />
       </SettingRow>
-      <SettingRow label="Room name" :description="ROOM_NAME_DESCRIPTION">
-        <input
-          class="display-name-input"
-          type="text"
-          :value="config.displayName"
-          aria-label="Room name"
-          @input="e => emit('update:config', { displayName: e.target.value })"
-        />
-      </SettingRow>
     </SettingsSection>
 
     <!-- TOUCH & CONTROLS — what the wall shows, then what reacts to touches -->
@@ -290,7 +281,6 @@ const emit = defineEmits(["update:config"]);
 
 // Kept out of the template: the quoted example would fight the formatter's
 // attribute quoting.
-const ROOM_NAME_DESCRIPTION = 'Shown in the clock bar, e.g. "Kitchen".';
 
 const editorOpen = ref(false);
 const route = useRoute();
@@ -375,24 +365,6 @@ const timeToHour = value => {
 <style scoped>
 .dashboard-settings {
   width: 100%;
-}
-
-.display-name-input {
-  height: var(--control-height);
-  min-height: var(--touch-target);
-  padding: 0 0.875rem; /* 14px */
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  font-family: var(--font-ui);
-  font-size: var(--fs-control-lg);
-  color: var(--ink);
-  min-width: 180px;
-}
-
-.display-name-input:focus {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .dash-hours {

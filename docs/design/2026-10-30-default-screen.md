@@ -28,8 +28,6 @@ Only the list remains (plus **Kiosk software** and **+ Add a screen**, unchanged
 ## 3. The Default page
 
 The same component and sections as a screen page (#165), opened from the Default card:
-- **Name** → **Room name** for browsers that aren't a screen (the global `displayName`). Description **Shown in the
-  clock bar of any browser that isn't set up as a screen.**
 - **Pages**: which pages browsers and new screens show, and the start page (the global `availableScreens` /
   `defaultScreenId`). **Edit pages** opens the editor previewing **Any browser**.
 - **Display**, **Power**, **Touch & keyboard**: today's All-screens rows, unchanged.

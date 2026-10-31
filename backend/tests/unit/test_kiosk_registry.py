@@ -356,3 +356,87 @@ async def test_request_update_unknown_id_returns_false(test_db):
     from app.services import kiosk_registry as kr
 
     assert await kr.request_agent_update("../bad") is False
+
+
+# --- CLV-84: the global room name becomes a per-screen name -----------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_room_name_moves_to_the_only_unnamed_screen(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await kr.set_overrides("hallway", {"displayName": "Hallway", "orientation": "portrait"})
+    await config_service.set_value("displayName", "Lounge")
+
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("hallway") == {
+        "displayName": "Hallway",
+        "orientation": "portrait",
+    }
+    assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
+    assert await config_service.get_value("displayName") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_room_name_is_dropped_when_two_screens_are_unnamed(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await kr.record_kiosk("hallway")
+    await config_service.set_value("displayName", "Lounge")
+
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("kitchen") == {}
+    assert await kr.get_overrides("hallway") == {}
+    assert await config_service.get_value("displayName") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_room_name_is_dropped_with_no_screens(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await config_service.set_value("displayName", "Lounge")
+
+    await kr.migrate_global_room_name()
+
+    assert await config_service.get_value("displayName") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_room_name_migration_is_idempotent(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await config_service.set_value("displayName", "Lounge")
+
+    await kr.migrate_global_room_name()
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
+    assert await config_service.get_value("displayName") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_room_name_migration_handles_the_snake_case_key(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await config_service.set_value("display_name", "Lounge")
+
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
+    assert await config_service.get_value("display_name") is None
