@@ -94,7 +94,7 @@
             input-id="auth-setup-code"
           >
             <template #hint>
-              <template v-if="shownSetupCode">Filled in from this screen.</template>
+              <template v-if="codePrefilled">{{ codePrefillHint }}</template>
               <template v-else>
                 Calvin printed it in its log when it first started.
                 <a
@@ -182,6 +182,7 @@
         <PhoneSetupCard
           class="auth-lock__phone"
           :compact="isShort"
+          :setup-code="mode === 'setup' ? shownSetupCode : ''"
           :title="mode === 'setup' ? 'Set it up from your phone' : 'Sign in from your phone'"
           :hint="isShort ? '' : undefined"
         />
@@ -197,6 +198,7 @@ import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { useOskState } from "@/composables/useOnScreenKeyboard";
 import { useNotificationsStore } from "@/stores/notifications";
+import { isLoopbackPage } from "@/utils/serverUrl";
 import PasswordField from "@/components/ui/PasswordField.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 
@@ -227,6 +229,12 @@ const networkError = ref(false);
 const submitting = ref(false);
 const retrying = ref(false);
 const shownSetupCode = ref("");
+const prefilledFromLink = ref(false);
+
+const codePrefilled = computed(() => Boolean(shownSetupCode.value || prefilledFromLink.value));
+const codePrefillHint = computed(() =>
+  prefilledFromLink.value ? "Filled in from the Calvin screen." : "Filled in from this screen."
+);
 
 const submitLabel = computed(() => {
   if (mode.value === "setup") return submitting.value ? "Setting password…" : "Set password";
@@ -301,20 +309,61 @@ function focusField() {
 
 /** The kiosk screen may show the code itself when the server allows it (loopback). */
 async function loadSetupCode() {
+  if (!isLoopbackPage()) return;
   const code = await auth.fetchSetupCode();
   shownSetupCode.value = code || "";
-  if (code) setupCode.value = code;
+  if (code && !prefilledFromLink.value) setupCode.value = code;
+}
+
+/**
+ * A phone that scanned the server screen's QR arrives with `?setup=CODE`.
+ * Apply it once (still editable) and drop it from the address bar so it is
+ * not kept in history or shared by copy-paste.
+ */
+const SETUP_PARAM = "setup";
+let linkParamApplied = false;
+
+function readSetupParam() {
+  if (typeof window === "undefined") return "";
+  const raw = new URLSearchParams(window.location.search).get(SETUP_PARAM) || "";
+  const normalized = raw.replace(/[\s-]/g, "").toUpperCase();
+  if (!/^[A-Z0-9]{8}$/.test(normalized)) return "";
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+}
+
+function stripSetupParam() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(SETUP_PARAM)) return;
+  url.searchParams.delete(SETUP_PARAM);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function applySetupParam() {
+  if (linkParamApplied) return;
+  linkParamApplied = true;
+  const fromLink = readSetupParam();
+  if (!fromLink) return;
+  setupCode.value = fromLink;
+  prefilledFromLink.value = true;
+  stripSetupParam();
 }
 
 watch(
   () => auth.status,
   value => {
-    if (value === "setup") loadSetupCode();
+    if (value === "setup") {
+      applySetupParam();
+      loadSetupCode();
+    }
     if (!isTouch.value && (value === "setup" || value === "locked")) focusField();
   }
 );
 onMounted(() => {
-  if (auth.status === "setup") loadSetupCode();
+  if (auth.status === "setup") {
+    applySetupParam();
+    loadSetupCode();
+  }
   if (!isTouch.value && (auth.status === "setup" || auth.status === "locked")) focusField();
 });
 

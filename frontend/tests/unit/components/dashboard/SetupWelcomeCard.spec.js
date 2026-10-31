@@ -11,10 +11,13 @@ import {
   SETUP_WELCOME_DISMISSED_KEY,
   useSetupPrompt,
 } from "@/composables/useSetupPrompt";
+import { _resetSetupCodeForTests } from "@/composables/useSetupCode";
 
 vi.mock("@/utils/serverUrl", () => ({
   resolveServerUrl: vi.fn(() => Promise.resolve("http://192.0.2.20:8000")),
-  settingsLink: (base, id) => `${base}/settings${id ? `?setting=${id}` : ""}`,
+  isLoopbackPage: () => true,
+  settingsLink: (base, id, code) =>
+    `${base}/settings${id ? `?setting=${id}` : ""}${code ? `${id ? "&" : "?"}setup=${code}` : ""}`,
 }));
 
 const REGIONS = [
@@ -55,6 +58,7 @@ describe("SetupWelcomeCard (CLV-20)", () => {
   beforeEach(() => {
     localStorage.clear();
     _resetSetupPromptForTests();
+    _resetSetupCodeForTests();
     window.innerWidth = 1280;
     window.innerHeight = 800;
     useConfigStore().touchControls = "on";
@@ -76,6 +80,28 @@ describe("SetupWelcomeCard (CLV-20)", () => {
       expect.stringContaining("Photos"),
       expect.stringContaining("Web pages"),
     ]);
+  });
+
+  it("puts the loopback setup code in the phone QR", async () => {
+    openWelcome();
+    useAuthStore().applyStatus({ configured: false, authenticated: false });
+    vi.spyOn(useAuthStore(), "fetchSetupCode").mockResolvedValue("ABCD-EFGH");
+
+    const { wrapper } = await mountCard();
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="phone-setup-url"]').text()).toContain("setup=ABCD-EFGH");
+  });
+
+  it("leaves setup= out of the phone QR when the code is not available", async () => {
+    openWelcome();
+    useAuthStore().applyStatus({ configured: false, authenticated: false });
+    vi.spyOn(useAuthStore(), "fetchSetupCode").mockResolvedValue(null);
+
+    const { wrapper } = await mountCard();
+    await flushPromises();
+
+    expect(wrapper.get('[data-test="phone-setup-url"]').text()).not.toContain("setup=");
   });
 
   it("says 'Add here' on a touch kiosk and 'Add' elsewhere", async () => {

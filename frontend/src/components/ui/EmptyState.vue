@@ -23,6 +23,7 @@
           class="empty-state__phone"
           compact
           :setting-id="phoneSettingId"
+          :setup-code="setupCode"
           :hint="usesPrompt ? 'Typing is easier there.' : undefined"
         />
       </template>
@@ -31,12 +32,14 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useModeStore } from "@/stores/mode";
+import { useAuthStore } from "@/stores/auth";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { usePhoneHandoff } from "@/composables/usePhoneHandoff";
 import { useSetupPrompt } from "@/composables/useSetupPrompt";
+import { useSetupCode } from "@/composables/useSetupCode";
 import PhoneSetupCard from "./PhoneSetupCard.vue";
 
 // An empty dashboard surface that says what's missing and jumps straight to the
@@ -62,9 +65,21 @@ const props = defineProps({
 
 const router = useRouter();
 const modeStore = useModeStore();
+const auth = useAuthStore();
 const { isTouch } = useTouchCapability();
 const { isPhoneHandoff } = usePhoneHandoff();
 const setupPrompt = useSetupPrompt();
+const { code: setupCode, load: loadSetupCode } = useSetupCode();
+
+// Only the server's own screen can read the code; the QR carries it so the
+// phone does not have to type it.
+watch(
+  () => auth.status,
+  status => {
+    if (status === "setup") loadSetupCode();
+  },
+  { immediate: true }
+);
 
 const rootEl = ref(null);
 let resizeObserver = null;

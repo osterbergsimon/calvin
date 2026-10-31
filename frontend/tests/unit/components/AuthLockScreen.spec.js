@@ -3,6 +3,8 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import api from "@/services/api";
 import { useAuthStore } from "@/stores/auth";
+import { useConfigStore } from "@/stores/config";
+import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 import AuthLockScreen from "@/components/settings/auth/AuthLockScreen.vue";
 
 function httpError(status, detail, options = {}) {
@@ -21,7 +23,10 @@ function mountLock() {
 
 describe("AuthLockScreen", () => {
   beforeEach(() => vi.clearAllMocks());
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    window.history.replaceState({}, "", "/");
+  });
 
   it("renders the setup variant when no password is configured", () => {
     const auth = useAuthStore();
@@ -51,6 +56,56 @@ describe("AuthLockScreen", () => {
     expect(wrapper.get("#auth-setup-code").element.value).toBe("ABCD-EFGH");
     expect(wrapper.text()).toContain("Filled in from this screen.");
     expect(wrapper.find("[data-test='setup-code-shown']").exists()).toBe(false);
+  });
+
+  it("puts the loopback code in the phone hand-off QR", async () => {
+    useConfigStore().touchControls = "on";
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    api.get.mockResolvedValueOnce({ data: { code: "ABCD-EFGH" } });
+
+    const wrapper = mountLock();
+    await flushPromises();
+
+    expect(wrapper.findComponent(PhoneSetupCard).props("setupCode")).toBe("ABCD-EFGH");
+  });
+
+  it("never puts a code in the QR when the server does not allow one", async () => {
+    useConfigStore().touchControls = "on";
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+
+    const wrapper = mountLock();
+    await flushPromises();
+
+    expect(wrapper.findComponent(PhoneSetupCard).props("setupCode")).toBe("");
+  });
+
+  it("prefills from a scanned ?setup= link and strips it from the address bar", async () => {
+    window.history.replaceState({}, "", "/settings?setup=ABCD-EFGH&setting=content-calendars");
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+
+    const wrapper = mountLock();
+    await flushPromises();
+
+    expect(wrapper.get("#auth-setup-code").element.value).toBe("ABCD-EFGH");
+    expect(wrapper.text()).toContain("Filled in from the Calvin screen.");
+    expect(window.location.search).not.toContain("setup=");
+    expect(window.location.search).toContain("setting=content-calendars");
+  });
+
+  it("ignores an invalid ?setup= link", async () => {
+    window.history.replaceState({}, "", "/settings?setup=nope");
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+
+    const wrapper = mountLock();
+    await flushPromises();
+
+    expect(wrapper.get("#auth-setup-code").element.value).toBe("");
+    expect(wrapper.text()).toContain("Calvin printed it in its log when it first started.");
+    expect(window.location.search).toContain("setup=nope");
   });
 
   it("gives the code input the right mobile and length attributes", () => {
