@@ -73,11 +73,18 @@ def _validate_schema_kind(
 
 
 class ConfigFieldDefinition(BaseModel):
-    """Typed config field metadata with permissive extra support."""
+    """Typed config field metadata with permissive extra support.
+
+    ``label`` names the form field; ``description`` is the one-line hint shown
+    under it. A field without a label falls back to a humanised key in the UI.
+    ``hidden: true`` keeps a field out of the form (its default still applies).
+    """
 
     type: str | None = None
+    label: str | None = None
     description: str | None = None
     default: Any = None
+    hidden: bool = False
     ui: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="allow")

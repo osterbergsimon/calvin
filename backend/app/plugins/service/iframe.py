@@ -35,10 +35,15 @@ class IframeServicePlugin(ServicePlugin):
             },
         },
         instance_config_schema={
-            "url": url_field("Website URL", placeholder="https://example.com", required=True),
+            "url": url_field(
+                "The web address to show.",
+                label="Address",
+                placeholder="https://example.com",
+                required=True,
+            ),
             "fullscreen": toggle_field(
-                "Prefer fullscreen mode",
-                help_text="Open this service in fullscreen by default",
+                "Open this service in fullscreen by default",
+                label="Fullscreen",
             ),
         },
         display_schema={

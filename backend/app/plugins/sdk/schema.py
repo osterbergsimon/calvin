@@ -6,8 +6,10 @@ plugins can write
     from app.plugins.sdk.schema import url_field, toggle_field
 
     instance_config_schema={
-        "url": url_field("Website URL", placeholder="https://example.com", required=True),
-        "fullscreen": toggle_field("Prefer fullscreen mode"),
+        "url": url_field(
+            "The web address to show.", label="Address", placeholder="https://example.com", required=True
+        ),
+        "fullscreen": toggle_field("Open this service in fullscreen by default", label="Fullscreen"),
     }
 
 instead of hand-rolling nested ``{type, ui: {component, validation}}`` dicts.
@@ -23,6 +25,13 @@ Canonical shape (see docs/plugins/PLUGIN_INTERFACE.md):
 
 from collections.abc import Iterable
 from typing import Any
+
+
+def _labelled(field: dict[str, Any], label: str | None) -> dict[str, Any]:
+    """Attach the optional form label; absent means the UI humanises the key."""
+    if label is not None:
+        field["label"] = label
+    return field
 
 
 def _ui(
@@ -45,6 +54,7 @@ def _ui(
 def text_field(
     description: str,
     *,
+    label: str | None = None,
     default: str = "",
     placeholder: str | None = None,
     required: bool = False,
@@ -52,17 +62,21 @@ def text_field(
 ) -> dict[str, Any]:
     """Plain single-line text input."""
     validation = {"required": True} if required else None
-    return {
-        "type": "string",
-        "description": description,
-        "default": default,
-        "ui": _ui("input", placeholder=placeholder, help_text=help_text, validation=validation),
-    }
+    return _labelled(
+        {
+            "type": "string",
+            "description": description,
+            "default": default,
+            "ui": _ui("input", placeholder=placeholder, help_text=help_text, validation=validation),
+        },
+        label,
+    )
 
 
 def password_field(
     description: str,
     *,
+    label: str | None = None,
     default: str = "",
     placeholder: str | None = None,
     required: bool = False,
@@ -70,18 +84,24 @@ def password_field(
 ) -> dict[str, Any]:
     """Masked secret input (API tokens, passwords)."""
     validation = {"required": True} if required else None
-    return {
-        "type": "password",
-        "description": description,
-        "default": default,
-        "ui": _ui("password", placeholder=placeholder, help_text=help_text, validation=validation),
-    }
+    return _labelled(
+        {
+            "type": "password",
+            "description": description,
+            "default": default,
+            "ui": _ui(
+                "password", placeholder=placeholder, help_text=help_text, validation=validation
+            ),
+        },
+        label,
+    )
 
 
 def select_field(
     description: str,
     options: Iterable[tuple[Any, str] | dict[str, Any]],
     *,
+    label: str | None = None,
     default: Any = None,
     required: bool = False,
     help_text: str | None = None,
@@ -94,8 +114,8 @@ def select_field(
                 raise ValueError("select_field option dicts must include 'value'")
             normalized.append(option)
         else:
-            value, label = option
-            normalized.append({"value": value, "label": label})
+            value, option_label = option
+            normalized.append({"value": value, "label": option_label})
     validation = {"required": True} if required else None
     ui = _ui("select", help_text=help_text, validation=validation)
     ui["options"] = normalized
@@ -106,12 +126,13 @@ def select_field(
     }
     if default is not None:
         field["default"] = default
-    return field
+    return _labelled(field, label)
 
 
 def url_field(
     description: str,
     *,
+    label: str | None = None,
     default: str = "",
     placeholder: str | None = None,
     required: bool = False,
@@ -122,32 +143,40 @@ def url_field(
     if required:
         validation["required"] = True
     validation["type"] = "url"
-    return {
-        "type": "string",
-        "description": description,
-        "default": default,
-        "ui": _ui("input", placeholder=placeholder, help_text=help_text, validation=validation),
-    }
+    return _labelled(
+        {
+            "type": "string",
+            "description": description,
+            "default": default,
+            "ui": _ui("input", placeholder=placeholder, help_text=help_text, validation=validation),
+        },
+        label,
+    )
 
 
 def toggle_field(
     description: str,
     *,
+    label: str | None = None,
     default: bool = False,
     help_text: str | None = None,
 ) -> dict[str, Any]:
-    """Boolean checkbox."""
-    return {
-        "type": "boolean",
-        "description": description,
-        "default": default,
-        "ui": _ui("checkbox", help_text=help_text),
-    }
+    """Boolean toggle (a switch in the form, not a native checkbox)."""
+    return _labelled(
+        {
+            "type": "boolean",
+            "description": description,
+            "default": default,
+            "ui": _ui("checkbox", help_text=help_text),
+        },
+        label,
+    )
 
 
 def number_field(
     description: str,
     *,
+    label: str | None = None,
     default: Any = None,
     min: int | float | None = None,
     max: int | float | None = None,
@@ -176,4 +205,4 @@ def number_field(
     }
     if default is not None:
         field["default"] = default
-    return field
+    return _labelled(field, label)
