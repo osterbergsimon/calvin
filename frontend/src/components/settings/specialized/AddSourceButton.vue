@@ -39,7 +39,7 @@ import { mdiUpload } from "@mdi/js";
 import InstanceModal from "./InstanceModal.vue";
 import ProviderPicker from "./ProviderPicker.vue";
 import ConfirmModal from "../shared/ConfirmModal.vue";
-import { pickerCatalogRepo } from "@/utils/pluginCatalog";
+import { pickerCatalogRepo, isCatalogEntry, isTestPlugin } from "@/utils/pluginCatalog";
 
 // The single "Add …" entry point for every Content section (§3.2). It picks a
 // provider by what the user wants to see ("photos from…") instead of by plugin
@@ -154,6 +154,8 @@ const installedIds = computed(() => new Set(plugins.value.map(plugin => plugin.i
 
 const catalogProviders = computed(() =>
   catalogItems.value
+    .filter(item => isCatalogEntry(item))
+    .filter(item => configStore.devMode || !isTestPlugin(item))
     .filter(
       item => catalogMatchesKind(item) && !item._installed && !installedIds.value.has(item.id)
     )

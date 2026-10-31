@@ -15,6 +15,7 @@ const pluginsRef = ref([]);
 const catalogPluginsRef = ref([]);
 const pluginInstallErrorRef = ref("");
 const catalogRepo = ref("https://github.com/osterbergsimon/calvin-plugins");
+const devModeRef = ref(false);
 
 const mockLoadPlugins = vi.fn().mockResolvedValue(undefined);
 const mockEnumerate = vi.fn().mockResolvedValue(undefined);
@@ -41,6 +42,9 @@ vi.mock("@/stores/config", () => ({
   useConfigStore: () => ({
     get pluginCatalogRepo() {
       return catalogRepo.value;
+    },
+    get devMode() {
+      return devModeRef.value;
     },
   }),
 }));
@@ -82,6 +86,26 @@ const CATALOG = [
     description: "Recipes.",
     _installed: false,
   },
+  {
+    id: "hidden_catalog",
+    name: "Hidden catalog entry",
+    type: "image",
+    version: "1.0.0",
+    path: "hidden-catalog",
+    description: "Not part of the published catalog.",
+    catalog: false,
+    _installed: false,
+  },
+  {
+    id: "test_plugin",
+    name: "Test Plugin",
+    type: "image",
+    version: "1.0.0",
+    path: "test-plugin",
+    description: "A test fixture.",
+    keywords: ["test", "example"],
+    _installed: false,
+  },
 ];
 
 const installedImage = {
@@ -116,6 +140,7 @@ describe("provider picker catalog group", () => {
     catalogPluginsRef.value = [];
     pluginInstallErrorRef.value = "";
     catalogRepo.value = "https://github.com/osterbergsimon/calvin-plugins";
+    devModeRef.value = false;
     mockLoadPlugins.mockReset().mockResolvedValue(undefined);
     mockEnumerate.mockReset().mockImplementation(async () => {
       catalogPluginsRef.value = CATALOG.map(item => ({ ...item }));
@@ -134,6 +159,22 @@ describe("provider picker catalog group", () => {
     expect(catalogIds(w)).toEqual(["immich"]);
     expect(w.find(".pp-group").text()).toBe("From the Calvin catalog");
     expect(w.text()).toContain("Albums from your Immich server.");
+  });
+
+  it("never offers catalog:false entries, even in dev mode", async () => {
+    devModeRef.value = true;
+    const w = await openPicker(await mountButton());
+
+    expect(catalogIds(w)).toEqual(["immich", "test_plugin"]);
+    expect(catalogIds(w)).not.toContain("hidden_catalog");
+    expect(w.text()).not.toContain("Hidden catalog entry");
+  });
+
+  it("hides the repo's test fixtures outside dev mode", async () => {
+    const w = await openPicker(await mountButton());
+
+    expect(catalogIds(w)).not.toContain("test_plugin");
+    expect(w.text()).not.toContain("Test Plugin");
   });
 
   it("leaves the group out when the catalog cannot be reached", async () => {

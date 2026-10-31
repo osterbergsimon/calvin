@@ -616,7 +616,13 @@ class PluginInstaller:
                         # Validate plugin directory
                         try:
                             manifest = self._validate_plugin_directory(plugin_dir)
-                            # Add metadata from manifest file
+                            # Add metadata from manifest file. `catalog: false`
+                            # is the repo's opt-out from the picker/catalog (P2);
+                            # unknown or non-boolean values keep the entry visible.
+                            catalog = plugin_info.get("catalog")
+                            keywords = plugin_info.get("keywords", manifest.get("keywords", []))
+                            if not isinstance(keywords, list):
+                                keywords = []
                             plugin_entry = {
                                 "id": manifest["id"],
                                 "name": plugin_info.get("name", manifest.get("name", "")),
@@ -626,6 +632,8 @@ class PluginInstaller:
                                 ),
                                 "version": plugin_info.get("version", manifest.get("version", "")),
                                 "type": plugin_info.get("type", manifest.get("type", "")),
+                                "catalog": catalog is not False,
+                                "keywords": keywords,
                                 "manifest": manifest,
                             }
                             plugins_list.append(plugin_entry)
@@ -656,6 +664,9 @@ class PluginInstaller:
             if plugin_json.exists() and plugin_py.exists():
                 try:
                     manifest = self._validate_plugin_directory(item)
+                    keywords = manifest.get("keywords", [])
+                    if not isinstance(keywords, list):
+                        keywords = []
                     plugin_entry = {
                         "id": manifest["id"],
                         "name": manifest.get("name", ""),
@@ -663,6 +674,8 @@ class PluginInstaller:
                         "description": manifest.get("description", ""),
                         "version": manifest.get("version", ""),
                         "type": manifest.get("type", ""),
+                        "catalog": True,
+                        "keywords": keywords,
                         "manifest": manifest,
                     }
                     plugins_list.append(plugin_entry)
