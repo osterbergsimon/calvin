@@ -11,7 +11,7 @@
             Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most
             screens; choose On if a touch panel acts like a mouse.
           </p>
-          <KioskScope
+          <ScopeLine
             :overridden="touchSetting.overridden.value"
             reset-test="reset-browser-touch"
             @reset="resetTouch"
@@ -42,7 +42,7 @@
               Show it again
             </button>
           </p>
-          <KioskScope
+          <ScopeLine
             :overridden="oskSetting.overridden.value"
             reset-test="reset-browser-osk"
             @reset="resetOsk"
@@ -69,7 +69,7 @@
           <p class="setting-row__desc">
             Only changes Settings. The dashboard has its own size below.
           </p>
-          <KioskScope
+          <ScopeLine
             :overridden="uiSizeSetting.overridden.value"
             reset-test="reset-browser-text-size"
             @reset="resetUiSize"
@@ -90,7 +90,7 @@
 import { computed, ref } from "vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
-import KioskScope from "@/components/settings/shared/KioskScope.vue";
+import ScopeLine from "@/components/ui/ScopeLine.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useOskHardwareSeen } from "@/composables/useOnScreenKeyboard";

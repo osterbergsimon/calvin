@@ -78,7 +78,9 @@ const toneIcon = computed(() => TONE_ICONS[toneClass.value] || null);
 
 .inline-note__action {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--gap-tight) var(--gap-inline);
 }
 
 .inline-note--ok {

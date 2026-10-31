@@ -1,75 +1,55 @@
 <!-- frontend/src/components/settings/categories/DefaultScreenSettings.vue -->
 <template>
   <div class="default-screen-settings" data-test="default-screen-page">
-    <SettingsSection id="default-name" title="Name">
-      <SettingRow
-        label="Room name"
-        description="Shown in the clock bar of any browser that isn't set up as a screen."
-      >
-        <input
-          class="screen-name-input"
-          type="text"
-          data-test="default-room-name"
-          :value="config.displayName || ''"
-          aria-label="Room name"
-          @input="e => emitChange({ displayName: e.target.value })"
-        />
-      </SettingRow>
-    </SettingsSection>
-
     <SettingsSection id="default-pages" title="Pages">
-      <div class="screen-pages__head">
-        <div class="screen-pages__meta">
-          <p v-if="pages.length === 1" class="screen-pages__hint" data-test="only-one-page">
+      <SettingRow label="Pages shown" description="The pages browsers and new screens show.">
+        <template #description>
+          <InlineNote v-if="pages.length === 1" data-test="only-one-page">
             Only one page so far.
-          </p>
-          <p class="screen-pages__scope-label">Pages shown</p>
-        </div>
-        <button
-          type="button"
-          class="screen-pages__edit"
-          data-test="default-edit-pages-btn"
-          @click="editorOpen = true"
-        >
-          Edit pages
-        </button>
-      </div>
-      <div
+          </InlineNote>
+        </template>
+        <Button data-test="default-edit-pages-btn" @click="editorOpen = true">Edit pages</Button>
+      </SettingRow>
+      <ListRow
         v-for="page in pages"
         :key="page.id"
-        class="screen-page"
-        :class="{ 'is-hidden-page': !showsPage(page.id) }"
+        :name="page.name"
+        :disabled="!showsPage(page.id)"
         data-test="default-page-row"
+        class="screen-page"
       >
-        <label class="screen-page__show">
-          <input
-            type="checkbox"
-            :checked="showsPage(page.id)"
-            :aria-label="`Show ${page.name} to browsers and new screens`"
-            @change="e => togglePage(page.id, e.target.checked)"
-          />
-          <span>Show</span>
-        </label>
-        <PageThumbnail :page="page" :orientation="effOrientation" size="page" />
-        <span class="screen-page__body">
-          <span class="screen-page__name">{{ page.name }}</span>
-          <span v-if="!showsPage(page.id)" class="screen-page__not-shown">Not shown here</span>
-        </span>
-        <label class="screen-page__start">
-          <input
-            type="radio"
-            name="default-start-page"
-            :checked="startPageId === page.id"
-            :disabled="!showsPage(page.id)"
-            :aria-label="`Start on ${page.name}`"
-            @change="setDefaultPage(page.id)"
-          />
-          <span>Start here</span>
-        </label>
-      </div>
-      <p v-if="pagesMsg" class="screens__saved" role="status" aria-live="polite">
+        <template #lead>
+          <PageThumbnail :page="page" :orientation="effOrientation" size="page" />
+        </template>
+        <template #meta>
+          <InlineNote v-if="!showsPage(page.id)">Not shown here</InlineNote>
+        </template>
+        <template #actions>
+          <label class="screen-page__show">
+            <input
+              type="checkbox"
+              :checked="showsPage(page.id)"
+              :aria-label="`Show ${page.name} to browsers and new screens`"
+              @change="e => togglePage(page.id, e.target.checked)"
+            />
+            <span>Show</span>
+          </label>
+          <label class="screen-page__start">
+            <input
+              type="radio"
+              name="default-start-page"
+              :checked="startPageId === page.id"
+              :disabled="!showsPage(page.id)"
+              :aria-label="`Start on ${page.name}`"
+              @change="setDefaultPage(page.id)"
+            />
+            <span>Start here</span>
+          </label>
+        </template>
+      </ListRow>
+      <InlineNote v-if="pagesMsg" class="screens-saved" tone="err" role="status" aria-live="polite">
         {{ pagesMsg }}
-      </p>
+      </InlineNote>
     </SettingsSection>
 
     <SettingsSection id="layout" title="Display">
@@ -156,7 +136,7 @@
         />
         <SettingRow label="Timezone">
           <template #description>
-            <p class="setting-row__desc">Used by the schedule.</p>
+            <InlineNote>Used by the schedule.</InlineNote>
             <DefaultOnlyNote />
           </template>
           <SelectPill
@@ -186,8 +166,8 @@
 
       <!-- The reboot combo restarts the Pi, so it sits under Power (decision C)
            and no screen can override it. -->
-      <div class="default-only-block" data-test="default-only-reboot">
-        <DefaultOnlyNote />
+      <div data-test="default-only-reboot">
+        <DefaultOnlyNote block />
         <RebootCombo :config="config" @update:config="patch => emitChange(patch)" />
       </div>
     </SettingsSection>
@@ -241,9 +221,9 @@
         label="Keyboard layout"
       >
         <template #description>
-          <p class="setting-row__desc">
+          <InlineNote>
             The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.
-          </p>
+          </InlineNote>
           <DefaultOnlyNote />
         </template>
         <div class="device-control device-osk-control" :inert="oskOff ? '' : undefined">
@@ -254,12 +234,19 @@
             aria-label="Keyboard layout"
             @update:model-value="onLayoutChange"
           />
-          <p v-if="deviceLayout" class="device-osk-device">
+          <InlineNote v-if="deviceLayout" class="device-osk-device">
             This screen uses {{ oskLayoutName(deviceLayout) }}, chosen on the keyboard.
-            <button type="button" class="device-osk-use-default" @click="useDefaultLayout">
-              Use default
-            </button>
-          </p>
+            <template #action>
+              <Button
+                class="device-osk-use-default"
+                variant="link"
+                size="sm"
+                @click="useDefaultLayout"
+              >
+                Use default
+              </Button>
+            </template>
+          </InlineNote>
         </div>
       </SettingRow>
       <SettingRow
@@ -268,7 +255,7 @@
         label="Also switch to"
       >
         <template #description>
-          <p class="setting-row__desc">{{ extraLayoutsDescription }}</p>
+          <InlineNote>{{ extraLayoutsDescription }}</InlineNote>
           <DefaultOnlyNote />
         </template>
         <div class="device-control" :inert="oskOff ? '' : undefined">
@@ -295,6 +282,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useKiosksStore } from "@/stores/kiosks";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import DefaultOnlyNote from "@/components/settings/shared/DefaultOnlyNote.vue";
@@ -511,150 +501,3 @@ onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDev
 
 const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezone));
 </script>
-
-<style scoped>
-.default-screen-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-.setting-row__desc {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-.screen-name-input {
-  min-width: 180px;
-  height: var(--control-height);
-  min-height: var(--touch-target);
-  padding: 0 0.875rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-control-lg);
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-}
-.screen-name-input:focus {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.screen-pages__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 12px 1.25rem 6px;
-}
-.screen-pages__hint {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
-}
-.screen-pages__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.screen-pages__scope-label {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-.screen-pages__edit {
-  margin-left: auto;
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.screen-page {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 1.25rem;
-  border-top: 1px solid var(--line-soft);
-}
-.screen-page.is-hidden-page {
-  opacity: 0.65;
-}
-.screen-page__show,
-.screen-page__start {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.screen-page__start {
-  margin-left: auto;
-}
-.screen-page__body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.screen-page__name {
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-}
-.screen-page__not-shown {
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-}
-.screens__saved {
-  margin: 8px 1.25rem;
-  font-size: 0.85em;
-  opacity: 0.7;
-}
-.device-control {
-  display: flex;
-  justify-content: flex-end;
-}
-.device-osk-control {
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.35rem;
-}
-.device-osk-device {
-  max-width: 24rem;
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  text-align: right;
-}
-.device-osk-use-default {
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  text-decoration: underline;
-  cursor: pointer;
-}
-.device-osk-use-default:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.setting-row--muted {
-  opacity: 0.55;
-}
-.default-only-block {
-  padding: 0.4rem 0;
-  border-top: 1px solid var(--line-soft);
-}
-</style>

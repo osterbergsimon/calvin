@@ -1,10 +1,11 @@
 /** Tests for ClockBarHorizontal component. */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarHorizontal from "@/components/ClockBarHorizontal.vue";
 import { useConfigStore } from "@/stores/config";
+import { useKiosksStore } from "@/stores/kiosks";
 
 // Mock window.matchMedia
 Object.defineProperty(window, "matchMedia", {
@@ -24,6 +25,7 @@ Object.defineProperty(window, "matchMedia", {
 describe("ClockBarHorizontal", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    window.sessionStorage.clear();
   });
 
   const globalMountOptions = {
@@ -206,25 +208,48 @@ describe("ClockBarHorizontal", () => {
     expect(timeElement.attributes("style")).toContain("font-size: 24px");
   });
 
-  it("shows the room label when displayName is set", () => {
+  it("shows a screen's own name in its clock bar", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
     const store = useConfigStore();
     store.showUI = true;
-    store.displayName = "Vardagsrummet";
+    const kiosks = useKiosksStore();
+    kiosks.kiosks = [{ id: "kitchen", overrides: { displayName: "Vardagsrummet" } }];
+    kiosks.loadKiosks = vi.fn(async () => {});
     const wrapper = mount(ClockBarHorizontal, {
       props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
       global: { stubs: { BarActionCluster: true } },
     });
+    await flushPromises();
     expect(wrapper.text()).toContain("Vardagsrummet");
   });
 
-  it("hides the room label when displayName is empty", () => {
+  it("shows nothing in an unnamed screen's clock bar", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    // Even a stale global name never reaches the bar: only the screen's own
+    // Name override does (CLV-84).
     const store = useConfigStore();
     store.showUI = true;
-    store.displayName = "";
+    store.displayName = "Global lounge";
+    const kiosks = useKiosksStore();
+    kiosks.kiosks = [{ id: "kitchen", hostname: "kitchen-pi", overrides: {} }];
+    kiosks.loadKiosks = vi.fn(async () => {});
     const wrapper = mount(ClockBarHorizontal, {
       props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
       global: { stubs: { BarActionCluster: true } },
     });
+    await flushPromises();
+    expect(wrapper.find(".clock-bar-room").exists()).toBe(false);
+  });
+
+  it("shows no room in a browser that is not a set-up screen", async () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.displayName = "Lounge";
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+    await flushPromises();
     expect(wrapper.find(".clock-bar-room").exists()).toBe(false);
   });
 });

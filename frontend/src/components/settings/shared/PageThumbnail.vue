@@ -55,7 +55,7 @@ const direction = computed(() =>
   box-sizing: border-box;
   padding: 3px;
   border: 1.5px solid var(--ink-2);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   background: var(--bg-0);
 }
 .page-thumb__regions {

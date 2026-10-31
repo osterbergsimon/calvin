@@ -508,6 +508,10 @@ async def lifespan(app: FastAPI):
         logger.info("Keyboard mappings initialized")
         await _initialize_default_config()
         logger.info("Default config initialized")
+        from app.services.kiosk_registry import migrate_global_room_name
+
+        await migrate_global_room_name()
+        logger.info("Room name migration checked")
         await _start_schedulers()
         logger.info("Schedulers started")
         await _sync_display_orientation()

@@ -243,7 +243,7 @@ describe("ScreensSettings — screen card software line", () => {
     await flushPromises();
     const line = wrapper.find('[data-test="kiosk-version-line"]');
     expect(line.text()).toBe("Kiosk software a1b2c3d · update needs a newer OS");
-    expect(line.classes()).toContain("is-warn");
+    expect(line.classes()).toContain("inline-note--warn");
   });
 
   it("treats a rollback as a normal failure", async () => {
@@ -258,7 +258,7 @@ describe("ScreensSettings — screen card software line", () => {
     await flushPromises();
     const line = wrapper.find('[data-test="kiosk-version-line"]');
     expect(line.text()).toBe("Kiosk software a1b2c3d · last update failed, kept this version");
-    expect(line.classes()).toContain("is-err");
+    expect(line.classes()).toContain("inline-note--err");
   });
 
   it("shows no software line for a kiosk without an agent", async () => {

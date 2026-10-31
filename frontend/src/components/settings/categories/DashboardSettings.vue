@@ -80,14 +80,6 @@
           @update:model-value="setUiSize"
         />
       </SettingRow>
-      <SettingRow label="Room name" :description="ROOM_NAME_DESCRIPTION">
-        <TextField
-          label="Room name"
-          hide-label
-          :model-value="config.displayName || ''"
-          @update:model-value="v => emit('update:config', { displayName: v })"
-        />
-      </SettingRow>
     </SettingsSection>
 
     <!-- TOUCH & CONTROLS — what the wall shows, then what reacts to touches -->
@@ -285,7 +277,6 @@ const emit = defineEmits(["update:config"]);
 
 // Kept out of the template: the quoted example would fight the formatter's
 // attribute quoting.
-const ROOM_NAME_DESCRIPTION = 'Shown in the clock bar, e.g. "Kitchen".';
 
 const editorOpen = ref(false);
 const route = useRoute();
