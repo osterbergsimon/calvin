@@ -2,7 +2,7 @@
   <SettingRow
     v-if="isContainer"
     label="How to update"
-    description="Calvin runs in a Docker container, so it is updated from the host by pulling a new image."
+    description="Calvin runs in Docker, so you update it there: pull the new image and restart the container."
     stacked
   >
     <dl class="update-detail">
@@ -14,10 +14,7 @@
   </SettingRow>
 
   <template v-else>
-    <SettingRow
-      label="Install updates"
-      description="Pull and apply the latest version from the selected branch."
-    >
+    <SettingRow label="Install updates" description="Download and install the latest Calvin.">
       <div class="update-actions">
         <button
           type="button"
@@ -39,7 +36,11 @@
     </SettingRow>
   </template>
 
-  <SettingRow label="Status" description="Live backend and updater state." stacked>
+  <SettingRow
+    label="Status"
+    description="Whether Calvin is running and if an update is under way."
+    stacked
+  >
     <div class="update-readout">
       <div class="readout-line">
         <span
@@ -47,7 +48,7 @@
           :class="`readout-lamp--${backendLampState}`"
           aria-hidden="true"
         />
-        <span class="readout-key">Backend API</span>
+        <span class="readout-key">Calvin</span>
         <span class="readout-val">{{ backendHealthLabel }}</span>
         <span v-if="backendHealthCheckedAt" class="readout-meta">
           {{ formatDateTime(backendHealthCheckedAt) }}
@@ -55,18 +56,20 @@
       </div>
       <div v-if="!isContainer" class="readout-line">
         <span class="readout-lamp" :class="`readout-lamp--${updateLampState}`" aria-hidden="true" />
-        <span class="readout-key">Update state</span>
+        <span class="readout-key">Updates</span>
         <span class="readout-val">{{ updateStatusLabel }}</span>
-        <span v-if="updateStatus?.phase" class="readout-meta">
-          {{ formatPhase(updateStatus.phase) }}
-        </span>
+        <span v-if="updatePhaseLabel" class="readout-meta">{{ updatePhaseLabel }}</span>
       </div>
       <div v-if="updateStatusCheckedAt" class="readout-line">
         <span class="readout-lamp readout-lamp--muted" aria-hidden="true" />
         <span class="readout-key">Last checked</span>
         <span class="readout-val">{{ formatDateTime(updateStatusCheckedAt) }}</span>
       </div>
-      <p v-if="backendHealth?.error" class="readout-note">{{ backendHealth.error }}</p>
+      <p v-if="backendHealth?.error" class="readout-note">{{ backendHealth.errorText }}</p>
+      <details v-if="backendHealth?.error" class="readout-details">
+        <summary>Details</summary>
+        <p class="readout-detail-text">{{ backendHealth.error }}</p>
+      </details>
     </div>
   </SettingRow>
 
@@ -114,7 +117,12 @@
       </template>
       <template v-if="updateStatus.error">
         <dt>Error</dt>
-        <dd class="update-detail__err">{{ updateStatus.error }}</dd>
+        <dd class="update-detail__err">
+          <details class="readout-details">
+            <summary>Details</summary>
+            <p class="readout-detail-text">{{ updateStatus.error }}</p>
+          </details>
+        </dd>
       </template>
     </dl>
   </SettingRow>
@@ -152,8 +160,11 @@ const statusRefreshLoading = computed(
 );
 
 const backendHealthLabel = computed(() => {
-  if (backendHealthLoading.value) return "Checking";
-  return backendHealth.value?.status || "Unknown";
+  if (backendHealthLoading.value) return "Checking…";
+  const status = backendHealth.value?.status;
+  if (status === "healthy") return "Running";
+  if (status === "unhealthy") return "Not responding";
+  return "Not checked yet";
 });
 
 // Lamp state maps health/updater status onto the instrument-readout palette:
@@ -165,9 +176,15 @@ const backendLampState = computed(() => {
   return "muted";
 });
 
+// Statuses and phases are server vocabulary; the screen shows plain words and
+// never the raw value (CLV-63).
 const updateStatusLabel = computed(() => {
-  if (updateStatusLoading.value) return "Checking";
-  return updateStatus.value?.status || "Unknown";
+  if (updateStatusLoading.value) return "Checking…";
+  const status = updateStatus.value?.status;
+  if (status === "idle") return "Up to date";
+  if (status === "running") return "Updating";
+  if (status === "error") return "Update failed";
+  return "Not checked yet";
 });
 
 const updateLampState = computed(() => {
@@ -177,6 +194,24 @@ const updateLampState = computed(() => {
   if (status === "running") return "info";
   if (status === "error") return "err";
   return "muted";
+});
+
+const PHASE_LABELS = {
+  pulling: "Downloading",
+  pulling_code: "Downloading",
+  downloading: "Downloading",
+  deps: "Installing",
+  installing: "Installing",
+  dependencies: "Installing",
+  building: "Preparing the screens",
+  building_frontend: "Preparing the screens",
+  restarting: "Restarting",
+};
+
+const updatePhaseLabel = computed(() => {
+  const phase = updateStatus.value?.phase;
+  if (!phase) return "";
+  return PHASE_LABELS[String(phase).toLowerCase()] || "";
 });
 
 const hasUpdateDetails = computed(() => {
@@ -193,13 +228,6 @@ const hasUpdateDetails = computed(() => {
       s.error
   );
 });
-
-const formatPhase = phase => {
-  if (!phase) return "";
-  return String(phase)
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, char => char.toUpperCase());
-};
 
 const formatDateTime = value => {
   if (!value) return "";
@@ -337,6 +365,25 @@ onMounted(async () => {
   font-size: var(--fs-xs);
   color: var(--err-text);
   line-height: 1.4;
+}
+
+/* Raw server detail belongs behind a Details disclosure, never on the line. */
+.readout-details {
+  margin-top: 0.35rem;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.readout-details summary {
+  cursor: pointer;
+  font-family: var(--font-ui);
+}
+.readout-detail-text {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-data);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 /* Verbose detail — mono key/value grid. */

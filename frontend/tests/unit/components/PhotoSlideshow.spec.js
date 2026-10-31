@@ -109,13 +109,13 @@ describe("PhotoSlideshow", () => {
       expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1");
     });
 
-    it("should show error message when error exists", () => {
+    it("keeps raw error text off the wall (CLV-63)", () => {
       imagesStore.error = "Failed to load images";
       configStore.showUI = true;
       const wrapper = createWrapper();
 
-      expect(wrapper.find(".error-message").exists()).toBe(true);
-      expect(wrapper.find(".error-message").text()).toBe("Failed to load images");
+      expect(wrapper.find(".error-message").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Failed to load images");
     });
   });
 

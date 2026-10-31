@@ -24,18 +24,21 @@ describe("KioskStatusHeader", () => {
   it("shows online Pending copy when versions differ and online", () => {
     const w = mountHeader({ online: true, appliedVersion: "old", desiredVersion: "new" });
     const t = w.get("[data-test='hardware-config-status']").text();
-    expect(t).toContain("Pending");
-    expect(t).toContain("applies shortly");
+    expect(t).toBe("Display settings · Applying…");
   });
 
   it("shows reconnect Pending copy when versions differ and offline", () => {
     const w = mountHeader({ online: false, appliedVersion: "old", desiredVersion: "new" });
-    expect(w.get("[data-test='hardware-config-status']").text()).toContain("reconnects");
+    expect(w.get("[data-test='hardware-config-status']").text()).toBe(
+      "Display settings · Applies when this screen comes back online"
+    );
   });
 
-  it("shows Not yet reported when appliedVersion is null", () => {
+  it("shows Not confirmed yet when appliedVersion is null", () => {
     const w = mountHeader({ appliedVersion: null, desiredVersion: "new" });
-    expect(w.get("[data-test='hardware-config-status']").text()).toContain("Not yet reported");
+    expect(w.get("[data-test='hardware-config-status']").text()).toBe(
+      "Display settings · Not confirmed yet"
+    );
   });
 
   it("fails open to Applied when desiredVersion is unknown", () => {

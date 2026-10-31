@@ -39,7 +39,7 @@
             v-if="row.running !== undefined"
             class="sl-dot"
             :class="row.error ? 'sl-dot--err' : row.running ? 'sl-dot--on' : 'sl-dot--off'"
-            :title="row.error || (row.running ? 'Running' : 'Stopped')"
+            :title="row.error || (row.running ? 'Working' : 'Off')"
           />
           <div class="sl-text">
             <span class="sl-name">{{ row.name }}</span>

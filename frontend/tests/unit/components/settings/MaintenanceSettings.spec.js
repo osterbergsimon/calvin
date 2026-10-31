@@ -51,6 +51,15 @@ describe("MaintenanceSettings", () => {
     expect(wrapper.findComponent({ name: "UpdateSourceRows" }).props("gitBranch")).toBe("develop");
   });
 
+  it("says Not available when the version is unknown (CLV-63)", () => {
+    const wrapper = mount(MaintenanceSettings, {
+      props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main", version: null },
+      global: { stubs },
+    });
+    expect(wrapper.find('[data-test="version-readout"]').text()).toContain("Not available");
+    expect(wrapper.find('[data-test="version-readout"]').text()).not.toContain("Unknown");
+  });
+
   it("renders its sections and the backup & restore block", () => {
     const wrapper = mount(MaintenanceSettings, {
       props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
@@ -182,7 +191,7 @@ describe("MaintenanceSettings", () => {
     expect(wrapper.find('[data-test="restart-frontend"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="reload-ui"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="docker-restart-hint"]').text()).toBe(
-      "To restart the server, restart the Calvin container from Docker (Unraid: Docker tab)."
+      "To restart Calvin, restart its container in Docker (on Unraid: the Docker tab)."
     );
   });
 
@@ -245,10 +254,8 @@ describe("MaintenanceSettings", () => {
 
     const backend = wrapper.find('[data-test="restart-backend"]');
     expect(backend.text()).toBe("Restart server");
-    expect(wrapper.text()).toContain("Restart kiosk browser");
-    expect(wrapper.text()).toContain(
-      "Restarts the browser on this Pi's screen. The server keeps running."
-    );
+    expect(wrapper.text()).toContain("Restart this screen");
+    expect(wrapper.text()).toContain("Reloads this screen's browser. Calvin keeps running.");
     expect(wrapper.text()).toContain(
       "Restarts Calvin. Screens reconnect on their own in about 15 seconds."
     );

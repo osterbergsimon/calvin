@@ -3,6 +3,7 @@ import { ref, computed, nextTick } from "vue";
 import api from "../services/api";
 import { getCachedData, setCachedData } from "../utils/cache";
 import { logError, logInfo } from "../utils/logger";
+import { friendlyError } from "../utils/friendlyError";
 import {
   cycleActiveDashboardRegion,
   cycleDashboardScreen,
@@ -110,6 +111,8 @@ export const useConfigStore = defineStore("config", () => {
   const pluginCatalogRepo = ref("https://github.com/osterbergsimon/calvin-plugins");
   const loading = ref(false);
   const error = ref(null);
+  // One friendly sentence for the screen; `error` keeps the raw text for logs.
+  const errorText = ref("");
   // True while the applied config came from the offline cache.
   const stale = ref(false);
   // Set after the first successful load: from then on the in-memory config is
@@ -268,9 +271,20 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
+  const clearError = () => {
+    error.value = null;
+    errorText.value = "";
+  };
+
+  const captureError = (err, action, message) => {
+    error.value = err.message;
+    errorText.value = friendlyError(err, action);
+    logError("[ConfigStore]", message, err);
+  };
+
   const fetchConfig = async () => {
     loading.value = true;
-    error.value = null;
+    clearError();
     bindViewportReporting();
     const path = withViewport(configPath());
     const cacheKey = `config_${path}`;
@@ -301,8 +315,7 @@ export const useConfigStore = defineStore("config", () => {
           return cached;
         }
       }
-      error.value = err.message;
-      logError("[ConfigStore]", "Failed to fetch config:", err);
+      captureError(err, "load your settings", "Failed to fetch config:");
     } finally {
       loading.value = false;
       // Mark hydrated only after this flush, so any watcher fired by the config
@@ -318,15 +331,14 @@ export const useConfigStore = defineStore("config", () => {
 
   const updateConfig = async config => {
     loading.value = true;
-    error.value = null;
+    clearError();
     try {
       const response = await api.post("/config", config);
       applyConfigPayload(config, configRefs);
       applyConfigPayload(response.data || {}, configRefs);
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      logError("[ConfigStore]", "Failed to update config:", err);
+      captureError(err, "save your settings", "Failed to update config:");
       throw err;
     } finally {
       loading.value = false;
@@ -660,6 +672,7 @@ export const useConfigStore = defineStore("config", () => {
     oskExtraLayouts,
     loading,
     error,
+    errorText,
     stale,
     hydrated,
     calendarWidth,

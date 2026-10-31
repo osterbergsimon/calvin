@@ -23,17 +23,17 @@ const props = defineProps({
 
 const config = computed(() => {
   if (props.appliedVersion == null) {
-    return { cls: "is-unknown", label: "Hardware config · Not yet reported" };
+    return { cls: "is-unknown", label: "Display settings · Not confirmed yet" };
   }
   if (props.desiredVersion != null && props.appliedVersion !== props.desiredVersion) {
     return props.online
-      ? { cls: "is-pending", label: "Hardware config · Pending (applies shortly)" }
+      ? { cls: "is-pending", label: "Display settings · Applying…" }
       : {
           cls: "is-pending",
-          label: "Hardware config · Pending — applies when this kiosk reconnects",
+          label: "Display settings · Applies when this screen comes back online",
         };
   }
-  return { cls: "is-applied", label: "Hardware config ✓ Applied" };
+  return { cls: "is-applied", label: "Display settings ✓ Applied" };
 });
 </script>
 

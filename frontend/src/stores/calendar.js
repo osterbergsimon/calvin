@@ -4,6 +4,7 @@ import api from "../services/api";
 import { fetchWithCache, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
 import { logDebug, logError, logInfo } from "../utils/logger";
+import { friendlyError } from "../utils/friendlyError";
 
 /**
  * Generated API types from backend OpenAPI snapshot.
@@ -19,6 +20,8 @@ export const useCalendarStore = defineStore("calendar", () => {
   const loading = ref(false);
   const backgroundRefreshing = ref(false);
   const error = ref(null);
+  // One friendly sentence for the screen; `error` keeps the raw text for logs.
+  const errorText = ref("");
   // True while the shown sources/events came from the offline cache instead of
   // the backend (offline, or the request failed).
   const stale = ref(false);
@@ -28,9 +31,20 @@ export const useCalendarStore = defineStore("calendar", () => {
   const dayEvents = ref([]); // All events for the expanded day
   const showAllDayEvents = ref(false); // Flag to show all events' details when expanding "today"
 
+  const clearError = () => {
+    error.value = null;
+    errorText.value = "";
+  };
+
+  const captureError = (err, action, message) => {
+    error.value = err.message;
+    errorText.value = friendlyError(err, action);
+    logError("[Calendar]", message, err);
+  };
+
   const fetchSources = async () => {
     loading.value = true;
-    error.value = null;
+    clearError();
 
     const connectionStore = useConnectionStore();
     const cacheKey = "calendar_sources";
@@ -57,8 +71,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       stale.value = result.stale;
       return result.data;
     } catch (err) {
-      error.value = err.message;
-      logError("[Calendar]", "Failed to fetch calendar sources:", err);
+      captureError(err, "load your calendars", "Failed to fetch calendar sources:");
       throw err;
     } finally {
       loading.value = false;
@@ -77,8 +90,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       setCachedData("calendar_sources", { sources: sources.value });
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      logError("[Calendar]", "Failed to update calendar source:", err);
+      captureError(err, "save this calendar source", "Failed to update calendar source:");
       throw err;
     }
   };
@@ -121,7 +133,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     } else {
       loading.value = true;
     }
-    error.value = null;
+    clearError();
 
     const connectionStore = useConnectionStore();
     const normalizedSourceIds = normalizeSourceIds(sourceIds);
@@ -179,8 +191,7 @@ export const useCalendarStore = defineStore("calendar", () => {
       }
       return responseData;
     } catch (err) {
-      error.value = err.message;
-      logError("[Calendar]", "Failed to fetch events:", err);
+      captureError(err, "load your events", "Failed to fetch events:");
       throw err;
     } finally {
       loading.value = false;
@@ -399,8 +410,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
       logInfo("[Calendar]", "Events refreshed successfully");
     } catch (err) {
-      error.value = err.message;
-      logError("[Calendar]", "Failed to refresh events:", err);
+      captureError(err, "refresh your events", "Failed to refresh events:");
       throw err;
     }
   };
@@ -412,6 +422,7 @@ export const useCalendarStore = defineStore("calendar", () => {
     loading,
     backgroundRefreshing,
     error,
+    errorText,
     stale,
     currentDate,
     selectedEvent,

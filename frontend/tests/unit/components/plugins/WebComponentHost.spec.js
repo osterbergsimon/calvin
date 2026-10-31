@@ -5,7 +5,21 @@ import { flushPromises, mount } from "@vue/test-utils";
 import WebComponentHost from "@/components/plugins/WebComponentHost.vue";
 
 describe("WebComponentHost", () => {
-  it("renders an error when schema.element is missing", async () => {
+  it("names the plugin without printing the raw failure (CLV-63)", async () => {
+    const wrapper = mount(WebComponentHost, {
+      props: {
+        schema: { kind: "web-component" },
+        data: null,
+        pluginId: "test-plugin",
+        pluginName: "Mealie",
+      },
+    });
+    await flushPromises();
+    expect(wrapper.text()).toBe("Couldn't show Mealie.");
+    expect(wrapper.text()).not.toContain("schema.element");
+  });
+
+  it("falls back to plain words when the plugin name is unknown", async () => {
     const wrapper = mount(WebComponentHost, {
       props: {
         schema: { kind: "web-component" },
@@ -14,7 +28,7 @@ describe("WebComponentHost", () => {
       },
     });
     await flushPromises();
-    expect(wrapper.text()).toContain("schema.element missing");
+    expect(wrapper.text()).toBe("Couldn't show this plugin.");
   });
 
   it("appends a stylesheet link when schema.stylesheet is set", async () => {
