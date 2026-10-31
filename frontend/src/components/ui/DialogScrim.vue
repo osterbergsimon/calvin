@@ -13,9 +13,11 @@ defineEmits(["dismiss"]);
 .dialog-scrim {
   position: fixed;
   inset: 0;
-  z-index: 999;
+  /* One step under the dialog layer, so a panel rendered before the scrim
+     still paints above it (CalendarView's event panel). */
+  z-index: calc(var(--z-dialog) - 1);
   background: color-mix(in srgb, var(--bg-0) 72%, transparent);
-  animation: scrim-in 0.25s ease;
+  animation: scrim-in var(--dur) var(--ease);
 }
 .dialog-scrim.is-blurred {
   /* Progressive enhancement — Raspberry Pi GPUs may ignore/struggle with
