@@ -15,10 +15,10 @@ the Pi, and nothing comes from GitHub, so the kiosk always matches the server's 
 | | Pi 3B / 3B+ | Auto-installs **cog** (WPE WebKit) instead of Chromium; see [Display stack](#display-stack-cog-on-pi-3-class-wayland-opt-in). |
 | | Pi Zero 2 W | Uses cog (WPE WebKit) via auto; still unmeasured on 512 MB, so not recommended yet. |
 | | Older Pis (Pi 1/2, Zero) | Not supported (too little RAM for the dashboard). |
-| **OS** | **Raspberry Pi OS Lite (64-bit), Bookworm** (Debian 12) | The tested target. |
+| **OS** | **Raspberry Pi OS Lite (64-bit), Trixie** (Debian 13) | Verified on a Pi 3B+ with the cog stack (2026-10-31); Pi 4/5 Wayland test pending. |
+| | Raspberry Pi OS Lite (64-bit), Bookworm (Debian 12) | Should work; 64-bit is preferred. |
 | | Raspberry Pi OS Lite 32-bit, Bookworm | Should work; 64-bit is preferred. |
 | | Raspberry Pi OS **Desktop** | Not supported: Calvin starts its own X session on tty1, which conflicts with the desktop. |
-| | Raspberry Pi OS Trixie (Debian 13) | Not yet verified on hardware. |
 
 You need a reachable Calvin server. Check from any machine on the LAN with
 `curl http://<server>:8000/api/health`. Use a stable hostname or IP for the server,
