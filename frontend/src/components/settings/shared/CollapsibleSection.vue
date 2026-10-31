@@ -10,7 +10,7 @@
       :aria-controls="contentId"
       @click="toggle"
     >
-      <h2>
+      <h2 class="heading-title">
         <span v-if="icon" class="section-icon">{{ icon }}</span>
         {{ title }}
       </h2>
@@ -102,11 +102,6 @@ const toggle = () => {
 }
 
 .section-header h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  font-family: var(--font-ui);
-  color: var(--ink);
   display: flex;
   align-items: center;
   gap: 0.5rem;

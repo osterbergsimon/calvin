@@ -36,7 +36,7 @@
           <span class="ap-group-count">{{ group.actions.length }}</span>
         </button>
         <!-- Static header for the recommended / primary tiers -->
-        <h4 v-else class="ap-group-title">
+        <h4 v-else class="ap-group-title heading-group">
           <span v-if="group.tier === 'recommended'" class="ap-star">★</span>
           {{ group.label }}
         </h4>
@@ -139,9 +139,6 @@ const visibleGroups = computed(() => {
   padding-bottom: var(--gap-3);
 }
 .ap-group-title {
-  font-size: var(--text-label);
-  font-weight: var(--weight-strong);
-  color: var(--ink);
   margin: var(--gap-4) 0 var(--gap-1);
   display: flex;
   align-items: center;

@@ -136,7 +136,7 @@ const onDuration = secs => {
 }
 .rc-key-cap {
   font-family: var(--font-data);
-  font-weight: 700;
+  font-weight: var(--weight-title);
   font-size: var(--fs-lg);
   color: var(--ink);
 }

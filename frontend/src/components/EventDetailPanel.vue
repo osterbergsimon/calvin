@@ -287,7 +287,7 @@ const getSourceName = sourceId => {
   margin: 0;
   font-family: var(--font-display);
   font-size: var(--fs-2xl);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   line-height: 1.1;
   letter-spacing: -0.01em;
   color: var(--ink);
@@ -329,7 +329,7 @@ const getSourceName = sourceId => {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-size: var(--fs-3xl);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   line-height: 1;
   letter-spacing: 0.01em;
   color: var(--ink);

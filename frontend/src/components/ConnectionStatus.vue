@@ -56,7 +56,9 @@
       </template>
 
       <div class="connection-popover" data-test="connection-popover">
-        <h2 id="connection-popover-title" class="connection-popover__title">{{ popoverTitle }}</h2>
+        <h2 id="connection-popover-title" class="connection-popover__title heading-title">
+          {{ popoverTitle }}
+        </h2>
         <p>{{ popoverDataLine }}</p>
         <p v-if="status === 'unreachable'">
           Check that the Calvin server is on and that this screen is on the same network.
@@ -317,9 +319,6 @@ onUnmounted(() => {
 
 .connection-popover__title {
   margin: 0 0 var(--gap-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
 }
 
 .connection-popover p {

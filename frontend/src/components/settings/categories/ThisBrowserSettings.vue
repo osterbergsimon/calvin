@@ -191,7 +191,7 @@ const resetUiSize = async () => {
   color: var(--ink);
   font-family: var(--font-ui);
   font-size: inherit;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;

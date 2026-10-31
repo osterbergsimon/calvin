@@ -90,7 +90,7 @@ const conflictHint = computed(() => {
 }
 .kbt-key {
   font-family: var(--font-data);
-  font-weight: 700;
+  font-weight: var(--weight-title);
   font-size: var(--fs-lg);
   color: var(--ink);
 }

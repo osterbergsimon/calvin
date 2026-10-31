@@ -104,7 +104,7 @@ const dotClass = computed(() => {
 .settings-topbar__wordmark {
   font-family: var(--font-display);
   font-size: var(--fs-base);
-  font-weight: 700;
+  font-weight: var(--weight-title);
   letter-spacing: 0.08em;
   color: var(--ink);
   user-select: none;
@@ -118,7 +118,7 @@ const dotClass = computed(() => {
 .settings-topbar__location {
   font-family: var(--font-ui);
   font-size: var(--fs-base);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
   padding-left: 16px;
   border-left: 1px solid var(--line);
@@ -177,7 +177,7 @@ const dotClass = computed(() => {
   padding: 6px 16px;
   font-family: inherit;
   font-size: var(--fs-control);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   cursor: pointer;
   transition: opacity 0.15s;
 }
@@ -186,7 +186,7 @@ const dotClass = computed(() => {
   padding: 6px 12px;
   font-family: inherit;
   font-size: var(--fs-control);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--ink);
   background: var(--bg-0);
   border: 1px solid var(--line);

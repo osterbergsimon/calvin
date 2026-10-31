@@ -232,7 +232,7 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .order-number {
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--focus-text);
   min-width: 1.5rem;
   text-align: center;
@@ -305,7 +305,7 @@ const handleInstanceDragEnd = pluginId => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: var(--fs-md);
+  font-size: var(--text-body);
 }
 
 .instance-drag-handle {
@@ -357,7 +357,7 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .instance-name {
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
   flex: 0 0 auto;
   font-family: var(--font-ui);
