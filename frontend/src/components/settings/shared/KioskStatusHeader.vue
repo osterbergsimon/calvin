@@ -4,12 +4,15 @@
     <Tag :tone="online ? 'ok' : 'neutral'">
       {{ online ? "Online" : "Offline" }} · seen {{ lastSeenLabel }}
     </Tag>
-    <Tag :tone="config.tone" data-test="hardware-config-status">{{ config.label }}</Tag>
+    <Tag :tone="config.tone" :icon="config.icon" data-test="hardware-config-status">{{
+      config.label
+    }}</Tag>
   </InlineNote>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import { mdiCheck } from "@mdi/js";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import Tag from "@/components/ui/Tag.vue";
 
@@ -36,7 +39,7 @@ const config = computed(() => {
           label: "Display settings · Applies when this screen comes back online",
         };
   }
-  return { tone: "ok", label: "Display settings ✓ Applied" };
+  return { tone: "ok", icon: mdiCheck, label: "Display settings · Applied" };
 });
 </script>
 

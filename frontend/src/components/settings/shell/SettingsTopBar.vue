@@ -27,7 +27,10 @@
         aria-label="Continue setup on your phone"
         @click="$emit('phone')"
       >
-        📱 Use your phone
+        <svg class="settings-topbar__phone-glyph" viewBox="0 0 24 24" aria-hidden="true">
+          <path :d="mdiCellphone" fill="currentColor" />
+        </svg>
+        Use your phone
       </button>
       <button class="settings-topbar__done" type="button" data-action="done" @click="$emit('done')">
         Done
@@ -38,6 +41,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { mdiCellphone } from "@mdi/js";
 
 const props = defineProps({
   categoryLabel: { type: String, required: true },
@@ -192,6 +196,18 @@ const dotClass = computed(() => {
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
   cursor: pointer;
+}
+
+.settings-topbar__phone {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+
+.settings-topbar__phone-glyph {
+  width: 1.15em;
+  height: 1.15em;
+  flex: 0 0 auto;
 }
 
 .settings-topbar__phone:focus-visible {

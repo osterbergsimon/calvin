@@ -33,7 +33,9 @@
             data-test="setup-welcome-row"
           >
             <template v-if="item.added || showActions" #actions>
-              <Tag v-if="item.added" tone="ok" data-test="setup-welcome-done">✓ Added</Tag>
+              <Tag v-if="item.added" tone="ok" :icon="mdiCheck" data-test="setup-welcome-done">
+                Added
+              </Tag>
               <Button
                 v-else
                 :variant="isPhoneWidth && index === 0 ? 'primary' : 'secondary'"
@@ -88,6 +90,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { mdiCheck } from "@mdi/js";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";

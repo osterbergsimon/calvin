@@ -88,8 +88,13 @@
               <Tag v-if="item.status === 'installing'" class="pp-install pp-install--busy">
                 Installing…
               </Tag>
-              <Tag v-else-if="item.status === 'installed'" tone="ok" class="pp-installed">
-                Installed ✓
+              <Tag
+                v-else-if="item.status === 'installed'"
+                tone="ok"
+                :icon="mdiCheck"
+                class="pp-installed"
+              >
+                Installed
               </Tag>
               <Button
                 v-else
@@ -116,7 +121,7 @@
 </template>
 
 <script setup>
-import { mdiPuzzleOutline } from "@mdi/js";
+import { mdiCheck, mdiPuzzleOutline } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";

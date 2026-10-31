@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { mdiMonitor } from "@mdi/js";
 import {
   defaultSettingsCategoryId,
   filterSettingsDestinations,
@@ -28,7 +29,7 @@ describe("settings registry", () => {
       "Security",
     ]);
     expect(settingsCategories.find(category => category.id === "screens")).toMatchObject({
-      icon: "📺",
+      icon: mdiMonitor,
       subtitle: "Pages · rotation · power · touch",
     });
     expect(defaultSettingsCategoryId).toBe("content");

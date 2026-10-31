@@ -145,9 +145,8 @@
                   role="img"
                   :aria-label="`${nameFor(k)}: offline, display settings waiting`"
                   title="Offline. It will apply the new display settings when it's back."
-                >
-                  ⚠
-                </Tag>
+                  :icon="mdiAlert"
+                />
               </template>
             </ListRow>
 
@@ -526,6 +525,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { mdiAlert } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
 import {
