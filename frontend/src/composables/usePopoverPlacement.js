@@ -38,14 +38,16 @@ export function usePopoverPlacement({
   const openUp = ref(false);
   const popoverStyle = ref({});
   let lastTrigger = null;
+  let lastPanel = null;
 
   const inset = () => {
     const value = typeof bottomInset === "function" ? bottomInset() : bottomInset;
     return Number.isFinite(value) ? Math.max(0, value) : 0;
   };
 
-  const place = trigger => {
+  const place = (trigger, panel) => {
     if (trigger !== undefined) lastTrigger = trigger;
+    if (panel !== undefined) lastPanel = panel;
     const t = lastTrigger;
     const el = t && "value" in t ? t.value : t;
     if (!el || typeof el.getBoundingClientRect !== "function") return;
@@ -57,10 +59,18 @@ export function usePopoverPlacement({
     openUp.value = up;
     const style = {
       position: "fixed",
-      // Right-aligned to the trigger, matching the original in-flow `right: 0` anchor.
-      right: `${Math.round(window.innerWidth - r.right)}px`,
       maxHeight: `${Math.max(minHeight, Math.round(up ? spaceAbove : spaceBelow))}px`,
     };
+    // Right-aligned to the trigger (the original in-flow `right: 0` anchor). A
+    // trigger near the left edge would push a wider panel off-screen, so then
+    // the panel's left edge is clamped to the margin instead.
+    const panelEl = lastPanel && "value" in lastPanel ? lastPanel.value : lastPanel;
+    const panelWidth = panelEl?.offsetWidth || 0;
+    if (panelWidth && r.right - panelWidth < margin) {
+      style.left = `${margin}px`;
+    } else {
+      style.right = `${Math.round(window.innerWidth - r.right)}px`;
+    }
     if (up) {
       style.bottom = `${Math.round(window.innerHeight - r.top + gap)}px`;
     } else {

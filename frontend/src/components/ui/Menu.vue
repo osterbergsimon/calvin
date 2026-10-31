@@ -53,7 +53,9 @@ function focusItem(key) {
   const el = itemEls.get(key);
   if (!el) return;
   activeKey.value = key;
-  el.focus();
+  // The popover panel may not be placed yet; a plain focus() would scroll the
+  // page to wherever the unplaced panel sits.
+  el.focus({ preventScroll: true });
 }
 
 function move(delta) {

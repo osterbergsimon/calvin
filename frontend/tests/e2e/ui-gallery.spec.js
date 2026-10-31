@@ -91,6 +91,16 @@ for (const viewport of VIEWPORTS) {
         await page.locator('[data-test="gallery-menu-trigger"]').click();
         const menu = page.getByRole("menu", { name: "More actions for Family calendar" });
         await expect(menu).toBeVisible();
+        // Playwright counts an off-screen fixed panel as visible; assert it is
+        // actually inside the viewport and anchored by its trigger.
+        const box = await menu.evaluate(el => {
+          const r = el.getBoundingClientRect();
+          return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+        });
+        expect(box.left).toBeGreaterThanOrEqual(0);
+        expect(box.top).toBeGreaterThanOrEqual(0);
+        expect(box.right).toBeLessThanOrEqual(viewport.size.width);
+        expect(box.bottom).toBeLessThanOrEqual(viewport.size.height);
         await expect(menu).toHaveScreenshot(`ui-gallery-menu-${viewport.name}-${theme}.png`, {
           animations: "disabled",
           maxDiffPixelRatio: 0.01,

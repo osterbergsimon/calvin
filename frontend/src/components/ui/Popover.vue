@@ -113,13 +113,13 @@ function focusInitial() {
     (props.initialFocus ? root.querySelector(props.initialFocus) : null) ||
     root.querySelector(FOCUSABLE) ||
     root;
-  target?.focus?.();
+  target?.focus?.({ preventScroll: true });
 }
 
 function restoreFocus() {
   const target = opener;
   opener = null;
-  nextTick(() => target?.focus?.());
+  nextTick(() => target?.focus?.({ preventScroll: true }));
 }
 
 function onDocumentPointerDown(event) {
@@ -171,7 +171,7 @@ watch(
       closing = false;
       opener = document.activeElement;
       nextTick(() => {
-        place(triggerEl.value);
+        place(triggerEl.value, panelEl);
         listen();
         // One more tick lets the placement style land before focus moves; a
         // focus in the same flush can be lost when the panel re-renders.
@@ -202,6 +202,9 @@ onBeforeUnmount(() => {
 }
 
 .popover__panel {
+  /* Fixed from the first paint: before place() runs the panel must not sit in
+     the page flow at the end of <body>, or focusing it scrolls the page there. */
+  position: fixed;
   z-index: var(--z-popover);
   max-width: calc(100vw - 2 * var(--gap-4));
   overflow-y: auto;
