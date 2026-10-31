@@ -87,6 +87,7 @@ nav:
     - plugins/PLUGIN_INTERFACE.md
     - plugins/PLUGIN_INSTALLATION.md
     - plugins/PLUGIN_PACKAGE_FORMAT.md
+    - plugins/THEME_PACKAGE_FORMAT.md
     - plugins/PLUGIN_REPOSITORY_SETUP.md
     - plugins/PLUGIN_FRONTEND_COMPONENTS.md
     - plugins/PLUGIN_PERSISTENCE_AND_RESTART.md

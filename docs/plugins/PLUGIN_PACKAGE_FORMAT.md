@@ -1,7 +1,8 @@
 # Plugin Package Format Specification
 
 The official format for installable Calvin plugins under **plugin contract
-1.0**. Enforced by
+1.0**. Theme packages use `theme.json` under the separate
+[theme_api 2 contract](THEME_PACKAGE_FORMAT.md). Enforced by
 [plugin_installer.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/services/plugin_installer.py) and
 [manifest_validator.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/services/validation/manifest_validator.py).
 
