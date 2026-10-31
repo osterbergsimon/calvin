@@ -141,11 +141,7 @@
     <span v-if="descriptionText" class="help-text">{{ descriptionText }}</span>
 
     <!-- Extra author help text and links -->
-    <span
-      v-if="ui && (ui.help_text || ui.help_link)"
-      class="help-text"
-      style="display: block; margin-top: 0.5rem"
-    >
+    <span v-if="ui && (ui.help_text || ui.help_link)" class="help-text">
       <span v-if="ui.help_text">{{ ui.help_text }}</span>
       <a
         v-if="ui.help_link"
@@ -260,7 +256,8 @@ async function runScan() {
 .plugin-field label {
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 
@@ -311,6 +308,12 @@ async function runScan() {
   transition: border-color 0.2s ease;
 }
 
+/* Match the modal's Name control; textareas stay content-sized. */
+input.form-input,
+select.form-input {
+  height: var(--control-height);
+}
+
 .form-input:focus {
   outline: none;
   border-color: var(--focus);
@@ -322,10 +325,11 @@ async function runScan() {
 }
 
 .help-text {
-  font-size: var(--fs-control);
-  color: var(--ink-2);
-  margin-top: 0.5rem;
   display: block;
+  margin-top: var(--gap-1);
+  font-size: var(--text-meta);
+  line-height: normal;
+  color: var(--ink-2);
 }
 
 .help-text a {
