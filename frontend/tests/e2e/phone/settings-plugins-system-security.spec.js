@@ -113,15 +113,13 @@ test.describe("phone: Security", () => {
     await page.locator('[data-test="api-keys-create"]').click();
     const form = page.locator('[data-test="api-key-form"]');
     await expect(form).toBeVisible();
-    await page.locator('[data-test="api-key-name"]').fill("Kitchen display");
+    await page.locator("#api-key-name").fill("Kitchen display");
     await page.locator('[data-test="scope-admin"]').check();
     await expectPhoneLayout(page, "create API key form", { scope: '[data-test="api-key-form"]' });
     await page.locator('[data-test="api-key-submit"]').click();
 
     await expect(page.locator('[data-test="api-key-result"]')).toBeVisible();
-    await expect(page.locator('[data-test="api-key-secret"]')).toHaveValue(
-      "calvin_new1_secret_value"
-    );
+    await expect(page.locator("#api-key-secret")).toHaveValue("calvin_new1_secret_value");
     await expectPhoneLayout(page, "new API key secret");
     await page.locator('[data-test="api-key-done"]').click();
     await expect.poll(() => api.requests).toContain("POST /api/auth/keys");
@@ -141,7 +139,7 @@ test.describe("phone: Security", () => {
     await expect.poll(() => api.requests).toContain("POST /api/auth/password");
 
     // Allowed sites keeps the add row usable on a phone.
-    await page.locator('[data-test="origin-input"]').fill("https://photos.local");
+    await page.locator("#origin-input").fill("https://photos.local");
     await page.locator('[data-test="origin-add"]').click();
     await page.locator('[data-test="origins-save"]').click();
     await expect.poll(() => api.requests).toContain("PUT /api/security/allowed-origins");

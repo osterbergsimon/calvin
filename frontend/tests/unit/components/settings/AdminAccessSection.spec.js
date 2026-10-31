@@ -95,7 +95,7 @@ describe("AdminAccessSection", () => {
     await flushPromises();
 
     expect(wrapper.find("[data-test='admin-change-form']").exists()).toBe(false);
-    expect(wrapper.text()).toContain("✓ Password changed. Other devices were signed out.");
+    expect(wrapper.text()).toContain("Password changed. Other devices were signed out.");
     expect(wrapper.find("[role='status']").text()).toContain("Password changed");
   });
 

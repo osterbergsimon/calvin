@@ -42,7 +42,7 @@ async function openForm() {
   await get("api-keys-create").trigger("click");
 }
 async function fillName(name) {
-  await get("api-key-name").setValue(name);
+  await wrapper.get("#api-key-name").setValue(name);
 }
 async function submit() {
   await get("api-key-form").trigger("submit");
@@ -103,8 +103,8 @@ describe("ApiKeysSection", () => {
     it("limits the name to 40 characters", async () => {
       await mountSection();
       await openForm();
-      expect(get("api-key-name").attributes("maxlength")).toBe("40");
-      expect(get("api-key-name").attributes("placeholder")).toBe("Home Assistant");
+      expect(wrapper.get("#api-key-name").attributes("maxlength")).toBe("40");
+      expect(wrapper.get("#api-key-name").attributes("placeholder")).toBe("Home Assistant");
       expect(wrapper.text()).toContain("So you know which app uses it.");
     });
 
@@ -222,7 +222,7 @@ describe("ApiKeysSection", () => {
       api.post.mockRejectedValueOnce(httpError(500));
       await submit();
       expect(wrapper.text()).toContain("Couldn't create the key. Try again.");
-      expect(get("api-key-name").element.value).toBe("Script");
+      expect(wrapper.get("#api-key-name").element.value).toBe("Script");
       expect(get("scope-admin").element.checked).toBe(true);
     });
 
@@ -232,7 +232,7 @@ describe("ApiKeysSection", () => {
       await fillName("Script");
       api.post.mockRejectedValueOnce(httpError(401, { code: "admin_required" }));
       await submit();
-      expect(get("api-key-name").element.value).toBe("Script");
+      expect(wrapper.get("#api-key-name").element.value).toBe("Script");
       expect(wrapper.text()).not.toContain("Couldn't create the key.");
     });
 
@@ -259,10 +259,12 @@ describe("ApiKeysSection", () => {
       expect(wrapper.text()).toContain(
         "You won't be able to see it again. If you lose it, revoke it and create a new one."
       );
-      const input = get("api-key-secret");
+      const input = wrapper.get("#api-key-secret");
       expect(input.element.value).toBe(SECRET);
       expect(input.attributes("readonly")).toBeDefined();
-      expect(input.attributes("aria-label")).toBe("New API key for Home Assistant");
+      expect(wrapper.get("label[for='api-key-secret']").text()).toBe(
+        "New API key for Home Assistant"
+      );
       expect(wrapper.text()).toContain("Authorization: Bearer <key>");
       expect(document.activeElement).toBe(get("api-key-result-title").element);
     });

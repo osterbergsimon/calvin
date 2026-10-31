@@ -168,9 +168,7 @@ const enterLabelFor = el => {
   const form = el.form || el.closest("form");
   if (!form) return "Enter";
   const submit = Array.from(form.querySelectorAll('button[type="submit"]')).find(isVisible);
-  const primary = Array.from(form.querySelectorAll(".btn--primary, .security-btn--primary")).find(
-    isVisible
-  );
+  const primary = Array.from(form.querySelectorAll(".btn--primary")).find(isVisible);
   const button = submit || primary;
   const label = button?.textContent?.trim();
   return label || "Enter";

@@ -1,14 +1,11 @@
 <template>
   <SettingRow v-if="behindCount > 0" label="Kiosk software" data-test="kiosk-software-pointer">
     <template #description>
-      <p class="pointer__desc" data-test="kiosk-software-pointer-copy">
-        {{ copy }} <span class="pointer__v">{{ shortVersion(availableVersion) }}</span
-        >.
-      </p>
+      <InlineNote data-test="kiosk-software-pointer-copy">
+        {{ copy }} {{ shortVersion(availableVersion) }}.
+      </InlineNote>
     </template>
-    <button type="button" class="pointer__btn" data-test="open-kiosks" @click="openKiosks">
-      Open Kiosks
-    </button>
+    <Button data-test="open-kiosks" @click="openKiosks">Open Kiosks</Button>
   </SettingRow>
 </template>
 
@@ -17,6 +14,8 @@ import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useKiosksStore } from "@/stores/kiosks";
 import { kiosksBehind, shortVersion } from "@/utils/kioskSoftware";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 // Pointer only: the fleet controls live in Kiosks. It reads the same store, so
@@ -41,30 +40,3 @@ onMounted(async () => {
   availableVersion.value = await store.fetchAvailableAgentVersion();
 });
 </script>
-
-<style scoped>
-.pointer__desc {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-.pointer__v {
-  font-family: var(--font-data);
-}
-.pointer__btn {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.pointer__btn:hover {
-  border-color: var(--focus);
-}
-</style>

@@ -12,16 +12,23 @@ vi.mock("vue-router", () => ({
 
 function mountDialog() {
   return mount(AdminSignInDialog, {
+    attachTo: document.body,
     global: { stubs: { PhoneSetupCard: true } },
   });
 }
 
 describe("AdminSignInDialog", () => {
+  let wrapper;
   beforeEach(() => vi.clearAllMocks());
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+    vi.useRealTimers();
+  });
 
   it("renders nothing until the store opens it", () => {
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
   });
 
@@ -29,7 +36,7 @@ describe("AdminSignInDialog", () => {
     const auth = useAuthStore();
     auth.requestSignIn({ action: actionForUrl("/api/system/reboot") });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
 
     expect(wrapper.text()).toContain("Sign in to reboot");
     expect(wrapper.text()).toContain("Rebooting Calvin needs the admin password.");
@@ -41,7 +48,7 @@ describe("AdminSignInDialog", () => {
     auth.requestSignIn({ action: actionForUrl("/api/system/reboot") });
     api.post.mockResolvedValueOnce({ data: { ok: true } });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
     await wrapper.get("#admin-signin-dialog-password").setValue("correct horse");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
@@ -61,7 +68,7 @@ describe("AdminSignInDialog", () => {
     auth.requestSignIn({ action: actionForUrl("/config") });
     api.post.mockResolvedValueOnce({ data: { ok: true } });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
     await wrapper.get("#admin-signin-dialog-password").setValue("correct horse");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
@@ -75,7 +82,7 @@ describe("AdminSignInDialog", () => {
     const auth = useAuthStore();
     auth.requestSignIn({ action: actionForUrl("/api/system/reboot") });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
     const input = wrapper.get("#admin-signin-dialog-password");
     const toggle = wrapper.get('button[aria-controls="admin-signin-dialog-password"]');
     await input.setValue("correct horse");
@@ -99,7 +106,7 @@ describe("AdminSignInDialog", () => {
       config: { url: "/auth/login" },
     });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
     await wrapper.get("#admin-signin-dialog-password").setValue("nope");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
@@ -113,7 +120,7 @@ describe("AdminSignInDialog", () => {
     const auth = useAuthStore();
     auth.requestSignIn({ mode: "setup", action: actionForUrl("/api/system/reboot") });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
 
     expect(wrapper.text()).toContain("No admin password yet");
     expect(wrapper.text()).toContain(
@@ -136,7 +143,7 @@ describe("AdminSignInDialog", () => {
       config: { url: "/auth/login" },
     });
 
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
     await wrapper.get("#admin-signin-dialog-password").setValue("nope");
     await wrapper.get("form").trigger("submit");
     await flushPromises();
@@ -154,7 +161,7 @@ describe("AdminSignInDialog", () => {
   it("closes on Escape and drops the typed password", async () => {
     const auth = useAuthStore();
     auth.requestSignIn({ action: actionForUrl("/api/system/reboot") });
-    const wrapper = mountDialog();
+    wrapper = mountDialog();
 
     await wrapper.get("#admin-signin-dialog-password").setValue("typed");
     await wrapper.get('[role="dialog"]').trigger("keydown", { key: "Escape" });
