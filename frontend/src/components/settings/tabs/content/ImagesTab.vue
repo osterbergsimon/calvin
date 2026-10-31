@@ -181,9 +181,3 @@ onMounted(async () => {
   if (!imagesStore.images?.length) void imagesStore.fetchImages();
 });
 </script>
-
-<style scoped>
-.images-tab {
-  width: 100%;
-}
-</style>
