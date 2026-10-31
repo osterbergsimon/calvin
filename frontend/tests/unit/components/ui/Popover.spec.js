@@ -16,6 +16,16 @@ const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"))
 
 const wrappers = [];
 
+describe("Popover panel CSS", () => {
+  it("is position: fixed from the first paint so an unplaced panel never sits in page flow", () => {
+    const rule = STYLE.slice(
+      STYLE.indexOf(".popover__panel {"),
+      STYLE.indexOf("}", STYLE.indexOf(".popover__panel {"))
+    );
+    expect(rule).toMatch(/position:\s*fixed/);
+  });
+});
+
 const mountPopover = (props = {}, attachTo = undefined) => {
   const wrapper = mount(Popover, {
     props: { modelValue: false, label: "More actions", ...props },

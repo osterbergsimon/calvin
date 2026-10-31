@@ -34,6 +34,21 @@ describe("Menu", () => {
     expect(w.findAll('[role="menuitem"]')[2].classes()).toContain("menu__item--danger");
   });
 
+  it("focuses items without scrolling the page (the panel may not be placed yet)", async () => {
+    const w = mountMenu();
+    const calls = [];
+    for (const node of w.findAll('[role="menuitem"]')) {
+      const real = node.element.focus.bind(node.element);
+      node.element.focus = opts => {
+        calls.push(opts);
+        real(opts);
+      };
+    }
+    await w.findAll('[role="menuitem"]')[0].trigger("keydown", { key: "ArrowDown" });
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every(o => o?.preventScroll === true)).toBe(true);
+  });
+
   it("focuses the first item and moves with Arrow keys, Home and End", async () => {
     const w = mountMenu();
     await nextTick();

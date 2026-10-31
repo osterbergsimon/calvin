@@ -15,6 +15,31 @@ function setViewport(w, h) {
 afterEach(() => setViewport(origW, origH));
 
 describe("usePopoverPlacement", () => {
+  it("clamps to the left margin when a wide panel would overflow the left edge", () => {
+    setViewport(1280, 800);
+    const { popoverStyle, place } = usePopoverPlacement({ margin: 12 });
+    place(trigger({ top: 100, bottom: 144, left: 45, right: 89 }), { offsetWidth: 146 });
+    expect(popoverStyle.value.left).toBe("12px");
+    expect("right" in popoverStyle.value).toBe(false);
+    place(trigger({ top: 100, bottom: 144, left: 500, right: 544 }), { offsetWidth: 146 });
+    expect(popoverStyle.value.right).toBe("736px");
+    expect("left" in popoverStyle.value).toBe(false);
+  });
+
+  it("tracks the trigger's current viewport rect when the page scrolls", () => {
+    setViewport(1000, 800);
+    let top = 100;
+    const el = {
+      getBoundingClientRect: () => ({ top, bottom: top + 30, left: 100, right: 220, width: 120 }),
+    };
+    const { popoverStyle, reposition, place } = usePopoverPlacement();
+    place(el);
+    expect(popoverStyle.value.top).toBe("136px");
+    top = 300; // the page scrolled the trigger; reposition follows it
+    reposition();
+    expect(popoverStyle.value.top).toBe("336px");
+  });
+
   it("emits fixed-viewport coords so the popover can escape ancestor clipping", () => {
     setViewport(1000, 800);
     const { popoverStyle, openUp, place } = usePopoverPlacement();
