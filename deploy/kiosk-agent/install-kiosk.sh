@@ -46,10 +46,11 @@ Options:
   --backend-url <URL>        Calvin server (default: the server this script came from${SERVER_URL:+, $SERVER_URL})
   --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
   --signing-key <HEX>        Same, inline (ends up in shell history; prefer the file)
-  --display-stack <STACK>    x11 (default), wayland (labwc) or cog (WPE WebKit
-                             on DRM/KMS, recommended for Pi 3-class boards).
-                             Re-run with another value to switch an existing
-                             kiosk in place; all stacks stay installed.
+  --display-stack <STACK>    auto (default; cog on Pi 3-class boards, x11
+                             elsewhere), x11, wayland (labwc) or cog (WPE
+                             WebKit on DRM/KMS). Re-run with another value to
+                             switch an existing kiosk in place; all stacks stay
+                             installed.
   --no-reboot                Do not reboot when done
   -h, --help                 Show this help
 EOF
@@ -83,8 +84,8 @@ SERVER_URL="${SERVER_URL%/}"
 [ -n "$SERVER_URL" ] || die "no server URL; pass --backend-url http://<server>:8000"
 case "$SERVER_URL" in http://*|https://*) ;; *) die "--backend-url must start with http:// or https://" ;; esac
 case "$DISPLAY_STACK" in
-    ""|x11|wayland|cog) ;;
-    *) die "--display-stack must be x11, wayland or cog (got: $DISPLAY_STACK)" ;;
+    ""|auto|x11|wayland|cog) ;;
+    *) die "--display-stack must be auto, x11, wayland or cog (got: $DISPLAY_STACK)" ;;
 esac
 [ "$(id -u)" -eq 0 ] || die "run as root: curl -fsSL $SERVER_URL/api/kiosks/install.sh | sudo bash"
 for cmd in curl python3 sha256sum; do
