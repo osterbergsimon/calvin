@@ -88,13 +88,13 @@ const panelClasses = computed(() => [
   top: 0;
   left: 0;
   right: 0;
-  z-index: 5;
+  z-index: var(--z-raised);
   min-height: 0;
-  padding: 0.5rem 0.75rem;
+  padding: var(--gap-2) var(--gap-3);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: var(--gap-3);
   /* Soft scrim so the title/controls stay legible over whatever the widget draws
      underneath, without a hard bar edge. */
   background: linear-gradient(
@@ -115,7 +115,7 @@ const panelClasses = computed(() => [
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--gap-1);
   pointer-events: auto;
 }
 
@@ -125,8 +125,8 @@ const panelClasses = computed(() => [
   font-family: var(--font-display);
   /* Scales with the dashboard "Touch target size" setting; the fallback keeps
      the medium/Default size pixel-identical and covers non-dashboard uses. */
-  font-size: var(--region-label-fs, var(--fs-2xl));
-  font-weight: 700;
+  font-size: var(--region-label-fs, var(--text-title));
+  font-weight: var(--weight-title);
   line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -136,8 +136,8 @@ const panelClasses = computed(() => [
 .dashboard-panel__subtitle {
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--region-sublabel-fs, var(--fs-sm));
-  font-weight: 500;
+  font-size: var(--region-sublabel-fs, var(--text-meta));
+  font-weight: var(--weight-strong);
   line-height: 1.25;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -148,7 +148,7 @@ const panelClasses = computed(() => [
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--gap-2);
   pointer-events: auto;
 }
 
@@ -157,13 +157,13 @@ const panelClasses = computed(() => [
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  padding: 1rem;
+  padding: var(--gap-4);
   display: flex;
   flex-direction: column;
 }
 
 .dashboard-panel--dense .dashboard-panel__body {
-  padding: 0.75rem;
+  padding: var(--gap-3);
 }
 
 .dashboard-panel--media .dashboard-panel__body,
@@ -174,23 +174,23 @@ const panelClasses = computed(() => [
 @media (max-width: 768px), (orientation: portrait) {
   .dashboard-panel__header {
     min-height: 64px;
-    padding: clamp(0.5rem, 1.5vw, 1rem);
+    padding: clamp(var(--gap-2), 1.5vw, var(--gap-4));
   }
 
   .dashboard-panel__title {
-    font-size: clamp(var(--fs-base), 3vw, var(--region-label-fs, var(--fs-2xl)));
+    font-size: clamp(var(--text-label), 3vw, var(--region-label-fs, var(--text-title)));
   }
 
   .dashboard-panel__subtitle {
-    font-size: clamp(var(--fs-micro), 1.6vw, var(--region-sublabel-fs, var(--fs-sm)));
+    font-size: clamp(var(--text-caption), 1.6vw, var(--region-sublabel-fs, var(--text-meta)));
   }
 
   .dashboard-panel__body {
-    padding: clamp(0.25rem, 1vw, 0.75rem);
+    padding: clamp(var(--gap-1), 1vw, var(--gap-3));
   }
 
   .dashboard-panel--dense .dashboard-panel__body {
-    padding: clamp(0.2rem, 0.8vw, 0.5rem);
+    padding: clamp(var(--gap-1), 0.8vw, var(--gap-2));
   }
 
   .dashboard-panel--media .dashboard-panel__body,

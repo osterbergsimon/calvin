@@ -177,6 +177,10 @@ async function collectProblems(page, scope) {
         if (!isVisible(el) || isAriaHidden(el) || el.closest("svg")) continue;
         const text = (el.textContent || "").trim();
         if (!text) continue;
+        // A visually-hidden (screen-reader-only) label is not visible text: a
+        // 1px clipping box is its technique, not a layout bug.
+        const box = el.getBoundingClientRect();
+        if (box.width <= 1 || box.height <= 1) continue;
         const style = getComputedStyle(el);
         // An ellipsis is deliberate truncation with a visible marker; the audit
         // is after text that is silently cut off or spilling.

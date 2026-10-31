@@ -199,19 +199,19 @@ const subResizeHandles = computed(() => {
   /* Default stacking context so the focused sibling can be raised above its
      neighbours — otherwise a later sub-region paints over its glow. */
   position: relative;
-  z-index: 0;
+  isolation: isolate;
 }
 /* Raise the focused sub-region so its neon glow blooms over adjacent sub-regions
    instead of being clipped by a later-painted sibling (mirrors the section --lit
    treatment for top-level regions). */
 .dashboard-subregion--lit {
-  z-index: 3;
+  z-index: var(--z-raised);
 }
 
 /* ── Nested drag-to-resize handles ─────────────────────────────────────────── */
 .subregion-resizer {
   position: absolute;
-  z-index: 6;
+  z-index: var(--z-raised);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -237,8 +237,8 @@ const subResizeHandles = computed(() => {
 .subregion-resizer__grip {
   background: var(--focus);
   border: 1px solid var(--focus-edge);
-  border-radius: 999px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent);
+  border-radius: var(--radius-round);
+  box-shadow: 0 0 0 3px var(--focus-glow);
 }
 .subregion-resizer--row .subregion-resizer__grip {
   width: 6px;
@@ -252,6 +252,6 @@ const subResizeHandles = computed(() => {
 }
 .subregion-resizer:hover .subregion-resizer__grip,
 .subregion-resizer:active .subregion-resizer__grip {
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--focus) 28%, transparent);
+  box-shadow: 0 0 0 5px var(--focus-glow);
 }
 </style>

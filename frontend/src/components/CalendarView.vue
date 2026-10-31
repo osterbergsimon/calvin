@@ -33,29 +33,31 @@
         <div class="calendar-header">
           <div class="calendar-header__label">{{ currentMonthYear }}</div>
           <div v-if="focused && hasPointer" class="calendar-header__controls">
-            <button
+            <Button
               v-if="!isCurrentPeriod"
-              type="button"
               class="calendar-header__today"
+              variant="primary"
+              size="sm"
               title="Jump to today"
               aria-label="Jump to today"
               @click="goToToday"
             >
               Today
-            </button>
+            </Button>
             <IconButton size="custom" label="Previous" title="Previous" @click="previousMonth">
               ‹
             </IconButton>
-            <button
-              type="button"
+            <Button
               class="calendar-header__view-switch"
+              variant="secondary"
+              size="sm"
               :title="`Switch view (currently ${viewModeLabel})`"
               :aria-label="`Switch calendar view, currently ${viewModeLabel}`"
               @click="cycleView"
             >
               <span class="calendar-header__view-label">{{ viewModeLabel }}</span>
               <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
-            </button>
+            </Button>
             <IconButton size="custom" label="Next" title="Next" @click="nextMonth"> › </IconButton>
             <CalendarViewOptions v-if="view" :region-id="regionId" :view="view" />
             <IconButton
@@ -266,6 +268,7 @@ import { buildMonthWeeks } from "../composables/useMonthLayout";
 import { autoVisibleEventCount, DEFAULT_EVENT_ROW_HEIGHT } from "@/utils/calendarDensity";
 import { addMonths } from "@/utils/dateMath";
 import DashboardPanel from "./DashboardPanel.vue";
+import Button from "./ui/Button.vue";
 import IconButton from "./ui/IconButton.vue";
 import EmptyState from "./ui/EmptyState.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
@@ -1370,7 +1373,7 @@ onActivated(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg-1);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   overflow: visible; /* let the focused panel glow bloom out */
   outline: none;
   min-height: 0;
@@ -1413,7 +1416,7 @@ onActivated(() => {
 .calendar-header {
   /* Stays above the first-run empty overlay so month navigation still works. */
   position: relative;
-  z-index: 91;
+  z-index: calc(var(--z-raised) + 1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1428,8 +1431,8 @@ onActivated(() => {
 
 .calendar-header__label {
   font-family: var(--font-display);
-  font-size: var(--region-label-fs, var(--fs-xl));
-  font-weight: 700;
+  font-size: var(--region-label-fs, var(--text-title));
+  font-weight: var(--weight-title);
   color: var(--ink);
   line-height: 1.2;
   white-space: nowrap;
@@ -1445,60 +1448,10 @@ onActivated(() => {
   flex-shrink: 0;
 }
 
-.calendar-header__view-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  height: var(--region-rail-h, 1.75rem);
-  padding: 0 0.7rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
-}
-
-.calendar-header__today {
-  height: var(--region-rail-h, 1.75rem);
-  padding: 0 0.75rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 1px solid var(--focus);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: filter 0.2s;
-}
-
-.calendar-header__today:hover {
-  filter: brightness(1.08);
-}
-
-.calendar-header__today:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
+/* The view-switch's chrome comes from ui/Button; only its caret stays local. */
 .calendar-header__view-caret {
-  font-size: var(--fs-micro);
+  font-size: var(--text-caption);
   color: var(--ink-2);
-}
-
-.calendar-header__view-switch:hover {
-  border-color: var(--focus-edge);
-}
-
-.calendar-header__view-switch:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 /* Fullscreen close button — mirrors the photos/web-service overlay. */
@@ -1506,16 +1459,16 @@ onActivated(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: 100;
+  z-index: calc(var(--z-raised) + 2);
   pointer-events: none;
 }
 
 .btn-close-fullscreen {
   pointer-events: auto;
-  box-shadow: 0 4px 12px var(--shadow);
+  box-shadow: var(--elev-1);
   /* IconButton's transition covers background/border-color/color only, so
      animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
-  transition: transform 0.2s;
+  transition: transform var(--dur-fast) var(--ease);
 }
 
 .btn-close-fullscreen:hover {
@@ -1525,7 +1478,7 @@ onActivated(() => {
 .calendar-empty-overlay {
   position: absolute;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-raised);
   background: color-mix(in srgb, var(--bg-1) 88%, transparent);
 }
 
@@ -1534,10 +1487,6 @@ onActivated(() => {
 @media (any-pointer: coarse) {
   .calendar-header__controls {
     --icon-size: max(var(--region-rail-h, 1.75rem), var(--touch-target, 2.75rem));
-  }
-  .calendar-header__view-switch,
-  .calendar-header__today {
-    height: max(var(--region-rail-h, 1.75rem), var(--touch-target, 2.75rem));
   }
 }
 
@@ -1552,7 +1501,7 @@ onActivated(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: calc(var(--z-raised) + 2);
   backdrop-filter: blur(2px);
 }
 
@@ -1569,13 +1518,13 @@ onActivated(() => {
   border: 4px solid var(--line);
   border-top: 4px solid var(--focus);
   border-radius: 50%;
-  animation: spin 1s linear infinite;
+  animation: spin calc(var(--dur) * 5) linear infinite;
 }
 
 .loading-text {
   color: var(--ink-2);
-  font-size: var(--fs-md);
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
 }
 
 @keyframes spin {
@@ -1600,7 +1549,7 @@ onActivated(() => {
   flex-direction: column;
   height: 100%;
   background: var(--bg-1);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   padding: 0.5rem;
   min-height: 0;
   width: 100%;
@@ -1635,8 +1584,8 @@ onActivated(() => {
 
 .weekday {
   text-align: center;
-  font-weight: 600;
-  font-size: var(--fs-md);
+  font-weight: var(--weight-title);
+  font-size: var(--text-body);
   color: var(--ink-2);
   padding: 0.5rem;
   min-width: 0;
@@ -1695,7 +1644,7 @@ onActivated(() => {
 
 .calendar-day {
   border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   padding: 0.5rem;
   min-height: 0;
   min-width: 0;
@@ -1704,7 +1653,7 @@ onActivated(() => {
   display: flex;
   flex-direction: column;
   background: var(--bg-1) !important;
-  transition: background 0.2s;
+  transition: background var(--dur-fast) var(--ease);
   position: relative;
   overflow: hidden;
   overflow-x: clip; /* Better clipping for event overflow on RPI */
@@ -1766,7 +1715,7 @@ onActivated(() => {
 
 .calendar-day.red-day:not(.other-month) .day-number {
   color: var(--err-text);
-  font-weight: 700;
+  font-weight: var(--weight-title);
 }
 
 /* Ensure day-events container doesn't affect day background */
@@ -1791,8 +1740,8 @@ onActivated(() => {
 }
 
 .day-number {
-  font-weight: 600;
-  font-size: var(--fs-md);
+  font-weight: var(--weight-title);
+  font-size: var(--text-body);
   color: var(--ink);
   flex-shrink: 0;
   white-space: nowrap;
@@ -1800,13 +1749,13 @@ onActivated(() => {
 
 .week-number {
   font-family: var(--font-data);
-  font-size: var(--fs-3xs);
-  font-weight: 600;
+  font-size: var(--text-dense);
+  font-weight: var(--weight-title);
   letter-spacing: 0.04em;
   color: var(--focus-text);
   background: color-mix(in srgb, var(--focus) 12%, transparent);
   padding: 0.05rem 0.35rem;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   line-height: 1.35;
   white-space: nowrap;
   align-self: flex-start;
@@ -1825,8 +1774,8 @@ onActivated(() => {
   align-items: flex-end;
   justify-content: center;
   font-family: var(--font-data);
-  font-size: var(--fs-3xs);
-  font-weight: 600;
+  font-size: var(--text-dense);
+  font-weight: var(--weight-title);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-2);
@@ -1846,8 +1795,8 @@ onActivated(() => {
 
 .week-spine-num {
   font-family: var(--font-data);
-  font-size: var(--fs-3xs);
-  font-weight: 600;
+  font-size: var(--text-dense);
+  font-weight: var(--weight-title);
   letter-spacing: 0.02em;
   line-height: 1.2;
   color: var(--ink-2);
@@ -1876,16 +1825,16 @@ onActivated(() => {
 }
 
 .event-overflow-indicator {
-  font-size: var(--fs-micro);
+  font-size: var(--text-caption);
   padding: 0.15rem 0.35rem;
   background: var(--bg-2);
   color: var(--ink-2);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   text-align: center;
   cursor: default;
   margin-top: 0.1rem;
   opacity: 0.8;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   flex-shrink: 0;
 }
 
@@ -1954,7 +1903,7 @@ onActivated(() => {
 }
 .calendar-weeks .calendar-day.today {
   border: 1px solid var(--focus) !important;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
 }
 .calendar-weeks .calendar-day .day-header {
   margin-bottom: 0;
@@ -1962,13 +1911,13 @@ onActivated(() => {
 }
 .calendar-weeks .calendar-day .day-number {
   font-family: var(--font-data);
-  font-size: var(--fs-micro);
-  font-weight: 500;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
   color: var(--ink-2);
 }
 .calendar-weeks .calendar-day.today .day-number {
   color: var(--focus-text);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 
 .mv-timed {
@@ -1985,7 +1934,7 @@ onActivated(() => {
   background: transparent;
   padding: 0.05rem 0.1rem;
   font-family: var(--font-data);
-  font-size: var(--fs-3xs);
+  font-size: var(--text-dense);
   letter-spacing: 0.02em;
 }
 
@@ -2038,12 +1987,12 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(var(--fs-3xs), 1.5vw, var(--fs-md));
+    font-size: clamp(var(--text-dense), 1.5vw, var(--text-body));
     padding: clamp(0.15rem, 0.5vw, 0.5rem);
   }
 
   .day-number {
-    font-size: clamp(var(--fs-micro), 2vw, var(--fs-md));
+    font-size: clamp(var(--text-caption), 2vw, var(--text-body));
   }
 
   .day-header {
@@ -2051,7 +2000,7 @@ onActivated(() => {
   }
 
   .week-number {
-    font-size: clamp(var(--fs-3xs), 1.5vw, var(--fs-micro));
+    font-size: clamp(var(--text-dense), 1.5vw, var(--text-caption));
     padding: clamp(0.05rem, 0.25vw, 0.125rem) clamp(0.2rem, 0.5vw, 0.375rem);
   }
 }
@@ -2073,7 +2022,7 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(var(--fs-3xs), 2vw, var(--fs-2xs));
+    font-size: clamp(var(--text-dense), 2vw, var(--text-caption));
     padding: clamp(0.1rem, 0.5vw, 0.25rem);
   }
 
@@ -2092,7 +2041,7 @@ onActivated(() => {
   }
 
   .day-number {
-    font-size: clamp(var(--fs-3xs), 2.5vw, var(--fs-xs));
+    font-size: clamp(var(--text-dense), 2.5vw, var(--text-meta));
   }
 }
 
@@ -2128,12 +2077,12 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(var(--fs-3xs), 2vh, var(--fs-2xs));
+    font-size: clamp(var(--text-dense), 2vh, var(--text-caption));
     padding: clamp(0.1rem, 0.5vh, 0.25rem);
   }
 
   .day-number {
-    font-size: clamp(var(--fs-3xs), 2.5vh, var(--fs-xs));
+    font-size: clamp(var(--text-dense), 2.5vh, var(--text-meta));
   }
 }
 
@@ -2155,7 +2104,7 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: var(--fs-3xs);
+    font-size: var(--text-dense);
     padding: 0.1rem;
   }
 
@@ -2174,7 +2123,7 @@ onActivated(() => {
   }
 
   .day-number {
-    font-size: var(--fs-3xs);
+    font-size: var(--text-dense);
   }
 
   .day-events {

@@ -116,10 +116,10 @@ for (const { position, mode } of POSITIONS) {
     ).toBe(true);
 
     await trigger.click();
-    const menu = page.locator(".admin-overflow__menu");
+    const menu = page.locator(".popover__panel");
     await expect(menu).toBeVisible();
 
-    const items = menu.locator(".admin-overflow__item");
+    const items = menu.locator(".menu__item");
     const itemCount = await items.count();
     expect(itemCount).toBeGreaterThan(0);
     for (let i = 0; i < itemCount; i++) {
@@ -133,7 +133,7 @@ for (const { position, mode } of POSITIONS) {
       ];
       for (const [x, y] of points) {
         expect(
-          await pointHits(page, x, y, ".admin-overflow__menu"),
+          await pointHits(page, x, y, ".popover__panel"),
           `menu item ${i} receives the pointer at ${Math.round(x)},${Math.round(y)}`
         ).toBe(true);
       }
