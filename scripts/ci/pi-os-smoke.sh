@@ -36,7 +36,7 @@ case "${VERSION_CODENAME}" in
     trixie)
         echo "== wayland kiosk packages resolve: ${CALVIN_WAYLAND_PACKAGES[*]}"
         apt-get install -s -qq "${CALVIN_WAYLAND_PACKAGES[@]}" >/dev/null
-        # cog (WPE WebKit on DRM/KMS) is the auto default on Pi 3-class boards;
+        # cog (WPE WebKit on DRM/KMS) is the auto default on every board;
         # Debian's cog 0.18.4 + libwpewebkit are what Trixie ships.
         echo "== cog kiosk packages resolve: ${CALVIN_COG_PACKAGES[*]}"
         apt-get install -s -qq "${CALVIN_COG_PACKAGES[@]}" >/dev/null
