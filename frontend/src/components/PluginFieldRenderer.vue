@@ -1,10 +1,11 @@
 <template>
-  <div class="plugin-field">
-    <label>{{ (schema && typeof schema === "object" && schema.description) || fieldKey }}</label>
+  <div v-if="!isHidden" class="plugin-field">
+    <label :for="fieldId">{{ label }}</label>
 
     <!-- Directory input (no browse button - directory browser removed) -->
     <div v-if="ui && ui.component === 'directory'" class="directory-input">
       <input
+        :id="fieldId"
         type="text"
         :value="fieldValue"
         :placeholder="ui.placeholder || 'Enter directory path...'"
@@ -16,6 +17,7 @@
     <!-- Text input -->
     <input
       v-else-if="ui && ui.component === 'input'"
+      :id="fieldId"
       type="text"
       :value="fieldValue"
       :placeholder="ui.placeholder"
@@ -26,6 +28,7 @@
     <!-- Password input -->
     <input
       v-else-if="ui && ui.component === 'password'"
+      :id="fieldId"
       type="password"
       :value="fieldValue"
       :placeholder="ui.placeholder"
@@ -36,6 +39,7 @@
     <!-- Number input -->
     <input
       v-else-if="ui && ui.component === 'number'"
+      :id="fieldId"
       type="number"
       :value="fieldValue"
       :min="ui.validation?.min"
@@ -49,6 +53,7 @@
     <!-- Select dropdown -->
     <select
       v-else-if="ui && ui.component === 'select'"
+      :id="fieldId"
       :value="fieldValue"
       class="form-input"
       @change="$emit('update', $event.target.value)"
@@ -62,6 +67,7 @@
     <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
       <div class="scan-select-row">
         <select
+          :id="fieldId"
           :value="fieldValue"
           class="form-input"
           @change="$emit('update', $event.target.value)"
@@ -95,6 +101,7 @@
     <!-- Textarea -->
     <textarea
       v-else-if="ui && ui.component === 'textarea'"
+      :id="fieldId"
       :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
@@ -102,28 +109,19 @@
       @input="$emit('update', $event.target.value)"
     />
 
-    <!-- Checkbox -->
-    <label
-      v-else-if="
-        (ui && ui.component === 'checkbox') ||
-        (schema && typeof schema === 'object' && schema.type === 'boolean')
-      "
-      class="checkbox-label"
-    >
-      <input
-        type="checkbox"
-        :checked="isChecked"
-        class="checkbox-input"
-        @change="$emit('update', $event.target.checked)"
-      />
-      <span class="checkbox-text">
-        {{ ui && ui.help_text ? ui.help_text : (schema && schema.description) || fieldKey }}
-      </span>
-    </label>
+    <!-- Boolean: the shared on/off toggle, never a native checkbox -->
+    <ToggleSwitch
+      v-else-if="isBoolean"
+      :id="fieldId"
+      :model-value="isChecked"
+      :aria-label="label"
+      @update:model-value="$emit('update', $event)"
+    />
 
     <!-- Fallback: Default input based on schema type -->
     <input
       v-else-if="schema && typeof schema === 'object' && schema.type === 'string'"
+      :id="fieldId"
       type="text"
       :value="fieldValue"
       class="form-input"
@@ -131,6 +129,7 @@
     />
     <input
       v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
+      :id="fieldId"
       type="password"
       :value="fieldValue"
       :placeholder="ui?.placeholder"
@@ -138,12 +137,11 @@
       @input="$emit('update', $event.target.value)"
     />
 
-    <!-- Help text and links -->
-    <span
-      v-if="ui && (ui.help_text || ui.help_link)"
-      class="help-text"
-      style="display: block; margin-top: 0.5rem"
-    >
+    <!-- The schema description is the hint line under the field -->
+    <span v-if="descriptionText" class="help-text">{{ descriptionText }}</span>
+
+    <!-- Extra author help text and links -->
+    <span v-if="ui && (ui.help_text || ui.help_link)" class="help-text">
       <span v-if="ui.help_text">{{ ui.help_text }}</span>
       <a
         v-if="ui.help_link"
@@ -161,6 +159,8 @@
 <script setup>
 import { computed, ref } from "vue";
 import axios from "axios";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { fieldLabel, isHiddenField } from "@/utils/pluginFields";
 
 const props = defineProps({
   pluginId: {
@@ -186,6 +186,22 @@ defineEmits(["update"]);
 const ui = computed(() => {
   return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
 });
+
+// `label` is the form label; without one the key is humanised. The description
+// is a hint line — it was historically used as the label, which read like a
+// sentence and left the field unnamed (CLV-74).
+const label = computed(() => fieldLabel(props.fieldKey, props.schema));
+const descriptionText = computed(() => {
+  const description = props.schema?.description;
+  return typeof description === "string" ? description.trim() : "";
+});
+const isHidden = computed(() => isHiddenField(props.fieldKey, props.schema));
+const isBoolean = computed(
+  () => ui.value?.component === "checkbox" || props.schema?.type === "boolean"
+);
+const fieldId = computed(() =>
+  `plugin-field-${props.pluginId}-${props.fieldKey}`.replace(/[^a-zA-Z0-9_-]/g, "-")
+);
 
 // `<input type="number">` defaults to step=1, which rejects decimals (e.g.
 // geographic coordinates) as a stepMismatch on form submit. Derive step from
@@ -240,7 +256,8 @@ async function runScan() {
 .plugin-field label {
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 
@@ -291,6 +308,12 @@ async function runScan() {
   transition: border-color 0.2s ease;
 }
 
+/* Match the modal's Name control; textareas stay content-sized. */
+input.form-input,
+select.form-input {
+  height: var(--control-height);
+}
+
 .form-input:focus {
   outline: none;
   border-color: var(--focus);
@@ -302,34 +325,16 @@ async function runScan() {
 }
 
 .help-text {
-  font-size: var(--fs-control);
-  color: var(--ink-2);
-  margin-top: 0.5rem;
   display: block;
+  margin-top: var(--gap-1);
+  font-size: var(--text-meta);
+  line-height: normal;
+  color: var(--ink-2);
 }
 
 .help-text a {
   color: var(--focus-text);
   text-decoration: underline;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.checkbox-input {
-  width: auto;
-  margin: 0;
-  cursor: pointer;
-}
-
-.checkbox-text {
-  color: var(--ink);
-  font-size: var(--fs-md);
 }
 
 .scan-select-row {

@@ -16,7 +16,8 @@ _ICAL_INSTANCE_SCHEMA = {
     # is never sent back to the frontend (audit S5, calvin-ua2).
     "ical_url": {
         "type": "password",
-        "description": "iCal feed URL",
+        "label": "Calendar address",
+        "description": "The .ics address to read events from.",
         "default": "",
         "ui": {
             "component": "password",

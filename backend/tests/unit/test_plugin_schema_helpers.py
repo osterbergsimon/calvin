@@ -27,6 +27,12 @@ class TestUrlField:
             "ui": {"component": "input", "validation": {"type": "url"}},
         }
 
+    def test_label_is_optional_and_kept_out_when_absent(self):
+        # CLV-74: the form label comes from `label`, the description is the
+        # hint. A helper call without a label keeps the old shape untouched.
+        assert "label" not in url_field("Website URL")
+        assert url_field("Where to read events.", label="Feed address")["label"] == ("Feed address")
+
     def test_full(self):
         field = url_field(
             "Website URL",

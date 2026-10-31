@@ -63,7 +63,7 @@ describe("InstanceModal secret fields", () => {
   it("tests the connection against the edited instance so stored secrets are used", async () => {
     const wrapper = await mountModal();
 
-    const testButton = wrapper.findAll("button").find(b => b.text().includes("Test Connection"));
+    const testButton = wrapper.findAll("button").find(b => b.text().includes("Test connection"));
     await testButton.trigger("click");
     await flushPromises();
 
