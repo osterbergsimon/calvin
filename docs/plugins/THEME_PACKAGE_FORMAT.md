@@ -8,7 +8,7 @@ schedule".
 
 The installer validates a package at install; the host validates every bundled
 and installed theme again on every startup. Both use the same rules in
-[`app/services/theme_contract.py`](../../backend/app/services/theme_contract.py).
+[`app/services/theme_contract.py`](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/services/theme_contract.py).
 
 ## Layout
 
