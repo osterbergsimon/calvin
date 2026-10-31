@@ -9,22 +9,22 @@
         type="button"
         class="rc-key"
         :class="{ 'rc-key--capturing': capturingSlot === 1 }"
-        :aria-label="`First reboot key (currently ${label1})`"
+        :aria-label="`${capturingSlot === 1 ? 'Press a button…' : label1} first key — first reboot key`"
         @click="captureKey(1)"
       >
-        <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span>
-        <span class="rc-key-hint">first key</span>
+        <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span
+        >{{ " " }}<span class="rc-key-hint">first key</span>
       </button>
       <span class="rc-plus" aria-hidden="true">+</span>
       <button
         type="button"
         class="rc-key"
         :class="{ 'rc-key--capturing': capturingSlot === 2 }"
-        :aria-label="`Second reboot key (currently ${label2})`"
+        :aria-label="`${capturingSlot === 2 ? 'Press a button…' : label2} second key — second reboot key`"
         @click="captureKey(2)"
       >
-        <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span>
-        <span class="rc-key-hint">second key</span>
+        <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span
+        >{{ " " }}<span class="rc-key-hint">second key</span>
       </button>
     </div>
     <p v-if="warning" class="rc-warn" role="alert">{{ warning }}</p>

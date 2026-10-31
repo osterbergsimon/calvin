@@ -332,7 +332,7 @@ describe("ScreenRegionEditor touch behaviour", () => {
 
     // Page settings are shown, where the clock bar's Position lives.
     expect(w.find('[aria-label="Page name"]').exists()).toBe(true);
-    const position = w.find('[aria-label="Clock bar position"]');
+    const position = w.find('[aria-label^="Clock bar position"]');
     expect(position.exists()).toBe(true);
     await position.trigger("click");
     const bottom = w.findAll(".pill__opt").find(option => option.text() === "Bottom");

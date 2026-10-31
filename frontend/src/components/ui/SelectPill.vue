@@ -3,7 +3,7 @@
     <button
       type="button"
       class="pill"
-      :aria-label="ariaLabel || undefined"
+      :aria-label="ariaLabel ? `${ariaLabel}: ${currentLabel}` : undefined"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="listbox"
       :aria-controls="listboxId"

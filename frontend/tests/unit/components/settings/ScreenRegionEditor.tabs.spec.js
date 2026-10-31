@@ -75,6 +75,13 @@ describe("ScreenRegionEditor page tabs", () => {
     sessionStorage.clear();
   });
 
+  it("keeps the Add page action outside the tablist", async () => {
+    const w = await mountEditor();
+    const tablist = w.find('[role="tablist"]');
+    expect(tablist.findAll('[role="tab"]')).toHaveLength(2);
+    expect(tablist.find(".sre-tab-add").exists()).toBe(false);
+  });
+
   it("renders one line per tab: name then where it shows", async () => {
     const w = await mountEditor([
       { id: "kitchen", overrides: { displayName: "Kitchen", availableScreens: ["home"] } },
@@ -108,7 +115,7 @@ describe("ScreenRegionEditor page tabs", () => {
     const screens = tab.find(".sre-tab-screens");
     expect(screens.text()).toBe("Kitchen, Hallway");
     expect(tab.attributes("title")).toContain("Kitchen, Hallway");
-    expect(tab.attributes("aria-label")).toBe("Home, shown on Kitchen, Hallway");
+    expect(tab.attributes("aria-label")).toBe("Home · Kitchen, Hallway");
     expect(ruleBody(".sre-tab-screens")).toContain("max-width: 16ch");
     expect(ruleBody(".sre-tab-screens")).toContain("text-overflow: ellipsis");
   });

@@ -253,6 +253,7 @@ const getSourceName = sourceId => {
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   box-shadow: 0 18px 50px var(--shadow);
+  /* a11y-allow-no-outline: the dialog panel is a programmatic focus target */
   outline: none;
 }
 
@@ -446,10 +447,14 @@ const getSourceName = sourceId => {
   cursor: pointer;
 }
 
-.event-detail__also-item:hover,
+.event-detail__also-item:hover {
+  background: var(--bg-2);
+}
+
 .event-detail__also-item:focus-visible {
   background: var(--bg-2);
-  outline: none;
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .event-detail__also-time {

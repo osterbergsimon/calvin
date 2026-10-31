@@ -1,5 +1,5 @@
 <template>
-  <div class="status-rail" aria-live="polite" aria-label="System status">
+  <div class="status-rail" role="status" aria-live="polite" aria-label="System status">
     <div v-if="overflow > 0" class="status-rail__more">{{ overflow }} more</div>
     <TransitionGroup name="tile" tag="div" class="status-rail__stack">
       <div

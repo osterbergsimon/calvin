@@ -20,7 +20,7 @@ describe("ServiceRegionViewOptions — card size", () => {
   it("reflects the region's current card size (default medium when absent)", async () => {
     const wrapper = openPopover({});
     await wrapper.vm.$nextTick();
-    const pill = wrapper.findAll('[aria-label="Card size"]');
+    const pill = wrapper.findAll('[aria-label^="Card size"]');
     expect(pill.length).toBe(1);
     // default surfaced as medium
     expect(wrapper.html()).toContain("Medium");
@@ -35,7 +35,7 @@ describe("ServiceRegionViewOptions — card size", () => {
 
     // SelectPill options are <li role="option"> teleported to document.body, not buttons.
     // First open the SelectPill dropdown by clicking its trigger (the pill button).
-    const pillTrigger = wrapper.find('[aria-label="Card size"]');
+    const pillTrigger = wrapper.find('[aria-label^="Card size"]');
     await pillTrigger.trigger("click");
     await wrapper.vm.$nextTick();
 
