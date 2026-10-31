@@ -382,7 +382,7 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
 }
 .pc-btn--danger {
-  color: var(--err);
+  color: var(--err-text);
 }
 .pc-btn--danger:hover {
   border-color: var(--err);

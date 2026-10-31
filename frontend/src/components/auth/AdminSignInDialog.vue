@@ -287,7 +287,7 @@ function openSettings() {
   color: var(--ink);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-2xl);
   box-shadow: 0 18px 50px -16px var(--shadow-hover);
   transform: translate(-50%, -50%);
 }
@@ -314,7 +314,7 @@ function openSettings() {
 }
 .admin-dialog__lead {
   margin: 0 0 20px;
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   line-height: 1.45;
   color: var(--ink-2);
 }

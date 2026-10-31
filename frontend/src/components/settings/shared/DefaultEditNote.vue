@@ -77,7 +77,7 @@ const sentence = computed(() => {
   border: none;
   color: var(--ink-3);
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
   cursor: pointer;
 }

@@ -36,7 +36,7 @@ const emit = defineEmits(["reset"]);
    copy of the row-description styles. */
 .setting-row__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -59,7 +59,7 @@ const emit = defineEmits(["reset"]);
   border: none;
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 3px;

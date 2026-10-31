@@ -149,3 +149,20 @@ assert_eq VICTIM "$(cat "$victim")" "root wrote through a symlink planted at <st
 [ ! -L "$UPDATE_STATE_FILE" ] || fail "state file is still a symlink"
 assert_eq success "$(state status)"
 pass "planted state temp symlink not followed"
+
+# --- 8. a host pinned to a release tag -----------------------------------------
+# A tag never moves: the updater refreshes the host files from that tag and
+# leaves the checkout at it instead of trying to merge origin/<tag>.
+git -C "$tmp/origin" tag v0.1.0
+git -C "$tmp/repo" fetch -q origin
+git -C "$tmp/repo" checkout -q --detach refs/tags/v0.1.0
+reset_host
+sed -i 's/^GIT_BRANCH=develop$/GIT_BRANCH=v0.1.0/' "$tmp/calvin-update"
+bash "$SCRIPT" > "$tmp/out9" 2>&1 || fail "update of a tag install failed: $(cat "$tmp/out9")"
+assert_contains "$tmp/out9" 'release tag' "no note that the ref is a release tag"
+assert_contains "$tmp/calls.log" '^setup-from-origin --refresh --mode prod' "host files not refreshed from the tag"
+assert_eq v0.1.0 "$(git -C "$tmp/repo" describe --tags --exact-match)" "the checkout left its tag"
+assert_eq success "$(state status)"
+sed -i 's/^GIT_BRANCH=v0.1.0$/GIT_BRANCH=develop/' "$tmp/calvin-update"
+git -C "$tmp/repo" checkout -q develop
+pass "tag installs update from their tag"

@@ -267,7 +267,7 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 }
 .pi-action--danger:hover {
   border-color: var(--err);
-  color: var(--err);
+  color: var(--err-text);
   background: color-mix(in srgb, var(--err) 8%, transparent);
 }
 </style>

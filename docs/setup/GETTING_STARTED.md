@@ -91,12 +91,15 @@ comparison and the security caveats.
 kiosk browser. Easiest to set up. From the Pi:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+# Stable release (replace v0.1.0 with the latest tag from
+# https://github.com/osterbergsimon/calvin/releases)
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
 sudo reboot
 ```
 
-The script installs Docker, the kiosk dependencies, the published
-runtime image, and three systemd units. The dashboard comes up at
+The script installs Docker, the kiosk dependencies, the published runtime
+image for that release, and three systemd units. The dashboard comes up at
 `http://localhost:8000` after reboot.
 
 On Pi 3-class boards (Pi 3/3B+, Zero 2 W, CM3) the kiosk runs Chromium without
@@ -105,10 +108,20 @@ graphics; Pi 4/5 keep it. The flags live in
 `/etc/default/calvin-kiosk-display`; see
 [Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu) for the override.
 
-This installs the `develop` branch (`main` is release-only). Pass
-`GIT_BRANCH=<branch>` after `sudo` (`... | sudo GIT_BRANCH=<branch> bash`) to
-track another one, or `--mode dev` for a hot-reload Pi. Details in
-[SETUP_LINUX.md](SETUP_LINUX.md).
+Testers can track the integration branch instead. It runs the `:develop` image
+and moves with every push:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+```
+
+`main` is release-only and is never installed directly — releases are installed
+by tag. Pass `GIT_BRANCH=<branch-or-tag>` after `sudo`
+(`... | sudo GIT_BRANCH=v0.1.0 bash`) to pin another ref, or `--mode dev` for
+a hot-reload Pi. Details in
+[SETUP_LINUX.md](SETUP_LINUX.md) and
+[SETUP_SCRIPTS.md](SETUP_SCRIPTS.md#installing-a-release-versus-develop).
+Before the first release exists, use the `develop` command.
 
 **Mode B — Remote backend + kiosk Pi.** A home server runs the
 backend; one or more Pis run only Chromium pointed at the server's

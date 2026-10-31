@@ -106,6 +106,7 @@ nav:
     - testing/BACKEND_TESTS.md
     - testing/TEST_COVERAGE_NEW_FEATURES.md
     - testing/E2E_TEST_REPO_SETUP.md
+  - Releasing: RELEASING.md
   - Contributing: CONTRIBUTING.md
 
 # Extra

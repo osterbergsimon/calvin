@@ -257,7 +257,7 @@ const panels = [
 
 .gallery__heading {
   color: var(--ink-3);
-  font-size: 0.8rem;
+  font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -270,7 +270,7 @@ const panels = [
   gap: 1.25rem;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.4rem 1rem;
   margin-bottom: 1.5rem;
   width: fit-content;
@@ -292,7 +292,7 @@ const panels = [
 .gallery__panel {
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   display: flex;
   flex-direction: column;
   min-height: 320px;
@@ -303,7 +303,7 @@ const panels = [
   padding: 0.5rem 1rem;
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: var(--fs-xl);
   font-weight: 700;
 }
 

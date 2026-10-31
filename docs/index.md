@@ -37,6 +37,9 @@ New to Calvin? Get started quickly:
 - Quick start guides for development
 - Configuration setup
 
+### Releasing
+- [Release process](RELEASING.md): develop → main promotion, release-please, tags and images
+
 ### Plugins
 - Plugin development guide
 - Plugin interface specification
