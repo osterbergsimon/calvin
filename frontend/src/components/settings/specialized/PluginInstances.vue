@@ -5,14 +5,14 @@
         {{ instanceLabelPlural }}
         <Tag v-if="instances.length > 0" class="pi-count" count>{{ instances.length }}</Tag>
       </h4>
-      <button type="button" class="pi-btn-add" @click="$emit('add-instance')">
+      <Button variant="secondary" @click="$emit('add-instance')">
         + Add {{ instanceLabel.toLowerCase() }}
-      </button>
+      </Button>
     </div>
 
-    <p v-if="instances.length === 0" class="pi-empty">
+    <InlineNote v-if="instances.length === 0" class="pi-empty">
       No {{ instanceLabelPlural.toLowerCase() }} yet. Add one to get started.
-    </p>
+    </InlineNote>
 
     <draggable
       v-else
@@ -24,42 +24,49 @@
       @update:model-value="handleOrderChange"
     >
       <template #item="{ element: instance }">
-        <div class="pi-item" :class="{ 'pi-item--off': !instance.enabled }">
-          <span class="pi-drag" title="Drag to reorder" aria-hidden="true">⠿</span>
-          <span
-            v-if="instance.running !== undefined"
-            class="pi-dot"
-            :class="instance.running ? 'pi-dot--on' : 'pi-dot--off'"
-            :title="instance.running ? 'Working' : 'Off'"
-          />
-          <div class="pi-info">
-            <span class="pi-name">{{ instance.name }}</span>
+        <ListRow :name="instance.name" :disabled="!instance.enabled" class="pi-item">
+          <template #lead>
+            <span class="pi-lead">
+              <span class="pi-drag" title="Drag to reorder" aria-hidden="true">⠿</span>
+              <span
+                v-if="instance.running !== undefined"
+                class="pi-dot"
+                :class="instance.running ? 'pi-dot--on' : 'pi-dot--off'"
+                :title="instance.running ? 'Working' : 'Off'"
+              />
+            </span>
+          </template>
+
+          <template #meta>
             <span v-if="getInstanceSummary && getInstanceSummary(instance)" class="pi-summary">{{
               getInstanceSummary(instance)
             }}</span>
-          </div>
-          <ToggleSwitch
-            :model-value="!!instance.enabled"
-            :aria-label="`Enable ${instance.name}`"
-            @update:model-value="v => handleToggle(instance.id, v)"
-          />
-          <button
-            type="button"
-            class="pi-action"
-            title="Edit"
-            @click="$emit('edit-instance', instance)"
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            class="pi-action pi-action--danger"
-            title="Delete"
-            @click="handleDelete(instance.id, instance.name)"
-          >
-            Delete
-          </button>
-        </div>
+          </template>
+
+          <template #actions>
+            <ToggleSwitch
+              :model-value="!!instance.enabled"
+              :aria-label="`Enable ${instance.name}`"
+              @update:model-value="v => handleToggle(instance.id, v)"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              title="Edit"
+              @click="$emit('edit-instance', instance)"
+            >
+              Edit
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              title="Delete"
+              @click="handleDelete(instance.id, instance.name)"
+            >
+              Delete
+            </Button>
+          </template>
+        </ListRow>
       </template>
     </draggable>
   </div>
@@ -68,6 +75,9 @@
 <script setup>
 import { computed } from "vue";
 import draggable from "vuedraggable";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
@@ -122,152 +132,68 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
 </script>
 
 <style scoped>
-/* Spacing/divider is owned by the parent (.pc-body) so a plugin with no global
-   settings doesn't get a floating divider above its instance list. */
-.pi-wrap {
-  margin-top: 0;
-}
-
 .pi-header {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-.pi-title {
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--ink);
-}
-.pi-btn-add {
-  padding: 0.4rem 0.85rem;
-  min-height: var(--touch-target);
-  background: var(--bg-1);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.pi-btn-add:hover {
-  border-color: var(--focus);
-}
-.pi-btn-add:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  gap: var(--gap-3);
+  margin-bottom: var(--gap-4);
 }
 
-.pi-empty {
+.pi-title {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-inline);
   margin: 0;
-  padding: 1rem;
-  text-align: center;
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
 }
 
 .pi-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--gap-inline);
 }
-.pi-item {
+
+.pi-lead {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.6rem 0.85rem;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  transition: border-color 0.15s;
+  gap: var(--gap-inline);
 }
-.pi-item:hover {
-  border-color: color-mix(in srgb, var(--focus) 45%, var(--line));
-}
-.pi-item--off {
-  opacity: 0.6;
-}
+
 .pi-drag {
   cursor: grab;
   color: var(--ink-3);
-  font-size: var(--fs-base);
+  font-size: var(--text-label);
   line-height: 1;
   user-select: none;
 }
+
 .pi-drag:active {
   cursor: grabbing;
 }
+
 .pi-dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
-  border-radius: var(--radius-pill);
-  flex-shrink: 0;
+  border-radius: var(--radius-round);
 }
+
 .pi-dot--on {
   background: var(--ok);
 }
+
 .pi-dot--off {
   background: var(--ink-3);
 }
-.pi-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-  flex: 1;
-}
-.pi-name {
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+
 .pi-summary {
   font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pi-action {
-  padding: 0.35rem 0.7rem;
-  min-height: var(--touch-target);
-  background: transparent;
+  font-size: var(--text-meta);
   color: var(--ink-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.pi-action:hover {
-  border-color: var(--focus);
-  color: var(--ink);
-}
-.pi-action:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.pi-action--danger:hover {
-  border-color: var(--err);
-  color: var(--err-text);
-  background: color-mix(in srgb, var(--err) 8%, transparent);
 }
 </style>

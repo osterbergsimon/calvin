@@ -69,7 +69,8 @@ Content sections become one per thing you see, in this order:
 
 **Calendars switch to the shared flow.** The custom inline form (`CalendarSourcesTab.vue`) is replaced by the
 provider picker + `InstanceModal` (calendar plugins already declare `instance_config_schema`). The calendar-only
-row extras (colour, **Show times**) stay on the row. "Check for new events every" stays as the section's last row.
+row extra (colour) stays on the row; **Show event times** lives in the Edit dialog so every row keeps exactly one
+toggle. "Check for new events every" stays as the section's last row.
 
 ### 3.2 Provider picker
 
@@ -202,7 +203,7 @@ Approved 2026-10-30: A, B, C and D.
 - `SourceList`, for each kind:
   - rows show the provider · summary, the status dot, the toggle, Edit and Remove;
   - drag only on Photos and Web pages & apps;
-  - the calendar row keeps its colour and Show times;
+  - the calendar row keeps its colour, with exactly one toggle (Show event times is in Edit);
   - the error row shows the plugin error;
   - empty uses the CLV-20 copy plus Add.
 - Provider picker:

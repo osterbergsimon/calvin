@@ -2,6 +2,7 @@
   <div class="source-list">
     <div v-if="addLabel" class="sl-add-row">
       <Button
+        class="sl-add"
         :variant="rows.length === 0 ? 'primary' : 'secondary'"
         :disabled="addDisabled"
         :title="addDisabled ? addDisabledHint : ''"
@@ -11,7 +12,7 @@
       </Button>
     </div>
 
-    <p v-if="rows.length === 0" class="sl-empty">{{ emptyText }}</p>
+    <InlineNote v-if="rows.length === 0" class="sl-empty">{{ emptyText }}</InlineNote>
 
     <draggable
       v-else
@@ -24,64 +25,65 @@
       @update:model-value="handleOrderChange"
     >
       <template #item="{ element: row }">
-        <div
+        <ListRow
           class="sl-row"
-          :class="{
-            'sl-row--off': !row.enabled,
-            'sl-row--focus': isHighlighted(row),
-            'sl-row--error': row.error,
-          }"
+          :name="row.name"
+          :meta="rowMeta(row)"
+          :selected="isHighlighted(row)"
+          :disabled="!row.enabled"
           :data-source-id="row.id"
         >
-          <span v-if="drag" class="sl-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
-          <span
-            v-if="row.running !== undefined"
-            class="sl-dot"
-            :class="row.error ? 'sl-dot--err' : row.running ? 'sl-dot--on' : 'sl-dot--off'"
-            :title="row.error || (row.running ? 'Working' : 'Off')"
-          />
-          <div class="sl-text">
-            <span class="sl-name">{{ row.name }}</span>
-            <span class="sl-provider" :class="{ 'sl-provider--err': row.error }">
-              {{ row.error || providerLine(row) }}
+          <template #lead>
+            <span class="sl-lead">
+              <span v-if="drag" class="sl-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
+              <span
+                v-if="row.running !== undefined"
+                class="sl-dot"
+                :class="row.error ? 'sl-dot--err' : row.running ? 'sl-dot--on' : 'sl-dot--off'"
+                :title="row.error || (row.running ? 'Working' : 'Off')"
+              />
             </span>
-            <slot name="meta" :row="row" />
-          </div>
+          </template>
 
-          <slot name="extra" :row="row" />
+          <div v-if="$slots.meta" class="sl-meta"><slot name="meta" :row="row" /></div>
 
-          <ToggleSwitch
-            :model-value="!!row.enabled"
-            :aria-label="`Show ${row.name}`"
-            @update:model-value="v => $emit('toggle', row, v)"
-          />
-          <Button size="sm" @click="$emit('edit', row)">Edit</Button>
-          <Popover
-            :model-value="openMenuId === row.id"
-            :label="`More actions for ${row.name}`"
-            haspopup="menu"
-            @update:model-value="open => setMenu(row.id, open)"
-          >
-            <template #trigger="{ attrs }">
-              <IconButton
-                v-bind="attrs"
-                size="md"
-                variant="ghost"
-                :label="`More actions for ${row.name}`"
-              >
-                <svg class="sl-more-glyph" viewBox="0 0 24 24" aria-hidden="true">
-                  <path :d="mdiDotsHorizontal" fill="currentColor" />
-                </svg>
-              </IconButton>
-            </template>
-            <Menu
-              :items="menuItems"
-              :label="`More actions for ${row.name}`"
-              @select="askRemove(row)"
-              @close="setMenu(row.id, false)"
+          <template #actions>
+            <slot name="extra" :row="row" />
+            <ToggleSwitch
+              :model-value="!!row.enabled"
+              :aria-label="`Show ${row.name}`"
+              @update:model-value="v => $emit('toggle', row, v)"
             />
-          </Popover>
-        </div>
+            <Button class="sl-action" variant="secondary" size="sm" @click="$emit('edit', row)">
+              Edit
+            </Button>
+            <Popover
+              :model-value="openMenuId === row.id"
+              :label="`More actions for ${row.name}`"
+              haspopup="menu"
+              @update:model-value="open => setMenu(row.id, open)"
+            >
+              <template #trigger="{ attrs }">
+                <IconButton
+                  v-bind="attrs"
+                  size="md"
+                  variant="ghost"
+                  :label="`More actions for ${row.name}`"
+                >
+                  <svg class="sl-more-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                    <path :d="mdiDotsHorizontal" fill="currentColor" />
+                  </svg>
+                </IconButton>
+              </template>
+              <Menu
+                :items="menuItems"
+                :label="`More actions for ${row.name}`"
+                @select="askRemove(row)"
+                @close="setMenu(row.id, false)"
+              />
+            </Popover>
+          </template>
+        </ListRow>
       </template>
     </draggable>
 
@@ -102,6 +104,8 @@ import { mdiDotsHorizontal } from "@mdi/js";
 import draggable from "vuedraggable";
 import Button from "@/components/ui/Button.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import Menu from "@/components/ui/Menu.vue";
 import Popover from "@/components/ui/Popover.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -164,6 +168,8 @@ const activeHighlight = ref("");
 // The ⋯ menu is an action list; Remove is the only action and stays last (and
 // red) because it is destructive.
 const menuItems = [{ key: "remove", label: "Remove", danger: true }];
+
+const rowMeta = row => [{ text: row.error || providerLine(row), tone: row.error ? "err" : "" }];
 
 const isHighlighted = row => {
   if (!activeHighlight.value) return false;
@@ -233,45 +239,26 @@ onBeforeUnmount(() => {
 .sl-add-row {
   display: flex;
   justify-content: flex-end;
-  padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-2);
+  padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-stack);
 }
 
 .sl-empty {
-  margin: 0;
-  padding: var(--gap-6) var(--panel-pad-x);
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+  justify-content: center;
   text-align: center;
-  font-family: var(--font-ui);
-  font-size: var(--text-body);
-  color: var(--ink-3);
 }
 
 .sl-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--gap-1);
+  gap: var(--gap-inline);
   padding: 0 var(--panel-pad-x) var(--panel-pad-y);
 }
 
-.sl-row {
-  display: flex;
+.sl-lead {
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  min-height: var(--touch-target);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  flex-wrap: wrap;
-  transition:
-    border-color var(--dur-fast) var(--ease),
-    box-shadow var(--dur-fast) var(--ease);
-}
-.sl-row--off {
-  opacity: 0.6;
-}
-.sl-row--focus {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
+  gap: var(--gap-tight);
 }
 
 .sl-grip {
@@ -288,7 +275,7 @@ onBeforeUnmount(() => {
 .sl-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-round);
   flex-shrink: 0;
 }
 .sl-dot--on {
@@ -301,42 +288,17 @@ onBeforeUnmount(() => {
   background: var(--err);
 }
 
-.sl-text {
+.sl-meta {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 6rem;
-  flex: 1;
-}
-.sl-name {
-  font-family: var(--font-ui);
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-provider {
-  font-family: var(--font-ui);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-tight) var(--gap-inline);
   font-size: var(--text-meta);
-  color: var(--ink-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-provider--err {
-  color: var(--err-text);
+  color: var(--ink-2);
 }
 
 .sl-more-glyph {
   width: 1.25rem;
   height: 1.25rem;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sl-row {
-    transition: none;
-  }
 }
 </style>

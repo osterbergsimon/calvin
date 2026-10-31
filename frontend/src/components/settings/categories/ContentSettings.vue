@@ -182,11 +182,3 @@ const photoFrameTimeoutOptions = computed(() => {
   return options;
 });
 </script>
-
-<style scoped>
-.content-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-</style>
