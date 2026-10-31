@@ -1,15 +1,18 @@
 <template>
-  <div class="ui-gallery" :class="{ dark: theme === 'dark' }" data-test="ui-gallery">
+  <div
+    class="ui-gallery"
+    :class="{ dark: preset.dark }"
+    :style="preset.vars"
+    :data-theme="themeName"
+    :data-mode="mode"
+    data-test="ui-gallery"
+  >
     <header class="ui-gallery__bar">
       <h1 class="ui-gallery__title">Calvin UI gallery</h1>
-      <SegmentedControl
-        v-model="theme"
-        :options="[
-          { value: 'light', label: 'Light' },
-          { value: 'dark', label: 'Backlit' },
-        ]"
-        aria-label="Theme"
-      />
+      <div class="ui-gallery__controls">
+        <SegmentedControl v-model="themeName" :options="GALLERY_THEME_OPTIONS" aria-label="Theme" />
+        <SegmentedControl v-model="mode" :options="GALLERY_MODE_OPTIONS" aria-label="Mode" />
+      </div>
     </header>
 
     <main class="ui-gallery__body">
@@ -84,8 +87,9 @@
       <section class="ui-gallery__section" data-test="gallery-inline-note">
         <h2 class="ui-gallery__heading">InlineNote</h2>
         <p class="ui-gallery__note">
-          The one-line note under a row: a hint, a warning, an error or a confirmation. Tones are
-          text only; status colours never decorate. An action can sit on the same line.
+          The one-line note under a row: a hint, a warning, an error or a confirmation. Status is
+          never colour alone — ok, warn and err add a decorative icon and the word carries the
+          meaning; neutral stays iconless. An action can sit on the same line.
         </p>
 
         <div class="ui-gallery__stack">
@@ -266,7 +270,7 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import {
   mdiCalendar,
   mdiCheck,
@@ -275,6 +279,7 @@ import {
   mdiMonitor,
   mdiRefresh,
 } from "@mdi/js";
+import { GALLERY_MODE_OPTIONS, GALLERY_THEME_OPTIONS, galleryTheme } from "./galleryThemes.js";
 import Button from "../components/ui/Button.vue";
 import Card from "../components/ui/Card.vue";
 import Dialog from "../components/ui/Dialog.vue";
@@ -288,10 +293,19 @@ import ToggleSwitch from "../components/ui/ToggleSwitch.vue";
 import SettingRow from "../components/settings/shell/SettingRow.vue";
 import SettingsSection from "../components/settings/shell/SettingsSection.vue";
 
-// ?theme=light|dark makes the snapshot and the reviewer's link deterministic;
-// without it the switcher starts on the light theme.
-const requested = new URLSearchParams(window.location.search).get("theme");
-const theme = ref(requested === "dark" ? "dark" : "light");
+// ?theme=calvin|ocean|forest|sunset&mode=light|dark makes a review link
+// deterministic. The snapshot suite keeps the legacy ?theme=light|dark (Calvin)
+// so the CI baselines stay on the default palette.
+const params = new URLSearchParams(window.location.search);
+const requestedTheme = params.get("theme");
+const requestedMode = params.get("mode");
+const themeName = ref(
+  GALLERY_THEME_OPTIONS.some(option => option.value === requestedTheme) ? requestedTheme : "calvin"
+);
+const mode = ref(
+  requestedMode === "dark" || (!requestedMode && requestedTheme === "dark") ? "dark" : "light"
+);
+const preset = computed(() => galleryTheme(themeName.value, mode.value));
 const text = ref("");
 const dialogOpen = ref(false);
 const dialogMode = ref("form");
@@ -325,6 +339,12 @@ const openDialog = mode => {
   font-family: var(--font-ui);
   font-size: var(--text-title);
   font-weight: var(--weight-title);
+}
+.ui-gallery__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-inline);
 }
 .ui-gallery__body {
   display: flex;
