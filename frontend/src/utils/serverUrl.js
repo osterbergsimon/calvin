@@ -16,6 +16,11 @@ export function isLoopbackHost(hostname) {
   return LOOPBACK_HOSTS.has(host) || host.startsWith("127.") || host.endsWith(".localhost");
 }
 
+/** Is this page loaded from the server's own loopback address? */
+export function isLoopbackPage() {
+  return typeof window !== "undefined" && isLoopbackHost(window.location.hostname);
+}
+
 export function pickServerUrl(network, location = window.location) {
   if (network?.public_url) return network.public_url.replace(/\/+$/, "");
   if (location?.origin && !isLoopbackHost(location.hostname)) return location.origin;
@@ -44,9 +49,13 @@ export function _resetServerUrlForTests() {
 }
 
 // "/settings?setting=content-calendars" on the server, ready for a QR code.
-export function settingsLink(serverUrl, settingId) {
+// `setupCode` is only ever passed on the server's own (loopback) screen: the
+// phone that scans it gets the one-time code without typing it.
+export function settingsLink(serverUrl, settingId, setupCode) {
   const base = (serverUrl || "").replace(/\/+$/, "");
-  return settingId
-    ? `${base}/settings?setting=${encodeURIComponent(settingId)}`
-    : `${base}/settings`;
+  const params = new URLSearchParams();
+  if (settingId) params.set("setting", settingId);
+  if (setupCode) params.set("setup", setupCode);
+  const query = params.toString();
+  return `${base}/settings${query ? `?${query}` : ""}`;
 }

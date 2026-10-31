@@ -23,6 +23,7 @@ makes no difference.
 | `backups/` | Saved and automatic backups | `BACKUP_DIR` |
 | `kiosk-signing.key` | Kiosk manifest signing key | `KIOSK_SIGNING_KEY_PATH` |
 | `admin-auth.json` | Admin password hash and session-signing secret (mode `0600`) | `ADMIN_AUTH_PATH` |
+| `setup-code.txt` | One-time first-run setup code while no admin password exists (mode `0600`); deleted once one is set | follows `ADMIN_AUTH_PATH` |
 
 An override wins over the data dir for that one path; everything else stays
 under the data dir. A relative value (for `CALVIN_DATA_DIR` or an override)

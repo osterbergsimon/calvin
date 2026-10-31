@@ -24,11 +24,17 @@ test.describe("phone: first run and sign-in", () => {
   }) => {
     const api = await installApiMock(page, { auth: { configured: false, authenticated: false } });
 
-    await gotoSettings(page);
+    // A phone arrives from the server screen's QR: ?setup= carries the code
+    // and must not stay in the address bar.
+    await page.goto("/settings?setup=ABCD-EFGH");
+    await expect(page.locator(".settings-page")).toBeVisible();
+    await page.waitForLoadState("networkidle");
 
     const card = page.locator('[data-test="auth-card"]');
     await expect(card).toBeVisible();
     await expect(page.getByRole("heading", { name: "Choose an admin password" })).toBeVisible();
+    await expect(page.locator("#auth-setup-code")).toHaveValue("ABCD-EFGH");
+    expect(new URL(page.url()).searchParams.has("setup")).toBe(false);
 
     await page.locator("#auth-setup-password").fill("correct horse battery");
     await page.locator("#auth-setup-repeat").fill("correct horse battery");
@@ -37,6 +43,7 @@ test.describe("phone: first run and sign-in", () => {
 
     await expectSettingsReady(page);
     expect(api.requests).toContain("POST /api/auth/setup");
+    expect(api.setupBody).toEqual({ password: "correct horse battery", code: "ABCD-EFGH" });
     expect(consoleErrors).toEqual([]);
   });
 
@@ -46,7 +53,9 @@ test.describe("phone: first run and sign-in", () => {
   }) => {
     const api = await installApiMock(page, { auth: { configured: false, authenticated: false } });
 
-    await gotoSettings(page);
+    await page.goto("/settings?setup=ABCD-EFGH");
+    await expect(page.locator(".settings-page")).toBeVisible();
+    await page.waitForLoadState("networkidle");
     await page.locator("#auth-setup-password").fill("short");
     await page.locator("#auth-setup-repeat").fill("short");
     await page.getByRole("button", { name: "Set password" }).click();

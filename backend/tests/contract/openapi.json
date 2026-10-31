@@ -1323,6 +1323,24 @@
         "title": "SealedModeBody",
         "type": "object"
       },
+      "SetupBody": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "password": {
+            "title": "Password",
+            "type": "string"
+          }
+        },
+        "required": [
+          "password",
+          "code"
+        ],
+        "title": "SetupBody",
+        "type": "object"
+      },
       "SingleMapping": {
         "description": "Action for a single key.",
         "properties": {
@@ -1592,13 +1610,13 @@
     },
     "/api/auth/setup": {
       "post": {
-        "description": "First-run claim: only while no password is configured.",
+        "description": "First-run claim: only with the one-time code while no password exists.",
         "operationId": "auth_setup_api_auth_setup_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/PasswordBody"
+                "$ref": "#/components/schemas/SetupBody"
               }
             }
           },
@@ -1625,6 +1643,26 @@
           }
         },
         "summary": "Auth Setup",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/setup-code": {
+      "get": {
+        "description": "The one-time setup code, only to the server itself (loopback).\n\nA kiosk on the same machine can show it on its setup screen. Everything\nelse is refused so the code never reaches the LAN: use the server log or\n``<data dir>/setup-code.txt`` instead.",
+        "operationId": "auth_setup_code_api_auth_setup_code_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Setup Code",
         "tags": [
           "auth"
         ]

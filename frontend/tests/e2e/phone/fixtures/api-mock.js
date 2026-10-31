@@ -319,6 +319,12 @@ const PNG_1PX = Buffer.from(
 export async function installApiMock(page, options = {}) {
   const state = {
     auth: { configured: true, authenticated: true, ...(options.auth || {}) },
+    // The one-time setup code the phone should send. Kept in the mock so the
+    // POST body is checked, not just the field's presence.
+    setupCode: "ABCD-EFGH",
+    // A phone is not the server: GET /auth/setup-code gives it nothing.
+    setupCodeAvailable: false,
+    setupBody: null,
     config: { ...sampleConfig, ...(options.config || {}) },
     instances: JSON.parse(JSON.stringify(sampleInstances)),
     hostActions: [],
@@ -353,11 +359,25 @@ export async function installApiMock(page, options = {}) {
     }
 
     if (path === "/api/health") return json(route, { status: "ok" });
+    // A phone is never loopback: the code reaches it in the QR's ?setup= link.
+    if (path === "/api/auth/setup-code") {
+      return json(route, state.setupCodeAvailable ? { code: state.setupCode } : {});
+    }
     if (path === "/api/auth/status") return json(route, state.auth);
     if (/^\/api\/auth\/(setup|login|logout|password)$/.test(path)) {
       if (path.endsWith("/logout")) {
         state.auth = { ...state.auth, authenticated: false };
       } else {
+        if (path === "/api/auth/setup") {
+          state.setupBody = request.postDataJSON();
+          if (state.setupBody?.code !== state.setupCode) {
+            return json(
+              route,
+              { detail: { code: "bad_setup_code", message: "Wrong setup code." } },
+              403
+            );
+          }
+        }
         state.auth = { configured: true, authenticated: true };
       }
       return json(route, { ok: true });

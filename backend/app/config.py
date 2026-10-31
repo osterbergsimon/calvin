@@ -174,6 +174,12 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("calvin_admin_password", "admin_password"),
     )
+    # One-time code gating the first admin password (CLV-61). Empty = generate
+    # one and keep it in a 0600 file; set it for headless installs.
+    setup_code: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_setup_code", "setup_code"),
+    )
     allowed_hosts: str = Field(
         default="",
         validation_alias=AliasChoices("calvin_allowed_hosts", "allowed_hosts"),
