@@ -1412,12 +1412,23 @@ def main():
 
 
 def reconcile(cfg, now, last, applier=None):
-    """Apply desired state only when it changed (or on first run). Return new state."""
+    """Apply desired state only when it changed (or on first run). Return new state.
+
+    A failed apply (the platform helper returns "none", e.g. the cog unit is
+    still starting or stopping) does not advance the recorded state, so the next
+    poll retries the same transition instead of waiting for the next schedule
+    boundary. Only "none" means failure; a method name (or a test applier's None)
+    counts as applied.
+    """
     on = desired_on(cfg, now)
     if applier is None:
         applier = apply_on
     if last is None or on != last:
-        applier(on)
+        if applier(on) == "none":
+            log(
+                f"display -> {'ON' if on else 'OFF'} failed; retrying on the next poll"
+            )
+            return last
     return on
 
 
