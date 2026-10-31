@@ -394,6 +394,22 @@ const mode = ref(
   requestedMode === "dark" || (!requestedMode && requestedTheme === "dark") ? "dark" : "light"
 );
 const preset = computed(() => galleryTheme(themeName.value, mode.value));
+
+// Popover, Menu and Dialog teleport to <body>, outside the wrapper above, so
+// mirror the preset onto the root the way the app's theme does; otherwise
+// their dark-mode states render with the light palette.
+let rootVarKeys = [];
+watch(
+  preset,
+  value => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", value.dark);
+    for (const key of rootVarKeys) root.style.removeProperty(key);
+    rootVarKeys = Object.keys(value.vars || {});
+    for (const key of rootVarKeys) root.style.setProperty(key, value.vars[key]);
+  },
+  { immediate: true }
+);
 const text = ref("");
 const dialogOpen = ref(false);
 const dialogMode = ref("form");
