@@ -24,7 +24,7 @@
         <TextField
           v-model="name"
           label="Kiosk name"
-          data-test="add-kiosk-name"
+          input-test="add-kiosk-name"
           maxlength="64"
           autocomplete="off"
         />
