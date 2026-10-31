@@ -7,6 +7,51 @@ import pytest
 
 from app.services.theme_installer import theme_installer
 
+LIGHT = {
+    "bg-0": "#eef1f4",
+    "bg-1": "#ffffff",
+    "bg-2": "#ffffff",
+    "line": "#dde3e8",
+    "line-soft": "#e8edf1",
+    "ink": "#1b242b",
+    "ink-2": "#5d6b75",
+    "ink-3": "#636e77",
+    "focus": "#e08a1e",
+    "ok": "#2e9e6b",
+    "warn": "#b38f00",
+    "err": "#c0392b",
+    "shadow": "rgba(0, 0, 0, 0.1)",
+    "shadow-hover": "rgba(0, 0, 0, 0.15)",
+}
+DARK = {
+    "bg-0": "#0e1316",
+    "bg-1": "#151c21",
+    "bg-2": "#1d262d",
+    "line": "#27313a",
+    "line-soft": "#1e272e",
+    "ink": "#eaf0f3",
+    "ink-2": "#9aa7b0",
+    "ink-3": "#818d96",
+    "focus": "#f3b052",
+    "ok": "#5bd0a0",
+    "warn": "#ffd84d",
+    "err": "#ef6b5e",
+    "shadow": "rgba(0, 0, 0, 0.3)",
+    "shadow-hover": "rgba(0, 0, 0, 0.4)",
+}
+
+
+def _manifest(theme_id: str, name: str) -> dict:
+    return {
+        "id": theme_id,
+        "name": name,
+        "version": "1.0.0",
+        "description": "A test theme",
+        "theme_api": 2,
+        "variables": dict(LIGHT),
+        "dark_mode": dict(DARK),
+    }
+
 
 @pytest.mark.integration
 class TestThemeAPI:
@@ -18,19 +63,24 @@ class TestThemeAPI:
         assert response.status_code == 200
         data = response.json()
         assert "plugins" in data
-        # Should include built-in themes
+        # D1: a theme is a palette; light/dark is the mode, not a theme.
         theme_ids = [p["id"] for p in data["plugins"]]
-        assert "light" in theme_ids
-        assert "dark" in theme_ids
+        assert {"ocean", "forest", "sunset"} <= set(theme_ids)
+        assert "light" not in theme_ids
+        assert "dark" not in theme_ids
 
     def test_get_theme_by_id_builtin(self, test_client):
         """Test getting a built-in theme by ID."""
-        response = test_client.get("/api/plugins/light")
+        response = test_client.get("/api/plugins/ocean")
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == "light"
+        assert data["id"] == "ocean"
         assert data["is_builtin"] is True
+        assert data["selectable"] is True
+        assert data["validation_errors"] == []
+        assert data["theme_api"] == 2
         assert "variables" in data
+        assert "dark_mode" in data
 
     def test_get_theme_by_id_installed(self, test_client, tmp_path):
         """Test getting an installed theme by ID."""
@@ -44,18 +94,7 @@ class TestThemeAPI:
         theme_dir = tmp_path / "test_theme"
         theme_dir.mkdir()
 
-        manifest = {
-            "id": "test_api_theme",
-            "name": "Test API Theme",
-            "version": "1.0.0",
-            "description": "A test theme",
-            "variables": {
-                "bg-primary": "#ffffff",
-                "bg-secondary": "#f5f5f5",
-                "text-primary": "#333333",
-                "accent-primary": "#2196f3",
-            },
-        }
+        manifest = _manifest("test_api_theme", "Test API Theme")
         (theme_dir / "theme.json").write_text(json.dumps(manifest))
 
         # Create zip file
@@ -99,18 +138,7 @@ class TestThemeAPI:
         theme_dir = tmp_path / "test_theme"
         theme_dir.mkdir()
 
-        manifest = {
-            "id": "test_install_theme",
-            "name": "Test Install Theme",
-            "version": "1.0.0",
-            "description": "A test theme for installation",
-            "variables": {
-                "bg-primary": "#ffffff",
-                "bg-secondary": "#f5f5f5",
-                "text-primary": "#333333",
-                "accent-primary": "#2196f3",
-            },
-        }
+        manifest = _manifest("test_install_theme", "Test Install Theme")
         (theme_dir / "theme.json").write_text(json.dumps(manifest))
 
         # Create zip file
@@ -163,12 +191,7 @@ class TestThemeAPI:
         # Install a theme first
         theme_dir = tmp_path / "test_theme"
         theme_dir.mkdir()
-        manifest = {
-            "id": "test_uninstall_theme",
-            "name": "Test Uninstall Theme",
-            "version": "1.0.0",
-            "variables": {"bg-primary": "#ffffff"},
-        }
+        manifest = _manifest("test_uninstall_theme", "Test Uninstall Theme")
         (theme_dir / "theme.json").write_text(json.dumps(manifest))
 
         zip_path = tmp_path / "test_theme.zip"
@@ -206,7 +229,7 @@ class TestThemeAPI:
 
     def test_uninstall_builtin_theme_fails(self, test_client):
         """Test that uninstalling a built-in theme fails."""
-        response = test_client.delete("/api/plugins/installed/light")
+        response = test_client.delete("/api/plugins/installed/ocean")
         # Should fail (400 or 404)
         assert response.status_code in [400, 404]
 
@@ -224,8 +247,7 @@ class TestThemeAPI:
 
         # Should include built-in themes
         theme_ids = [item["id"] for item in items if item.get("type") == "theme"]
-        assert "light" in theme_ids
-        assert "dark" in theme_ids
+        assert {"ocean", "forest", "sunset"} <= set(theme_ids)
 
     def test_get_plugins_filtered_by_theme(self, test_client):
         """Test that GET /api/plugins?plugin_type=theme returns only themes."""
@@ -240,5 +262,37 @@ class TestThemeAPI:
 
         # Should include built-in themes
         theme_ids = [item["id"] for item in items]
-        assert "light" in theme_ids
-        assert "dark" in theme_ids
+        assert {"ocean", "forest", "sunset"} <= set(theme_ids)
+
+    def test_installed_theme_failing_load_check_is_unselectable(self, test_client, tmp_path):
+        """A theme edited after install is kept but marked unselectable (load check)."""
+        try:
+            theme_installer.uninstall_theme("test_broken_theme")
+        except Exception:
+            pass
+
+        theme_dir = tmp_path / "broken"
+        theme_dir.mkdir()
+        (theme_dir / "theme.json").write_text(json.dumps(_manifest("test_broken_theme", "Broken")))
+        theme_installer.install_theme(theme_dir, "test_broken_theme")
+
+        manifest_path = theme_installer.get_theme_path("test_broken_theme") / "theme.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["variables"]["focus"] = "url(https://evil.example/x)"
+        manifest_path.write_text(json.dumps(manifest))
+
+        try:
+            response = test_client.get("/api/plugins?plugin_type=theme")
+            assert response.status_code == 200
+            entry = next(p for p in response.json()["plugins"] if p["id"] == "test_broken_theme")
+            assert entry["selectable"] is False
+            assert entry["validation_errors"]
+
+            detail = test_client.get("/api/plugins/test_broken_theme")
+            assert detail.status_code == 200
+            assert detail.json()["selectable"] is False
+        finally:
+            try:
+                theme_installer.uninstall_theme("test_broken_theme")
+            except Exception:
+                pass

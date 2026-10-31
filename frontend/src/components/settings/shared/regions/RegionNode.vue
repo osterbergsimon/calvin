@@ -38,7 +38,9 @@
       </template>
     </div>
     <div v-else class="sre-region-face">
-      <span v-if="!narrow" class="sre-region-emoji">{{ emoji }}</span>
+      <svg v-if="!narrow" class="sre-region-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path :d="icon" fill="currentColor" />
+      </svg>
       <span class="sre-region-name">{{ title }}</span>
       <span v-if="!narrow" class="sre-region-size">{{ region.size }}%</span>
     </div>
@@ -47,6 +49,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { mdiCalendarBlankOutline, mdiImageOutline, mdiWeb } from "@mdi/js";
 import { getSplitDirection } from "@/utils/layout";
 
 const props = defineProps({
@@ -64,8 +67,12 @@ const emit = defineEmits(["select", "resize"]);
 
 const containerEl = ref(null);
 const splitDir = computed(() => getSplitDirection(props.region.split, props.parentDirection));
-const emoji = computed(() =>
-  props.region.kind === "calendar" ? "📅" : props.region.kind === "photos" ? "🖼️" : "🌐"
+const icon = computed(() =>
+  props.region.kind === "calendar"
+    ? mdiCalendarBlankOutline
+    : props.region.kind === "photos"
+      ? mdiImageOutline
+      : mdiWeb
 );
 const title = computed(() =>
   props.region.kind === "calendar"
@@ -97,24 +104,21 @@ const onResize = (firstIndex, event) =>
     box-shadow 0.15s,
     filter 0.15s;
 }
-.sre-region.kind-calendar {
-  background: color-mix(in srgb, var(--region-calendar) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--region-calendar) 55%, transparent);
-}
-.sre-region.kind-photos {
-  background: color-mix(in srgb, var(--region-photos) 15%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--region-photos) 55%, transparent);
-}
+/* Regions are neutral theme surfaces (D3): the kind is recognisable from its
+   icon and label, never from a colour. Neutral also keeps the focus colour
+   meaning "selected" — the only colour a region uses. */
+.sre-region.kind-calendar,
+.sre-region.kind-photos,
 .sre-region.kind-service {
-  background: color-mix(in srgb, var(--region-service) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--region-service) 55%, transparent);
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .sre-region.is-split {
   background: transparent;
   box-shadow: inset 0 0 0 1px var(--line-soft);
 }
 .sre-region.is-active {
-  filter: brightness(1.08);
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-2));
   box-shadow:
     inset 0 0 0 2px var(--focus),
     0 0 0 2px var(--focus-glow);
@@ -145,16 +149,17 @@ const onResize = (firstIndex, event) =>
   text-align: center;
   pointer-events: none;
 }
-/* The device screen is always a dark, lit surface regardless of the app theme,
-   so on-screen text is fixed light rather than theme-driven --ink. */
-.sre-region-emoji {
-  font-size: var(--fs-xl);
-  filter: saturate(1.05);
+/* Region tiles are theme surfaces in every mode, so they use the theme ink
+   (not the fixed device-screen ink of the bezel). */
+.sre-region-icon {
+  width: 1.25rem; /* 20px */
+  height: 1.25rem;
+  color: var(--ink-2);
 }
 .sre-region-name {
   font-size: var(--fs-2xs);
   font-weight: 600;
-  color: var(--device-ink);
+  color: var(--ink);
   letter-spacing: 0.01em;
 }
 .sre-region-size {
@@ -162,7 +167,7 @@ const onResize = (firstIndex, event) =>
   right: 5px;
   bottom: 4px;
   font-size: var(--fs-micro);
-  color: var(--device-ink-2);
+  color: var(--ink-3);
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
 }
