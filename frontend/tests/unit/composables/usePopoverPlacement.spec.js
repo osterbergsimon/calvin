@@ -48,6 +48,17 @@ describe("usePopoverPlacement", () => {
     expect(popoverStyle.value.minWidth).toBe("120px");
   });
 
+  it("reserves a bottom inset (the on-screen keyboard) before deciding to flip", () => {
+    setViewport(1000, 800);
+    const { popoverStyle, openUp, place } = usePopoverPlacement({ bottomInset: 400 });
+    // 300px below the trigger is fine in the full viewport, but not above a
+    // 400px keyboard.
+    place(trigger({ top: 300, bottom: 330 }));
+    expect(openUp.value).toBe(true);
+    expect(popoverStyle.value.bottom).toBe("506px"); // innerHeight(800) - top(300) + gap(6)
+    expect("top" in popoverStyle.value).toBe(false);
+  });
+
   it("reposition() re-runs placement against the last trigger", () => {
     setViewport(1000, 800);
     const { popoverStyle, place, reposition } = usePopoverPlacement();

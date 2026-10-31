@@ -47,6 +47,16 @@ describe("calendar colour helpers", () => {
     expect(swatches[0]).toEqual({ token: "--event-1", number: 1, hex: "#863427" });
   });
 
+  it("reads a theme scoped to an element (the UI gallery's wrapper)", () => {
+    const scope = document.createElement("div");
+    for (let i = 1; i <= 8; i += 1) {
+      scope.style.setProperty(`--event-${i}`, "#123456");
+    }
+    const swatches = eventSwatches(scope);
+    expect(swatches).toHaveLength(8);
+    expect(swatches.every(swatch => swatch.hex === "#123456")).toBe(true);
+  });
+
   it("picks the next unused calendar colour", () => {
     expect(nextEventColour([])).toBe("#863427");
     expect(nextEventColour(["#863427"])).toBe("#000002");
