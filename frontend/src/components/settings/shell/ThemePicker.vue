@@ -22,9 +22,10 @@
         aria-label="Choose theme"
       >
         <ThemeSelector
-          :themes="themes"
-          :selected-theme-id="selectedThemeId"
+          :themes="themesWithCalvin"
+          :selected-theme-id="selectedThemeId || CALVIN_ID"
           :loading="loading"
+          :dark="dark"
           :show-help="false"
           @select="onSelect"
         />
@@ -51,17 +52,27 @@ const popoverEl = ref(null);
 const open = ref(false);
 const themes = ref([]);
 const loading = ref(false);
+// The mini previews show the palette in the mode the screen is in right now.
+const dark = ref(false);
 // Teleported to <body> to escape the rounded settings panel's overflow:hidden;
 // placed with fixed viewport coords.
 const { popoverStyle, place, reposition } = usePopoverPlacement();
 
-// No selected theme means Calvin's own palette (light/dark per the Mode below) —
-// name it rather than showing a bare "Theme" on a fresh install (F8).
-const DEFAULT_THEME_LABEL = "Calvin default";
+// No selected theme means Calvin's own palette (light/dark per the Mode below).
+// D1: a theme is a palette family, so the picker lists Calvin (the default)
+// plus installed plugin themes; Light/Dark are modes, not themes.
+const CALVIN_ID = "calvin";
+const CALVIN_OPTION = {
+  id: CALVIN_ID,
+  name: "Calvin",
+  is_builtin: true,
+  selectable: true,
+};
+const themesWithCalvin = computed(() => [CALVIN_OPTION, ...themes.value]);
 const selectedThemeName = computed(() => {
-  if (!props.selectedThemeId) return DEFAULT_THEME_LABEL;
+  if (!props.selectedThemeId) return CALVIN_OPTION.name;
   if (loading.value && themes.value.length === 0) return "Loading themes…";
-  return themes.value.find(t => t.id === props.selectedThemeId)?.name ?? DEFAULT_THEME_LABEL;
+  return themes.value.find(t => t.id === props.selectedThemeId)?.name ?? CALVIN_OPTION.name;
 });
 
 const loadThemes = async () => {
@@ -104,6 +115,8 @@ const onDocKeydown = event => {
 const onReposition = () => reposition();
 
 const openPopover = () => {
+  dark.value =
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark");
   place(triggerEl);
   open.value = true;
   document.addEventListener("click", onDocClick, true);
@@ -126,7 +139,8 @@ const toggleOpen = () => {
 };
 
 const onSelect = id => {
-  emit("select", id);
+  // Calvin is "no theme overrides": the CSS defaults take over.
+  emit("select", id === CALVIN_ID ? null : id);
   close();
 };
 

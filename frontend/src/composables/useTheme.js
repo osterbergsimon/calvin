@@ -37,7 +37,17 @@ const THEME_VARIABLE_KEYS = [
   "err",
   "err-ink",
   "err-text",
+  ...Array.from({ length: 8 }, (_, i) => `event-${i + 1}`),
 ];
+
+// The same value syntax the backend allowlist enforces. The backend rejects an
+// unsafe value at install and flags it at load; this is the last line of
+// defence, so a stale or hand-edited theme.json can never write a var()/url().
+const THEME_COLOUR_VALUE = /^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9.,%\s/+-]+\))$/i;
+
+// D1: a theme is a palette family; light/dark is the mode. These two ids were
+// themes in 0.1.0 and are migrated away on load, once.
+const LEGACY_MODE_THEMES = { light: null, dark: "dark" };
 
 const appliedCustomThemeKeys = new Set();
 
@@ -66,6 +76,8 @@ export function useTheme() {
   const darkModeEnd = ref(6); // 6 AM (06:00) - when to switch to light mode
   let timeCheckInterval = null;
   let systemThemeWatcher = null;
+  // Run the D1 migration at most once per app instance.
+  let legacyThemeMigrated = false;
 
   // Check if current time is within dark mode hours
   const isDarkTime = () => {
@@ -109,32 +121,30 @@ export function useTheme() {
 
     try {
       const theme = await themesStore.getTheme(themeId);
-      if (!theme || !theme.variables) return;
+
+      // Load-time contract verdict from the backend. A theme that fails is
+      // kept installed but is not selectable: fall back to Calvin's palette.
+      if (!theme || theme.selectable === false) {
+        clearCustomThemeVariables();
+        return;
+      }
+
+      const variables = { ...theme.variables, ...(isDark.value ? theme.dark_mode || {} : {}) };
+      if (!variables || typeof variables !== "object") return;
 
       clearCustomThemeVariables();
 
       const root = document.documentElement;
-      const variables = { ...theme.variables, ...(isDark.value ? theme.dark_mode || {} : {}) };
-
       for (const [key, value] of Object.entries(variables)) {
+        // Colours only, allowlisted keys only. Role, spacing, radius, z-index
+        // and legacy names can never reach the page from a theme.
         if (!THEME_VARIABLE_KEYS.includes(key)) continue;
-        root.style.setProperty(`--${key}`, value);
+        if (typeof value !== "string" || !THEME_COLOUR_VALUE.test(value.trim())) continue;
+        root.style.setProperty(`--${key}`, value.trim());
         appliedCustomThemeKeys.add(key);
       }
-
-      // The focus-light glow stays Calvin's signature amber unless a theme opts
-      // in by setting `focus` explicitly. Neutral themes (Light/Dark) keep amber;
-      // expressive themes (Ocean, Forest, Sunset) ship their own focus hue.
-      // --focus-edge/--focus-glow derive from --focus in theme.css.
-      const explicitFocus =
-        (theme.dark_mode && isDark.value && theme.dark_mode.focus) || variables.focus;
-      if (explicitFocus) {
-        root.style.setProperty("--focus", explicitFocus);
-      } else {
-        // Clear any focus left by a previously-selected theme → back to amber.
-        root.style.removeProperty("--focus");
-      }
     } catch (err) {
+      clearCustomThemeVariables();
       console.error(`Failed to apply custom theme ${themeId}:`, err);
     }
   };
@@ -220,6 +230,23 @@ export function useTheme() {
     await saveTheme();
   };
 
+  // D1 migration: a config saved by 0.1.0 may point at the retired Light or
+  // Dark theme. Map it to Calvin default once; Dark also sets the mode so the
+  // screen looks the same as before. Follow device / On a schedule keep working
+  // because the theme no longer overrides the mode.
+  const migrateLegacyTheme = async () => {
+    if (legacyThemeMigrated) return;
+    const legacy = normalizeThemeId(configStore.selectedTheme);
+    if (!(legacy in LEGACY_MODE_THEMES)) return;
+
+    legacyThemeMigrated = true;
+    selectedThemeId.value = null;
+    themesStore.setSelectedTheme(null);
+    const mode = LEGACY_MODE_THEMES[legacy];
+    if (mode) themeMode.value = mode;
+    await saveTheme();
+  };
+
   // Load theme from config
   const loadTheme = async () => {
     await configStore.fetchConfig();
@@ -240,6 +267,7 @@ export function useTheme() {
       darkModeEnd.value = configStore.darkModeEnd;
     }
 
+    await migrateLegacyTheme();
     await updateTheme();
     startTimeCheck();
   };
