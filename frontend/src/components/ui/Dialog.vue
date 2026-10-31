@@ -139,8 +139,14 @@ function restoreFocus() {
   nextTick(() => target?.focus?.());
 }
 
+// A SelectPill, Menu or Popover inside the dialog is a floating surface of its
+// own: Escape closes that, not the editor behind it. Their panels teleport to
+// <body>, so detect them from the event target rather than the DOM subtree.
+const NESTED_OVERLAY = '[role="listbox"], [role="menu"], .popover__panel';
+
 function onKeydown(event) {
   if (event.key === "Escape") {
+    if (event.target?.closest?.(NESTED_OVERLAY)) return;
     if (!props.dismissible) return;
     event.preventDefault();
     close();
