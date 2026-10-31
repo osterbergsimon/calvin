@@ -1,7 +1,6 @@
 <template>
   <div
     v-if="visible"
-    ref="rootEl"
     class="connection-status"
     :class="[
       {
@@ -12,45 +11,75 @@
     ]"
     data-test="connection-status"
   >
-    <Button
-      v-if="hasPill && !compact"
-      ref="pillEl"
-      variant="secondary"
-      size="sm"
-      shape="pill"
-      aria-haspopup="dialog"
-      :aria-expanded="open ? 'true' : 'false'"
-      data-test="connection-pill"
-      @click="togglePopover"
+    <Popover
+      v-if="hasPill"
+      v-model="open"
+      :label="popoverTitle"
+      role="dialog"
+      initial-focus="[data-test='connection-try-now']"
+      @close="open = false"
     >
-      <template #icon>
-        <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path :d="iconPath" />
-        </svg>
+      <template #trigger="{ attrs }">
+        <Button
+          v-if="!compact"
+          variant="secondary"
+          size="sm"
+          shape="pill"
+          data-test="connection-pill"
+          v-bind="attrs"
+        >
+          <template #icon>
+            <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path :d="iconPath" />
+            </svg>
+          </template>
+          <span class="connection-status__text"
+            >{{ pillBaseText
+            }}<span v-if="dataFrom" class="connection-status__from">
+              · data from {{ dataFrom }}</span
+            ></span
+          >
+        </Button>
+        <IconButton
+          v-else
+          variant="ghost"
+          size="sm"
+          shape="circle"
+          :label="pillText"
+          data-test="connection-pill"
+          v-bind="attrs"
+        >
+          <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path :d="iconPath" />
+          </svg>
+        </IconButton>
       </template>
-      <span class="connection-status__text"
-        >{{ pillBaseText
-        }}<span v-if="dataFrom" class="connection-status__from">
-          · data from {{ dataFrom }}</span
-        ></span
-      >
-    </Button>
-    <IconButton
-      v-else-if="hasPill"
-      ref="pillEl"
-      variant="ghost"
-      size="sm"
-      shape="circle"
-      :label="pillText"
-      aria-haspopup="dialog"
-      :aria-expanded="open ? 'true' : 'false'"
-      data-test="connection-pill"
-      @click="togglePopover"
-    >
-      <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path :d="iconPath" />
-      </svg>
-    </IconButton>
+
+      <div class="connection-popover" data-test="connection-popover">
+        <h2 id="connection-popover-title" class="connection-popover__title">{{ popoverTitle }}</h2>
+        <p>{{ popoverDataLine }}</p>
+        <p v-if="status === 'unreachable'">
+          Check that the Calvin server is on and that this screen is on the same network.
+        </p>
+        <p v-else>It isn't connected to the network. Check its Wi-Fi or cable.</p>
+        <Button
+          variant="secondary"
+          data-test="connection-try-now"
+          :disabled="trying"
+          @click="tryNow"
+        >
+          {{ trying ? "Checking…" : "Try now" }}
+        </Button>
+        <InlineNote
+          v-if="tryFailed"
+          class="connection-popover__result"
+          tone="err"
+          data-test="connection-try-failed"
+        >
+          Still can't reach it.
+        </InlineNote>
+      </div>
+    </Popover>
     <span
       v-else-if="showConnecting"
       class="connection-status__connecting"
@@ -71,47 +100,11 @@
     <span class="connection-status__announce" role="status" aria-live="polite">{{
       announcement
     }}</span>
-
-    <Teleport to="body">
-      <div
-        v-if="open && hasPill"
-        ref="popoverEl"
-        class="connection-popover"
-        :style="popoverStyle"
-        role="dialog"
-        aria-labelledby="connection-popover-title"
-        data-test="connection-popover"
-      >
-        <h2 id="connection-popover-title" class="connection-popover__title">{{ popoverTitle }}</h2>
-        <p>{{ popoverDataLine }}</p>
-        <p v-if="status === 'unreachable'">
-          Check that the Calvin server is on and that this screen is on the same network.
-        </p>
-        <p v-else>It isn't connected to the network. Check its Wi-Fi or cable.</p>
-        <Button
-          ref="tryButtonEl"
-          variant="secondary"
-          data-test="connection-try-now"
-          :disabled="trying"
-          @click="tryNow"
-        >
-          {{ trying ? "Checking…" : "Try now" }}
-        </Button>
-        <InlineNote
-          v-if="tryFailed"
-          class="connection-popover__result"
-          tone="err"
-          data-test="connection-try-failed"
-        >
-          Still can't reach it.
-        </InlineNote>
-      </div>
-    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { mdiCloudOffOutline, mdiLanDisconnect } from "@mdi/js";
 import { useConfigStore } from "../stores/config";
 import { useConnectionStore } from "../stores/connection";
@@ -119,6 +112,7 @@ import { formatDataFrom } from "../utils/connectionTime";
 import Button from "./ui/Button.vue";
 import IconButton from "./ui/IconButton.vue";
 import InlineNote from "./ui/InlineNote.vue";
+import Popover from "./ui/Popover.vue";
 
 /**
  * The dashboard's single connection indicator (CLV-48).
@@ -146,16 +140,10 @@ const STARTING_DELAY_MS = 5000;
 const configStore = useConfigStore();
 const connectionStore = useConnectionStore();
 
-const rootEl = ref(null);
-const pillEl = ref(null);
-const popoverEl = ref(null);
-const tryButtonEl = ref(null);
-
 const open = ref(false);
 const trying = ref(false);
 const tryFailed = ref(false);
 const startingElapsed = ref(false);
-const popoverStyle = ref({});
 
 let startingTimer = null;
 
@@ -214,6 +202,10 @@ const announcement = computed(() => {
   return "";
 });
 
+const closePopover = () => {
+  open.value = false;
+};
+
 watch(
   status,
   value => {
@@ -230,82 +222,6 @@ watch(
   { immediate: true }
 );
 
-// Component refs expose the instance; the DOM node is their $el.
-const pillNode = () => pillEl.value?.$el ?? pillEl.value;
-
-const updatePopoverPosition = () => {
-  const pill = pillNode();
-  const popover = popoverEl.value;
-  if (!pill) return;
-  const rect = pill.getBoundingClientRect();
-  const width = popover?.offsetWidth || 320;
-  const height = popover?.offsetHeight || 200;
-  const margin = 8;
-
-  let top = rect.bottom + margin;
-  if (top + height > window.innerHeight - margin) {
-    top = Math.max(margin, rect.top - margin - height);
-  }
-  let left = rect.left;
-  if (left + width > window.innerWidth - margin) {
-    left = window.innerWidth - margin - width;
-  }
-  left = Math.max(margin, left);
-
-  popoverStyle.value = { top: `${top}px`, left: `${left}px` };
-};
-
-const onDocumentPointerDown = event => {
-  if (!open.value) return;
-  const target = event.target;
-  if (rootEl.value?.contains(target) || popoverEl.value?.contains(target)) return;
-  closePopover();
-};
-
-const onDocumentKeyDown = event => {
-  if (event.key === "Escape" && open.value) closePopover();
-};
-
-const addDocumentListeners = () => {
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("keydown", onDocumentKeyDown);
-  window.addEventListener("resize", updatePopoverPosition);
-  window.addEventListener("scroll", updatePopoverPosition, true);
-};
-
-const removeDocumentListeners = () => {
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("keydown", onDocumentKeyDown);
-  window.removeEventListener("resize", updatePopoverPosition);
-  window.removeEventListener("scroll", updatePopoverPosition, true);
-};
-
-const openPopover = async () => {
-  open.value = true;
-  tryFailed.value = false;
-  addDocumentListeners();
-  await nextTick();
-  updatePopoverPosition();
-  const tryButton = tryButtonEl.value?.$el ?? tryButtonEl.value;
-  tryButton?.focus?.();
-};
-
-const closePopover = () => {
-  if (!open.value) return;
-  const focusWasInside =
-    document.activeElement === document.body ||
-    popoverEl.value?.contains(document.activeElement) ||
-    rootEl.value?.contains(document.activeElement);
-  open.value = false;
-  removeDocumentListeners();
-  if (focusWasInside) pillNode()?.focus?.();
-};
-
-const togglePopover = () => {
-  if (open.value) closePopover();
-  else openPopover();
-};
-
 const tryNow = async () => {
   trying.value = true;
   tryFailed.value = false;
@@ -317,7 +233,6 @@ const tryNow = async () => {
 
 onUnmounted(() => {
   clearTimeout(startingTimer);
-  removeDocumentListeners();
 });
 </script>
 
@@ -392,17 +307,12 @@ onUnmounted(() => {
   border: 0;
 }
 
+/* The floating shell (surface, border, radius, elevation, placement, Escape
+   and outside close) comes from ui/Popover; this is the panel's inset. */
 .connection-popover {
-  position: fixed;
-  z-index: var(--z-dialog);
   width: 20rem;
   padding: var(--gap-4);
-  color: var(--ink);
   text-align: left;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--elev-2);
 }
 
 .connection-popover__title {

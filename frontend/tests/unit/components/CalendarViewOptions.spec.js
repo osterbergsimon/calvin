@@ -10,6 +10,7 @@ function mountOptions(view) {
   const w = mount(CalendarViewOptions, {
     attachTo: document.body,
     props: { regionId: "r1", view },
+    global: { stubs: { teleport: true } },
   });
   return { w, cfg };
 }

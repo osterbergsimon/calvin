@@ -7,6 +7,7 @@ function mountShell(props = {}) {
     attachTo: document.body,
     props,
     slots: { default: '<div class="probe">panel</div>' },
+    global: { stubs: { teleport: true } },
   });
 }
 
