@@ -1,16 +1,17 @@
 <template>
   <div class="web-component-host">
-    <div v-if="error" class="web-component-host__error calvin-plugin-error">
+    <InlineNote v-if="error" tone="err" class="web-component-host__error">
       Couldn't show {{ pluginLabel }}.
-    </div>
+    </InlineNote>
     <component v-else-if="loaded" :is="elementName" ref="elementRef" />
-    <div v-else class="web-component-host__loading calvin-plugin-loading">Loading…</div>
+    <InlineNote v-else class="web-component-host__loading">Loading…</InlineNote>
   </div>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { logError } from "../../utils/logger";
+import InlineNote from "../ui/InlineNote.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -92,13 +93,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* The plugin draws its own surface; the host only fills the region. */
 .web-component-host {
   width: 100%;
   height: 100%;
-}
-
-.web-component-host__error,
-.web-component-host__loading {
-  font-size: var(--fs-sm);
 }
 </style>

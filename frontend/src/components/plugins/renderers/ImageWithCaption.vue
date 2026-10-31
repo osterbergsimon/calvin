@@ -64,7 +64,7 @@ const metadata = computed(() => pick("metadata_path", "metadata", "metadata_form
   margin: 0;
   font-family: var(--font-ui);
   font-size: 1.1em;
-  font-weight: 700;
+  font-weight: var(--weight-title);
 }
 
 .image-caption__caption {

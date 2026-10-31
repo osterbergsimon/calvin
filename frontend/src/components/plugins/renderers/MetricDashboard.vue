@@ -1,9 +1,9 @@
 <template>
   <div class="metric-dashboard calvin-plugin-grid" :style="gridStyle">
-    <div
+    <Card
       v-for="(metric, i) in metrics"
       :key="i"
-      class="metric-dashboard__tile calvin-plugin-surface calvin-plugin-metric calvin-plugin-readout"
+      class="metric-dashboard__tile calvin-plugin-readout"
       :class="statusClass(metric)"
     >
       <span class="calvin-plugin-readout__label">
@@ -17,7 +17,7 @@
           unitFor(metric)
         }}</span>
       </span>
-    </div>
+    </Card>
   </div>
 </template>
 
@@ -25,6 +25,7 @@
 import { computed } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
+import Card from "../../ui/Card.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -83,9 +84,12 @@ function statusClass(metric) {
 </script>
 
 <style scoped>
+/* The card owns the surface and inset; a metric tile only centres its readout. */
 .metric-dashboard__tile {
+  display: flex;
+  flex-direction: column;
   justify-content: center;
-  gap: 0.45rem;
+  gap: var(--gap-2);
 }
 
 .metric-dashboard__icon {

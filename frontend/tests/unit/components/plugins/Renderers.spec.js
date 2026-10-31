@@ -152,8 +152,8 @@ describe("StatusRenderer", () => {
     expect(cells).toHaveLength(2);
     expect(cells[0].text()).toContain("CPU");
     expect(cells[0].text()).toContain("42");
-    expect(cells[0].classes()).not.toContain("status--warn");
-    expect(cells[1].classes()).toContain("status--warn");
+    expect(cells[0].classes()).not.toContain("calvin-plugin-readout--warn");
+    expect(cells[1].classes()).toContain("calvin-plugin-readout--warn");
   });
 
   it("defaults to row layout in the statusbar and tile layout in panels", () => {
@@ -245,7 +245,8 @@ describe("CardGrid", () => {
     const cards = wrapper.findAll(".card-grid__card");
     expect(cards).toHaveLength(2);
     expect(wrapper.classes()).toContain("calvin-plugin-grid");
-    expect(cards[0].classes()).toContain("calvin-plugin-surface");
+    // The cards are the shared block; the class is the fit-clamp's hook.
+    expect(cards[0].classes()).toContain("card");
     expect(cards[0].text()).toContain("dinner");
     expect(cards[0].text()).toContain("Pasta");
     expect(cards[1].text()).toContain("Salad");
@@ -389,7 +390,7 @@ describe("MetricDashboard", () => {
     const tiles = wrapper.findAll(".metric-dashboard__tile");
     expect(tiles).toHaveLength(2);
     expect(wrapper.classes()).toContain("calvin-plugin-grid");
-    expect(tiles[0].classes()).toContain("calvin-plugin-metric");
+    expect(tiles[0].classes()).toContain("card");
     expect(tiles[0].text()).toContain("21.5");
     expect(tiles[0].classes()).not.toContain("calvin-plugin-readout--warn");
     expect(tiles[1].classes()).toContain("calvin-plugin-readout--warn");
