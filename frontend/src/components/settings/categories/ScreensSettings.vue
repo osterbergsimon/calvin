@@ -194,7 +194,7 @@
       <SettingsSection id="screen-name" title="Name">
         <SettingRow label="Name" description="Shown in this screen's clock bar.">
           <TextField
-            data-test="screen-name-input"
+            input-test="screen-name-input"
             hide-label
             label="Name"
             :model-value="nameDraft"
