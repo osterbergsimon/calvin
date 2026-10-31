@@ -2,7 +2,7 @@
  * Theme contrast contract.
  *
  * Every text/background token pair the frontend actually uses must clear WCAG
- * AA in all five built-in themes, in both light and dark mode:
+ * AA in all four built-in themes, in both light and dark mode:
  *
  *   - body text               >= 4.5:1
  *   - large text / UI glyphs  >= 3:1  (>= 1.125rem)
@@ -16,7 +16,6 @@
  * Two kinds of ink are deliberately out of the surface scan, with the reason
  * recorded below, and are checked against the surface they really sit on:
  *   - `--on-scrim`      is composited over photo/video content → `--scrim-solid`
- *   - `--device-ink`    is drawn on the device mockup screen    → `--device-screen`
  *   - `--on-event-ink`  is painted on a calendar's own colour (user data, so
  *                       it cannot be measured); it has no theme surface.
  *
@@ -39,7 +38,6 @@ const SKIP_FILES = new Set(["components/ui/Tag.vue"]);
 /** Ink that sits on content rather than on a theme surface. */
 const CONTENT_INK = {
   "on-scrim": "scrim-solid",
-  "device-ink": "device-screen",
   "on-event-ink": null, // painted on the calendar's own (user) colour
 };
 
@@ -202,7 +200,6 @@ describe("theme contrast: text/background token pairs used in components", () =>
   it("checks the content inks against the surface they sit on", () => {
     const pairs = PAIRS.map(pair => `${describeSpec(pair.fg)} on ${pair.bg}`);
     expect(pairs).toContain("on-scrim on scrim-solid");
-    expect(pairs).toContain("device-ink on device-screen");
     // Calendar chips are painted in the calendar's own colour; there is no
     // theme surface to measure, which is why they use a fixed light ink.
     expect(pairs.some(pair => pair.startsWith("on-event-ink"))).toBe(false);
