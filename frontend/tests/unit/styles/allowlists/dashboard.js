@@ -6,17 +6,7 @@
  */
 
 export const roleLint = {
-  allowlist: [
-    "components/DashboardPanel.vue",
-    "components/DashboardRegion.vue",
-    "components/MinimalUIOverlay.vue",
-    "components/dashboard/AdminOverflow.vue",
-    "components/dashboard/CalendarViewOptions.vue",
-    "components/dashboard/RegionViewOptions.vue",
-    "components/dashboard/ServiceRegionViewOptions.vue",
-    "components/settings/categories/DashboardSettings.vue",
-    "views/Dashboard.vue",
-  ],
+  allowlist: [],
   baseline: [
     "components/DashboardPanel.vue",
     "components/DashboardRegion.vue",
@@ -32,11 +22,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/dashboard/CalendarViewOptions.vue",
-    "components/dashboard/ServiceRegionViewOptions.vue",
-    "components/settings/categories/DashboardSettings.vue",
-  ],
+  allowlist: [],
   baseline: [
     "components/dashboard/CalendarViewOptions.vue",
     "components/dashboard/ServiceRegionViewOptions.vue",
@@ -45,6 +31,6 @@ export const controlLint = {
 };
 
 export const settingsNoStyle = {
-  allowlist: ["components/settings/categories/DashboardSettings.vue"],
+  allowlist: [],
   baseline: ["components/settings/categories/DashboardSettings.vue"],
 };

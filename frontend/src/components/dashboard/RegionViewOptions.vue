@@ -99,17 +99,17 @@ defineExpose({ open, close });
 
 .region-view-options__popover {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + var(--gap-1));
   right: 0;
-  z-index: 20;
+  z-index: var(--z-raised);
   min-width: 168px;
-  padding: 0.5rem 0.6rem;
+  padding: var(--gap-2) var(--gap-3);
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: var(--gap-1);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px var(--shadow);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elev-1);
 }
 </style>

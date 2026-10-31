@@ -57,7 +57,7 @@ const restOpacity = computed(() => {
    background. Rest opacity + size are user-set. */
 .hot-corner {
   position: fixed;
-  z-index: 1001; /* above the clock (1000) */
+  z-index: calc(var(--z-dialog) + 1); /* above the clock (--z-sticky) */
   width: var(--hot-corner-size, 64px);
   height: var(--hot-corner-size, 64px);
   display: flex;
@@ -65,7 +65,7 @@ const restOpacity = computed(() => {
   color: var(--on-scrim);
   pointer-events: none; /* never intercept content taps; reveal is a long-press */
   opacity: var(--rest-opacity, 0.55);
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur) var(--ease);
   -webkit-tap-highlight-color: transparent;
 }
 /* Keyboard users can still Tab to the button and reveal with Enter (pointer-events
