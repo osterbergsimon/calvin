@@ -222,12 +222,6 @@ async function setDashboardDirection(baseUrl, direction) {
   if (!response.ok) throw new Error(`Could not set dashboard direction: ${response.status}`);
 }
 
-/** The sample room name is seed convenience; the wordmark has no gap for it. */
-async function clearRoomName(context, baseUrl) {
-  const response = await context.request.post(`${baseUrl}/api/config`, { data: { displayName: "" } });
-  if (!response.ok()) throw new Error(`Could not clear the room name: ${response.status()}`);
-}
-
 /** The GIF ends in day view (persisted per region); wide shots start in month. */
 async function resetCalendarView(baseUrl) {
   const config = await fetch(`${baseUrl}/api/config`).then(response => response.json());
@@ -504,7 +498,6 @@ async function main() {
         colorScheme: scheme,
       });
       await login(context, baseUrl);
-      if (scheme === "light") await clearRoomName(context, baseUrl);
       const page = await context.newPage();
       await guardHostActions(page);
       await page.goto(`${baseUrl}/`, { waitUntil: "networkidle" });
