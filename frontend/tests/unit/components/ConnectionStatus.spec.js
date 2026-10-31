@@ -178,7 +178,8 @@ describe("ConnectionStatus", () => {
 
       const dialog = popoverEl();
       expect(dialog).not.toBeNull();
-      expect(dialog.getAttribute("role")).toBe("dialog");
+      // The content sits inside the shared Popover's dialog panel.
+      expect(dialog.closest('[role="dialog"]')).not.toBeNull();
       expect(dialog.textContent).toContain("Can't reach Calvin");
       expect(dialog.textContent).toContain("This screen is showing what it last got at 08:41.");
       expect(dialog.textContent).toContain(

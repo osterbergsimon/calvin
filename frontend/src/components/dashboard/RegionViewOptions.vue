@@ -1,38 +1,40 @@
 <template>
-  <div ref="root" class="region-view-options">
-    <IconButton
-      class="region-view-options__trigger"
-      size="custom"
-      :active="active"
-      :label="label"
-      :title="label"
-      :aria-expanded="open ? 'true' : 'false'"
-      @click.stop="toggle"
-    >
-      <!-- Sliders/"tune" glyph: reads as "adjust what I'm looking at", distinct
-           from a settings gear (which lives in the Settings screen). -->
-      <svg class="tune-glyph" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-        <line x1="4" y1="7" x2="20" y2="7" />
-        <line x1="4" y1="12" x2="20" y2="12" />
-        <line x1="4" y1="17" x2="20" y2="17" />
-        <circle cx="15" cy="7" r="2.4" class="knob" />
-        <circle cx="9" cy="12" r="2.4" class="knob" />
-        <circle cx="13" cy="17" r="2.4" class="knob" />
-      </svg>
-    </IconButton>
-    <div v-if="open" class="region-view-options__popover" @click.stop>
+  <Popover v-model="open" :label="label" role="dialog" @close="open = false">
+    <template #trigger="{ attrs }">
+      <IconButton
+        class="region-view-options__trigger"
+        size="custom"
+        :active="active"
+        :label="label"
+        :title="label"
+        v-bind="attrs"
+      >
+        <!-- Sliders/"tune" glyph: reads as "adjust what I'm looking at", distinct
+             from a settings gear (which lives in the Settings screen). -->
+        <svg class="tune-glyph" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+          <line x1="4" y1="7" x2="20" y2="7" />
+          <line x1="4" y1="12" x2="20" y2="12" />
+          <line x1="4" y1="17" x2="20" y2="17" />
+          <circle cx="15" cy="7" r="2.4" class="knob" />
+          <circle cx="9" cy="12" r="2.4" class="knob" />
+          <circle cx="13" cy="17" r="2.4" class="knob" />
+        </svg>
+      </IconButton>
+    </template>
+    <div class="region-view-options__panel">
       <slot />
     </div>
-  </div>
+  </Popover>
 </template>
 
 <script setup>
-// Generic region view-options control: a tune trigger + a popover shell that
+// Generic region view-options control: a tune trigger + the shared Popover that
 // hosts region-specific quick display controls (calendar window/rolling today,
 // service view options later). Owns nothing about a region's data — a consumer
 // fills the default slot and drives `active` from whatever modifier is on.
-import { onBeforeUnmount, ref, watch } from "vue";
+import { ref } from "vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import Popover from "@/components/ui/Popover.vue";
 
 defineProps({
   // When a display modifier is engaged (e.g. calendar rolling), the trigger
@@ -41,49 +43,25 @@ defineProps({
   label: { type: String, default: "View options" },
 });
 
-const root = ref(null);
 const open = ref(false);
 
-const toggle = () => (open.value = !open.value);
-const close = () => (open.value = false);
-
-const onDocPointer = e => {
-  if (root.value && !root.value.contains(e.target)) close();
-};
-const onKeydown = e => {
-  if (e.key === "Escape") close();
-};
-
-// Listeners exist only while open. Capture phase so an outside pointerdown is
-// caught before other handlers can stop it. The opening click's pointerdown
-// fires before this watch attaches the listener, so it never self-closes.
-watch(open, isOpen => {
-  if (isOpen) {
-    document.addEventListener("pointerdown", onDocPointer, true);
-    document.addEventListener("keydown", onKeydown, true);
-  } else {
-    document.removeEventListener("pointerdown", onDocPointer, true);
-    document.removeEventListener("keydown", onKeydown, true);
-  }
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener("pointerdown", onDocPointer, true);
-  document.removeEventListener("keydown", onKeydown, true);
-});
-
-defineExpose({ open, close });
+defineExpose({ open });
 </script>
 
 <style scoped>
-.region-view-options {
-  position: relative;
-  display: inline-flex;
+/* Panel inset/rhythm only: the floating shell (surface, border, radius,
+   elevation, placement, Escape/outside close) comes from ui/Popover. */
+.region-view-options__panel {
+  min-width: 168px;
+  padding: var(--gap-2) var(--gap-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
 }
 
-/* Button chrome (size/border/hover/focus/active) comes from ui/IconButton; only
-   the tune glyph's stroke styling is region-specific. Slotted SVG is compiled in
-   this component's scope, so these scoped selectors reach it. The glyph inherits
+/* The icon-only control's chrome comes from ui/IconButton; only the tune
+   glyph's stroke styling is region-specific. Slotted SVG is compiled in this
+   component's scope, so these scoped selectors reach it. The glyph inherits
    the button's `color`, so IconButton's active state (--focus) lights it up. */
 .tune-glyph {
   fill: none;
@@ -95,21 +73,5 @@ defineExpose({ open, close });
 .tune-glyph .knob {
   fill: currentColor;
   stroke: none;
-}
-
-.region-view-options__popover {
-  position: absolute;
-  top: calc(100% + var(--gap-1));
-  right: 0;
-  z-index: var(--z-raised);
-  min-width: 168px;
-  padding: var(--gap-2) var(--gap-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-1);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--elev-1);
 }
 </style>

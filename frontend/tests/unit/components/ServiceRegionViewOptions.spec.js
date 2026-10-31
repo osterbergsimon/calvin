@@ -10,6 +10,7 @@ function mountOptions(view) {
   const w = mount(ServiceRegionViewOptions, {
     attachTo: document.body,
     props: { regionId: "svc-1", view },
+    global: { stubs: { teleport: true } },
   });
   return { w, cfg };
 }
@@ -55,6 +56,7 @@ describe("ServiceRegionViewOptions", () => {
     const w = mount(ServiceRegionViewOptions, {
       attachTo: document.body,
       props: { regionId: "r1", view: {} },
+      global: { stubs: { teleport: true } },
     });
     await w.find(".region-view-options__trigger").trigger("click");
     await w.find('[data-action="refresh-now"]').trigger("click");
