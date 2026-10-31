@@ -26,11 +26,10 @@
         </template>
         <template #actions>
           <label class="screen-page__show">
-            <input
-              type="checkbox"
-              :checked="showsPage(page.id)"
+            <ToggleSwitch
+              :model-value="showsPage(page.id)"
               :aria-label="`Show ${page.name} to browsers and new screens`"
-              @change="e => togglePage(page.id, e.target.checked)"
+              @update:model-value="value => togglePage(page.id, value)"
             />
             <span>Show</span>
           </label>
