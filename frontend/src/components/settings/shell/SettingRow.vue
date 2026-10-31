@@ -32,9 +32,10 @@ defineProps({
   gap: 1.5rem;
   row-gap: 0.75rem;
   min-height: 4.5rem; /* 72px */
-  padding: 0.75rem 1.25rem;
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
-.setting-row + .setting-row {
+.setting-row + .setting-row,
+.where-shows + .setting-row {
   border-top: 1px solid var(--line-soft);
 }
 .setting-row__info {
