@@ -15,6 +15,31 @@ function setViewport(w, h) {
 afterEach(() => setViewport(origW, origH));
 
 describe("usePopoverPlacement", () => {
+  it("clamps to the left margin when a wide panel would overflow the left edge", () => {
+    setViewport(1280, 800);
+    const { popoverStyle, place } = usePopoverPlacement({ margin: 12 });
+    place(trigger({ top: 100, bottom: 144, left: 45, right: 89 }), { offsetWidth: 146 });
+    expect(popoverStyle.value.left).toBe("12px");
+    expect("right" in popoverStyle.value).toBe(false);
+    place(trigger({ top: 100, bottom: 144, left: 500, right: 544 }), { offsetWidth: 146 });
+    expect(popoverStyle.value.right).toBe("736px");
+    expect("left" in popoverStyle.value).toBe(false);
+  });
+
+  it("tracks the trigger's current viewport rect when the page scrolls", () => {
+    setViewport(1000, 800);
+    let top = 100;
+    const el = {
+      getBoundingClientRect: () => ({ top, bottom: top + 30, left: 100, right: 220, width: 120 }),
+    };
+    const { popoverStyle, reposition, place } = usePopoverPlacement();
+    place(el);
+    expect(popoverStyle.value.top).toBe("136px");
+    top = 300; // the page scrolled the trigger; reposition follows it
+    reposition();
+    expect(popoverStyle.value.top).toBe("336px");
+  });
+
   it("emits fixed-viewport coords so the popover can escape ancestor clipping", () => {
     setViewport(1000, 800);
     const { popoverStyle, openUp, place } = usePopoverPlacement();
@@ -46,6 +71,17 @@ describe("usePopoverPlacement", () => {
     const { popoverStyle, place } = usePopoverPlacement({ matchTriggerWidth: true });
     place(trigger({ top: 100, bottom: 130, left: 100, right: 220 }));
     expect(popoverStyle.value.minWidth).toBe("120px");
+  });
+
+  it("reserves a bottom inset (the on-screen keyboard) before deciding to flip", () => {
+    setViewport(1000, 800);
+    const { popoverStyle, openUp, place } = usePopoverPlacement({ bottomInset: 400 });
+    // 300px below the trigger is fine in the full viewport, but not above a
+    // 400px keyboard.
+    place(trigger({ top: 300, bottom: 330 }));
+    expect(openUp.value).toBe(true);
+    expect(popoverStyle.value.bottom).toBe("506px"); // innerHeight(800) - top(300) + gap(6)
+    expect("top" in popoverStyle.value).toBe(false);
   });
 
   it("reposition() re-runs placement against the last trigger", () => {

@@ -14,13 +14,11 @@
       @remove="handleRemove"
     >
       <template #extra="{ row }">
-        <input
-          type="color"
-          class="cal-color"
-          :value="getColorValue(row.source?.color)"
-          :aria-label="`Colour for ${row.name}`"
-          :title="`Colour for ${row.name}`"
-          @change="handleColorChange(row, $event.target.value)"
+        <ColourField
+          compact
+          :model-value="getColorValue(row.source?.color)"
+          :label="`Colour for ${row.name}`"
+          @update:model-value="handleColorChange(row, $event)"
         />
       </template>
     </SourceList>
@@ -79,6 +77,7 @@ import * as calendarApi from "@/services/calendarApi";
 import * as pluginsApi from "@/services/pluginsApi";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import Button from "@/components/ui/Button.vue";
+import ColourField from "@/components/ui/ColourField.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";

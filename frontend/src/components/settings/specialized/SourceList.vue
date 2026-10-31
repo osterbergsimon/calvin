@@ -57,29 +57,31 @@
             <Button class="sl-action" variant="secondary" size="sm" @click="$emit('edit', row)">
               Edit
             </Button>
-            <div class="sl-more">
-              <IconButton
-                class="sl-more-btn"
-                variant="ghost"
-                size="md"
-                :label="`More actions for ${row.name}`"
-                :aria-expanded="openMenuId === row.id ? 'true' : 'false'"
-                @click="toggleMenu(row.id)"
-              >
-                ⋯
-              </IconButton>
-              <div v-if="openMenuId === row.id" class="sl-menu" role="menu">
-                <Button
-                  class="sl-menu-item"
-                  variant="danger"
-                  size="sm"
-                  role="menuitem"
-                  @click="askRemove(row)"
+            <Popover
+              :model-value="openMenuId === row.id"
+              :label="`More actions for ${row.name}`"
+              haspopup="menu"
+              @update:model-value="open => setMenu(row.id, open)"
+            >
+              <template #trigger="{ attrs }">
+                <IconButton
+                  v-bind="attrs"
+                  size="md"
+                  variant="ghost"
+                  :label="`More actions for ${row.name}`"
                 >
-                  Remove
-                </Button>
-              </div>
-            </div>
+                  <svg class="sl-more-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                    <path :d="mdiDotsHorizontal" fill="currentColor" />
+                  </svg>
+                </IconButton>
+              </template>
+              <Menu
+                :items="menuItems"
+                :label="`More actions for ${row.name}`"
+                @select="askRemove(row)"
+                @close="setMenu(row.id, false)"
+              />
+            </Popover>
           </template>
         </ListRow>
       </template>
@@ -98,11 +100,14 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { mdiDotsHorizontal } from "@mdi/js";
 import draggable from "vuedraggable";
 import Button from "@/components/ui/Button.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
+import Menu from "@/components/ui/Menu.vue";
+import Popover from "@/components/ui/Popover.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { providerLine } from "@/utils/instanceSummary";
@@ -160,6 +165,10 @@ const openMenuId = ref(null);
 const pendingRemove = ref(null);
 const activeHighlight = ref("");
 
+// The ⋯ menu is an action list; Remove is the only action and stays last (and
+// red) because it is destructive.
+const menuItems = [{ key: "remove", label: "Remove", danger: true }];
+
 const rowMeta = row => [{ text: row.error || providerLine(row), tone: row.error ? "err" : "" }];
 
 const isHighlighted = row => {
@@ -186,8 +195,8 @@ watch(
   { immediate: true }
 );
 
-const toggleMenu = id => {
-  openMenuId.value = openMenuId.value === id ? null : id;
+const setMenu = (id, open) => {
+  openMenuId.value = open ? id : openMenuId.value === id ? null : openMenuId.value;
 };
 
 const askRemove = row => {
@@ -288,25 +297,8 @@ onBeforeUnmount(() => {
   color: var(--ink-2);
 }
 
-.sl-more {
-  position: relative;
-}
-
-.sl-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + var(--gap-tight));
-  z-index: var(--z-raised);
-  min-width: 9rem;
-  padding: var(--gap-1);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--elev-1);
-}
-
-.sl-menu-item {
-  width: 100%;
-  justify-content: flex-start;
+.sl-more-glyph {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 </style>

@@ -67,7 +67,10 @@ const configWith = screens => ({
 const mountTab = async config => {
   const w = mount(ServicesTab, {
     props: { config },
-    global: { stubs: { AddSourceButton: true, InstanceModal: true } },
+    global: {
+      // The ⋯ menu lives in a teleported Popover; render it in place.
+      stubs: { AddSourceButton: true, InstanceModal: true, teleport: true },
+    },
   });
   await flushPromises();
   return w;
@@ -126,8 +129,8 @@ describe("Service placement lines", () => {
     ]);
     const w = await mountTab(config);
 
-    await w.find(".sl-more-btn").trigger("click");
-    await w.find(".sl-menu-item").trigger("click");
+    await w.find('button[aria-label="More actions for Recipes"]').trigger("click");
+    await w.find('[role="menu"] [role="menuitem"]').trigger("click");
     await flushPromises();
 
     expect(w.findComponent({ name: "ConfirmModal" }).props("message")).toBe(
