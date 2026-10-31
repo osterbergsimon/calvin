@@ -162,13 +162,13 @@ async function save() {
 }
 .security-origins__inactive {
   margin: 0 0 0.5rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   font-weight: 500;
-  color: var(--warn);
+  color: var(--warn-text);
 }
 .security-origins__intro {
   margin: 0 0 0.75rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -195,13 +195,13 @@ async function save() {
 }
 .security-origins__origin {
   font-family: var(--font-data);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink);
   overflow-wrap: anywhere;
 }
 .security-origins__empty {
   padding: 0.65rem 0.75rem;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   color: var(--ink-2);
 }
 
@@ -236,7 +236,7 @@ async function save() {
 
 .security-origins__error {
   margin: 0 0 0.75rem;
-  font-size: 0.85rem;
-  color: var(--err);
+  font-size: var(--fs-sm);
+  color: var(--err-text);
 }
 </style>

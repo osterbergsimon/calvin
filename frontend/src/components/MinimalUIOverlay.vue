@@ -62,7 +62,7 @@ const restOpacity = computed(() => {
   height: var(--hot-corner-size, 64px);
   display: flex;
   border: 0;
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--on-scrim);
   pointer-events: none; /* never intercept content taps; reveal is a long-press */
   opacity: var(--rest-opacity, 0.55);
   transition: opacity 0.2s ease;
@@ -90,7 +90,11 @@ const restOpacity = computed(() => {
   justify-content: flex-start;
   padding: 0 0 calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19);
   border-top-right-radius: calc(var(--hot-corner-size, 64px) * 0.28);
-  background: linear-gradient(135deg, color-mix(in srgb, black 42%, transparent), transparent 70%);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
 }
 .hot-corner--bottom-right {
   bottom: 0;
@@ -99,7 +103,11 @@ const restOpacity = computed(() => {
   justify-content: flex-end;
   padding: 0 calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19) 0;
   border-top-left-radius: calc(var(--hot-corner-size, 64px) * 0.28);
-  background: linear-gradient(225deg, color-mix(in srgb, black 42%, transparent), transparent 70%);
+  background: linear-gradient(
+    225deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
 }
 .hot-corner--top-left {
   top: 0;
@@ -108,7 +116,11 @@ const restOpacity = computed(() => {
   justify-content: flex-start;
   padding: calc(var(--hot-corner-size, 64px) * 0.19) 0 0 calc(var(--hot-corner-size, 64px) * 0.19);
   border-bottom-right-radius: calc(var(--hot-corner-size, 64px) * 0.28);
-  background: linear-gradient(45deg, color-mix(in srgb, black 42%, transparent), transparent 70%);
+  background: linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
 }
 .hot-corner--top-right {
   top: 0;
@@ -117,7 +129,11 @@ const restOpacity = computed(() => {
   justify-content: flex-end;
   padding: calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19) 0 0;
   border-bottom-left-radius: calc(var(--hot-corner-size, 64px) * 0.28);
-  background: linear-gradient(315deg, color-mix(in srgb, black 42%, transparent), transparent 70%);
+  background: linear-gradient(
+    315deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {

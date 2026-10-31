@@ -18,3 +18,12 @@ chmod +x "$tmp/bin/curl"
 grep -q 'raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup-common.sh' "$tmp/curl.log" \
     || { echo "FAIL: fallback did not fetch from develop: $(cat "$tmp/curl.log" 2>/dev/null)"; exit 1; }
 echo "PASS"
+
+# A release install pins the tag (CLV-62): the fallback common download must
+# come from that tag, not from develop.
+rm -f "$tmp/curl.log"
+(cd "$tmp" && env GIT_BRANCH=v0.1.0 PATH="$tmp/bin:$PATH" \
+    bash "$tmp/alone/setup-kiosk.sh" --backend-url http://h:8000) >/dev/null 2>&1 || true
+grep -q 'raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup-common.sh' "$tmp/curl.log" \
+    || { echo "FAIL: pinned kiosk install did not fetch from the release tag: $(cat "$tmp/curl.log" 2>/dev/null)"; exit 1; }
+echo "PASS (pinned tag)"

@@ -335,7 +335,7 @@ onMounted(async () => {
   margin: 0.5rem 0 0;
   font-family: var(--font-ui);
   font-size: var(--fs-xs);
-  color: var(--err);
+  color: var(--err-text);
   line-height: 1.4;
 }
 
@@ -366,7 +366,7 @@ onMounted(async () => {
   overflow-wrap: anywhere;
 }
 .update-detail__err {
-  color: var(--err);
+  color: var(--err-text);
 }
 
 .update-log {

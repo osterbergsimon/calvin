@@ -51,7 +51,7 @@ const onInput = event => {
 .range-slider__input {
   flex: 1;
   height: 0.375rem; /* 6px */
-  border-radius: 0.1875rem; /* 3px */
+  border-radius: var(--radius-xs);
   background: var(--bg-2);
   outline: none;
   -webkit-appearance: none;

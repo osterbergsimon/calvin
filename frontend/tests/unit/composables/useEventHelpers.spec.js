@@ -96,6 +96,24 @@ describe("useEventHelpers", () => {
     });
   });
 
+  describe("getEventInk", () => {
+    const inkFor = colour => eventHelpers.getEventInk({ id: "1", title: "Event", color: colour });
+
+    it("uses light ink on dark calendar colours", () => {
+      expect(inkFor("#1b242b")).toBe("var(--on-event-ink)");
+      expect(inkFor("#455a64")).toBe("var(--on-event-ink)");
+    });
+
+    it("uses dark ink on light calendar colours", () => {
+      expect(inkFor("#ffeb3b")).toBe("var(--on-event-ink-dark)");
+      expect(inkFor("#2196f3")).toBe("var(--on-event-ink-dark)");
+    });
+
+    it("falls back to light ink when the colour is not a hex value", () => {
+      expect(inkFor("hsl(200 50% 50%)")).toBe("var(--on-event-ink)");
+    });
+  });
+
   describe("formatEventTime", () => {
     it("should return 'All day' for all-day events", () => {
       const event = {

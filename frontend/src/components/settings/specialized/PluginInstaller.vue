@@ -1044,7 +1044,7 @@ watch(searchQuery, () => {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: var(--focus);
+  accent-color: var(--focus-text);
 }
 
 .plugin-item-inline {
@@ -1117,7 +1117,7 @@ watch(searchQuery, () => {
   background: color-mix(in srgb, var(--err) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
   border-radius: var(--radius-sm);
-  color: var(--err);
+  color: var(--err-text);
   font-size: var(--fs-control);
 }
 
@@ -1127,7 +1127,7 @@ watch(searchQuery, () => {
   background: color-mix(in srgb, var(--ok) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
   border-radius: var(--radius-sm);
-  color: var(--ok);
+  color: var(--ok-text);
   font-size: var(--fs-control);
 }
 </style>

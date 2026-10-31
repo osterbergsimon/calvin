@@ -158,7 +158,7 @@ onBeforeUnmount(() => {
 .empty-state__message {
   margin: 0;
   font-family: var(--font-ui);
-  font-size: 1.15rem;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--ink);
 }
@@ -171,12 +171,12 @@ onBeforeUnmount(() => {
   margin-top: var(--space-xs);
   padding: 0 1.25rem;
   font-family: var(--font-ui);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 600;
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .empty-state__action:focus-visible {
@@ -193,7 +193,7 @@ onBeforeUnmount(() => {
 }
 .empty-state--quiet .empty-state__message {
   color: var(--ink-3);
-  font-size: 1rem;
+  font-size: var(--fs-base);
   font-weight: 500;
 }
 /* A small region can't fit the QR card — the button alone still works. */

@@ -74,7 +74,7 @@ const conflictKeysFor = key => {
 }
 .kb-add {
   border: 1px dashed var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg-2);
   color: var(--ink-2);
   padding: 10px 14px;

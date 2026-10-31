@@ -520,7 +520,7 @@ const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezon
 }
 .setting-row__desc {
   margin: 0.2rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
 }
@@ -574,7 +574,7 @@ const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezon
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .screen-page {
@@ -605,7 +605,7 @@ const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezon
   min-width: 0;
 }
 .screen-page__name {
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
 }

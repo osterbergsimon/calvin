@@ -50,7 +50,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown, true));
   padding: 0;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   box-shadow: 0 12px 40px var(--shadow);
   overflow: hidden;
 }
@@ -69,7 +69,7 @@ onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown, true));
   border-radius: 50%;
   background: var(--bg-2);
   color: var(--ink);
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   line-height: 1;
   cursor: pointer;
 }

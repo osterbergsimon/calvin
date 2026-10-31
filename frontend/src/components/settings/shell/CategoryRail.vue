@@ -117,14 +117,14 @@ function focusItem(index) {
 .category-rail__label {
   font-family: var(--font-ui);
   color: var(--ink);
-  font-size: 0.875rem;
+  font-size: var(--fs-control);
   font-weight: 500;
   line-height: 1.2;
 }
 
 .category-rail__subtitle {
   color: var(--ink-3);
-  font-size: 0.75rem;
+  font-size: var(--fs-2xs);
   line-height: 1.3;
 }
 </style>

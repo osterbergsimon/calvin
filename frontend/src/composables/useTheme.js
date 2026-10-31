@@ -27,9 +27,16 @@ const THEME_VARIABLE_KEYS = [
   "ink-3",
   "focus",
   "focus-ink",
+  "focus-text",
   "ok",
+  "ok-ink",
+  "ok-text",
   "warn",
+  "warn-ink",
+  "warn-text",
   "err",
+  "err-ink",
+  "err-text",
 ];
 
 const appliedCustomThemeKeys = new Set();

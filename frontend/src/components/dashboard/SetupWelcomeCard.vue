@@ -230,7 +230,7 @@ function dismiss() {
   text-align: left;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-2xl);
   box-shadow: 0 18px 50px -16px var(--shadow-hover);
 }
 .setup-welcome--solo {
@@ -257,11 +257,11 @@ function dismiss() {
   font-weight: 600;
 }
 .setup-welcome--compact .setup-welcome__title {
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
 }
 .setup-welcome__lead {
   margin: 0 0 14px;
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .setup-welcome__list {
@@ -269,7 +269,7 @@ function dismiss() {
   margin: 0;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   overflow: hidden;
 }
 .setup-welcome__row {
@@ -295,7 +295,7 @@ function dismiss() {
   color: var(--ink-3);
 }
 .setup-welcome__done {
-  color: var(--ok);
+  color: var(--ok-text);
   font-size: var(--fs-sm);
   font-weight: 500;
 }
@@ -303,13 +303,13 @@ function dismiss() {
   min-height: var(--touch-target);
   padding: 0 1.1rem;
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink);
   white-space: nowrap;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .setup-welcome__btn--primary {
@@ -332,12 +332,12 @@ function dismiss() {
   min-height: var(--touch-target);
   padding: 0 0.75rem;
   font-family: var(--font-ui);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   font-weight: 500;
   color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .setup-welcome__ghost:hover {

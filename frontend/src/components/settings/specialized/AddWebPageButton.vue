@@ -93,12 +93,12 @@ const handleSaved = async () => {
   min-height: var(--touch-target);
   padding: 0 1.25rem;
   font-family: var(--font-ui);
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
   font-weight: 600;
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .add-web-page-btn:hover:not(:disabled) {

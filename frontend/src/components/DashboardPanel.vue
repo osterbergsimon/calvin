@@ -125,7 +125,7 @@ const panelClasses = computed(() => [
   font-family: var(--font-display);
   /* Scales with the dashboard "Touch target size" setting; the fallback keeps
      the medium/Default size pixel-identical and covers non-dashboard uses. */
-  font-size: var(--region-label-fs, 1.5rem);
+  font-size: var(--region-label-fs, var(--fs-2xl));
   font-weight: 700;
   line-height: 1.2;
   overflow: hidden;
@@ -136,7 +136,7 @@ const panelClasses = computed(() => [
 .dashboard-panel__subtitle {
   margin: 0;
   color: var(--ink-2);
-  font-size: var(--region-sublabel-fs, 0.85rem);
+  font-size: var(--region-sublabel-fs, var(--fs-sm));
   font-weight: 500;
   line-height: 1.25;
   overflow: hidden;
@@ -178,11 +178,11 @@ const panelClasses = computed(() => [
   }
 
   .dashboard-panel__title {
-    font-size: clamp(1rem, 3vw, var(--region-label-fs, 1.5rem));
+    font-size: clamp(var(--fs-base), 3vw, var(--region-label-fs, var(--fs-2xl)));
   }
 
   .dashboard-panel__subtitle {
-    font-size: clamp(0.65rem, 1.6vw, var(--region-sublabel-fs, 0.85rem));
+    font-size: clamp(var(--fs-micro), 1.6vw, var(--region-sublabel-fs, var(--fs-sm)));
   }
 
   .dashboard-panel__body {

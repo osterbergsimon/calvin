@@ -136,7 +136,7 @@ defineExpose({ focus, select });
   border: 0;
   background: transparent;
   color: var(--ink-2);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font: 500 var(--fs-control) var(--font-ui);
   cursor: pointer;
 }
@@ -152,6 +152,6 @@ defineExpose({ focus, select });
 .password-field__error {
   margin: 6px 0 0;
   font-size: var(--fs-sm);
-  color: var(--err);
+  color: var(--err-text);
 }
 </style>

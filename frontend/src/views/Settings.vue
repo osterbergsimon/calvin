@@ -501,7 +501,7 @@ onUnmounted(() => {
   padding: var(--space-xl);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius-2xl);
   box-shadow: 0 18px 50px -16px var(--shadow-hover);
 }
 .settings-phone__close {
@@ -513,7 +513,7 @@ onUnmounted(() => {
   color: var(--focus-ink);
   background: var(--focus);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   cursor: pointer;
 }
 .settings-page {
@@ -573,7 +573,7 @@ onUnmounted(() => {
 
 .settings-banner {
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   margin-bottom: 1rem;
   font-weight: 500;
 }

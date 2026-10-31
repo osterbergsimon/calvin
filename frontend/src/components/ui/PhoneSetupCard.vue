@@ -80,7 +80,7 @@ onMounted(async () => {
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
 }
 .phone-setup--compact {
   gap: var(--space-lg);
@@ -90,8 +90,8 @@ onMounted(async () => {
   flex: none;
   width: 200px;
   height: 200px;
-  border-radius: 8px;
-  background: #fff; /* QR codes need a light quiet zone in dark themes too */
+  border-radius: var(--radius-sm);
+  background: var(--qr-surface); /* QR codes need a light quiet zone in dark themes too */
 }
 .phone-setup--compact .phone-setup__qr {
   width: 132px;
@@ -125,18 +125,18 @@ onMounted(async () => {
 }
 .phone-setup__hint {
   margin: 0 0 var(--space-sm);
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   color: var(--ink-2);
 }
 .phone-setup__url {
   display: block;
   font-family: var(--font-data);
-  font-size: 0.85rem;
+  font-size: var(--fs-sm);
   overflow-wrap: anywhere;
   color: var(--ink);
 }
 .phone-setup--stacked .phone-setup__url {
-  font-size: 0.78rem;
+  font-size: var(--fs-xs);
 }
 @media (max-width: 480px) {
   .phone-setup {
