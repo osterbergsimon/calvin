@@ -5,6 +5,7 @@
       drag
       add-label="Add photos from…"
       empty-text="No photo sources yet. Add photos from this device or another app."
+      :empty-icon="mdiImageOutline"
       :highlight-id="savedHighlightId || highlightId"
       :highlight-provider="highlightProvider"
       remove-title="Remove photo source"
@@ -45,6 +46,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { mdiImageOutline } from "@mdi/js";
 import { useImagesStore } from "@/stores/images";
 import { usePlugins } from "@/composables";
 import * as pluginsApi from "@/services/pluginsApi";

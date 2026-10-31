@@ -12,7 +12,13 @@
       </Button>
     </div>
 
-    <InlineNote v-if="rows.length === 0" class="sl-empty">{{ emptyText }}</InlineNote>
+    <EmptyState
+      v-if="rows.length === 0"
+      compact
+      data-test="source-list-empty"
+      :icon="emptyIcon"
+      :message="emptyText"
+    />
 
     <draggable
       v-else
@@ -103,8 +109,8 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { mdiDotsHorizontal } from "@mdi/js";
 import draggable from "vuedraggable";
 import Button from "@/components/ui/Button.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import IconButton from "@/components/ui/IconButton.vue";
-import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import Menu from "@/components/ui/Menu.vue";
 import Popover from "@/components/ui/Popover.vue";
@@ -139,6 +145,11 @@ const props = defineProps({
   emptyText: {
     type: String,
     default: "No sources yet.",
+  },
+  // An @mdi/js path for the empty state, by source kind.
+  emptyIcon: {
+    type: String,
+    default: null,
   },
   // A newly saved source, or every row of a provider, pulses once.
   highlightId: {
@@ -240,12 +251,6 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
   padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-stack);
-}
-
-.sl-empty {
-  padding: var(--panel-pad-y) var(--panel-pad-x);
-  justify-content: center;
-  text-align: center;
 }
 
 .sl-rows {
