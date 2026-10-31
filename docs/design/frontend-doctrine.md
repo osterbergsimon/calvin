@@ -101,6 +101,8 @@ Rules:
 | Item in a list (source, screen, key, plugin) | **`ListRow.vue` (new)**, extracted from `SourceList`: lead (dot/thumb/icon), body (name `--text-label` + meta lines), trailing actions group | per-feature cards |
 | Empty | `EmptyState` | an ad-hoc centred paragraph |
 | Confirm / dialog | `ConfirmModal`, `DialogScrim` | custom overlays |
+| Small floating surface anchored to a control (⋯ menus, pickers, the connection explainer) | **`Popover.vue` (new)**: anchored, flips at viewport edges, Escape/outside tap closes, focus returns, `--elev-1`, `--radius-card`, `--z-raised`; **`Menu.vue`** on top of it for action lists (items ≥ `--touch-target`, danger item last) | per-feature popovers (SourceList ⋯, ThemePicker, ActionPicker, RegionViewOptions, ConnectionStatus) |
+| Colour | **`ColourField.vue` (new)**: the theme's `--event-1…8` swatches first (radio group), then **Custom…** opening the native picker; shows the chosen swatch + name, never a raw hex field by default | a bare `<input type="color">` + hex text box |
 
 ### 3.1 Building blocks for settings (the "new setting looks out of place" fix)
 
@@ -199,7 +201,7 @@ backend) at 1280 and 390, light and one dark theme. The design lead reviews agai
 
 1. **Roles in, no visual change.** Add the role tokens as aliases of today's primitives (radius snaps excepted) and
    add the lints with full allowlists. One PR, mechanical.
-2. **The blocks and the gallery.** Build `Button`, `TextField`, `ListRow`, `SettingGroup`, `ScopeLine`, `InlineNote` and
+2. **The blocks and the gallery.** Build `Button`, `TextField`, `ListRow`, `SettingGroup`, `ScopeLine`, `InlineNote`, `Popover`/`Menu`, `ColourField` and
    `ui-gallery.html` first. Then replace the 61 button classes and remove settings `<style>` blocks file by file. The
    largest are Security (15 `security-btn`), Plugins (`btn-install`, `pc-btn`), System (`maint-btn`,
    `backup-btn`, `update-btn`) and Screens (`kiosk-software__btn`). Each file leaves the `controlLint` allowlist
