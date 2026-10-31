@@ -42,4 +42,26 @@ describe("SettingsTopBar", () => {
     expect(w.get(".settings-topbar__location").text()).toBe("Display");
     expect(w.get('[data-action="done"]').exists()).toBe(true);
   });
+
+  it("exposes the full save wording as the pill's accessible name", () => {
+    // On a phone only the dot shows, so the wording must live on the pill.
+    const w = mount(SettingsTopBar, {
+      props: { categoryLabel: "Screens", saveState: "idle" },
+    });
+    const pill = w.get(".settings-topbar__pill");
+    expect(pill.attributes("role")).toBe("status");
+    expect(pill.attributes("aria-label")).toBe("All changes saved");
+    expect(pill.attributes("title")).toBe("All changes saved");
+    // The visible label stays for wider screens.
+    expect(w.get(".settings-topbar__pill-label").text()).toBe("All changes saved");
+  });
+
+  it("updates the accessible name with the save state", async () => {
+    const w = mount(SettingsTopBar, {
+      props: { categoryLabel: "Screens", saveState: "saving" },
+    });
+    expect(w.get(".settings-topbar__pill").attributes("aria-label")).toBe("Saving…");
+    await w.setProps({ saveState: "error" });
+    expect(w.get(".settings-topbar__pill").attributes("aria-label")).toBe("Error");
+  });
 });

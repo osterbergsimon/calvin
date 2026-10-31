@@ -1421,6 +1421,10 @@ onActivated(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  /* A narrow region cannot fit the title and every control on one row. Let the
+     controls wrap under the title instead of clipping at the right edge and
+     squeezing the month name away (CLV-91). */
+  flex-wrap: wrap;
   flex-shrink: 0;
   /* Panel body is flush now, so the header carries its own inset — top + sides
      line the month label up with the grid (0.5rem) instead of jamming it into
@@ -1438,6 +1442,9 @@ onActivated(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* The title is the one thing that must never vanish: it keeps the first line
+     and truncates with an ellipsis when even it alone is too wide. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -1445,6 +1452,13 @@ onActivated(() => {
   display: flex;
   align-items: center;
   gap: 0.35rem;
+  /* If the controls themselves are wider than the region, wrap them rather
+     than letting the right edge clip. `margin-left: auto` keeps them right-
+     aligned when they move to their own row. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
   flex-shrink: 0;
 }
 

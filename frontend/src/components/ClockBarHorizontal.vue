@@ -221,6 +221,12 @@ onMounted(() => {
   .clock-bar-horizontal .clock-bar-room {
     display: none;
   }
+  /* Screen dots are 44px touch targets each and cannot shrink; at 390px they
+     ran under the centred time ("●15:31"). Below the phone breakpoint the dots
+     give way so the clock keeps its own room. */
+  .clock-bar-horizontal .screen-dots {
+    display: none;
+  }
   .clock-bar-outer {
     gap: var(--gap-2);
   }
@@ -261,7 +267,9 @@ onMounted(() => {
 }
 
 .clock-bar-content {
-  flex: 0 1 auto;
+  /* The centred clock keeps its full width: the side groups yield instead of
+     the time being squeezed under the screen dots (CLV-91). */
+  flex: 0 0 auto;
   min-width: 0;
 }
 </style>
