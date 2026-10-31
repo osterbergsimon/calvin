@@ -15,6 +15,10 @@ from fastapi.testclient import TestClient
 from app.demo.ics import build_ics
 from app.demo.seed import (
     CALENDAR_SOURCE_ID,
+    DEFAULT_CALENDAR_VIEW,
+    DEFAULT_PHOTOS_VIEW,
+    DEFAULT_SCREEN_ID,
+    DEFAULT_SCREEN_NAME,
     DEMO_ROOM_NAME,
     PHOTO_ASSETS_DIR,
     SCREEN_CALENDAR_ID,
@@ -22,6 +26,7 @@ from app.demo.seed import (
     calendar_ics_path,
     clear_demo,
     default_calendar_url,
+    is_untouched_default_page,
     read_manifest,
     seed_demo,
 )
@@ -42,6 +47,70 @@ USER_PAGE = {
     "activeRegionId": "region-1",
 }
 USER_SCREENS = {"version": 2, "activeScreenId": "user-screen", "screens": [USER_PAGE]}
+
+
+def shipped_default_screens() -> dict:
+    """The raw default a backend writes on first start."""
+    return {
+        "version": 2,
+        "activeScreenId": DEFAULT_SCREEN_ID,
+        "screens": [
+            {
+                "id": DEFAULT_SCREEN_ID,
+                "name": DEFAULT_SCREEN_NAME,
+                "layout": {
+                    "version": 1,
+                    "preset": "split_two",
+                    "regions": [
+                        {"id": "region-1", "kind": "calendar", "size": 70},
+                        {"id": "region-2", "kind": "photos", "size": 30},
+                    ],
+                },
+                "activeRegionId": "region-1",
+            }
+        ],
+    }
+
+
+def normalized_default_screens() -> dict:
+    """The same page after the frontend normalized it and CLV-49 migrated it."""
+    return {
+        "version": 2,
+        "activeScreenId": DEFAULT_SCREEN_ID,
+        "screens": [
+            {
+                "id": DEFAULT_SCREEN_ID,
+                "name": DEFAULT_SCREEN_NAME,
+                "layout": {
+                    "version": 1,
+                    "preset": "split_two",
+                    "direction": None,
+                    "regions": [
+                        {
+                            "id": "region-1",
+                            "kind": "calendar",
+                            "serviceId": None,
+                            "instanceIds": [],
+                            "size": 70,
+                            "split": None,
+                            "view": dict(DEFAULT_CALENDAR_VIEW),
+                        },
+                        {
+                            "id": "region-2",
+                            "kind": "photos",
+                            "serviceId": None,
+                            "instanceIds": [],
+                            "size": 30,
+                            "split": None,
+                            "view": dict(DEFAULT_PHOTOS_VIEW),
+                        },
+                    ],
+                },
+                "activeRegionId": "region-1",
+                "clockBar": None,
+            }
+        ],
+    }
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -126,6 +195,89 @@ async def test_seed_is_idempotent(demo_env):
     ]
     assert await config_service.get_value("displayName") == DEMO_ROOM_NAME
     assert calendar_ics_path(data_dir).is_file()
+
+
+@pytest.mark.parametrize(
+    "factory",
+    [shipped_default_screens, normalized_default_screens],
+    ids=["raw", "normalized"],
+)
+async def test_seed_replaces_the_untouched_default_page(demo_env, factory):
+    from app.services.config_service import config_service
+
+    data_dir, image_dir = demo_env
+    await config_service.set_value("dashboard_screens", factory())
+
+    seeded = await _seed(data_dir, image_dir)
+
+    assert seeded["pages"]["created"] is True
+    screens = await config_service.get_value("dashboard_screens")
+    assert [screen["id"] for screen in screens["screens"]] == [
+        SCREEN_CALENDAR_ID,
+        SCREEN_PHOTO_ID,
+    ]
+    assert await config_service.get_value("displayName") == DEMO_ROOM_NAME
+
+    await clear_demo(data_dir=data_dir, image_dir=image_dir)
+    assert await config_service.get_value("dashboard_screens") is None
+    assert await config_service.get_value("displayName") is None
+
+
+async def test_seed_skips_pages_when_the_default_page_was_edited(demo_env):
+    from app.services.config_service import config_service
+
+    data_dir, image_dir = demo_env
+    edited = shipped_default_screens()
+    edited["screens"][0]["name"] = "Living room"
+    await config_service.set_value("dashboard_screens", edited)
+
+    seeded = await _seed(data_dir, image_dir)
+
+    assert seeded["pages"]["created"] is False
+    assert seeded["photos"]["count"] == 12
+    assert await config_service.get_value("dashboard_screens") == edited
+    assert await config_service.get_value("displayName") is None
+
+
+async def test_backend_synthesized_default_is_recognized(demo_env):
+    """Guard against the shipped default drifting away from the detection."""
+    from app.api.routes.config import build_global_config
+
+    config = await build_global_config()
+    assert is_untouched_default_page(config["dashboardScreens"])
+
+
+def test_untouched_default_page_is_recognized():
+    assert is_untouched_default_page(shipped_default_screens())
+    assert is_untouched_default_page(normalized_default_screens())
+    assert is_untouched_default_page(None) is False
+    assert is_untouched_default_page({"screens": []}) is False
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda config: config["screens"][0].update(name="Living room"),
+        lambda config: config["screens"][0].update(clockBar={"enabled": True}),
+        lambda config: config["screens"][0]["layout"].update(preset="single"),
+        lambda config: config["screens"][0]["layout"].update(direction="column"),
+        lambda config: config["screens"][0]["layout"]["regions"][0].update(size=60),
+        lambda config: config["screens"][0]["layout"]["regions"][0].update(
+            instanceIds=["ical-12345678"]
+        ),
+        lambda config: config["screens"][0]["layout"]["regions"][0]["view"].update(mode="week"),
+        lambda config: config["screens"][0]["layout"]["regions"][1]["view"].update(fit="fill"),
+        lambda config: config["screens"].append(config["screens"][0]),
+        lambda config: config.update(activeScreenId="somewhere-else"),
+        lambda config: config["screens"][0].update(futureSetting=True),
+        lambda config: config["screens"][0]["layout"].update(futureSetting=True),
+        lambda config: config["screens"][0]["layout"]["regions"][0].update(futureSetting=True),
+    ],
+)
+def test_user_edits_are_not_treated_as_the_default_page(edit):
+    config = normalized_default_screens()
+    edit(config)
+    assert is_untouched_default_page(config) is False
 
 
 async def test_clear_removes_only_demo_items(demo_env):
