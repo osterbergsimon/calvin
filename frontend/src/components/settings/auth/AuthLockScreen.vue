@@ -573,8 +573,9 @@ async function submitLogin() {
 }
 .auth-card__hint-link {
   margin-left: 4px;
-  color: var(--focus);
-  text-underline-offset: 2px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .auth-card__hint-link:focus-visible {
   outline: 2px solid var(--focus);
