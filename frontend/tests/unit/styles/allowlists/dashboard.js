@@ -14,7 +14,6 @@ export const roleLint = {
     "components/dashboard/CalendarViewOptions.vue",
     "components/dashboard/RegionViewOptions.vue",
     "components/dashboard/ServiceRegionViewOptions.vue",
-    "components/dashboard/SetupWelcomeCard.vue",
     "components/settings/categories/DashboardSettings.vue",
     "views/Dashboard.vue",
   ],
