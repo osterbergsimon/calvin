@@ -23,33 +23,36 @@
       >
         <ToggleSwitch v-model="includeSigningKey" aria-label="Include kiosk signing key" />
       </SettingRow>
-      <div class="backup-actions">
-        <p v-if="includeSecrets" class="backup-warning" data-test="secrets-warning">
-          The file will contain passwords and API keys in plain text. Keep it somewhere safe.
-        </p>
-        <p v-if="exportError" class="backup-error">{{ exportError }}</p>
-        <button
-          type="button"
-          class="backup-btn backup-btn--primary"
+      <SettingRow label="Download a backup">
+        <template #description>
+          <InlineNote v-if="includeSecrets" tone="warn" data-test="secrets-warning">
+            The file will contain passwords and API keys in plain text. Keep it somewhere safe.
+          </InlineNote>
+          <InlineNote v-if="exportError" tone="err">{{ exportError }}</InlineNote>
+        </template>
+        <Button
+          variant="primary"
           data-test="backup-download"
-          :disabled="exporting"
+          :loading="exporting"
+          loading-label="Preparing…"
           @click="download"
         >
-          {{ exporting ? "Preparing…" : "Download backup" }}
-        </button>
-      </div>
+          Download backup
+        </Button>
+      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="maintenance-restore" title="Restore">
-      <div class="backup-restore">
-        <p class="backup-note">
-          Choose a backup file (.zip, or a backup.json). You see what will change before anything is
-          written, and the current setup is saved to the backup folder first.
-        </p>
+      <SettingRow label="Restore a backup" stacked>
+        <template #description>
+          <InlineNote>
+            Choose a backup file (.zip, or a backup.json). You see what will change before anything
+            is written, and the current setup is saved to the backup folder first.
+          </InlineNote>
+        </template>
         <input
           type="file"
           accept=".zip,.json,application/zip,application/json"
-          class="backup-file"
           data-test="restore-file"
           aria-label="Backup file to restore"
           @change="onFile"
@@ -63,20 +66,20 @@
             { value: 'merge', label: 'Merge' },
           ]"
         />
-        <p class="backup-note">
+        <InlineNote>
           {{
             mode === "replace"
               ? "Replace: this Calvin ends up exactly like the backup. Sources not in it are removed."
               : "Merge: the backup's settings and sources are added; everything else here is kept."
           }}
-        </p>
+        </InlineNote>
 
-        <p v-if="previewing" class="backup-note">Checking the file…</p>
-        <p v-if="restoreError" class="backup-error" data-test="restore-error">
+        <InlineNote v-if="previewing">Checking the file…</InlineNote>
+        <InlineNote v-if="restoreError" tone="err" data-test="restore-error">
           {{ restoreError }}
-        </p>
+        </InlineNote>
 
-        <div v-if="plan && !result" class="backup-preview" data-test="restore-preview">
+        <Card v-if="plan && !result" data-test="restore-preview">
           <p>
             Made {{ formatDate(plan.created_at) }} on
             <strong>{{ plan.source?.hostname || "an unknown host" }}</strong>
@@ -106,8 +109,10 @@
               Made without passwords: {{ plan.stripped_secrets.length }} to re-enter after restore
             </li>
           </ul>
-          <ul v-if="plan.warnings.length" class="backup-warnings">
-            <li v-for="w in plan.warnings" :key="w">{{ w }}</li>
+          <ul v-if="plan.warnings.length">
+            <li v-for="w in plan.warnings" :key="w">
+              <InlineNote tone="warn">{{ w }}</InlineNote>
+            </li>
           </ul>
           <SettingRow
             v-if="plan.signing_key"
@@ -120,47 +125,51 @@
               data-test="restore-signing-key"
             />
           </SettingRow>
-          <button
-            type="button"
-            class="backup-btn backup-btn--primary"
+          <Button
+            variant="primary"
             data-test="restore-start"
-            :disabled="restoring"
+            :loading="restoring"
+            loading-label="Restoring…"
             @click="confirmOpen = true"
           >
-            {{ restoring ? "Restoring…" : "Restore this backup" }}
-          </button>
-        </div>
+            Restore this backup
+          </Button>
+        </Card>
 
-        <div v-if="result" class="backup-preview" data-test="restore-result">
+        <Card v-if="result" data-test="restore-result">
           <p>
             <strong>Restored.</strong> {{ result.instances.created.length }} created,
             {{ result.instances.updated.length }} updated,
             {{ result.instances.removed.length }} removed.
           </p>
-          <p v-if="result.safety_backup" class="backup-note">
+          <InlineNote v-if="result.safety_backup">
             The previous setup was saved as {{ result.safety_backup }}.
-          </p>
-          <p v-if="result.needs_credentials.length" class="backup-warning">
+          </InlineNote>
+          <InlineNote v-if="result.needs_credentials.length" tone="warn">
             Switched off until you enter their passwords again:
             {{ result.needs_credentials.join(", ") }}
-          </p>
-          <ul v-if="result.warnings.length || result.errors.length" class="backup-warnings">
-            <li v-for="e in result.errors" :key="'e' + e" class="backup-error">{{ e }}</li>
-            <li v-for="w in result.warnings" :key="'w' + w">{{ w }}</li>
+          </InlineNote>
+          <ul v-if="result.warnings.length || result.errors.length">
+            <li v-for="e in result.errors" :key="'e' + e">
+              <InlineNote tone="err">{{ e }}</InlineNote>
+            </li>
+            <li v-for="w in result.warnings" :key="'w' + w">
+              <InlineNote tone="warn">{{ w }}</InlineNote>
+            </li>
           </ul>
-          <button
-            type="button"
-            class="backup-btn backup-btn--primary"
-            data-test="restore-reload"
-            @click="reload()"
-          >
+          <Button variant="primary" data-test="restore-reload" @click="reload()">
             Reload Calvin
-          </button>
-        </div>
-      </div>
+          </Button>
+        </Card>
+      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="maintenance-auto-backup" title="Automatic backups">
+      <template #action>
+        <Button :disabled="saving" :loading="saving" loading-label="Saving…" @click="saveNow">
+          Save a backup now
+        </Button>
+      </template>
       <SettingRow
         label="Automatic backups"
         description="Saves a backup to the backup folder on this server at a regular interval."
@@ -192,21 +201,21 @@
           @update:model-value="v => saveSchedule({ retention: v })"
         />
       </SettingRow>
-      <div class="backup-stored">
-        <div class="backup-stored__head">
-          <span class="backup-note">Stored in {{ directory || "the backup folder" }}</span>
-          <button type="button" class="backup-btn" :disabled="saving" @click="saveNow">
-            Save a backup now
-          </button>
-        </div>
-        <ul class="backup-stored__list">
+      <SettingRow
+        label="Stored backups"
+        :description="`Stored in ${directory || 'the backup folder'}`"
+        stacked
+      >
+        <ul>
           <li v-for="f in files" :key="f.name" data-test="stored-backup">
             <a :href="`/api/backup/files/${encodeURIComponent(f.name)}`" download>{{ f.name }}</a>
-            <span class="backup-note">{{ formatSize(f.size) }} · {{ formatDate(f.modified) }}</span>
+            <InlineNote>{{ formatSize(f.size) }} · {{ formatDate(f.modified) }}</InlineNote>
           </li>
-          <li v-if="!files.length" class="backup-note">No stored backups yet.</li>
+          <li v-if="!files.length">
+            <InlineNote>No stored backups yet.</InlineNote>
+          </li>
         </ul>
-      </div>
+      </SettingRow>
     </SettingsSection>
 
     <ConfirmModal
@@ -228,6 +237,9 @@
 import { onMounted, reactive, ref, watch } from "vue";
 import { useBackupStore } from "@/stores/backup";
 import { logError } from "@/utils/logger";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -383,109 +395,3 @@ onMounted(async () => {
   loadFiles();
 });
 </script>
-
-<style scoped>
-.backup-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-.backup-actions,
-.backup-restore,
-.backup-stored {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-  padding: 0.75rem 1.25rem 1rem;
-}
-.backup-preview {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  color: var(--ink);
-}
-.backup-preview ul {
-  margin: 0;
-  padding-left: 1.25rem;
-}
-.backup-note {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-md);
-}
-.backup-warning {
-  margin: 0;
-  color: var(--warn-text);
-  font-size: var(--fs-md);
-}
-.backup-error {
-  margin: 0;
-  color: var(--err-text);
-  font-size: var(--fs-md);
-}
-.backup-warnings {
-  margin: 0;
-  font-size: var(--fs-md);
-}
-.backup-file {
-  font-family: var(--font-ui);
-  color: var(--ink);
-}
-.backup-stored__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-}
-.backup-stored__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  width: 100%;
-}
-.backup-stored__list li {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.4rem 0;
-  border-top: 1px solid var(--line-soft);
-}
-.backup-stored__list a {
-  color: var(--ink);
-  word-break: break-all;
-}
-.backup-btn {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.backup-btn--primary {
-  border-color: var(--focus);
-}
-.backup-btn:hover {
-  border-color: var(--focus);
-}
-.backup-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.backup-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-</style>

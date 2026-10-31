@@ -27,7 +27,7 @@ describe("SecuritySettings", () => {
   it("rejects a CIDR entry with guidance and does not add it", async () => {
     const { wrapper } = mountWith([]);
     await flushPromises();
-    await wrapper.find("[data-test='origin-input']").setValue("10.0.0.0/24");
+    await wrapper.find("#origin-input").setValue("10.0.0.0/24");
     await wrapper.find("[data-test='origin-add']").trigger("click");
     expect(wrapper.text().toLowerCase()).toContain("wildcard");
     expect(wrapper.text()).not.toContain("10.0.0.0/24");
@@ -36,7 +36,7 @@ describe("SecuritySettings", () => {
   it("adds a valid origin and saves the full list", async () => {
     const { wrapper, store } = mountWith(["grafana.lab"]);
     await flushPromises();
-    await wrapper.find("[data-test='origin-input']").setValue("*.lab.example.com");
+    await wrapper.find("#origin-input").setValue("*.lab.example.com");
     await wrapper.find("[data-test='origin-add']").trigger("click");
     await wrapper.find("[data-test='origins-save']").trigger("click");
     await flushPromises();
