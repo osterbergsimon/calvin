@@ -11,18 +11,20 @@ from loguru import logger
 
 
 def apply_startup_admin_password() -> None:
-    """Apply ``CALVIN_ADMIN_PASSWORD``, without bumping for an unchanged value."""
+    """Apply ``CALVIN_ADMIN_PASSWORD`` and log the one-time setup code (CLV-61)."""
     from app.config import settings
     from app.security.admin_auth import PasswordTooShort, get_admin_store
+    from app.security.setup_code import announce_setup_code
 
-    if not settings.admin_password:
-        return
-    try:
-        get_admin_store().apply_env_password(settings.admin_password)
-    except PasswordTooShort:
-        logger.error("CALVIN_ADMIN_PASSWORD is shorter than 8 characters; ignoring it")
-        return
-    logger.info("Admin password set from CALVIN_ADMIN_PASSWORD")
+    if settings.admin_password:
+        try:
+            get_admin_store().apply_env_password(settings.admin_password)
+        except PasswordTooShort:
+            logger.error("CALVIN_ADMIN_PASSWORD is shorter than 8 characters; ignoring it")
+        else:
+            logger.info("Admin password set from CALVIN_ADMIN_PASSWORD")
+    # Never leaves the code in the log once a password exists (announce clears it).
+    announce_setup_code()
 
 
 def redact_secrets(record: Any) -> None:

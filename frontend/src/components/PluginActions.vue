@@ -9,7 +9,7 @@
       :key="action.id"
       :class="action.style === 'primary' ? 'btn-primary' : 'btn-secondary'"
       :disabled="isActionDisabled(action)"
-      :title="action.type === 'custom' ? `Custom action: ${action.id}` : ''"
+      :title="action.type === 'custom' ? action.label || '' : ''"
       @click="handleAction(action)"
     >
       {{ getActionLabel(action) }}

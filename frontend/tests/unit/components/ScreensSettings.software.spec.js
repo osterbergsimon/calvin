@@ -199,8 +199,9 @@ describe("ScreensSettings — kiosk software summary", () => {
 
     expect(store.triggerUpdate).toHaveBeenCalledTimes(2);
     const notifications = useNotificationsStore();
+    // The screen's name (hostname/display name), not its internal id.
     expect(notifications.items.map(n => n.message)).toContain(
-      "Couldn't start the update on kitchen."
+      "Couldn't start the update on kitchen-pi."
     );
   });
 });

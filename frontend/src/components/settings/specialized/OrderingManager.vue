@@ -2,9 +2,8 @@
   <div class="ordering-manager">
     <div class="setting-item">
       <p class="help-text">
-        Configure the display order of {{ type }} plugins and their instances. Drag plugins to
-        reorder them, and drag instances within each plugin to reorder instances. Each level can
-        only be reordered within its own scope.
+        Choose the order of {{ type }} plugins and what they show. Drag a plugin to reorder it, and
+        drag its entries within the plugin. Each level can only be reordered within its own scope.
       </p>
     </div>
 
@@ -47,7 +46,7 @@
                   class="instance-count-badge"
                   count
                   :aria-label="`${pluginInstances[plugin.id].length} ${
-                    pluginInstances[plugin.id].length === 1 ? 'instance' : 'instances'
+                    pluginInstances[plugin.id].length === 1 ? 'source' : 'sources'
                   }`"
                 >
                   {{ pluginInstances[plugin.id].length }}
@@ -89,8 +88,8 @@
                             stopped: !instance.running,
                           }"
                           role="img"
-                          :aria-label="instance.running ? 'Running' : 'Stopped'"
-                          :title="instance.running ? 'Running' : 'Stopped'"
+                          :aria-label="instance.running ? 'Working' : 'Off'"
+                          :title="instance.running ? 'Working' : 'Off'"
                         >
                           <span aria-hidden="true">{{ instance.running ? "●" : "○" }}</span>
                         </span>
@@ -107,7 +106,7 @@
                 </draggable>
               </div>
               <div v-else class="no-instances-message">
-                <span class="help-text">No instances configured</span>
+                <span class="help-text">No sources yet</span>
               </div>
             </template>
           </div>

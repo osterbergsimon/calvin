@@ -28,6 +28,12 @@ async def _upsert_config_row(key: str, value: str | None, value_type: str) -> No
     await _execute_upsert(key, value, value_type)
 
 
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _delete_config_row(key: str) -> None:
+    """Delete one config row, retrying while SQLite holds a write lock."""
+    await ConfigDB.objects.delete(key=key)
+
+
 class ConfigService:
     """Service for managing application configuration."""
 
@@ -90,6 +96,11 @@ class ConfigService:
 
         # Update cache
         self._cache[key] = value
+
+    async def delete_value(self, key: str) -> None:
+        """Remove a configuration value so its built-in default applies again."""
+        await _delete_config_row(key)
+        self._cache.pop(key, None)
 
     async def update_config(self, config: dict[str, Any]) -> None:
         """
