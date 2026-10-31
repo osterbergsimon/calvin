@@ -24,161 +24,168 @@
         data-test="auth-unreachable"
         @submit.prevent="retry"
       >
-        <h1 class="auth-card__title">Can't reach Calvin</h1>
-        <p class="auth-card__lead">
-          Settings can't check whether you're signed in. Check that the server is running and this
-          device is on the same network.
-        </p>
-        <Button
-          type="submit"
-          variant="primary"
-          class="auth-card__submit"
-          :disabled="retrying"
-          :loading="retrying"
-        >
-          {{ retrying ? "Checking…" : "Try again" }}
-        </Button>
+        <Card>
+          <h1 class="auth-card__title">Can't reach Calvin</h1>
+          <p class="auth-card__lead">
+            Settings can't check whether you're signed in. Check that the server is running and this
+            device is on the same network.
+          </p>
+          <Button
+            type="submit"
+            variant="primary"
+            class="auth-card__submit"
+            :disabled="retrying"
+            :loading="retrying"
+          >
+            {{ retrying ? "Checking…" : "Try again" }}
+          </Button>
+        </Card>
       </form>
 
       <form v-else class="auth-card" novalidate data-test="auth-card" @submit.prevent="submit">
-        <div v-if="showIcon" class="auth-card__icon" aria-hidden="true">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <rect x="4" y="11" width="16" height="10" rx="2" />
-            <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
-        </div>
+        <Card>
+          <div v-if="showIcon" class="auth-card__icon" aria-hidden="true">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="4" y="11" width="16" height="10" rx="2" />
+              <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </svg>
+          </div>
 
-        <h1 v-if="!oskCollapsed" class="auth-card__title">{{ title }}</h1>
+          <h1 v-if="!oskCollapsed" class="auth-card__title">{{ title }}</h1>
 
-        <p v-if="notice" class="auth-banner auth-banner--warn" role="status">{{ notice }}</p>
-        <p v-else-if="!oskCollapsed" class="auth-card__lead">{{ lead }}</p>
+          <InlineNote v-if="notice" class="auth-card__notice" tone="warn" role="status">
+            {{ notice }}
+          </InlineNote>
+          <p v-else-if="!oskCollapsed" class="auth-card__lead">{{ lead }}</p>
 
-        <!-- Password managers attach saved passwords to one consistent account. -->
-        <input
-          class="auth-card__username"
-          type="text"
-          name="username"
-          autocomplete="username"
-          value="admin"
-          readonly
-          tabindex="-1"
-          aria-hidden="true"
-        />
-
-        <p
-          v-if="rateLocked"
-          class="auth-banner auth-banner--err auth-banner--rate"
-          role="status"
-          aria-live="off"
-        >
-          {{ rateMessage }}
-        </p>
-        <p class="auth-card__live" aria-live="polite">{{ liveMessage }}</p>
-
-        <div v-if="mode === 'setup'" class="auth-card__fields">
-          <PasswordField
-            ref="codeField"
-            v-model="setupCode"
+          <!-- Password managers attach saved passwords to one consistent account. -->
+          <input
+            class="auth-card__username"
             type="text"
-            label="Setup code"
-            autocomplete="one-time-code"
-            autocapitalize="characters"
-            :maxlength="9"
-            :error="error3"
-            :disabled="submitting || rateLocked"
-            input-id="auth-setup-code"
+            name="username"
+            autocomplete="username"
+            value="admin"
+            readonly
+            tabindex="-1"
+            aria-hidden="true"
+          />
+
+          <InlineNote
+            v-if="rateLocked"
+            class="auth-card__notice"
+            tone="err"
+            role="status"
+            aria-live="off"
           >
-            <template #hint>
-              <template v-if="codePrefilled">{{ codePrefillHint }}</template>
-              <template v-else>
-                Calvin printed it in its log when it first started.
-                <a
-                  class="auth-card__hint-link"
-                  href="https://osterbergsimon.github.io/calvin/setup/GETTING_STARTED/#first-sign-in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  >Where to find it</a
-                >
+            {{ rateMessage }}
+          </InlineNote>
+          <p class="auth-card__live" aria-live="polite">{{ liveMessage }}</p>
+
+          <div v-if="mode === 'setup'" class="auth-card__fields">
+            <PasswordField
+              ref="codeField"
+              v-model="setupCode"
+              type="text"
+              label="Setup code"
+              autocomplete="one-time-code"
+              autocapitalize="characters"
+              :maxlength="9"
+              :error="error3"
+              :disabled="submitting || rateLocked"
+              input-id="auth-setup-code"
+            >
+              <template #hint>
+                <template v-if="codePrefilled">{{ codePrefillHint }}</template>
+                <template v-else>
+                  Calvin printed it in its log when it first started.
+                  <a
+                    class="auth-card__hint-link"
+                    href="https://osterbergsimon.github.io/calvin/setup/GETTING_STARTED/#first-sign-in"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Where to find it</a
+                  >
+                </template>
               </template>
-            </template>
-          </PasswordField>
-          <PasswordField
-            ref="firstField"
-            v-model="password"
-            v-model:revealed="revealed"
-            label="Password"
-            autocomplete="new-password"
-            hint="At least 8 characters."
-            :error="error1"
+            </PasswordField>
+            <PasswordField
+              ref="firstField"
+              v-model="password"
+              v-model:revealed="revealed"
+              label="Password"
+              autocomplete="new-password"
+              hint="At least 8 characters."
+              :error="error1"
+              :disabled="submitting || rateLocked"
+              input-id="auth-setup-password"
+              @blur="onFirstBlur"
+            />
+            <PasswordField
+              ref="secondField"
+              v-model="repeat"
+              :revealed="revealed"
+              label="Repeat password"
+              autocomplete="new-password"
+              :show-toggle="false"
+              :error="error2"
+              :disabled="submitting || rateLocked"
+              input-id="auth-setup-repeat"
+              @blur="onSecondBlur"
+            />
+          </div>
+
+          <div v-else class="auth-card__fields">
+            <PasswordField
+              ref="firstField"
+              v-model="password"
+              v-model:revealed="revealed"
+              label="Admin password"
+              autocomplete="current-password"
+              :error="error1"
+              :disabled="submitting || rateLocked"
+              input-id="auth-signin-password"
+            />
+          </div>
+
+          <InlineNote v-if="networkError" class="auth-card__notice" tone="err" role="alert">
+            Couldn't reach Calvin. Check the connection and try again.
+          </InlineNote>
+
+          <Button
+            v-if="!oskCollapsed"
+            type="submit"
+            variant="primary"
+            class="auth-card__submit"
             :disabled="submitting || rateLocked"
-            input-id="auth-setup-password"
-            @blur="onFirstBlur"
-          />
-          <PasswordField
-            ref="secondField"
-            v-model="repeat"
-            :revealed="revealed"
-            label="Repeat password"
-            autocomplete="new-password"
-            :show-toggle="false"
-            :error="error2"
-            :disabled="submitting || rateLocked"
-            input-id="auth-setup-repeat"
-            @blur="onSecondBlur"
-          />
-        </div>
+            :loading="submitting"
+          >
+            {{ submitLabel }}
+          </Button>
 
-        <div v-else class="auth-card__fields">
-          <PasswordField
-            ref="firstField"
-            v-model="password"
-            v-model:revealed="revealed"
-            label="Admin password"
-            autocomplete="current-password"
-            :error="error1"
-            :disabled="submitting || rateLocked"
-            input-id="auth-signin-password"
-          />
-        </div>
+          <div v-if="mode === 'setup' && !hideRecovery" class="auth-card__recover">
+            If you forget it, delete <code>admin-auth.json</code> from Calvin's data folder, or set
+            <code>CALVIN_ADMIN_PASSWORD</code>, then restart Calvin.
+          </div>
 
-        <p v-if="networkError" class="auth-banner auth-banner--err" role="alert">
-          Couldn't reach Calvin. Check the connection and try again.
-        </p>
-
-        <Button
-          v-if="!oskCollapsed"
-          type="submit"
-          variant="primary"
-          class="auth-card__submit"
-          :disabled="submitting || rateLocked"
-          :loading="submitting"
-        >
-          {{ submitLabel }}
-        </Button>
-
-        <div v-if="mode === 'setup' && !hideRecovery" class="auth-card__recover">
-          If you forget it, delete <code>admin-auth.json</code> from Calvin's data folder, or set
-          <code>CALVIN_ADMIN_PASSWORD</code>, then restart Calvin.
-        </div>
-
-        <details
-          v-if="mode === 'locked' && !hideRecovery"
-          class="auth-card__recover auth-card__forgot"
-        >
-          <summary>Forgot the password?</summary>
-          <p>
-            Someone with access to the server deletes <code>admin-auth.json</code> from Calvin's
-            data folder and restarts Calvin. Settings then asks for a new password. Or set
-            <code>CALVIN_ADMIN_PASSWORD</code> and restart. That password always wins.
-          </p>
-        </details>
+          <details
+            v-if="mode === 'locked' && !hideRecovery"
+            class="auth-card__recover auth-card__forgot"
+          >
+            <summary>Forgot the password?</summary>
+            <p>
+              Someone with access to the server deletes <code>admin-auth.json</code> from Calvin's
+              data folder and restarts Calvin. Settings then asks for a new password. Or set
+              <code>CALVIN_ADMIN_PASSWORD</code> and restart. That password always wins.
+            </p>
+          </details>
+        </Card>
       </form>
 
       <template v-if="showPhone && !oskVisible">
@@ -206,6 +213,8 @@ import { isLoopbackPage } from "@/utils/serverUrl";
 import PasswordField from "@/components/ui/PasswordField.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 
 const auth = useAuthStore();
 const notifications = useNotificationsStore();
@@ -519,18 +528,18 @@ async function submitLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--gap-5);
   overflow: auto;
   background: var(--bg-0);
 }
 .auth-lock--osk-up {
   align-items: center;
-  padding-bottom: calc(24px + var(--osk-height, 0px));
+  padding-bottom: calc(var(--gap-5) + var(--osk-height, 0px));
 }
 .auth-lock__checking {
   margin: auto;
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
+  font-size: var(--text-body);
   color: var(--ink-2);
 }
 .auth-lock__checking.is-hidden {
@@ -543,19 +552,16 @@ async function submitLogin() {
   width: 100%;
 }
 
+/* Card owns the surface; this is only the lock screen's width. */
 .auth-card {
   width: 26rem;
   max-width: 100%;
-  padding: 2rem;
   text-align: left;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
 }
 .auth-card__icon {
   width: 44px;
   height: 44px;
-  margin-bottom: 16px;
+  margin-bottom: var(--gap-4);
   display: grid;
   place-items: center;
   border-radius: 50%;
@@ -563,21 +569,24 @@ async function submitLogin() {
   color: var(--focus-text);
 }
 .auth-card__title {
-  margin: 0 0 6px;
+  margin: 0 0 var(--gap-1);
   font-family: var(--font-ui);
-  font-size: var(--fs-xl);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
   line-height: 1.3;
   color: var(--ink);
 }
 .auth-card__lead {
-  margin: 0 0 20px;
-  font-size: var(--fs-md);
+  margin: 0 0 var(--gap-4);
+  font-size: var(--text-body);
   line-height: 1.45;
   color: var(--ink-2);
 }
+.auth-card__notice {
+  margin-bottom: var(--gap-3);
+}
 .auth-card__hint-link {
-  margin-left: 4px;
+  margin-left: var(--gap-1);
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -586,6 +595,7 @@ async function submitLogin() {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+/* Kept for password managers: one consistent account across the forms. */
 .auth-card__username {
   position: absolute;
   width: 1px;
@@ -600,8 +610,8 @@ async function submitLogin() {
 .auth-card__fields {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--gap-3);
+  margin-bottom: var(--gap-3);
 }
 .auth-card__live {
   position: absolute;
@@ -612,10 +622,10 @@ async function submitLogin() {
   white-space: nowrap;
 }
 .auth-card__recover {
-  margin-top: 20px;
-  padding-top: 16px;
+  margin-top: var(--gap-3);
+  padding-top: var(--gap-3);
   border-top: 1px solid var(--line-soft);
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   line-height: 1.5;
   color: var(--ink-2);
 }
@@ -623,8 +633,8 @@ async function submitLogin() {
   display: flex;
   align-items: center;
   min-height: var(--touch-target);
-  margin: -12px 0 -8px;
-  font-weight: 500;
+  margin: calc(var(--gap-3) * -1) 0 calc(var(--gap-2) * -1);
+  font-weight: var(--weight-strong);
   color: var(--ink);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -635,7 +645,7 @@ async function submitLogin() {
   display: none;
 }
 .auth-card__forgot p {
-  margin: 8px 0 0;
+  margin: var(--gap-2) 0 0;
 }
 .auth-card code {
   padding: 1px 5px;
@@ -643,32 +653,12 @@ async function submitLogin() {
   font-size: 0.85em;
   color: var(--ink);
   background: var(--bg-0);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
 }
 
 .auth-card__submit {
   width: 100%;
-  margin-top: 4px;
-}
-
-.auth-banner {
-  display: flex;
-  gap: 10px;
-  margin: 0 0 20px;
-  padding: 12px 14px;
-  font-size: var(--fs-md);
-  line-height: 1.45;
-  color: var(--ink);
-  border: 1px solid;
-  border-radius: var(--radius-md);
-}
-.auth-banner--err {
-  background: color-mix(in srgb, var(--err) 8%, var(--bg-1));
-  border-color: color-mix(in srgb, var(--err) 40%, transparent);
-}
-.auth-banner--warn {
-  background: color-mix(in srgb, var(--warn) 10%, var(--bg-1));
-  border-color: color-mix(in srgb, var(--warn) 45%, transparent);
+  margin-top: var(--gap-1);
 }
 
 /* "or" seam between the password card and the phone hand-off (kiosk only). */
@@ -678,9 +668,9 @@ async function submitLogin() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin: 40px 32px;
-  font-size: var(--fs-md);
+  gap: var(--gap-2);
+  margin: var(--gap-6) var(--gap-4);
+  font-size: var(--text-body);
   color: var(--ink-3);
 }
 .auth-lock__seam::before,
@@ -696,20 +686,19 @@ async function submitLogin() {
 
 /* Short kiosk (800x480): no icon, compact stacked phone card, no hint. */
 .auth-lock--short {
-  padding: 12px;
+  padding: var(--gap-3);
 }
 .auth-lock--short .auth-card {
   width: 22rem;
-  padding: 1.25rem;
 }
 .auth-lock--short .auth-card__lead {
-  margin-bottom: 12px;
+  margin-bottom: var(--gap-2);
 }
 .auth-lock--short .auth-card__fields {
-  gap: 10px;
+  gap: var(--gap-2);
 }
 .auth-lock--short .auth-lock__seam {
-  margin: 24px 16px;
+  margin: var(--gap-3) var(--gap-2);
 }
 .auth-lock--short .auth-lock__phone {
   width: 17rem;
@@ -718,9 +707,6 @@ async function submitLogin() {
 }
 
 /* On-screen keyboard up: only the field (plus any banner) is left. */
-.auth-lock--osk-collapsed .auth-card {
-  padding: 1rem;
-}
 .auth-lock--osk-collapsed .auth-card__fields {
   margin-bottom: 0;
 }
@@ -730,7 +716,7 @@ async function submitLogin() {
   .auth-lock,
   .auth-lock--short {
     align-items: flex-start;
-    padding: 24px 16px;
+    padding: var(--gap-5) var(--gap-4);
   }
   .auth-lock__row {
     display: block;
@@ -738,10 +724,9 @@ async function submitLogin() {
   .auth-card,
   .auth-lock--short .auth-card {
     width: 100%;
-    padding: 1.5rem 1.25rem;
   }
   .auth-card__lead {
-    margin-bottom: 16px;
+    margin-bottom: var(--gap-4);
   }
 }
 </style>
