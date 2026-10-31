@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 vi.mock("@/services/pluginsApi", () => ({
   testPlugin: vi.fn(() => Promise.resolve({ success: true, message: "ok" })),
@@ -66,6 +67,34 @@ describe("InstanceModal form", () => {
     expect(text).not.toContain("Calendar Color");
     expect(text).not.toContain("Show Event Times");
     expect(text).not.toContain("Test Connection");
+  });
+
+  it("puts the Colour label above the swatch and hex row", async () => {
+    const wrapper = await mountModal();
+
+    const label = wrapper.get(".colour-label");
+    const row = wrapper.get(".colour-row");
+    expect(label.text()).toBe("Colour");
+    expect(label.attributes("for")).toBe("instance-calendar-colour");
+    expect(label.element.nextElementSibling).toBe(row.element);
+
+    // The hex field is named by the group label that sits above the row.
+    const hexLabel = wrapper.get(".colour-value .text-field__label");
+    expect(hexLabel.text()).toBe("Colour value");
+    expect(hexLabel.classes()).toContain("text-field__label--hidden");
+    expect(wrapper.findAll(".text-field__label--hidden")).toHaveLength(1);
+  });
+
+  it("removes the panel inset from both dialog toggle rows", async () => {
+    const wrapper = await mountModal();
+
+    const rows = wrapper.findAllComponents(SettingRow);
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => row.props("flush"))).toEqual([true, true]);
+    expect(rows.map(row => row.classes())).toEqual([
+      expect.arrayContaining(["setting-row--flush"]),
+      expect.arrayContaining(["setting-row--flush"]),
+    ]);
   });
 
   it("renders on/off controls as the shared toggles, not native checkboxes", async () => {

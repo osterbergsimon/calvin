@@ -57,6 +57,57 @@ test.describe("phone: Content", () => {
     await expect(modal.getByRole("switch", { name: "Enabled" })).toBeVisible();
     await expect(modal.getByRole("button", { name: "Test connection" })).toBeVisible();
     await expect(modal.locator('input[type="checkbox"]')).toHaveCount(0);
+
+    // CLV-80 review: "Colour" names the whole swatch + hex row and sits above
+    // it; the hex field keeps an accessible name without a second visible one.
+    const colourLayout = await page.evaluate(() => {
+      const root = document.querySelector(".dialog");
+      const label = root.querySelector(".colour-label");
+      const row = root.querySelector(".colour-row");
+      const labelRect = label.getBoundingClientRect();
+      const rowRect = row.getBoundingClientRect();
+      const hexLabel = row.querySelector(".text-field__label");
+      return {
+        labelText: label.textContent.trim(),
+        labelAboveRow: labelRect.bottom <= rowRect.top + 1,
+        labelLeftOfSwatch: labelRect.left <= row.getBoundingClientRect().left + 1,
+        hexLabelHidden: getComputedStyle(hexLabel).clip !== "auto",
+        hexFieldWidth: row.querySelector(".text-field__input").getBoundingClientRect().width,
+        swatchWidth: row.querySelector('input[type="color"]').getBoundingClientRect().width,
+      };
+    });
+    expect(colourLayout.labelText).toBe("Colour");
+    expect(colourLayout.labelAboveRow).toBe(true);
+    expect(colourLayout.labelLeftOfSwatch).toBe(true);
+    expect(colourLayout.hexLabelHidden).toBe(true);
+    expect(colourLayout.hexFieldWidth).toBeGreaterThan(colourLayout.swatchWidth);
+
+    // Both switches share the dialog's own inset (no panel padding on top) and
+    // keep label-left / toggle-right on a phone.
+    const toggleRows = await page.evaluate(() => {
+      const root = document.querySelector(".dialog");
+      return [...root.querySelectorAll(".setting-row")].map(row => {
+        const info = row.querySelector(".setting-row__info").getBoundingClientRect();
+        const control = row.querySelector(".setting-row__control").getBoundingClientRect();
+        const rowRect = row.getBoundingClientRect();
+        return {
+          label: row.querySelector(".setting-row__label").textContent.trim(),
+          paddingLeft: getComputedStyle(row).paddingLeft,
+          paddingRight: getComputedStyle(row).paddingRight,
+          controlRightOfLabel: control.left >= info.right - 1,
+          controlInsideRow: control.right <= rowRect.right + 1,
+          sameLine: control.top < info.bottom - 1 && control.bottom > info.top + 1,
+        };
+      });
+    });
+    expect(toggleRows.map(row => row.label)).toEqual(["Show event times", "Enabled"]);
+    for (const row of toggleRows) {
+      expect(row.paddingLeft).toBe("0px");
+      expect(row.paddingRight).toBe("0px");
+      expect(row.controlRightOfLabel).toBe(true);
+      expect(row.controlInsideRow).toBe(true);
+      expect(row.sameLine).toBe(true);
+    }
     await expect(modal.locator(".text-field__input").first()).toHaveAttribute(
       "placeholder",
       "e.g. Family"
