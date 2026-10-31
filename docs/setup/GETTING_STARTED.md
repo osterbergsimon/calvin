@@ -109,7 +109,8 @@ For a Docker install, point `--data-dir` at the directory bind-mounted as
   `/api/demo/calendar.ics`, so it also works in Docker),
 - twelve small CC0 sample photos in the local photos source,
 - two pages — “calendar + photos” and “photo frame” — and the room name
-  “Demo Room”, but **only when you have no pages yet**,
+  “Demo Room”, but **only when you have no pages of your own** (Calvin's
+  untouched default “Home” page is replaced),
 - a manifest at `<data-dir>/demo/manifest.json` marking every seeded item.
 
 `clear` reads that manifest and removes only those items, so your own
@@ -117,10 +118,10 @@ calendars, photos, pages and room name survive both commands. Plugin
 instances load at startup, so restart Calvin after seeding or clearing to
 see the change.
 
-The two sample pages (and the room name) are only added when Calvin has no
-pages yet — seed **before** the first start if you want them, because a
-first start creates a default “Home” page. The calendar and photos are
-added either way.
+The two sample pages (and the room name) are only added when you have no
+pages of your own. Calvin's untouched default “Home” page is replaced; as
+soon as you rename, edit or add a page, seeding leaves your pages alone.
+The calendar and photos are added either way.
 
 The equivalent commands are `uv run python -m app.demo seed|clear` from
 `backend/`; add `--data-dir DIR` to point at another data directory and

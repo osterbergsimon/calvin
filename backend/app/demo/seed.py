@@ -44,6 +44,30 @@ SCREEN_PHOTO_ID = "demo-screen-photo-frame"
 DEMO_SCREEN_IDS = (SCREEN_CALENDAR_ID, SCREEN_PHOTO_ID)
 DEMO_ROOM_NAME = "Demo Room"
 
+# The shipped single Home page (backend defaults in main._initialize_default_config
+# and config.py's build_global_config). The frontend normalizes it on first load
+# and the CLV-49 migration adds per-region view defaults, so detection below
+# accepts those default values as well — a fresh install that has rendered once
+# must still count as "no pages yet".
+DEFAULT_SCREEN_ID = "screen-home"
+DEFAULT_SCREEN_NAME = "Home"
+DEFAULT_CALENDAR_VIEW = {
+    "mode": "month",
+    "rolling": False,
+    "weeks": 4,
+    "days": 7,
+    "extraWeeks": 0,
+    "weekNumbers": False,
+    "maxVisibleEvents": 4,
+}
+DEFAULT_PHOTOS_VIEW = {"fit": "smart"}
+
+# Keys the shipped default page may carry. Anything else is a newer feature or a
+# user edit: refuse to treat the page as untouched rather than replace it.
+_SCREEN_KEYS = frozenset({"id", "name", "layout", "activeRegionId", "clockBar"})
+_LAYOUT_KEYS = frozenset({"version", "preset", "direction", "regions"})
+_REGION_KEYS = frozenset({"id", "kind", "serviceId", "instanceIds", "size", "split", "view"})
+
 MANIFEST_VERSION = 1
 
 
@@ -162,6 +186,99 @@ def _is_demo_screen(screen: dict[str, Any]) -> bool:
     return screen.get("id") in DEMO_SCREEN_IDS
 
 
+def _view_is_untouched(view: Any, defaults: dict[str, Any]) -> bool:
+    """True when a region view only carries default values (or no view at all)."""
+    if not view:
+        return True
+    if not isinstance(view, dict):
+        return False
+    return all(defaults.get(key) == value for key, value in view.items())
+
+
+def _is_default_region(
+    region: Any,
+    *,
+    region_id: str,
+    kind: str,
+    size: float,
+    view_defaults: dict[str, Any],
+) -> bool:
+    if not isinstance(region, dict):
+        return False
+    if set(region) - _REGION_KEYS:
+        return False
+    if region.get("id") != region_id or region.get("kind") != kind:
+        return False
+    try:
+        if abs(float(region.get("size", -1)) - size) > 0.01:
+            return False
+    except (TypeError, ValueError):
+        return False
+    if region.get("split"):
+        return False
+    if region.get("serviceId") not in (None, ""):
+        return False
+    # A non-empty source filter is a user edit; the normalizer writes [].
+    if region.get("instanceIds"):
+        return False
+    return _view_is_untouched(region.get("view"), view_defaults)
+
+
+def is_untouched_default_page(screens_config: Any) -> bool:
+    """True for the shipped single Home page before the user edits anything.
+
+    Both the raw backend default and the normalized/migrated form the frontend
+    persists on first load are accepted. Any rename, layout change, extra page,
+    non-default region view, source filter or clock-bar override is a user edit
+    and returns False.
+    """
+    if not isinstance(screens_config, dict):
+        return False
+    screens = screens_config.get("screens") or []
+    if len(screens) != 1:
+        return False
+    screen = screens[0]
+    if not isinstance(screen, dict):
+        return False
+    if set(screen) - _SCREEN_KEYS:
+        return False
+    if screen.get("id") != DEFAULT_SCREEN_ID or screen.get("name") != DEFAULT_SCREEN_NAME:
+        return False
+    if screen.get("activeRegionId") not in (None, "region-1"):
+        return False
+    if screen.get("clockBar") not in (None, {}):
+        return False
+
+    layout = screen.get("layout")
+    if not isinstance(layout, dict) or layout.get("preset") != "split_two":
+        return False
+    if set(layout) - _LAYOUT_KEYS:
+        return False
+    if layout.get("direction") is not None:
+        return False
+    regions = layout.get("regions") or []
+    if len(regions) != 2:
+        return False
+    if not _is_default_region(
+        regions[0],
+        region_id="region-1",
+        kind="calendar",
+        size=70.0,
+        view_defaults=DEFAULT_CALENDAR_VIEW,
+    ):
+        return False
+    if not _is_default_region(
+        regions[1],
+        region_id="region-2",
+        kind="photos",
+        size=30.0,
+        view_defaults=DEFAULT_PHOTOS_VIEW,
+    ):
+        return False
+
+    return screens_config.get("activeScreenId") in (None, DEFAULT_SCREEN_ID)
+
+
 async def _seed_pages(manifest: dict[str, Any]) -> dict[str, Any]:
     from app.services.config_service import config_service
 
@@ -169,7 +286,10 @@ async def _seed_pages(manifest: dict[str, Any]) -> dict[str, Any]:
     screens = list(screens_config.get("screens") or [])
     user_screens = [screen for screen in screens if not _is_demo_screen(screen)]
 
-    if user_screens:
+    # A fresh install already has the shipped Home page. Treat it as empty so
+    # the sample pages appear in the main use case; a page the user touched
+    # (renamed, relaid out, added, filtered, restyled) still blocks seeding.
+    if user_screens and not is_untouched_default_page(screens_config):
         return {"created": False, "reason": "the user already has pages"}
 
     # First seed that touches pages: remember that the key was ours to remove.
