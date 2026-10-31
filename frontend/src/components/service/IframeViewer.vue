@@ -14,7 +14,12 @@
     <!-- CORS/Iframe Error Message -->
     <div v-if="iframeError" class="iframe-error-message">
       <div class="error-content">
-        <h3>⚠️ Cannot Display Service</h3>
+        <h3 class="heading-title">
+          <svg class="error-content__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path :d="mdiAlert" />
+          </svg>
+          Cannot Display Service
+        </h3>
         <p>
           This service cannot be embedded in an iframe due to security restrictions
           (CORS/X-Frame-Options).
@@ -35,6 +40,7 @@
 
 <script setup>
 import { ref, watch, onUnmounted } from "vue";
+import { mdiAlert } from "@mdi/js";
 
 const props = defineProps({
   url: {
@@ -152,8 +158,18 @@ onUnmounted(() => {
 }
 
 .error-content h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-2);
   margin: 0 0 var(--gap-4);
   color: var(--err-text);
+}
+
+.error-content__icon {
+  width: 1.2em;
+  height: 1.2em;
+  flex: 0 0 auto;
+  fill: currentColor;
 }
 
 .error-content p {

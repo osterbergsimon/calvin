@@ -56,7 +56,6 @@ export const roleLint = {
 export const controlLint = {
   allowlist: [
     "components/settings/shared/TabNavigation.vue",
-    "components/settings/tabs/layout/keyboard/KeyBindingTile.vue",
   ],
   baseline: [
     "components/settings/shared/ConfirmModal.vue",

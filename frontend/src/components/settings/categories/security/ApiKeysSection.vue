@@ -26,7 +26,12 @@
           @focusin="selectSecret"
           @click="selectSecret"
         />
-        <Button data-test="api-key-copy" @click="copySecret">{{ copyLabel }}</Button>
+        <Button
+          data-test="api-key-copy"
+          :icon="copyState === 'copied' ? mdiCheck : null"
+          @click="copySecret"
+          >{{ copyLabel }}</Button
+        >
         <InlineNote v-if="copyState === 'failed'">
           Press Ctrl+C (or long-press → Copy) to copy the selected key.
         </InlineNote>
@@ -171,7 +176,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { mdiAlert } from "@mdi/js";
+import { mdiAlert, mdiCheck } from "@mdi/js";
 import Tag from "@/components/ui/Tag.vue";
 import { useApiKeysStore } from "@/stores/apiKeys";
 import { useSystem } from "@/composables/useSystem";
@@ -238,7 +243,7 @@ const showTouchHint = computed(() => isTouch.value && width.value >= 720);
 const hostUnavailable = computed(() => environment.value?.host_control === false);
 const copyLabel = computed(() =>
   copyState.value === "copied"
-    ? "✓ Copied"
+    ? "Copied"
     : copyState.value === "failed"
       ? "Select and copy"
       : "Copy"
