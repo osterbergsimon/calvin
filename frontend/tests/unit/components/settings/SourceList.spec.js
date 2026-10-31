@@ -34,6 +34,15 @@ describe("SourceList", () => {
     expect(unknown.find(".sl-dot").exists()).toBe(false);
   });
 
+  it("titles the dot Working or Off, like the other source lists (CLV-63)", () => {
+    expect(mountList().find(".sl-dot--on").attributes("title")).toBe("Working");
+    const off = mountList({ rows: [row({ running: false })] });
+    expect(off.find(".sl-dot--off").attributes("title")).toBe("Off");
+    // A plugin error still wins: it is the useful thing to show.
+    const broken = mountList({ rows: [row({ error: "Couldn't sign in." })] });
+    expect(broken.find(".sl-dot--err").attributes("title")).toBe("Couldn't sign in.");
+  });
+
   it("shows the plugin error in place of the summary", () => {
     const w = mountList({ rows: [row({ error: "Couldn't sign in. Check the API key." })] });
     expect(w.find(".sl-dot--err").exists()).toBe(true);
