@@ -75,6 +75,24 @@ describe("Dialog", () => {
     expect(w.emitted("update:modelValue")).toEqual([[false]]);
   });
 
+  it("leaves Escape to a nested floating surface", async () => {
+    const w = mountOpen(
+      {},
+      { default: '<div role="listbox"><button type="button" class="inner">Inner</button></div>' }
+    );
+    await nextTick();
+    w.find(".inner").element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    );
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toBeUndefined();
+
+    // The same key from the dialog itself still dismisses it.
+    keydown("Escape");
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toEqual([[false]]);
+  });
+
   it("does not dismiss a non-dismissible dialog", async () => {
     const w = mountOpen({ dismissible: false });
     expect(w.find("[aria-label='Close']").exists()).toBe(false);
