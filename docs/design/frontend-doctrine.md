@@ -67,7 +67,7 @@ Components stop referencing these (§7 migration).
 | | `--ok`, `--warn`, `--err` (+ the `--tag-*` mix rule) | existing | status only |
 | Elevation | `--elev-1` (raised: menus, popovers), `--elev-2` (dialogs, sheets) | `0 6px 18px -8px var(--shadow-hover)` / `0 18px 50px -16px var(--shadow-hover)` | nothing else casts shadows |
 | Motion | `--dur-fast` 120ms, `--dur` 200ms, `--ease` `cubic-bezier(.2,.7,.2,1)` | | all transitions; zero under `prefers-reduced-motion` |
-| Layers | `--z-raised` 10, `--z-sticky` 100, `--z-dialog` 1000, `--z-osk` 1100, `--z-toast` 1200 | | no other z-index values |
+| Layers | `--z-raised` 10, `--z-sticky` 100, `--z-dialog` 1000, `--z-popover` 1050 (popovers teleport to body, so they must clear an open dialog), `--z-osk` 1100, `--z-toast` 1200 | | no other z-index values |
 
 **Component tokens** are allowed when a component has geometry of its own. They're prefixed with the component
 name and built from roles, e.g. `--tag-*`, `--toggle-*`, `--tab-height`, `--osk-height`, `--touch-target`,
@@ -101,7 +101,7 @@ Rules:
 | Item in a list (source, screen, key, plugin) | **`ListRow.vue` (new)**, extracted from `SourceList`: lead (dot/thumb/icon), body (name `--text-label` + meta lines), trailing actions group | per-feature cards |
 | Empty | `EmptyState` | an ad-hoc centred paragraph |
 | Confirm / dialog | `ConfirmModal`, `DialogScrim` | custom overlays |
-| Small floating surface anchored to a control (⋯ menus, pickers, the connection explainer) | **`Popover.vue` (new)**: anchored, flips at viewport edges, Escape/outside tap closes, focus returns, `--elev-1`, `--radius-card`, `--z-raised`; **`Menu.vue`** on top of it for action lists (items ≥ `--touch-target`, danger item last) | per-feature popovers (SourceList ⋯, ThemePicker, ActionPicker, RegionViewOptions, ConnectionStatus) |
+| Small floating surface anchored to a control (⋯ menus, pickers, the connection explainer) | **`Popover.vue` (new)**: anchored, flips at viewport edges, Escape/outside tap closes, focus returns, `--elev-1`, `--radius-card`, `--z-popover`; **`Menu.vue`** on top of it for action lists (items ≥ `--touch-target`, danger item last) | per-feature popovers (SourceList ⋯, ThemePicker, ActionPicker, RegionViewOptions, ConnectionStatus) |
 | Colour | **`ColourField.vue` (new)**: the theme's `--event-1…8` swatches first (radio group), then **Custom…** opening the native picker; shows the chosen swatch + name, never a raw hex field by default | a bare `<input type="color">` + hex text box |
 
 ### 3.1 Building blocks for settings (the "new setting looks out of place" fix)
