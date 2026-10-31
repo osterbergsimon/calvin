@@ -96,6 +96,9 @@
   --space-xl: 1rem;
   --space-2xl: 1.25rem;
   --space-3xl: 1.5rem;
+  /* Settings panels add no padding; every direct child insets by these. */
+  --panel-pad-x: var(--space-2xl);
+  --panel-pad-y: var(--space-lg);
 
   /* Type scale */
   --fs-3xs: 0.6rem; /* dense calendar chrome (week spine, ribbon times) */
