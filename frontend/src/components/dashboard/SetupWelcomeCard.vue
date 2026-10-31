@@ -75,6 +75,7 @@
           stacked
           :compact="compact"
           :setting-id="qrSettingId"
+          :setup-code="setupCode"
           :title="compact ? 'Or use your phone' : 'Set it up from your phone'"
           :hint="compact ? '' : 'Scan the code or open this address on the same network.'"
         />
@@ -98,6 +99,7 @@ import { useModeStore } from "@/stores/mode";
 import { useAuthStore } from "@/stores/auth";
 import { usePhoneHandoff } from "@/composables/usePhoneHandoff";
 import { useSetupPrompt } from "@/composables/useSetupPrompt";
+import { useSetupCode } from "@/composables/useSetupCode";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 
@@ -118,8 +120,19 @@ const auth = useAuthStore();
 const { isPhoneHandoff, width } = usePhoneHandoff();
 const { isTouch } = useTouchCapability();
 const setupPrompt = useSetupPrompt();
+const { code: setupCode, load: loadSetupCode } = useSetupCode();
 
 const { mode, items, qrSettingId } = setupPrompt;
+
+// Only the server's own screen can read the code; the QR carries it so the
+// phone does not have to type it. Phones and LAN clients get an empty string.
+watch(
+  () => auth.status,
+  status => {
+    if (status === "setup") loadSetupCode();
+  },
+  { immediate: true }
+);
 
 const cardEl = ref(null);
 const areaHeight = ref(typeof window === "undefined" ? 0 : window.innerHeight);

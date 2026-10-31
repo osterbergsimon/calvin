@@ -24,6 +24,8 @@ import { resolveServerUrl, settingsLink } from "@/utils/serverUrl";
 const props = defineProps({
   // ?setting= destination to open on the phone; null opens Settings' landing page.
   settingId: { type: String, default: null },
+  // One-time admin setup code to carry in the link (server's own screen only).
+  setupCode: { type: String, default: "" },
   // An explicit URL to show instead of a settings deep link.
   url: { type: String, default: "" },
   title: { type: String, default: "Set up from your phone" },
@@ -40,7 +42,9 @@ const serverUrl = ref("");
 const qr = ref("");
 
 const link = computed(
-  () => props.url || (serverUrl.value ? settingsLink(serverUrl.value, props.settingId) : "")
+  () =>
+    props.url ||
+    (serverUrl.value ? settingsLink(serverUrl.value, props.settingId, props.setupCode) : "")
 );
 
 const qrWidth = computed(() => {
