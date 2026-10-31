@@ -6,7 +6,7 @@
  */
 
 export const roleLint = {
-  allowlist: ["components/settings/auth/AuthLockScreen.vue"],
+  allowlist: [],
   baseline: [
     "components/auth/AdminSignInDialog.vue",
     "components/settings/auth/AuthLockScreen.vue",

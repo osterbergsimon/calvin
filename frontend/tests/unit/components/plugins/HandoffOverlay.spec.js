@@ -20,7 +20,7 @@ describe("HandoffOverlay", () => {
     const w = mountIt();
     await new Promise(r => setTimeout(r, 0)); // let toDataURL resolve
     expect(w.text()).toContain("mealie.home");
-    expect(w.find("img.link-overlay__qr").attributes("src")).toBe("data:image/png;base64,ZZ");
+    expect(w.find('[data-test="qr"]').attributes("src")).toBe("data:image/png;base64,ZZ");
     w.unmount();
   });
 
@@ -34,8 +34,8 @@ describe("HandoffOverlay", () => {
 
   it("emits close on backdrop click and on close button", async () => {
     const w = mountIt();
-    await w.find(".link-overlay").trigger("click"); // backdrop (self)
-    await w.find('[data-test="close"]').trigger("click");
+    await w.find(".dialog-overlay").trigger("click"); // backdrop (self)
+    await w.find('button[aria-label="Close"]').trigger("click");
     expect(w.emitted("close")?.length).toBeGreaterThanOrEqual(1);
     w.unmount();
   });

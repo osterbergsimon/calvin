@@ -13,7 +13,6 @@ export const roleLint = {
     "components/plugins/SchemaRenderer.vue",
     "components/plugins/WebComponentHost.vue",
     "components/plugins/overlays/EmbedOverlay.vue",
-    "components/plugins/overlays/HandoffOverlay.vue",
     "components/plugins/renderers/CardGrid.vue",
     "components/plugins/renderers/IframeRenderer.vue",
     "components/plugins/renderers/ImageWithCaption.vue",
