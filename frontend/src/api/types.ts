@@ -492,6 +492,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/demo/calendar.ics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Demo Calendar
+     * @description The seeded sample calendar feed (404 until ``app.demo seed`` runs).
+     */
+    get: operations["demo_calendar_api_demo_calendar_ics_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/health": {
     parameters: {
       query?: never;
@@ -3312,6 +3332,24 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  demo_calendar_api_demo_calendar_ics_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
