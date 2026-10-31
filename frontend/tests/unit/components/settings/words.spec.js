@@ -82,7 +82,7 @@ describe("Settings words: the source modal", () => {
 
   it("labels the name field 'Name' with a plain placeholder", () => {
     const w = mountModal(service({ instance_config_schema: { url: { type: "string" } } }));
-    expect(w.find(".form-group label").text()).toBe("Name");
+    expect(w.find(".text-field__label").text()).toBe("Name");
     expect(w.find('input[type="text"]').attributes("placeholder")).toBe("e.g. Family photos");
   });
 
@@ -93,7 +93,7 @@ describe("Settings words: the source modal", () => {
         instance_label: "Recipe list",
       })
     );
-    expect(w.find(".modal-header h3").text()).toBe("Add Recipe list");
+    expect(w.find(".dialog__title").text()).toBe("Add Recipe list");
     expect(w.find('input[type="text"]').attributes("placeholder")).toBe("e.g. Recipe list");
   });
 

@@ -1,5 +1,8 @@
 <template>
-  <div class="setting-row" :class="{ 'setting-row--stacked': stacked }">
+  <div
+    class="setting-row"
+    :class="{ 'setting-row--stacked': stacked, 'setting-row--flush': flush }"
+  >
     <div class="setting-row__info">
       <div class="setting-row__label">
         <span v-if="statusDot" class="setting-row__dot" aria-hidden="true"></span>
@@ -19,6 +22,9 @@ defineProps({
   // Stack the control full-width below the label instead of beside it.
   // Use for wide embedded editors that must not be sized by their own content.
   stacked: { type: Boolean, default: false },
+  // A dialog body already pads its content, so its rows must not add the
+  // settings-panel inset on top (CLV-80).
+  flush: { type: Boolean, default: false },
   // A small --ok dot before the label (e.g. "Signed in on this device").
   statusDot: { type: Boolean, default: false },
 });
@@ -80,5 +86,15 @@ defineProps({
   flex-shrink: 1;
   width: 100%;
   min-width: 0;
+}
+
+.setting-row--flush {
+  padding: 0;
+}
+
+/* Let the label column shrink before the control wraps below it, so two
+   dialog rows with a toggle keep the same label-left / toggle-right layout. */
+.setting-row--flush .setting-row__info {
+  flex: 1 1 0;
 }
 </style>

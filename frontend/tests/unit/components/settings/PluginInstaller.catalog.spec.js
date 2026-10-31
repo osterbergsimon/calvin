@@ -95,7 +95,7 @@ describe("PluginInstaller catalog (§3.3)", () => {
 
   it("installs from the catalog repository, not the other-repository field", async () => {
     const w = mountWith({ devMode: false });
-    await w.find('[data-catalog-plugin-id="mealie"] button.btn-install').trigger("click");
+    await w.find('[data-catalog-plugin-id="mealie"] button.btn--primary').trigger("click");
 
     expect(w.emitted("install")[0][0]).toMatchObject({
       path: "mealie",
@@ -111,7 +111,7 @@ describe("PluginInstaller catalog (§3.3)", () => {
     expect(immich.text()).toContain("Update");
     // Update is an install action: the same primary button as Install, not a
     // separate amber look (CLV-45 review).
-    const updateButton = immich.find("button.btn-install");
+    const updateButton = immich.find("button.btn--primary");
     expect(updateButton.exists()).toBe(true);
     expect(updateButton.classes()).not.toContain("btn-update");
 
