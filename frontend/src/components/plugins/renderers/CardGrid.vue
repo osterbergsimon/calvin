@@ -5,10 +5,11 @@
     :class="shadeClass"
     :style="[gridStyle, clampStyle]"
   >
-    <article
+    <Card
       v-for="(card, idx) in cards"
       :key="cardKey(card, idx)"
-      class="card-grid__card calvin-plugin-surface"
+      class="card-grid__card"
+      :style="cardPadStyle"
     >
       <header v-if="cardTitle(card)" class="card-grid__title">{{ cardTitle(card) }}</header>
       <ul v-if="cardItems(card).length" class="card-grid__items calvin-plugin-list">
@@ -26,10 +27,14 @@
           <span v-if="itemValue(item)" class="card-grid__item-value">{{ itemValue(item) }}</span>
         </li>
       </ul>
-      <p v-else class="card-grid__empty calvin-plugin-empty">
-        {{ schema.empty_text || "Nothing planned." }}
-      </p>
-    </article>
+      <EmptyState
+        v-else
+        compact
+        :inset="false"
+        class="card-grid__empty"
+        :message="schema.empty_text || 'Nothing planned.'"
+      />
+    </Card>
     <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
     <EmbedOverlay
       v-else-if="overlay?.kind === 'embed'"
@@ -46,6 +51,8 @@ import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
 import { useLinkOpen } from "../../../composables/useLinkOpen";
 import { useFitScroll } from "../../../composables/useFitScroll.js";
+import Card from "../../ui/Card.vue";
+import EmptyState from "../../ui/EmptyState.vue";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
@@ -65,6 +72,11 @@ const { clampStyle, shadeClass } = useFitScroll(gridEl, {
   itemSelector: ".card-grid__card",
   data: () => props.data,
 });
+
+// A region's card-size control sets --card-pad (styles/cardSizeScale.js); the
+// card block owns its inset otherwise. This is the one geometry a plugin panel
+// may override, so it stays an inline var rather than a local card style.
+const cardPadStyle = { padding: "var(--card-pad, var(--gap-4))" };
 
 const itemLinkAction = computed(() => itemSpec().link_action);
 
@@ -147,12 +159,13 @@ function itemKey(item, idx) {
   overflow: hidden;
 }
 
+/* The block owns the surface; the card only lays its own children out and
+   stays the fit-clamp's measuring unit. */
 .card-grid__card {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--gap-inline);
   overflow: hidden;
-  padding: var(--card-pad, 1rem);
   scroll-snap-align: start;
 }
 
@@ -160,18 +173,18 @@ function itemKey(item, idx) {
 .card-grid__title {
   font-family: var(--font-ui);
   font-size: 0.7em;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-3);
-  padding-bottom: 0.45rem;
+  padding-bottom: var(--gap-2);
   border-bottom: 1px solid var(--line-soft);
 }
 
 .card-grid__item {
   display: flex;
   align-items: baseline;
-  gap: 0.75rem;
+  gap: var(--gap-3);
   border-radius: 2px;
 }
 
@@ -182,7 +195,7 @@ function itemKey(item, idx) {
 .card-grid__item-label {
   font-family: var(--font-ui);
   font-size: 0.7em;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -196,11 +209,5 @@ function itemKey(item, idx) {
   font-size: 0.95em;
   line-height: 1.35;
   word-break: break-word;
-}
-
-.card-grid__empty {
-  margin: 0;
-  text-align: left;
-  padding: 0.5rem 0;
 }
 </style>

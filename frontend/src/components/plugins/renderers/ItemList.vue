@@ -22,8 +22,8 @@
         <span v-if="valueFor(item)" class="item-list__value">{{ valueFor(item) }}</span>
       </div>
     </li>
-    <li v-if="items.length === 0" class="item-list__empty calvin-plugin-empty">
-      {{ schema.empty_text || "Nothing to show yet." }}
+    <li v-if="items.length === 0" class="item-list__empty">
+      <EmptyState compact :inset="false" :message="schema.empty_text || 'Nothing to show yet.'" />
     </li>
   </ul>
   <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
@@ -43,6 +43,7 @@ import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
 import { useLinkOpen } from "../../../composables/useLinkOpen";
 import { useFitScroll } from "../../../composables/useFitScroll.js";
+import EmptyState from "../../ui/EmptyState.vue";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import EmbedOverlay from "../overlays/EmbedOverlay.vue";
 
@@ -99,7 +100,7 @@ const keyFor = (item, i) => {
 .item-list__row {
   display: flex;
   align-items: baseline;
-  gap: 0.9rem;
+  gap: var(--gap-3);
   flex-shrink: 0;
   scroll-snap-align: start;
 }
@@ -113,7 +114,7 @@ const keyFor = (item, i) => {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-size: 0.8em;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink-3);
   min-width: 80px;
   flex-shrink: 0;
@@ -123,13 +124,13 @@ const keyFor = (item, i) => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: var(--gap-tight);
   min-width: 0;
 }
 
 .item-list__label {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   font-size: 0.95em;
   line-height: 1.35;
 }

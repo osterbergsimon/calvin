@@ -70,9 +70,9 @@
       </div>
     </div>
   </section>
-  <div v-else-if="data?.error" class="weather-forecast-renderer calvin-plugin-error">
-    <p>{{ data.error }}</p>
-    <p v-if="data.message">{{ data.message }}</p>
+  <div v-else-if="data?.error" class="weather-forecast-renderer weather-forecast-renderer--error">
+    <InlineNote tone="err">{{ data.error }}</InlineNote>
+    <InlineNote v-if="data.message">{{ data.message }}</InlineNote>
   </div>
 </template>
 
@@ -81,6 +81,7 @@ import { computed, ref } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { weatherIconPath } from "../../../utils/weatherIcons";
 import { useFitScroll } from "../../../composables/useFitScroll.js";
+import InlineNote from "../../ui/InlineNote.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -185,15 +186,22 @@ function capitalize(value) {
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--gap-5);
   overflow: hidden;
   box-sizing: border-box;
+}
+
+/* A failed fetch is one err note plus its detail, centred in the region. */
+.weather-forecast-renderer--error {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .weather-forecast-renderer__current {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: var(--gap-5);
 }
 
 /* The current conditions are the panel's one big display moment: open air,
@@ -202,8 +210,8 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 0 0.25rem;
+  gap: var(--gap-2);
+  padding: var(--gap-3) 0 var(--gap-1);
   flex-shrink: 0;
 }
 
@@ -216,14 +224,14 @@ function capitalize(value) {
 .weather-forecast-renderer__temp {
   display: flex;
   align-items: baseline;
-  gap: 0.25rem;
+  gap: var(--gap-1);
 }
 
 .weather-forecast-renderer__temp-value {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-size: 4em;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
   line-height: 1;
 }
@@ -231,7 +239,7 @@ function capitalize(value) {
 .weather-forecast-renderer__temp-unit {
   font-family: var(--font-data);
   font-size: 1.75em;
-  font-weight: 400;
+  font-weight: var(--weight-body);
   color: var(--ink-3);
 }
 
@@ -243,16 +251,16 @@ function capitalize(value) {
 .weather-forecast-renderer__details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 1rem;
+  gap: var(--gap-4);
   border-top: 1px solid var(--line-soft);
-  padding-top: 1rem;
+  padding-top: var(--gap-4);
 }
 
 .weather-forecast-renderer__detail-value {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-size: 1.2em;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 
@@ -263,11 +271,11 @@ function capitalize(value) {
   flex-direction: column;
   overflow: hidden;
   border-top: 1px solid var(--line-soft);
-  padding-top: 0.9rem;
+  padding-top: var(--gap-4);
 }
 
 .weather-forecast-renderer__forecast h4 {
-  margin: 0 0 0.75rem 0;
+  margin: 0 0 var(--gap-3) 0;
   flex-shrink: 0;
 }
 
@@ -284,9 +292,9 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--gap-2);
   text-align: center;
-  padding: 0.25rem 0.5rem;
+  padding: var(--gap-1) var(--gap-2);
   scroll-snap-align: start;
 }
 
@@ -297,7 +305,7 @@ function capitalize(value) {
 .weather-forecast-renderer__date {
   font-family: var(--font-ui);
   font-size: 0.7em;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -311,7 +319,7 @@ function capitalize(value) {
 
 .weather-forecast-renderer__temps {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--gap-2);
   align-items: baseline;
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
@@ -319,7 +327,7 @@ function capitalize(value) {
 
 .weather-forecast-renderer__high {
   font-size: 1.1em;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 
