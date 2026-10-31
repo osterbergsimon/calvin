@@ -226,7 +226,7 @@ describe("CalendarSourcesTab", () => {
     await menu.findAll('[role="menuitem"]')[0].trigger("click");
     await flushPromises();
 
-    const confirmBtn = w.find(".btn-danger");
+    const confirmBtn = w.find('[data-test="confirm-accept"]');
     expect(confirmBtn.exists()).toBe(true);
     await confirmBtn.trigger("click");
     await flushPromises();

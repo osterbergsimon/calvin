@@ -1,18 +1,18 @@
 <template>
-  <div class="ap calvin-plugin-surface" role="dialog" aria-label="Choose keyboard action">
+  <div class="ap">
     <header class="ap-head">
       <span class="ap-key">{{ keyCode }}</span>
       <span class="ap-arrow">→</span>
       <span class="ap-lbl">choose an action</span>
-      <IconButton variant="ghost" label="Cancel" @click="$emit('close')">×</IconButton>
     </header>
 
-    <input
+    <TextField
       v-model="query"
       class="ap-search"
-      type="text"
+      label="Search actions"
+      type="search"
       placeholder="Search actions…"
-      aria-label="Search actions"
+      hide-label
     />
 
     <div class="ap-scroll">
@@ -62,14 +62,16 @@
 
 <script setup>
 import { ref, computed } from "vue";
-import IconButton from "@/components/ui/IconButton.vue";
+import TextField from "@/components/ui/TextField.vue";
 import { ACTION_GROUPS } from "@/utils/keyboardActionsCatalog";
 
+// The content of the "choose an action" Dialog (KeyboardTab supplies the
+// shell); this component owns the search and the grouped list, not an overlay.
 defineProps({
   keyCode: { type: String, required: true },
   currentAction: { type: String, default: null },
 });
-defineEmits(["select", "close"]);
+defineEmits(["select"]);
 
 const query = ref("");
 const searching = computed(() => query.value.trim() !== "");
@@ -102,30 +104,24 @@ const visibleGroups = computed(() => {
 <style scoped>
 .ap {
   width: 100%;
-  max-width: 440px;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  max-height: 70vh;
+  max-height: 60vh;
 }
 .ap-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: var(--gap-inline);
+  padding: 0 0 var(--gap-3);
   border-bottom: 1px solid var(--line);
-  background: var(--bg-2);
 }
 .ap-key {
   font-family: var(--font-data);
-  font-weight: 700;
-  background: var(--bg-1);
+  font-weight: var(--weight-title);
+  background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: 3px 12px;
+  border-radius: var(--radius-control);
+  padding: var(--gap-1) var(--gap-3);
   color: var(--ink);
 }
 .ap-arrow {
@@ -136,30 +132,20 @@ const visibleGroups = computed(() => {
   flex: 1;
 }
 .ap-search {
-  margin: 10px 14px 6px;
-  padding: 7px 10px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  color: var(--ink);
-  font-family: var(--font-ui);
-}
-.ap-search:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  margin: var(--gap-3) 0 var(--gap-2);
 }
 .ap-scroll {
   overflow-y: auto;
-  padding: 4px 14px 12px;
+  padding-bottom: var(--gap-3);
 }
 .ap-group-title {
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
   color: var(--ink);
-  margin: var(--space-lg) 0 var(--space-xs);
+  margin: var(--gap-4) 0 var(--gap-1);
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: var(--gap-1);
 }
 .ap-star {
   color: var(--warn-text);
@@ -167,17 +153,17 @@ const visibleGroups = computed(() => {
 .ap-group-toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--gap-inline);
   width: 100%;
-  margin: 8px 0 4px;
-  padding: 6px 4px;
+  margin: var(--gap-2) 0 var(--gap-1);
+  padding: var(--gap-1) 0;
   background: none;
   border: none;
   border-top: 1px solid var(--line);
   color: var(--ink);
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
   cursor: pointer;
   min-height: var(--touch-target);
 }
@@ -189,7 +175,7 @@ const visibleGroups = computed(() => {
   outline-offset: 2px;
 }
 .ap-chevron {
-  width: 12px;
+  width: 0.75rem;
   color: var(--ink-2);
 }
 .ap-group-toggle-label {
@@ -206,12 +192,12 @@ const visibleGroups = computed(() => {
   align-items: flex-start;
   width: 100%;
   text-align: left;
-  gap: 2px;
-  padding: 8px 10px;
-  margin-bottom: 4px;
+  gap: var(--gap-1);
+  padding: var(--gap-2) var(--gap-3);
+  margin-bottom: var(--gap-1);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   color: var(--ink);
   cursor: pointer;
   min-height: var(--touch-target);
@@ -231,11 +217,11 @@ const visibleGroups = computed(() => {
   outline-offset: 1px;
 }
 .ap-opt-desc {
-  font-size: var(--fs-micro);
+  font-size: var(--text-caption);
   color: var(--ink-2);
 }
 .ap-empty {
   color: var(--ink-2);
-  padding: 12px 4px;
+  padding: var(--gap-3) 0;
 }
 </style>

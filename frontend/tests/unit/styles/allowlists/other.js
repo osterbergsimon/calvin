@@ -11,7 +11,6 @@ export const roleLint = {
     "components/StatusRail.vue",
     "components/settings/categories/ThisBrowserSettings.vue",
     "components/settings/shared/CollapsibleSection.vue",
-    "components/settings/shared/ConfirmModal.vue",
     "components/settings/shared/DefaultEditNote.vue",
     "components/settings/shared/DefaultOnlyNote.vue",
     "components/settings/shared/TabNavigation.vue",
@@ -22,10 +21,7 @@ export const roleLint = {
     "components/settings/shell/SettingsSearch.vue",
     "components/settings/shell/SettingsSection.vue",
     "components/settings/shell/SettingsTopBar.vue",
-    "components/settings/shell/ThemePicker.vue",
     "components/settings/specialized/ThemeSelector.vue",
-    "components/settings/tabs/layout/KeyboardTab.vue",
-    "components/settings/tabs/layout/keyboard/ActionPicker.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingBoard.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingTile.vue",
     "components/settings/tabs/layout/keyboard/RebootCombo.vue",
@@ -60,7 +56,6 @@ export const roleLint = {
 
 export const controlLint = {
   allowlist: [
-    "components/settings/shared/ConfirmModal.vue",
     "components/settings/shared/TabNavigation.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingTile.vue",
   ],
@@ -74,7 +69,6 @@ export const controlLint = {
 export const settingsNoStyle = {
   allowlist: [
     "components/settings/categories/ThisBrowserSettings.vue",
-    "components/settings/tabs/layout/KeyboardTab.vue",
     "components/settings/tabs/layout/keyboard/ActionPicker.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingBoard.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingTile.vue",

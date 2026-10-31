@@ -326,6 +326,19 @@ onBeforeUnmount(() => {
   padding: var(--gap-4) var(--gap-5) var(--gap-5);
 }
 
+/* Inside a destructive confirm the danger Button is the filled one (doctrine
+   §3: the text-only danger style is for row actions). */
+.dialog__actions :deep(.btn--danger) {
+  color: var(--err-ink);
+  background: var(--err);
+  border-color: var(--err);
+}
+
+.dialog__actions :deep(.btn--danger:not(:disabled):hover) {
+  background: color-mix(in srgb, var(--err) 88%, var(--ink));
+  border-color: color-mix(in srgb, var(--err) 88%, var(--ink));
+}
+
 @keyframes dialog-in {
   from {
     opacity: 0;
