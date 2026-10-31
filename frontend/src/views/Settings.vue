@@ -17,9 +17,6 @@
       @update:model-value="phoneOpen = $event"
     >
       <PhoneSetupCard :setting-id="phoneSettingId" />
-      <template #actions>
-        <Button variant="primary" @click="phoneOpen = false">Close</Button>
-      </template>
     </Dialog>
 
     <div v-if="!auth.authenticated" class="settings-lock-scale">
@@ -100,7 +97,6 @@ import { expandSettingsSection } from "@/utils/settingsSectionExpansion";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
-import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 import AuthLockScreen from "@/components/settings/auth/AuthLockScreen.vue";
