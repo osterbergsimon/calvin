@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
+import ColourField from "@/components/ui/ColourField.vue";
 
 vi.mock("@/services/pluginsApi", () => ({
   testPlugin: vi.fn(() => Promise.resolve({ success: true, message: "ok" })),
@@ -74,6 +75,18 @@ describe("InstanceModal form", () => {
     const switches = wrapper.findAll('[role="switch"]');
     expect(switches.map(s => s.attributes("aria-label"))).toEqual(["Show event times", "Enabled"]);
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
+  });
+
+  it("uses the shared ColourField, not a native colour input plus hex box", async () => {
+    const wrapper = await mountModal();
+
+    const colour = wrapper.findComponent(ColourField);
+    expect(colour.exists()).toBe(true);
+    expect(colour.props("label")).toBe("Colour");
+    expect(wrapper.find('input[type="text"][aria-label="Colour value"]').exists()).toBe(false);
+    expect(wrapper.find('input[type="color"]').attributes("aria-label")).toBe(
+      "Custom colour picker"
+    );
   });
 
   it("wires the show-event-times toggle to the form value", async () => {
