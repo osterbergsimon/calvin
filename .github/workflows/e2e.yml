@@ -1,0 +1,58 @@
+name: Desktop E2E
+
+# CLV-73: the default (desktop chromium) Playwright project never ran in CI, so
+# stale selectors after the Settings redesign sat red on develop unnoticed.
+# This job runs it on every frontend PR alongside the phone and a11y projects.
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/e2e.yml"
+
+concurrency:
+  group: desktop-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-e2e:
+    name: Desktop E2E
+    # Pin the runner: Playwright 1.57 has no support for ubuntu-26.04 yet
+    # ("Playwright does not support chromium on ubuntu26.04-x64").
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: ./frontend
+        run: npx playwright install --with-deps chromium
+
+      # The default project runs without a backend: tests that need data answer
+      # every /api request with page.route, and the rest tolerate an absent
+      # server. Host-acting routes are always intercepted, never sent.
+      - name: Run desktop E2E
+        working-directory: ./frontend
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-desktop-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
