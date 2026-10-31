@@ -77,6 +77,12 @@ test.describe("phone: System", () => {
       system.locator(".settings-section__eyebrow", { hasText: "Versions & status" }).first()
     ).toBeVisible();
     await expect(page.locator('[data-test="version-readout"]')).toContainText("1.6.0");
+    // The health and update labels come from the real API vocabulary, not the
+    // mock's old "ok"/missing-status shapes (CLV-81 review).
+    await expect(page.locator('[data-test="readout-calvin"]')).toContainText("Running");
+    await expect(page.locator('[data-test="readout-calvin"]')).not.toContainText("Not checked yet");
+    await expect(page.locator('[data-test="readout-updates"]')).toContainText("Up to date");
+    await expect(page.locator('[data-test="readout-last-checked"]')).toBeVisible();
     await expectPhoneLayout(page, "System category");
 
     // The Advanced disclosure holds the installer-facing rows.
@@ -113,24 +119,26 @@ test.describe("phone: Security", () => {
     await expect(
       security.locator(".settings-section__eyebrow", { hasText: "API keys" })
     ).toBeVisible();
-    await expect(
-      security.locator('[data-test="api-key-row"]', { hasText: "Home Assistant" })
-    ).toBeVisible();
+    const keyRow = security.locator('[data-test="api-key-row"]', { hasText: "Home Assistant" });
+    await expect(keyRow).toBeVisible();
+    // camelCase createdAt/lastUsedAt from the API, formatted in ListRow's meta.
+    const keyMeta = keyRow.locator(".list-row__meta");
+    await expect(keyMeta).toContainText("Created");
+    await expect(keyMeta).toContainText("Never used");
+    await expect(keyMeta).not.toContainText("NaN");
     await expectPhoneLayout(page, "Security category");
 
     // Create a key: name, scope, then the one-time secret.
     await page.locator('[data-test="api-keys-create"]').click();
     const form = page.locator('[data-test="api-key-form"]');
     await expect(form).toBeVisible();
-    await page.locator('[data-test="api-key-name"]').fill("Kitchen display");
+    await page.locator("#api-key-name").fill("Kitchen display");
     await page.locator('[data-test="scope-admin"]').check();
     await expectPhoneLayout(page, "create API key form", { scope: '[data-test="api-key-form"]' });
     await page.locator('[data-test="api-key-submit"]').click();
 
     await expect(page.locator('[data-test="api-key-result"]')).toBeVisible();
-    await expect(page.locator('[data-test="api-key-secret"]')).toHaveValue(
-      "calvin_new1_secret_value"
-    );
+    await expect(page.locator("#api-key-secret")).toHaveValue("calvin_new1_secret_value");
     await expectPhoneLayout(page, "new API key secret");
     await page.locator('[data-test="api-key-done"]').click();
     await expect.poll(() => api.requests).toContain("POST /api/auth/keys");
@@ -150,7 +158,7 @@ test.describe("phone: Security", () => {
     await expect.poll(() => api.requests).toContain("POST /api/auth/password");
 
     // Allowed sites keeps the add row usable on a phone.
-    await page.locator('[data-test="origin-input"]').fill("https://photos.local");
+    await page.locator("#origin-input").fill("https://photos.local");
     await page.locator('[data-test="origin-add"]').click();
     await page.locator('[data-test="origins-save"]').click();
     await expect.poll(() => api.requests).toContain("PUT /api/security/allowed-origins");

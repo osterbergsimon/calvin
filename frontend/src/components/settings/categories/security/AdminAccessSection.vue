@@ -1,108 +1,79 @@
 <template>
   <SettingsSection id="security-admin" title="Admin access">
-    <div class="admin-access" :class="{ 'admin-access--form-open': formOpen }">
-      <SettingRow
-        label="Signed in on this device"
-        description="Signing out here doesn't sign out other devices."
-        :stacked="isPhone"
-        status-dot
+    <SettingRow
+      label="Signed in on this device"
+      description="Signing out here doesn't sign out other devices."
+      :stacked="isPhone"
+      status-dot
+    >
+      <Button
+        data-test="admin-sign-out"
+        :disabled="signingOut"
+        :loading="signingOut"
+        loading-label="Signing out…"
+        @click="signOut"
       >
-        <button
-          type="button"
-          class="security-btn"
-          data-test="admin-sign-out"
-          :disabled="signingOut"
-          @click="signOut"
-        >
-          {{ signingOut ? "Signing out…" : "Sign out" }}
-        </button>
-      </SettingRow>
+        Sign out
+      </Button>
+    </SettingRow>
 
-      <SettingRow
-        label="Admin password"
-        :description="changed ? '' : 'Changing it signs out every other device.'"
-        :stacked="isPhone"
-      >
-        <template v-if="changed" #description>
-          <p class="admin-access__success" role="status">
-            ✓ Password changed. Other devices were signed out.
-          </p>
-        </template>
-        <button
-          v-if="!formOpen"
-          type="button"
-          class="security-btn"
-          data-test="admin-change-password"
-          @click="openForm"
+    <SettingRow label="Admin password" :stacked="isPhone">
+      <template #description>
+        <InlineNote v-if="changed" tone="ok" role="status">
+          Password changed. Other devices were signed out.
+        </InlineNote>
+        <InlineNote v-else>Changing it signs out every other device.</InlineNote>
+      </template>
+      <Button v-if="!formOpen" data-test="admin-change-password" @click="openForm">
+        Change password
+      </Button>
+    </SettingRow>
+
+    <SettingRow v-if="formOpen" label="Change password" stacked>
+      <form data-test="admin-change-form" novalidate @submit.prevent="submit">
+        <PasswordField
+          ref="currentField"
+          v-model="current"
+          v-model:revealed="currentRevealed"
+          label="Current password"
+          autocomplete="current-password"
+          :error="currentError"
+          :disabled="submitting || rateLocked"
+          input-id="admin-current-password"
+        />
+        <PasswordField
+          ref="newField"
+          v-model="next"
+          v-model:revealed="nextRevealed"
+          label="New password"
+          autocomplete="new-password"
+          hint="At least 8 characters."
+          :error="newError"
+          :disabled="submitting || rateLocked"
+          input-id="admin-new-password"
+        />
+
+        <InlineNote v-if="rateLocked" tone="err" role="status" aria-live="off">
+          Too many wrong passwords. Try again in {{ rateRemaining }}.
+        </InlineNote>
+        <InlineNote aria-live="polite">{{ liveMessage }}</InlineNote>
+        <InlineNote v-if="networkError" tone="err" role="alert">
+          Couldn't reach Calvin. Check the connection and try again.
+        </InlineNote>
+
+        <Button data-test="admin-change-cancel" @click="closeForm">Cancel</Button>
+        <Button
+          type="submit"
+          variant="primary"
+          data-test="admin-change-submit"
+          :disabled="rateLocked"
+          :loading="submitting"
+          loading-label="Changing password…"
         >
           Change password
-        </button>
-      </SettingRow>
-
-      <form
-        v-if="formOpen"
-        class="admin-access__form"
-        novalidate
-        data-test="admin-change-form"
-        @submit.prevent="submit"
-      >
-        <div class="admin-access__fields">
-          <PasswordField
-            ref="currentField"
-            v-model="current"
-            v-model:revealed="currentRevealed"
-            label="Current password"
-            autocomplete="current-password"
-            :error="currentError"
-            :disabled="submitting || rateLocked"
-            input-id="admin-current-password"
-          />
-          <PasswordField
-            ref="newField"
-            v-model="next"
-            v-model:revealed="nextRevealed"
-            label="New password"
-            autocomplete="new-password"
-            hint="At least 8 characters."
-            :error="newError"
-            :disabled="submitting || rateLocked"
-            input-id="admin-new-password"
-          />
-        </div>
-
-        <p
-          v-if="rateLocked"
-          class="admin-access__banner admin-access__banner--err"
-          role="status"
-          aria-live="off"
-        >
-          Too many wrong passwords. Try again in {{ rateRemaining }}.
-        </p>
-        <p class="admin-access__live" aria-live="polite">{{ liveMessage }}</p>
-        <p v-if="networkError" class="admin-access__banner admin-access__banner--err" role="alert">
-          Couldn't reach Calvin. Check the connection and try again.
-        </p>
-
-        <div class="admin-access__actions">
-          <button
-            type="button"
-            class="security-btn"
-            data-test="admin-change-cancel"
-            @click="closeForm"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            class="security-btn security-btn--primary"
-            data-test="admin-change-submit"
-            :disabled="submitting || rateLocked"
-          >
-            {{ submitting ? "Changing password…" : "Change password" }}
-          </button>
-        </div>
+        </Button>
       </form>
-    </div>
+    </SettingRow>
   </SettingsSection>
 </template>
 
@@ -112,6 +83,8 @@ import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";
 import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import PasswordField from "@/components/ui/PasswordField.vue";
 
 const auth = useAuthStore();
@@ -246,75 +219,3 @@ async function submit() {
   }
 }
 </script>
-
-<style scoped>
-@media (max-width: 479px) {
-  .admin-access--form-open :deep(.setting-row__desc) {
-    display: none;
-  }
-}
-@media (max-width: 479px) {
-  .admin-access :deep(.setting-row) {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-  .admin-access :deep(.setting-row__control) {
-    flex-shrink: 1;
-    width: 100%;
-  }
-  .admin-access :deep(.setting-row__control .security-btn) {
-    width: 100%;
-  }
-}
-
-.admin-access__form {
-  padding: 0.25rem 1.25rem 1.25rem;
-  border-top: 1px solid var(--line-soft);
-}
-.admin-access__fields {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0 16px;
-  max-width: 40rem;
-  margin-bottom: 16px;
-}
-@media (min-width: 720px) {
-  .admin-access__fields {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-.admin-access__actions {
-  display: flex;
-  gap: 10px;
-}
-.admin-access__success {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ok-text);
-}
-.admin-access__banner {
-  display: flex;
-  gap: 10px;
-  margin: 0 0 16px;
-  padding: 12px 14px;
-  font-size: var(--fs-md);
-  line-height: 1.45;
-  color: var(--ink);
-  border: 1px solid;
-  border-radius: var(--radius-md);
-}
-.admin-access__banner--err {
-  background: color-mix(in srgb, var(--err) 8%, var(--bg-1));
-  border-color: color-mix(in srgb, var(--err) 40%, transparent);
-}
-.admin-access__live {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-</style>

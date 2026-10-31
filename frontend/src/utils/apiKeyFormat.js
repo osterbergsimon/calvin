@@ -2,7 +2,10 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 /** "30 Oct", with the year when it isn't the current one. */
 export function formatKeyDate(iso, now = new Date()) {
+  // A missing or corrupt value must never reach the screen as "NaN undefined".
+  if (iso === null || iso === undefined || iso === "") return "";
   const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
   const base = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
   return date.getFullYear() === now.getFullYear() ? base : `${base} ${date.getFullYear()}`;
 }
