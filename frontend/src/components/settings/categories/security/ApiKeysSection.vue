@@ -162,6 +162,7 @@
       :title="`Revoke &quot;${revoking?.name}&quot;?`"
       message="Apps using this key stop working right away. This can't be undone."
       confirm-text="Revoke key"
+      :danger="true"
       @confirm="revoke"
       @cancel="revoking = null"
     />

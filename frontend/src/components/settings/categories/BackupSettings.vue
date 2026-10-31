@@ -227,6 +227,7 @@
           : 'The backup will be merged into this Calvin.'
       "
       confirm-text="Restore"
+      :danger="true"
       @confirm="runRestore"
       @cancel="confirmOpen = false"
     />

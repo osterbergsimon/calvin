@@ -98,6 +98,7 @@
       :title="removeTitle"
       :message="removePrompt"
       confirm-text="Remove"
+      :danger="true"
       @confirm="confirmRemove"
       @cancel="cancelRemove"
     />
