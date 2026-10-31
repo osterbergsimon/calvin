@@ -38,7 +38,7 @@
               label="What this region shows"
               haspopup="dialog"
               role="dialog"
-              initial-focus="input"
+              :initial-focus="pickerInitialFocus"
               @close="onPickerClose"
             >
               <template #trigger="{ attrs }">
@@ -49,16 +49,17 @@
               </template>
               <div class="picker-panel">
                 <TextField
+                  v-if="showPickerSearch"
                   v-model="search"
                   class="picker-search"
-                  label="Filter components"
+                  label="Search"
                   type="search"
                   @keydown.down.prevent="menuRef?.focusFirst()"
                 />
                 <Menu
                   ref="menuRef"
                   :items="pickerItems"
-                  label="Components"
+                  label="Options"
                   :autofocus="false"
                   @select="chooseKey"
                   @close="pickerOpen = false"
@@ -222,6 +223,7 @@ import SettingGroup from "@/components/ui/SettingGroup.vue";
 import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 import { filterComponentOptions } from "@/utils/componentPicker";
 
 const props = defineProps({
@@ -251,6 +253,7 @@ const pickerOpen = ref(false);
 const search = ref("");
 const menuRef = ref(null);
 const hasServices = computed(() => props.componentOptions.some(o => o.kind === "service"));
+const { isTouch } = useTouchCapability();
 // Leaves the region editor for the Service plugins tab (Settings re-routes on ?setting=).
 const addService = () => {
   pickerOpen.value = false;
@@ -283,6 +286,17 @@ const pickerItems = computed(() => {
   }
   return items;
 });
+// A short list needs no filter (and an empty one would only get in the way).
+// Count the whole menu, not the filtered rows, so typing cannot hide the field.
+const pickerOptionCount = computed(
+  () => props.componentOptions.length + (hasServices.value ? 0 : 1)
+);
+const showPickerSearch = computed(() => pickerOptionCount.value > 8);
+// A touch keyboard would cover half the editor and flip the popover over the
+// header, so touch opens on the first option and leaves the filter unfocused.
+const pickerInitialFocus = computed(() =>
+  showPickerSearch.value && !isTouch.value ? "input" : '[role="menuitem"]'
+);
 const chooseKey = key => {
   if (key === ADD_SERVICE_KEY) {
     addService();
