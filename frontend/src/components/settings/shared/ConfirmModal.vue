@@ -41,9 +41,11 @@ defineProps({
     type: String,
     default: "Confirm",
   },
+  // Opt-in: only an action that loses something irreversible (uninstall,
+  // restore, revoke, remove, reset, restart/reboot) asks for the red Button.
   danger: {
     type: Boolean,
-    default: true,
+    default: false,
   },
 });
 

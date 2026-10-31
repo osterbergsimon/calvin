@@ -116,6 +116,7 @@
       :title="confirm.title"
       :message="confirm.message"
       :confirm-text="confirm.confirmText"
+      :danger="true"
       @confirm="onConfirm"
       @cancel="confirm.show = false"
     />

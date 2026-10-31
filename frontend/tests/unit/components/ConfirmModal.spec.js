@@ -100,24 +100,25 @@ describe("ConfirmModal", () => {
   });
 
   describe("Button Styling", () => {
-    it("uses the danger Button for a destructive confirm by default", () => {
+    it("uses the primary Button for a confirm by default", () => {
       const wrapper = mountConfirm({ show: true });
       expect(wrapper.find('[data-test="confirm-cancel"]').classes()).toContain("btn--secondary");
-      expect(wrapper.find('[data-test="confirm-accept"]').classes()).toContain("btn--danger");
+      expect(wrapper.find('[data-test="confirm-accept"]').classes()).toContain("btn--primary");
+      expect(wrapper.find('[data-test="confirm-accept"]').classes()).not.toContain("btn--danger");
     });
 
-    it("uses the primary style for a confirm that is not destructive", () => {
+    it("uses the danger Button only when the action loses something", () => {
       const wrapper = mountConfirm({
         show: true,
-        message: "Make these the default?",
-        confirmText: "Make default",
-        danger: false,
+        message: "Uninstall Mealie?",
+        confirmText: "Uninstall",
+        danger: true,
       });
 
       const confirmButton = wrapper.find('[data-test="confirm-accept"]');
-      expect(confirmButton.text()).toBe("Make default");
-      expect(confirmButton.classes()).toContain("btn--primary");
-      expect(confirmButton.classes()).not.toContain("btn--danger");
+      expect(confirmButton.text()).toBe("Uninstall");
+      expect(confirmButton.classes()).toContain("btn--danger");
+      expect(confirmButton.classes()).not.toContain("btn--primary");
     });
   });
 });
