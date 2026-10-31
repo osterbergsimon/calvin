@@ -90,6 +90,15 @@ from the per-plugin `plugin.json`.
 - `version` (string): repository manifest format version.
 - `plugins[]`: `id` and `path` required; `name`, `description`, `version`,
   `type` optional (fall back to the plugin's own manifest).
+- `catalog` (boolean, optional, default `true`): `false` keeps the plugin out
+  of the published catalog — Calvin's Plugins › catalog and the Content
+  provider picker never list it, in any mode. It stays installable from the
+  repository by path (and from a local checkout in dev mode), which is how
+  test fixtures and in-development plugins are kept around.
+- `keywords` (array of strings, optional): free-form discovery metadata. A
+  `"test"` keyword keeps the entry out of the catalog for end users while
+  still showing it in dev mode; the per-plugin `plugin.json` `keywords` work
+  the same way when the entry does not repeat them.
 - Paths must be relative, without `..` (path-traversal protection).
 - Entries whose directories are missing or fail plugin validation are skipped.
 
