@@ -38,13 +38,15 @@
         >
           <template #lead>
             <span class="catalog-icon" aria-hidden="true">
+              <svg v-if="pluginIconPath(plugin)" class="catalog-icon-svg" viewBox="0 0 24 24">
+                <path :d="pluginIconPath(plugin)" fill="currentColor" />
+              </svg>
               <img
-                v-if="isIconFile(plugin.icon)"
+                v-else-if="isIconFile(plugin.icon)"
                 class="catalog-icon-img"
                 :src="pluginIconUrl(plugin)"
                 alt=""
               />
-              <template v-else-if="plugin.icon">{{ plugin.icon }}</template>
               <template v-else>{{ catalogLetter(plugin) }}</template>
             </span>
           </template>
@@ -400,7 +402,8 @@ import TextField from "@/components/ui/TextField.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { pluginKindFilters, pluginKindKey, pluginKindLabel } from "@/utils/pluginKind";
 import { isNewerVersion } from "@/utils/pluginVersions";
-import { isIconFile, pluginIconUrl } from "@/utils/pluginIcon";
+import { isIconFile, pluginIconPath, pluginIconUrl } from "@/utils/pluginIcon";
+import { isCatalogEntry, isTestPlugin } from "@/utils/pluginCatalog";
 
 const props = defineProps({
   installing: {
@@ -515,7 +518,8 @@ watch(
 
 // The plugin repo ships fixtures for its own test suite ("test" keyword); end
 // users shouldn't be offered them, developers in dev mode still are (F8).
-const isTestPlugin = p => (p.keywords || p.manifest?.keywords || []).includes("test");
+// `catalog: false` entries are hidden in every mode: they are development-only
+// or otherwise not for the picker.
 const withoutTestFixtures = list => (props.devMode ? list : list.filter(p => !isTestPlugin(p)));
 
 // An Installed card's Update, and the catalog row's, only offer a genuinely
@@ -541,7 +545,9 @@ const enrichedCatalog = computed(() => {
   });
 });
 
-const catalogList = computed(() => withoutTestFixtures(enrichedCatalog.value));
+const catalogList = computed(() =>
+  withoutTestFixtures(enrichedCatalog.value).filter(isCatalogEntry)
+);
 
 const catalogFilters = computed(() => pluginKindFilters(catalogList.value));
 const catalogTypeOptions = computed(() =>
@@ -826,6 +832,11 @@ watch(searchQuery, () => {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.catalog-icon-svg {
+  width: 62%;
+  height: 62%;
 }
 
 .catalog-meta,

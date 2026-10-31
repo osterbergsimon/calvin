@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import { mdiUpload } from "@mdi/js";
+import { mdiCast, mdiUpload } from "@mdi/js";
 import ProviderPicker from "@/components/settings/specialized/ProviderPicker.vue";
 
 const mountPicker = (props = {}) =>
@@ -21,9 +21,25 @@ describe("ProviderPicker tile icons (§6)", () => {
     expect(w.find(".pp-icon img").exists()).toBe(false);
   });
 
-  it("renders an emoji icon as text", () => {
-    const w = mountPicker({ providers: [{ id: "immich", name: "Immich", icon: "🖼" }] });
-    expect(w.find(".pp-icon").text()).toBe("🖼");
+  it("renders a curated mdi icon as an SVG glyph", () => {
+    const w = mountPicker({
+      providers: [{ id: "chromecast", name: "Chromecast", icon: "mdi:cast" }],
+    });
+    expect(w.find(".pp-icon svg").exists()).toBe(true);
+    expect(w.find(".pp-icon svg path").attributes("d")).toBe(mdiCast);
+    expect(w.find(".pp-icon").text()).toBe("");
+  });
+
+  it("falls back to the first letter for an unknown mdi name or an emoji", () => {
+    const unknown = mountPicker({
+      providers: [{ id: "immich", name: "Immich", icon: "mdi:no-such-icon" }],
+    });
+    expect(unknown.find(".pp-icon").text()).toBe("I");
+    expect(unknown.find(".pp-icon svg").exists()).toBe(false);
+
+    const emoji = mountPicker({ providers: [{ id: "immich", name: "Immich", icon: "🖼" }] });
+    expect(emoji.find(".pp-icon").text()).toBe("I");
+    expect(emoji.find(".pp-icon svg").exists()).toBe(false);
   });
 
   it("renders an SVG glyph for a non-plugin choice (Upload), not a letter", () => {

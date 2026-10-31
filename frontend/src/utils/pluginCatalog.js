@@ -22,6 +22,17 @@ export const isOfficialCatalogRepo = repo =>
   normalizeRepo(repo) === normalizeRepo(OFFICIAL_PLUGIN_CATALOG_REPO);
 
 /**
+ * A repo entry that opts out of the catalog (`"catalog": false` in
+ * `plugins.json`). It stays installable from its repository, but never appears
+ * in the Content picker or Plugins › catalog, in any mode.
+ */
+export const isCatalogEntry = plugin => plugin?.catalog !== false;
+
+/** The repo's own test fixtures, hidden from end users (shown in dev mode). */
+export const isTestPlugin = plugin =>
+  (plugin?.keywords || plugin?.manifest?.keywords || []).includes("test");
+
+/**
  * The repository the picker may enumerate and install from: the configured
  * catalog when it is the official one, otherwise "" (no catalog group).
  */
