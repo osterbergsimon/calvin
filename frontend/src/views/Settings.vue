@@ -10,20 +10,17 @@
       @phone="phoneOpen = true"
     />
 
-    <template v-if="phoneOpen && auth.authenticated">
-      <DialogScrim blur @dismiss="phoneOpen = false" />
-      <div
-        class="settings-phone dialog-above-osk dialog-above-osk--center"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Set up from your phone"
-      >
-        <PhoneSetupCard :setting-id="phoneSettingId" />
-        <button type="button" class="settings-phone__close" @click="phoneOpen = false">
-          Close
-        </button>
-      </div>
-    </template>
+    <Dialog
+      :model-value="phoneOpen && auth.authenticated"
+      label="Set up from your phone"
+      scrim-blur
+      @update:model-value="phoneOpen = $event"
+    >
+      <PhoneSetupCard :setting-id="phoneSettingId" />
+      <template #actions>
+        <Button variant="primary" @click="phoneOpen = false">Close</Button>
+      </template>
+    </Dialog>
 
     <div v-if="!auth.authenticated" class="settings-lock-scale">
       <AuthLockScreen />
@@ -103,7 +100,8 @@ import { expandSettingsSection } from "@/utils/settingsSectionExpansion";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
-import DialogScrim from "@/components/ui/DialogScrim.vue";
+import Button from "@/components/ui/Button.vue";
+import Dialog from "@/components/ui/Dialog.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 import AuthLockScreen from "@/components/settings/auth/AuthLockScreen.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
@@ -488,34 +486,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.settings-phone {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  z-index: 1000;
-  transform: translate(-50%, -50%);
-  width: min(32rem, calc(100vw - 32px));
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
-  padding: var(--space-xl);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
-  box-shadow: 0 18px 50px -16px var(--shadow-hover);
-}
-.settings-phone__close {
-  align-self: flex-end;
-  min-height: var(--touch-target);
-  padding: 0 1.25rem;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
 .settings-page {
   height: 100dvh;
   overflow: hidden;

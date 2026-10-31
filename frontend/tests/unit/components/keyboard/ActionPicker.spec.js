@@ -19,7 +19,7 @@ describe("ActionPicker", () => {
 
   it("filters actions by search text", async () => {
     const w = mount(ActionPicker, { props: { keyCode: "KEY_4", currentAction: null } });
-    await w.find("input.ap-search").setValue("refresh");
+    await w.find(".ap-search input").setValue("refresh");
     expect(w.text().toLowerCase()).toContain("refresh");
     expect(w.find('[data-action="generic_next"]').exists()).toBe(false);
   });
@@ -47,7 +47,7 @@ describe("ActionPicker", () => {
   it("reveals matches inside collapsed groups while searching", async () => {
     const w = mount(ActionPicker, { props: { keyCode: "KEY_4", currentAction: null } });
     // calendar_next lives in a collapsed group; search should surface it without a manual click
-    await w.find("input.ap-search").setValue("calendar: next");
+    await w.find(".ap-search input").setValue("calendar: next");
     expect(w.find('[data-action="calendar_next"]').exists()).toBe(true);
   });
 });
