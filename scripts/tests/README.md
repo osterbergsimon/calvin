@@ -17,7 +17,7 @@ This directory contains tests for the Calvin setup scripts.
 - `test_install_kiosk.sh` - Verifies the one-command installer (`deploy/kiosk-agent/install-kiosk.sh`): fetch + hash/signature checks of the setup scripts, signing-key handling, reboot
 - `test_display_stack.sh` - Verifies display stack selection (x11/wayland/cog), packages, session env, and in-place switching
 - `test_cog_units.sh` - Verifies the cog systemd unit (DRM/gles, tty1 session, SIGSEGV stop) and the root panel helper
-- `test_cog_panel.sh` - Verifies the cog panel helper's screen-off/on order and rotation persistence
+- `test_cog_panel.sh` - Verifies the cog panel helper's screen-off/on order (stop, MainPID wait, tty1 clear, blank 0/4), DPMS verification with one retry, and rotation persistence
 - `test_update_kiosk_cog.sh` - Verifies the updater installs the cog unit but never switches stacks or starts Chromium on cog
 - `test_setup_kiosk_fallback_branch.sh` - Standalone `setup-kiosk.sh` falls back to `develop` (never `main`) for `setup-common.sh`
 - `helpers/` - Test helper functions and mocks
