@@ -34,18 +34,17 @@
             <span v-if="item.added" class="setup-welcome__done" data-test="setup-welcome-done">
               ✓ Added
             </span>
-            <button
+            <Button
               v-else-if="showActions"
-              type="button"
-              class="setup-welcome__btn"
-              :class="{ 'setup-welcome__btn--primary': isPhoneWidth && index === 0 }"
+              :variant="isPhoneWidth && index === 0 ? 'primary' : 'secondary'"
+              size="sm"
               data-test="setup-welcome-add"
               :data-setting="item.settingId"
               :aria-label="`Add ${item.label.toLowerCase()}`"
               @click="openSetting(item.settingId)"
             >
               {{ addLabel }}
-            </button>
+            </Button>
           </li>
         </ul>
         <p
@@ -56,14 +55,9 @@
           Open Settings on a phone or computer to add these.
         </p>
         <div class="setup-welcome__foot">
-          <button
-            type="button"
-            class="setup-welcome__ghost"
-            data-test="setup-welcome-dismiss"
-            @click="dismiss"
-          >
+          <Button variant="ghost" size="sm" data-test="setup-welcome-dismiss" @click="dismiss">
             Not now
-          </button>
+          </Button>
         </div>
         <p class="setup-welcome__announce" aria-live="polite" data-test="setup-welcome-announce">
           {{ announcement }}
@@ -102,6 +96,7 @@ import { useSetupPrompt } from "@/composables/useSetupPrompt";
 import { useSetupCode } from "@/composables/useSetupCode";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
+import Button from "@/components/ui/Button.vue";
 
 /**
  * First-run welcome card (CLV-20 §4.1): one non-modal card over the dashboard
@@ -299,49 +294,10 @@ function dismiss() {
   font-size: var(--fs-sm);
   font-weight: 500;
 }
-.setup-welcome__btn {
-  min-height: var(--touch-target);
-  padding: 0 1.1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  white-space: nowrap;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.setup-welcome__btn--primary {
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border-color: var(--focus);
-}
-.setup-welcome__btn:focus-visible,
-.setup-welcome__ghost:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
 .setup-welcome__foot {
   display: flex;
   justify-content: flex-start;
   margin-top: 10px;
-}
-.setup-welcome__ghost {
-  min-height: var(--touch-target);
-  padding: 0 0.75rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink-2);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.setup-welcome__ghost:hover {
-  color: var(--ink);
 }
 .setup-welcome__hint-line {
   margin: 10px 0 0;

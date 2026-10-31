@@ -29,13 +29,15 @@
           Settings can't check whether you're signed in. Check that the server is running and this
           device is on the same network.
         </p>
-        <button
+        <Button
           type="submit"
-          class="auth-btn auth-btn--primary auth-btn--block"
+          variant="primary"
+          class="auth-card__submit"
           :disabled="retrying"
+          :loading="retrying"
         >
           {{ retrying ? "Checking…" : "Try again" }}
-        </button>
+        </Button>
       </form>
 
       <form v-else class="auth-card" novalidate data-test="auth-card" @submit.prevent="submit">
@@ -150,14 +152,16 @@
           Couldn't reach Calvin. Check the connection and try again.
         </p>
 
-        <button
+        <Button
           v-if="!oskCollapsed"
           type="submit"
-          class="auth-btn auth-btn--primary auth-btn--block"
+          variant="primary"
+          class="auth-card__submit"
           :disabled="submitting || rateLocked"
+          :loading="submitting"
         >
           {{ submitLabel }}
-        </button>
+        </Button>
 
         <div v-if="mode === 'setup' && !hideRecovery" class="auth-card__recover">
           If you forget it, delete <code>admin-auth.json</code> from Calvin's data folder, or set
@@ -201,6 +205,7 @@ import { useNotificationsStore } from "@/stores/notifications";
 import { isLoopbackPage } from "@/utils/serverUrl";
 import PasswordField from "@/components/ui/PasswordField.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
+import Button from "@/components/ui/Button.vue";
 
 const auth = useAuthStore();
 const notifications = useNotificationsStore();
@@ -641,41 +646,9 @@ async function submitLogin() {
   border-radius: var(--radius-xs);
 }
 
-.auth-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-control);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.auth-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.auth-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.auth-btn--primary {
-  color: var(--focus-ink);
-  background: var(--focus);
-  border-color: var(--focus);
-  font-weight: 600;
-}
-.auth-btn--block {
+.auth-card__submit {
   width: 100%;
-  height: var(--control-height);
   margin-top: 4px;
-  font-size: var(--fs-base);
 }
 
 .auth-banner {
