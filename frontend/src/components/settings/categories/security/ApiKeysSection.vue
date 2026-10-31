@@ -4,15 +4,11 @@
       <Button data-test="api-keys-create" @click="openForm">Create key</Button>
     </template>
 
-    <SettingRow label="Keys" stacked>
-      <template #description>
-        <InlineNote>
-          Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give
-          each one its own key.
-        </InlineNote>
-        <InlineNote aria-live="polite" data-test="api-key-live">{{ liveMessage }}</InlineNote>
-      </template>
-    </SettingRow>
+    <template #description>
+      Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each
+      one its own key.
+      <InlineNote aria-live="polite" data-test="api-key-live">{{ liveMessage }}</InlineNote>
+    </template>
 
     <!-- Show once -->
     <SettingRow v-if="secret" label="New key" stacked>
@@ -133,21 +129,19 @@
     </SettingRow>
 
     <SettingRow v-if="store.keys.length" label="Your keys" stacked>
-      <ListRow v-for="item in store.keys" :key="item.id" :name="item.name" data-test="api-key-row">
-        <template #meta>
-          <span>
-            {{ item.prefix }}… · Created {{ formatKeyDate(item.createdAt, now()) }} ·
-            {{
-              item.lastUsedAt ? `Last used ${formatLastUsed(item.lastUsedAt, now())}` : "Never used"
-            }}
-          </span>
-          <InlineNote v-if="item.scope === 'host' && environment?.host_control === false">
-            Host actions are blocked: this Calvin doesn't control its machine.
-          </InlineNote>
-          <InlineNote v-if="rowErrors[item.id]" tone="err" data-test="api-key-row-error">
-            Couldn't revoke this key. Try again.
-          </InlineNote>
-        </template>
+      <ListRow
+        v-for="item in store.keys"
+        :key="item.id"
+        :name="item.name"
+        :meta="[keyMeta(item)]"
+        data-test="api-key-row"
+      >
+        <InlineNote v-if="item.scope === 'host' && environment?.host_control === false">
+          Host actions are blocked: this Calvin doesn't control its machine.
+        </InlineNote>
+        <InlineNote v-if="rowErrors[item.id]" tone="err" data-test="api-key-row-error">
+          Couldn't revoke this key. Try again.
+        </InlineNote>
         <template #actions>
           <Tag
             :tone="item.scope === 'host' ? 'err' : 'neutral'"
@@ -250,6 +244,18 @@ const copyLabel = computed(() =>
 );
 
 const now = () => new Date();
+// One meta line in ListRow's own meta role, so it keeps --text-meta/--ink-2.
+// Empty parts are dropped: a bad date must never leave "Created ·" behind.
+const keyMeta = item => {
+  const created = formatKeyDate(item.createdAt, now());
+  return [
+    `${item.prefix}…`,
+    created ? `Created ${created}` : "",
+    item.lastUsedAt ? `Last used ${formatLastUsed(item.lastUsedAt, now())}` : "Never used",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+};
 const scopeChip = value =>
   value === "host" ? "Host control" : (scopeOptions.find(o => o.value === value)?.label ?? value);
 const isDisabled = option => option.value === "host" && hostUnavailable.value;

@@ -68,6 +68,12 @@ test.describe("phone: System", () => {
       system.locator(".settings-section__eyebrow", { hasText: "Versions & status" }).first()
     ).toBeVisible();
     await expect(page.locator('[data-test="version-readout"]')).toContainText("1.6.0");
+    // The health and update labels come from the real API vocabulary, not the
+    // mock's old "ok"/missing-status shapes (CLV-81 review).
+    await expect(page.locator('[data-test="readout-calvin"]')).toContainText("Running");
+    await expect(page.locator('[data-test="readout-calvin"]')).not.toContainText("Not checked yet");
+    await expect(page.locator('[data-test="readout-updates"]')).toContainText("Up to date");
+    await expect(page.locator('[data-test="readout-last-checked"]')).toBeVisible();
     await expectPhoneLayout(page, "System category");
 
     // The Advanced disclosure holds the installer-facing rows.
@@ -104,9 +110,13 @@ test.describe("phone: Security", () => {
     await expect(
       security.locator(".settings-section__eyebrow", { hasText: "API keys" })
     ).toBeVisible();
-    await expect(
-      security.locator('[data-test="api-key-row"]', { hasText: "Home Assistant" })
-    ).toBeVisible();
+    const keyRow = security.locator('[data-test="api-key-row"]', { hasText: "Home Assistant" });
+    await expect(keyRow).toBeVisible();
+    // camelCase createdAt/lastUsedAt from the API, formatted in ListRow's meta.
+    const keyMeta = keyRow.locator(".list-row__meta");
+    await expect(keyMeta).toContainText("Created");
+    await expect(keyMeta).toContainText("Never used");
+    await expect(keyMeta).not.toContainText("NaN");
     await expectPhoneLayout(page, "Security category");
 
     // Create a key: name, scope, then the one-time secret.

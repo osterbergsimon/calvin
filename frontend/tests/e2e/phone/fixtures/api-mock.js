@@ -292,8 +292,8 @@ const sampleKeys = [
     name: "Home Assistant",
     scope: "read",
     prefix: "calvin_abcd",
-    created_at: new Date(Date.now() - 86400000).toISOString(),
-    last_used_at: null,
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+    lastUsedAt: null,
   },
 ];
 
@@ -358,7 +358,9 @@ export async function installApiMock(page, options = {}) {
       return json(route, { ok: true, mocked: true });
     }
 
-    if (path === "/api/health") return json(route, { status: "ok" });
+    // The real backend answers {status: "healthy", database: "ok"}; "ok" here
+    // made the UI say "Not checked yet" beside a check time.
+    if (path === "/api/health") return json(route, { status: "healthy", database: "ok" });
     // A phone is never loopback: the code reaches it in the QR's ?setup= link.
     if (path === "/api/auth/setup-code") {
       return json(route, state.setupCodeAvailable ? { code: state.setupCode } : {});
@@ -390,7 +392,7 @@ export async function installApiMock(page, options = {}) {
             name: "New key",
             scope: "read",
             prefix: "calvin_new1",
-            created_at: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
           },
           secret: "calvin_new1_secret_value",
         });
@@ -524,6 +526,8 @@ export async function installApiMock(page, options = {}) {
     }
     if (path === "/api/system/update/status") {
       return json(route, {
+        // The real API always includes a status; the UI maps idle to "Up to date".
+        status: "idle",
         available: false,
         current_version: "1.6.0",
         latest_version: "1.6.0",

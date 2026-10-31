@@ -34,43 +34,29 @@
     </SettingRow>
   </template>
 
+  <SettingRow label="Calvin" data-test="readout-calvin">
+    <template #description>
+      <InlineNote>Whether Calvin is running and if an update is under way.</InlineNote>
+      <InlineNote v-if="backendHealth?.error" tone="err" data-test="readout-note">
+        {{ backendHealth.errorText }}
+      </InlineNote>
+      <details v-if="backendHealth?.error" data-test="readout-details">
+        <summary>Details</summary>
+        <p>{{ backendHealth.error }}</p>
+      </details>
+    </template>
+    <Tag :tone="backendTone" data-test="backend-health-value">{{ backendHealthLabel }}</Tag>
+  </SettingRow>
   <SettingRow
-    label="Status"
-    description="Whether Calvin is running and if an update is under way."
-    stacked
+    v-if="!isContainer"
+    label="Updates"
+    :description="updatePhaseLabel"
+    data-test="readout-updates"
   >
-    <ListRow
-      name="Calvin"
-      :meta="backendHealthCheckedAt ? [formatDateTime(backendHealthCheckedAt)] : []"
-      data-test="readout-calvin"
-    >
-      <template #actions>
-        <Tag :tone="backendTone" data-test="backend-health-value">{{ backendHealthLabel }}</Tag>
-      </template>
-    </ListRow>
-    <ListRow
-      v-if="!isContainer"
-      name="Updates"
-      :meta="updatePhaseLabel ? [updatePhaseLabel] : []"
-      data-test="readout-updates"
-    >
-      <template #actions>
-        <Tag :tone="updateTone" data-test="update-status-value">{{ updateStatusLabel }}</Tag>
-      </template>
-    </ListRow>
-    <ListRow
-      v-if="updateStatusCheckedAt"
-      name="Last checked"
-      :meta="[formatDateTime(updateStatusCheckedAt)]"
-      data-test="readout-last-checked"
-    />
-    <InlineNote v-if="backendHealth?.error" tone="err" data-test="readout-note">
-      {{ backendHealth.errorText }}
-    </InlineNote>
-    <details v-if="backendHealth?.error" data-test="readout-details">
-      <summary>Details</summary>
-      <p>{{ backendHealth.error }}</p>
-    </details>
+    <Tag :tone="updateTone" data-test="update-status-value">{{ updateStatusLabel }}</Tag>
+  </SettingRow>
+  <SettingRow v-if="updateStatusCheckedAt" label="Last checked" data-test="readout-last-checked">
+    <span>{{ formatDateTime(updateStatusCheckedAt) }}</span>
   </SettingRow>
 
   <SettingRow
@@ -137,7 +123,6 @@ import { computed, onMounted } from "vue";
 import { useSystem } from "@/composables";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
-import ListRow from "@/components/ui/ListRow.vue";
 import Tag from "@/components/ui/Tag.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
@@ -168,7 +153,9 @@ const backendHealthLabel = computed(() => {
   const status = backendHealth.value?.status;
   if (status === "healthy") return "Running";
   if (status === "unhealthy") return "Not responding";
-  return "Not checked yet";
+  // A completed check can't be "not checked": say we don't know the state
+  // rather than contradict the time beside it.
+  return backendHealthCheckedAt.value ? "Unknown" : "Not checked yet";
 });
 
 // The Tag tone is the status: ok (green) · warn (in-flight) · err (red) ·

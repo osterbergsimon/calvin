@@ -90,6 +90,50 @@ describe("UpdatesTab", () => {
     expect(wrapper.text()).not.toContain("pulling_code");
   });
 
+  it("shows system status as setting rows, with no nested cards", async () => {
+    systemMock.backendHealth.value = { status: "healthy" };
+    systemMock.backendHealthCheckedAt.value = "2026-05-03T10:15:00Z";
+    systemMock.updateStatus.value = { status: "idle" };
+    systemMock.updateStatusCheckedAt.value = "2026-05-03T10:16:00Z";
+
+    const wrapper = mount(UpdatesTab, {
+      props: { gitRepoUrl: "https://github.com/example/calvin.git", gitBranch: "main" },
+    });
+
+    for (const test of ["readout-calvin", "readout-updates", "readout-last-checked"]) {
+      const row = wrapper.find(`[data-test="${test}"]`);
+      expect(row.classes()).toContain("setting-row");
+      expect(row.find(".list-row").exists()).toBe(false);
+    }
+    expect(wrapper.find('[data-test="readout-calvin"]').text()).toContain(
+      "Whether Calvin is running and if an update is under way."
+    );
+    expect(wrapper.find('[data-test="readout-last-checked"]').text()).toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("reads the health status the backend actually sends", async () => {
+    systemMock.backendHealth.value = { status: "healthy" };
+    systemMock.backendHealthCheckedAt.value = "2026-05-03T10:15:00Z";
+
+    const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
+    const row = wrapper.find('[data-test="readout-calvin"]');
+
+    expect(row.find('[data-test="backend-health-value"]').text()).toBe("Running");
+    // A completed check never claims it was not checked.
+    expect(row.text()).not.toContain("Not checked yet");
+  });
+
+  it("says Unknown, not Not checked yet, beside a check time", async () => {
+    systemMock.backendHealth.value = { status: "ok" };
+    systemMock.backendHealthCheckedAt.value = "2026-05-03T10:15:00Z";
+
+    const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
+    const row = wrapper.find('[data-test="readout-calvin"]');
+
+    expect(row.find('[data-test="backend-health-value"]').text()).toBe("Unknown");
+    expect(row.text()).not.toContain("Not checked yet");
+  });
+
   it("maps every update status to plain words", async () => {
     const labelFor = async status => {
       systemMock.updateStatus.value = { status };
