@@ -30,8 +30,9 @@
           data-test="api-key-copy"
           :icon="copyState === 'copied' ? mdiCheck : null"
           @click="copySecret"
-          >{{ copyLabel }}</Button
         >
+          {{ copyLabel }}
+        </Button>
         <InlineNote v-if="copyState === 'failed'">
           Press Ctrl+C (or long-press → Copy) to copy the selected key.
         </InlineNote>
