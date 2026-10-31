@@ -31,8 +31,8 @@ test.describe("phone: Dashboard", () => {
 
     // The theme chooser is the widest popover in the category.
     await dashboard.locator(".theme-picker__trigger").click();
-    await expect(page.locator(".theme-picker__popover")).toBeVisible();
-    await expectPhoneLayout(page, "theme chooser", { scope: ".theme-picker__popover" });
+    await expect(page.locator(".theme-picker__panel")).toBeVisible();
+    await expectPhoneLayout(page, "theme chooser", { scope: ".theme-picker__panel" });
     await page.keyboard.press("Escape");
 
     // A change saves through the config route and keeps the layout intact.

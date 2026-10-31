@@ -37,9 +37,14 @@
         </Button>
       </li>
     </ul>
-    <InlineNote v-if="providers.length === 0" class="pp-empty">
-      No add-ons of this kind are installed yet.
-    </InlineNote>
+    <EmptyState
+      v-if="providers.length === 0"
+      compact
+      :inset="false"
+      class="pp-empty"
+      :icon="mdiPuzzleOutline"
+      message="No add-ons of this kind are installed yet."
+    />
 
     <!-- §3.7: discovering an add-on is bridged here, installing stays the
          official catalog's job and management stays in Plugins. -->
@@ -111,8 +116,10 @@
 </template>
 
 <script setup>
+import { mdiPuzzleOutline } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import Tag from "@/components/ui/Tag.vue";

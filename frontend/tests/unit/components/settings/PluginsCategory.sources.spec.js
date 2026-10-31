@@ -149,6 +149,7 @@ describe("Plugins › Installed cards and confirms", () => {
     const confirms = w.findAllComponents({ name: "ConfirmModal" });
     const confirm = confirms[confirms.length - 1];
     expect(confirm.props("show")).toBe(true);
+    expect(confirm.props("title")).toBe("Uninstall Immich?");
     expect(confirm.props("message")).toContain("2 sources are removed too");
   });
 

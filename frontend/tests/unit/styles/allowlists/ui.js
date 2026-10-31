@@ -8,7 +8,6 @@
 export const roleLint = {
   allowlist: [
     "components/ui/ChipMultiSelect.vue",
-    "components/ui/EmptyState.vue",
     "components/ui/FocusPanel.vue",
     "components/ui/IconButton.vue",
     "components/ui/NumberStepper.vue",

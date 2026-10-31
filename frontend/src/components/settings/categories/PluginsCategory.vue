@@ -86,9 +86,10 @@
     <!-- Uninstall Confirm Modal -->
     <ConfirmModal
       :show="showUninstallModal"
-      title="Uninstall plugin"
+      :title="`Uninstall ${pendingUninstall?.name || 'plugin'}?`"
       :message="uninstallMessage"
       confirm-text="Uninstall"
+      :danger="true"
       @confirm="confirmUninstall"
       @cancel="cancelUninstall"
     />
@@ -516,7 +517,7 @@ const handleUninstall = (pluginId, pluginType) => {
   uninstallMessage.value = count
     ? `Uninstall ${pluginName}? Its ${count} source${count === 1 ? "" : "s"} ${count === 1 ? "is" : "are"} removed too.`
     : `Uninstall ${pluginName}?`;
-  pendingUninstall.value = { pluginId, pluginType };
+  pendingUninstall.value = { pluginId, pluginType, name: pluginName };
   showUninstallModal.value = true;
 };
 
@@ -529,13 +530,13 @@ const confirmUninstall = async () => {
   } catch (error) {
     console.error("Failed to uninstall plugin:", error);
   } finally {
-    pendingUninstall.value = { pluginId: null, pluginType: null };
+    pendingUninstall.value = { pluginId: null, pluginType: null, name: "" };
   }
 };
 
 const cancelUninstall = () => {
   showUninstallModal.value = false;
-  pendingUninstall.value = { pluginId: null, pluginType: null };
+  pendingUninstall.value = { pluginId: null, pluginType: null, name: "" };
 };
 
 const handleUpdateFormValue = (pluginId, key, value) => {

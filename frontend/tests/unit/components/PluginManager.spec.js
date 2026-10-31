@@ -100,7 +100,7 @@ describe("PluginManager", () => {
         plugins: [{ id: "local", name: "Local", type: "image", enabled: true }],
         activeTab: "backend",
       });
-      const status = wrapper.find(".pm-status");
+      const status = wrapper.find('[data-test="plugin-manager-empty"]');
       expect(status.exists()).toBe(true);
       expect(status.text().toLowerCase()).toContain("kind");
     });

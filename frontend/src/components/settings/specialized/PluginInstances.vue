@@ -10,9 +10,13 @@
       </Button>
     </div>
 
-    <InlineNote v-if="instances.length === 0" class="pi-empty">
-      No {{ instanceLabelPlural.toLowerCase() }} yet. Add one to get started.
-    </InlineNote>
+    <EmptyState
+      v-if="instances.length === 0"
+      compact
+      :inset="false"
+      :icon="mdiPuzzleOutline"
+      :message="`No ${instanceLabelPlural.toLowerCase()} yet. Add one to get started.`"
+    />
 
     <draggable
       v-else
@@ -74,9 +78,10 @@
 
 <script setup>
 import { computed } from "vue";
+import { mdiPuzzleOutline } from "@mdi/js";
 import draggable from "vuedraggable";
 import Button from "@/components/ui/Button.vue";
-import InlineNote from "@/components/ui/InlineNote.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";

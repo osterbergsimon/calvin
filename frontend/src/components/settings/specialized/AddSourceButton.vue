@@ -24,7 +24,6 @@
     :title="installConfirmTitle"
     :message="installConfirmMessage"
     confirm-text="Install"
-    :danger="false"
     @confirm="confirmInstall"
     @cancel="cancelInstall"
   />

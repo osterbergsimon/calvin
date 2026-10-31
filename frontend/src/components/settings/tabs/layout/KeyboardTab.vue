@@ -4,10 +4,8 @@
     description="Press a button to bind it, then choose what it does. Any key works — your remote's buttons or a full keyboard."
     stacked
   >
-    <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
-    <div v-else-if="store.error" class="kb-msg kb-msg--err" role="alert">
-      {{ store.errorText }}
-    </div>
+    <InlineNote v-if="store.loading">Loading mappings…</InlineNote>
+    <InlineNote v-else-if="store.error" tone="err" role="alert">{{ store.errorText }}</InlineNote>
 
     <KeyBindingBoard
       v-else
@@ -19,14 +17,20 @@
     />
   </SettingRow>
 
-  <div v-if="pickerKey" class="kb-picker-overlay" @click.self="closePicker">
+  <Dialog
+    v-if="pickerKey"
+    :model-value="true"
+    title="Choose keyboard action"
+    initial-focus=".ap-opt"
+    @update:model-value="onDialogUpdate"
+    @close="closePicker"
+  >
     <ActionPicker
       :key-code="pickerKey"
       :current-action="store.mappings[pickerKey] || null"
       @select="onSelect"
-      @close="closePicker"
     />
-  </div>
+  </Dialog>
 </template>
 
 <script setup>
@@ -35,6 +39,8 @@ import { useKeyboardStore } from "@/stores/keyboard";
 import { useKeyCapture } from "@/composables/useKeyCapture";
 import { logError } from "@/utils/logger";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import KeyBindingBoard from "./keyboard/KeyBindingBoard.vue";
 import ActionPicker from "./keyboard/ActionPicker.vue";
 
@@ -52,6 +58,10 @@ const openPicker = key => {
 };
 const closePicker = () => {
   pickerKey.value = null;
+};
+
+const onDialogUpdate = value => {
+  if (!value) closePicker();
 };
 
 const onSelect = async action => {
@@ -77,27 +87,3 @@ const captureNewKey = async () => {
   if (key) openPicker(key);
 };
 </script>
-
-<style scoped>
-.kb-msg {
-  padding: 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  color: var(--ink-2);
-}
-.kb-msg--err {
-  background: color-mix(in srgb, var(--err) 12%, var(--bg-1));
-  color: var(--err-text);
-  border: 1px solid var(--err);
-}
-.kb-picker-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: color-mix(in srgb, var(--bg-1) 60%, transparent);
-}
-</style>

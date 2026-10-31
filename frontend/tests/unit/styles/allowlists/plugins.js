@@ -12,7 +12,6 @@ export const roleLint = {
     "components/PluginSections.vue",
     "components/plugins/SchemaRenderer.vue",
     "components/plugins/WebComponentHost.vue",
-    "components/plugins/overlays/EmbedOverlay.vue",
     "components/plugins/renderers/CardGrid.vue",
     "components/plugins/renderers/IframeRenderer.vue",
     "components/plugins/renderers/ImageWithCaption.vue",

@@ -52,8 +52,7 @@ defineProps({
 }
 
 /* A note at the end of a panel gets the panel's own inset. */
-.screens-layout__detail :deep(.screens-saved),
-.screens-layout__list :deep(.screens-empty) {
+.screens-layout__detail :deep(.screens-saved) {
   margin: var(--panel-pad-y) var(--panel-pad-x);
 }
 
