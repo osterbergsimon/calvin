@@ -23,6 +23,27 @@ for (const viewport of VIEWPORTS) {
 
         await expectAccessible(page, testInfo, `${viewport.name}/${theme}: ui gallery`);
 
+        // The new floating blocks in their open states: menu, explainer and
+        // the compact ColourField picker.
+        await page.locator('[data-test="gallery-menu-trigger"]').click();
+        await expect(page.getByRole("menu")).toBeVisible();
+        await expectAccessible(page, testInfo, `${viewport.name}/${theme}: ui gallery menu`);
+        await page.keyboard.press("Escape");
+
+        await page.locator('[data-test="gallery-popover-trigger"]').click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await expectAccessible(page, testInfo, `${viewport.name}/${theme}: ui gallery popover`);
+        await page.keyboard.press("Escape");
+
+        await page.locator('[data-test="gallery-colour-field"] .colour-field__trigger').click();
+        await expect(page.getByRole("dialog")).toBeVisible();
+        await expectAccessible(
+          page,
+          testInfo,
+          `${viewport.name}/${theme}: ui gallery colour field`
+        );
+        await page.keyboard.press("Escape");
+
         await page.locator('[data-test="open-dialog"]').click();
         await expect(page.getByRole("dialog")).toBeVisible();
         await expectAccessible(page, testInfo, `${viewport.name}/${theme}: ui gallery dialog`);

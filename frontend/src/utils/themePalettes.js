@@ -30,10 +30,13 @@ export function cssColourToHex(value) {
 /**
  * The current theme's calendar swatches, resolved to the hex a colour input
  * (and the backend's stored calendar colour) needs. Empty outside the browser.
+ * Pass an element to read a theme scoped to it (the UI gallery applies its
+ * theme on a wrapper, not on :root).
  */
-export function eventSwatches() {
+export function eventSwatches(element) {
   if (typeof window === "undefined" || typeof getComputedStyle !== "function") return [];
-  const styles = getComputedStyle(document.documentElement);
+  const target = element || document.documentElement;
+  const styles = getComputedStyle(target);
   return EVENT_TOKENS.map((token, index) => ({
     token,
     number: index + 1,
