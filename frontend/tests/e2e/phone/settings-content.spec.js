@@ -43,7 +43,7 @@ test.describe("phone: Content", () => {
     const api = await openContent(page);
 
     await page.getByRole("button", { name: "Add a calendar" }).click();
-    const modal = page.locator(".instance-modal");
+    const modal = page.locator(".dialog");
     await expect(modal).toBeVisible();
     await expect(modal.getByRole("heading", { name: /Add calendar/ })).toBeVisible();
 
@@ -57,7 +57,7 @@ test.describe("phone: Content", () => {
     await expect(modal.getByRole("switch", { name: "Enabled" })).toBeVisible();
     await expect(modal.getByRole("button", { name: "Test connection" })).toBeVisible();
     await expect(modal.locator('input[type="checkbox"]')).toHaveCount(0);
-    await expect(modal.locator('input.form-input[type="text"]').first()).toHaveAttribute(
+    await expect(modal.locator(".text-field__input").first()).toHaveAttribute(
       "placeholder",
       "e.g. Family"
     );
@@ -65,12 +65,12 @@ test.describe("phone: Content", () => {
     // The plugin fields share the modal's type and control rhythm: label
     // weight/size, input height, and a tight single-line hint.
     const styles = await page.evaluate(() => {
-      const root = document.querySelector(".instance-modal");
+      const root = document.querySelector(".dialog");
       const css = element => getComputedStyle(element);
       const pluginLabel = root.querySelector(".plugin-field label");
-      const nameLabel = root.querySelector(".form-group > label");
+      const nameLabel = root.querySelector(".text-field__label");
       const pluginInput = root.querySelector(".plugin-field input.form-input");
-      const nameInput = root.querySelector(".form-group input.form-input");
+      const nameInput = root.querySelector(".text-field__input");
       const hint = root.querySelector(".plugin-field .help-text");
       return {
         pluginLabel: { weight: css(pluginLabel).fontWeight, size: css(pluginLabel).fontSize },
@@ -82,7 +82,11 @@ test.describe("phone: Content", () => {
         hintLineHeight: css(hint).lineHeight,
       };
     });
-    expect(styles.pluginLabel).toEqual(styles.nameLabel);
+    // Both labels use a role token at the same size; the shared TextField uses
+    // the row-label weight and the plugin renderer keeps its title weight.
+    expect(styles.nameLabel.size).toBe(styles.pluginLabel.size);
+    expect(styles.nameLabel.weight).toBe("500");
+    expect(styles.pluginLabel.weight).toBe("600");
     expect(styles.pluginHeight).toBe(styles.nameHeight);
     expect(styles.hintMargin).toBe("4px");
     const lineHeight =
@@ -91,13 +95,13 @@ test.describe("phone: Content", () => {
         : parseFloat(styles.hintLineHeight) / parseFloat(styles.hintSize);
     expect(lineHeight).toBeLessThan(1.4);
 
-    await modal.locator('input.form-input[type="text"]').first().fill("Birthdays");
+    await modal.locator(".text-field__input").first().fill("Birthdays");
     await modal
       .locator('.plugin-field input[type="text"]')
       .first()
       .fill("https://example.com/birthdays.ics");
 
-    await expectPhoneLayout(page, "add calendar form", { scope: ".instance-modal" });
+    await expectPhoneLayout(page, "add calendar form", { scope: ".dialog" });
     await modal.getByRole("button", { name: "Save" }).click();
 
     await expect(modal).toBeHidden();
@@ -115,14 +119,14 @@ test.describe("phone: Content", () => {
     const familyRow = page.locator('.content-settings [data-source-id="src-family"]');
     await familyRow.getByRole("button", { name: "Edit" }).click();
 
-    const modal = page.locator(".instance-modal");
+    const modal = page.locator(".dialog");
     await expect(modal).toBeVisible();
     await expect(modal.getByRole("heading", { name: /Edit Family/ })).toBeVisible();
 
-    const name = modal.locator('input.form-input[type="text"]').first();
+    const name = modal.locator(".text-field__input").first();
     await expect(name).toHaveValue("Family");
     await name.fill("Family & friends");
-    await expectPhoneLayout(page, "edit calendar form", { scope: ".instance-modal" });
+    await expectPhoneLayout(page, "edit calendar form", { scope: ".dialog" });
     await modal.getByRole("button", { name: "Save" }).click();
 
     await expect(modal).toBeHidden();
@@ -137,10 +141,10 @@ test.describe("phone: Content", () => {
     const api = await openContent(page);
 
     await page.getByRole("button", { name: "Add photos from…" }).click();
-    const picker = page.locator(".pp-panel");
+    const picker = page.locator(".dialog");
     await expect(picker).toBeVisible();
     await expect(picker.getByRole("heading", { name: "Add photos from…" })).toBeVisible();
-    await expectPhoneLayout(page, "photo provider picker", { scope: ".pp-panel" });
+    await expectPhoneLayout(page, "photo provider picker", { scope: ".dialog" });
 
     // The upload tile hands the same flow to the device file picker.
     await picker.locator('[data-provider-id="__upload"]').click();
@@ -159,10 +163,10 @@ test.describe("phone: Content", () => {
     // And a photo source itself can be added from the picker's other tile.
     await page.getByRole("button", { name: "Add photos from…" }).click();
     await page.locator('[data-provider-id="image-local"]').click();
-    const modal = page.locator(".instance-modal");
+    const modal = page.locator(".dialog");
     await expect(modal).toBeVisible();
-    await modal.locator('input.form-input[type="text"]').first().fill("Holiday photos");
-    await expectPhoneLayout(page, "add photo source form", { scope: ".instance-modal" });
+    await modal.locator(".text-field__input").first().fill("Holiday photos");
+    await expectPhoneLayout(page, "add photo source form", { scope: ".dialog" });
     await modal.getByRole("button", { name: "Save" }).click();
     await expect(modal).toBeHidden();
     await expect.poll(() => api.requests).toContain("POST /api/plugins/image-local/instances");
@@ -175,7 +179,7 @@ test.describe("phone: Content", () => {
     const api = await openContent(page);
 
     await page.getByRole("button", { name: "Add a web page or app" }).click();
-    const picker = page.locator(".pp-panel");
+    const picker = page.locator(".dialog");
     await expect(picker).toBeVisible();
     await expect(picker.getByRole("heading", { name: "Add a web page or app" })).toBeVisible();
     // A web page and an app are both offered; the plain page leads.
@@ -183,17 +187,17 @@ test.describe("phone: Content", () => {
       "Web page (any address)"
     );
     await expect(picker.locator('[data-provider-id="mealie"]')).toBeVisible();
-    await expectPhoneLayout(page, "web page picker", { scope: ".pp-panel" });
+    await expectPhoneLayout(page, "web page picker", { scope: ".dialog" });
 
     await picker.locator('[data-provider-id="web-embed"]').click();
-    const modal = page.locator(".instance-modal");
+    const modal = page.locator(".dialog");
     await expect(modal.getByRole("heading", { name: /Add web page/ })).toBeVisible();
-    await modal.locator('input.form-input[type="text"]').first().fill("Calendar board");
+    await modal.locator(".text-field__input").first().fill("Calendar board");
     await modal
       .locator('.plugin-field input[type="text"]')
       .first()
       .fill("https://example.com/board");
-    await expectPhoneLayout(page, "add web page form", { scope: ".instance-modal" });
+    await expectPhoneLayout(page, "add web page form", { scope: ".dialog" });
     await modal.getByRole("button", { name: "Save" }).click();
 
     await expect(modal).toBeHidden();

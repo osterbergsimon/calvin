@@ -1,19 +1,15 @@
 <template>
-  <div v-if="show" class="pp-overlay dialog-above-osk" @click.self="$emit('close')">
-    <div class="pp-panel" role="dialog" aria-modal="true" :aria-label="title">
-      <div class="pp-head">
-        <h3 class="pp-title">{{ title }}</h3>
-        <IconButton variant="ghost" label="Close" @click="$emit('close')">×</IconButton>
-      </div>
-      <ul class="pp-list">
-        <li v-for="provider in providers" :key="provider.id">
-          <button
-            type="button"
-            class="pp-tile"
-            :class="{ 'pp-tile--off': provider.disabled }"
-            :data-provider-id="provider.id"
-            @click="choose(provider)"
-          >
+  <Dialog :model-value="show" :title="title" @update:model-value="handleDialog">
+    <ul class="pp-list">
+      <li v-for="provider in providers" :key="provider.id">
+        <Button
+          variant="secondary"
+          class="pp-tile"
+          :class="{ 'pp-tile--off': provider.disabled }"
+          :data-provider-id="provider.id"
+          @click="choose(provider)"
+        >
+          <template #icon>
             <span class="pp-icon" aria-hidden="true">
               <svg v-if="provider.svg" class="pp-icon-svg" viewBox="0 0 24 24">
                 <path :d="provider.svg" fill="currentColor" />
@@ -27,48 +23,59 @@
               <template v-else-if="provider.icon">{{ provider.icon }}</template>
               <template v-else>{{ providerLetter(provider) }}</template>
             </span>
+          </template>
+          <span class="pp-tile-body">
             <span class="pp-text">
               <span class="pp-name">{{ provider.label || provider.name }}</span>
               <span v-if="provider.description" class="pp-desc">{{ provider.description }}</span>
             </span>
-            <span v-if="provider.disabled" class="pp-on">Turn on</span>
-          </button>
-        </li>
-      </ul>
-      <p v-if="providers.length === 0" class="pp-empty">
-        No add-ons of this kind are installed yet.
-      </p>
+            <Tag v-if="provider.disabled" class="pp-on">Turn on</Tag>
+          </span>
+        </Button>
+      </li>
+    </ul>
+    <InlineNote v-if="providers.length === 0" class="pp-empty">
+      No add-ons of this kind are installed yet.
+    </InlineNote>
 
-      <!-- §3.7: discovering an add-on is bridged here, installing stays the
-           official catalog's job and management stays in Plugins. -->
-      <section v-if="catalogProviders.length > 0" class="pp-catalog">
-        <h4 class="pp-group">From the Calvin catalog</h4>
-        <ul class="pp-list">
-          <li v-for="item in catalogProviders" :key="`catalog-${item.id}`">
-            <div
-              class="pp-tile pp-tile--catalog"
-              :class="{ 'pp-tile--off': item.status === 'installing' }"
-              :data-catalog-id="item.id"
-            >
+    <!-- §3.7: discovering an add-on is bridged here, installing stays the
+         official catalog's job and management stays in Plugins. -->
+    <section v-if="catalogProviders.length > 0" class="pp-catalog">
+      <h4 class="pp-group">From the Calvin catalog</h4>
+      <ul class="pp-list">
+        <li v-for="item in catalogProviders" :key="`catalog-${item.id}`">
+          <ListRow
+            :name="item.label || item.name"
+            :data-catalog-id="item.id"
+            :disabled="item.status === 'installing'"
+          >
+            <template #lead>
               <span class="pp-icon" aria-hidden="true">
                 <img v-if="isIconFile(item.icon)" class="pp-icon-img" :src="iconUrl(item)" alt="" />
                 <template v-else-if="item.icon">{{ item.icon }}</template>
                 <template v-else>{{ providerLetter(item) }}</template>
               </span>
-              <span class="pp-text">
-                <span class="pp-name">{{ item.label || item.name }}</span>
-                <span v-if="item.description" class="pp-desc">{{ item.description }}</span>
-                <span v-if="item.error" class="pp-error">
-                  {{ item.error }}
+            </template>
+
+            <template #meta>
+              <span v-if="item.description" class="pp-desc">{{ item.description }}</span>
+              <InlineNote v-if="item.error" tone="err">
+                {{ item.error }}
+                <template #action>
                   <Button variant="link" size="sm" class="pp-error-link" @click="$emit('more')">
                     See details in Plugins ›
                   </Button>
-                </span>
-              </span>
-              <span v-if="item.status === 'installing'" class="pp-install pp-install--busy">
+                </template>
+              </InlineNote>
+            </template>
+
+            <template #actions>
+              <Tag v-if="item.status === 'installing'" class="pp-install pp-install--busy">
                 Installing…
-              </span>
-              <span v-else-if="item.status === 'installed'" class="pp-installed">Installed ✓</span>
+              </Tag>
+              <Tag v-else-if="item.status === 'installed'" tone="ok" class="pp-installed">
+                Installed ✓
+              </Tag>
               <Button
                 v-else
                 variant="primary"
@@ -79,23 +86,26 @@
               >
                 Install
               </Button>
-            </div>
-          </li>
-        </ul>
-      </section>
+            </template>
+          </ListRow>
+        </li>
+      </ul>
+    </section>
 
-      <div v-if="moreLabel" class="pp-foot">
-        <Button variant="ghost" class="pp-more" @click="$emit('more')">
-          {{ moreLabel }}
-        </Button>
-      </div>
-    </div>
-  </div>
+    <template #actions>
+      <Button v-if="moreLabel" variant="ghost" class="pp-more" @click="$emit('more')">
+        {{ moreLabel }}
+      </Button>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
-import IconButton from "@/components/ui/IconButton.vue";
 import Button from "@/components/ui/Button.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
+import Tag from "@/components/ui/Tag.vue";
 import { isIconFile, pluginIconLetter, pluginIconUrl } from "@/utils/pluginIcon";
 
 // A small chooser of providers (plugins) for one kind of source. It carries no
@@ -139,98 +149,35 @@ const iconUrl = provider => pluginIconUrl(provider);
 const choose = provider => {
   emit("select", provider);
 };
+
+const handleDialog = open => {
+  if (!open) emit("close");
+};
 </script>
 
 <style scoped>
-.pp-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  background: color-mix(in srgb, var(--ink) 55%, transparent);
-  z-index: 1000;
-}
-
-.pp-panel {
-  width: 30rem;
-  max-width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 20px var(--shadow);
-}
-
-.pp-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.pp-title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  color: var(--ink);
-}
-
 .pp-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--gap-inline);
   margin: 0;
-  padding: 1rem;
+  padding: 0;
   list-style: none;
 }
 
 .pp-tile {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
   width: 100%;
-  min-height: 56px;
-  padding: 0.75rem 1rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
+  height: auto;
+  min-height: 3.5rem;
+  justify-content: flex-start;
+  gap: var(--gap-3);
+  line-height: 1.3;
+  white-space: normal;
   text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
-}
-
-.pp-tile:hover {
-  border-color: var(--focus);
-  background: color-mix(in srgb, var(--focus) 8%, var(--bg-2));
-}
-
-.pp-tile:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .pp-tile--off {
   opacity: 0.55;
-}
-
-/* Catalog rows are not a single click target: Install is the action. */
-.pp-tile--catalog {
-  cursor: default;
-}
-
-.pp-tile--catalog:hover {
-  border-color: var(--line);
-  background: var(--bg-2);
 }
 
 .pp-icon {
@@ -240,11 +187,11 @@ const choose = provider => {
   flex-shrink: 0;
   width: 2rem;
   height: 2rem;
-  border-radius: var(--radius-xs);
+  overflow: hidden;
+  border-radius: var(--radius-control);
   background: var(--bg-0);
   color: var(--ink-2);
-  font-weight: 600;
-  overflow: hidden;
+  font-weight: var(--weight-title);
 }
 
 .pp-icon-img {
@@ -258,88 +205,57 @@ const choose = provider => {
   height: 60%;
 }
 
+.pp-tile-body {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--gap-inline);
+  width: 100%;
+}
+
 .pp-text {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: var(--gap-tight);
   min-width: 0;
+  text-align: left;
 }
 
 .pp-name {
-  font-size: var(--fs-md);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
 }
 
 .pp-desc {
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
+  line-height: 1.4;
   color: var(--ink-2);
-  line-height: 1.4;
-}
-
-.pp-error {
-  font-size: var(--fs-xs);
-  color: var(--err-text);
-  line-height: 1.4;
 }
 
 .pp-on {
-  margin-left: auto;
   flex-shrink: 0;
-  padding: 0.25rem 0.75rem;
-  border: 1px solid var(--focus-edge);
-  border-radius: var(--radius-xs);
-  color: var(--ink);
-  font-size: var(--fs-xs);
-  font-weight: 600;
+  margin-left: auto;
 }
 
 .pp-catalog {
+  margin-top: var(--gap-4);
+  padding-top: var(--gap-4);
   border-top: 1px solid var(--line);
 }
 
 .pp-group {
-  margin: 0;
-  padding: var(--space-xl) var(--space-3xl) 0;
+  margin: 0 0 var(--gap-inline);
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
   color: var(--ink);
 }
 
-.pp-install {
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.pp-install--busy {
-  padding: 0.4rem 1rem;
-  background: transparent;
-  color: var(--ink-3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control);
-  font-size: var(--fs-sm);
-  cursor: progress;
-}
-
+.pp-install,
 .pp-installed {
-  margin-left: auto;
   flex-shrink: 0;
-  color: var(--ok-text);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-}
-
-.pp-empty {
-  margin: 0;
-  padding: 0 1.5rem 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  color: var(--ink-3);
-}
-
-.pp-foot {
-  padding: var(--gap-1);
-  border-top: 1px solid var(--line);
+  margin-left: auto;
 }
 
 .pp-more {
