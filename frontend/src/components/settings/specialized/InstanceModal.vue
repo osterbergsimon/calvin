@@ -219,11 +219,15 @@ const addTitle = computed(() => {
   return declared ? `Add ${declared}` : `Add a ${instanceLabel.value}`;
 });
 
-const namePlaceholder = computed(() =>
-  currentPlugin.value?.instance_label
-    ? `e.g. ${currentPlugin.value.instance_label}`
-    : "e.g. Family photos"
-);
+// A label that just repeats the kind ("calendar") makes a poor example, so a
+// calendar suggests a real name and other kinds drop the placeholder.
+const namePlaceholder = computed(() => {
+  const plugin = currentPlugin.value;
+  if (!plugin?.instance_label) return "e.g. Family photos";
+  if (plugin.type === "calendar") return "e.g. Family";
+  if (plugin.instance_label.toLowerCase() === String(plugin.type || "").toLowerCase()) return "";
+  return `e.g. ${plugin.instance_label}`;
+});
 
 // Config values are bare scalars (the backend normalizes legacy wrappers);
 // this only fills schema defaults for fields the instance hasn't set yet.
@@ -678,6 +682,7 @@ const handleSave = async () => {
 
 .form-input {
   width: 100%;
+  height: var(--control-height);
   padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   color: var(--ink);
@@ -720,10 +725,10 @@ const handleSave = async () => {
 }
 
 .help-text {
-  font-size: var(--fs-control);
+  font-size: var(--text-meta);
   color: var(--ink-2);
-  margin-top: 0.25rem;
-  line-height: 1.4;
+  margin-top: var(--gap-1);
+  line-height: normal;
 }
 
 .error-message {

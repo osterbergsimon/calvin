@@ -27,11 +27,11 @@ const plugin = {
   ui_actions: [{ type: "test" }],
 };
 
-const mountModal = async () => {
+const mountModal = async (pluginOverride = plugin) => {
   const wrapper = mount(InstanceModal, {
     props: { show: false, plugin: null, instance: null },
   });
-  await wrapper.setProps({ plugin, show: true });
+  await wrapper.setProps({ plugin: pluginOverride, show: true });
   await flushPromises();
   return wrapper;
 };
@@ -83,6 +83,24 @@ describe("InstanceModal form", () => {
     expect(toggle.attributes("aria-checked")).toBe("true");
     await toggle.trigger("click");
     expect(toggle.attributes("aria-checked")).toBe("false");
+  });
+
+  it("suggests a real calendar name instead of repeating the kind", async () => {
+    const wrapper = await mountModal();
+
+    expect(wrapper.get("input[placeholder]").attributes("placeholder")).toBe("e.g. Family");
+  });
+
+  it("drops the placeholder when instance_label just repeats the kind", async () => {
+    const wrapper = await mountModal({
+      ...plugin,
+      id: "web-embed",
+      type: "service",
+      instance_label: "service",
+      instance_config_schema: { url: { type: "string", default: "" } },
+    });
+
+    expect(wrapper.get("input").attributes("placeholder") || "").toBe("");
   });
 
   it("renders Test connection as the shared secondary Button", async () => {

@@ -57,6 +57,39 @@ test.describe("phone: Content", () => {
     await expect(modal.getByRole("switch", { name: "Enabled" })).toBeVisible();
     await expect(modal.getByRole("button", { name: "Test connection" })).toBeVisible();
     await expect(modal.locator('input[type="checkbox"]')).toHaveCount(0);
+    await expect(modal.locator('input.form-input[type="text"]').first()).toHaveAttribute(
+      "placeholder",
+      "e.g. Family"
+    );
+
+    // The plugin fields share the modal's type and control rhythm: label
+    // weight/size, input height, and a tight single-line hint.
+    const styles = await page.evaluate(() => {
+      const root = document.querySelector(".instance-modal");
+      const css = element => getComputedStyle(element);
+      const pluginLabel = root.querySelector(".plugin-field label");
+      const nameLabel = root.querySelector(".form-group > label");
+      const pluginInput = root.querySelector(".plugin-field input.form-input");
+      const nameInput = root.querySelector(".form-group input.form-input");
+      const hint = root.querySelector(".plugin-field .help-text");
+      return {
+        pluginLabel: { weight: css(pluginLabel).fontWeight, size: css(pluginLabel).fontSize },
+        nameLabel: { weight: css(nameLabel).fontWeight, size: css(nameLabel).fontSize },
+        pluginHeight: css(pluginInput).height,
+        nameHeight: css(nameInput).height,
+        hintMargin: css(hint).marginTop,
+        hintSize: css(hint).fontSize,
+        hintLineHeight: css(hint).lineHeight,
+      };
+    });
+    expect(styles.pluginLabel).toEqual(styles.nameLabel);
+    expect(styles.pluginHeight).toBe(styles.nameHeight);
+    expect(styles.hintMargin).toBe("4px");
+    const lineHeight =
+      styles.hintLineHeight === "normal"
+        ? 1
+        : parseFloat(styles.hintLineHeight) / parseFloat(styles.hintSize);
+    expect(lineHeight).toBeLessThan(1.4);
 
     await modal.locator('input.form-input[type="text"]').first().fill("Birthdays");
     await modal
