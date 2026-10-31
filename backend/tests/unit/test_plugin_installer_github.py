@@ -221,6 +221,42 @@ class TestPluginEnumeration:
         plugin1 = next(p for p in result["plugins"] if p["id"] == "plugin1")
         assert plugin1["description"] == "First plugin"
 
+    def test_enumerate_carries_catalog_opt_out_and_keywords(
+        self, plugin_installer, mock_repo_with_manifest
+    ):
+        """plugins.json `catalog: false` and `keywords` reach the UI (P2)."""
+        manifest_path = mock_repo_with_manifest / "plugins.json"
+        data = json.loads(manifest_path.read_text())
+        data["plugins"][0].update({"catalog": False, "keywords": ["test", "example"]})
+        # A non-boolean catalog value is not an opt-out.
+        data["plugins"][1]["catalog"] = "false"
+        manifest_path.write_text(json.dumps(data))
+
+        result = plugin_installer.enumerate_plugins_from_repo(mock_repo_with_manifest)
+
+        plugin1 = next(p for p in result["plugins"] if p["id"] == "plugin1")
+        assert plugin1["catalog"] is False
+        assert plugin1["keywords"] == ["test", "example"]
+
+        plugin2 = next(p for p in result["plugins"] if p["id"] == "plugin2")
+        assert plugin2["catalog"] is True
+        assert plugin2["keywords"] == []
+
+    def test_auto_discovery_defaults_entries_into_the_catalog(
+        self, plugin_installer, mock_repo_structure
+    ):
+        """Repos without plugins.json keep every discovered plugin visible."""
+        manifest1_path = mock_repo_structure / "plugin1" / "plugin.json"
+        manifest1 = json.loads(manifest1_path.read_text())
+        manifest1["keywords"] = ["test"]
+        manifest1_path.write_text(json.dumps(manifest1))
+
+        result = plugin_installer.enumerate_plugins_from_repo(mock_repo_structure)
+
+        plugin1 = next(p for p in result["plugins"] if p["id"] == "plugin1")
+        assert plugin1["catalog"] is True
+        assert plugin1["keywords"] == ["test"]
+
     def test_enumerate_plugins_skips_invalid(self, plugin_installer, tmp_path):
         """Test that invalid plugins are skipped during enumeration."""
         repo_root = tmp_path / "repo"
