@@ -46,7 +46,7 @@
   --font-ui: "IBM Plex Sans", system-ui, sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* Switch: a surface-coloured knob in both states (white in light themes,
+  /* Switch: a surface-coloured knob in both states (light in light themes,
      the dark surface in dark ones), so "on" reads as the orange track and the
      knob's position, not as a heavy dark dot. The off track is a visible grey
      in every theme. */
