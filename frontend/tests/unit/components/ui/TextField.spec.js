@@ -22,6 +22,14 @@ describe("TextField", () => {
     expect(w.find("label").attributes("for")).toBe(input.attributes("id"));
   });
 
+  it("can hide the label visually but keep it as the input's name", () => {
+    const w = mount(TextField, { props: { label: "Colour value", hideLabel: true } });
+    const label = w.find("label");
+    expect(label.classes()).toContain("text-field__label--hidden");
+    expect(label.text()).toBe("Colour value");
+    expect(label.attributes("for")).toBe(w.find("input").attributes("id"));
+  });
+
   it("emits the typed value", async () => {
     const w = mount(TextField, { props: { label: "Name" } });
     await w.find("input").setValue("Hall");

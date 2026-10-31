@@ -21,8 +21,8 @@ test.describe("phone: Plugins", () => {
     await selectCategory(page, "Plugins");
 
     const category = page.locator(".plugins-category");
-    await expect(category.locator(".pc-name", { hasText: "ICS calendar" })).toBeVisible();
-    await expect(category.locator(".pc-name", { hasText: "Web page" })).toBeVisible();
+    await expect(category.locator(".list-row__name", { hasText: "ICS calendar" })).toBeVisible();
+    await expect(category.locator(".list-row__name", { hasText: "Web page" })).toBeVisible();
     await expectPhoneLayout(page, "Plugins category");
 
     // Kind filters are a segmented control; each one narrows the list.
@@ -33,6 +33,15 @@ test.describe("phone: Plugins", () => {
         "aria-checked",
         "true"
       );
+      if (kind === "Theme") {
+        // CLV-80 review: a theme that fails its load check is kept but says it
+        // needs an update, not that it can be chosen in Appearance.
+        const theme = category.locator(".pc-card", { hasText: "Midnight" }).first();
+        await expect(theme.locator(".pc-summary")).toHaveText(
+          "Needs an update to work with this Calvin."
+        );
+        await expect(theme.locator(".pc-summary")).not.toContainText("Choose it in");
+      }
       await expectPhoneLayout(page, `Plugins filtered to ${kind}`);
     }
 

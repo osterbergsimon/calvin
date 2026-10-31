@@ -66,6 +66,21 @@ describe("PluginCard source count", () => {
     expect(w.emitted("open-appearance")?.length).toBe(1);
   });
 
+  it("says a theme that needs an update cannot be chosen yet", async () => {
+    const w = mountCard({
+      id: "midnight",
+      name: "Midnight",
+      type: "theme",
+      enabled: true,
+      selectable: false,
+    });
+    expect(normalized(w.find(".pc-summary").text())).toBe(
+      "Needs an update to work with this Calvin."
+    );
+    expect(w.find(".pc-summary .pc-link").exists()).toBe(false);
+    expect(w.emitted("open-appearance")).toBeUndefined();
+  });
+
   it("says a background add-on has no sources", () => {
     const w = mountCard({ id: "imap", name: "IMAP", type: "backend", enabled: true });
     expect(w.find(".pc-summary").text()).toBe("Works in the background. No sources to add.");

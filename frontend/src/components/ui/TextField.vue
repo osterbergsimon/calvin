@@ -1,6 +1,11 @@
 <template>
   <div class="text-field">
-    <label class="text-field__label" :for="fieldId">{{ label }}</label>
+    <label
+      class="text-field__label"
+      :class="{ 'text-field__label--hidden': hideLabel }"
+      :for="fieldId"
+      >{{ label }}</label
+    >
     <input
       :id="fieldId"
       ref="inputEl"
@@ -62,6 +67,9 @@ const props = defineProps({
   autocapitalize: { type: String, default: "off" },
   maxlength: { type: [String, Number], default: undefined },
   hint: { type: String, default: "" },
+  // Keep the label for assistive tech when a visible label already names the
+  // group (e.g. the colour swatch and its hex value share one label).
+  hideLabel: { type: Boolean, default: false },
   error: { type: String, default: "" },
   disabled: { type: Boolean, default: false },
   readonly: { type: Boolean, default: false },
@@ -102,6 +110,17 @@ defineExpose({ focus, select });
   font-size: var(--text-body);
   font-weight: var(--weight-strong);
   color: var(--ink);
+}
+
+.text-field__label--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
 }
 
 .text-field__input {
