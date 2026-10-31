@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 
@@ -44,5 +46,15 @@ describe("KioskStatusHeader", () => {
   it("fails open to Applied when desiredVersion is unknown", () => {
     const w = mountHeader({ appliedVersion: "9f2a", desiredVersion: null });
     expect(w.get("[data-test='hardware-config-status']").text()).toContain("Applied");
+  });
+
+  it("keeps the inline gap between the name and each tag", () => {
+    const source = readFileSync(
+      resolve(__dirname, "../../../src/components/settings/shared/KioskStatusHeader.vue"),
+      "utf-8"
+    );
+    expect(source).toMatch(
+      /\.kiosk-status\s*:deep\(\.inline-note__text\)\s*\{[^}]*gap: var\(--gap-inline\)/s
+    );
   });
 });

@@ -260,6 +260,11 @@ async def migrate_global_room_name() -> None:
         target.overrides = overrides
         await target.update()
         logger.info(f"Moved the global room name onto screen {target.id!r}")
+    else:
+        logger.warning(
+            f"Dropped the global room name {global_name!r}: {len(unnamed)} unnamed screens; "
+            "set it per screen in Settings › Screens"
+        )
 
     for key in _GLOBAL_NAME_KEYS:
         await config_service.delete_value(key)

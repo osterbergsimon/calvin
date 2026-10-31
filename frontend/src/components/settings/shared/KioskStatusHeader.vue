@@ -39,3 +39,14 @@ const config = computed(() => {
   return { tone: "ok", label: "Display settings ✓ Applied" };
 });
 </script>
+
+<style scoped>
+/* The name and each tag sit on one line with the bar's inline gap. They are
+   inside InlineNote's text span, so the gap lives there. */
+.kiosk-status :deep(.inline-note__text) {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-inline);
+}
+</style>

@@ -4,13 +4,6 @@
     <template #list>
       <div data-test="screens-list">
         <SettingsSection id="screens-list" title="Screens">
-          <template #description>
-            <span v-if="kiosks.length === 0" data-test="screens-empty">
-              No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
-              Raspberry Pi installed with the command under “Add a screen”, or any browser that
-              opens the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
-            </span>
-          </template>
           <template #action>
             <Button
               data-test="add-screen-btn"
@@ -20,6 +13,11 @@
               {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
             </Button>
           </template>
+          <InlineNote v-if="kiosks.length === 0" class="screens-empty" data-test="screens-empty">
+            No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
+            Raspberry Pi installed with the command under “Add a screen”, or any browser that opens
+            the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
+          </InlineNote>
           <AddKioskPanel v-if="addOpen" />
           <SettingRow
             v-if="agentKiosks.length > 0"
