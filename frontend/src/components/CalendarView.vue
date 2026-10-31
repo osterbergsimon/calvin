@@ -1426,6 +1426,9 @@ onActivated(() => {
      squeezing the month name away (CLV-91). */
   flex-wrap: wrap;
   flex-shrink: 0;
+  /* The header grows to the height of its wrapped rows; never clip a row. */
+  height: auto;
+  overflow: visible;
   /* Panel body is flush now, so the header carries its own inset — top + sides
      line the month label up with the grid (0.5rem) instead of jamming it into
      the corner; the bottom keeps the gap above the grid. */
@@ -1459,7 +1462,10 @@ onActivated(() => {
   justify-content: flex-end;
   margin-left: auto;
   min-width: 0;
-  flex-shrink: 0;
+  /* Do not hold the row at its max-content width: that is what pushed the last
+     button past the region edge. Let the controls shrink onto their own row so
+     their buttons wrap inside it instead of disappearing (CLV-91). */
+  flex: 0 1 auto;
 }
 
 /* The view-switch's chrome comes from ui/Button; only its caret stays local. */
