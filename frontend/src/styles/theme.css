@@ -46,10 +46,14 @@
   --font-ui: "IBM Plex Sans", system-ui, sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, monospace;
 
-  /* switch knob tokens */
-  --switch-knob: #cdd6dc;
-  /* Knob on the "on" track: the track is --focus, so it takes the tone ink. */
-  --switch-knob-on: var(--focus-ink);
+  /* Switch: a surface-coloured knob in both states (white in light themes,
+     the dark surface in dark ones), so "on" reads as the orange track and the
+     knob's position, not as a heavy dark dot. The off track is a visible grey
+     in every theme. */
+  --switch-track-off: color-mix(in srgb, var(--ink) 28%, var(--bg-1));
+  --switch-knob: var(--bg-1);
+  --switch-knob-on: var(--bg-1);
+  --switch-knob-shadow: 0 1px 2px var(--shadow-hover);
 
   /* ------------------------------------------------------------------ *
    * UI sizing tokens. See docs/design/2026-07-04-ui-sizing-tokens.md.
