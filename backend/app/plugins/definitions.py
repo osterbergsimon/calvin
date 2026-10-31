@@ -7,8 +7,10 @@ instantiation, config normalization, config-update handling — is derived from
 this model. There are no registration hooks.
 """
 
+import re
 from typing import Any
 
+from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.plugins.base import PluginType
@@ -40,6 +42,12 @@ SUPPORTED_STATUSBAR_KINDS = {"status"}
 # shipped .vue components). Rejected loudly so straddlers fail at load, not at
 # render.
 _LEGACY_DISPLAY_KEYS = {"type", "api_endpoint", "render_template", "component", "data_schema"}
+
+# `mdi:<name>` tile icons (design 2026-10-31-plugin-copy P1). The host resolves
+# the name from its curated frontend map; the backend only pins the shape here.
+# A malformed entry is a load-time warning, never a crash: the UI falls back to
+# the plugin name's first letter, exactly like an unknown name.
+_MDI_ICON_PATTERN = re.compile(r"^mdi:[a-z0-9-]+$")
 
 
 def _validate_schema_kind(
@@ -191,6 +199,31 @@ class PluginMetadata(BaseModel):
             allowed_kinds=SUPPORTED_STATUSBAR_KINDS,
             check_panel_variant=False,
         )
+
+    @field_validator("icon")
+    @classmethod
+    def validate_icon(cls, value: str | None) -> str | None:
+        """Warn (do not fail) on a malformed `mdi:` tile icon.
+
+        `icon` is an optional contract addition, so an emoji, a file path, or an
+        unknown-but-well-formed `mdi:<name>` all load unchanged. Only the shape
+        of the `mdi:` form is checked here; the curated name list lives in the
+        frontend, which falls back to the first letter for anything it cannot
+        resolve.
+        """
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("icon must be a string")
+        icon = value.strip()
+        if icon.lower().startswith("mdi:") and not _MDI_ICON_PATTERN.match(icon):
+            logger.warning(
+                "PluginMetadata.icon {!r} is not a valid mdi icon; expected "
+                "'mdi:<name>' with lowercase letters, digits or hyphens. "
+                "The UI will fall back to the plugin name's first letter.",
+                value,
+            )
+        return value
 
     @field_validator("browser_origins")
     @classmethod
