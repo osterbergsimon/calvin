@@ -11,13 +11,6 @@ export const roleLint = {
     "components/PluginFieldRenderer.vue",
     "components/PluginSections.vue",
     "components/plugins/SchemaRenderer.vue",
-    "components/plugins/WebComponentHost.vue",
-    "components/plugins/renderers/CardGrid.vue",
-    "components/plugins/renderers/IframeRenderer.vue",
-    "components/plugins/renderers/ImageWithCaption.vue",
-    "components/plugins/renderers/ItemList.vue",
-    "components/plugins/renderers/StatusRenderer.vue",
-    "components/plugins/renderers/WeatherForecast.vue",
     "components/settings/specialized/OrderingManager.vue",
   ],
   baseline: [
@@ -49,7 +42,6 @@ export const controlLint = {
     "components/PluginActions.vue",
     "components/PluginFieldRenderer.vue",
     "components/PluginSections.vue",
-    "components/plugins/renderers/IframeRenderer.vue",
   ],
   baseline: [
     "components/PluginActions.vue",
