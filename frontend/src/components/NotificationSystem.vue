@@ -252,15 +252,15 @@ defineExpose({
 <style scoped>
 .hud {
   position: fixed;
-  z-index: 9999;
+  z-index: var(--z-toast);
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 0.8rem 0.5rem 0.65rem;
+  gap: var(--gap-3);
+  padding: var(--gap-2) var(--gap-3);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--ink) 18%, transparent);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elev-1);
   pointer-events: none;
   user-select: none;
   max-width: min(90vw, 22rem);
@@ -302,12 +302,12 @@ defineExpose({
   padding: 0 0.4rem;
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--text-body);
+  font-weight: var(--weight-title);
   color: var(--ink);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
 }
 
 .hud__glyph {
@@ -319,8 +319,8 @@ defineExpose({
 
 .hud__label {
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
@@ -329,32 +329,32 @@ defineExpose({
 
 /* Larger, calmer variant when the mode HUD holds centre-screen. */
 .hud--normal {
-  padding: 0.65rem 1rem 0.65rem 0.8rem;
-  gap: 0.75rem;
+  padding: var(--gap-3) var(--gap-4);
+  gap: var(--gap-3);
 }
 .hud--normal .hud__keycap {
   min-width: 2.4rem;
   height: 2.4rem;
-  font-size: var(--fs-lg);
+  font-size: var(--text-title);
 }
 .hud--normal .hud__glyph {
   width: 2rem;
   height: 2rem;
 }
 .hud--normal .hud__label {
-  font-size: var(--fs-lg);
+  font-size: var(--text-title);
 }
 
 /* Motion */
 .hud-enter-active {
   transition:
-    opacity 0.25s ease-out,
-    transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+    opacity var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
 }
 .hud-leave-active {
   transition:
-    opacity 0.2s ease-in,
-    transform 0.2s ease-in;
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .hud--center.hud-enter-from,
 .hud--center.hud-leave-to {

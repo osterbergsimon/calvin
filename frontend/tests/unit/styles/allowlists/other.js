@@ -7,8 +7,6 @@
 
 export const roleLint = {
   allowlist: [
-    "components/ConnectionStatus.vue",
-    "components/NotificationSystem.vue",
     "components/PerimeterProgress.vue",
     "components/StatusRail.vue",
     "components/settings/categories/ThisBrowserSettings.vue",
@@ -34,8 +32,6 @@ export const roleLint = {
     "views/Settings.vue",
   ],
   baseline: [
-    "components/ConnectionStatus.vue",
-    "components/NotificationSystem.vue",
     "components/PerimeterProgress.vue",
     "components/StatusRail.vue",
     "components/settings/categories/ThisBrowserSettings.vue",
