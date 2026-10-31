@@ -1,14 +1,16 @@
 <template>
-  <button
+  <IconButton
     v-if="visible"
     class="hot-corner"
     :class="`hot-corner--${position}`"
-    :style="{ '--rest-opacity': restOpacity, '--hot-corner-size': `${size}px` }"
-    type="button"
+    variant="ghost"
+    size="custom"
+    label="Show controls"
     title="Show controls (press and hold)"
-    aria-label="Show controls"
+    :style="cornerStyle"
     @click="configStore.showUITemporarily(60)"
   >
+    <span class="hot-corner__scrim" aria-hidden="true" />
     <svg class="hot-corner__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
       <path
         d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"
@@ -19,13 +21,14 @@
       />
       <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
     </svg>
-  </button>
+  </IconButton>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 import { normalizeHotCornerPosition, HOT_CORNER_DEFAULTS } from "../utils/hotCorner";
+import IconButton from "./ui/IconButton.vue";
 
 const configStore = useConfigStore();
 
@@ -47,25 +50,31 @@ const restOpacity = computed(() => {
   const v = Number(configStore.hotCornerOpacity);
   return Math.max(0, Math.min(1, (Number.isFinite(v) ? v : HOT_CORNER_DEFAULTS.opacity) / 100));
 });
+
+// Geometry of its own (size, rest opacity) is a component token; the button
+// chrome itself comes from ui/IconButton.
+const cornerStyle = computed(() => ({
+  "--hot-corner-size": `${size.value}px`,
+  "--icon-size": `${size.value}px`,
+  "--rest-opacity": restOpacity.value,
+}));
 </script>
 
 <style scoped>
 /* A deliberate reveal affordance tucked into a screen corner: a subtle hint
    that stays unobtrusive over content (calendar/photos). It never captures
    pointer events — short taps fall through to content; a press-and-hold in the
-   corner is what reveals the UI. The dark glass keeps the icon legible over any
-   background. Rest opacity + size are user-set. */
+   corner is what reveals the UI. The dark glass scrim keeps the icon legible
+   over any background. Rest opacity + size are user-set. */
 .hot-corner {
   position: fixed;
-  z-index: 1001; /* above the clock (1000) */
+  z-index: calc(var(--z-dialog) + 1); /* above the clock (--z-sticky) */
   width: var(--hot-corner-size, 64px);
   height: var(--hot-corner-size, 64px);
-  display: flex;
-  border: 0;
   color: var(--on-scrim);
   pointer-events: none; /* never intercept content taps; reveal is a long-press */
   opacity: var(--rest-opacity, 0.55);
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur) var(--ease);
   -webkit-tap-highlight-color: transparent;
 }
 /* Keyboard users can still Tab to the button and reveal with Enter (pointer-events
@@ -73,9 +82,15 @@ const restOpacity = computed(() => {
 .hot-corner:focus-visible {
   opacity: 1;
   pointer-events: auto;
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
 }
+
+/* Readability scrim: hugs the screen corner, never the button's box chrome. */
+.hot-corner__scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .hot-corner__icon {
   width: calc(var(--hot-corner-size, 64px) * 0.34);
   height: calc(var(--hot-corner-size, 64px) * 0.34);
@@ -89,6 +104,8 @@ const restOpacity = computed(() => {
   align-items: flex-end;
   justify-content: flex-start;
   padding: 0 0 calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19);
+}
+.hot-corner--bottom-left .hot-corner__scrim {
   border-top-right-radius: calc(var(--hot-corner-size, 64px) * 0.28);
   background: linear-gradient(
     135deg,
@@ -102,6 +119,8 @@ const restOpacity = computed(() => {
   align-items: flex-end;
   justify-content: flex-end;
   padding: 0 calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19) 0;
+}
+.hot-corner--bottom-right .hot-corner__scrim {
   border-top-left-radius: calc(var(--hot-corner-size, 64px) * 0.28);
   background: linear-gradient(
     225deg,
@@ -115,6 +134,8 @@ const restOpacity = computed(() => {
   align-items: flex-start;
   justify-content: flex-start;
   padding: calc(var(--hot-corner-size, 64px) * 0.19) 0 0 calc(var(--hot-corner-size, 64px) * 0.19);
+}
+.hot-corner--top-left .hot-corner__scrim {
   border-bottom-right-radius: calc(var(--hot-corner-size, 64px) * 0.28);
   background: linear-gradient(
     45deg,
@@ -128,6 +149,8 @@ const restOpacity = computed(() => {
   align-items: flex-start;
   justify-content: flex-end;
   padding: calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19) 0 0;
+}
+.hot-corner--top-right .hot-corner__scrim {
   border-bottom-left-radius: calc(var(--hot-corner-size, 64px) * 0.28);
   background: linear-gradient(
     315deg,

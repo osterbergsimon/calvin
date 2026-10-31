@@ -10,10 +10,12 @@ function mountOptions(view) {
   const w = mount(ServiceRegionViewOptions, {
     attachTo: document.body,
     props: { regionId: "svc-1", view },
+    global: { stubs: { teleport: true } },
   });
   return { w, cfg };
 }
 const open = w => w.find(".region-view-options__trigger").trigger("click");
+const optionByText = (w, text) => w.findAll('.svo-seg [role="radio"]').find(o => o.text() === text);
 
 describe("ServiceRegionViewOptions", () => {
   beforeEach(() => setActivePinia(createPinia()));
@@ -28,7 +30,7 @@ describe("ServiceRegionViewOptions", () => {
   it("selecting In-app persists linkAction=embed", async () => {
     const { w, cfg } = mountOptions({});
     await open(w);
-    await w.find('.svo-seg [aria-label="Link behavior embed"]').trigger("click");
+    await optionByText(w, "In-app").trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("svc-1", { linkAction: "embed" });
     w.unmount();
   });
@@ -36,7 +38,7 @@ describe("ServiceRegionViewOptions", () => {
   it("selecting Default clears the override", async () => {
     const { w, cfg } = mountOptions({ linkAction: "embed" });
     await open(w);
-    await w.find('.svo-seg [aria-label="Link behavior default"]').trigger("click");
+    await optionByText(w, "Default").trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("svc-1", { linkAction: undefined });
     w.unmount();
   });
@@ -54,6 +56,7 @@ describe("ServiceRegionViewOptions", () => {
     const w = mount(ServiceRegionViewOptions, {
       attachTo: document.body,
       props: { regionId: "r1", view: {} },
+      global: { stubs: { teleport: true } },
     });
     await w.find(".region-view-options__trigger").trigger("click");
     await w.find('[data-action="refresh-now"]').trigger("click");

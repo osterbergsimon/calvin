@@ -43,6 +43,6 @@ export async function openSettingsFromDashboard(page) {
   const more = page.getByRole("button", { name: "More controls" });
   await expect(more).toBeVisible();
   await more.click();
-  await page.locator('[data-admin="settings"]').click();
+  await page.getByRole("menuitem", { name: "Settings" }).click();
   await expect(page.locator(".settings-page")).toBeVisible();
 }

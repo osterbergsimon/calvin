@@ -1,11 +1,34 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 
 vi.mock("vue-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import AdminOverflow from "@/components/dashboard/AdminOverflow.vue";
 import { useConfigStore } from "@/stores/config";
+
+const panel = () => document.querySelector(".popover__panel");
+const menuItems = () =>
+  Array.from(document.querySelectorAll(".menu [role='menuitem']")).map(item =>
+    item.textContent.trim()
+  );
+const itemByText = text =>
+  Array.from(document.querySelectorAll(".menu [role='menuitem']")).find(
+    item => item.textContent.trim() === text
+  );
+
+const mountedWrappers = [];
+
+const mountOverflow = () => {
+  const wrapper = mount(AdminOverflow, { attachTo: document.body });
+  mountedWrappers.push(wrapper);
+  return wrapper;
+};
+
+const openMenu = async wrapper => {
+  await wrapper.get(".admin-overflow__trigger").trigger("click");
+  await flushPromises();
+};
 
 describe("AdminOverflow", () => {
   beforeEach(() => {
@@ -14,24 +37,29 @@ describe("AdminOverflow", () => {
     store.showUI = true;
   });
 
+  afterEach(() => {
+    while (mountedWrappers.length) mountedWrappers.pop().unmount();
+    document.body.innerHTML = "";
+  });
+
   it("popover is closed initially and opens on trigger click", async () => {
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    expect(w.find(".admin-overflow__menu").exists()).toBe(false);
-    await w.get(".admin-overflow__trigger").trigger("click");
-    expect(w.find(".admin-overflow__menu").exists()).toBe(true);
+    const w = mountOverflow();
+    expect(panel()).toBeNull();
+    await openMenu(w);
+    expect(panel()).not.toBeNull();
+    expect(panel().getAttribute("role")).toBe("menu");
     w.unmount();
   });
 
   it("offers only Settings + Hide controls; legacy mode/side-view/orientation items are gone (calvin-ayr, calvin-7nm)", async () => {
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    await w.get(".admin-overflow__trigger").trigger("click");
-    expect(w.find('[data-admin="settings"]').exists()).toBe(true);
-    expect(w.find('[data-admin="hide-ui"]').exists()).toBe(true);
-    expect(w.get('[data-admin="hide-ui"]').text()).toBe("Hide controls");
+    const w = mountOverflow();
+    await openMenu(w);
+    expect(menuItems()).toContain("Settings");
+    expect(menuItems()).toContain("Hide controls");
     // these are no-ops / belong in Display settings now — removed from the ⋯ menu
-    expect(w.find('[data-admin="mode"]').exists()).toBe(false);
-    expect(w.find('[data-admin="side-view"]').exists()).toBe(false);
-    expect(w.find('[data-admin="orientation"]').exists()).toBe(false);
+    expect(menuItems()).not.toContain("Mode");
+    expect(menuItems()).not.toContain("Side view");
+    expect(menuItems()).not.toContain("Orientation");
     w.unmount();
   });
 
@@ -39,11 +67,12 @@ describe("AdminOverflow", () => {
     const store = useConfigStore();
     store.hotCornerPosition = "top-right";
     const spy = vi.spyOn(store, "toggleUI").mockResolvedValue();
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    await w.get(".admin-overflow__trigger").trigger("click");
-    await w.get('[data-admin="hide-ui"]').trigger("click");
+    const w = mountOverflow();
+    await openMenu(w);
+    itemByText("Hide controls").click();
+    await flushPromises();
 
-    expect(w.find(".admin-overflow__menu").exists()).toBe(false);
+    expect(panel()).toBeNull();
     expect(spy).not.toHaveBeenCalled();
     const text = document.body.textContent;
     expect(text).toContain("every screen");
@@ -54,18 +83,20 @@ describe("AdminOverflow", () => {
   it("confirming the dialog hides the controls; cancelling does not", async () => {
     const store = useConfigStore();
     const spy = vi.spyOn(store, "toggleUI").mockResolvedValue();
-    const w = mount(AdminOverflow, { attachTo: document.body });
+    const w = mountOverflow();
     const modal = () => w.findComponent({ name: "ConfirmModal" });
 
-    await w.get(".admin-overflow__trigger").trigger("click");
-    await w.get('[data-admin="hide-ui"]').trigger("click");
+    await openMenu(w);
+    itemByText("Hide controls").click();
+    await flushPromises();
     modal().vm.$emit("cancel");
     await w.vm.$nextTick();
     expect(spy).not.toHaveBeenCalled();
     expect(modal().props("show")).toBe(false);
 
-    await w.get(".admin-overflow__trigger").trigger("click");
-    await w.get('[data-admin="hide-ui"]').trigger("click");
+    await openMenu(w);
+    itemByText("Hide controls").click();
+    await flushPromises();
     modal().vm.$emit("confirm");
     expect(spy).toHaveBeenCalledTimes(1);
     w.unmount();
@@ -91,14 +122,13 @@ describe("AdminOverflow", () => {
       ],
     };
     const spy = vi.spyOn(store, "toggleRegionsLock").mockResolvedValue();
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    await w.get(".admin-overflow__trigger").trigger("click");
-    const item = w.find('[data-admin="lock-layout"]');
-    expect(item.exists()).toBe(true);
-    expect(item.text()).toBe("Unlock layout");
-    await item.trigger("click");
+    const w = mountOverflow();
+    await openMenu(w);
+    expect(menuItems()).toContain("Unlock layout");
+    itemByText("Unlock layout").click();
+    await flushPromises();
     expect(spy).toHaveBeenCalled();
-    expect(w.find(".admin-overflow__menu").exists()).toBe(false);
+    expect(panel()).toBeNull();
     w.unmount();
   });
 
@@ -117,23 +147,24 @@ describe("AdminOverflow", () => {
         },
       ],
     };
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    await w.get(".admin-overflow__trigger").trigger("click");
-    expect(w.find('[data-admin="lock-layout"]').exists()).toBe(false);
+    const w = mountOverflow();
+    await openMenu(w);
+    expect(menuItems()).not.toContain("Unlock layout");
     w.unmount();
   });
 
   it("Escape closes the popover", async () => {
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    await w.get(".admin-overflow__trigger").trigger("click");
-    await w.get(".admin-overflow__trigger").trigger("keydown", { key: "Escape" });
-    expect(w.find(".admin-overflow__menu").exists()).toBe(false);
+    const w = mountOverflow();
+    await openMenu(w);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await flushPromises();
+    expect(panel()).toBeNull();
     w.unmount();
   });
 
-  it("opens upward + left-anchored for a bottom-left trigger (vertical bar) so it stays on-screen (calvin-37g)", async () => {
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    const trigger = w.get(".admin-overflow__trigger");
+  it("opens upward for a bottom-left trigger (vertical bar) so it stays on-screen (calvin-37g)", async () => {
+    const w = mountOverflow();
+    const trigger = w.get(".popover");
     trigger.element.getBoundingClientRect = () => ({
       top: window.innerHeight - 50,
       left: 8,
@@ -142,16 +173,16 @@ describe("AdminOverflow", () => {
       bottom: window.innerHeight - 4,
       right: 54,
     });
-    await trigger.trigger("click");
-    const menu = w.get(".admin-overflow__menu");
-    expect(menu.classes()).toContain("admin-overflow__menu--up");
-    expect(menu.classes()).toContain("admin-overflow__menu--left");
+    await openMenu(w);
+    expect(panel().classList).toContain("popover__panel--above");
+    expect(panel().style.bottom).not.toBe("");
+    expect(panel().style.top).toBe("");
     w.unmount();
   });
 
-  it("opens down/right (default) for a top-right trigger (horizontal bar)", async () => {
-    const w = mount(AdminOverflow, { attachTo: document.body });
-    const trigger = w.get(".admin-overflow__trigger");
+  it("opens down for a top-right trigger (horizontal bar)", async () => {
+    const w = mountOverflow();
+    const trigger = w.get(".popover");
     trigger.element.getBoundingClientRect = () => ({
       top: 8,
       left: window.innerWidth - 60,
@@ -160,10 +191,10 @@ describe("AdminOverflow", () => {
       bottom: 54,
       right: window.innerWidth - 14,
     });
-    await trigger.trigger("click");
-    const menu = w.get(".admin-overflow__menu");
-    expect(menu.classes()).not.toContain("admin-overflow__menu--up");
-    expect(menu.classes()).not.toContain("admin-overflow__menu--left");
+    await openMenu(w);
+    expect(panel().classList).not.toContain("popover__panel--above");
+    expect(panel().style.top).not.toBe("");
+    expect(panel().style.bottom).toBe("");
     w.unmount();
   });
 });

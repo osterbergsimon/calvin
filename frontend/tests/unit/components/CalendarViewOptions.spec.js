@@ -10,6 +10,7 @@ function mountOptions(view) {
   const w = mount(CalendarViewOptions, {
     attachTo: document.body,
     props: { regionId: "r1", view },
+    global: { stubs: { teleport: true } },
   });
   return { w, cfg };
 }
@@ -31,8 +32,8 @@ describe("CalendarViewOptions", () => {
     const { w, cfg } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await openPopover(w);
     expect(w.find(".cvo-label").text()).toBe("Extra weeks");
-    expect(w.find(".cvo-count-value").text()).toBe("0");
-    await w.find('[aria-label="Increase count"]').trigger("click");
+    expect(w.find(".cvo-count .stepper__value").text()).toBe("0");
+    await w.find('[data-step="inc"]').trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { extraWeeks: 1 });
     w.unmount();
   });
@@ -40,7 +41,7 @@ describe("CalendarViewOptions", () => {
   it("does not step extra weeks below zero", async () => {
     const { w, cfg } = mountOptions({ mode: "month", rolling: false, weeks: 4, days: 7 });
     await openPopover(w);
-    await w.find('[aria-label="Decrease count"]').trigger("click");
+    await w.find('[data-step="dec"]').trigger("click");
     expect(cfg.updateRegionView).not.toHaveBeenCalled();
     w.unmount();
   });
@@ -49,7 +50,7 @@ describe("CalendarViewOptions", () => {
     const { w, cfg } = mountOptions({ mode: "month", rolling: true, weeks: 4, days: 7 });
     await openPopover(w);
     expect(w.find(".cvo-label").text()).toBe("Weeks");
-    await w.find('[aria-label="Increase count"]').trigger("click");
+    await w.find('[data-step="inc"]').trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { weeks: 5 });
     w.unmount();
   });
@@ -64,7 +65,7 @@ describe("CalendarViewOptions", () => {
   it("does not step above the max", async () => {
     const { w, cfg } = mountOptions({ mode: "week", rolling: true, weeks: 4, days: 14 });
     await openPopover(w);
-    await w.find('[aria-label="Increase count"]').trigger("click");
+    await w.find('[data-step="inc"]').trigger("click");
     expect(cfg.updateRegionView).not.toHaveBeenCalled();
     w.unmount();
   });

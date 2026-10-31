@@ -2,7 +2,7 @@
   <button
     :type="type"
     class="btn"
-    :class="[`btn--${variant}`, `btn--${size}`, { 'btn--icon-only': iconOnly }]"
+    :class="[`btn--${variant}`, `btn--${size}`, `btn--${shape}`, { 'btn--icon-only': iconOnly }]"
     :disabled="disabled || loading"
     :aria-busy="loading ? 'true' : undefined"
     :aria-label="label || undefined"
@@ -44,6 +44,13 @@ defineProps({
     default: "button",
     validator: value => ["button", "submit", "reset"].includes(value),
   },
+  // `pill` is for a status-shaped control (the connection pill); everything
+  // else is the standard --radius-control rectangle.
+  shape: {
+    type: String,
+    default: "default",
+    validator: value => ["default", "pill"].includes(value),
+  },
   disabled: { type: Boolean, default: false },
   // Loading disables the control and marks it aria-busy. Pass the verb + "…"
   // as loadingLabel ("Saving…"); the doctrine has no spinner inside a control.
@@ -78,6 +85,10 @@ defineProps({
     background var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
+}
+
+.btn--pill {
+  border-radius: var(--radius-round);
 }
 
 .btn--md {

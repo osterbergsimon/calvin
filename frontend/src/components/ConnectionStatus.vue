@@ -1,7 +1,6 @@
 <template>
   <div
     v-if="visible"
-    ref="rootEl"
     class="connection-status"
     :class="[
       {
@@ -12,27 +11,75 @@
     ]"
     data-test="connection-status"
   >
-    <button
+    <Popover
       v-if="hasPill"
-      ref="pillEl"
-      type="button"
-      class="connection-status__pill"
-      :aria-label="compact ? pillText : null"
-      aria-haspopup="dialog"
-      :aria-expanded="open ? 'true' : 'false'"
-      data-test="connection-pill"
-      @click="togglePopover"
+      v-model="open"
+      :label="popoverTitle"
+      role="dialog"
+      initial-focus="[data-test='connection-try-now']"
+      @close="open = false"
     >
-      <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path :d="iconPath" />
-      </svg>
-      <span v-if="!compact" class="connection-status__text"
-        >{{ pillBaseText
-        }}<span v-if="dataFrom" class="connection-status__from">
-          · data from {{ dataFrom }}</span
-        ></span
-      >
-    </button>
+      <template #trigger="{ attrs }">
+        <Button
+          v-if="!compact"
+          variant="secondary"
+          size="sm"
+          shape="pill"
+          data-test="connection-pill"
+          v-bind="attrs"
+        >
+          <template #icon>
+            <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path :d="iconPath" />
+            </svg>
+          </template>
+          <span class="connection-status__text"
+            >{{ pillBaseText
+            }}<span v-if="dataFrom" class="connection-status__from">
+              · data from {{ dataFrom }}</span
+            ></span
+          >
+        </Button>
+        <IconButton
+          v-else
+          variant="ghost"
+          size="sm"
+          shape="circle"
+          :label="pillText"
+          data-test="connection-pill"
+          v-bind="attrs"
+        >
+          <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path :d="iconPath" />
+          </svg>
+        </IconButton>
+      </template>
+
+      <div class="connection-popover" data-test="connection-popover">
+        <h2 id="connection-popover-title" class="connection-popover__title">{{ popoverTitle }}</h2>
+        <p>{{ popoverDataLine }}</p>
+        <p v-if="status === 'unreachable'">
+          Check that the Calvin server is on and that this screen is on the same network.
+        </p>
+        <p v-else>It isn't connected to the network. Check its Wi-Fi or cable.</p>
+        <Button
+          variant="secondary"
+          data-test="connection-try-now"
+          :disabled="trying"
+          @click="tryNow"
+        >
+          {{ trying ? "Checking…" : "Try now" }}
+        </Button>
+        <InlineNote
+          v-if="tryFailed"
+          class="connection-popover__result"
+          tone="err"
+          data-test="connection-try-failed"
+        >
+          Still can't reach it.
+        </InlineNote>
+      </div>
+    </Popover>
     <span
       v-else-if="showConnecting"
       class="connection-status__connecting"
@@ -53,47 +100,19 @@
     <span class="connection-status__announce" role="status" aria-live="polite">{{
       announcement
     }}</span>
-
-    <Teleport to="body">
-      <div
-        v-if="open && hasPill"
-        ref="popoverEl"
-        class="connection-popover"
-        :style="popoverStyle"
-        role="dialog"
-        aria-labelledby="connection-popover-title"
-        data-test="connection-popover"
-      >
-        <h2 id="connection-popover-title" class="connection-popover__title">{{ popoverTitle }}</h2>
-        <p>{{ popoverDataLine }}</p>
-        <p v-if="status === 'unreachable'">
-          Check that the Calvin server is on and that this screen is on the same network.
-        </p>
-        <p v-else>It isn't connected to the network. Check its Wi-Fi or cable.</p>
-        <button
-          ref="tryButtonEl"
-          type="button"
-          class="connection-popover__try"
-          data-test="connection-try-now"
-          :disabled="trying"
-          @click="tryNow"
-        >
-          {{ trying ? "Checking…" : "Try now" }}
-        </button>
-        <p v-if="tryFailed" class="connection-popover__result" data-test="connection-try-failed">
-          Still can't reach it.
-        </p>
-      </div>
-    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { mdiCloudOffOutline, mdiLanDisconnect } from "@mdi/js";
 import { useConfigStore } from "../stores/config";
 import { useConnectionStore } from "../stores/connection";
 import { formatDataFrom } from "../utils/connectionTime";
+import Button from "./ui/Button.vue";
+import IconButton from "./ui/IconButton.vue";
+import InlineNote from "./ui/InlineNote.vue";
+import Popover from "./ui/Popover.vue";
 
 /**
  * The dashboard's single connection indicator (CLV-48).
@@ -121,16 +140,10 @@ const STARTING_DELAY_MS = 5000;
 const configStore = useConfigStore();
 const connectionStore = useConnectionStore();
 
-const rootEl = ref(null);
-const pillEl = ref(null);
-const popoverEl = ref(null);
-const tryButtonEl = ref(null);
-
 const open = ref(false);
 const trying = ref(false);
 const tryFailed = ref(false);
 const startingElapsed = ref(false);
-const popoverStyle = ref({});
 
 let startingTimer = null;
 
@@ -189,6 +202,10 @@ const announcement = computed(() => {
   return "";
 });
 
+const closePopover = () => {
+  open.value = false;
+};
+
 watch(
   status,
   value => {
@@ -205,78 +222,6 @@ watch(
   { immediate: true }
 );
 
-const updatePopoverPosition = () => {
-  const pill = pillEl.value;
-  const popover = popoverEl.value;
-  if (!pill) return;
-  const rect = pill.getBoundingClientRect();
-  const width = popover?.offsetWidth || 320;
-  const height = popover?.offsetHeight || 200;
-  const margin = 8;
-
-  let top = rect.bottom + margin;
-  if (top + height > window.innerHeight - margin) {
-    top = Math.max(margin, rect.top - margin - height);
-  }
-  let left = rect.left;
-  if (left + width > window.innerWidth - margin) {
-    left = window.innerWidth - margin - width;
-  }
-  left = Math.max(margin, left);
-
-  popoverStyle.value = { top: `${top}px`, left: `${left}px` };
-};
-
-const onDocumentPointerDown = event => {
-  if (!open.value) return;
-  const target = event.target;
-  if (rootEl.value?.contains(target) || popoverEl.value?.contains(target)) return;
-  closePopover();
-};
-
-const onDocumentKeyDown = event => {
-  if (event.key === "Escape" && open.value) closePopover();
-};
-
-const addDocumentListeners = () => {
-  document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("keydown", onDocumentKeyDown);
-  window.addEventListener("resize", updatePopoverPosition);
-  window.addEventListener("scroll", updatePopoverPosition, true);
-};
-
-const removeDocumentListeners = () => {
-  document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("keydown", onDocumentKeyDown);
-  window.removeEventListener("resize", updatePopoverPosition);
-  window.removeEventListener("scroll", updatePopoverPosition, true);
-};
-
-const openPopover = async () => {
-  open.value = true;
-  tryFailed.value = false;
-  addDocumentListeners();
-  await nextTick();
-  updatePopoverPosition();
-  tryButtonEl.value?.focus?.();
-};
-
-const closePopover = () => {
-  if (!open.value) return;
-  const focusWasInside =
-    document.activeElement === document.body ||
-    popoverEl.value?.contains(document.activeElement) ||
-    rootEl.value?.contains(document.activeElement);
-  open.value = false;
-  removeDocumentListeners();
-  if (focusWasInside) pillEl.value?.focus?.();
-};
-
-const togglePopover = () => {
-  if (open.value) closePopover();
-  else openPopover();
-};
-
 const tryNow = async () => {
   trying.value = true;
   tryFailed.value = false;
@@ -288,7 +233,6 @@ const tryNow = async () => {
 
 onUnmounted(() => {
   clearTimeout(startingTimer);
-  removeDocumentListeners();
 });
 </script>
 
@@ -297,29 +241,16 @@ onUnmounted(() => {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--gap-1);
   min-width: 0;
 }
 
-.connection-status__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  color: var(--ink);
-  white-space: nowrap;
-  background: var(--bg-1);
-  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line));
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-
-.connection-status__pill:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/* The status glyph keeps the warn tone; the button chrome comes from ui/. */
+.connection-status__icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  fill: var(--warn);
 }
 
 /* On a phone-width clock bar the age of the data is the first thing that does
@@ -330,36 +261,23 @@ onUnmounted(() => {
   }
 }
 
-.connection-status__icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  fill: var(--warn);
-}
-
 .connection-status__connecting {
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--text-body);
   color: var(--ink-2);
   white-space: nowrap;
 }
 
 .connection-status__connected {
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--text-body);
   color: var(--ok-text);
   white-space: nowrap;
 }
 
-/* Vertical clock bar: a 28px pill with the icon only, time underneath. */
-.connection-status--compact .connection-status__pill {
-  height: 28px;
-  padding: 0 8px;
-}
-
 .connection-status__compact-time {
   font-family: var(--font-data);
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-2);
   white-space: nowrap;
 }
@@ -367,13 +285,13 @@ onUnmounted(() => {
 /* Floating fallback when no clock bar is visible: status, not chrome. */
 .connection-status--floating {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
-  z-index: 1003;
+  left: var(--gap-4);
+  bottom: var(--gap-4);
+  z-index: calc(var(--z-dialog) + 3);
 }
 
 .connection-status--floating.connection-status--top-left {
-  top: 16px;
+  top: var(--gap-4);
   bottom: auto;
 }
 
@@ -389,52 +307,29 @@ onUnmounted(() => {
   border: 0;
 }
 
+/* The floating shell (surface, border, radius, elevation, placement, Escape
+   and outside close) comes from ui/Popover; this is the panel's inset. */
 .connection-popover {
-  position: fixed;
-  z-index: 2100;
   width: 20rem;
-  padding: 16px;
-  color: var(--ink);
+  padding: var(--gap-4);
   text-align: left;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 18px 50px -16px var(--shadow-hover);
 }
 
 .connection-popover__title {
-  margin: 0 0 8px;
+  margin: 0 0 var(--gap-2);
   font-family: var(--font-ui);
-  font-size: var(--fs-base);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
 }
 
 .connection-popover p {
-  margin: 0 0 10px;
-  font-size: var(--fs-sm);
+  margin: 0 0 var(--gap-3);
+  font-size: var(--text-body);
   line-height: 1.4;
   color: var(--ink-2);
 }
 
-.connection-popover__try {
-  min-height: 44px;
-  padding: 0 16px;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.connection-popover__try:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .connection-popover__result {
-  margin: 10px 0 0 !important;
+  margin-top: var(--gap-3);
 }
 </style>
