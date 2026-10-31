@@ -198,6 +198,9 @@ const themePlugin = {
   type: "theme",
   version: "1.0.0",
   enabled: true,
+  // A theme kept on disk but failing its load check: the card must say it
+  // needs an update instead of pointing at Dashboard › Appearance (CLV-80).
+  selectable: false,
   description: "A dark theme",
   display_schema: null,
 };

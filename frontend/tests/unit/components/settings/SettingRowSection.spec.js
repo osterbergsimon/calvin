@@ -23,6 +23,15 @@ describe("SettingRow + SettingsSection", () => {
     });
     expect(stacked.find(".setting-row").classes()).toContain("setting-row--stacked");
   });
+  it("SettingRow drops the panel inset when it sits in a dialog body", () => {
+    const w = mount(SettingRow, {
+      props: { label: "A", flush: true },
+      slots: { default: "<i>c</i>" },
+    });
+    const row = w.find(".setting-row");
+    expect(row.classes()).toContain("setting-row--flush");
+    expect(row.classes()).not.toContain("setting-row--stacked");
+  });
   it("SettingsSection renders an eyebrow title and exposes its id", () => {
     const w = mount(SettingsSection, {
       props: { id: "layout", title: "Layout" },
