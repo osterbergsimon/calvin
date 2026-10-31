@@ -14,13 +14,11 @@
       @remove="handleRemove"
     >
       <template #extra="{ row }">
-        <input
-          type="color"
-          class="cal-color"
-          :value="getColorValue(row.source?.color)"
-          :aria-label="`Colour for ${row.name}`"
-          :title="`Colour for ${row.name}`"
-          @change="handleColorChange(row, $event.target.value)"
+        <ColourField
+          compact
+          :model-value="getColorValue(row.source?.color)"
+          :label="`Colour for ${row.name}`"
+          @update:model-value="handleColorChange(row, $event)"
         />
       </template>
       <template #meta="{ row }">
@@ -56,14 +54,9 @@
           aria-label="Check for new events every, in minutes"
           @update:model-value="v => emit('update:config', { calendarRefreshInterval: v })"
         />
-        <button
-          type="button"
-          class="cal-refresh-btn"
-          :disabled="refreshStatus === 'refreshing'"
-          @click="handleRefreshNow"
-        >
+        <Button size="sm" :disabled="refreshStatus === 'refreshing'" @click="handleRefreshNow">
           Refresh now
-        </button>
+        </Button>
         <span v-if="refreshStatus" class="cal-refresh-status" aria-live="polite">{{
           refreshStatus === "refreshing" ? "Refreshing…" : "Refreshed"
         }}</span>
@@ -87,6 +80,8 @@ import { usePlugins } from "@/composables";
 import * as calendarApi from "@/services/calendarApi";
 import * as pluginsApi from "@/services/pluginsApi";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
+import ColourField from "@/components/ui/ColourField.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
@@ -302,22 +297,6 @@ onMounted(async () => {
   width: 100%;
 }
 
-.cal-color {
-  width: 30px;
-  height: 30px;
-  min-height: 0;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: none;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.cal-color:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 /* Show times lives on the row's subline as a small labelled checkbox, so the
    right-hand controls read exactly like every other source row. */
 .cal-show-times {
@@ -326,7 +305,7 @@ onMounted(async () => {
   gap: 0.35rem;
   margin-top: 0.1rem;
   font-family: var(--font-ui);
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-2);
   cursor: pointer;
   white-space: nowrap;
@@ -349,29 +328,8 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: 0.75rem;
 }
-.cal-refresh-btn {
-  padding: 0.4rem 0.9rem;
-  min-height: var(--touch-target);
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-control);
-  font-family: var(--font-ui);
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.cal-refresh-btn:hover {
-  background: var(--bg-1);
-  border-color: var(--focus);
-}
-.cal-refresh-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
 .cal-refresh-status {
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-2);
   font-family: var(--font-ui);
 }

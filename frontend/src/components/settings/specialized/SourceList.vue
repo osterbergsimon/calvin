@@ -1,15 +1,14 @@
 <template>
   <div class="source-list">
     <div v-if="addLabel" class="sl-add-row">
-      <button
-        type="button"
-        class="sl-add"
+      <Button
+        :variant="rows.length === 0 ? 'primary' : 'secondary'"
         :disabled="addDisabled"
         :title="addDisabled ? addDisabledHint : ''"
         @click="$emit('add')"
       >
         {{ addLabel }}
-      </button>
+      </Button>
     </div>
 
     <p v-if="rows.length === 0" class="sl-empty">{{ emptyText }}</p>
@@ -56,23 +55,32 @@
             :aria-label="`Show ${row.name}`"
             @update:model-value="v => $emit('toggle', row, v)"
           />
-          <button type="button" class="sl-action" @click="$emit('edit', row)">Edit</button>
-          <div class="sl-more">
-            <button
-              type="button"
-              class="sl-more-btn"
-              :aria-label="`More actions for ${row.name}`"
-              :aria-expanded="openMenuId === row.id ? 'true' : 'false'"
-              @click="toggleMenu(row.id)"
-            >
-              ⋯
-            </button>
-            <div v-if="openMenuId === row.id" class="sl-menu" role="menu">
-              <button type="button" class="sl-menu-item" role="menuitem" @click="askRemove(row)">
-                Remove
-              </button>
-            </div>
-          </div>
+          <Button size="sm" @click="$emit('edit', row)">Edit</Button>
+          <Popover
+            :model-value="openMenuId === row.id"
+            :label="`More actions for ${row.name}`"
+            haspopup="menu"
+            @update:model-value="open => setMenu(row.id, open)"
+          >
+            <template #trigger="{ attrs }">
+              <IconButton
+                v-bind="attrs"
+                size="md"
+                variant="ghost"
+                :label="`More actions for ${row.name}`"
+              >
+                <svg class="sl-more-glyph" viewBox="0 0 24 24" aria-hidden="true">
+                  <path :d="mdiDotsHorizontal" fill="currentColor" />
+                </svg>
+              </IconButton>
+            </template>
+            <Menu
+              :items="menuItems"
+              :label="`More actions for ${row.name}`"
+              @select="askRemove(row)"
+              @close="setMenu(row.id, false)"
+            />
+          </Popover>
         </div>
       </template>
     </draggable>
@@ -90,7 +98,12 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { mdiDotsHorizontal } from "@mdi/js";
 import draggable from "vuedraggable";
+import Button from "@/components/ui/Button.vue";
+import IconButton from "@/components/ui/IconButton.vue";
+import Menu from "@/components/ui/Menu.vue";
+import Popover from "@/components/ui/Popover.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { providerLine } from "@/utils/instanceSummary";
@@ -148,6 +161,10 @@ const openMenuId = ref(null);
 const pendingRemove = ref(null);
 const activeHighlight = ref("");
 
+// The ⋯ menu is an action list; Remove is the only action and stays last (and
+// red) because it is destructive.
+const menuItems = [{ key: "remove", label: "Remove", danger: true }];
+
 const isHighlighted = row => {
   if (!activeHighlight.value) return false;
   return row.id === activeHighlight.value || row.providerId === activeHighlight.value;
@@ -172,8 +189,8 @@ watch(
   { immediate: true }
 );
 
-const toggleMenu = id => {
-  openMenuId.value = openMenuId.value === id ? null : id;
+const setMenu = (id, open) => {
+  openMenuId.value = open ? id : openMenuId.value === id ? null : openMenuId.value;
 };
 
 const askRemove = row => {
@@ -216,46 +233,22 @@ onBeforeUnmount(() => {
 .sl-add-row {
   display: flex;
   justify-content: flex-end;
-  padding: var(--panel-pad-y) var(--panel-pad-x) var(--space-sm);
-}
-
-.sl-add {
-  min-height: var(--touch-target);
-  padding: 0 1.25rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.sl-add:hover:not(:disabled) {
-  filter: brightness(1.06);
-}
-.sl-add:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.sl-add:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-2);
 }
 
 .sl-empty {
   margin: 0;
-  padding: var(--space-3xl) var(--panel-pad-x);
+  padding: var(--gap-6) var(--panel-pad-x);
   text-align: center;
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
+  font-size: var(--text-body);
   color: var(--ink-3);
 }
 
 .sl-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--gap-1);
   padding: 0 var(--panel-pad-x) var(--panel-pad-y);
 }
 
@@ -267,11 +260,11 @@ onBeforeUnmount(() => {
   padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   flex-wrap: wrap;
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
 }
 .sl-row--off {
   opacity: 0.6;
@@ -283,7 +276,7 @@ onBeforeUnmount(() => {
 
 .sl-grip {
   color: var(--ink-3);
-  font-size: var(--fs-base);
+  font-size: var(--text-label);
   line-height: 1;
   cursor: grab;
   user-select: none;
@@ -317,8 +310,8 @@ onBeforeUnmount(() => {
 }
 .sl-name {
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
   color: var(--ink);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -326,7 +319,7 @@ onBeforeUnmount(() => {
 }
 .sl-provider {
   font-family: var(--font-ui);
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -336,82 +329,9 @@ onBeforeUnmount(() => {
   color: var(--err-text);
 }
 
-.sl-action {
-  padding: 0.35rem 0.7rem;
-  min-height: var(--touch-target);
-  background: transparent;
-  color: var(--ink-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.sl-action:hover {
-  border-color: var(--focus);
-  color: var(--ink);
-}
-.sl-action:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.sl-more {
-  position: relative;
-}
-.sl-more-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
-  padding: 0;
-  background: transparent;
-  color: var(--ink-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-lg);
-  line-height: 1;
-  cursor: pointer;
-}
-.sl-more-btn:hover {
-  border-color: var(--line);
-  color: var(--ink);
-}
-.sl-more-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.sl-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 0.25rem);
-  z-index: 20;
-  min-width: 9rem;
-  padding: 0.25rem;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 6px 18px var(--shadow);
-}
-.sl-menu-item {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: transparent;
-  color: var(--err-text);
-  border: 0;
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  text-align: left;
-  cursor: pointer;
-}
-.sl-menu-item:hover {
-  background: color-mix(in srgb, var(--err) 10%, transparent);
+.sl-more-glyph {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

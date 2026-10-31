@@ -65,45 +65,11 @@
           <!-- Calendar-specific fields (colour and show_time) -->
           <template v-if="currentPlugin?.type === 'calendar'">
             <div class="form-group">
-              <label for="instance-calendar-colour">Colour</label>
-              <div class="colour-row">
-                <input
-                  id="instance-calendar-colour"
-                  v-model="formData.color"
-                  type="color"
-                  class="color-input"
-                  style="width: 60px; height: 40px; cursor: pointer"
-                />
-                <input
-                  v-model="formData.color"
-                  type="text"
-                  class="form-input"
-                  placeholder="#275f86"
-                  aria-label="Colour value"
-                  style="flex: 1"
-                />
-              </div>
-              <div
-                v-if="swatches.length"
-                class="colour-swatches"
-                role="group"
-                aria-label="Calendar colours"
-              >
-                <button
-                  v-for="swatch in swatches"
-                  :key="swatch.token"
-                  type="button"
-                  class="colour-swatch"
-                  :class="{ selected: formData.color?.toLowerCase() === swatch.hex }"
-                  :style="{ background: swatch.hex }"
-                  :aria-label="`Calendar colour ${swatch.number}`"
-                  :aria-pressed="formData.color?.toLowerCase() === swatch.hex"
-                  @click="formData.color = swatch.hex"
-                />
-              </div>
-              <span class="help-text"
-                >These eight follow the theme; pick one or enter a custom colour</span
-              >
+              <ColourField
+                v-model="formData.color"
+                label="Colour"
+                hint="These eight follow the theme; pick a custom colour if you need one."
+              />
             </div>
             <div class="form-group">
               <div class="toggle-row">
@@ -169,11 +135,12 @@ import { ref, watch, computed } from "vue";
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import Button from "@/components/ui/Button.vue";
+import ColourField from "@/components/ui/ColourField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { isHiddenField } from "@/utils/pluginFields";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
-import { eventSwatches, nextEventColour } from "@/utils/themePalettes";
+import { nextEventColour } from "@/utils/themePalettes";
 import { errorDetailMessage } from "@/utils/apiErrors";
 
 // Plain words: the form adds a source, never an "instance". The plugin's own
@@ -219,9 +186,6 @@ const testing = ref(false);
 const testStatus = ref(null);
 const geocoding = ref(false);
 const geocodeStatus = ref(null);
-
-// The eight curated calendar colours, in the theme currently in use.
-const swatches = computed(() => eventSwatches());
 
 const instanceLabel = computed(() => {
   const plugin = currentPlugin.value;
@@ -734,38 +698,6 @@ const handleSave = async () => {
 }
 
 .form-input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.colour-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.colour-swatches {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
-.colour-swatch {
-  width: 1.75rem; /* 28px */
-  height: 1.75rem;
-  padding: 0;
-  border: 2px solid var(--line);
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-}
-
-.colour-swatch.selected {
-  border-color: var(--ink);
-  box-shadow: 0 0 0 2px var(--focus);
-}
-
-.colour-swatch:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
