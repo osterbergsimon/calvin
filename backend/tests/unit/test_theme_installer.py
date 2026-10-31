@@ -25,21 +25,62 @@ def theme_installer(temp_themes_dir, monkeypatch):
     return installer
 
 
+LIGHT_PALETTE = {
+    "bg-0": "#eef1f4",
+    "bg-1": "#ffffff",
+    "bg-2": "#ffffff",
+    "line": "#dde3e8",
+    "line-soft": "#e8edf1",
+    "ink": "#1b242b",
+    "ink-2": "#5d6b75",
+    "ink-3": "#636e77",
+    "focus": "#e08a1e",
+    "ok": "#2e9e6b",
+    "warn": "#b38f00",
+    "err": "#c0392b",
+    "shadow": "rgba(0, 0, 0, 0.1)",
+    "shadow-hover": "rgba(0, 0, 0, 0.15)",
+}
+
+DARK_PALETTE = {
+    "bg-0": "#0e1316",
+    "bg-1": "#151c21",
+    "bg-2": "#1d262d",
+    "line": "#27313a",
+    "line-soft": "#1e272e",
+    "ink": "#eaf0f3",
+    "ink-2": "#9aa7b0",
+    "ink-3": "#818d96",
+    "focus": "#f3b052",
+    "ok": "#5bd0a0",
+    "warn": "#ffd84d",
+    "err": "#ef6b5e",
+    "shadow": "rgba(0, 0, 0, 0.3)",
+    "shadow-hover": "rgba(0, 0, 0, 0.4)",
+}
+
+
+def build_manifest(
+    theme_id: str = "test_theme",
+    name: str = "Test Theme",
+    version: str = "1.0.0",
+) -> dict:
+    """A complete theme_api 2 manifest (both modes, all base colours)."""
+    return {
+        "id": theme_id,
+        "name": name,
+        "description": "A test theme",
+        "version": version,
+        "theme_api": 2,
+        "variables": dict(LIGHT_PALETTE),
+        "dark_mode": dict(DARK_PALETTE),
+    }
+
+
 @pytest.fixture
 def valid_theme_manifest():
-    """Return a valid theme manifest."""
-    return {
-        "id": "test_theme",
-        "name": "Test Theme",
-        "description": "A test theme",
-        "version": "1.0.0",
-        "variables": {
-            "bg-primary": "#ffffff",
-            "bg-secondary": "#f5f5f5",
-            "text-primary": "#333333",
-            "accent-primary": "#2196f3",
-        },
-    }
+    """Return a valid theme manifest (theme_api 2, both modes)."""
+    return build_manifest()
 
 
 @pytest.fixture
@@ -313,16 +354,9 @@ class TestThemeInstaller:
         repo_dir = tmp_path / name
         theme_dir = repo_dir / "test_theme"
         theme_dir.mkdir(parents=True)
-        (theme_dir / "theme.json").write_text(
-            json.dumps(
-                {
-                    "id": "test_theme",
-                    "name": "Test Theme",
-                    "version": version,
-                    "variables": {"bg-primary": bg},
-                }
-            )
-        )
+        manifest = build_manifest(version=version)
+        manifest["variables"]["bg-0"] = bg
+        (theme_dir / "theme.json").write_text(json.dumps(manifest))
         return repo_dir
 
     def test_install_theme_from_repo_force_overwrites(
@@ -339,7 +373,7 @@ class TestThemeInstaller:
             (theme_installer.get_theme_path("test_theme") / "theme.json").read_text()
         )
         assert on_disk["version"] == "1.1.0"
-        assert on_disk["variables"]["bg-primary"] == "#111111"
+        assert on_disk["variables"]["bg-0"] == "#111111"
 
     def test_install_theme_from_repo_without_force_errors_when_installed(
         self, theme_installer, valid_theme_directory, tmp_path
@@ -373,12 +407,7 @@ class TestThemeInstaller:
         assert theme_path.exists()
 
         # Create a modified theme manifest
-        modified_manifest = {
-            "id": "test_theme",
-            "name": "Modified Test Theme",
-            "version": "2.0.0",
-            "variables": {"bg-primary": "#000000"},
-        }
+        modified_manifest = build_manifest(name="Modified Test Theme", version="2.0.0")
         modified_theme_dir = valid_theme_directory.parent / "modified_theme"
         modified_theme_dir.mkdir()
         (modified_theme_dir / "theme.json").write_text(json.dumps(modified_manifest))
@@ -456,12 +485,7 @@ class TestThemeInstaller:
         theme_installer.install_theme(valid_theme_directory, "test_theme")
 
         # Create older version
-        older_manifest = {
-            "id": "test_theme",
-            "name": "Test Theme",
-            "version": "0.5.0",  # Older version
-            "variables": {},
-        }
+        older_manifest = build_manifest(version="0.5.0")
         older_theme_dir = tmp_path / "older_theme"
         older_theme_dir.mkdir()
         (older_theme_dir / "theme.json").write_text(json.dumps(older_manifest))
@@ -491,3 +515,117 @@ class TestThemeInstaller:
         result = theme_installer.enumerate_themes_from_repo(repo_dir)
         # Path traversal should be filtered out
         assert len(result["themes"]) == 0
+
+
+class TestThemeContractInstall:
+    """theme_api 2 checks run at install and normalise what is stored."""
+
+    def _install_dir(self, tmp_path, manifest):
+        theme_dir = tmp_path / "contract_theme"
+        theme_dir.mkdir(exist_ok=True)
+        (theme_dir / "theme.json").write_text(json.dumps(manifest))
+        return theme_dir
+
+    def test_missing_base_colour_is_rejected_naming_the_key(
+        self, theme_installer, tmp_path, valid_theme_manifest
+    ):
+        manifest = valid_theme_manifest
+        del manifest["dark_mode"]["bg-2"]
+        theme_dir = self._install_dir(tmp_path, manifest)
+
+        with pytest.raises(ValueError, match="missing bg-2 in dark mode"):
+            theme_installer.install_theme(theme_dir, "test_theme")
+
+        assert not theme_installer.get_theme_path("test_theme").exists()
+
+    def test_missing_dark_mode_is_rejected(self, theme_installer, tmp_path, valid_theme_manifest):
+        manifest = valid_theme_manifest
+        del manifest["dark_mode"]
+        theme_dir = self._install_dir(tmp_path, manifest)
+
+        with pytest.raises(ValueError, match="dark mode"):
+            theme_installer.install_theme(theme_dir, "test_theme")
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "url(https://evil.example/x.png)",
+            "var(--gap-4)",
+            "expression(alert(1))",
+            "red",
+            "rgb(0, 0, 0); background: url(x)",
+        ],
+    )
+    def test_injection_values_are_rejected(
+        self, theme_installer, tmp_path, valid_theme_manifest, value
+    ):
+        manifest = valid_theme_manifest
+        manifest["variables"]["bg-0"] = value
+        theme_dir = self._install_dir(tmp_path, manifest)
+
+        with pytest.raises(ValueError, match="bg-0 in light mode is not a valid colour"):
+            theme_installer.install_theme(theme_dir, "test_theme")
+
+    def test_non_colour_keys_are_ignored_and_not_stored(
+        self, theme_installer, tmp_path, valid_theme_manifest
+    ):
+        manifest = valid_theme_manifest
+        manifest["variables"]["gap-4"] = "9rem"
+        manifest["variables"]["bg-primary"] = "#ff0000"
+        theme_dir = self._install_dir(tmp_path, manifest)
+
+        stored = theme_installer.install_theme(theme_dir, "test_theme")["variables"]
+
+        assert "gap-4" not in stored
+        assert "bg-primary" not in stored
+        on_disk = json.loads(
+            (theme_installer.get_theme_path("test_theme") / "theme.json").read_text()
+        )
+        assert "gap-4" not in on_disk["variables"]
+
+    def test_missing_pairs_are_derived_and_stored(
+        self, theme_installer, tmp_path, valid_theme_manifest
+    ):
+        manifest = valid_theme_manifest
+        # The fixture ships base colours only.
+        theme_dir = self._install_dir(tmp_path, manifest)
+
+        theme_installer.install_theme(theme_dir, "test_theme")
+        on_disk = json.loads(
+            (theme_installer.get_theme_path("test_theme") / "theme.json").read_text()
+        )
+
+        for pair in ("focus-ink", "focus-text", "err-ink", "err-text"):
+            assert pair in on_disk["variables"]
+            assert pair in on_disk["dark_mode"]
+        assert on_disk["theme_api"] == 2
+
+    def test_hue_collision_installs_with_a_warning(
+        self, theme_installer, tmp_path, valid_theme_manifest
+    ):
+        manifest = valid_theme_manifest
+        manifest["variables"]["warn"] = manifest["variables"]["focus"]
+        theme_dir = self._install_dir(tmp_path, manifest)
+
+        # A warning is not a rejection for third-party themes.
+        theme_installer.install_theme(theme_dir, "test_theme")
+
+        assert theme_installer.get_theme_manifest("test_theme")["validation_warnings"]
+
+    def test_load_check_marks_an_edited_theme_unselectable(
+        self, theme_installer, tmp_path, valid_theme_manifest
+    ):
+        theme_dir = self._install_dir(tmp_path, valid_theme_manifest)
+        theme_installer.install_theme(theme_dir, "test_theme")
+
+        # Edit the installed manifest behind Calvin's back.
+        manifest_path = theme_installer.get_theme_path("test_theme") / "theme.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["variables"]["bg-0"] = "url(https://evil.example/x.png)"
+        manifest_path.write_text(json.dumps(manifest))
+
+        [theme] = theme_installer.get_installed_themes()
+        assert theme["selectable"] is False
+        assert any("bg-0" in error for error in theme["validation_errors"])
+        # The theme is kept, not deleted.
+        assert manifest_path.exists()

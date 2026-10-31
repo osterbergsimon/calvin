@@ -138,7 +138,7 @@ declared.
 | `image` | `ImagePlugin` | `get_images` / `get_image` / `get_image_data` / `scan_images` (required); `upload_image` / `delete_image` / `get_thumbnail_path` (optional) |
 | `service` | `ServicePlugin` | `fetch(start_date, end_date)` → payload for the display schema |
 | `backend` | `BackendPlugin` | optional: `fetch()` ("check now"), scheduled tasks, workers, event handlers, service provider |
-| `theme` | — | **Not a Python plugin** — CSS bundles installed via `app.services.theme_installer`. The enum value only tags theme records in the management routes. |
+| `theme` | — | **Not a Python plugin** — a palette package (`theme.json`, `theme_api: 2`) installed via `app.services.theme_installer`. See [Theme package format](THEME_PACKAGE_FORMAT.md). The enum value only tags theme records in the management routes. |
 
 ## Optional Class-Level Hooks
 

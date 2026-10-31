@@ -285,7 +285,7 @@ const positionOptions = computed(() => {
 .preset .mini i {
   flex: 1;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--region-calendar) 45%, transparent);
+  background: color-mix(in srgb, var(--ink-3) 45%, transparent);
 }
 .preset-label {
   font-size: var(--fs-micro);

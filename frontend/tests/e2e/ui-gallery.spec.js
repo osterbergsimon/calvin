@@ -9,10 +9,22 @@
 import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-// The built-in palettes are the app's source of truth (backend/data/themes).
+// The built-in palettes are the app's source of truth (backend/data/themes);
+// Calvin itself lives in theme.css.
 const builtinThemes = JSON.parse(
   readFileSync(new URL("../../../backend/data/themes/builtin.json", import.meta.url), "utf8")
 );
+const themeCss = readFileSync(new URL("../../src/styles/theme.css", import.meta.url), "utf8");
+const cssPalette = selector => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const block = themeCss.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([\\s\\S]*?)\\n\\}`));
+  const vars = {};
+  for (const [, name, value] of block[1].matchAll(/^\s*--([a-z0-9-]+):\s*(#[0-9a-fA-F]{3,8});/gm)) {
+    vars[name] = value;
+  }
+  return vars;
+};
+const CALVIN = { variables: cssPalette(":root"), dark_mode: cssPalette(".dark") };
 
 const VIEWPORTS = [
   { name: "1280", size: { width: 1280, height: 800 } },
@@ -41,7 +53,7 @@ test.describe("ui gallery palettes", () => {
         await page.getByRole("radio", { name: mode, exact: true }).click();
 
         const theme = name.toLowerCase();
-        const palette = theme === "calvin" ? builtinThemes.light : builtinThemes[theme];
+        const palette = theme === "calvin" ? CALVIN : builtinThemes[theme];
         const expected = mode === "Dark" ? palette.dark_mode["bg-0"] : palette.variables["bg-0"];
 
         await expect(gallery).toHaveAttribute("data-theme", theme);
