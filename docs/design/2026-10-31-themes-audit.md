@@ -1,6 +1,7 @@
 # Themes audit (CLV-76)
 
-Status: audit + recommendation. The fixes fold into the doctrine migration PRs ([frontend doctrine](frontend-doctrine.md),
+Status: audit + decisions. **Owner decisions 2026-10-31: D1 yes, D2 yes, D3 yes, D4 yes (four built-ins; plugin themes per §4).**
+The fixes fold into the doctrine migration PRs ([frontend doctrine](frontend-doctrine.md),
 [frontend audit](audits/2026-10-31-frontend-audit.md)). Owner decisions are marked **D1–D4**.
 
 ## 1. How theming works today
@@ -70,7 +71,7 @@ Colour tokens with literal values that no theme sets (`theme.css`):
 - The picker lists **Calvin** (renamed from "Calvin default"), **Ocean**, **Forest**, **Sunset**.
 - Migration on load: `selectedTheme: "light"` → `null`; `selectedTheme: "dark"` → `null` and `themeMode: "dark"`, so
   nobody's screen changes.
-- Remove both from `builtin.json`. Plugin themes keep working (they carry both modes).
+- Remove both from `builtin.json`. Plugin themes follow the same model (§4).
 - Alternative (not recommended): picking Dark sets the mode to Dark. That keeps two controls for one thing, and
   the mode would change behind the user's back.
 
@@ -114,7 +115,68 @@ Also, with no decision needed:
 - **Theme picker**: each option shows a mini preview (page, panel, a primary button, a tag) in the *current* mode,
   plus "Light and dark" under the name. It lives with Appearance in the Dashboard category migration PR.
 
-## 4. Where the fixes land
+## 4. Plugin themes (e.g. calvin-plugins `midnight-theme`)
+
+**Today:** `validate_theme_variables` accepts any object, and `applyCustomTheme()` writes every key verbatim as
+`--<key>` on `:root`. So a theme can:
+- override layout tokens (`--gap-*`, `--z-*`, `--touch-target`);
+- inject `url()`/`var()` values;
+- ship only half a palette, leaving the other half on Calvin's colours.
+
+`midnight-theme` 1.1.0 shows all three problems:
+- it sets 15 of the 22 colours and 17 legacy keys (`accent-*`, `bg-primary`, `calendar-*`, `text-*`, `border-color`,
+  `indicator-*`) that the shell no longer reads;
+- it sets dark colours in **both** `variables` and `dark_mode`, which is the "Dark ignores the mode" problem from §2.1.
+
+**The model (theme contract 2):** a theme is a palette family, exactly like a built-in:
+1. **Colours only.** A theme may set only the colour allowlist: the 22 semantic colours plus the optional
+   `event-1`…`event-8`. Any other key (role, size, spacing, radius, z-index, font, legacy names) is **ignored with a
+   warning** at install and never written to the page.
+2. **Both modes.** `variables` is the light palette and `dark_mode` the dark one. Both are required, so picking a theme
+   never fights the light/dark setting (D1).
+3. **Required vs derived.**
+   - The 14 base colours are **required in both modes**: `bg-0/1/2`, `ink/-2/-3`, `line`, `line-soft`, `focus`, `ok`,
+     `warn`, `err`, `shadow`, `shadow-hover`.
+   - The 8 pairs are **derived if missing**: `focus/ok/warn/err` × `-ink`/`-text`.
+     - `-ink` = `--ink` or `--bg-1`, whichever passes AA on the tone.
+     - `-text` = the tone mixed toward `--ink` until it passes AA on `--bg-1`.
+     - The same algorithm CLV-64 used, ported to the backend so derived values are stored at install.
+   - `event-1…8` fall back to Calvin's palette.
+4. **Values:** `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()/rgba()`, `hsl()/hsla()` only. No `var()`, `url()`, keywords or
+   expressions.
+5. **Checks at install and at load** (every startup, for installed and bundled themes):
+   - missing base colour, bad value, or a text pair below AA (`ink`/`ink-2`/`ink-3` on `bg-1`; `-text` on `bg-1`;
+     `-ink` on its tone) → **rejected at install**, with the missing or failing keys named:
+     **"Midnight can't be installed: it's missing bg-2 in dark mode."**;
+   - an already-installed theme that fails at load is kept but **not selectable**. If it was selected, Calvin falls
+     back to the Calvin theme in the current mode, and the picker shows it disabled with **"Needs an update to work
+     with this Calvin."**;
+   - the hue-distance rule (D2) is a **warning, not a rejection**, for third-party themes: install succeeds and the
+     picker shows **"Status colours may be hard to tell apart in this theme."** under its name.
+   - Catalog themes (calvin-plugins) must pass **all** rules in that repo's CI (`test_validate_plugins.py`).
+6. **Versioning:** `theme.json` gains `"theme_api": 2`. A theme without it is checked by the same rules (most old
+   themes fail on legacy keys only, which are now just ignored).
+
+**What `midnight-theme` needs (calvin-plugins PR, version 2.0.0):**
+- add `"theme_api": 2`; remove the 17 legacy keys;
+- keep the dark palette in `dark_mode` (focus `#8b5cf6` 263°, ok `#3fb950`, warn `#fbbf24`, err `#f87171`: all pass the
+  D2 distances);
+- **add a real light palette in `variables`** (contrast and hue checked against `bg-1`):
+
+| Token | Light value | | Token | Light value |
+|---|---|---|---|---|
+| `bg-0` | `#eceaf6` | | `focus` | `#6d28d9` (6.6:1) |
+| `bg-1` | `#f7f6fc` | | `ok` | `#15803d` (4.7:1) |
+| `bg-2` | `#ffffff` | | `warn` | `#a16207` (4.6:1, Δ35° from err) |
+| `ink` | `#1b1630` (16:1) | | `err` | `#b91c1c` (6.0:1) |
+| `ink-2` | `#4b4566` (8.3:1) | | `line` | `#d9d5ea` |
+| `ink-3` | `#6e6889` (4.9:1) | | `line-soft` | `#e7e4f2` |
+| `shadow` / `shadow-hover` | `rgba(27,22,48,.10)` / `rgba(27,22,48,.16)` | | | |
+
+- derived pairs: let the host derive them (or ship them; either passes);
+- update its README: "Midnight: violet on night blue in dark mode, violet on pale lavender in light mode."
+
+## 5. Where the fixes land
 
 | Fix | PR |
 |---|---|
@@ -122,11 +184,17 @@ Also, with no decision needed:
 | D1 drop Light/Dark + migration + picker preview | Dashboard category migration PR (`useTheme.js`, `ThemePicker`) |
 | D3 neutral regions | Page editor migration PR |
 | Calendar colour palette in the add form | Content category migration PR |
+| §4 plugin theme contract: backend allowlist + validation + derivation + load check; `applyCustomTheme` writes allowlisted keys only; picker disabled state | Phase 1 tokens PR (backend + `useTheme.js`), with its own tests |
+| `midnight-theme` 2.0.0 | calvin-plugins PR, after the host accepts `theme_api: 2` |
 
-## 5. Tests
+## 6. Tests
 
 - Hue-distance assertions (§D2 thresholds) in the CLV-64 contrast spec for 4 themes × 2 modes.
 - `useTheme` migration: `light` → null with the mode unchanged; `dark` → null and the mode set to dark; runs once.
 - The picker lists exactly Calvin, Ocean, Forest, Sunset (plus installed plugin themes).
 - No `--region-*` tokens or `#2196f3` left (token lint).
 - `--event-*`: each passes AA against `--on-event-ink` in every theme × mode.
+- Theme contract (backend): a non-colour key is ignored and logged; a `url()`/`var()` value is rejected; a missing base
+  colour is rejected with the key named; missing pairs are derived and pass AA; a load-time failure marks the theme
+  unselectable and falls back to Calvin; a hue-distance failure warns but installs.
+- `applyCustomTheme` never writes a non-allowlisted property (unit test with a theme setting `--gap-4`).
