@@ -6,15 +6,7 @@
  */
 
 export const roleLint = {
-  allowlist: [
-    "components/settings/categories/DefaultScreenSettings.vue",
-    "components/settings/categories/ScreensSettings.vue",
-    "components/settings/shared/AddKioskPanel.vue",
-    "components/settings/shared/DisplayScheduleGrid.vue",
-    "components/settings/shared/KioskScope.vue",
-    "components/settings/shared/KioskStatusHeader.vue",
-    "components/settings/shared/PageThumbnail.vue",
-  ],
+  allowlist: ["components/settings/shared/DisplayScheduleGrid.vue"],
   baseline: [
     "components/settings/categories/DefaultScreenSettings.vue",
     "components/settings/categories/ScreensSettings.vue",
@@ -28,11 +20,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/settings/categories/ScreensSettings.vue",
-    "components/settings/shared/AddKioskPanel.vue",
-    "components/settings/shared/DisplayScheduleGrid.vue",
-  ],
+  allowlist: ["components/settings/shared/DisplayScheduleGrid.vue"],
   baseline: [
     "components/settings/categories/ScreensSettings.vue",
     "components/settings/shared/AddKioskPanel.vue",
@@ -42,10 +30,7 @@ export const controlLint = {
 };
 
 export const settingsNoStyle = {
-  allowlist: [
-    "components/settings/categories/DefaultScreenSettings.vue",
-    "components/settings/categories/ScreensSettings.vue",
-  ],
+  allowlist: [],
   baseline: [
     "components/settings/categories/DefaultScreenSettings.vue",
     "components/settings/categories/ScreensSettings.vue",
