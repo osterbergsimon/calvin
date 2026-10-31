@@ -60,38 +60,42 @@
                 <span v-if="item.description" class="pp-desc">{{ item.description }}</span>
                 <span v-if="item.error" class="pp-error">
                   {{ item.error }}
-                  <button type="button" class="pp-error-link" @click="$emit('more')">
+                  <Button variant="link" size="sm" class="pp-error-link" @click="$emit('more')">
                     See details in Plugins ›
-                  </button>
+                  </Button>
                 </span>
               </span>
               <span v-if="item.status === 'installing'" class="pp-install pp-install--busy">
                 Installing…
               </span>
               <span v-else-if="item.status === 'installed'" class="pp-installed">Installed ✓</span>
-              <button
+              <Button
                 v-else
-                type="button"
+                variant="primary"
+                size="sm"
                 class="pp-install"
                 :data-install-id="item.id"
                 @click="$emit('install', item)"
               >
                 Install
-              </button>
+              </Button>
             </div>
           </li>
         </ul>
       </section>
 
-      <button v-if="moreLabel" type="button" class="pp-more" @click="$emit('more')">
-        {{ moreLabel }}
-      </button>
+      <div v-if="moreLabel" class="pp-foot">
+        <Button variant="ghost" class="pp-more" @click="$emit('more')">
+          {{ moreLabel }}
+        </Button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import IconButton from "@/components/ui/IconButton.vue";
+import Button from "@/components/ui/Button.vue";
 import { isIconFile, pluginIconLetter, pluginIconUrl } from "@/utils/pluginIcon";
 
 // A small chooser of providers (plugins) for one kind of source. It carries no
@@ -278,17 +282,6 @@ const choose = provider => {
   line-height: 1.4;
 }
 
-.pp-error-link {
-  padding: 0;
-  background: transparent;
-  color: var(--err-text);
-  border: 0;
-  border-bottom: 1px dotted currentColor;
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
 .pp-on {
   margin-left: auto;
   flex-shrink: 0;
@@ -316,31 +309,15 @@ const choose = provider => {
 .pp-install {
   margin-left: auto;
   flex-shrink: 0;
-  min-height: var(--touch-target);
-  padding: 0.4rem 1rem;
-  background: var(--focus);
-  color: var(--focus-ink);
-  border: 0;
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.pp-install:hover {
-  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
-}
-
-.pp-install:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .pp-install--busy {
+  padding: 0.4rem 1rem;
   background: transparent;
   color: var(--ink-3);
   border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  font-size: var(--fs-sm);
   cursor: progress;
 }
 
@@ -360,26 +337,13 @@ const choose = provider => {
   color: var(--ink-3);
 }
 
-.pp-more {
-  display: block;
-  width: 100%;
-  padding: 0.9rem 1.5rem;
-  background: transparent;
-  color: var(--ink-2);
-  border: 0;
+.pp-foot {
+  padding: var(--gap-1);
   border-top: 1px solid var(--line);
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  text-align: left;
-  cursor: pointer;
 }
 
-.pp-more:hover {
-  color: var(--ink);
-}
-
-.pp-more:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
+.pp-more {
+  width: 100%;
+  justify-content: flex-start;
 }
 </style>
