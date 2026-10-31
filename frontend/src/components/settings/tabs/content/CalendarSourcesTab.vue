@@ -23,16 +23,6 @@
           @change="handleColorChange(row, $event.target.value)"
         />
       </template>
-      <template #meta="{ row }">
-        <span class="cal-show-times">
-          <ToggleSwitch
-            :model-value="row.showTime"
-            :aria-label="`Show event times for ${row.name}`"
-            @update:model-value="v => handleShowTimeChange(row, v)"
-          />
-          Show event times
-        </span>
-      </template>
     </SourceList>
 
     <AddSourceButton ref="addButton" kind="calendar" @saved="handleAddSaved" />
@@ -91,7 +81,6 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
-import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
@@ -102,7 +91,8 @@ import { nextEventColour } from "@/utils/themePalettes";
 
 // Calendars use the one shared source flow (§3.1, decision B): a SourceList of
 // sources, the provider picker to add one, and the shared add/edit form. The
-// calendar-only row extras — colour and Show times — stay on the row.
+// only calendar-only extra on the row is colour; Show event times lives in the
+// source's Edit dialog so the row keeps exactly one toggle like every other row.
 defineProps({
   config: {
     type: Object,
@@ -155,7 +145,6 @@ const rows = computed(() =>
       source,
       plugin,
       instance,
-      showTime: source.show_time !== false,
     };
   })
 );
@@ -188,14 +177,6 @@ const handleColorChange = async (row, hexColor) => {
     await calendarStore.updateSource(row.id, { ...row.source, color: hexColor });
   } catch (error) {
     logError("[CalendarSources]", "Failed to update calendar source colour:", error);
-  }
-};
-
-const handleShowTimeChange = async (row, showTime) => {
-  try {
-    await calendarStore.updateSource(row.id, { ...row.source, show_time: showTime });
-  } catch (error) {
-    logError("[CalendarSources]", "Failed to update show time:", error);
   }
 };
 

@@ -103,7 +103,7 @@ describe("CalendarSourcesTab", () => {
     expect(mockFetchSources).toHaveBeenCalledOnce();
   });
 
-  it("names the provider and shows the calendar row extras", async () => {
+  it("names the provider and keeps the calendar row extras", async () => {
     mockSources.value = [{ ...sampleSource }];
     const w = mountComp();
     await flushPromises();
@@ -111,14 +111,15 @@ describe("CalendarSourcesTab", () => {
     const row = w.find(".sl-row");
     expect(row.find(".list-row__name").text()).toBe("Work Calendar");
     expect(row.text()).toContain("Google Calendar");
-    // Calendar-only extras stay on the row.
+    // Colour is the only calendar-only extra on the row.
     expect(row.find('input[type="color"]').exists()).toBe(true);
-    // Show times is a labelled toggle on the subline, so the right side keeps
-    // the same controls as every other source row.
-    const showTimes = row.find(".cal-show-times");
-    expect(showTimes.text()).toBe("Show event times");
-    expect(showTimes.findComponent({ name: "ToggleSwitch" }).exists()).toBe(true);
-    expect(row.findAllComponents({ name: "ToggleSwitch" })).toHaveLength(2);
+    // Show event times lives in the Edit dialog, so the row carries exactly one
+    // toggle (enabled) and never two side by side.
+    expect(row.text()).not.toContain("Show event times");
+    expect(row.find(".cal-show-times").exists()).toBe(false);
+    const toggles = row.findAllComponents({ name: "ToggleSwitch" });
+    expect(toggles).toHaveLength(1);
+    expect(toggles[0].props("ariaLabel")).toBe("Show Work Calendar");
   });
 
   it("add: the shared form's new calendar becomes a calendar source row", async () => {
@@ -172,23 +173,6 @@ describe("CalendarSourcesTab", () => {
     expect(mockUpdateSource).toHaveBeenCalledWith(
       sampleSource.id,
       expect.objectContaining({ ...sampleSource, color: "#ff0000" })
-    );
-  });
-
-  it("show_time toggle calls updateSource with full object + updated show_time", async () => {
-    mockSources.value = [{ ...sampleSource, show_time: true }];
-    const w = mountComp();
-    await flushPromises();
-
-    const showTimesToggle = w
-      .findAllComponents({ name: "ToggleSwitch" })
-      .find(t => t.props("ariaLabel") === "Show event times for Work Calendar");
-    showTimesToggle.vm.$emit("update:modelValue", false);
-    await flushPromises();
-
-    expect(mockUpdateSource).toHaveBeenCalledWith(
-      sampleSource.id,
-      expect.objectContaining({ show_time: false })
     );
   });
 
