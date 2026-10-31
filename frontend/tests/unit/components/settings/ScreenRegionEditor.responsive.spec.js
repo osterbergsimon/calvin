@@ -122,34 +122,34 @@ describe("ScreenRegionEditor size classes", () => {
     const w = await mountEditor();
     expect(classes(w)).toContain("size-wide");
 
-    await resize(w, ".sre-modal", 1280, 720);
+    await resize(w, ".sre-root", 1280, 720);
     expect(classes(w)).toContain("size-wide");
 
-    await resize(w, ".sre-modal", 800, 480);
+    await resize(w, ".sre-root", 800, 480);
     expect(classes(w)).toContain("size-compact");
 
-    await resize(w, ".sre-modal", 390, 844);
+    await resize(w, ".sre-root", 390, 844);
     expect(classes(w)).toContain("size-phone");
   });
 
   it("moves a kiosk from Wide to Compact when the OSK shrinks the modal", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 1280, 720);
+    await resize(w, ".sre-root", 1280, 720);
     expect(classes(w)).toContain("size-wide");
 
     // The on-screen keyboard eats the bottom of the screen.
-    await resize(w, ".sre-modal", 1280, 430);
+    await resize(w, ".sre-root", 1280, 430);
     expect(classes(w)).toContain("size-compact");
   });
 
   it("is applied above the on-screen keyboard", async () => {
     const w = await mountEditor();
-    expect(classes(w)).toContain("dialog-above-osk");
+    expect(w.find(".dialog-overlay").classes()).toContain("dialog-above-osk");
   });
 
   it("moves the orientation badge under the device in Compact", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 800, 480);
+    await resize(w, ".sre-root", 800, 480);
     const caption = w.find('[data-test="orientation-caption"]');
     expect(caption.exists()).toBe(true);
     // Any browser owns its orientation through the toggle, so the caption
@@ -167,7 +167,7 @@ describe("ScreenRegionEditor device fit", () => {
     { name: "wide", modal: [1280, 720], stage: [1280, 700] },
   ])("keeps the aspect ratio and stays in the stage at $name", async ({ modal, stage }) => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", ...modal);
+    await resize(w, ".sre-root", ...modal);
     await resize(w, ".sre-stage", ...stage);
 
     const { width, height } = deviceBox(w);
@@ -178,7 +178,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("stops shrinking at 200px on the long side", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 300, 844);
+    await resize(w, ".sre-root", 300, 844);
     await resize(w, ".sre-stage", 300, 160);
     const { width, height } = deviceBox(w);
     expect(Math.max(width, height)).toBeGreaterThanOrEqual(200);
@@ -186,7 +186,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("shrinks region labels and drops the icon and size badge under 320px", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 390, 844);
+    await resize(w, ".sre-root", 390, 844);
     await resize(w, ".sre-stage", 300, 600);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
     expect(w.findAll(".sre-region-name").length).toBeGreaterThan(0);
@@ -196,7 +196,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("keeps the region icon and size badge when the device has room", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 1280, 720);
+    await resize(w, ".sre-root", 1280, 720);
     await resize(w, ".sre-stage", 1280, 700);
     expect(w.find(".sre-device").classes()).not.toContain("is-narrow");
     expect(w.findAll(".sre-region-icon").length).toBeGreaterThan(0);
@@ -205,7 +205,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("hides the icon and % badge when the open phone sheet leaves a narrow device", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 390, 844);
+    await resize(w, ".sre-root", 390, 844);
     // The stage left above an open 65% inspector sheet.
     await resize(w, ".sre-stage", 390, 204);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
@@ -218,7 +218,7 @@ describe("ScreenRegionEditor device fit", () => {
 describe("ScreenRegionEditor phone inspector sheet", () => {
   const phone = async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 390, 844);
+    await resize(w, ".sre-root", 390, 844);
     return w;
   };
 
@@ -320,7 +320,7 @@ describe("ScreenRegionEditor touch behaviour", () => {
 
   it("is not draggable in Compact either", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 800, 480);
+    await resize(w, ".sre-root", 800, 480);
     expect(w.find(".sre-clockbar").attributes("draggable")).toBe("false");
     expect(w.find(".sre-clock-grip").exists()).toBe(false);
   });
@@ -350,7 +350,7 @@ describe("ScreenRegionEditor touch behaviour", () => {
   it("names the clock bar in the phone peek", async () => {
     setMedia({ coarse: true });
     const w = await mountEditor();
-    await resize(w, ".sre-modal", 390, 844);
+    await resize(w, ".sre-root", 390, 844);
     await w.find(".sre-clockbar").trigger("click");
     expect(w.find('[data-test="sheet-selection"]').text()).toBe("Clock bar");
     expect(w.find(".sre-rail").classes()).toContain("is-open");
