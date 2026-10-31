@@ -19,54 +19,44 @@
     </SettingsSection>
 
     <SettingsSection id="security-origins" title="Allowed sites">
-      <div class="security-origins">
-        <p v-if="sealed" data-test="allowlist-inactive" class="security-origins__inactive">
-          Ignored while sealed mode is on.
-        </p>
-        <p class="security-origins__intro">
-          Sites this dashboard may show or load from. Everything else is blocked. Use a domain like
-          grafana.lab or *.lab.example.com, or a full address.
-        </p>
+      <SettingRow label="Sites" stacked>
+        <template #description>
+          <InlineNote>
+            Sites this dashboard may show or load from. Everything else is blocked. Use a domain
+            like grafana.lab or *.lab.example.com, or a full address.
+          </InlineNote>
+          <InlineNote v-if="sealed" tone="warn" data-test="allowlist-inactive">
+            Ignored while sealed mode is on.
+          </InlineNote>
+          <InlineNote v-if="!origins.length">No sites allowed.</InlineNote>
+          <InlineNote v-if="error" tone="err" data-test="origin-error">{{ error }}</InlineNote>
+        </template>
+        <TextField
+          v-model="draft"
+          label="Add a site"
+          input-id="origin-input"
+          placeholder="grafana.lab or *.lab.example.com"
+          @keyup.enter="add"
+        />
+        <Button data-test="origin-add" @click="add">Add</Button>
+      </SettingRow>
 
-        <ul class="security-origins__list">
-          <li v-for="origin in origins" :key="origin" class="security-origins__row">
-            <span class="security-origins__origin">{{ origin }}</span>
-            <button
-              type="button"
-              class="security-btn"
-              data-test="origin-remove"
-              @click="remove(origin)"
-            >
-              Remove
-            </button>
-          </li>
-          <li v-if="origins.length === 0" class="security-origins__empty">No sites allowed.</li>
-        </ul>
+      <SettingRow v-for="origin in origins" :key="origin" :label="origin">
+        <Button size="sm" data-test="origin-remove" @click="remove(origin)">Remove</Button>
+      </SettingRow>
 
-        <div class="security-origins__add">
-          <input
-            v-model="draft"
-            class="security-origins__input"
-            data-test="origin-input"
-            placeholder="grafana.lab or *.lab.example.com"
-            @keyup.enter="add"
-          />
-          <button type="button" class="security-btn" data-test="origin-add" @click="add">
-            Add
-          </button>
-        </div>
-        <p v-if="error" class="security-origins__error" data-test="origin-error">{{ error }}</p>
-
-        <button
-          type="button"
-          class="security-btn security-btn--primary"
+      <SettingRow label="Save allowed sites" description="Applies the list above to this Calvin.">
+        <Button
+          variant="primary"
           data-test="origins-save"
           :disabled="saving"
+          :loading="saving"
+          loading-label="Saving…"
           @click="save"
         >
-          {{ saving ? "Saving…" : "Save" }}
-        </button>
-      </div>
+          Save
+        </Button>
+      </SettingRow>
     </SettingsSection>
   </div>
 </template>
@@ -78,6 +68,9 @@ import { logError } from "@/utils/logger";
 import { friendlyError } from "@/utils/friendlyError";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import AdminAccessSection from "@/components/settings/categories/security/AdminAccessSection.vue";
 import ApiKeysSection from "@/components/settings/categories/security/ApiKeysSection.vue";
@@ -150,94 +143,3 @@ async function save() {
   }
 }
 </script>
-
-<style scoped>
-.security-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.security-origins {
-  padding: 0.75rem 1.25rem 1rem;
-}
-.security-origins__inactive {
-  margin: 0 0 0.5rem;
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  color: var(--warn-text);
-}
-.security-origins__intro {
-  margin: 0 0 0.75rem;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-
-.security-origins__list {
-  list-style: none;
-  margin: 0 0 0.75rem;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-}
-.security-origins__row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  min-height: var(--touch-target);
-  padding: 0.35rem 0.75rem;
-}
-.security-origins__row + .security-origins__row,
-.security-origins__row + .security-origins__empty {
-  border-top: 1px solid var(--line-soft);
-}
-.security-origins__origin {
-  font-family: var(--font-data);
-  font-size: var(--fs-md);
-  color: var(--ink);
-  overflow-wrap: anywhere;
-}
-.security-origins__empty {
-  padding: 0.65rem 0.75rem;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-
-.security-origins__add {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 0.75rem;
-}
-.security-origins__input {
-  flex: 1;
-  min-width: 0;
-  min-height: var(--touch-target);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
-  font-size: var(--fs-control);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-.security-origins__input:hover {
-  border-color: var(--focus-edge);
-}
-.security-origins__input:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-
-.security-origins__error {
-  margin: 0 0 0.75rem;
-  font-size: var(--fs-sm);
-  color: var(--err-text);
-}
-</style>

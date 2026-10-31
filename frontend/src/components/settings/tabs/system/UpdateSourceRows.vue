@@ -4,28 +4,24 @@
     description="Where Calvin downloads updates from. Leave as is unless you run your own copy."
     stacked
   >
-    <input
+    <TextField
       v-model="localGitRepoUrl"
-      class="field-input"
-      type="text"
+      label="Update source address"
+      input-id="update-source-url"
       placeholder="https://github.com/user/repo.git"
-      aria-label="Update source address"
-      @change="handleGitRepoChange"
       @blur="handleGitRepoChange"
+      @keyup.enter="handleGitRepoChange"
     />
   </SettingRow>
 
   <SettingRow label="Release channel" description="Which line of updates to follow." stacked>
-    <select
-      class="field-select"
-      :value="gitBranch"
+    <SelectPill
+      :model-value="gitBranch"
+      :options="availableBranches.map(branch => ({ value: branch, label: branch }))"
       aria-label="Release channel"
-      @change="handleGitBranchChange"
-    >
-      <option v-for="branch in availableBranches" :key="branch" :value="branch">
-        {{ branch }}
-      </option>
-    </select>
+      data-test="release-channel"
+      @update:model-value="handleGitBranchChange"
+    />
   </SettingRow>
 </template>
 
@@ -34,6 +30,8 @@
 // copy audit §4): a family member never needs them, and search still finds them.
 import { ref, watch } from "vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import SelectPill from "@/components/ui/SelectPill.vue";
+import TextField from "@/components/ui/TextField.vue";
 import { getGitBranches } from "@/services/configApi";
 
 const props = defineProps({
@@ -57,8 +55,8 @@ const handleGitRepoChange = () => {
   }
 };
 
-const handleGitBranchChange = event => {
-  emit("update:gitBranch", event.target.value);
+const handleGitBranchChange = value => {
+  emit("update:gitBranch", value);
 };
 
 const loadBranches = async () => {
@@ -81,40 +79,3 @@ watch(
   }
 );
 </script>
-
-<style scoped>
-/* Full-width inputs for the stacked config rows. */
-.field-input,
-.field-select {
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
-  font-size: var(--fs-control);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
-}
-.field-input:hover,
-.field-select:hover {
-  border-color: var(--focus-edge);
-}
-.field-input:focus,
-.field-select:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-.field-select {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2393a0a9' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.75rem center;
-  padding-right: 2.5rem;
-}
-</style>

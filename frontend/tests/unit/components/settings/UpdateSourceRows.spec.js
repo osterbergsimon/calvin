@@ -34,7 +34,7 @@ describe("UpdateSourceRows", () => {
 
     const repoInput = wrapper.find('input[type="text"]');
     await repoInput.setValue("https://github.com/example/other.git");
-    await repoInput.trigger("change");
+    await repoInput.trigger("blur");
 
     expect(wrapper.emitted("update:gitRepoUrl")).toEqual([
       ["https://github.com/example/other.git"],
@@ -47,13 +47,20 @@ describe("UpdateSourceRows", () => {
         gitRepoUrl: "https://github.com/example/calvin.git",
         gitBranch: "main",
       },
+      attachTo: document.body,
     });
 
     await flushPromises();
 
-    const branchSelect = wrapper.find("select");
-    await branchSelect.setValue("develop");
+    await wrapper.get('[data-test="release-channel"] .pill').trigger("click");
+    await flushPromises();
+    const option = [...document.body.querySelectorAll(".pill__opt")].find(
+      el => el.textContent.trim() === "develop"
+    );
+    option.click();
+    await flushPromises();
 
     expect(wrapper.emitted("update:gitBranch")).toEqual([["develop"]]);
+    wrapper.unmount();
   });
 });
