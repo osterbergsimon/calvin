@@ -24,8 +24,8 @@ describe("SourceList", () => {
   it("shows the name and a provider · summary line", () => {
     const w = mountList();
     const item = w.find(".sl-row");
-    expect(item.find(".sl-name").text()).toBe("Family albums");
-    expect(item.find(".sl-provider").text()).toBe("Immich · 2 albums");
+    expect(item.find(".list-row__name").text()).toBe("Family albums");
+    expect(item.find(".list-row__meta").text()).toBe("Immich · 2 albums");
   });
 
   it("shows a running dot and omits it when the source has no run flag", () => {
@@ -46,7 +46,7 @@ describe("SourceList", () => {
   it("shows the plugin error in place of the summary", () => {
     const w = mountList({ rows: [row({ error: "Couldn't sign in. Check the API key." })] });
     expect(w.find(".sl-dot--err").exists()).toBe(true);
-    expect(w.find(".sl-provider").text()).toBe("Couldn't sign in. Check the API key.");
+    expect(w.find(".list-row__meta").text()).toBe("Couldn't sign in. Check the API key.");
   });
 
   it("offers a toggle, Edit and a ⋯ Remove on every row", async () => {
@@ -90,7 +90,7 @@ describe("SourceList", () => {
       highlightProvider: "immich",
     });
     // The pulse is a class on the matching row only.
-    expect(w.findAll(".sl-row")[0].classes()).toContain("sl-row--focus");
-    expect(w.findAll(".sl-row")[1].classes()).not.toContain("sl-row--focus");
+    expect(w.findAll(".sl-row")[0].classes()).toContain("list-row--selected");
+    expect(w.findAll(".sl-row")[1].classes()).not.toContain("list-row--selected");
   });
 });

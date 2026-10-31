@@ -109,16 +109,16 @@ describe("CalendarSourcesTab", () => {
     await flushPromises();
 
     const row = w.find(".sl-row");
-    expect(row.find(".sl-name").text()).toBe("Work Calendar");
+    expect(row.find(".list-row__name").text()).toBe("Work Calendar");
     expect(row.text()).toContain("Google Calendar");
     // Calendar-only extras stay on the row.
     expect(row.find('input[type="color"]').exists()).toBe(true);
-    // Show times is a small labelled checkbox on the subline, so the right
-    // side keeps the same controls as every other source row.
+    // Show times is a labelled toggle on the subline, so the right side keeps
+    // the same controls as every other source row.
     const showTimes = row.find(".cal-show-times");
     expect(showTimes.text()).toBe("Show event times");
-    expect(showTimes.find('input[type="checkbox"]').exists()).toBe(true);
-    expect(row.findAllComponents({ name: "ToggleSwitch" })).toHaveLength(1);
+    expect(showTimes.findComponent({ name: "ToggleSwitch" }).exists()).toBe(true);
+    expect(row.findAllComponents({ name: "ToggleSwitch" })).toHaveLength(2);
   });
 
   it("add: the shared form's new calendar becomes a calendar source row", async () => {
@@ -175,12 +175,15 @@ describe("CalendarSourcesTab", () => {
     );
   });
 
-  it("show_time checkbox calls updateSource with full object + updated show_time", async () => {
+  it("show_time toggle calls updateSource with full object + updated show_time", async () => {
     mockSources.value = [{ ...sampleSource, show_time: true }];
     const w = mountComp();
     await flushPromises();
 
-    await w.find('.cal-show-times input[type="checkbox"]').setValue(false);
+    const showTimesToggle = w
+      .findAllComponents({ name: "ToggleSwitch" })
+      .find(t => t.props("ariaLabel") === "Show event times for Work Calendar");
+    showTimesToggle.vm.$emit("update:modelValue", false);
     await flushPromises();
 
     expect(mockUpdateSource).toHaveBeenCalledWith(
@@ -194,7 +197,9 @@ describe("CalendarSourcesTab", () => {
     const w = mountComp();
     await flushPromises();
 
-    const enabledToggle = w.findAllComponents({ name: "ToggleSwitch" })[0];
+    const enabledToggle = w
+      .findAllComponents({ name: "ToggleSwitch" })
+      .find(t => t.props("ariaLabel") === "Show Work Calendar");
     enabledToggle.vm.$emit("update:modelValue", false);
     await flushPromises();
 
