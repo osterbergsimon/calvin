@@ -127,6 +127,7 @@ from app.api.routes import (  # noqa: E402
     backup,
     calendar,
     config,
+    demo,
     health,
     images,
     keyboard,
@@ -660,6 +661,7 @@ app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(security.router, prefix="/api", tags=["security"])
 app.include_router(backup.router, prefix="/api", tags=["backup"])
+app.include_router(demo.router, prefix="/api", tags=["demo"])
 
 # MCP server (CLV-33). Not a FastAPI route, so the gateway authenticates itself:
 # every request needs a bearer API key. Both spellings avoid a redirect on POST.
