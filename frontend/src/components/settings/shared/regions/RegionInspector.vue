@@ -32,45 +32,41 @@
     <template v-else>
       <SettingGroup title="Shows">
         <div class="ins-field">
-          <Popover
-            v-model="pickerOpen"
-            class="picker"
-            label="What this region shows"
-            haspopup="dialog"
-            role="dialog"
-            initial-focus="input"
-            @close="onPickerClose"
-          >
-            <template #trigger="{ attrs }">
-              <Button
-                v-bind="attrs"
-                class="picker-trigger"
-                variant="secondary"
-                :icon="kindIcon"
-              >
-                {{ componentLabel }}
-                <span class="picker-caret" aria-hidden="true">▾</span>
-              </Button>
-            </template>
-            <div class="picker-panel">
-              <TextField
-                v-model="search"
-                class="picker-search"
-                label="Filter components"
-                type="search"
-                @keydown.down.prevent="menuRef?.focusFirst()"
-              />
-              <Menu
-                ref="menuRef"
-                :items="pickerItems"
-                label="Components"
-                :autofocus="false"
-                @select="chooseKey"
-                @close="pickerOpen = false"
-              />
-              <InlineNote v-if="filtered.length === 0">No matches</InlineNote>
-            </div>
-          </Popover>
+          <div class="picker">
+            <Popover
+              v-model="pickerOpen"
+              label="What this region shows"
+              haspopup="dialog"
+              role="dialog"
+              initial-focus="input"
+              @close="onPickerClose"
+            >
+              <template #trigger="{ attrs }">
+                <Button v-bind="attrs" class="picker-trigger" variant="secondary" :icon="kindIcon">
+                  {{ componentLabel }}
+                  <span class="picker-caret" aria-hidden="true">▾</span>
+                </Button>
+              </template>
+              <div class="picker-panel">
+                <TextField
+                  v-model="search"
+                  class="picker-search"
+                  label="Filter components"
+                  type="search"
+                  @keydown.down.prevent="menuRef?.focusFirst()"
+                />
+                <Menu
+                  ref="menuRef"
+                  :items="pickerItems"
+                  label="Components"
+                  :autofocus="false"
+                  @select="chooseKey"
+                  @close="pickerOpen = false"
+                />
+                <InlineNote v-if="filtered.length === 0">No matches</InlineNote>
+              </div>
+            </Popover>
+          </div>
         </div>
 
         <SettingRow v-if="sourceOptions.length" label="Sources" stacked>
@@ -211,7 +207,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { mdiCalendarBlankOutline, mdiChevronLeft, mdiImageOutline, mdiPlus, mdiWeb } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
@@ -299,6 +295,11 @@ const onPickerClose = () => {
   pickerOpen.value = false;
   search.value = "";
 };
+// Menu's Escape/Tab close and a chosen item both end with the picker closed;
+// clearing the filter keeps the next open showing every component.
+watch(pickerOpen, open => {
+  if (!open) search.value = "";
+});
 
 const kindIcon = computed(() =>
   props.region.kind === "calendar"
@@ -438,6 +439,10 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
    outside close, focus return) comes from ui/Popover; the option list and its
    keyboard handling come from ui/Menu. Only the panel's inset is local. */
 .picker {
+  width: 100%;
+}
+.picker :deep(.popover) {
+  display: flex;
   width: 100%;
 }
 .picker-trigger {

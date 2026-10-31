@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import PluginManager from "@/components/settings/specialized/PluginManager.vue";
-import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 
 const mountManager = props =>
   mount(PluginManager, {
@@ -17,8 +17,8 @@ const mountManager = props =>
 
 const filterValues = wrapper =>
   wrapper
-    .findComponent(SegmentedControl)
-    .props("options")
+    .findComponent(Tabs)
+    .props("items")
     .map(o => o.value);
 
 describe("PluginManager", () => {
@@ -54,18 +54,18 @@ describe("PluginManager", () => {
       expect(filterValues(wrapper)).toEqual(["all", "clock"]);
       expect(
         wrapper
-          .findComponent(SegmentedControl)
-          .props("options")
+          .findComponent(Tabs)
+          .props("items")
           .find(o => o.value === "clock").label
       ).toBe("Clock bar");
     });
 
-    it("relays tab changes from the SegmentedControl", async () => {
+    it("relays tab changes from the Tabs block", async () => {
       const wrapper = mountManager({
         plugins: [{ id: "imap", name: "IMAP", type: "backend", enabled: true }],
         activeTab: "all",
       });
-      wrapper.findComponent(SegmentedControl).vm.$emit("update:modelValue", "backend");
+      wrapper.findComponent(Tabs).vm.$emit("update:modelValue", "backend");
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("tab-change")?.[0]).toEqual(["backend"]);
     });

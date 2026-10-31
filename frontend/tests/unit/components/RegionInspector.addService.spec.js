@@ -17,7 +17,9 @@ const mountWith = services =>
       sourceOptions: [],
       context: null,
     },
-    global: { stubs: { SegmentedControl: true, ToggleSwitch: true, NumberStepper: true } },
+    global: {
+      stubs: { SegmentedControl: true, ToggleSwitch: true, NumberStepper: true, teleport: true },
+    },
   });
 
 const openPicker = async w => w.get(".picker-trigger").trigger("click");
@@ -46,5 +48,39 @@ describe("RegionInspector 'Shows' picker without services (F4)", () => {
     await openPicker(w);
     expect(w.find('[data-test="picker-add-service"]').exists()).toBe(false);
     expect(w.text()).toContain("Home Assistant");
+  });
+
+  it("shows the service's plugin name as the option's meta line", async () => {
+    const w = mountWith([{ id: "iframe-1", name: "Home Assistant", plugin_name: "Iframe" }]);
+    await openPicker(w);
+    const option = w
+      .findAll('[role="menuitem"]')
+      .find(item => item.text().includes("Home Assistant"));
+    expect(option.find(".menu__label").text()).toBe("Home Assistant");
+    expect(option.find(".menu__meta").text()).toBe("Iframe");
+  });
+
+  it("chooses a component through the menu", async () => {
+    const w = mountWith([{ id: "iframe-1", name: "Home Assistant", plugin_name: "Iframe" }]);
+    await openPicker(w);
+    const option = w
+      .findAll('[role="menuitem"]')
+      .find(item => item.text().includes("Home Assistant"));
+    await option.trigger("click");
+    expect(w.emitted("set-component")[0][0]).toMatchObject({ label: "Home Assistant" });
+    expect(w.find(".popover__panel").exists()).toBe(false);
+  });
+
+  it("filters the menu from the search field", async () => {
+    const w = mountWith([
+      { id: "iframe-1", name: "Home Assistant", plugin_name: "Iframe" },
+      { id: "iframe-2", name: "Kitchen", plugin_name: "Iframe" },
+    ]);
+    await openPicker(w);
+    await w.get(".picker-search input").setValue("kitchen");
+    expect(w.findAll('[role="menuitem"] .menu__label').map(item => item.text())).toEqual([
+      "Kitchen",
+    ]);
+    expect(w.text()).not.toContain("No matches");
   });
 });

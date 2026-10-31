@@ -79,7 +79,7 @@ const activeIndex = computed(() => {
 const nextEnabled = (from, delta) => {
   const count = props.items.length;
   for (let step = 1; step <= count; step += 1) {
-    const index = ((from + delta * step) % count + count) % count;
+    const index = (((from + delta * step) % count) + count) % count;
     if (enabled(index)) return index;
   }
   return from;
