@@ -6,7 +6,10 @@
           <Tag class="pc-badge">{{ kindLabel }}</Tag>
           <span v-if="plugin.version" class="pc-ver">v{{ plugin.version }}</span>
           <span class="pc-summary">
-            <template v-if="isTheme">
+            <template v-if="isTheme && plugin.selectable === false">
+              Needs an update to work with this Calvin.
+            </template>
+            <template v-else-if="isTheme">
               Choose it in
               <Button variant="link" size="sm" class="pc-link" @click="$emit('open-appearance')">
                 Dashboard › Appearance
