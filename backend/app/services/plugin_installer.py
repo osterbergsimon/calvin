@@ -15,6 +15,12 @@ from loguru import logger
 
 from app.config import settings
 from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
+from app.services.plugin_packages import (
+    ensure_plugin_packages_dir,
+    ensure_plugin_packages_on_path,
+    plugin_packages_dir,
+    write_dependency_stamp,
+)
 from app.services.validation import (
     resolve_child_dir,
     validate_directory_structure,
@@ -286,6 +292,11 @@ class PluginInstaller:
             with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(manifest, f, indent=2)
 
+            # The persistent target now holds exactly what the installed plugins
+            # declare, so a container restart can trust it and skip the
+            # entrypoint's network restore (calvin-26c).
+            write_dependency_stamp(self.plugins_dir)
+
             return manifest
 
         except Exception as e:
@@ -302,14 +313,20 @@ class PluginInstaller:
     def _install_pip_requirements(self, manifest: dict[str, Any]) -> list[str]:
         """Install Python packages declared in plugin.json under dependencies.packages.
 
-        Uses the running interpreter so the packages land in the correct venv.
+        Packages go into the persistent per-Python-version target on the data
+        volume, not the image venv, so an image update does not drop them and
+        an offline restart still has them (calvin-26c). The target is appended
+        to ``sys.path`` afterwards (image packages win on conflicts), so the
+        freshly installed plugin can be imported in this process right away.
         Raises ValueError if any package fails to install so the caller can roll back.
         """
         requirements: list[str] = (manifest.get("dependencies") or {}).get("packages", [])
         if not requirements:
             return []
 
-        pip_cmd = self._resolve_pip()
+        target = ensure_plugin_packages_dir()
+        ensure_plugin_packages_on_path(target)
+        pip_cmd = self._resolve_pip(target)
         logger.info(
             f"Installing pip packages for plugin {manifest.get('id')} "
             f"using {pip_cmd}: {requirements}"
@@ -351,7 +368,11 @@ class PluginInstaller:
         """
         if not packages:
             return
-        pip_cmd = self._resolve_uninstall_pip()
+        # Packages installed before calvin-26c live in the venv; newer ones live
+        # in the persistent target. Uninstall from the target when it exists, and
+        # fall back to the venv for a pre-upgrade install that has none.
+        target = plugin_packages_dir()
+        pip_cmd = self._resolve_uninstall_pip(target if target.is_dir() else None)
         for req in packages:
             cmd = [*pip_cmd, req]
             logger.info(f"Uninstalling pip package: {' '.join(str(c) for c in cmd)}")
@@ -380,11 +401,18 @@ class PluginInstaller:
         return required
 
     @staticmethod
-    def _resolve_uninstall_pip() -> list[str]:
-        """Like _resolve_pip but for uninstall (adds -y / --python as needed)."""
+    def _resolve_uninstall_pip(target: Path | None = None) -> list[str]:
+        """Like _resolve_pip but for uninstall (adds -y / --python as needed).
+
+        With a ``target`` the packages are removed from that directory (the
+        persistent plugin-packages target); without one, from the venv.
+        """
         uv = shutil.which("uv")
         if uv:
-            cmd = [uv, "pip", "uninstall", "--python", sys.executable]
+            cmd = [uv, "pip", "uninstall"]
+            if target is not None:
+                cmd += ["--target", str(target)]
+            cmd += ["--python", sys.executable]
             if sys.platform == "win32":
                 return ["cmd", "/c"] + cmd
             return cmd
@@ -392,26 +420,36 @@ class PluginInstaller:
         for candidate in ("pip", "pip3"):
             pip_bin = bin_dir / candidate
             if pip_bin.exists():
-                return [str(pip_bin), "uninstall", "-y"]
-        return [sys.executable, "-m", "pip", "uninstall", "-y"]
+                cmd = [str(pip_bin), "uninstall", "-y"]
+                if target is not None:
+                    cmd += ["--target", str(target)]
+                return cmd
+        cmd = [sys.executable, "-m", "pip", "uninstall", "-y"]
+        if target is not None:
+            cmd += ["--target", str(target)]
+        return cmd
 
     @staticmethod
-    def _resolve_pip() -> list[str]:
-        """Return the best pip invocation prefix for the running venv.
+    def _resolve_pip(target: Path | None = None) -> list[str]:
+        """Return the best pip invocation prefix for the running venv or a target.
 
         Resolution order:
-        1. uv pip install --python <exe>   — UV-managed venvs (no pip binary installed)
-        2. bin/pip install / bin/pip3 install — conventional venvs with a pip binary
-        3. python -m pip install           — last resort
+        1. uv pip install --python <exe> [--target <dir>] — UV-managed venvs (no pip binary)
+        2. bin/pip install / bin/pip3 install [--target <dir>] — conventional venvs
+        3. python -m pip install [--target <dir>] — last resort
 
         The returned list already includes "install"; append only the package name.
+        ``--python`` goes *after* ``install`` (CLAUDE.md gotcha, commit 4d73ca2).
         """
         # 1. Prefer uv when available — works even when pip is absent from the venv.
         # On Windows, uv.exe must be launched via cmd /c (same pattern as npm) to avoid
         # STATUS_FATAL_APP_EXIT when spawning from within a running Python process.
         uv = shutil.which("uv")
         if uv:
-            cmd = [uv, "pip", "install", "--python", sys.executable]
+            cmd = [uv, "pip", "install"]
+            if target is not None:
+                cmd += ["--target", str(target)]
+            cmd += ["--python", sys.executable]
             if sys.platform == "win32":
                 return ["cmd", "/c"] + cmd
             return cmd
@@ -421,10 +459,16 @@ class PluginInstaller:
         for candidate in ("pip", "pip3"):
             pip_bin = bin_dir / candidate
             if pip_bin.exists():
-                return [str(pip_bin), "install"]
+                cmd = [str(pip_bin), "install"]
+                if target is not None:
+                    cmd += ["--target", str(target)]
+                return cmd
 
         # 3. Last resort
-        return [sys.executable, "-m", "pip", "install"]
+        cmd = [sys.executable, "-m", "pip", "install"]
+        if target is not None:
+            cmd += ["--target", str(target)]
+        return cmd
 
     def uninstall_plugin(self, plugin_id: str) -> None:
         """
@@ -459,6 +503,7 @@ class PluginInstaller:
 
         # Remove plugin directory (frontend assets live inside it, so they go too)
         shutil.rmtree(plugin_path)
+        write_dependency_stamp(self.plugins_dir)
 
     def get_installed_plugins(self) -> list[dict[str, Any]]:
         """
