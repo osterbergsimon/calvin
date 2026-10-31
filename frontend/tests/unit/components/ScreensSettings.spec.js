@@ -129,8 +129,8 @@ describe("ScreensSettings — screen list", () => {
     expect(btn.exists()).toBe(true);
     expect(btn.text()).toBe("+ Add a screen");
     // Secondary, not the filled primary style used by Edit pages.
-    expect(btn.classes()).toContain("screens__add");
-    expect(btn.classes()).not.toContain("screens__add--primary");
+    expect(btn.classes()).toContain("btn--secondary");
+    expect(btn.classes()).not.toContain("btn--primary");
     expect(wrapper.findAll("[data-test='add-screen-btn']")).toHaveLength(1);
   });
 
@@ -139,7 +139,7 @@ describe("ScreensSettings — screen list", () => {
       cfg: config({ orientation: "portrait", onScreenKeyboard: "on" }),
     });
     await flushPromises();
-    const cards = wrapper.findAll(".screens__cards .screen-card");
+    const cards = wrapper.findAll("[data-test='screens-list'] .screen-card");
     expect(cards[0].attributes("data-test")).toBe("screen-default-card");
     const def = wrapper.find("[data-test='screen-default-card']");
     expect(def.text()).toContain("Default");
@@ -400,6 +400,7 @@ describe("ScreensSettings — Name", () => {
     await selectFirst(wrapper);
 
     await wrapper.find("[data-test='screen-name-input']").setValue("Hallway");
+    await wrapper.find("[data-test='screen-name-input']").trigger("blur");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { displayName: "Hallway" });
   });
@@ -412,6 +413,7 @@ describe("ScreensSettings — Name", () => {
     await selectFirst(wrapper);
 
     await wrapper.find("[data-test='screen-name-input']").setValue("");
+    await wrapper.find("[data-test='screen-name-input']").trigger("blur");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
   });
@@ -840,7 +842,7 @@ describe("ScreensSettings — software (CLV-19)", () => {
     const empty = wrapper.find("[data-test='screen-software-empty']");
     expect(empty.text()).toContain("no kiosk software to update");
     // The note gets the normal row padding instead of sitting on the border.
-    expect(empty.classes()).toContain("screen-software__empty");
+    expect(empty.classes()).toContain("setting-row");
   });
 });
 
@@ -897,7 +899,6 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
       .map(s => s.attributes("id"))
       .filter(id => id !== "section-screens-list");
     expect(ids).toEqual([
-      "section-default-name",
       "section-default-pages",
       "section-layout",
       "section-device-power",
@@ -923,16 +924,13 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
   });
 
-  it("calls the global name Room name and writes displayName", async () => {
+  it("has no global Room name row (the name is per screen, CLV-84)", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
     await openDefault(wrapper);
 
-    expect(rowByLabel(wrapper, "Room name").props("description")).toBe(
-      "Shown in the clock bar of any browser that isn't set up as a screen."
-    );
-    await wrapper.find("[data-test='default-room-name']").setValue("Lounge");
-    expect(wrapper.emitted("update:config")).toContainEqual([{ displayName: "Lounge" }]);
+    expect(wrapper.find("[data-test='default-room-name']").exists()).toBe(false);
+    expect(rowByLabel(wrapper, "Room name")).toBeUndefined();
   });
 
   it("writes the global page allowlist and start page", async () => {

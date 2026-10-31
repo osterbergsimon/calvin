@@ -36,10 +36,11 @@ test.describe("phone: Dashboard", () => {
     await page.keyboard.press("Escape");
 
     // A change saves through the config route and keeps the layout intact.
-    const roomName = dashboard.getByLabel("Room name").first();
-    await roomName.fill("Kitchen wall");
+    const hideControls = dashboard.getByLabel("Hide controls");
+    await hideControls.click();
     await expect(page.locator(".settings-topbar__pill-label")).toHaveText(/Saved/);
     await expect.poll(() => api.requests).toContain("POST /api/config");
+    await hideControls.click();
 
     await expectPhoneLayout(page, "Dashboard settings after saving");
     expect(api.unmatched).toEqual([]);
@@ -61,7 +62,6 @@ test.describe("phone: Screens", () => {
     // Default is a screen too.
     await page.locator('[data-test="screen-default-card"]').click();
     await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
-    await expect(page.locator('[data-test="default-room-name"]')).toBeVisible();
     await expect(page.locator('[data-test="default-page-row"]')).toHaveCount(2);
     await expectPhoneLayout(page, "Screens / Default");
 

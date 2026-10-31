@@ -13,6 +13,7 @@
       :class="{ 'text-field__input--invalid': error }"
       :type="type"
       :value="modelValue"
+      :data-test="dataTest || undefined"
       :name="name || undefined"
       :placeholder="placeholder || undefined"
       :autocomplete="autocomplete"
@@ -66,6 +67,8 @@ const props = defineProps({
   autocomplete: { type: String, default: "off" },
   autocapitalize: { type: String, default: "off" },
   maxlength: { type: [String, Number], default: undefined },
+  // Attach a test id to the input itself (attrs land on the wrapper).
+  dataTest: { type: String, default: "" },
   hint: { type: String, default: "" },
   // Keep the label for assistive tech when a visible label already names the
   // group (e.g. the colour swatch and its hex value share one label).
