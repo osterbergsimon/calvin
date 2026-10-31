@@ -1,30 +1,22 @@
 <template>
   <teleport to="body">
-    <div class="link-overlay" role="dialog" aria-modal="true" @click.self="emitClose">
-      <div class="link-overlay__panel calvin-plugin-surface">
-        <button
-          type="button"
-          class="link-overlay__close"
-          data-test="close"
-          aria-label="Close"
-          @click="emitClose"
-        >
-          ×
-        </button>
-        <p class="link-overlay__host">{{ host }}</p>
-        <img v-if="qr" class="link-overlay__qr" :src="qr" alt="QR code for this link" />
-        <p class="link-overlay__hint">Scan to open on your phone</p>
-        <button type="button" class="link-overlay__open" data-test="open" @click="openNow">
-          Open ↗
-        </button>
+    <Dialog :model-value="true" label="Open this link on your phone" @close="emitClose">
+      <div class="handoff">
+        <p class="handoff__host">{{ host }}</p>
+        <img v-if="qr" class="handoff__qr" data-test="qr" :src="qr" alt="QR code for this link" />
+        <InlineNote>Scan to open on your phone</InlineNote>
+        <Button variant="primary" data-test="open" @click="openNow">Open ↗</Button>
       </div>
-    </div>
+    </Dialog>
   </teleport>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import QRCode from "qrcode";
+import Button from "@/components/ui/Button.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 
 const props = defineProps({
   url: { type: String, required: true },
@@ -55,88 +47,38 @@ const openNow = () => {
   emitClose();
 };
 
-// Dismissal: Escape + a 45s idle auto-close so a wall display can never be left
-// sitting on an overlay indefinitely.
-const onKeydown = e => {
-  if (e.key === "Escape") emitClose();
-};
+// Dismissal: Escape (Dialog) plus a 45s idle auto-close so a wall display can
+// never be left sitting on an overlay indefinitely.
 let idleTimer = null;
 onMounted(() => {
-  document.addEventListener("keydown", onKeydown, true);
   idleTimer = setTimeout(emitClose, 45000);
 });
 onBeforeUnmount(() => {
-  document.removeEventListener("keydown", onKeydown, true);
   if (idleTimer) clearTimeout(idleTimer);
 });
 </script>
 
 <style scoped>
-.link-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--bg-1) 78%, transparent);
-}
-.link-overlay__panel {
-  position: relative;
+.handoff {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.6rem;
-  padding: 1.5rem 1.75rem;
-  min-width: 240px;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
-  box-shadow: 0 12px 40px var(--shadow);
+  gap: var(--gap-3);
+  padding-bottom: var(--gap-2);
 }
-.link-overlay__close {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.55rem;
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  font-size: var(--fs-2xl);
-  line-height: 1;
-  cursor: pointer;
-}
-.link-overlay__host {
+.handoff__host {
   margin: 0;
   font-family: var(--font-data);
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-2);
   word-break: break-all;
   text-align: center;
 }
-.link-overlay__qr {
+.handoff__qr {
   width: 200px;
   height: 200px;
   image-rendering: pixelated;
-  background: var(--qr-surface);
-  border-radius: var(--radius-sm);
-}
-.link-overlay__hint {
-  margin: 0;
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-}
-.link-overlay__open {
-  margin-top: 0.25rem;
-  padding: 0.45rem 1.1rem;
-  border: 1px solid var(--focus-edge);
-  border-radius: var(--radius-sm);
-  background: var(--focus);
-  color: var(--focus-ink);
-  font-size: var(--fs-md);
-  cursor: pointer;
-}
-.link-overlay__open:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  background: var(--qr-surface); /* QR codes need a light quiet zone in dark themes too */
+  border-radius: var(--radius-control);
 }
 </style>
