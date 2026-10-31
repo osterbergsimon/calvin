@@ -116,11 +116,15 @@ GitHub → Packages → `calvin` → Package settings → Change visibility.
 root; Unraid uses `99:100`). On every start it:
 
 - creates the data layout under `/var/lib/calvin` (`CALVIN_DATA_DIR`);
-- re-installs the pip packages that installed plugins declare
-  (`dependencies.packages`), because the venv lives in the image and is
-  replaced when the container is recreated;
-- chowns the data volume and the venv to `PUID:PGID` where they differ,
-  so live plugin installs work as the unprivileged user.
+- checks the persistent plugin package target,
+  `python/<major>.<minor>/site-packages` on the volume. Plugin pip packages
+  (`dependencies.packages`) are installed there — not in the image venv,
+  which is replaced when the container is recreated. A stamp of the installed
+  plugins' dependencies marks the target current, so a normal (and an offline)
+  start does no network work; only a missing, corrupt or stale target, or a
+  new Python minor version in the image, is restored from the network;
+- chowns the data volume (including that target) and the venv to `PUID:PGID`
+  where they differ, so live plugin installs work as the unprivileged user.
 
 The image sets `CALVIN_DATA_DIR=/var/lib/calvin`, and the backend derives
 every path it writes from it (database, images, plugins, installed themes,

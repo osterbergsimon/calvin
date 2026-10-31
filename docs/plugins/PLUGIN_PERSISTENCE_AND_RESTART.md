@@ -48,8 +48,10 @@ synchronously — when the call returns success, the plugin is usable:
    `backend/data/plugins/{plugin_id}/`. Frontend assets stay inside that
    directory and are served at `/api/plugins/{plugin_id}/static/{asset}`.
 2. **Pip dependencies.** `dependencies.packages` are installed into the
-   host's venv. Any failure rolls the plugin directory back and fails the
-   install.
+   persistent target on the data volume
+   (`<data dir>/python/<major>.<minor>/site-packages`), which is appended to
+   `sys.path` so core packages keep winning on conflicts. Any failure rolls
+   the plugin directory back and fails the install.
 3. **Import + discover.** The loader imports `plugin.py` and registers every
    `BasePlugin` subclass that declares a `metadata = PluginMetadata(...)`
    attribute. `PluginMetadata` is validated at class-definition time, so a
@@ -74,7 +76,7 @@ synchronously — when the call returns success, the plugin is usable:
    (`unload_installed_plugin`) — the type disappears from
    `get_plugin_types()` without a restart.
 4. Pip packages the plugin installed (recorded in the manifest's
-   `_installed_packages`) are uninstalled from the shared venv — **except** any
+   `_installed_packages`) are uninstalled from the persistent target — **except** any
    package another installed plugin still declares, which is kept so a sibling's
    dependencies aren't broken. Uninstall is best-effort (logged, never fatal).
 5. The plugin directory (including frontend assets) is removed.

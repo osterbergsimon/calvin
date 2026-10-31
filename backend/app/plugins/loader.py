@@ -21,6 +21,7 @@ from app.plugins.base import BasePlugin, PluginType
 from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION, PluginMetadata
 from app.plugins.protocols import BackendPlugin, CalendarPlugin, ImagePlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
+from app.services.plugin_packages import ensure_plugin_packages_on_path
 from app.services.validation import validate_plugin_id
 
 _FAMILY_BASES: tuple[tuple[type[BasePlugin], PluginType], ...] = (
@@ -206,6 +207,11 @@ class PluginLoader:
         match the host's supported version — stale plugins are skipped loudly.
         """
         installed_plugins = plugin_installer.get_installed_plugins()
+
+        # Plugin pip dependencies live on the data volume, not in the image
+        # venv, so they survive an image update (calvin-26c). Appended — after
+        # the interpreter's own site-packages — so core packages win.
+        ensure_plugin_packages_on_path()
 
         # Ensure backend directory is in sys.path so plugins can import from app.*
         # Find backend directory (where this file is located: backend/app/plugins/loader.py)

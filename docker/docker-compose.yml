@@ -47,5 +47,5 @@ services:
       test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 5s
-      start_period: 180s  # entrypoint restores plugin packages first
+      start_period: 180s  # entrypoint may restore plugin packages (first start only)
       retries: 3

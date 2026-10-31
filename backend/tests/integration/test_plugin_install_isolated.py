@@ -17,6 +17,7 @@ import pytest
 from app.api.routes.plugins import management
 from app.plugins import isolated_check
 from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
+from app.services import plugin_packages
 from app.services.plugin_installer import plugin_installer
 
 
@@ -82,7 +83,11 @@ def test_child_command_puts_backend_dir_on_sys_path(tmp_path):
     assert "-m" not in cmd
     assert "sys.path.insert(0, sys.argv[1])" in cmd[3]
     assert Path(cmd[4]) == isolated_check.BACKEND_DIR
-    assert Path(cmd[5]) == tmp_path
+    # Plugin pip dependencies live on the data volume (calvin-26c) and travel
+    # as their own argument; the bootstrap appends them after installed packages.
+    assert Path(cmd[5]) == plugin_packages.plugin_packages_dir()
+    assert "sys.path.append(plugin_packages)" in cmd[3]
+    assert Path(cmd[6]) == tmp_path
 
 
 def test_child_check_runs_without_cwd_or_installed_package(tmp_path):
