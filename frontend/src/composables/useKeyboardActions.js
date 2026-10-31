@@ -14,6 +14,7 @@ import {
   normalizeDashboardScreens,
   setActiveDashboardRegion,
 } from "../utils/layout";
+import { addMonths } from "../utils/dateMath";
 
 // Back-compat: stored mappings from before py5 (vocabulary unfreeze) may still
 // carry the old `mode_*` action values. The three jump actions were renamed to
@@ -502,9 +503,9 @@ export function useKeyboardActions() {
             weekStart.setDate(weekStart.getDate() + 7);
             newDate = new Date(weekStart);
           } else {
-            // Month/Rolling view: move to next month
-            newDate = new Date(calendarStore.currentDate);
-            newDate.setMonth(newDate.getMonth() + 1);
+            // Month/Rolling view: move to next month (clamped so a month-end
+            // date cannot skip the next month, e.g. Oct 31 -> Nov 30)
+            newDate = addMonths(calendarStore.currentDate, 1);
           }
 
           // Update current date (triggers calendar rerender)
@@ -543,9 +544,9 @@ export function useKeyboardActions() {
             weekStart.setDate(weekStart.getDate() - 7);
             newDate = new Date(weekStart);
           } else {
-            // Month/Rolling view: move to previous month
-            newDate = new Date(calendarStore.currentDate);
-            newDate.setMonth(newDate.getMonth() - 1);
+            // Month/Rolling view: move to previous month (clamped so Mar 31
+            // becomes Feb 28/29 instead of Mar 3)
+            newDate = addMonths(calendarStore.currentDate, -1);
           }
 
           // Update current date (triggers calendar rerender)
