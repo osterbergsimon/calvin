@@ -66,7 +66,8 @@ const place = () => {
 
 <style scoped>
 .where-shows {
-  margin-top: var(--space-lg);
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+  border-top: 1px solid var(--line-soft);
 }
 .where-shows__title {
   margin: 0 0 var(--space-sm);

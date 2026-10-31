@@ -216,7 +216,7 @@ onBeforeUnmount(() => {
 .sl-add-row {
   display: flex;
   justify-content: flex-end;
-  padding: 0.875rem 1rem 0.5rem;
+  padding: var(--panel-pad-y) var(--panel-pad-x) var(--space-sm);
 }
 
 .sl-add {
@@ -245,7 +245,7 @@ onBeforeUnmount(() => {
 
 .sl-empty {
   margin: 0;
-  padding: 1.5rem 1rem;
+  padding: var(--space-3xl) var(--panel-pad-x);
   text-align: center;
   font-family: var(--font-ui);
   font-size: var(--fs-md);
@@ -255,8 +255,8 @@ onBeforeUnmount(() => {
 .sl-rows {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  padding: 0 1rem 1rem;
+  gap: var(--space-xs);
+  padding: 0 var(--panel-pad-x) var(--panel-pad-y);
 }
 
 .sl-row {
