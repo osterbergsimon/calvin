@@ -264,6 +264,7 @@ import CalendarRibbon from "./CalendarRibbon.vue";
 import CalendarTimedEvent from "./CalendarTimedEvent.vue";
 import { buildMonthWeeks } from "../composables/useMonthLayout";
 import { autoVisibleEventCount, DEFAULT_EVENT_ROW_HEIGHT } from "@/utils/calendarDensity";
+import { addMonths } from "@/utils/dateMath";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "./ui/IconButton.vue";
 import EmptyState from "./ui/EmptyState.vue";
@@ -1186,7 +1187,7 @@ const handleKeydown = event => {
 // - Week view: moves by 1 week (7 days)
 // - Month/Rolling view: moves by 1 month
 const navigatePrevious = () => {
-  const newDate = new Date(currentDate.value);
+  let newDate = new Date(currentDate.value);
   if (viewMode.value === "day") {
     // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
@@ -1199,8 +1200,9 @@ const navigatePrevious = () => {
     weekStart.setDate(weekStart.getDate() - 7);
     newDate.setTime(weekStart.getTime());
   } else {
-    // Month view: move to previous month
-    newDate.setMonth(newDate.getMonth() - 1);
+    // Month view: move to previous month (clamped so a month-end date such as
+    // Mar 31 -> Feb 28/29 never rolls over into the wrong month)
+    newDate = addMonths(newDate, -1);
   }
   calendarStore.setCurrentDate(newDate);
   loadEvents();
@@ -1211,7 +1213,7 @@ const navigatePrevious = () => {
 };
 
 const navigateNext = () => {
-  const newDate = new Date(currentDate.value);
+  let newDate = new Date(currentDate.value);
   if (viewMode.value === "day") {
     // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
@@ -1224,8 +1226,9 @@ const navigateNext = () => {
     weekStart.setDate(weekStart.getDate() + 7);
     newDate.setTime(weekStart.getTime());
   } else {
-    // Month view: move to next month
-    newDate.setMonth(newDate.getMonth() + 1);
+    // Month view: move to next month (clamped so Oct 31 -> Nov 30 instead of
+    // rolling over to Dec 1)
+    newDate = addMonths(newDate, 1);
   }
   calendarStore.setCurrentDate(newDate);
   loadEvents();
