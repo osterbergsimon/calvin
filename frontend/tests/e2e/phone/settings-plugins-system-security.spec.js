@@ -83,7 +83,7 @@ test.describe("phone: System", () => {
     await expectPhoneLayout(page, "restart confirmation", { scope: ".confirm-modal" });
     await confirm.getByRole("button", { name: "Restart" }).click();
     await expect.poll(() => api.hostActions).toContain("POST /api/system/restart-backend");
-    await expect(page.getByText(/Backend restarting/)).toBeVisible();
+    await expect(page.getByText(/Calvin is restarting/)).toBeVisible();
 
     expect(api.hostActions.every(call => call.startsWith("POST /api/system/"))).toBe(true);
     expect(consoleErrors).toEqual([]);

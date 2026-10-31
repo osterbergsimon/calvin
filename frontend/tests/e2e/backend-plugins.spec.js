@@ -1,6 +1,9 @@
 /**
- * E2E tests for backend plugin functionality
- * Tests functionality: backend plugin tab display, installation, listing from repo
+ * E2E tests for background plugin functionality
+ * Tests functionality: background plugin tab display, installation, listing from repo
+ *
+ * The plugin type is still "backend" in the API; the UI calls the kind
+ * "Background" (CLV-63).
  */
 
 import { test, expect } from "@playwright/test";
@@ -25,22 +28,22 @@ test.describe("Backend Plugins", () => {
     }
   });
 
-  test("should display backend tab in plugin manager", async ({ page }) => {
+  test("should display background tab in plugin manager", async ({ page }) => {
     // Look for plugin tabs
     const backendTab = page.locator(
-      'button:has-text("Backend"), [role="tab"]:has-text("Backend"), .tab:has-text("Backend")'
+      'button:has-text("Background"), [role="tab"]:has-text("Background"), .tab:has-text("Background")'
     );
 
-    // Backend tab should be visible (even if no plugins installed)
+    // Background tab should be visible (even if no plugins installed)
     const tabCount = await backendTab.count();
     expect(tabCount).toBeGreaterThan(0);
   });
 
-  test("should show backend plugins when backend tab is active", async ({ page }) => {
-    // Click backend tab
+  test("should show background plugins when background tab is active", async ({ page }) => {
+    // Click background tab
     const backendTab = page
       .locator(
-        'button:has-text("Backend"), [role="tab"]:has-text("Backend"), .tab:has-text("Backend")'
+        'button:has-text("Background"), [role="tab"]:has-text("Background"), .tab:has-text("Background")'
       )
       .first();
 
@@ -48,10 +51,10 @@ test.describe("Backend Plugins", () => {
       await backendTab.click();
       await page.waitForTimeout(500);
 
-      // Should show backend plugins or empty state
+      // Should show background plugins or empty state
       const pluginList = page.locator(".plugin-list, .plugins, [class*='plugin']");
       const emptyState = page.locator(
-        ':has-text("backend"), :has-text("Backend"), :has-text("No backend")'
+        ':has-text("background"), :has-text("Background"), :has-text("No background")'
       );
 
       // Either plugins or empty state should be visible
@@ -135,10 +138,10 @@ test.describe("Backend Plugins", () => {
     expect(badgeCount).toBeGreaterThanOrEqual(0);
   });
 
-  test("should filter plugins by backend type", async ({ page }) => {
-    // Click backend tab
+  test("should filter plugins by background type", async ({ page }) => {
+    // Click background tab
     const backendTab = page
-      .locator('button:has-text("Backend"), [role="tab"]:has-text("Backend")')
+      .locator('button:has-text("Background"), [role="tab"]:has-text("Background")')
       .first();
 
     if ((await backendTab.count()) > 0) {
@@ -155,9 +158,9 @@ test.describe("Backend Plugins", () => {
         // but we can verify the tab is working
         expect(pluginCount).toBeGreaterThanOrEqual(0);
       } else {
-        // Empty state should mention backend
+        // Empty state should mention background
         const emptyState = page.locator(
-          ':has-text("backend"), :has-text("Backend"), :has-text("No")'
+          ':has-text("background"), :has-text("Background"), :has-text("No")'
         );
         const emptyCount = await emptyState.count();
         expect(emptyCount).toBeGreaterThanOrEqual(0);
