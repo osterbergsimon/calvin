@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
+import ColourField from "@/components/ui/ColourField.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 vi.mock("@/services/pluginsApi", () => ({
@@ -69,22 +70,6 @@ describe("InstanceModal form", () => {
     expect(text).not.toContain("Test Connection");
   });
 
-  it("puts the Colour label above the swatch and hex row", async () => {
-    const wrapper = await mountModal();
-
-    const label = wrapper.get(".colour-label");
-    const row = wrapper.get(".colour-row");
-    expect(label.text()).toBe("Colour");
-    expect(label.attributes("for")).toBe("instance-calendar-colour");
-    expect(label.element.nextElementSibling).toBe(row.element);
-
-    // The hex field is named by the group label that sits above the row.
-    const hexLabel = wrapper.get(".colour-value .text-field__label");
-    expect(hexLabel.text()).toBe("Colour value");
-    expect(hexLabel.classes()).toContain("text-field__label--hidden");
-    expect(wrapper.findAll(".text-field__label--hidden")).toHaveLength(1);
-  });
-
   it("removes the panel inset from both dialog toggle rows", async () => {
     const wrapper = await mountModal();
 
@@ -103,6 +88,18 @@ describe("InstanceModal form", () => {
     const switches = wrapper.findAll('[role="switch"]');
     expect(switches.map(s => s.attributes("aria-label"))).toEqual(["Show event times", "Enabled"]);
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
+  });
+
+  it("uses the shared ColourField, not a native colour input plus hex box", async () => {
+    const wrapper = await mountModal();
+
+    const colour = wrapper.findComponent(ColourField);
+    expect(colour.exists()).toBe(true);
+    expect(colour.props("label")).toBe("Colour");
+    expect(wrapper.find('input[type="text"][aria-label="Colour value"]').exists()).toBe(false);
+    expect(wrapper.find('input[type="color"]').attributes("aria-label")).toBe(
+      "Custom colour picker"
+    );
   });
 
   it("wires the show-event-times toggle to the form value", async () => {
