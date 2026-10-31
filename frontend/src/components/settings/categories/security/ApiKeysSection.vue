@@ -1,246 +1,167 @@
 <template>
   <SettingsSection id="security-api-keys" title="API keys">
-    <div class="api-keys">
-      <p class="api-keys__intro">
-        Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each
-        one its own key.
-      </p>
+    <template v-if="store.keys.length && !formOpen && !secret" #action>
+      <Button data-test="api-keys-create" @click="openForm">Create key</Button>
+    </template>
 
-      <p class="api-keys__live" aria-live="polite" data-test="api-key-live">{{ liveMessage }}</p>
+    <SettingRow label="Keys" stacked>
+      <template #description>
+        <InlineNote>
+          Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give
+          each one its own key.
+        </InlineNote>
+        <InlineNote aria-live="polite" data-test="api-key-live">{{ liveMessage }}</InlineNote>
+      </template>
+    </SettingRow>
 
-      <!-- Show once -->
-      <div v-if="secret" class="api-keys__result" data-test="api-key-result">
-        <h4
-          ref="resultTitle"
-          class="api-keys__result-title"
-          tabindex="-1"
-          data-test="api-key-result-title"
-        >
-          Copy your key now
-        </h4>
-        <p class="api-keys__muted">
+    <!-- Show once -->
+    <SettingRow v-if="secret" label="New key" stacked>
+      <Card data-test="api-key-result">
+        <h3 ref="resultTitle" tabindex="-1" data-test="api-key-result-title">Copy your key now</h3>
+        <InlineNote>
           You won't be able to see it again. If you lose it, revoke it and create a new one.
-        </p>
-        <div class="api-keys__secret-row">
-          <input
-            ref="secretInput"
-            class="api-keys__secret"
-            type="text"
-            readonly
-            spellcheck="false"
-            autocomplete="off"
-            :value="secret"
-            :aria-label="`New API key for ${createdKey.name}`"
-            data-test="api-key-secret"
-            @focus="selectSecret"
-            @click="selectSecret"
-          />
-          <button type="button" class="security-btn" data-test="api-key-copy" @click="copySecret">
-            {{ copyLabel }}
-          </button>
-        </div>
-        <p v-if="copyState === 'failed'" class="api-keys__muted api-keys__hint">
+        </InlineNote>
+        <TextField
+          ref="secretInput"
+          :model-value="secret"
+          :label="`New API key for ${createdKey?.name}`"
+          input-id="api-key-secret"
+          readonly
+          @focusin="selectSecret"
+          @click="selectSecret"
+        />
+        <Button data-test="api-key-copy" @click="copySecret">{{ copyLabel }}</Button>
+        <InlineNote v-if="copyState === 'failed'">
           Press Ctrl+C (or long-press → Copy) to copy the selected key.
-        </p>
-        <p class="api-keys__muted api-keys__small">
-          Send it as <code>Authorization: Bearer &lt;key&gt;</code>
-        </p>
-        <button type="button" class="security-btn" data-test="api-key-done" @click="done">
-          Done
-        </button>
-      </div>
+        </InlineNote>
+        <InlineNote> Send it as <code>Authorization: Bearer &lt;key&gt;</code> </InlineNote>
+        <Button data-test="api-key-done" @click="done">Done</Button>
+      </Card>
+    </SettingRow>
 
-      <!-- Create form -->
-      <form
-        v-else-if="formOpen"
-        class="api-keys__form"
-        novalidate
-        data-test="api-key-form"
-        @submit.prevent="submit"
-      >
-        <div class="api-keys__field">
-          <label class="api-keys__label" for="api-key-name">Name</label>
-          <input
-            id="api-key-name"
-            v-model="name"
-            class="api-keys__input"
-            type="text"
-            maxlength="40"
-            placeholder="Home Assistant"
-            autocomplete="off"
-            :aria-invalid="nameError ? 'true' : 'false'"
-            aria-describedby="api-key-name-hint"
-            data-test="api-key-name"
-          />
-          <p id="api-key-name-hint" class="api-keys__muted api-keys__small">
-            So you know which app uses it.
-          </p>
-          <p v-if="nameError" class="api-keys__error" role="alert">{{ nameError }}</p>
-        </div>
+    <!-- Create form -->
+    <SettingRow v-else-if="formOpen" label="Create a key" stacked>
+      <form data-test="api-key-form" novalidate @submit.prevent="submit">
+        <TextField
+          v-model="name"
+          label="Name"
+          input-id="api-key-name"
+          maxlength="40"
+          placeholder="Home Assistant"
+          hint="So you know which app uses it."
+          :error="nameError"
+        />
 
-        <fieldset class="api-keys__scopes">
-          <legend class="api-keys__label">What it can do</legend>
-          <div class="api-keys__cards">
-            <label
-              v-for="option in scopeOptions"
-              :key="option.value"
-              class="api-keys__card"
-              :class="{
-                'api-keys__card--host': option.value === 'host',
-                'api-keys__card--selected': scope === option.value,
-                'api-keys__card--disabled': isDisabled(option),
-              }"
-              :aria-disabled="isDisabled(option) ? 'true' : undefined"
-              :data-test="`scope-card-${option.value}`"
-            >
+        <fieldset>
+          <legend>What it can do</legend>
+          <ListRow
+            v-for="option in scopeOptions"
+            :key="option.value"
+            :name="option.label"
+            :selected="scope === option.value"
+            :disabled="isDisabled(option)"
+            :data-test="`scope-card-${option.value}`"
+            @click="selectScope(option)"
+          >
+            <template #lead>
               <input
                 v-model="scope"
                 type="radio"
                 name="api-key-scope"
-                class="api-keys__radio"
                 :value="option.value"
                 :disabled="isDisabled(option)"
+                :aria-label="option.label"
                 :aria-describedby="`api-key-scope-${option.value}-desc`"
                 :data-test="`scope-${option.value}`"
               />
-              <span class="api-keys__card-label">
-                <template v-if="option.value === 'host'">⚠ </template>{{ option.label }}
-              </span>
-              <span :id="`api-key-scope-${option.value}-desc`" class="api-keys__card-desc">
+            </template>
+            <template #meta>
+              <span :id="`api-key-scope-${option.value}-desc`">
                 {{ isDisabled(option) ? HOST_UNAVAILABLE : option.description }}
               </span>
-              <span
-                v-if="option.value === 'host' && !isDisabled(option)"
-                class="api-keys__card-warn"
-              >
+              <InlineNote v-if="option.value === 'host' && !isDisabled(option)" tone="err">
                 Anyone with this key can reboot the machine Calvin runs on.
-              </span>
-            </label>
-          </div>
+              </InlineNote>
+            </template>
+          </ListRow>
         </fieldset>
 
-        <label v-if="scope === 'host'" class="api-keys__ack">
+        <label v-if="scope === 'host'">
           <input v-model="hostAck" type="checkbox" data-test="api-key-host-ack" />
           I understand this key can reboot this machine.
         </label>
 
-        <p v-if="showTouchHint" class="api-keys__muted api-keys__small">
+        <InlineNote v-if="showTouchHint">
           Easier on the computer where you'll paste it: the key is only shown once.
-        </p>
+        </InlineNote>
 
-        <div class="api-keys__actions">
-          <button
-            type="submit"
-            class="security-btn security-btn--primary"
-            data-test="api-key-submit"
-            :disabled="creating || (scope === 'host' && !hostAck)"
-          >
-            {{ creating ? "Creating…" : "Create key" }}
-          </button>
-          <button
-            type="button"
-            class="security-btn"
-            data-test="api-key-cancel"
-            :disabled="creating"
-            @click="closeForm"
-          >
-            Cancel
-          </button>
-        </div>
-        <p v-if="createError" class="api-keys__error" role="alert">{{ createError }}</p>
-      </form>
-
-      <!-- Loading / error / empty / list -->
-      <template v-if="store.loading && !store.keys.length">
-        <div
-          v-for="n in 3"
-          :key="n"
-          class="api-keys__skeleton"
-          data-test="api-keys-skeleton"
-          aria-hidden="true"
-        ></div>
-      </template>
-
-      <div v-else-if="store.loadFailed && !store.keys.length" class="api-keys__empty">
-        <p>Couldn't load API keys.</p>
-        <button type="button" class="security-btn" data-test="api-keys-retry" @click="load">
-          Try again
-        </button>
-      </div>
-
-      <div
-        v-else-if="!store.keys.length && !formOpen && !secret"
-        class="api-keys__empty"
-        data-test="api-keys-empty"
-      >
-        <p class="api-keys__empty-title">No API keys yet.</p>
-        <p class="api-keys__muted">
-          Create one to let Home Assistant or a script read or change Calvin.
-        </p>
-        <button
-          type="button"
-          class="security-btn security-btn--primary"
-          data-test="api-keys-create"
-          @click="openForm"
+        <Button
+          type="submit"
+          variant="primary"
+          data-test="api-key-submit"
+          :disabled="scope === 'host' && !hostAck"
+          :loading="creating"
+          loading-label="Creating…"
         >
           Create key
-        </button>
-      </div>
+        </Button>
+        <Button data-test="api-key-cancel" :disabled="creating" @click="closeForm">Cancel</Button>
+        <InlineNote v-if="createError" tone="err" role="alert">{{ createError }}</InlineNote>
+      </form>
+    </SettingRow>
 
-      <template v-if="store.keys.length">
-        <SettingRow
-          v-for="item in store.keys"
-          :key="item.id"
-          :stacked="isPhone"
-          :label="item.name"
-          data-test="api-key-row"
-        >
-          <template #label-extra>
-            <Tag
-              class="api-keys__chip"
-              :tone="item.scope === 'host' ? 'err' : 'neutral'"
-              :icon="item.scope === 'host' ? mdiAlert : null"
-              data-test="api-key-scope"
-            >
-              {{ scopeChip(item.scope) }}
-            </Tag>
-          </template>
-          <template #description>
-            <p class="setting-row__desc">
-              <span class="api-keys__prefix">{{ item.prefix }}…</span>
-              · Created {{ formatKeyDate(item.createdAt, now()) }} ·
-              {{
-                item.lastUsedAt
-                  ? `Last used ${formatLastUsed(item.lastUsedAt, now())}`
-                  : "Never used"
-              }}
-            </p>
-            <p
-              v-if="item.scope === 'host' && environment?.host_control === false"
-              class="api-keys__muted api-keys__small"
-            >
-              Host actions are blocked: this Calvin doesn't control its machine.
-            </p>
-            <p v-if="rowErrors[item.id]" class="api-keys__row-error" data-test="api-key-row-error">
-              Couldn't revoke this key. Try again.
-            </p>
-          </template>
-          <button
-            type="button"
-            class="security-btn api-keys__revoke"
-            data-test="api-key-revoke"
-            @click="askRevoke(item)"
+    <!-- Loading / error / empty / list -->
+    <SettingRow v-if="store.loading && !store.keys.length" label="Loading keys" stacked>
+      <Card v-for="n in 3" :key="n" data-test="api-keys-skeleton" aria-hidden="true" />
+    </SettingRow>
+
+    <SettingRow
+      v-else-if="store.loadFailed && !store.keys.length"
+      label="API keys"
+      description="Couldn't load API keys."
+    >
+      <Button data-test="api-keys-retry" @click="load">Try again</Button>
+    </SettingRow>
+
+    <SettingRow
+      v-else-if="!store.keys.length && !formOpen && !secret"
+      label="No API keys yet."
+      description="Create one to let Home Assistant or a script read or change Calvin."
+      data-test="api-keys-empty"
+    >
+      <Button variant="primary" data-test="api-keys-create" @click="openForm">Create key</Button>
+    </SettingRow>
+
+    <SettingRow v-if="store.keys.length" label="Your keys" stacked>
+      <ListRow v-for="item in store.keys" :key="item.id" :name="item.name" data-test="api-key-row">
+        <template #meta>
+          <span>
+            {{ item.prefix }}… · Created {{ formatKeyDate(item.createdAt, now()) }} ·
+            {{
+              item.lastUsedAt ? `Last used ${formatLastUsed(item.lastUsedAt, now())}` : "Never used"
+            }}
+          </span>
+          <InlineNote v-if="item.scope === 'host' && environment?.host_control === false">
+            Host actions are blocked: this Calvin doesn't control its machine.
+          </InlineNote>
+          <InlineNote v-if="rowErrors[item.id]" tone="err" data-test="api-key-row-error">
+            Couldn't revoke this key. Try again.
+          </InlineNote>
+        </template>
+        <template #actions>
+          <Tag
+            :tone="item.scope === 'host' ? 'err' : 'neutral'"
+            :icon="item.scope === 'host' ? mdiAlert : null"
+            data-test="api-key-scope"
           >
+            {{ scopeChip(item.scope) }}
+          </Tag>
+          <Button variant="danger" size="sm" data-test="api-key-revoke" @click="askRevoke(item)">
             Revoke
-          </button>
-        </SettingRow>
-        <div v-if="!formOpen && !secret" class="api-keys__more">
-          <button type="button" class="security-btn" data-test="api-keys-create" @click="openForm">
-            Create key
-          </button>
-        </div>
-      </template>
-    </div>
+          </Button>
+        </template>
+      </ListRow>
+    </SettingRow>
 
     <ConfirmModal
       :show="Boolean(revoking)"
@@ -262,6 +183,11 @@ import { useSystem } from "@/composables/useSystem";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { formatKeyDate, formatLastUsed } from "@/utils/apiKeyFormat";
 import { logError } from "@/utils/logger";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
+import TextField from "@/components/ui/TextField.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
@@ -313,7 +239,6 @@ const width = ref(typeof window === "undefined" ? 1024 : window.innerWidth);
 const onResize = () => {
   width.value = window.innerWidth;
 };
-const isPhone = computed(() => width.value < 480);
 const showTouchHint = computed(() => isTouch.value && width.value >= 720);
 const hostUnavailable = computed(() => environment.value?.host_control === false);
 const copyLabel = computed(() =>
@@ -328,6 +253,9 @@ const now = () => new Date();
 const scopeChip = value =>
   value === "host" ? "Host control" : (scopeOptions.find(o => o.value === value)?.label ?? value);
 const isDisabled = option => option.value === "host" && hostUnavailable.value;
+const selectScope = option => {
+  if (!isDisabled(option)) scope.value = option.value;
+};
 
 watch(scope, () => {
   hostAck.value = false;
@@ -475,209 +403,3 @@ async function revoke() {
   }
 }
 </script>
-
-<style scoped>
-.api-keys {
-  padding: 0.75rem 0 0.25rem;
-}
-.api-keys__intro {
-  margin: 0 1.25rem 0.75rem;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.api-keys__live {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-.api-keys__muted {
-  margin: 0.25rem 0 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.api-keys__small {
-  font-size: var(--fs-xs);
-}
-.api-keys__hint {
-  margin-bottom: 0.5rem;
-}
-.api-keys__error,
-.api-keys__row-error {
-  margin: 0.4rem 0 0;
-  font-size: var(--fs-xs);
-  color: var(--err-text);
-}
-.api-keys__empty {
-  padding: 0.75rem 1.25rem 1.25rem;
-  border-top: 1px solid var(--line-soft);
-}
-.api-keys__empty-title {
-  margin: 0;
-  font-weight: 600;
-  color: var(--ink);
-}
-.api-keys__empty .security-btn {
-  margin-top: 0.75rem;
-}
-.api-keys__skeleton {
-  height: 3.5rem;
-  margin: 0.5rem 1.25rem;
-  border-radius: var(--radius-md);
-  background: var(--bg-2);
-}
-.api-keys__more {
-  padding: 0.75rem 1.25rem 1rem;
-  border-top: 1px solid var(--line-soft);
-}
-
-.api-keys__form,
-.api-keys__result {
-  margin: 0 1.25rem 1rem;
-}
-.api-keys__form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-.api-keys__label {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-}
-.api-keys__input,
-.api-keys__secret {
-  box-sizing: border-box;
-  width: 100%;
-  min-height: var(--touch-target);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
-  font-size: var(--fs-control);
-}
-.api-keys__input:focus,
-.api-keys__secret:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-.api-keys__scopes {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  min-width: 0;
-}
-.api-keys__cards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.6rem;
-}
-@media (min-width: 600px) {
-  .api-keys__cards {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-.api-keys__card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  min-height: 44px;
-  padding: 0.75rem 0.85rem 0.75rem 2.2rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.api-keys__card--selected {
-  border-color: var(--focus);
-}
-.api-keys__card--host.api-keys__card--selected {
-  border-color: var(--err);
-  background: color-mix(in srgb, var(--err) 6%, transparent);
-}
-.api-keys__card--disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.api-keys__radio {
-  position: absolute;
-  top: 0.9rem;
-  left: 0.8rem;
-  margin: 0;
-}
-.api-keys__card-label {
-  font-weight: 600;
-  color: var(--ink);
-}
-.api-keys__card--host .api-keys__card-label {
-  color: var(--err-text);
-}
-.api-keys__card-desc {
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.api-keys__card-warn {
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--err-text);
-}
-.api-keys__ack {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  min-height: 44px;
-  font-size: var(--fs-md);
-  color: var(--ink);
-}
-.api-keys__actions {
-  display: flex;
-  gap: 10px;
-}
-
-.api-keys__result {
-  padding: 1.25rem;
-  border: 1px solid var(--focus);
-  border-radius: var(--radius-xl);
-}
-.api-keys__result-title {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--ink);
-}
-.api-keys__result-title:focus {
-  /* a11y-allow-no-outline: result heading receives programmatic focus only */
-  outline: none;
-}
-.api-keys__secret-row {
-  display: flex;
-  gap: 0.5rem;
-  margin: 0.75rem 0;
-}
-.api-keys__secret {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-data);
-  font-size: var(--fs-md);
-}
-.api-keys__result .security-btn:last-child {
-  margin-top: 0.75rem;
-}
-
-.api-keys__chip {
-  margin-left: var(--space-sm);
-}
-.api-keys__prefix {
-  font-family: var(--font-data);
-}
-.api-keys__revoke {
-  color: var(--err-text);
-}
-</style>

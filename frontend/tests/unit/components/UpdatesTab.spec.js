@@ -94,8 +94,8 @@ describe("UpdatesTab", () => {
     const labelFor = async status => {
       systemMock.updateStatus.value = { status };
       const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
-      const row = wrapper.findAll(".readout-line")[1];
-      return row.find(".readout-val").text();
+      const row = wrapper.find('[data-test="readout-updates"]');
+      return row.find('[data-test="update-status-value"]').text();
     };
 
     expect(await labelFor("idle")).toBe("Up to date");
@@ -121,10 +121,10 @@ describe("UpdatesTab", () => {
     };
     const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
 
-    expect(wrapper.find(".readout-note").text()).toBe(
+    expect(wrapper.find('[data-test="readout-note"]').text()).toBe(
       "Something went wrong on the Calvin server while trying to check on Calvin."
     );
-    const details = wrapper.find("details.readout-details");
+    const details = wrapper.find('[data-test="readout-details"]');
     expect(details.exists()).toBe(true);
     expect(details.find("summary").text()).toBe("Details");
     expect(details.text()).toContain("Request failed with status code 500");
