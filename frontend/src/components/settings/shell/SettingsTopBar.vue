@@ -8,7 +8,14 @@
     </div>
 
     <div class="settings-topbar__right">
-      <div v-if="!locked" class="settings-topbar__pill" :data-state="saveState">
+      <div
+        v-if="!locked"
+        class="settings-topbar__pill"
+        :data-state="saveState"
+        role="status"
+        :aria-label="pillLabel"
+        :title="pillLabel"
+      >
         <span class="settings-topbar__dot" :class="dotClass" aria-hidden="true"></span>
         <span class="settings-topbar__pill-label">{{ pillLabel }}</span>
       </div>
@@ -204,6 +211,15 @@ const dotClass = computed(() => {
    button only squeezes the bar on a 390px screen. */
 @media (max-width: 600px) {
   .settings-topbar__phone {
+    display: none;
+  }
+  /* "All changes saved" wrapped onto two lines and squeezed the section title
+     to "Scr…" on a phone. Keep the dot alone; the full wording stays on the
+     pill's accessible name and tooltip. */
+  .settings-topbar__pill {
+    padding: 6px;
+  }
+  .settings-topbar__pill-label {
     display: none;
   }
 }

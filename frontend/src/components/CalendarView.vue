@@ -1421,7 +1421,14 @@ onActivated(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  /* A narrow region cannot fit the title and every control on one row. Let the
+     controls wrap under the title instead of clipping at the right edge and
+     squeezing the month name away (CLV-91). */
+  flex-wrap: wrap;
   flex-shrink: 0;
+  /* The header grows to the height of its wrapped rows; never clip a row. */
+  height: auto;
+  overflow: visible;
   /* Panel body is flush now, so the header carries its own inset — top + sides
      line the month label up with the grid (0.5rem) instead of jamming it into
      the corner; the bottom keeps the gap above the grid. */
@@ -1438,6 +1445,9 @@ onActivated(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* The title is the one thing that must never vanish: it keeps the first line
+     and truncates with an ellipsis when even it alone is too wide. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -1445,7 +1455,17 @@ onActivated(() => {
   display: flex;
   align-items: center;
   gap: 0.35rem;
-  flex-shrink: 0;
+  /* If the controls themselves are wider than the region, wrap them rather
+     than letting the right edge clip. `margin-left: auto` keeps them right-
+     aligned when they move to their own row. */
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  min-width: 0;
+  /* Do not hold the row at its max-content width: that is what pushed the last
+     button past the region edge. Let the controls shrink onto their own row so
+     their buttons wrap inside it instead of disappearing (CLV-91). */
+  flex: 0 1 auto;
 }
 
 /* The view-switch's chrome comes from ui/Button; only its caret stays local. */

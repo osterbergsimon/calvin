@@ -252,4 +252,43 @@ describe("ClockBarHorizontal", () => {
     await flushPromises();
     expect(wrapper.find(".clock-bar-room").exists()).toBe(false);
   });
+
+  it("keeps the screen dots in the left group the phone rule hides", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.dashboardScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+          },
+        },
+        {
+          id: "media",
+          name: "Media",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "photos", size: 100 }],
+          },
+        },
+      ],
+    };
+
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+
+    expect(wrapper.find(".clock-bar-left .screen-dots").exists()).toBe(true);
+    expect(wrapper.find(".clock-bar-content .clock-time").exists()).toBe(true);
+  });
 });

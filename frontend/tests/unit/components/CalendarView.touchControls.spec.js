@@ -66,6 +66,16 @@ describe("CalendarView touch controls", () => {
     expect(w.find(".calendar-header__controls").exists()).toBe(true);
   });
 
+  it("keeps the month title and controls as separate header groups so the header can wrap", () => {
+    const w = mountCal({ focused: true });
+    const label = w.find(".calendar-header > .calendar-header__label");
+    const controls = w.find(".calendar-header > .calendar-header__controls");
+    expect(label.exists()).toBe(true);
+    expect(label.text()).not.toBe("");
+    expect(controls.exists()).toBe(true);
+    expect(controls.find(".calendar-header__view-switch").exists()).toBe(true);
+  });
+
   it("hides the control row on a keyboard-only kiosk even when focused", () => {
     touch.hasPointer.value = false;
     const w = mountCal({ focused: true });
