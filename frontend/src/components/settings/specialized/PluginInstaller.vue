@@ -13,14 +13,13 @@
         :disabled="installing"
       />
 
-      <div v-if="catalogTypeOptions.length > 1" class="catalog-filters">
-        <SegmentedControl
-          :model-value="activeTypeTab"
-          :options="catalogTypeOptions"
-          aria-label="Plugin kind"
-          @update:model-value="activeTypeTab = $event"
-        />
-      </div>
+      <Tabs
+        v-if="catalogTypeOptions.length > 1"
+        :model-value="activeTypeTab"
+        :items="catalogTypeOptions"
+        aria-label="Plugin kind"
+        @update:model-value="activeTypeTab = $event"
+      />
 
       <InlineNote v-if="catalogEnumerating">Loading the catalog…</InlineNote>
       <InlineNote v-else-if="catalogError" tone="err">{{ catalogError }}</InlineNote>
@@ -396,7 +395,7 @@ import { ref, computed, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
-import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
 import * as pluginsApi from "@/services/pluginsApi";
@@ -799,12 +798,6 @@ watch(searchQuery, () => {
   font-size: var(--text-label);
   font-weight: var(--weight-strong);
   color: var(--ink);
-}
-
-.catalog-filters {
-  display: flex;
-  max-width: 100%;
-  overflow-x: auto;
 }
 
 .catalog-list {

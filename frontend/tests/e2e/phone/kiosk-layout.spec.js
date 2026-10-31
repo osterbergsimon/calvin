@@ -46,7 +46,7 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
   await expect(editor).toBeVisible();
   await expect(editor).toHaveClass(/size-compact/);
   await expectPhoneLayout(page, "pages editor at 800x480", { settleMs: 2000 });
-  await editor.getByRole("button", { name: "Close editor" }).click();
+  await page.getByRole("button", { name: "Close editor" }).click();
 
   expect(api.unmatched).toEqual([]);
   expect(consoleErrors).toEqual([]);

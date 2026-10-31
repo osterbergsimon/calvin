@@ -1,24 +1,40 @@
 <template>
   <template v-if="modelValue">
-    <DialogScrim @dismiss="onScrim" />
-    <div ref="overlayEl" class="dialog-overlay dialog-above-osk" @click.self="onScrim">
+    <DialogScrim :blur="scrimBlur" @dismiss="onScrim" />
+    <div
+      ref="overlayEl"
+      class="dialog-overlay dialog-above-osk"
+      :class="{
+        'dialog-overlay--full': size === 'full',
+        'dialog-overlay--bleed': size === 'full' && bleed,
+      }"
+      @click.self="onScrim"
+    >
       <div
         ref="panelEl"
         class="dialog"
-        :class="{ 'dialog--wide': wide }"
+        :class="{
+          'dialog--sm': size === 'sm',
+          'dialog--wide': wide,
+          'dialog--full': size === 'full',
+          'dialog--bleed': size === 'full' && bleed,
+        }"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="hasTitle ? titleId : undefined"
         :aria-label="hasTitle ? undefined : label || undefined"
         tabindex="-1"
       >
-        <header v-if="hasTitle || dismissible" class="dialog__header">
-          <h2 v-if="hasTitle" :id="titleId" class="dialog__title">
-            <slot name="title">{{ title }}</slot>
-          </h2>
+        <header v-if="hasTitle || dismissible || $slots.subtitle" class="dialog__header">
+          <div v-if="hasTitle || $slots.subtitle" class="dialog__heading">
+            <h2 v-if="hasTitle" :id="titleId" class="dialog__title">
+              <slot name="title">{{ title }}</slot>
+            </h2>
+            <p v-if="$slots.subtitle" class="dialog__subtitle"><slot name="subtitle" /></p>
+          </div>
           <IconButton
             v-if="dismissible"
-            label="Close"
+            :label="closeLabel"
             size="md"
             variant="ghost"
             @click="requestClose"
@@ -56,8 +72,21 @@ const props = defineProps({
   label: { type: String, default: "" },
   // Wider sheet for editors (the sign-in dialog's two-column layout).
   wide: { type: Boolean, default: false },
+  // sm = a short confirm, md = the default form, full = the pages editor's
+  // large sheet. `bleed` makes full edge-to-edge (no gutter, border or radius),
+  // which the editor turns on when its measured space is compact or phone.
+  size: {
+    type: String,
+    default: "md",
+    validator: value => ["sm", "md", "full"].includes(value),
+  },
+  bleed: { type: Boolean, default: false },
   // A blocking dialog (a required setup step) keeps Escape and the scrim inert.
   dismissible: { type: Boolean, default: true },
+  // Accessible name for the close control (the pages editor says "Close editor").
+  closeLabel: { type: String, default: "Close" },
+  // Blur the scrim behind a large editor sheet.
+  scrimBlur: { type: Boolean, default: false },
   // Optional selector for the control that should take focus first.
   initialFocus: { type: String, default: "" },
 });
@@ -110,8 +139,14 @@ function restoreFocus() {
   nextTick(() => target?.focus?.());
 }
 
+// A SelectPill, Menu or Popover inside the dialog is a floating surface of its
+// own: Escape closes that, not the editor behind it. Their panels teleport to
+// <body>, so detect them from the event target rather than the DOM subtree.
+const NESTED_OVERLAY = '[role="listbox"], [role="menu"], .popover__panel';
+
 function onKeydown(event) {
   if (event.key === "Escape") {
+    if (event.target?.closest?.(NESTED_OVERLAY)) return;
     if (!props.dismissible) return;
     event.preventDefault();
     close();
@@ -204,6 +239,53 @@ onBeforeUnmount(() => {
   width: min(56rem, 100%);
 }
 
+/* A short confirm. */
+.dialog--sm {
+  width: min(24rem, 100%);
+}
+
+/* The full-size editor sheet: as large as the space above the OSK allows,
+   with the page gutter kept on a roomy screen. `bleed` drops the gutter,
+   border and radius when the editor measures itself as compact or phone. */
+.dialog-overlay--full {
+  padding: 2.5vh 2vw;
+}
+
+.dialog-overlay--bleed {
+  padding: 0;
+}
+
+.dialog--full {
+  width: min(1240px, 100%);
+  height: min(820px, 100%);
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.dialog--full.dialog--bleed {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The full sheet's content owns the scrolling (the editor's stage and rail),
+   so its body is a flex column with no inset of its own. */
+.dialog--full .dialog__header {
+  align-items: center;
+  padding: var(--gap-4) var(--gap-5);
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog--full .dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
 .dialog__header {
   display: flex;
   align-items: flex-start;
@@ -211,15 +293,25 @@ onBeforeUnmount(() => {
   padding: var(--gap-4) var(--gap-5) 0;
 }
 
-.dialog__title {
+.dialog__heading {
   flex: 1;
   min-width: 0;
+}
+
+.dialog__title {
   margin: 0;
   font-family: var(--font-ui);
   font-size: var(--text-title);
   font-weight: var(--weight-title);
   line-height: 1.3;
   color: var(--ink);
+}
+
+.dialog__subtitle {
+  margin: var(--gap-1) 0 0;
+  font-size: var(--text-meta);
+  line-height: 1.4;
+  color: var(--ink-3);
 }
 
 .dialog__body {

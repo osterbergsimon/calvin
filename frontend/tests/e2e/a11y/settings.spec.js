@@ -67,7 +67,7 @@ for (const viewport of VIEWPORTS) {
           await expectAccessible(page, testInfo, `${viewport.name}/${theme}: region inspector`);
         }
 
-        await editor.getByRole("button", { name: "Close editor" }).click();
+        await page.getByRole("button", { name: "Close editor" }).click();
         await expect(editor).toBeHidden();
 
         expect(consoleErrors).toEqual([]);
