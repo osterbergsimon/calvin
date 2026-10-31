@@ -18,7 +18,7 @@ the field; `hidden` skipped). Copy rules: settings audit §5 and the no-develope
   page or app".
 - **`instance_label`** (used in "Add {label}" titles) is Title Case or missing.
 
-## 2. Decisions (flagged; recommendations given)
+## 2. Decisions (owner approved P1 and P2, 2026-10-31)
 
 - **P1. Icons are mdi names** (recommended): `icon: "mdi:<name>"`. The host resolves it from a **curated map** in
   `frontend/src/utils/pluginIcon.js` (about 30 names, imported individually from `@mdi/js`, so the bundle grows by a
