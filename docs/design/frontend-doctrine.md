@@ -100,7 +100,8 @@ Rules:
 | Setting | `SettingRow` | label/description markup by hand |
 | Item in a list (source, screen, key, plugin) | **`ListRow.vue` (new)**, extracted from `SourceList`: lead (dot/thumb/icon), body (name `--text-label` + meta lines), trailing actions group | per-feature cards |
 | Empty | `EmptyState` | an ad-hoc centred paragraph |
-| Confirm / dialog | `ConfirmModal`, `DialogScrim` | custom overlays |
+| Confirm / dialog | `ConfirmModal`, `DialogScrim`; `Dialog` with `size` = `sm` / `md` (default) / **`full`** (edge-to-edge, for the pages editor; same focus trap, Escape and OSK rules) | custom overlays, hand-built full-screen shells |
+| Navigation between views of the same thing (editor pages, catalog kinds) | **`Tabs.vue` (new)**: ARIA `tablist`, one line per tab (label + optional `--ink-3` meta), 2px `--focus` underline on the active tab, arrow keys move, scrolls horizontally with edge fades | local tablists, filter pills used as tabs. Choosing a *value* (Light/Dark, Month/Week) stays `SegmentedControl` |
 | Small floating surface anchored to a control (⋯ menus, pickers, the connection explainer) | **`Popover.vue` (new)**: anchored, flips at viewport edges, Escape/outside tap closes, focus returns, `--elev-1`, `--radius-card`, `--z-popover`; **`Menu.vue`** on top of it for action lists (items ≥ `--touch-target`, danger item last) | per-feature popovers (SourceList ⋯, ThemePicker, ActionPicker, RegionViewOptions, ConnectionStatus) |
 | Colour | **`ColourField.vue` (new)**: the theme's `--event-1…8` swatches first (radio group), then **Custom…** opening the native picker; shows the chosen swatch + name, never a raw hex field by default | a bare `<input type="color">` + hex text box |
 
@@ -201,7 +202,7 @@ backend) at 1280 and 390, light and one dark theme. The design lead reviews agai
 
 1. **Roles in, no visual change.** Add the role tokens as aliases of today's primitives (radius snaps excepted) and
    add the lints with full allowlists. One PR, mechanical.
-2. **The blocks and the gallery.** Build `Button`, `TextField`, `ListRow`, `SettingGroup`, `ScopeLine`, `InlineNote`, `Popover`/`Menu`, `ColourField` and
+2. **The blocks and the gallery.** Build `Button`, `TextField`, `ListRow`, `SettingGroup`, `ScopeLine`, `InlineNote`, `Popover`/`Menu`, `ColourField`, `Tabs`, the `Dialog` `full` size and
    `ui-gallery.html` first. Then replace the 61 button classes and remove settings `<style>` blocks file by file. The
    largest are Security (15 `security-btn`), Plugins (`btn-install`, `pc-btn`), System (`maint-btn`,
    `backup-btn`, `update-btn`) and Screens (`kiosk-software__btn`). Each file leaves the `controlLint` allowlist
