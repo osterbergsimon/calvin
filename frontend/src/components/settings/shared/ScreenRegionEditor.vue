@@ -1,65 +1,32 @@
 <template>
-  <teleport to="body">
-    <div
-      v-if="open"
-      class="sre-root dialog-above-osk"
-      :class="[`size-${sizeClass}`, { 'is-coarse': coarsePointer }]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Pages and regions"
-    >
-      <DialogScrim blur @dismiss="$emit('close')" />
-      <div ref="modalEl" class="sre-modal">
-        <!-- Header -->
-        <header class="sre-header">
-          <div class="sre-title">
-            <h2>Pages &amp; regions</h2>
-            <p class="sre-sub">
-              Design the pages your screens display · drag dividers to resize, the clock bar to
-              reposition · changes apply live
-            </p>
-          </div>
-          <IconButton
-            class="sre-close"
-            variant="ghost"
-            size="md"
-            label="Close editor"
-            @click="$emit('close')"
-          >
-            ×
-          </IconButton>
-        </header>
+  <Dialog
+    ref="dialogEl"
+    :model-value="open"
+    size="full"
+    :bleed="sizeClass !== 'wide'"
+    label="Pages and regions"
+    close-label="Close editor"
+    scrim-blur
+    @close="$emit('close')"
+  >
+    <template #title>Pages &amp; regions</template>
+    <template v-if="sizeClass === 'wide'" #subtitle>
+      Design the pages your screens display · drag dividers to resize, the clock bar to reposition ·
+      changes apply live
+    </template>
 
-        <!-- Context strip: page tabs + preview-on -->
-        <div class="sre-context">
-          <div class="sre-tabs">
-            <div class="sre-tablist" role="tablist" aria-label="Pages">
-              <button
-                v-for="page in screens.screens"
-                :key="page.id"
-                type="button"
-                role="tab"
-                class="sre-tab"
-                :class="{
-                  'is-active': page.id === activeScreenId,
-                  'is-dimmed': isPageDimmed(page.id),
-                }"
-                :aria-selected="page.id === activeScreenId"
-                :aria-label="pageTabLabel(page)"
-                :title="pageTabTitle(page)"
-                data-test="page-tab"
-                @click="selectScreen(page.id)"
-              >
-                <span class="sre-tab-name">{{ page.name }}</span
-                >{{ " "
-                }}<span
-                  class="sre-tab-screens"
-                  :class="{ 'is-not-shown': screensLine(page.id) === NOT_SHOWN }"
-                  data-test="page-screens"
-                  >{{ screensLine(page.id) }}</span
-                >
-              </button>
-            </div>
+    <div class="sre-root" :class="[`size-${sizeClass}`, { 'is-coarse': coarsePointer }]">
+      <!-- Context strip: page tabs + preview-on -->
+      <div class="sre-context">
+        <Tabs
+          class="sre-tabs"
+          :model-value="activeScreenId"
+          :items="pageTabItems"
+          aria-label="Pages"
+          :hide-meta="isPhone"
+          @update:model-value="selectScreen"
+        >
+          <template #action>
             <Button
               class="sre-tab-add"
               variant="ghost"
@@ -71,8 +38,9 @@
             >
               Page
             </Button>
-          </div>
-          <div class="sre-preview-as">
+          </template>
+        </Tabs>
+        <div class="sre-preview-as">
             <span class="sre-preview-label">Preview on</span>
             <SelectPill
               :model-value="previewScreenId"
