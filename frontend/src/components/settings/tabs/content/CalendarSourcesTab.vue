@@ -21,17 +21,6 @@
           @update:model-value="handleColorChange(row, $event)"
         />
       </template>
-      <template #meta="{ row }">
-        <label class="cal-show-times">
-          <input
-            type="checkbox"
-            :checked="row.showTime"
-            :aria-label="`Show event times for ${row.name}`"
-            @change="handleShowTimeChange(row, $event.target.checked)"
-          />
-          Show event times
-        </label>
-      </template>
     </SourceList>
 
     <AddSourceButton ref="addButton" kind="calendar" @saved="handleAddSaved" />
@@ -54,12 +43,19 @@
           aria-label="Check for new events every, in minutes"
           @update:model-value="v => emit('update:config', { calendarRefreshInterval: v })"
         />
-        <Button size="sm" :disabled="refreshStatus === 'refreshing'" @click="handleRefreshNow">
+        <Button
+          class="cal-refresh-btn"
+          variant="secondary"
+          size="sm"
+          :loading="refreshStatus === 'refreshing'"
+          loading-label="Refreshing…"
+          @click="handleRefreshNow"
+        >
           Refresh now
         </Button>
-        <span v-if="refreshStatus" class="cal-refresh-status" aria-live="polite">{{
-          refreshStatus === "refreshing" ? "Refreshing…" : "Refreshed"
-        }}</span>
+        <InlineNote v-if="refreshStatus" class="cal-refresh-status" aria-live="polite">
+          {{ refreshStatus === "refreshing" ? "Refreshing…" : "Refreshed" }}
+        </InlineNote>
       </div>
     </SettingRow>
 
@@ -82,6 +78,7 @@ import * as pluginsApi from "@/services/pluginsApi";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import Button from "@/components/ui/Button.vue";
 import ColourField from "@/components/ui/ColourField.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
@@ -93,7 +90,8 @@ import { nextEventColour } from "@/utils/themePalettes";
 
 // Calendars use the one shared source flow (§3.1, decision B): a SourceList of
 // sources, the provider picker to add one, and the shared add/edit form. The
-// calendar-only row extras — colour and Show times — stay on the row.
+// only calendar-only extra on the row is colour; Show event times lives in the
+// source's Edit dialog so the row keeps exactly one toggle like every other row.
 defineProps({
   config: {
     type: Object,
@@ -146,7 +144,6 @@ const rows = computed(() =>
       source,
       plugin,
       instance,
-      showTime: source.show_time !== false,
     };
   })
 );
@@ -179,14 +176,6 @@ const handleColorChange = async (row, hexColor) => {
     await calendarStore.updateSource(row.id, { ...row.source, color: hexColor });
   } catch (error) {
     logError("[CalendarSources]", "Failed to update calendar source colour:", error);
-  }
-};
-
-const handleShowTimeChange = async (row, showTime) => {
-  try {
-    await calendarStore.updateSource(row.id, { ...row.source, show_time: showTime });
-  } catch (error) {
-    logError("[CalendarSources]", "Failed to update show time:", error);
   }
 };
 
@@ -291,46 +280,3 @@ onMounted(async () => {
   await Promise.all([loadPlugins(), calendarStore.fetchSources()]);
 });
 </script>
-
-<style scoped>
-.calendar-sources {
-  width: 100%;
-}
-
-/* Show times lives on the row's subline as a small labelled checkbox, so the
-   right-hand controls read exactly like every other source row. */
-.cal-show-times {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-top: 0.1rem;
-  font-family: var(--font-ui);
-  font-size: var(--text-meta);
-  color: var(--ink-2);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.cal-show-times input {
-  width: 0.9rem;
-  height: 0.9rem;
-  margin: 0;
-  accent-color: var(--focus-text);
-  cursor: pointer;
-}
-.cal-show-times input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.cal-refresh {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-.cal-refresh-status {
-  font-size: var(--text-meta);
-  color: var(--ink-2);
-  font-family: var(--font-ui);
-}
-</style>
