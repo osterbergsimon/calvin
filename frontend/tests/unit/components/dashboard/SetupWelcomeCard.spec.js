@@ -179,7 +179,7 @@ describe("SetupWelcomeCard (CLV-20)", () => {
     expect(wrapper.find('[data-test="phone-setup"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="setup-welcome-add"]').text()).toBe("Add");
     expect(wrapper.findAll('[data-test="setup-welcome-add"]')[0].classes()).toContain(
-      "setup-welcome__btn--primary"
+      "btn--primary"
     );
   });
 

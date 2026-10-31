@@ -1,14 +1,13 @@
 <template>
-  <button
-    type="button"
-    class="add-web-page-btn"
+  <Button
+    variant="primary"
     data-test="add-web-page"
     :disabled="candidates.length === 0"
     :title="candidates.length === 0 ? 'Enable a web-service plugin first' : ''"
     @click="open"
   >
     Add a web page
-  </button>
+  </Button>
 
   <ProviderPicker
     :show="showPicker"
@@ -32,6 +31,7 @@ import { computed, onMounted, ref } from "vue";
 import { usePlugins } from "@/composables";
 import InstanceModal from "./InstanceModal.vue";
 import ProviderPicker from "./ProviderPicker.vue";
+import Button from "@/components/ui/Button.vue";
 
 // The "Add a web page" flow shared with Content › Web pages & services. A web
 // page is one service plugin among several, so the user always picks one:
@@ -87,29 +87,3 @@ const handleSaved = async () => {
   await loadPlugins();
 };
 </script>
-
-<style scoped>
-.add-web-page-btn {
-  min-height: var(--touch-target);
-  padding: 0 1.25rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.add-web-page-btn:hover:not(:disabled) {
-  filter: brightness(1.06);
-}
-.add-web-page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.add-web-page-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-</style>

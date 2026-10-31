@@ -43,15 +43,17 @@
                 @update="updateFormValue(key, $event)"
               />
               <!-- Geocode button for location field (for weather plugins like YR.no) -->
-              <button
+              <Button
                 v-if="key === 'location' && hasGeocodeAction"
-                type="button"
-                class="btn-geocode"
+                variant="secondary"
+                class="instance-modal__geocode"
                 :disabled="geocoding || !formData.location"
+                :loading="geocoding"
+                loading-label="Getting coordinates…"
                 @click="handleGeocode"
               >
-                {{ geocoding ? "Geocoding..." : "Get Coordinates" }}
-              </button>
+                Get Coordinates
+              </Button>
               <div
                 v-if="key === 'location' && geocodeStatus"
                 :class="geocodeStatus.success ? 'success-message' : 'error-message'"
@@ -111,9 +113,15 @@
 
           <!-- Test Connection Button (if plugin supports it) -->
           <div v-if="hasTestAction" class="form-group">
-            <button type="button" class="btn-secondary" :disabled="testing" @click="handleTest">
-              {{ testing ? "Testing..." : "Test Connection" }}
-            </button>
+            <Button
+              variant="secondary"
+              :disabled="testing"
+              :loading="testing"
+              loading-label="Testing…"
+              @click="handleTest"
+            >
+              Test Connection
+            </Button>
             <div
               v-if="testStatus"
               :class="testStatus.success ? 'success-message' : 'error-message'"
@@ -124,10 +132,10 @@
           </div>
 
           <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="handleClose">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="saving">
-              {{ saving ? "Saving..." : "Save" }}
-            </button>
+            <Button @click="handleClose">Cancel</Button>
+            <Button type="submit" variant="primary" :loading="saving" loading-label="Saving…">
+              Save
+            </Button>
           </div>
         </form>
       </div>
@@ -139,6 +147,7 @@
 import { ref, watch, computed } from "vue";
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import Button from "@/components/ui/Button.vue";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
 import { errorDetailMessage } from "@/utils/apiErrors";
@@ -719,88 +728,7 @@ const handleSave = async () => {
   border-top: 1px solid var(--line);
 }
 
-.btn-primary,
-.btn-secondary {
-  padding: 0.75rem 1.5rem;
-  min-height: var(--touch-target);
-  border: none;
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary {
-  background: var(--focus);
-  color: var(--focus-ink);
-  border: 1px solid var(--focus);
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-secondary {
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-2);
-  border-color: var(--focus);
-}
-
-.btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.btn-geocode {
+.instance-modal__geocode {
   margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  min-height: var(--touch-target);
-  background: var(--focus);
-  color: var(--focus-ink);
-  border: none;
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-control);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-geocode:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-geocode:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-geocode:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 </style>

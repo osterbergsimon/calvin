@@ -129,6 +129,60 @@
   --radius-pill: 999px;
 
   /* ------------------------------------------------------------------ *
+   * Semantic role tokens (docs/design/frontend-doctrine.md §2).
+   * Components use these roles; the primitive scales above are for
+   * theme.css only. Adding them is a no-op: each role aliases an existing
+   * primitive (the radius roles deliberately snap 6→8 and 10/11→12).
+   * ------------------------------------------------------------------ */
+  /* Type roles */
+  --text-dense: var(--fs-3xs);
+  --text-caption: var(--fs-2xs);
+  --text-meta: var(--fs-xs);
+  --text-body: var(--fs-md);
+  --text-label: var(--fs-base);
+  --text-title: var(--fs-lg);
+  --text-display: var(--fs-3xl);
+  --weight-body: 400;
+  --weight-strong: 500;
+  --weight-title: 600;
+
+  /* Space roles (4px grid; --gap-1 … --gap-6, --gap-8) */
+  --gap-1: 0.25rem;
+  --gap-2: 0.5rem;
+  --gap-3: 0.75rem;
+  --gap-4: 1rem;
+  --gap-5: 1.25rem;
+  --gap-6: 1.5rem;
+  --gap-8: 2rem;
+  --gap-tight: var(--gap-1); /* icon ↔ text inside a control */
+  --gap-inline: var(--gap-2); /* between controls in a row */
+  --gap-stack: var(--gap-3); /* between stacked items in a group */
+  --gap-group: var(--gap-4); /* between groups in a panel */
+  --gap-section: var(--gap-8); /* between sections */
+
+  /* Radius roles */
+  --radius-control: var(--radius-sm); /* 8px */
+  --radius-card: var(--radius-xl); /* 12px */
+  --radius-panel: var(--radius-2xl); /* 16px */
+  --radius-round: var(--radius-pill);
+
+  /* Elevation roles */
+  --elev-1: 0 6px 18px -8px var(--shadow-hover);
+  --elev-2: 0 18px 50px -16px var(--shadow-hover);
+
+  /* Motion roles */
+  --dur-fast: 120ms;
+  --dur: 200ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  /* Layer roles */
+  --z-raised: 10;
+  --z-sticky: 100;
+  --z-dialog: 1000;
+  --z-osk: 1100;
+  --z-toast: 1200;
+
+  /* ------------------------------------------------------------------ *
    * Tag — the one non-interactive label behind chips, badges and counts.
    * See docs/design/2026-10-30-chips-and-tags.md. Components use only
    * these knobs plus the semantic colour tokens, so a theme only needs
