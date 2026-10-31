@@ -294,6 +294,7 @@ async function runScan() {
 .form-input:focus {
   outline: none;
   border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 22%, transparent);
 }
 
 .form-input::placeholder {

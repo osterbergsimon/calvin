@@ -653,6 +653,7 @@ async function revoke() {
   color: var(--ink);
 }
 .api-keys__result-title:focus {
+  /* a11y-allow-no-outline: result heading receives programmatic focus only */
   outline: none;
 }
 .api-keys__secret-row {

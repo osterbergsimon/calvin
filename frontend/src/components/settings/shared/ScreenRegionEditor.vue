@@ -32,31 +32,34 @@
 
         <!-- Context strip: page tabs + preview-on -->
         <div class="sre-context">
-          <div class="sre-tabs" role="tablist" aria-label="Pages">
-            <button
-              v-for="page in screens.screens"
-              :key="page.id"
-              type="button"
-              role="tab"
-              class="sre-tab"
-              :class="{
-                'is-active': page.id === activeScreenId,
-                'is-dimmed': isPageDimmed(page.id),
-              }"
-              :aria-selected="page.id === activeScreenId"
-              :aria-label="pageTabLabel(page)"
-              :title="pageTabTitle(page)"
-              data-test="page-tab"
-              @click="selectScreen(page.id)"
-            >
-              <span class="sre-tab-name">{{ page.name }}</span>
-              <span
-                class="sre-tab-screens"
-                :class="{ 'is-not-shown': screensLine(page.id) === NOT_SHOWN }"
-                data-test="page-screens"
-                >{{ screensLine(page.id) }}</span
+          <div class="sre-tabs">
+            <div class="sre-tablist" role="tablist" aria-label="Pages">
+              <button
+                v-for="page in screens.screens"
+                :key="page.id"
+                type="button"
+                role="tab"
+                class="sre-tab"
+                :class="{
+                  'is-active': page.id === activeScreenId,
+                  'is-dimmed': isPageDimmed(page.id),
+                }"
+                :aria-selected="page.id === activeScreenId"
+                :aria-label="pageTabLabel(page)"
+                :title="pageTabTitle(page)"
+                data-test="page-tab"
+                @click="selectScreen(page.id)"
               >
-            </button>
+                <span class="sre-tab-name">{{ page.name }}</span
+                >{{ " "
+                }}<span
+                  class="sre-tab-screens"
+                  :class="{ 'is-not-shown': screensLine(page.id) === NOT_SHOWN }"
+                  data-test="page-screens"
+                  >{{ screensLine(page.id) }}</span
+                >
+              </button>
+            </div>
             <button
               type="button"
               class="sre-tab-add"
@@ -636,12 +639,7 @@ const screensLine = pageId => {
 };
 // The tab reads as one sentence for screen readers, including the screens
 // text that is truncated visually at 16ch.
-const pageTabLabel = page => {
-  const line = screensLine(page.id);
-  if (line === "All screens") return `${page.name}, shown on all screens`;
-  if (line === NOT_SHOWN) return `${page.name}, not shown on any screen`;
-  return `${page.name}, shown on ${line}`;
-};
+const pageTabLabel = page => `${page.name} · ${screensLine(page.id)}`;
 const pageTabTitle = page => `${page.name} · ${screensLine(page.id)}`;
 const isPageDimmed = pageId =>
   previewScreenId.value !== ANY_BROWSER && !kioskShowsPage(previewKiosk.value, pageId);
@@ -1086,7 +1084,9 @@ const clockTitle = computed(() =>
   clockDraggable.value ? "Drag to reposition the clock bar" : "Tap to change the clock bar"
 );
 const clockAria = computed(() =>
-  clockDraggable.value ? "Clock bar — drag to reposition" : "Clock bar — tap to change its position"
+  clockDraggable.value
+    ? `${previewClock.value} — clock bar, drag to reposition`
+    : `${previewClock.value} — clock bar, tap to change its position`
 );
 const beginClockDrag = event => {
   if (!clockDraggable.value) return;
@@ -1346,6 +1346,12 @@ onUnmounted(() => {
 }
 .sre-tabs::-webkit-scrollbar {
   display: none;
+}
+/* The tablist is the ARIA container; the scroll container stays .sre-tabs so
+   the "Add page" action sits beside the tabs without becoming a tab itself. */
+.sre-tablist {
+  display: flex;
+  align-items: stretch;
 }
 .sre-tab {
   position: relative;

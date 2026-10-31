@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div class="app-shell">
     <KeyboardHandler />
     <RouterView />
     <ConnectionStatus v-if="!clockBarVisible" floating />
@@ -48,7 +48,7 @@ onUnmounted(() => {
 </script>
 
 <style>
-#app {
+.app-shell {
   width: 100%;
   height: 100vh;
   margin: 0;
