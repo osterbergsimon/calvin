@@ -42,11 +42,13 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
 import { useConfigStore } from "../stores/config";
+import { useKiosksStore } from "../stores/kiosks";
 import { useClockBar } from "../composables/useClockBar";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { getActiveDashboardScreen } from "../utils/layout";
+import { getKioskId } from "../utils/kioskId";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 import BarActionCluster from "./BarActionCluster.vue";
 import BarLogo from "./BarLogo.vue";
@@ -130,7 +132,22 @@ const { activateScreen } = useKeyboardActions();
 const screensConfig = computed(() => configStore.effectiveDashboardScreens);
 const screens = computed(() => screensConfig.value.screens);
 const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
-const roomLabel = computed(() => configStore.displayName);
+
+// The room name is a screen's own Name (its displayName override), never a
+// global value: a browser that is not a known screen shows nothing, and an
+// unnamed screen shows nothing here too (CLV-84). The screen's card falls back
+// to its hostname; the clock bar does not.
+const kioskId = getKioskId();
+const kiosksStore = useKiosksStore();
+const roomLabel = computed(() => {
+  if (!kioskId) return "";
+  const self = kiosksStore.kiosks.find(kiosk => kiosk.id === kioskId);
+  return self?.overrides?.displayName || "";
+});
+
+onMounted(() => {
+  if (kioskId) kiosksStore.loadKiosks();
+});
 </script>
 
 <style scoped>

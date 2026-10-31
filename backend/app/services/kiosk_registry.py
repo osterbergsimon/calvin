@@ -228,6 +228,44 @@ async def get_overrides(kiosk_id: str) -> dict | None:
     return row.overrides or {}
 
 
+_GLOBAL_NAME_KEYS = ("displayName", "display_name")
+
+
+@retry_on_db_locked()
+async def migrate_global_room_name() -> None:
+    """Move the retired global room name onto the one screen that can own it (CLV-84).
+
+    The room name is per-screen now: a screen's own ``displayName`` override.
+    A value left in the global config is moved to the only screen without a name
+    when there is exactly one such screen; otherwise it is dropped. Deleting the
+    global keys makes a second run a no-op.
+    """
+    from app.services.config_service import config_service
+
+    global_name = ""
+    for key in _GLOBAL_NAME_KEYS:
+        value = await config_service.get_value(key)
+        if isinstance(value, str) and value.strip():
+            global_name = value.strip()
+            break
+    if not global_name:
+        return
+
+    rows = await KioskDB.objects.all()
+    unnamed = [row for row in rows if not (row.overrides or {}).get("displayName")]
+    if len(unnamed) == 1:
+        target = unnamed[0]
+        overrides = dict(target.overrides or {})
+        overrides["displayName"] = global_name
+        target.overrides = overrides
+        await target.update()
+        logger.info(f"Moved the global room name onto screen {target.id!r}")
+
+    for key in _GLOBAL_NAME_KEYS:
+        await config_service.delete_value(key)
+    logger.info("Retired the global room name (CLV-84)")
+
+
 @retry_on_db_locked()
 async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     """Upsert the kiosk row and replace its overrides. No-op on malformed id."""

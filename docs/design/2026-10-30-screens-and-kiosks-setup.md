@@ -19,7 +19,7 @@ Today that takes four places:
 | Choose which layouts each Pi shows, and its start layout | Kiosks › select card › **{id} — Content** |
 | Set portrait, upside down, rotate output | Kiosks › **Display hardware** (drawer) for one Pi, or Screen & keyboard › Screen orientation for "everyone" |
 | Power schedule, idle off, touch, keyboard | Screen & keyboard for everyone; Kiosks for one Pi (schedule and keyboard only) |
-| Room name in the clock bar | Dashboard › Appearance › Display name (one name for every Pi) |
+| Room name in the clock bar | Screens › a screen › **Name** (per screen) |
 
 The editor itself is solid. The problems are around it.
 
@@ -105,8 +105,10 @@ aliased like CLV-17 did (`device` → `screens`, `kiosks` → `screens`), so dee
 `displayName` is already a config key and kiosks already get merged config. A screen's **Name** is just that key in
 its overrides:
 - The Screens card, the editor's preview picker and the clock bar on that Pi all show it.
-- With no override, the card falls back to the hostname, then the id.
-- Dashboard › Appearance › **Room name** stays as the shared name for any browser that isn't a known screen.
+- With no override, the card falls back to the hostname, then the id; the clock bar shows nothing for a screen with
+  no name.
+- There is no global room name (CLV-84). A browser that isn't a known screen shows no room name, and a one-time
+  migration moves an existing global value onto the only unnamed screen (or drops it when the choice is ambiguous).
 
 ### 3.4 The editor knows the screens (mock S3)
 
