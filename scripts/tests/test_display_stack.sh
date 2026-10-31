@@ -31,16 +31,43 @@ PATH="$tmp/bin:$PATH"
 
 reset_systemctl_log() { rm -f "$SYSTEMCTL_LOG"; }
 
+# Fake board model files: the device-tree model is NUL-terminated on a real Pi.
+model_file() {  # $1 name, $2 model string
+    printf '%s\0' "$2" > "$tmp/model-$1"
+    printf '%s\n' "$tmp/model-$1"
+}
+PI4_MODEL="$(model_file pi4 'Raspberry Pi 4 Model B Rev 1.4')"
+PI3_MODEL="$(model_file pi3 'Raspberry Pi 3 Model B Plus Rev 1.3')"
+PI3A_MODEL="$(model_file pi3a 'Raspberry Pi 3 Model A Plus Rev 1.0')"
+ZERO2_MODEL="$(model_file zero2 'Raspberry Pi Zero 2 W Rev 1.0')"
+CM3_MODEL="$(model_file cm3 'Compute Module 3 Rev 1.0')"
+
 # --- 1. Selection -------------------------------------------------------------
-# Phase 1: auto is X11 everywhere, so an existing kiosk that has no setting and
-# no flag keeps what it has.
-assert_eq "x11" "$(CALVIN_DISPLAY_STACK=auto resolve_display_stack)" "auto must mean x11 in phase 1"
-assert_eq "x11" "$(unset CALVIN_DISPLAY_STACK; resolve_display_stack)" "unset must mean x11"
+# auto is x11 off the Pi 3 class and cog on it (the same VC4-class detection that
+# drives --disable-gpu). An explicit stack always wins.
+export CALVIN_DEVICE_TREE_MODEL="$PI4_MODEL"
+assert_eq "x11" "$(CALVIN_DISPLAY_STACK=auto resolve_display_stack)" "auto must mean x11 on a Pi 4"
+assert_eq "x11" "$(unset CALVIN_DISPLAY_STACK; resolve_display_stack)" "unset must mean x11 on a Pi 4"
 assert_eq "wayland" "$(CALVIN_DISPLAY_STACK=wayland resolve_display_stack)" "env override ignored"
 assert_eq "cog" "$(CALVIN_DISPLAY_STACK=cog resolve_display_stack)" "cog env override ignored"
 assert_eq "x11" "$(CALVIN_DISPLAY_STACK=wayland resolve_display_stack x11)" "--display-stack must win over env"
 assert_eq "wayland" "$(CALVIN_DISPLAY_STACK=x11 resolve_display_stack wayland)" "--display-stack must win over env"
 assert_eq "cog" "$(CALVIN_DISPLAY_STACK=x11 resolve_display_stack cog)" "--display-stack cog must win over env"
+
+# Pi 3-class boards (VC4) auto-select cog instead of X11.
+for model in "$PI3_MODEL" "$PI3A_MODEL" "$ZERO2_MODEL" "$CM3_MODEL"; do
+    assert_eq "cog" "$(CALVIN_DEVICE_TREE_MODEL="$model" CALVIN_DISPLAY_STACK=auto resolve_display_stack)" \
+        "auto must mean cog on Pi 3-class (${model##*/})"
+done
+assert_eq "x11" "$(CALVIN_DISPLAY_STACK=auto CALVIN_DEVICE_TREE_MODEL="$PI3_MODEL" resolve_display_stack x11)" \
+    "an explicit x11 must win over auto on a Pi 3-class board"
+assert_eq "wayland" "$(CALVIN_DISPLAY_STACK=auto CALVIN_DEVICE_TREE_MODEL="$PI3_MODEL" resolve_display_stack wayland)" \
+    "an explicit wayland must win over auto on a Pi 3-class board"
+assert_eq "x11" "$(CALVIN_DISPLAY_STACK=x11 CALVIN_DEVICE_TREE_MODEL="$PI3_MODEL" resolve_display_stack)" \
+    "an explicit CALVIN_DISPLAY_STACK=x11 must win on a Pi 3-class board"
+# A missing device-tree file (non-Pi host) stays x11.
+assert_eq "x11" "$(CALVIN_DEVICE_TREE_MODEL="$tmp/nope" CALVIN_DISPLAY_STACK=auto resolve_display_stack)" \
+    "auto must mean x11 when the board is unknown"
 if err="$(CALVIN_DISPLAY_STACK=bogus resolve_display_stack 2>&1)"; then
     fail "invalid CALVIN_DISPLAY_STACK accepted"
 fi
@@ -199,5 +226,40 @@ assert_eq "wayland" "$(CALVIN_DISPLAY_STACK=x11 requested_display_stack)" "--dis
 DISPLAY_STACK_ARG=""
 unset CALVIN_DISPLAY_STACK
 pass "stack resolution order"
+
+# --- 7. A re-run keeps an existing kiosk's recorded stack ----------------------
+# setup records the resolved stack, so re-running on a Pi 3-class board must not
+# flip an existing x11 kiosk to cog; only a fresh install auto-selects.
+export CALVIN_KIOSK_ENV_FILE="$tmp/calvin-kiosk-existing"
+printf 'CALVIN_DISPLAY_STACK=x11\n' > "$CALVIN_KIOSK_ENV_FILE"
+assert_eq "x11" "$(CALVIN_DEVICE_TREE_MODEL="$PI3_MODEL" requested_display_stack)" \
+    "a re-run on a Pi 3-class board must keep the recorded x11 stack"
+printf 'CALVIN_DISPLAY_STACK=cog\n' > "$CALVIN_KIOSK_ENV_FILE"
+assert_eq "cog" "$(CALVIN_DEVICE_TREE_MODEL="$PI4_MODEL" requested_display_stack)" \
+    "a re-run on a Pi 4 must keep the recorded cog stack"
+
+# A kiosk installed before the setting existed was X11; the auto mapping must not
+# migrate it behind the operator's back on a re-run.
+printf 'CALVIN_BACKEND_URL=http://tower.local:8000\n' > "$CALVIN_KIOSK_ENV_FILE"
+assert_eq "x11" "$(CALVIN_DEVICE_TREE_MODEL="$PI3_MODEL" requested_display_stack)" \
+    "a legacy X11 kiosk must stay on x11 on a Pi 3-class board"
+
+# A fresh install (no config file yet) auto-selects cog on the Pi 3 class ...
+rm -f "$CALVIN_KIOSK_ENV_FILE"
+CALVIN_DEVICE_TREE_MODEL="$PI3_MODEL"
+export CALVIN_DEVICE_TREE_MODEL
+assert_eq "cog" "$(requested_display_stack)" "a fresh Pi 3-class install must auto-select cog"
+install_kiosk_config "$(requested_display_stack)" >/dev/null
+assert_eq "cog" "$(read_env_value "$CALVIN_KIOSK_ENV_FILE" CALVIN_DISPLAY_STACK)" \
+    "the fresh Pi 3-class install did not record cog"
+
+# ... and a second run keeps it (idempotent), while an explicit flag still wins.
+install_kiosk_config "$(requested_display_stack)" >/dev/null
+assert_eq "cog" "$(read_env_value "$CALVIN_KIOSK_ENV_FILE" CALVIN_DISPLAY_STACK)" \
+    "the second run changed the recorded cog stack"
+DISPLAY_STACK_ARG="x11"
+assert_eq "x11" "$(requested_display_stack)" "--display-stack must switch an existing kiosk"
+DISPLAY_STACK_ARG=""
+pass "a re-run keeps the existing stack"
 
 echo "PASS"
