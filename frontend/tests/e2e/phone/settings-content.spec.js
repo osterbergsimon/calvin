@@ -47,6 +47,17 @@ test.describe("phone: Content", () => {
     await expect(modal).toBeVisible();
     await expect(modal.getByRole("heading", { name: /Add calendar/ })).toBeVisible();
 
+    // CLV-74: the declared label names the field, the description is the hint
+    // under it, and type-level internals never appear.
+    await expect(modal.getByLabel("Calendar address")).toBeVisible();
+    await expect(modal.getByText("The .ics address to read events from.")).toBeVisible();
+    await expect(modal.getByText("display_order")).toHaveCount(0);
+    await expect(modal.getByText("Colour", { exact: true })).toBeVisible();
+    await expect(modal.getByRole("switch", { name: "Show event times" })).toBeVisible();
+    await expect(modal.getByRole("switch", { name: "Enabled" })).toBeVisible();
+    await expect(modal.getByRole("button", { name: "Test connection" })).toBeVisible();
+    await expect(modal.locator('input[type="checkbox"]')).toHaveCount(0);
+
     await modal.locator('input.form-input[type="text"]').first().fill("Birthdays");
     await modal
       .locator('.plugin-field input[type="text"]')
