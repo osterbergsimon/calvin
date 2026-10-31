@@ -228,6 +228,8 @@ describe("ScreenRegionEditor phone inspector sheet", () => {
     expect(rail.attributes("role")).toBe("region");
     expect(rail.attributes("aria-label")).toBe("Inspector");
     expect(w.find('[data-test="sheet-selection"]').text()).toBe("Page · Home");
+    // The sheet bar names the selection, so the inspector heading is hidden.
+    expect(w.find(".ins-mode").exists()).toBe(false);
   });
 
   it("opens when a region is selected and names it in the peek", async () => {
@@ -238,6 +240,7 @@ describe("ScreenRegionEditor phone inspector sheet", () => {
 
     expect(w.find(".sre-rail").classes()).toContain("is-open");
     expect(w.find('[data-test="sheet-selection"]').text()).toBe("Region · Calendar");
+    expect(w.find(".ins-mode").exists()).toBe(false);
   });
 
   it("the chevron toggles the sheet and is labelled for the action", async () => {

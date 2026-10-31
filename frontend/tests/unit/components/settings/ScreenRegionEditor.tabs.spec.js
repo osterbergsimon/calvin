@@ -235,6 +235,21 @@ describe("eyebrows stay outside cards", () => {
     expect(body).toContain("color: var(--ink)");
   });
 
+  it("keeps toggle rows label-left / switch-right and stacked chips left-aligned", () => {
+    for (const path of [
+      "shared/regions/RegionInspector.vue",
+      "shared/regions/ScreenInspector.vue",
+    ]) {
+      const source = read(path);
+      expect(rule(source, ".ins-toggle-row :deep(.setting-row__info)")).toContain("flex: 1 1 0");
+      expect(rule(source, ".ins-toggle-row :deep(.setting-row__control)")).toContain(
+        "flex: 0 0 auto"
+      );
+    }
+    const sources = read("shared/regions/RegionInspector.vue");
+    expect(rule(sources, ":deep(.ins-sources.chips)")).toContain("justify-content: flex-start");
+  });
+
   it("leaves only the section titles and the stage tag uppercase under settings", () => {
     const dir = resolve(__dirname, "../../../../src/components");
     const offenders = [];
