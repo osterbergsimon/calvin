@@ -24,9 +24,9 @@
   --ok: #2e9e6b;
   --ok-ink: #1b242b;
   --ok-text: #25674e;
-  --warn: #c8860a;
+  --warn: #b38f00;
   --warn-ink: #1b242b;
-  --warn-text: #7a5a19;
+  --warn-text: #7f6a0f;
   --err: #c0392b;
   --err-ink: #ffffff;
   --err-text: #76302b;
@@ -35,11 +35,18 @@
   --shadow: rgba(0, 0, 0, 0.1);
   --shadow-hover: rgba(0, 0, 0, 0.15);
 
-  /* Content-kind accent strips (regions editor, source legends, …). Semantic
-     identity colors — calendar = green, photos = blue, service = orange. */
-  --region-calendar: #4caf50;
-  --region-photos: #2196f3;
-  --region-service: #ff9800;
+  /* Calendar palette. A calendar without a colour of its own takes the first
+     unused one; the add form offers these eight swatches before a custom
+     colour. Each value clears WCAG AA against --on-event-ink (the chip ink),
+     and the theme contrast spec checks that for every built-in theme × mode. */
+  --event-1: #863427;
+  --event-2: #865a27;
+  --event-3: #7b7824;
+  --event-4: #26844e;
+  --event-5: #26827b;
+  --event-6: #275f86;
+  --event-7: #2f2786;
+  --event-8: #862786;
 
   /* font roles — default = Instrument; overridden by useTypeTheme */
   --font-display: "IBM Plex Sans Condensed", system-ui, sans-serif;
@@ -260,14 +267,22 @@
   --ok: #5bd0a0;
   --ok-ink: #151c21;
   --ok-text: #9bdec5;
-  --warn: #f3b052;
+  --warn: #ffd84d;
   --warn-ink: #151c21;
-  --warn-text: #efcd9a;
+  --warn-text: #ffd84d;
   --err: #ef6b5e;
   --err-ink: #151c21;
   --err-text: #eda7a1;
   --shadow: rgba(0, 0, 0, 0.3);
   --shadow-hover: rgba(0, 0, 0, 0.4);
+  --event-1: #933c2f;
+  --event-2: #93642f;
+  --event-3: #7a7727;
+  --event-4: #2a844f;
+  --event-5: #288079;
+  --event-6: #2f6993;
+  --event-7: #372f93;
+  --event-8: #932f93;
 }
 
 /* Apply theme variables globally */
