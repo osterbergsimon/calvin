@@ -93,9 +93,9 @@ test.describe("phone: System", () => {
     // Host actions are intercepted by fixtures/api-mock.js, never executed.
     // Do this last: a real restart replaces the page with a waiting overlay.
     await page.locator('[data-test="restart-backend"]').click();
-    const confirm = page.locator(".confirm-modal");
+    const confirm = page.getByRole("dialog");
     await expect(confirm).toBeVisible();
-    await expectPhoneLayout(page, "restart confirmation", { scope: ".confirm-modal" });
+    await expectPhoneLayout(page, "restart confirmation", { scope: "[role='dialog']" });
     await confirm.getByRole("button", { name: "Restart" }).click();
     await expect.poll(() => api.hostActions).toContain("POST /api/system/restart-backend");
     await expect(page.getByText(/Calvin is restarting/)).toBeVisible();
