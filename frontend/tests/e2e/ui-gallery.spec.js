@@ -7,6 +7,12 @@
  * CI. Baselines are committed next to this file.
  */
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
+
+// The built-in palettes are the app's source of truth (backend/data/themes).
+const builtinThemes = JSON.parse(
+  readFileSync(new URL("../../../backend/data/themes/builtin.json", import.meta.url), "utf8")
+);
 
 const VIEWPORTS = [
   { name: "1280", size: { width: 1280, height: 800 } },
@@ -23,6 +29,31 @@ async function openGallery(page, theme) {
   // One real focus state in the page: the TextField with a validation error.
   await page.locator('[data-test="gallery-text-field-focus"]').locator("input").focus();
 }
+
+test.describe("ui gallery palettes", () => {
+  test("the switcher reaches every built-in theme in light and dark", async ({ page }) => {
+    await page.goto("/ui-gallery.html?theme=calvin");
+    const gallery = page.locator('[data-test="ui-gallery"]');
+
+    for (const name of ["Calvin", "Ocean", "Forest", "Sunset"]) {
+      for (const mode of ["Light", "Dark"]) {
+        await page.getByRole("radio", { name, exact: true }).click();
+        await page.getByRole("radio", { name: mode, exact: true }).click();
+
+        const theme = name.toLowerCase();
+        const palette = theme === "calvin" ? builtinThemes.light : builtinThemes[theme];
+        const expected = mode === "Dark" ? palette.dark_mode["bg-0"] : palette.variables["bg-0"];
+
+        await expect(gallery).toHaveAttribute("data-theme", theme);
+        await expect(gallery).toHaveAttribute("data-mode", mode.toLowerCase());
+        const actual = await gallery.evaluate(el =>
+          getComputedStyle(el).getPropertyValue("--bg-0").trim()
+        );
+        expect(actual.toUpperCase()).toBe(expected.toUpperCase());
+      }
+    }
+  });
+});
 
 for (const viewport of VIEWPORTS) {
   for (const theme of THEMES) {
