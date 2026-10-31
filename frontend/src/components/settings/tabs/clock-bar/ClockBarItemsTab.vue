@@ -36,18 +36,15 @@
           </div>
           <label
             class="switch"
-            :class="{ 'switch-on': isVisible(service), saving: pendingId === service.id }"
+            :class="{ saving: pendingId === service.id }"
             :title="isVisible(service) ? 'Click to hide' : 'Click to show'"
           >
-            <input
-              type="checkbox"
-              :checked="isVisible(service)"
+            <ToggleSwitch
+              :model-value="isVisible(service)"
+              :aria-label="`Show ${service.name} in the clock bar`"
               :disabled="pendingId === service.id"
-              @change="toggle(service, $event.target.checked)"
+              @update:model-value="value => toggle(service, value)"
             />
-            <span class="switch-track" aria-hidden="true">
-              <span class="switch-thumb" />
-            </span>
             <span class="switch-label">{{ isVisible(service) ? "Shown" : "Hidden" }}</span>
           </label>
         </li>
@@ -65,6 +62,7 @@ import { useWebServicesStore } from "@/stores/webServices";
 import * as pluginsApi from "@/services/pluginsApi";
 import { logError } from "@/utils/logger";
 import SchemaStatusbarItem from "@/components/plugins/SchemaStatusbarItem.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const webServicesStore = useWebServicesStore();
 const router = useRouter();
@@ -247,51 +245,13 @@ onMounted(async () => {
 .switch {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: var(--gap-inline);
   cursor: pointer;
-  font-size: var(--fs-sm);
+  font-size: var(--text-body);
   font-family: var(--font-ui);
   color: var(--ink);
   user-select: none;
   min-height: var(--touch-target);
-}
-
-.switch input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-}
-
-.switch-track {
-  position: relative;
-  width: 2.2rem;
-  height: 1.2rem;
-  border-radius: 999px;
-  background: var(--line);
-  transition: background 0.15s ease;
-  flex-shrink: 0;
-}
-
-.switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  background: var(--bg-1);
-  box-shadow: 0 1px 2px var(--shadow);
-  transition: transform 0.15s ease;
-}
-
-.switch-on .switch-track {
-  background: var(--focus);
-}
-
-.switch-on .switch-thumb {
-  transform: translateX(1rem);
 }
 
 .switch-label {
@@ -301,11 +261,6 @@ onMounted(async () => {
 .switch.saving {
   opacity: 0.6;
   cursor: progress;
-}
-
-.switch input:focus-visible + .switch-track {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .error-message {

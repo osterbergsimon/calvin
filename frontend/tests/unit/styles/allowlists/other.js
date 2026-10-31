@@ -54,9 +54,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/settings/shared/TabNavigation.vue",
-  ],
+  allowlist: ["components/settings/shared/TabNavigation.vue"],
   baseline: [
     "components/settings/shared/ConfirmModal.vue",
     "components/settings/shared/TabNavigation.vue",
