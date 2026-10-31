@@ -52,7 +52,22 @@ defineProps({
 }
 
 /* A note at the end of a panel gets the panel's own inset. */
-.screens-layout__detail :deep(.screens-saved) {
+.screens-layout__detail :deep(.screens-saved),
+.screens-layout__list :deep(.screens-empty) {
   margin: var(--panel-pad-y) var(--panel-pad-x);
+}
+
+/* The page list's native Show / Start here controls: orange accent, never the
+   browser blue, with the tight gap between control and word. */
+.screens-layout__detail :deep(.screen-page__show),
+.screens-layout__detail :deep(.screen-page__start) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
+}
+
+.screens-layout__detail :deep(.screen-page__show input),
+.screens-layout__detail :deep(.screen-page__start input) {
+  accent-color: var(--focus);
 }
 </style>

@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
@@ -117,6 +119,13 @@ describe("ScreensSettings — screen list", () => {
     expect(btn.text()).toBe("+ Add a screen");
     await btn.trigger("click");
     expect(wrapper.find("[data-test='add-kiosk-panel']").exists()).toBe(true);
+  });
+
+  it("leaves no empty intro strip above the first row", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    expect(wrapper.find("#section-screens-list .settings-section__intro").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screens-empty']").exists()).toBe(false);
   });
 
   it("puts + Add a screen in the Screens header as a secondary button", async () => {
@@ -421,6 +430,15 @@ describe("ScreensSettings — Name", () => {
 
 describe("ScreensSettings — Pages", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("accents the Show and Start here controls and keeps a tight gap", () => {
+    const source = readFileSync(
+      resolve(__dirname, "../../../src/components/settings/shared/ScreensLayout.vue"),
+      "utf-8"
+    );
+    expect(source).toMatch(/\.screen-page__show\)[\s\S]*?gap: var\(--gap-tight\)/);
+    expect(source).toMatch(/\.screen-page__show input\)[\s\S]*?accent-color: var\(--focus\)/);
+  });
 
   it("lists every page with Show and Start here, marking the effective start page", async () => {
     const { wrapper } = mountScreens({ overrides: { defaultScreenId: "photos" } });

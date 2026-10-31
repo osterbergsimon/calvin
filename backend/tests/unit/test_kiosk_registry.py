@@ -384,6 +384,8 @@ async def test_global_room_name_moves_to_the_only_unnamed_screen(test_db):
 @pytest.mark.asyncio
 @pytest.mark.unit
 async def test_global_room_name_is_dropped_when_two_screens_are_unnamed(test_db):
+    from loguru import logger
+
     from app.services import kiosk_registry as kr
     from app.services.config_service import config_service
 
@@ -391,11 +393,20 @@ async def test_global_room_name_is_dropped_when_two_screens_are_unnamed(test_db)
     await kr.record_kiosk("hallway")
     await config_service.set_value("displayName", "Lounge")
 
-    await kr.migrate_global_room_name()
+    messages: list[str] = []
+    sink = logger.add(lambda message: messages.append(message.record["message"]), level="WARNING")
+    try:
+        await kr.migrate_global_room_name()
+    finally:
+        logger.remove(sink)
 
     assert await kr.get_overrides("kitchen") == {}
     assert await kr.get_overrides("hallway") == {}
     assert await config_service.get_value("displayName") is None
+    assert (
+        "Dropped the global room name 'Lounge': 2 unnamed screens; "
+        "set it per screen in Settings › Screens" in messages
+    )
 
 
 @pytest.mark.asyncio
