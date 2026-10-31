@@ -139,7 +139,8 @@ describe("ScreenRegionEditor page tabs", () => {
     expect(add.attributes("aria-label")).toBe("Add page");
     expect(add.text()).toBe("Page");
     expect(add.find("svg").exists()).toBe(true);
-    expect(ruleBody(".sre-tab-add")).toContain("background: transparent");
+    expect(add.classes()).toContain("btn--ghost");
+    expect(add.classes()).toContain("btn--sm");
     expect(ruleBody(".sre-tab-add")).not.toContain("dashed");
   });
 
@@ -164,7 +165,7 @@ describe("ScreenRegionEditor inspector headings", () => {
 
   it("does not repeat Page as a group label under the heading", async () => {
     const w = await mountEditor();
-    const groupLabels = w.findAll(".ins-h").map(n => n.text());
+    const groupLabels = w.findAll(".setting-group__title").map(n => n.text());
     expect(groupLabels).not.toContain("Page");
   });
 
@@ -222,11 +223,16 @@ describe("eyebrows stay outside cards", () => {
       "shared/regions/RegionInspector.vue",
       "shared/regions/ScreenInspector.vue",
     ]) {
-      const body = rule(read(path), ".ins-h");
-      expect(body).not.toContain("text-transform: uppercase");
-      expect(body).not.toContain("letter-spacing");
-      expect(body).toContain("color: var(--ink)");
+      expect(read(path)).toContain("<SettingGroup");
     }
+    const groupSource = readFileSync(
+      resolve(__dirname, "../../../../src/components/ui/SettingGroup.vue"),
+      "utf-8"
+    );
+    const body = rule(groupSource, ".setting-group__title");
+    expect(body).not.toContain("text-transform: uppercase");
+    expect(body).not.toContain("letter-spacing");
+    expect(body).toContain("color: var(--ink)");
   });
 
   it("leaves only the section titles and the stage tag uppercase under settings", () => {

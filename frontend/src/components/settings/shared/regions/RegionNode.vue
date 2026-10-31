@@ -97,12 +97,12 @@ const onResize = (firstIndex, event) =>
   display: flex;
   min-width: 0;
   min-height: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   cursor: pointer;
   overflow: hidden;
   transition:
-    box-shadow 0.15s,
-    filter 0.15s;
+    box-shadow var(--dur-fast) var(--ease),
+    filter var(--dur-fast) var(--ease);
 }
 /* Regions are neutral theme surfaces (D3): the kind is recognisable from its
    icon and label, never from a colour. Neutral also keeps the focus colour
@@ -122,7 +122,7 @@ const onResize = (firstIndex, event) =>
   box-shadow:
     inset 0 0 0 2px var(--focus),
     0 0 0 2px var(--focus-glow);
-  z-index: 2;
+  z-index: var(--z-raised);
 }
 .sre-subsplit {
   display: flex;
@@ -157,8 +157,8 @@ const onResize = (firstIndex, event) =>
   color: var(--ink-2);
 }
 .sre-region-name {
-  font-size: var(--fs-2xs);
-  font-weight: 600;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-title);
   color: var(--ink);
   letter-spacing: 0.01em;
 }
@@ -166,7 +166,7 @@ const onResize = (firstIndex, event) =>
   position: absolute;
   right: 5px;
   bottom: 4px;
-  font-size: var(--fs-micro);
+  font-size: var(--text-caption);
   color: var(--ink-3);
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
@@ -194,7 +194,7 @@ const onResize = (firstIndex, event) =>
 .sre-resizer .grip {
   width: 4px;
   height: 34px;
-  border-radius: 999px;
+  border-radius: var(--radius-round);
   background: color-mix(in srgb, var(--focus) 55%, transparent);
 }
 .sre-resizer.row .grip {
