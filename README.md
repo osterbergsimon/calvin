@@ -1,9 +1,77 @@
-# Calvin - Lightweight DAKBoard Alternative
+# Calvin — a self-hosted dashboard for your screens
 
-A lightweight, self-hosted home dashboard for Raspberry Pi that displays
-calendars, photos, and external web services. It ships a Vue 3 frontend, a
-FastAPI backend, and a plugin system — and it runs happily on a single Pi or as
-a backend serving several kiosk displays.
+**Calvin is a home or business LAN dashboard for a wall screen.** Put calendars,
+photos and the web apps you check every day side by side, then drive that same
+dashboard from a Raspberry Pi kiosk, a spare tablet, or any browser on the
+network. One server holds the data; any number of screens show it. A plugin
+system adds calendar providers, photo sources and web services without touching
+the core.
+
+![Calvin's dashboard in light mode: a November calendar with multi-day events next to a photo frame](docs/images/tour/dashboard-light.webp)
+
+## A quick look
+
+**Light or dark, it is the same screen.** The shot above is light; the same
+layout in dark keeps the calendar and photo readable at night.
+
+![Calvin dashboard, dark theme](docs/images/tour/dashboard-dark.webp)
+
+**Portrait or landscape.** Turn the layout for a vertical screen, or stack the
+calendar above the photo frame on a tall display.
+
+![Calvin in portrait: calendar above a photo frame](docs/images/tour/dashboard-portrait.webp)
+
+**Settings from the couch.** Content and screens are managed from the same web
+UI, on a laptop or a phone.
+
+| Content                                                         | Screens                                                         |
+| --------------------------------------------------------------- | --------------------------------------------------------------- |
+| ![Settings › Content: calendars and photo sources](docs/images/tour/settings-content.webp) | ![Settings › Screens: the connected kiosks](docs/images/tour/settings-screens.webp) |
+
+**First run takes a minute.** A one-time setup code from the server log becomes
+the admin password; after that you can add a calendar from your phone and see it
+on the wall.
+
+| Set up from a phone                                            | Content on a phone                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------- |
+| ![First-run setup: the prefilled setup code and password fields](docs/images/tour/phone-setup.webp) | ![Content settings on a phone](docs/images/tour/phone-content.webp) |
+
+![The setup flow: choose a password with the setup code, add a calendar, and see it on the dashboard](docs/images/tour/setup-flow.gif)
+
+_Screenshots and the recording were made with the sample data from
+`make demo-seed`; see [frontend/scripts/capture-tour.mjs](frontend/scripts/capture-tour.mjs)
+to regenerate them._
+
+## Quick start
+
+Calvin runs on a Raspberry Pi 3B+ or newer, or any always-on Linux host, with
+Docker. The setup script installs the runtime and the kiosk browser for you.
+
+**Stable release** — replace `vX.Y.Z` with the newest tag from
+[Releases](https://github.com/osterbergsimon/calvin/releases):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/vX.Y.Z/scripts/setup.sh \
+  | sudo GIT_BRANCH=vX.Y.Z bash
+sudo reboot
+```
+
+The dashboard comes up at `http://<pi>:8000` after the reboot.
+
+**Testers** can track `develop` (the `:develop` image is rebuilt on every push).
+It is also the only installable ref until the first release is cut:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+sudo reboot
+```
+
+The full walkthrough — first sign-in, finding the setup code, and what to do
+next — is in [docs/setup/GETTING_STARTED.md](docs/setup/GETTING_STARTED.md).
+Setup-script details are in
+[docs/setup/SETUP_SCRIPTS.md](docs/setup/SETUP_SCRIPTS.md), and the three
+deployment shapes are compared in
+[docs/setup/DEPLOYMENT_TOPOLOGIES.md](docs/setup/DEPLOYMENT_TOPOLOGIES.md).
 
 ## ✨ Features
 
@@ -31,10 +99,9 @@ For **native development** (tests, linters, formatting) you also need:
 - **Node.js 20+**
 - **uv** (installed by the dev setup scripts if missing)
 
-## 🧭 Pick a topology
+## 🧭 Deployment shapes
 
-Calvin supports three deployment shapes. The full comparison, including
-security caveats, is in
+The full comparison, including security caveats, is in
 [docs/setup/DEPLOYMENT_TOPOLOGIES.md](docs/setup/DEPLOYMENT_TOPOLOGIES.md);
 the guided tour is
 [docs/setup/GETTING_STARTED.md](docs/setup/GETTING_STARTED.md).
@@ -42,30 +109,8 @@ the guided tour is
 ### 1. All-in-one Pi (default)
 
 One Pi runs the backend, the frontend, and the kiosk browser. Simplest option,
-and the one to pick for a single display.
-
-```bash
-# Stable release: pin the latest tag from
-# https://github.com/osterbergsimon/calvin/releases
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
-  | sudo GIT_BRANCH=v0.1.0 bash
-sudo reboot
-```
-
-The script installs Docker, the published runtime image for that release, the
-kiosk dependencies, and the systemd units. The dashboard comes up at
-`http://<pi>:8000` after reboot. Details:
-[docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md) and
-[docs/setup/SETUP_SCRIPTS.md](docs/setup/SETUP_SCRIPTS.md#installing-a-release-versus-develop).
-
-Testers can track `develop` instead (the `:develop` image, rebuilt on every
-push). It is also the only installable ref until the first release is cut — use
-this command until `vX.Y.Z` shows up on the releases page:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
-sudo reboot
-```
+and the one to pick for a single display. Use the [quick start](#quick-start)
+above; details are in [docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md).
 
 ### 2. Remote backend + kiosk Pi
 
@@ -144,6 +189,13 @@ pinned toolchain.
 **Keyboard support** is browser-side: `KeyboardHandler.vue` listens for DOM
 `keydown` events; there is no backend hardware-keyboard (`evdev`) path, so no
 kernel headers or `--extra linux` install are needed.
+
+### README screenshots
+
+`npm run capture:tour` in `frontend/` boots a throwaway Calvin on free ports
+with `make demo-seed` data, drives it with Playwright, and writes the optimised
+assets under `docs/images/tour/`. It runs with `CALVIN_HOST_CONTROL=0` and
+intercepts every host-acting route.
 
 ## 📁 Project Structure
 
