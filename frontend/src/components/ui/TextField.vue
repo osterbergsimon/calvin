@@ -121,9 +121,13 @@ defineExpose({ focus, select });
   height: 1px;
   margin: -1px;
   padding: 0;
-  overflow: hidden;
+  /* Visually hidden but still the input's accessible name. Do not use
+     overflow: hidden here: the phone layout audit reads a 1px clipped box as
+     truncated text. `clip`/`clip-path` hide it without reporting overflow. */
+  overflow: visible;
   white-space: nowrap;
   clip: rect(0 0 0 0);
+  clip-path: inset(50%);
 }
 
 .text-field__input {
