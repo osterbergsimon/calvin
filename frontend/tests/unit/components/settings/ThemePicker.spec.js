@@ -13,13 +13,45 @@ const stubs = {
   teleport: true,
   ThemeSelector: {
     name: "ThemeSelector",
-    props: ["themes", "selectedThemeId", "loading"],
+    props: ["themes", "selectedThemeId", "loading", "dark"],
     emits: ["select"],
-    template: '<div class="theme-selector-stub" @click="$emit(\'select\', themes[0]?.id)" />',
+    template: '<div class="theme-selector-stub" @click="$emit(\'select\', themes[1]?.id)" />',
   },
 };
 
 describe("ThemePicker", () => {
+  it("lists Calvin first, then installed themes", async () => {
+    const w = mount(ThemePicker, { props: { selectedThemeId: null }, global: { stubs } });
+    await flushPromises();
+    await w.get(".theme-picker__trigger").trigger("click");
+    const selector = w.findComponent({ name: "ThemeSelector" });
+    expect(selector.props("themes").map(theme => theme.name)).toEqual(["Calvin", "Midnight"]);
+    expect(selector.props("selectedThemeId")).toBe("calvin");
+    w.unmount();
+  });
+
+  it("emits null when Calvin is chosen", async () => {
+    const w = mount(ThemePicker, {
+      props: { selectedThemeId: "midnight" },
+      global: {
+        stubs: {
+          ...stubs,
+          ThemeSelector: {
+            name: "ThemeSelector",
+            props: ["themes", "selectedThemeId", "loading", "dark"],
+            emits: ["select"],
+            template: "<div class=\"calvin-stub\" @click=\"$emit('select', 'calvin')\" />",
+          },
+        },
+      },
+    });
+    await flushPromises();
+    await w.get(".theme-picker__trigger").trigger("click");
+    await w.get(".calvin-stub").trigger("click");
+    expect(w.emitted("select")[0]).toEqual([null]);
+    w.unmount();
+  });
+
   it("opens the popover and emits select", async () => {
     const w = mount(ThemePicker, {
       props: { selectedThemeId: null },
@@ -39,7 +71,7 @@ describe("ThemePicker", () => {
   it("names the built-in palette when no theme is selected (F8)", async () => {
     const w = mount(ThemePicker, { props: { selectedThemeId: null }, global: { stubs } });
     await flushPromises();
-    expect(w.get(".theme-picker__label").text()).toBe("Calvin default");
+    expect(w.get(".theme-picker__label").text()).toBe("Calvin");
   });
 
   it("shows the selected theme's name", async () => {

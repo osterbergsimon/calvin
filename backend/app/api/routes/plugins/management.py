@@ -268,6 +268,9 @@ async def get_plugins(
                     "supports_multiple_instances": False,
                     "is_builtin": True,
                     "version": theme_manifest.get("version", "1.0.0"),
+                    "selectable": theme_manifest.get("selectable", True),
+                    "validation_errors": theme_manifest.get("validation_errors", []),
+                    "validation_warnings": theme_manifest.get("validation_warnings", []),
                 }
                 result.append(theme_entry)
 
@@ -295,6 +298,9 @@ async def get_plugins(
                     "supports_multiple_instances": False,
                     "is_builtin": False,
                     "version": theme_manifest.get("version", "1.0.0"),
+                    "selectable": theme_manifest.get("selectable", True),
+                    "validation_errors": theme_manifest.get("validation_errors", []),
+                    "validation_warnings": theme_manifest.get("validation_warnings", []),
                 }
                 result.append(theme_entry)
         except Exception:
