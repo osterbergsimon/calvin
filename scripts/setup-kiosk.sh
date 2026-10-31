@@ -20,7 +20,7 @@ _CALVIN_SOURCE_ONLY=0
 BACKEND_URL=""
 SIGNING_KEY=""
 # --display-stack <x11|wayland|cog>; empty means "environment, then env file, then
-# auto" (phase 1: auto is X11).
+# auto" (auto: cog on Pi 3-class boards, x11 elsewhere).
 DISPLAY_STACK_ARG=""
 DISPLAY_STACK=""
 for _arg in "$@"; do
@@ -106,7 +106,10 @@ install_kiosk_config() {
 }
 
 # Which stack to install: --display-stack wins, then the environment, then the
-# value already in /etc/default/calvin-kiosk, then auto (phase 1: x11).
+# value already in /etc/default/calvin-kiosk, then auto (cog on Pi 3-class, x11
+# elsewhere). install_kiosk_config records the resolved value, so a re-run with
+# no flag keeps the stack an existing kiosk already has. An older kiosk whose
+# config predates CALVIN_DISPLAY_STACK is X11 and stays X11.
 requested_display_stack() {
     if [ -n "${DISPLAY_STACK_ARG}" ]; then
         resolve_display_stack "${DISPLAY_STACK_ARG}"
@@ -118,8 +121,12 @@ requested_display_stack() {
     fi
     local env_file existing
     env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
-    existing="$(read_env_value "$env_file" CALVIN_DISPLAY_STACK)"
-    resolve_display_stack "${existing:-auto}"
+    if [ -f "${env_file}" ]; then
+        existing="$(read_env_value "$env_file" CALVIN_DISPLAY_STACK)"
+        resolve_display_stack "${existing:-x11}"
+        return
+    fi
+    resolve_display_stack auto
 }
 
 usage() {
@@ -137,10 +144,11 @@ Required:
 Options:
   --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
   --signing-key <HEX>        Same, inline (visible in ps and shell history)
-  --display-stack <STACK>    x11 (default), wayland (labwc) or cog (WPE WebKit
-                             on DRM/KMS, recommended for Pi 3-class boards).
-                             All stacks stay installed: re-run with another
-                             value to switch an existing kiosk in place.
+  --display-stack <STACK>    auto (default; cog on Pi 3-class boards, x11
+                             elsewhere), x11, wayland (labwc) or cog (WPE
+                             WebKit on DRM/KMS). All stacks stay installed:
+                             re-run with another value to switch an existing
+                             kiosk in place.
 EOF
 }
 
