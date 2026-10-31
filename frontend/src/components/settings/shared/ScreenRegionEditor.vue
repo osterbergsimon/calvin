@@ -60,16 +60,17 @@
                 >
               </button>
             </div>
-            <button
-              type="button"
+            <Button
               class="sre-tab-add"
-              aria-label="Add page"
+              variant="ghost"
+              size="sm"
+              label="Add page"
               title="Add page"
+              :icon="mdiPlus"
               @click="addScreen"
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path :d="mdiPlus" /></svg>
               Page
-            </button>
+            </Button>
           </div>
           <div class="sre-preview-as">
             <span class="sre-preview-label">Preview on</span>
@@ -102,17 +103,18 @@
 
         <!-- Body: stage + rail -->
         <div v-if="placeSource" class="sre-place" data-test="place-banner">
-          <span class="sre-place__text"
-            >Choose a region for <strong>{{ placeSource.name }}</strong></span
-          >
-          <button
-            type="button"
+          <InlineNote class="sre-place__text">
+            Choose a region for <strong>{{ placeSource.name }}</strong>
+          </InlineNote>
+          <Button
             class="sre-place__cancel"
+            variant="secondary"
+            size="sm"
             data-test="place-cancel"
             @click="$emit('place-cancel')"
           >
             Cancel
-          </button>
+          </Button>
         </div>
 
         <div class="sre-body" :class="{ 'is-sheet-open': isPhone && sheetOpen }">
@@ -121,22 +123,20 @@
             <div class="sre-stage-tag"><span class="dot" /> {{ stageTag }}</div>
 
             <div v-if="mismatch" class="sre-mismatch" data-test="mismatch">
-              <span class="sre-mismatch__text"
-                >⚠️ <strong>{{ previewScreenName }}</strong> doesn’t show “{{
-                  activeScreen.name
-                }}”.</span
-              >
-              <button
-                type="button"
+              <InlineNote class="sre-mismatch__text" tone="warn">
+                <strong>{{ previewScreenName }}</strong> doesn’t show “{{ activeScreen.name }}”.
+              </InlineNote>
+              <Button
                 class="sre-mismatch__btn"
+                size="sm"
                 :disabled="showItBusy"
                 @click="showItOnScreen"
               >
                 Show it on {{ previewScreenName }}
-              </button>
-              <span v-if="showItError" class="sre-mismatch__error" role="alert">{{
-                showItError
-              }}</span>
+              </Button>
+              <InlineNote v-if="showItError" class="sre-mismatch__error" tone="err" role="alert">
+                {{ showItError }}
+              </InlineNote>
             </div>
 
             <div class="sre-stage-focus">
@@ -310,20 +310,20 @@
                 </div>
               </div>
 
-              <div
+              <Tag
                 v-if="sizeClass === 'compact'"
                 class="sre-orient-caption"
                 data-test="orientation-caption"
               >
                 {{ orientationBadge }}
-              </div>
+              </Tag>
             </div>
 
-            <div v-if="!mismatch && previewScreenId !== ANY_BROWSER" class="sre-preview-note">
+            <Tag v-if="!mismatch && previewScreenId !== ANY_BROWSER" class="sre-preview-note">
               Previewing on {{ previewScreenName }} · edits change the shared “{{
                 activeScreen.name
               }}” page
-            </div>
+            </Tag>
           </div>
 
           <!-- RAIL (a bottom sheet on phones) -->
@@ -346,16 +346,17 @@
               <span class="sre-sheet-label" data-test="sheet-selection">{{
                 sheetSelectionLabel
               }}</span>
-              <button
-                type="button"
+              <IconButton
                 class="sre-sheet-chevron"
                 data-test="sheet-chevron"
-                :aria-label="sheetOpen ? 'Hide settings' : 'Show settings'"
+                variant="ghost"
+                size="md"
+                :label="sheetOpen ? 'Hide settings' : 'Show settings'"
                 :aria-expanded="sheetOpen"
                 @click.stop="toggleSheet"
               >
                 {{ sheetOpen ? "⌄" : "⌃" }}
-              </button>
+              </IconButton>
             </div>
             <div class="sre-rail-scroll">
               <RegionInspector
@@ -366,6 +367,7 @@
                 :component-options="componentOptions"
                 :source-options="sourceOptionsFor(selectedRegion.kind)"
                 :context="selectionContext"
+                :hide-heading="isPhone"
                 @patch-view="patchSelectedView"
                 @set-component="setSelectedComponent"
                 @toggle-source="toggleSelectedSource"
@@ -383,6 +385,7 @@
                 :clock="clock"
                 :clock-selected="clockSelected"
                 :can-delete="screens.screens.length > 1"
+                :hide-heading="isPhone"
                 @rename="renameScreen"
                 @preset="applyPreset"
                 @add-region="addRegion"
@@ -418,8 +421,10 @@ import { useKiosksStore } from "@/stores/kiosks";
 import { useConfigStore } from "@/stores/config";
 import { usePlugins } from "@/composables";
 import { buildComponentOptions } from "@/utils/componentPicker";
+import Button from "@/components/ui/Button.vue";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import Tag from "@/components/ui/Tag.vue";
@@ -1257,7 +1262,7 @@ onUnmounted(() => {
 .sre-root {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: var(--z-dialog);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1265,17 +1270,17 @@ onUnmounted(() => {
 }
 .sre-modal {
   position: relative;
-  z-index: 1001;
+  z-index: calc(var(--z-dialog) + 1);
   width: min(1240px, 100%);
   height: min(820px, 100%);
   display: grid;
   grid-template-rows: auto auto 1fr;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-panel);
   overflow: hidden;
-  box-shadow: 0 24px 70px var(--shadow-hover);
-  animation: sre-rise 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--elev-2);
+  animation: sre-rise var(--dur) var(--ease);
 }
 @keyframes sre-rise {
   from {
@@ -1296,33 +1301,31 @@ onUnmounted(() => {
 .sre-header {
   display: flex;
   align-items: center;
-  gap: var(--space-xl);
-  padding: var(--space-xl) var(--space-2xl);
+  gap: var(--gap-4);
+  padding: var(--gap-4) var(--gap-5);
   border-bottom: 1px solid var(--line);
 }
 .sre-title h2 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: var(--fs-lg);
-  font-weight: 650;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 .sre-sub {
   margin: 0.15rem 0 0;
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-3);
 }
 .sre-close {
   margin-left: auto;
-  font-size: var(--fs-xl);
-  line-height: 1;
 }
 
 .sre-context {
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
-  padding: 0 var(--space-lg);
+  gap: var(--gap-3);
+  padding: 0 var(--gap-3);
   border-bottom: 1px solid var(--line);
   background: var(--bg-1);
 }
@@ -1339,8 +1342,8 @@ onUnmounted(() => {
   mask-image: linear-gradient(
     to right,
     transparent,
-    var(--ink) var(--space-lg),
-    var(--ink) calc(100% - var(--space-lg)),
+    var(--ink) var(--gap-3),
+    var(--ink) calc(100% - var(--gap-3)),
     transparent
   );
 }
@@ -1357,14 +1360,14 @@ onUnmounted(() => {
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-lg);
-  padding: 0 var(--space-lg);
+  gap: var(--gap-3);
+  padding: 0 var(--gap-3);
   border: 0;
   background: transparent;
   color: var(--ink-2);
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 500;
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
   white-space: nowrap;
   cursor: pointer;
 }
@@ -1377,13 +1380,13 @@ onUnmounted(() => {
 }
 .sre-tab.is-active {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 .sre-tab.is-active::after {
   content: "";
   position: absolute;
-  left: var(--space-lg);
-  right: var(--space-lg);
+  left: var(--gap-3);
+  right: var(--gap-3);
   bottom: 0;
   height: var(--tab-indicator);
   background: var(--focus);
@@ -1395,8 +1398,8 @@ onUnmounted(() => {
   max-width: 16ch;
   overflow: hidden;
   color: var(--ink-3);
-  font-size: var(--fs-xs);
-  font-weight: 400;
+  font-size: var(--text-meta);
+  font-weight: var(--weight-body);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1406,39 +1409,12 @@ onUnmounted(() => {
 .sre-tab.is-dimmed {
   opacity: 0.5;
 }
-.sre-tab-add {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2xs);
-  height: var(--tab-height);
-  padding: 0 var(--space-lg);
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.sre-tab-add svg {
-  width: var(--tab-icon);
-  height: var(--tab-icon);
-  fill: currentColor;
-}
-.sre-tab-add:hover {
-  color: var(--ink);
-}
-.sre-tab-add:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-}
 .sre-preview-as {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  font-size: var(--fs-xs);
+  gap: var(--gap-2);
+  font-size: var(--text-meta);
   color: var(--ink-2);
 }
 .sre-preview-label {
@@ -1455,36 +1431,22 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.7rem 1.25rem;
+  gap: var(--gap-4);
+  padding: var(--gap-3) var(--gap-5);
   background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
   border-top: 1px solid var(--focus-edge, var(--line));
   border-bottom: 1px solid var(--focus-edge, var(--line));
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  color: var(--ink);
 }
-.sre-place__cancel {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  background: var(--bg-1);
+.sre-place__text {
+  flex: 1 1 auto;
   color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  font-family: var(--font-ui);
-  font-weight: 600;
-  cursor: pointer;
-}
-.sre-place__cancel:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 .sre-stage {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-2xl);
+  padding: var(--gap-5);
   overflow: hidden;
   background: radial-gradient(
     120% 120% at 50% 8%,
@@ -1494,12 +1456,12 @@ onUnmounted(() => {
 }
 .sre-stage-tag {
   position: absolute;
-  top: var(--space-xl);
-  left: var(--space-2xl);
+  top: var(--gap-4);
+  left: var(--gap-5);
   display: flex;
   align-items: center;
-  gap: var(--space-2xs);
-  font-size: var(--fs-2xs);
+  gap: var(--gap-1);
+  font-size: var(--text-caption);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -1507,73 +1469,55 @@ onUnmounted(() => {
 .sre-stage-tag .dot {
   width: 6px;
   height: 6px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-round);
   background: var(--ok);
 }
 .sre-mismatch {
   position: absolute;
-  top: var(--space-xl);
+  top: var(--gap-4);
   left: 50%;
   transform: translateX(-50%);
-  z-index: 4;
+  z-index: var(--z-raised);
   max-width: 78%;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: var(--space-sm);
-  font-size: var(--fs-xs);
-  line-height: 1.35;
-  color: var(--ink);
+  gap: var(--gap-2);
   background: color-mix(in srgb, var(--warn) 16%, var(--bg-1));
   border: 1px solid color-mix(in srgb, var(--warn) 50%, transparent);
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-sm);
+  padding: var(--gap-2) var(--gap-3);
+  border-radius: var(--radius-card);
+}
+.sre-mismatch__text {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--ink);
 }
 .sre-mismatch__btn {
   flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--focus) 55%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--focus) 16%, transparent);
-  color: var(--focus-text);
-  font-size: var(--fs-xs);
-  font-weight: 600;
-  padding: 0.2rem 0.65rem;
-  cursor: pointer;
-}
-.sre-mismatch__btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--focus) 28%, transparent);
-}
-.sre-mismatch__btn:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 .sre-mismatch__error {
-  flex-basis: 100%;
-  color: var(--ink-2);
+  width: 100%;
+  justify-content: center;
   text-align: center;
 }
 .sre-preview-note {
   position: absolute;
-  bottom: var(--space-xl);
+  bottom: var(--gap-4);
   left: 50%;
   transform: translateX(-50%);
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  padding: var(--space-2xs) var(--space-md);
-  border-radius: var(--radius-pill);
+  max-width: 90%;
 }
 
 .sre-device-wrap {
-  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform var(--dur) var(--ease);
 }
 .sre-stage-focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--gap-3);
   min-width: 0;
 }
 .sre-device-wrap.dimmed {
@@ -1583,14 +1527,14 @@ onUnmounted(() => {
 .sre-device {
   position: relative;
   padding: 12px;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-panel);
   background: linear-gradient(160deg, var(--device-bezel-a), var(--device-bezel-b));
   box-shadow:
-    0 30px 50px -18px var(--device-inset),
+    var(--elev-2),
     inset 0 1px 0 var(--device-highlight);
   transition:
-    width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-    height 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    width var(--dur) var(--ease),
+    height var(--dur) var(--ease);
 }
 .sre-screen {
   position: relative;
@@ -1599,7 +1543,7 @@ onUnmounted(() => {
   display: flex;
   gap: 2px;
   padding: 3px;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   background: var(--device-screen);
   box-shadow:
     inset 0 0 0 1px var(--device-highlight-soft),
@@ -1642,7 +1586,7 @@ onUnmounted(() => {
 .sre-resizer .grip {
   width: 4px;
   height: 34px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-round);
   background: color-mix(in srgb, var(--focus) 55%, transparent);
 }
 .sre-resizer.row .grip {
@@ -1658,13 +1602,13 @@ onUnmounted(() => {
   top: -26px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: var(--fs-micro);
+  font-size: var(--text-caption);
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   color: var(--bg-1);
   background: var(--ink);
   padding: 0.12rem 0.4rem;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-round);
   opacity: 0;
   white-space: nowrap;
   pointer-events: none;
@@ -1681,8 +1625,8 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--focus) 14%, var(--bg-1));
   color: var(--focus-text);
   border: 1px solid color-mix(in srgb, var(--focus) 30%, transparent);
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-micro);
+  border-radius: var(--radius-control);
+  font-size: var(--text-caption);
   font-variant-numeric: tabular-nums;
 }
 .sre-clockbar.h {
@@ -1711,15 +1655,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--focus) 9%, transparent);
   border: 1px dashed color-mix(in srgb, var(--focus) 50%, transparent);
   color: var(--focus-text);
-  font-size: var(--fs-micro);
-  font-weight: 600;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-title);
   transition:
-    background 0.12s,
-    border-color 0.12s;
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .sre-drop > span {
   pointer-events: none;
@@ -1732,7 +1676,7 @@ onUnmounted(() => {
 }
 .sre-drop.perim {
   position: absolute;
-  z-index: 6;
+  z-index: var(--z-raised);
 }
 .sre-drop.perim.top {
   top: 3px;
@@ -1765,11 +1709,11 @@ onUnmounted(() => {
 .sre-drop.gap {
   flex: 0 0 24px;
   align-self: stretch;
-  z-index: 3;
+  z-index: var(--z-raised);
 }
 .sre-drop-plus {
-  font-size: var(--fs-2xs);
-  font-weight: 700;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-title);
 }
 
 .sre-rail {
@@ -1813,13 +1757,7 @@ onUnmounted(() => {
   display: none;
 }
 .sre-orient-caption {
-  margin-top: var(--space-md);
-  font-size: var(--fs-2xs);
-  color: var(--ink-2);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  padding: var(--space-2xs) var(--space-md);
-  border-radius: var(--radius-pill);
+  margin-top: var(--gap-3);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1827,8 +1765,8 @@ onUnmounted(() => {
 .sre-root.size-phone .sre-context {
   flex-direction: column;
   align-items: stretch;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg);
+  gap: var(--gap-2);
+  padding: var(--gap-2) var(--gap-3);
 }
 .sre-root.size-phone .sre-tab-screens {
   display: none;
@@ -1856,11 +1794,11 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: var(--sre-sheet-height);
-  padding: var(--space-lg);
+  padding: var(--gap-3);
 }
 .sre-root.size-phone .sre-stage-tag {
-  top: var(--space-md);
-  left: var(--space-lg);
+  top: var(--gap-3);
+  left: var(--gap-3);
 }
 .sre-root.size-phone .sre-preview-note {
   display: none;
@@ -1869,7 +1807,7 @@ onUnmounted(() => {
 .sre-root.size-phone .sre-mismatch {
   flex-direction: column;
   max-width: 92%;
-  top: var(--space-sm);
+  top: var(--gap-2);
 }
 .sre-root.size-phone .sre-mismatch__btn {
   width: 100%;
@@ -1881,14 +1819,14 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 6;
+  z-index: var(--z-raised);
   height: 64px;
   border-left: 0;
   border-top: 1px solid var(--line);
-  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
   background: var(--bg-1);
-  box-shadow: 0 -12px 32px var(--shadow-hover);
-  transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: var(--elev-2);
+  transition: height var(--dur) var(--ease);
 }
 .sre-rail.is-sheet.is-open {
   height: 65%;
@@ -1901,8 +1839,8 @@ onUnmounted(() => {
   height: 64px;
   display: flex;
   align-items: center;
-  gap: var(--space-md);
-  padding: 0 var(--space-lg);
+  gap: var(--gap-3);
+  padding: 0 var(--gap-3);
   cursor: pointer;
   touch-action: none;
 }
@@ -1910,7 +1848,7 @@ onUnmounted(() => {
   width: 40px;
   height: 4px;
   flex: 0 0 auto;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-round);
   background: var(--line);
   cursor: grab;
 }
@@ -1920,25 +1858,9 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--text-label);
+  font-weight: var(--weight-title);
   color: var(--ink);
-}
-.sre-sheet-chevron {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--bg-1);
-  color: var(--ink-2);
-  font-size: var(--fs-base);
-  line-height: 1;
-  cursor: pointer;
-}
-.sre-sheet-chevron:hover {
-  border-color: var(--focus);
-  color: var(--focus-text);
 }
 .sre-rail.is-sheet .sre-rail-scroll {
   min-height: 0;
@@ -1946,7 +1868,7 @@ onUnmounted(() => {
 
 /* Region labels shrink under 320px (§2). */
 .sre-device.is-narrow :deep(.sre-region-name) {
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
 }
 
 /* Coarse pointer: bigger divider hit areas with the same 4x34 grip (§4). */
@@ -1954,13 +1876,11 @@ onUnmounted(() => {
   flex: 0 0 28px;
 }
 
-.sre-sheet-chevron:focus-visible,
 .sre-sheet-peek:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
-.sre-tab:focus-visible,
 .sre-resizer:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
