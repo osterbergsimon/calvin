@@ -13,7 +13,6 @@ const ITEMS = [
     label: "Home",
     meta: "Kitchen",
     title: "Home · Kitchen",
-    ariaLabel: "Home · Kitchen",
   },
   { value: "week", label: "Week", meta: "Not shown", metaTone: "warn", dimmed: true },
   { value: "month", label: "Month", meta: "All screens" },
@@ -53,7 +52,10 @@ describe("Tabs", () => {
     expect(tabs[0].find(".tabs__label").text()).toBe("Home");
     expect(tabs[0].find(".tabs__meta").text()).toBe("Kitchen");
     expect(tabs[0].attributes("title")).toBe("Home · Kitchen");
-    expect(tabs[0].attributes("aria-label")).toBe("Home · Kitchen");
+    // The visible label and meta are the accessible name (no override that
+    // could drift from it, e.g. a dot the visible text does not contain).
+    expect(tabs[0].attributes("aria-label")).toBeUndefined();
+    expect(tabs[0].text()).toBe("Home Kitchen");
   });
 
   it("marks a dimmed tab and a warn-toned meta line", () => {

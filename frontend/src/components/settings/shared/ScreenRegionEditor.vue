@@ -613,9 +613,8 @@ const screensLine = pageId => {
   if (showing.length === 0) return NOT_SHOWN;
   return showing.map(kioskName).join(", ");
 };
-// The tab reads as one sentence for screen readers, including the screens
-// text that is truncated visually at 16ch.
-const pageTabLabel = page => `${page.name} · ${screensLine(page.id)}`;
+// The title carries the full screens text (the meta line is truncated visually
+// at 16ch but its DOM text stays complete for screen readers too).
 const pageTabTitle = page => `${page.name} · ${screensLine(page.id)}`;
 const isPageDimmed = pageId =>
   previewScreenId.value !== ANY_BROWSER && !kioskShowsPage(previewKiosk.value, pageId);
@@ -631,7 +630,6 @@ const pageTabItems = computed(() =>
       meta: screensText,
       metaTone: screensText === NOT_SHOWN ? "warn" : "neutral",
       title: pageTabTitle(page),
-      ariaLabel: pageTabLabel(page),
       dimmed: isPageDimmed(page.id),
     };
   })

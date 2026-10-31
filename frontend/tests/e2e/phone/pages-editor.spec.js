@@ -65,7 +65,7 @@ test("phone: pages editor opens, edits a region and adds a page", async ({
   await expectPhoneLayout(page, "preview-on chooser", { scope: ".pill__panel" });
   await page.keyboard.press("Escape");
 
-  await editor.getByRole("button", { name: "Close editor" }).click();
+  await page.getByRole("button", { name: "Close editor" }).click();
   await expect(editor).toBeHidden();
 
   expect(api.unmatched).toEqual([]);
