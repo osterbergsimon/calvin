@@ -188,7 +188,7 @@ describe("Calendar Store", () => {
       const store = useCalendarStore();
       store.sources = [];
 
-      expect(store.getSourceColor("999")).toBe("#2196f3");
+      expect(store.getSourceColor("999")).toBe("var(--event-1)");
     });
   });
 
