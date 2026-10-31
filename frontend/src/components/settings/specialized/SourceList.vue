@@ -1,18 +1,18 @@
 <template>
   <div class="source-list">
     <div v-if="addLabel" class="sl-add-row">
-      <button
-        type="button"
+      <Button
         class="sl-add"
+        :variant="rows.length === 0 ? 'primary' : 'secondary'"
         :disabled="addDisabled"
         :title="addDisabled ? addDisabledHint : ''"
         @click="$emit('add')"
       >
         {{ addLabel }}
-      </button>
+      </Button>
     </div>
 
-    <p v-if="rows.length === 0" class="sl-empty">{{ emptyText }}</p>
+    <InlineNote v-if="rows.length === 0" class="sl-empty">{{ emptyText }}</InlineNote>
 
     <draggable
       v-else
@@ -25,55 +25,63 @@
       @update:model-value="handleOrderChange"
     >
       <template #item="{ element: row }">
-        <div
+        <ListRow
           class="sl-row"
-          :class="{
-            'sl-row--off': !row.enabled,
-            'sl-row--focus': isHighlighted(row),
-            'sl-row--error': row.error,
-          }"
+          :name="row.name"
+          :meta="rowMeta(row)"
+          :selected="isHighlighted(row)"
+          :disabled="!row.enabled"
           :data-source-id="row.id"
         >
-          <span v-if="drag" class="sl-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
-          <span
-            v-if="row.running !== undefined"
-            class="sl-dot"
-            :class="row.error ? 'sl-dot--err' : row.running ? 'sl-dot--on' : 'sl-dot--off'"
-            :title="row.error || (row.running ? 'Working' : 'Off')"
-          />
-          <div class="sl-text">
-            <span class="sl-name">{{ row.name }}</span>
-            <span class="sl-provider" :class="{ 'sl-provider--err': row.error }">
-              {{ row.error || providerLine(row) }}
+          <template #lead>
+            <span class="sl-lead">
+              <span v-if="drag" class="sl-grip" title="Drag to reorder" aria-hidden="true">⠿</span>
+              <span
+                v-if="row.running !== undefined"
+                class="sl-dot"
+                :class="row.error ? 'sl-dot--err' : row.running ? 'sl-dot--on' : 'sl-dot--off'"
+                :title="row.error || (row.running ? 'Working' : 'Off')"
+              />
             </span>
-            <slot name="meta" :row="row" />
-          </div>
+          </template>
 
-          <slot name="extra" :row="row" />
+          <div v-if="$slots.meta" class="sl-meta"><slot name="meta" :row="row" /></div>
 
-          <ToggleSwitch
-            :model-value="!!row.enabled"
-            :aria-label="`Show ${row.name}`"
-            @update:model-value="v => $emit('toggle', row, v)"
-          />
-          <button type="button" class="sl-action" @click="$emit('edit', row)">Edit</button>
-          <div class="sl-more">
-            <button
-              type="button"
-              class="sl-more-btn"
-              :aria-label="`More actions for ${row.name}`"
-              :aria-expanded="openMenuId === row.id ? 'true' : 'false'"
-              @click="toggleMenu(row.id)"
-            >
-              ⋯
-            </button>
-            <div v-if="openMenuId === row.id" class="sl-menu" role="menu">
-              <button type="button" class="sl-menu-item" role="menuitem" @click="askRemove(row)">
-                Remove
-              </button>
+          <template #actions>
+            <slot name="extra" :row="row" />
+            <ToggleSwitch
+              :model-value="!!row.enabled"
+              :aria-label="`Show ${row.name}`"
+              @update:model-value="v => $emit('toggle', row, v)"
+            />
+            <Button class="sl-action" variant="secondary" size="sm" @click="$emit('edit', row)">
+              Edit
+            </Button>
+            <div class="sl-more">
+              <IconButton
+                class="sl-more-btn"
+                variant="ghost"
+                size="md"
+                :label="`More actions for ${row.name}`"
+                :aria-expanded="openMenuId === row.id ? 'true' : 'false'"
+                @click="toggleMenu(row.id)"
+              >
+                ⋯
+              </IconButton>
+              <div v-if="openMenuId === row.id" class="sl-menu" role="menu">
+                <Button
+                  class="sl-menu-item"
+                  variant="danger"
+                  size="sm"
+                  role="menuitem"
+                  @click="askRemove(row)"
+                >
+                  Remove
+                </Button>
+              </div>
             </div>
-          </div>
-        </div>
+          </template>
+        </ListRow>
       </template>
     </draggable>
 
@@ -91,6 +99,10 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import draggable from "vuedraggable";
+import Button from "@/components/ui/Button.vue";
+import IconButton from "@/components/ui/IconButton.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { providerLine } from "@/utils/instanceSummary";
@@ -147,6 +159,8 @@ const emit = defineEmits(["add", "toggle", "edit", "remove", "order-change"]);
 const openMenuId = ref(null);
 const pendingRemove = ref(null);
 const activeHighlight = ref("");
+
+const rowMeta = row => [{ text: row.error || providerLine(row), tone: row.error ? "err" : "" }];
 
 const isHighlighted = row => {
   if (!activeHighlight.value) return false;
@@ -216,74 +230,31 @@ onBeforeUnmount(() => {
 .sl-add-row {
   display: flex;
   justify-content: flex-end;
-  padding: var(--panel-pad-y) var(--panel-pad-x) var(--space-sm);
-}
-
-.sl-add {
-  min-height: var(--touch-target);
-  padding: 0 1.25rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.sl-add:hover:not(:disabled) {
-  filter: brightness(1.06);
-}
-.sl-add:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.sl-add:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-stack);
 }
 
 .sl-empty {
-  margin: 0;
-  padding: var(--space-3xl) var(--panel-pad-x);
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+  justify-content: center;
   text-align: center;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  color: var(--ink-3);
 }
 
 .sl-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--gap-inline);
   padding: 0 var(--panel-pad-x) var(--panel-pad-y);
 }
 
-.sl-row {
-  display: flex;
+.sl-lead {
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  min-height: var(--touch-target);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  flex-wrap: wrap;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-.sl-row--off {
-  opacity: 0.6;
-}
-.sl-row--focus {
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 30%, transparent);
+  gap: var(--gap-tight);
 }
 
 .sl-grip {
   color: var(--ink-3);
-  font-size: var(--fs-base);
+  font-size: var(--text-label);
   line-height: 1;
   cursor: grab;
   user-select: none;
@@ -295,7 +266,7 @@ onBeforeUnmount(() => {
 .sl-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: var(--radius-round);
   flex-shrink: 0;
 }
 .sl-dot--on {
@@ -308,115 +279,34 @@ onBeforeUnmount(() => {
   background: var(--err);
 }
 
-.sl-text {
+.sl-meta {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 6rem;
-  flex: 1;
-}
-.sl-name {
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-provider {
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sl-provider--err {
-  color: var(--err-text);
-}
-
-.sl-action {
-  padding: 0.35rem 0.7rem;
-  min-height: var(--touch-target);
-  background: transparent;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-tight) var(--gap-inline);
+  font-size: var(--text-meta);
   color: var(--ink-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
-}
-.sl-action:hover {
-  border-color: var(--focus);
-  color: var(--ink);
-}
-.sl-action:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .sl-more {
   position: relative;
 }
-.sl-more-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--touch-target);
-  height: var(--touch-target);
-  padding: 0;
-  background: transparent;
-  color: var(--ink-2);
-  border: 1px solid transparent;
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-lg);
-  line-height: 1;
-  cursor: pointer;
-}
-.sl-more-btn:hover {
-  border-color: var(--line);
-  color: var(--ink);
-}
-.sl-more-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
+
 .sl-menu {
   position: absolute;
   right: 0;
-  top: calc(100% + 0.25rem);
-  z-index: 20;
+  top: calc(100% + var(--gap-tight));
+  z-index: var(--z-raised);
   min-width: 9rem;
-  padding: 0.25rem;
+  padding: var(--gap-1);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 6px 18px var(--shadow);
-}
-.sl-menu-item {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: transparent;
-  color: var(--err-text);
-  border: 0;
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  text-align: left;
-  cursor: pointer;
-}
-.sl-menu-item:hover {
-  background: color-mix(in srgb, var(--err) 10%, transparent);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elev-1);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sl-row {
-    transition: none;
-  }
+.sl-menu-item {
+  width: 100%;
+  justify-content: flex-start;
 }
 </style>

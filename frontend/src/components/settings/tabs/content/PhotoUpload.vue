@@ -8,29 +8,36 @@
       type="file"
       accept="image/*"
       multiple
-      class="photo-upload__input"
+      hidden
       data-test="photo-upload-input"
       @change="onFiles"
     />
-    <button
-      type="button"
-      class="photo-upload__btn"
+    <Button
       data-test="photo-upload-btn"
-      :disabled="uploading"
+      variant="primary"
+      :loading="uploading"
+      loading-label="Uploading…"
       @click="fileInput?.click()"
     >
-      {{ uploading ? "Uploading…" : "Choose photos" }}
-    </button>
+      Choose photos
+    </Button>
   </SettingRow>
-  <p v-if="status" class="photo-upload__status" :class="`is-${status.kind}`" role="status">
+  <InlineNote
+    v-if="status"
+    class="photo-upload__status"
+    :tone="status.kind === 'ok' ? 'ok' : 'err'"
+    role="status"
+  >
     {{ status.text }}
-  </p>
+  </InlineNote>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useImagesStore } from "@/stores/images";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import { errorDetailMessage } from "@/utils/apiErrors";
 
 // The landing spot for the dashboard's "Add photos" button (F3): upload right
@@ -77,40 +84,3 @@ onMounted(() => {
   if (!imagesStore.images?.length) void imagesStore.fetchImages();
 });
 </script>
-
-<style scoped>
-.photo-upload__input {
-  display: none;
-}
-.photo-upload__btn {
-  min-height: var(--touch-target);
-  padding: 0 1.1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.photo-upload__btn:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
-.photo-upload__btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.photo-upload__status {
-  margin: 0;
-  padding: 0 1.25rem 0.75rem;
-  font-size: var(--fs-md);
-}
-.photo-upload__status.is-ok {
-  color: var(--ok-text);
-}
-.photo-upload__status.is-error {
-  color: var(--err-text);
-}
-</style>
