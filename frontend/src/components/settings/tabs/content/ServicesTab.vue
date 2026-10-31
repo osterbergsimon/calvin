@@ -19,20 +19,20 @@
         <span class="svc-place">
           <template v-if="row.pages.length">
             On
-            <button type="button" class="svc-link" @click="openPage(row.pages[0].id)">
+            <Button variant="link" class="svc-link" @click="openPage(row.pages[0].id)">
               {{ pageNamesLabel(row.pages) }}
-            </button>
+            </Button>
           </template>
           <template v-else>
             <span class="svc-unplaced">Not on any page yet</span>
-            <button
-              type="button"
-              class="svc-link svc-link--primary"
-              :class="{ 'svc-link--cta': row.id === savedHighlightId }"
+            <Button
+              :variant="row.id === savedHighlightId ? 'primary' : 'link'"
+              :size="row.id === savedHighlightId ? 'sm' : 'md'"
+              class="svc-link"
               @click="placeOnPage(row)"
             >
               Put it on a page
-            </button>
+            </Button>
           </template>
           <template v-if="row.inClockBar"> · in the clock bar</template>
         </span>
@@ -64,6 +64,7 @@ import { useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
 import * as pluginsApi from "@/services/pluginsApi";
+import Button from "@/components/ui/Button.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
@@ -211,49 +212,3 @@ onMounted(async () => {
   if (plugins.value.length === 0 && !loadingPlugins.value) await loadPlugins();
 });
 </script>
-
-<style scoped>
-.services-tab {
-  width: 100%;
-}
-
-.svc-place {
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  color: var(--ink-2);
-}
-.svc-unplaced {
-  margin-right: 0.4rem;
-  color: var(--ink-3);
-}
-.svc-link {
-  padding: 0;
-  background: transparent;
-  color: var(--ink-2);
-  border: 0;
-  border-bottom: 1px dotted currentColor;
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.svc-link:hover {
-  color: var(--ink);
-}
-.svc-link:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.svc-link--primary {
-  color: var(--focus-text);
-}
-.svc-link--cta {
-  display: inline-block;
-  margin-left: 0.5rem;
-  padding: 0.2rem 0.65rem;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-xs);
-  font-weight: 600;
-}
-</style>

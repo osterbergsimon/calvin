@@ -1,34 +1,41 @@
 <template>
   <div class="where-shows" data-test="where-shows">
-    <h4 class="where-shows__title">Where {{ title }} show</h4>
-    <template v-if="lines.length">
-      <button
-        v-for="line in lines"
-        :key="line.regionId"
-        type="button"
-        class="where-shows__row"
-        data-test="where-shows-row"
-        @click="openLine(line)"
-      >
-        <span class="where-shows__where">{{ line.pageName }} · {{ line.regionLabel }}</span>
-        <span class="where-shows__look">
-          {{ line.summary }}
-          <template v-if="line.sourceNames.length"> · {{ line.sourceNames.join(", ") }}</template>
-        </span>
-      </button>
-    </template>
-    <p v-else class="where-shows__empty">
-      Not on any page yet.
-      <button type="button" class="where-shows__place" data-test="where-shows-place" @click="place">
-        Put it on a page
-      </button>
-    </p>
+    <SettingGroup :title="`Where ${title} show`">
+      <div class="where-shows__body">
+        <template v-if="lines.length">
+          <Button
+            v-for="line in lines"
+            :key="line.regionId"
+            variant="ghost"
+            class="where-shows__row"
+            data-test="where-shows-row"
+            @click="openLine(line)"
+          >
+            <span class="where-shows__lines">
+              <span class="where-shows__where">{{ line.pageName }} · {{ line.regionLabel }}</span>
+              <span class="where-shows__look">{{ lookLabel(line) }}</span>
+            </span>
+          </Button>
+        </template>
+        <InlineNote v-else>
+          Not on any page yet.
+          <template #action>
+            <Button variant="link" data-test="where-shows-place" @click="place">
+              Put it on a page
+            </Button>
+          </template>
+        </InlineNote>
+      </div>
+    </SettingGroup>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useRouter } from "vue-router";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
 import { useRegionEditorRequest } from "@/composables/useRegionEditorRequest";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
 import { whereItShows } from "@/utils/whereItShows";
@@ -49,6 +56,8 @@ const { requestPlacement } = usePlacementRequest();
 
 const lines = computed(() => whereItShows(props.config, props.kind, props.sources));
 
+const lookLabel = line => [line.summary, line.sourceNames.join(", ")].filter(Boolean).join(" · ");
+
 const openEditor = () =>
   router?.replace({ path: "/settings", query: { setting: "dashboard-regions" } });
 
@@ -66,71 +75,39 @@ const place = () => {
 
 <style scoped>
 .where-shows {
-  padding: var(--panel-pad-y) var(--panel-pad-x);
+  padding-bottom: var(--panel-pad-y);
   border-top: 1px solid var(--line-soft);
 }
-.where-shows__title {
-  margin: 0 0 var(--space-sm);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-.where-shows__row {
+
+.where-shows__body {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
+  gap: var(--gap-tight);
+  padding: var(--gap-2) var(--panel-pad-x) 0;
+}
+
+.where-shows__row {
   width: 100%;
-  min-height: 44px;
-  padding: var(--space-sm) 0;
-  border: 0;
-  border-top: 1px solid var(--line-soft);
-  background: transparent;
-  color: var(--ink);
+  justify-content: flex-start;
+  padding-inline: 0;
   text-align: left;
-  cursor: pointer;
 }
-.where-shows__row:hover .where-shows__where,
-.where-shows__row:focus-visible .where-shows__where {
-  color: var(--focus-text);
+
+.where-shows__lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-tight);
+  min-width: 0;
 }
-.where-shows__row:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
+
 .where-shows__where {
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 550;
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
 }
+
 .where-shows__look {
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-2);
-}
-.where-shows__empty {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.where-shows__place {
-  min-height: 44px;
-  padding: 0 var(--space-md);
-  border: 0;
-  background: transparent;
-  color: var(--focus-text);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  cursor: pointer;
-}
-.where-shows__place:hover {
-  text-decoration: underline;
-}
-.where-shows__place:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 </style>

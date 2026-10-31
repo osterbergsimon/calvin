@@ -60,7 +60,7 @@ describe("WhereItShows", () => {
 
   it("lists one line per region with its look and source filter", () => {
     const w = mountWhere();
-    expect(w.find(".where-shows__title").text()).toBe("Where calendars show");
+    expect(w.find(".setting-group__title").text()).toBe("Where calendars show");
     const rows = w.findAll('[data-test="where-shows-row"]');
     expect(rows).toHaveLength(1);
     expect(rows[0].text()).toContain("Home · Calendar");
