@@ -26,7 +26,7 @@ export function useEventHelpers() {
       }
     }
     // Default color
-    return "#2196f3";
+    return "var(--event-1)";
   };
 
   /**

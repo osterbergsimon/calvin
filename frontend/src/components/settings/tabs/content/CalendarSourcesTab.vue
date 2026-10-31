@@ -98,6 +98,7 @@ import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
 import WhereItShows from "@/components/settings/specialized/WhereItShows.vue";
 import { getInstanceSummary } from "@/utils/instanceSummary";
 import { logError } from "@/utils/logger";
+import { nextEventColour } from "@/utils/themePalettes";
 
 // Calendars use the one shared source flow (§3.1, decision B): a SourceList of
 // sources, the provider picker to add one, and the shared add/edit form. The
@@ -162,12 +163,12 @@ const rows = computed(() =>
 // Calendar colours are DATA (named colours or hex), not theme tokens: map the
 // names a stored source may carry to hex so the native colour input shows it.
 const getColorValue = color => {
-  if (!color) return "#2196f3";
+  if (!color) return "#275f86";
   if (color.startsWith("#")) return color;
   const colorMap = {
     green: "#4caf50",
     red: "#f44336",
-    blue: "#2196f3",
+    blue: "#275f86",
     yellow: "#ffeb3b",
     orange: "#ff9800",
     purple: "#9c27b0",
@@ -179,7 +180,7 @@ const getColorValue = color => {
     grey: "#9e9e9e",
     gray: "#9e9e9e",
   };
-  return colorMap[color.toLowerCase()] || "#2196f3";
+  return colorMap[color.toLowerCase()] || "#275f86";
 };
 
 const handleColorChange = async (row, hexColor) => {
@@ -258,7 +259,9 @@ const handleAddSaved = async payload => {
       name: created.instanceName,
       ical_url: created.calendarConfig?.ical_url || "",
       enabled: instance.enabled !== false,
-      color: created.calendarConfig?.color || "#2196f3",
+      color:
+        created.calendarConfig?.color ||
+        nextEventColour((calendarStore.sources || []).map(source => source.color)),
       show_time: created.calendarConfig?.show_time !== false,
     });
     savedHighlightId.value = instance.id;

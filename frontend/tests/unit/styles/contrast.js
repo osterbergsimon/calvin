@@ -2,9 +2,10 @@
  * WCAG contrast helpers shared by the theme contract tests.
  *
  * Themes ship as CSS custom properties in two places: the defaults in
- * `src/styles/theme.css` (`:root` / `.dark`) and the five built-in themes in
- * `backend/data/themes/builtin.json`. Both are read here so a change to either
- * is caught by `tagContrast.spec.js` and `themeContrast.spec.js`.
+ * `src/styles/theme.css` (`:root` / `.dark`, which are the Calvin theme) and the
+ * built-in themes in `backend/data/themes/builtin.json`. Both are read here so a
+ * change to either is caught by `tagContrast.spec.js`, `themeContrast.spec.js`
+ * and `themeHue.spec.js`.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -49,12 +50,33 @@ export const percentage = name => {
   return Number(match?.[1]) / 100;
 };
 
+const COLOUR_DECLARATION = /^\s*--([a-z0-9-]+):\s*([^;]+);/gm;
+// Only the hex palettes are theme colours; the constant/value tokens in
+// theme.css (device chrome, scrims, shadows) stay out of the palette scan.
+const COLOUR_VALUE = /^#[0-9a-fA-F]{3,8}$/;
+
+/** Palette declared in one theme.css block (`:root` or `.dark`). */
+const cssPalette = selector => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = THEME_CSS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([\\s\\S]*?)\\n\\}`));
+  const vars = {};
+  for (const declaration of match?.[1]?.matchAll(COLOUR_DECLARATION) ?? []) {
+    const [, name, value] = declaration;
+    if (COLOUR_VALUE.test(value.trim())) vars[name] = value.trim();
+  }
+  return vars;
+};
+
 /**
- * Every theme × mode a built-in theme can render: the five themes each carry a
- * light (`variables`) and a dark (`dark_mode`) palette.
+ * Every theme × mode a built-in theme can render: Calvin (theme.css defaults)
+ * plus the built-in palettes, each with a light (`variables`) and a dark
+ * (`dark_mode`) palette.
  */
 export const palettes = () => {
-  const out = [];
+  const out = [
+    { id: "calvin", mode: "light", vars: cssPalette(":root") },
+    { id: "calvin", mode: "dark", vars: cssPalette(".dark") },
+  ];
   for (const [id, theme] of Object.entries(THEMES)) {
     for (const [mode, key] of [
       ["light", "variables"],

@@ -9,6 +9,12 @@ from typing import Any
 from loguru import logger
 
 from app.config import settings
+from app.services.theme_contract import (
+    check_theme,
+    decorate_theme,
+    install_error,
+    log_ignored_keys,
+)
 from app.services.validation import (
     resolve_child_dir,
     validate_directory_structure,
@@ -75,12 +81,25 @@ class ThemeInstaller:
             # Path resolution failed, not safe
             return False
 
-    def _validate_manifest(self, manifest: dict[str, Any]) -> None:
+    def _validate_manifest(
+        self, manifest: dict[str, Any], check_contract: bool = True
+    ) -> dict[str, Any]:
         """
-        Validate a theme manifest structure.
+        Validate a theme manifest structure and (optionally) the theme_api 2
+        palette contract.
+
+        The contract check normalises the palettes: non-colour keys are dropped,
+        and missing ``-ink``/``-text`` pairs are derived and stored, so a theme
+        installed once is self-contained afterwards.
 
         Args:
             manifest: Theme manifest dictionary
+            check_contract: Enforce palette rules (install); False when merely
+                listing a repository, so a broken theme can still be shown and
+                rejected with a useful message at install time.
+
+        Returns:
+            The manifest to persist (normalised when the contract was checked)
 
         Raises:
             ValueError: If manifest is invalid
@@ -91,6 +110,20 @@ class ThemeInstaller:
 
         # Validate variables structure
         validate_theme_variables(manifest["variables"])
+
+        if not check_contract:
+            return manifest
+
+        check = check_theme(manifest)
+        log_ignored_keys(manifest, check)
+        if not check.ok:
+            raise ValueError(install_error(manifest, check))
+
+        normalised = dict(manifest)
+        normalised["variables"] = check.variables
+        normalised["dark_mode"] = check.dark_mode
+        normalised["theme_api"] = manifest.get("theme_api", 2)
+        return normalised
 
     def validate_theme_package(self, theme_path: Path) -> dict[str, Any]:
         """
@@ -119,16 +152,18 @@ class ThemeInstaller:
         )
 
         # Validate theme-specific fields
-        self._validate_manifest(manifest)
+        return self._validate_manifest(manifest)
 
-        return manifest
-
-    def _validate_theme_directory(self, theme_dir: Path) -> dict[str, Any]:
+    def _validate_theme_directory(
+        self, theme_dir: Path, check_contract: bool = True
+    ) -> dict[str, Any]:
         """
         Validate a theme directory structure.
 
         Args:
             theme_dir: Path to theme directory
+            check_contract: Enforce the palette contract (False when listing a
+                repository so an invalid theme can still be shown)
 
         Returns:
             Theme manifest dictionary
@@ -143,9 +178,7 @@ class ThemeInstaller:
         )
 
         # Validate theme-specific fields
-        self._validate_manifest(manifest)
-
-        return manifest
+        return self._validate_manifest(manifest, check_contract=check_contract)
 
     def install_theme(
         self,
@@ -342,7 +375,7 @@ class ThemeInstaller:
                 with open(manifest_path, encoding="utf-8") as f:
                     manifest = json.load(f)
                 manifest["_installed_path"] = str(theme_dir)
-                themes.append(manifest)
+                themes.append(decorate_theme(manifest))
             except json.JSONDecodeError as e:
                 logger.warning(f"Invalid JSON in theme manifest for {theme_dir.name}: {e}")
                 continue
@@ -373,7 +406,7 @@ class ThemeInstaller:
 
         try:
             with open(manifest_path, encoding="utf-8") as f:
-                return json.load(f)
+                return decorate_theme(json.load(f))
         except (json.JSONDecodeError, Exception):
             return None
 
@@ -423,7 +456,9 @@ class ThemeInstaller:
 
                         # Validate theme directory
                         try:
-                            manifest = self._validate_theme_directory(theme_dir)
+                            manifest = self._validate_theme_directory(
+                                theme_dir, check_contract=False
+                            )
                             # Add metadata from manifest file
                             theme_entry = {
                                 "id": manifest["id"],
@@ -462,7 +497,7 @@ class ThemeInstaller:
 
             if theme_json.exists():
                 try:
-                    manifest = self._validate_theme_directory(item)
+                    manifest = self._validate_theme_directory(item, check_contract=False)
                     theme_entry = {
                         "id": manifest["id"],
                         "name": manifest.get("name", ""),

@@ -8,6 +8,7 @@ from loguru import logger
 from app.config import BACKEND_DIR
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
+from app.services.theme_contract import decorate_theme
 from app.utils.db_retry import retry_on_db_locked
 
 
@@ -23,9 +24,11 @@ def _load_builtin_themes() -> dict[str, Any]:
     try:
         with open(themes_file, encoding="utf-8") as f:
             themes = json.load(f)
-            # Ensure is_builtin is True for all loaded themes
+            # Ensure is_builtin is True for all loaded themes and run the
+            # theme_api 2 load check on every startup, bundle included.
             for theme_id, theme_data in themes.items():
                 theme_data["is_builtin"] = True
+                themes[theme_id] = decorate_theme(theme_data)
             return themes
     except (json.JSONDecodeError, Exception) as e:
         logger.error(f"Failed to load built-in themes from {themes_file}: {e}")
