@@ -93,6 +93,25 @@ def test_desired_on_camelcase_keys():
     assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is False
 
 
+# desired_on — merged payload from a per-screen camelCase override ⇒ OFF (CLV-101)
+def test_desired_on_merged_payload_honours_screen_override():
+    """The server sends both spellings, both carrying the override value.
+
+    The household schedule was enabled and the screen override disabled it; the
+    agent reads the snake spelling first and must still turn the display off.
+    """
+    cfg = {
+        "display_schedule_enabled": False,
+        "displayScheduleEnabled": False,
+        "display_schedule": _sched(),
+        "displaySchedule": _sched(),
+        "timezone": None,
+    }
+    now = datetime(2026, 7, 11, 23, 0)
+    assert agent.desired_on(cfg, now) is True
+    assert agent.seconds_to_next_boundary(cfg, now) is None
+
+
 # desired_on — day not enabled ⇒ ON
 def test_desired_on_day_disabled():
     cfg = _cfg(display_schedule=_sched(enabled=False))
