@@ -1,75 +1,71 @@
 /**
- * E2E tests for theme switching
- * Tests functionality: manual theme toggle, theme mode changes
+ * E2E tests for light/dark theme switching.
+ *
+ * A theme mode lives in Settings › Dashboard › Appearance as a "Light or dark"
+ * pill (it stopped being a <select> when the Settings shell was redesigned), and
+ * it is applied to <html> as the `.light` / `.dark` class.
+ *
+ * Everything is answered by the mocked backend, so the suite runs without a
+ * Calvin server and never reaches a real one.
  */
 
 import { test, expect } from "@playwright/test";
+import { installApiMock } from "./phone/fixtures/api-mock.js";
+import { gotoSettings } from "./phone/fixtures/navigation.js";
+
+const THEME_CONTROL = /^Light or dark:/;
+
+/** Open Settings › Dashboard and bring the Appearance section into view. */
+async function openAppearance(page) {
+  await gotoSettings(page, "Dashboard");
+  const control = page.getByRole("button", { name: THEME_CONTROL });
+  await control.scrollIntoViewIfNeeded();
+  await expect(control).toBeVisible();
+}
+
+/** Pick one of the Light / Dark / Follow device / On a schedule options. */
+async function chooseThemeMode(page, label) {
+  await page.getByRole("button", { name: THEME_CONTROL }).click();
+  await page.getByRole("option", { name: label, exact: true }).click();
+  await page.waitForLoadState("networkidle");
+}
 
 test.describe("Theme Switching", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-    // Wait for app to load
-    await page.waitForLoadState("networkidle");
-  });
-
   test("should apply dark theme class to HTML element", async ({ page }) => {
-    // Navigate to settings
-    await page.click('button:has-text("Settings"), a[href*="settings"]');
-    await page.waitForLoadState("networkidle");
+    await installApiMock(page, { config: { themeMode: "auto" } });
 
-    // Find theme mode selector and change to dark
-    const themeSelector = page
-      .locator('select[name*="theme"], select[aria-label*="theme" i]')
-      .first();
-    if ((await themeSelector.count()) > 0) {
-      await themeSelector.selectOption("dark");
-      await page.waitForTimeout(500); // Wait for theme to apply
+    await openAppearance(page);
+    await chooseThemeMode(page, "Dark");
 
-      // Check if HTML element has dark class
-      const htmlElement = page.locator("html");
-      await expect(htmlElement).toHaveClass(/dark/);
-    }
+    const html = page.locator("html");
+    await expect(html).toHaveClass(/dark/);
+    await expect(html).not.toHaveClass(/light/);
   });
 
   test("should apply light theme class to HTML element", async ({ page }) => {
-    // Navigate to settings
-    await page.click('button:has-text("Settings"), a[href*="settings"]');
-    await page.waitForLoadState("networkidle");
+    await installApiMock(page, { config: { themeMode: "dark" } });
 
-    // Find theme mode selector and change to light
-    const themeSelector = page
-      .locator('select[name*="theme"], select[aria-label*="theme" i]')
-      .first();
-    if ((await themeSelector.count()) > 0) {
-      await themeSelector.selectOption("light");
-      await page.waitForTimeout(500); // Wait for theme to apply
+    await openAppearance(page);
+    await chooseThemeMode(page, "Light");
 
-      // Check if HTML element has light class
-      const htmlElement = page.locator("html");
-      await expect(htmlElement).toHaveClass(/light/);
-    }
+    const html = page.locator("html");
+    await expect(html).toHaveClass(/light/);
+    await expect(html).not.toHaveClass(/dark/);
   });
 
   test("should persist theme selection", async ({ page }) => {
-    // Navigate to settings
-    await page.click('button:has-text("Settings"), a[href*="settings"]');
+    const mock = await installApiMock(page, { config: { themeMode: "auto" } });
+
+    await openAppearance(page);
+    await chooseThemeMode(page, "Dark");
+    await expect(page.locator("html")).toHaveClass(/dark/);
+
+    // The choice is auto-saved, not only kept in memory.
+    expect(mock.requests).toContain("POST /api/config");
+
+    await page.reload();
     await page.waitForLoadState("networkidle");
 
-    // Change theme to dark
-    const themeSelector = page
-      .locator('select[name*="theme"], select[aria-label*="theme" i]')
-      .first();
-    if ((await themeSelector.count()) > 0) {
-      await themeSelector.selectOption("dark");
-      await page.waitForTimeout(500);
-
-      // Reload page
-      await page.reload();
-      await page.waitForLoadState("networkidle");
-
-      // Verify theme is still dark
-      const htmlElement = page.locator("html");
-      await expect(htmlElement).toHaveClass(/dark/);
-    }
+    await expect(page.locator("html")).toHaveClass(/dark/);
   });
 });
