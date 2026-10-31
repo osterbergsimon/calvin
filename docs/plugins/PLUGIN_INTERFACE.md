@@ -86,7 +86,9 @@ Each `instance_config_schema` entry is a field dict in one canonical shape:
 ```python
 "field_key": {
     "type": "string" | "integer" | "number" | "boolean" | "password",
-    "description": "shown in the form",
+    "label": "Calendar address",   # optional — form label
+    "description": "The .ics address to read events from.",  # hint line
+    "hidden": False,         # optional — true keeps the field out of the form
     "default": ...,          # optional — omit to leave a field genuinely unset
     "ui": {
         "component": "input" | "password" | "number" | "checkbox"
@@ -103,6 +105,12 @@ Each `instance_config_schema` entry is a field dict in one canonical shape:
 }
 ```
 
+- **`label` names the field; `description` is the hint under it.** Without a
+  label the form humanises the key (`feed_url` → "Feed URL") in sentence case.
+- **`hidden: true` keeps a field out of the form** while its default still
+  applies to the saved config. Type-level internals such as `display_order`
+  are never shown even if a plugin leaves the flag off.
+- **Booleans render as the shared on/off switch**, not a native checkbox.
 - **`type`** drives `normalize_config` conversion — numeric fields must be
   `integer`/`number`, never `string`, or the value won't convert.
 - **Constraints belong under `ui.validation`** — this is the single validation
@@ -120,11 +128,13 @@ build this shape so plugins don't hand-roll nested dicts. `text_field()`,
 from app.plugins.sdk.schema import number_field, password_field, select_field, toggle_field, url_field
 
 instance_config_schema={
-    "url": url_field("Website URL", placeholder="https://example.com", required=True),
-    "api_token": password_field("API token", required=True),
-    "days_ahead": number_field("Days ahead", default=7, min=1, max=30, integer=True),
-    "mark_as_read": select_field("Mark as read", [("true", "Yes"), ("false", "No")]),
-    "fullscreen": toggle_field("Prefer fullscreen mode"),
+    "url": url_field(
+        "The web address to show.", label="Address", placeholder="https://example.com", required=True
+    ),
+    "api_token": password_field("The token from your account page.", label="API token", required=True),
+    "days_ahead": number_field("How many days to include.", label="Days ahead", default=7, min=1, max=30, integer=True),
+    "mark_as_read": select_field("When to mark items read.", [("true", "Yes"), ("false", "No")], label="Mark as read"),
+    "fullscreen": toggle_field("Open this service in fullscreen by default", label="Fullscreen"),
 }
 ```
 

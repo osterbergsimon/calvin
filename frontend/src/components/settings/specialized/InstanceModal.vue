@@ -24,17 +24,8 @@
           </div>
 
           <!-- Instance-specific fields from instance_config_schema -->
-          <template
-            v-if="
-              currentPlugin?.instance_config_schema &&
-              Object.keys(currentPlugin.instance_config_schema).length > 0
-            "
-          >
-            <div
-              v-for="(schema, key) in currentPlugin.instance_config_schema"
-              :key="key"
-              class="form-group"
-            >
+          <template v-if="instanceFields.length > 0">
+            <div v-for="[key, schema] in instanceFields" :key="key" class="form-group">
               <PluginFieldRenderer
                 :plugin-id="currentPlugin.id"
                 :field-key="key"
@@ -52,7 +43,7 @@
                 loading-label="Getting coordinates…"
                 @click="handleGeocode"
               >
-                Get Coordinates
+                Get coordinates
               </Button>
               <div
                 v-if="key === 'location' && geocodeStatus"
@@ -71,12 +62,13 @@
             </div>
           </template>
 
-          <!-- Calendar-specific fields (color and show_time) -->
+          <!-- Calendar-specific fields (colour and show_time) -->
           <template v-if="currentPlugin?.type === 'calendar'">
             <div class="form-group">
-              <label>Calendar Color</label>
-              <div style="display: flex; align-items: center; gap: 0.5rem">
+              <label for="instance-calendar-colour">Colour</label>
+              <div class="colour-row">
                 <input
+                  id="instance-calendar-colour"
                   v-model="formData.color"
                   type="color"
                   class="color-input"
@@ -87,16 +79,21 @@
                   type="text"
                   class="form-input"
                   placeholder="#2196f3"
+                  aria-label="Colour value"
                   style="flex: 1"
                 />
               </div>
-              <span class="help-text"> Choose a color for events from this calendar source </span>
+              <span class="help-text">Choose a colour for events from this calendar source</span>
             </div>
             <div class="form-group">
-              <label>
-                <input v-model="formData.show_time" type="checkbox" />
-                Show Event Times
-              </label>
+              <div class="toggle-row">
+                <span class="toggle-row__label">Show event times</span>
+                <ToggleSwitch
+                  :model-value="formData.show_time"
+                  aria-label="Show event times"
+                  @update:model-value="formData.show_time = $event"
+                />
+              </div>
               <span class="help-text">
                 Display time information for events from this calendar
               </span>
@@ -105,13 +102,17 @@
 
           <!-- Enable/Disable -->
           <div class="form-group">
-            <label>
-              <input v-model="formData.enabled" type="checkbox" />
-              Enabled
-            </label>
+            <div class="toggle-row">
+              <span class="toggle-row__label">Enabled</span>
+              <ToggleSwitch
+                :model-value="formData.enabled"
+                aria-label="Enabled"
+                @update:model-value="formData.enabled = $event"
+              />
+            </div>
           </div>
 
-          <!-- Test Connection Button (if plugin supports it) -->
+          <!-- Test connection Button (if plugin supports it) -->
           <div v-if="hasTestAction" class="form-group">
             <Button
               variant="secondary"
@@ -120,7 +121,7 @@
               loading-label="Testing…"
               @click="handleTest"
             >
-              Test Connection
+              Test connection
             </Button>
             <div
               v-if="testStatus"
@@ -148,6 +149,8 @@ import { ref, watch, computed } from "vue";
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import Button from "@/components/ui/Button.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { isHiddenField } from "@/utils/pluginFields";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
 import { errorDetailMessage } from "@/utils/apiErrors";
@@ -201,17 +204,30 @@ const instanceLabel = computed(() => {
   return plugin?.instance_label || instanceLabelMap[plugin?.type] || "source";
 });
 
+// The form shows only real instance settings: `hidden` fields and type-level
+// internals (display_order) are never rendered, though their defaults still
+// travel with the saved config.
+const instanceFields = computed(() => {
+  const schema = currentPlugin.value?.instance_config_schema;
+  if (!schema || typeof schema !== "object") return [];
+  return Object.entries(schema).filter(([key, field]) => !isHiddenField(key, field));
+});
+
 // "Add Recipe list" when the plugin names its instances; otherwise "Add a source".
 const addTitle = computed(() => {
   const declared = currentPlugin.value?.instance_label;
   return declared ? `Add ${declared}` : `Add a ${instanceLabel.value}`;
 });
 
-const namePlaceholder = computed(() =>
-  currentPlugin.value?.instance_label
-    ? `e.g. ${currentPlugin.value.instance_label}`
-    : "e.g. Family photos"
-);
+// A label that just repeats the kind ("calendar") makes a poor example, so a
+// calendar suggests a real name and other kinds drop the placeholder.
+const namePlaceholder = computed(() => {
+  const plugin = currentPlugin.value;
+  if (!plugin?.instance_label) return "e.g. Family photos";
+  if (plugin.type === "calendar") return "e.g. Family";
+  if (plugin.instance_label.toLowerCase() === String(plugin.type || "").toLowerCase()) return "";
+  return `e.g. ${plugin.instance_label}`;
+});
 
 // Config values are bare scalars (the backend normalizes legacy wrappers);
 // this only fills schema defaults for fields the instance hasn't set yet.
@@ -666,6 +682,7 @@ const handleSave = async () => {
 
 .form-input {
   width: 100%;
+  height: var(--control-height);
   padding: 0.5rem 0.75rem;
   background: var(--bg-2);
   color: var(--ink);
@@ -687,11 +704,31 @@ const handleSave = async () => {
   outline-offset: 2px;
 }
 
+.colour-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.toggle-row__label {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: var(--fs-md);
+  font-family: var(--font-ui);
+}
+
 .help-text {
-  font-size: var(--fs-control);
+  font-size: var(--text-meta);
   color: var(--ink-2);
-  margin-top: 0.25rem;
-  line-height: 1.4;
+  margin-top: var(--gap-1);
+  line-height: normal;
 }
 
 .error-message {

@@ -88,7 +88,8 @@ class GoogleCalendarPlugin(CalendarPlugin):
             # field, so it is never sent back to the frontend (audit S5).
             "ical_url": {
                 "type": "password",
-                "description": "Google Calendar iCal URL or share URL",
+                "label": "Calendar address",
+                "description": "A Google Calendar iCal URL or share link.",
                 "default": "",
                 "ui": {
                     "component": "password",
