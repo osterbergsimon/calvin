@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { mdiSilverwareForkKnife } from "@mdi/js";
 import { mount } from "@vue/test-utils";
 import PluginInstaller from "@/components/settings/specialized/PluginInstaller.vue";
 
@@ -10,7 +11,18 @@ const CATALOG = [
     version: "1.0.0",
     description: "Recipes and meal plans from your Mealie server",
     keywords: ["recipes"],
+    icon: "mdi:silverware-fork-knife",
     path: "mealie",
+    _installed: false,
+  },
+  {
+    id: "internal_tool",
+    name: "Internal tool",
+    type: "service",
+    version: "1.0.0",
+    description: "Not part of the published catalog.",
+    catalog: false,
+    path: "internal-tool",
     _installed: false,
   },
   {
@@ -74,6 +86,21 @@ describe("PluginInstaller catalog (§3.3)", () => {
   it("still lists test plugins in dev mode", () => {
     const w = mountWith({ devMode: true });
     expect(w.text()).toContain("Test Plugin");
+  });
+
+  it("never lists catalog:false entries, in either mode", () => {
+    for (const devMode of [false, true]) {
+      const w = mountWith({ devMode });
+      expect(w.find('[data-catalog-plugin-id="internal_tool"]').exists()).toBe(false);
+      expect(w.text()).not.toContain("Internal tool");
+    }
+  });
+
+  it("renders a curated mdi icon as an SVG glyph", () => {
+    const w = mountWith({ devMode: false });
+    const row = w.find('[data-catalog-plugin-id="mealie"]');
+    expect(row.find(".catalog-icon svg").exists()).toBe(true);
+    expect(row.find(".catalog-icon svg path").attributes("d")).toBe(mdiSilverwareForkKnife);
   });
 
   it("labels the kind in plain words, never the raw type", () => {
