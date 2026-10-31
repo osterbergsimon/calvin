@@ -1,7 +1,7 @@
 <template>
   <div class="web-component-host">
     <div v-if="error" class="web-component-host__error calvin-plugin-error">
-      Couldn't load this plugin's display. {{ error }}
+      Couldn't show {{ pluginLabel }}.
     </div>
     <component v-else-if="loaded" :is="elementName" ref="elementRef" />
     <div v-else class="web-component-host__loading calvin-plugin-loading">Loading…</div>
@@ -10,11 +10,14 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { logError } from "../../utils/logger";
 
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array, null], default: null },
   pluginId: { type: String, required: true },
+  // The plugin's own name, for the one line a person sees when it can't draw.
+  pluginName: { type: String, default: "" },
 });
 
 const loaded = ref(false);
@@ -23,6 +26,8 @@ const elementRef = ref(null);
 let stylesheetEl = null;
 
 const elementName = computed(() => props.schema?.element);
+// Never render the raw failure text (CLV-63): it is for the console only.
+const pluginLabel = computed(() => props.pluginName || "this plugin");
 
 const moduleUrl = computed(() => {
   const file = props.schema?.module || "dist.js";
@@ -53,7 +58,9 @@ async function load() {
     }
     loaded.value = true;
   } catch (err) {
-    error.value = err?.message || String(err);
+    // "schema.element missing" and import failures are log messages, never copy.
+    logError("[WebComponentHost]", `Failed to load ${props.pluginId}:`, err);
+    error.value = err;
   }
 }
 

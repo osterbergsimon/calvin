@@ -6,6 +6,7 @@ import { computed, ref } from "vue";
 import { useConfigStore } from "../stores/config";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
+import { friendlyError } from "../utils/friendlyError";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 
@@ -238,7 +239,7 @@ export function useConfigForm(initialConfig = {}) {
       }, 2500);
     } catch (err) {
       logError("[useConfigForm]", "Failed to save config:", err);
-      error.value = err.response?.data?.detail || err.message || "Failed to save configuration";
+      error.value = friendlyError(err, "save your settings");
       throw err;
     } finally {
       saving.value = false;

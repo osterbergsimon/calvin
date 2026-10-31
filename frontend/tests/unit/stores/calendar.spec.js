@@ -116,6 +116,9 @@ describe("Calendar Store", () => {
 
       await expect(store.fetchSources()).rejects.toThrow("Network error");
       expect(store.error).toBe("Network error");
+      expect(store.errorText).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(store.loading).toBe(false);
     });
   });

@@ -3,7 +3,7 @@
  * Tests calendar event navigation and keyboard action resolution
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useModeStore } from "@/stores/mode";
@@ -291,11 +291,64 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
     });
 
     it("should resolve generic_next to calendar_next_month when no event is selected", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date(2026, 9, 15));
+      calendarStore.setCurrentDate(new Date());
       const initialDate = calendarStore.currentDate;
       keyboardActions.handleAction("generic_next");
 
       // Should navigate to next month
       expect(calendarStore.currentDate.getMonth()).toBe((initialDate.getMonth() + 1) % 12);
+      vi.useRealTimers();
+    });
+
+    describe("month navigation at month end (CLV-70)", () => {
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      // Pin "today" so the navigation starts from the end of a month, whatever
+      // the real clock says. Only Date is faked: promises and nextTick stay real.
+      const shiftFrom = (start, action) => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(start);
+        calendarStore.setCurrentDate(new Date());
+        keyboardActions.handleAction(action);
+        const d = calendarStore.currentDate;
+        return [d.getFullYear(), d.getMonth(), d.getDate()];
+      };
+
+      it("Jan 31 -> next month is February, not March", () => {
+        expect(shiftFrom(new Date(2026, 0, 31), "calendar_next")).toEqual([2026, 1, 28]);
+      });
+
+      it("Mar 31 -> previous month is February, not March 3rd", () => {
+        expect(shiftFrom(new Date(2026, 2, 31), "calendar_prev")).toEqual([2026, 1, 28]);
+      });
+
+      it("Oct 31 -> next month is November (the reported repro)", () => {
+        expect(shiftFrom(new Date(2026, 9, 31), "calendar_next")).toEqual([2026, 10, 30]);
+      });
+
+      it("Dec 31 -> next month rolls the year into January", () => {
+        expect(shiftFrom(new Date(2026, 11, 31), "calendar_next")).toEqual([2027, 0, 31]);
+      });
+
+      it("generic_next resolves to the same clamped month step", () => {
+        expect(shiftFrom(new Date(2026, 9, 31), "generic_next")).toEqual([2026, 10, 30]);
+      });
+
+      it("generic_prev resolves to the same clamped month step", () => {
+        expect(shiftFrom(new Date(2026, 2, 31), "generic_prev")).toEqual([2026, 1, 28]);
+      });
+
+      it("legacy calendar_next_month alias is clamped too", () => {
+        expect(shiftFrom(new Date(2026, 9, 31), "calendar_next_month")).toEqual([2026, 10, 30]);
+      });
+
+      it("legacy calendar_prev_month alias is clamped too", () => {
+        expect(shiftFrom(new Date(2026, 2, 31), "calendar_prev_month")).toEqual([2026, 1, 28]);
+      });
     });
 
     it("navigates by the focused region's view mode (day steps a day, not a month)", () => {

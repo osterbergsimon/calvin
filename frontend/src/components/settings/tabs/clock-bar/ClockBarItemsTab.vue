@@ -107,7 +107,7 @@ async function toggle(service, nextValue) {
     });
     await webServicesStore.fetchServices();
   } catch (err) {
-    errorMessage.value = `Failed to update ${service.name}: ${err.message}`;
+    errorMessage.value = `Couldn't change ${service.name}. Try again.`;
     logError("[ClockBarItemsTab]", "Failed to toggle show_in_statusbar:", err);
   } finally {
     pendingId.value = null;

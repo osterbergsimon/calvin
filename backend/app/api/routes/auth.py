@@ -4,6 +4,7 @@ All endpoints here are same-origin-checked by the Host/Origin middleware and are
 registered by :func:`app.security.install.install_security` at prefix ``/api``.
 """
 
+import ipaddress
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -19,6 +20,13 @@ from app.security.admin_auth import (
 )
 from app.security.api_keys import MAX_NAME_LEN, DuplicateKeyName, get_api_key_store
 from app.security.route_policy import admin_error, is_admin_session, request_api_key
+from app.security.setup_code import (
+    current_setup_code,
+    ensure_setup_code,
+    format_code,
+    invalidate_setup_code,
+    verify_setup_code,
+)
 from app.utils.host_control import host_control_enabled
 
 router = APIRouter()
@@ -26,6 +34,12 @@ router = APIRouter()
 
 class PasswordBody(BaseModel):
     password: str
+
+
+class SetupBody(BaseModel):
+    password: str
+    # Required: a body without a code is a 422, before anything can be claimed.
+    code: str
 
 
 class ChangePasswordBody(BaseModel):
@@ -62,6 +76,36 @@ def _set_admin_cookie(response: Response, value: str) -> None:
     )
 
 
+# A local reverse proxy makes every visitor's peer loopback. If the request
+# carries any proxy header it came through (or a client tried to look like it
+# did), so it is never a trusted loopback caller.
+_PROXY_HEADERS = (
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+)
+
+
+def _is_loopback(request: Request) -> bool:
+    """True only for a direct loopback peer with no proxy headers at all.
+
+    ``X-Forwarded-*``/``Forwarded`` is never trusted (design §5). Uvicorn may
+    rewrite ``request.client`` from ``X-Forwarded-For`` when a local proxy is
+    trusted, so the header check comes first and does not depend on that.
+    """
+    if any(header in request.headers for header in _PROXY_HEADERS):
+        return False
+    host = request.client.host if request.client else ""
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 @router.get("/auth/status")
 async def auth_status(request: Request):
     """Whether an admin password exists and whether this client has a session."""
@@ -69,10 +113,44 @@ async def auth_status(request: Request):
     return {"configured": store.is_configured(), "authenticated": is_admin_session(request)}
 
 
+@router.get("/auth/setup-code")
+async def auth_setup_code(request: Request):
+    """The one-time setup code, only to the server itself (loopback).
+
+    A kiosk on the same machine can show it on its setup screen. Everything
+    else is refused so the code never reaches the LAN: use the server log or
+    ``<data dir>/setup-code.txt`` instead.
+    """
+    if not _is_loopback(request):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "loopback_only",
+                "message": "The setup code is only available on the server itself.",
+            },
+        )
+    if get_admin_store().is_configured():
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "already_configured",
+                "message": "An admin password is already configured.",
+            },
+        )
+    code = ensure_setup_code()
+    if not code:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "no_setup_code", "message": "No setup code is available."},
+        )
+    return {"code": format_code(code)}
+
+
 @router.post("/auth/setup")
-async def auth_setup(body: PasswordBody, request: Request, response: Response):
-    """First-run claim: only while no password is configured."""
-    wait = login_limiter.check(_client_ip(request))
+async def auth_setup(body: SetupBody, request: Request, response: Response):
+    """First-run claim: only with the one-time code while no password exists."""
+    ip = _client_ip(request)
+    wait = login_limiter.check(ip)
     if wait:
         raise _rate_limited(wait)
     store = get_admin_store()
@@ -82,6 +160,23 @@ async def auth_setup(body: PasswordBody, request: Request, response: Response):
             detail={
                 "code": "already_configured",
                 "message": "An admin password is already configured.",
+            },
+        )
+    # A process started without the lifespan (tests) still gets a valid code.
+    ensure_setup_code()
+    if not verify_setup_code(body.code):
+        login_limiter.record_failure(ip)
+        code = current_setup_code()
+        logger.warning(
+            "Setup attempt rejected from {}: wrong setup code. Calvin setup code: {}",
+            ip,
+            format_code(code) if code else "(unavailable)",
+        )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "bad_setup_code",
+                "message": "Wrong setup code. Find it in Calvin's server log.",
             },
         )
     try:
@@ -94,7 +189,9 @@ async def auth_setup(body: PasswordBody, request: Request, response: Response):
                 "message": "The admin password must be at least 8 characters.",
             },
         ) from None
-    logger.info("Admin password configured (first run)")
+    invalidate_setup_code()
+    login_limiter.record_success(ip)
+    logger.info("Admin password configured (first run); setup code invalidated")
     _set_admin_cookie(response, store.issue_cookie())
     return {"ok": True}
 

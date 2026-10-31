@@ -24,6 +24,7 @@ makes no difference.
 | `backups/` | Saved and automatic backups | `BACKUP_DIR` |
 | `kiosk-signing.key` | Kiosk manifest signing key | `KIOSK_SIGNING_KEY_PATH` |
 | `admin-auth.json` | Admin password hash and session-signing secret (mode `0600`) | `ADMIN_AUTH_PATH` |
+| `setup-code.txt` | One-time first-run setup code while no admin password exists (mode `0600`); deleted once one is set | follows `ADMIN_AUTH_PATH` |
 
 `python/` holds one directory per interpreter version (`3.11`, `3.12`, …).
 After a base-image Python upgrade Calvin builds the new one; the old one is no

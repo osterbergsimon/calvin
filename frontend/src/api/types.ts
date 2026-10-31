@@ -139,9 +139,33 @@ export interface paths {
     put?: never;
     /**
      * Auth Setup
-     * @description First-run claim: only while no password is configured.
+     * @description First-run claim: only with the one-time code while no password exists.
      */
     post: operations["auth_setup_api_auth_setup_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/setup-code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Auth Setup Code
+     * @description The one-time setup code, only to the server itself (loopback).
+     *
+     *     A kiosk on the same machine can show it on its setup screen. Everything
+     *     else is refused so the code never reaches the LAN: use the server log or
+     *     ``<data dir>/setup-code.txt`` instead.
+     */
+    get: operations["auth_setup_code_api_auth_setup_code_get"];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -484,6 +508,26 @@ export interface paths {
      *         List of branch names
      */
     get: operations["get_git_branches_api_config_git_branches_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/demo/calendar.ics": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Demo Calendar
+     * @description The seeded sample calendar feed (404 until ``app.demo seed`` runs).
+     */
+    get: operations["demo_calendar_api_demo_calendar_ics_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -2495,6 +2539,13 @@ export interface components {
       /** Sealed Mode */
       sealed_mode: boolean;
     };
+    /** SetupBody */
+    SetupBody: {
+      /** Code */
+      code: string;
+      /** Password */
+      password: string;
+    };
     /**
      * SingleMapping
      * @description Action for a single key.
@@ -2718,7 +2769,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["PasswordBody"];
+        "application/json": components["schemas"]["SetupBody"];
       };
     };
     responses: {
@@ -2738,6 +2789,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  auth_setup_code_api_auth_setup_code_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
         };
       };
     };
@@ -3312,6 +3383,24 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
         };
+      };
+    };
+  };
+  demo_calendar_api_demo_calendar_ics_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

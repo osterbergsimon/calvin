@@ -27,7 +27,9 @@ describe("SchemaRenderer dispatcher", () => {
     const wrapper = mount(SchemaRenderer, {
       props: { schema: { kind: "not-a-real-kind" }, data: null },
     });
-    expect(wrapper.text()).toContain("Unknown schema kind");
+    expect(wrapper.text()).toContain("This can't be shown here.");
+    // The raw kind is developer text: never rendered (CLV-63).
+    expect(wrapper.text()).not.toContain("not-a-real-kind");
   });
 
   it("dispatches web-component schemas to the web component host", () => {
