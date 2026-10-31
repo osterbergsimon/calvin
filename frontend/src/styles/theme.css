@@ -184,8 +184,9 @@
 
   /* Layer roles */
   --z-raised: 10;
-  /* A popover is a raised surface; the alias keeps its layer explicit. */
-  --z-popover: var(--z-raised);
+  /* Popovers teleport to <body> and must open above a dialog (a Menu or
+   * ColourField inside InstanceModal), but stay under the on-screen keyboard. */
+  --z-popover: 1050;
   --z-sticky: 100;
   --z-dialog: 1000;
   --z-osk: 1100;
