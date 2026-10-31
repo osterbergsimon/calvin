@@ -97,7 +97,7 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   const getSourceColor = sourceId => {
     const source = sources.value.find(s => s.id === sourceId);
-    return source?.color || "#2196f3"; // Default color
+    return source?.color || "var(--event-1)"; // Default calendar colour
   };
 
   const shouldShowTime = sourceId => {

@@ -456,11 +456,37 @@ def test_theme_package_round_trip(test_client, tmp_path):
 
     src = tmp_path / "dusk_theme"
     src.mkdir()
+    base = {
+        "bg-0": "#eef1f4",
+        "bg-1": "#ffffff",
+        "bg-2": "#ffffff",
+        "line": "#dde3e8",
+        "line-soft": "#e8edf1",
+        "ink": "#1b242b",
+        "ink-2": "#5d6b75",
+        "ink-3": "#636e77",
+        "focus": "#e08a1e",
+        "ok": "#2e9e6b",
+        "warn": "#b38f00",
+        "err": "#c0392b",
+        "shadow": "rgba(0, 0, 0, 0.1)",
+        "shadow-hover": "rgba(0, 0, 0, 0.15)",
+    }
     manifest = {
         "id": "dusk_theme",
         "name": "Dusk",
         "version": "1.0.0",
-        "variables": {"bg-primary": "#101010", "text-primary": "#eeeeee"},
+        "theme_api": 2,
+        "variables": dict(base),
+        "dark_mode": {
+            **base,
+            "bg-0": "#101010",
+            "bg-1": "#151c21",
+            "bg-2": "#1d262d",
+            "ink": "#eaf0f3",
+            "ink-2": "#9aa7b0",
+            "ink-3": "#818d96",
+        },
     }
     (src / "theme.json").write_text(json.dumps(manifest))
     installed = theme_installer.install_theme(src)

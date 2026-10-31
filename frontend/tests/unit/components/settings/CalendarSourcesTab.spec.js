@@ -64,7 +64,7 @@ const sampleSource = {
   type: "google",
   name: "Work Calendar",
   ical_url: "https://calendar.google.com/calendar/ical/test/basic.ics",
-  color: "#2196f3",
+  color: "#275f86",
   show_time: true,
   enabled: true,
 };
