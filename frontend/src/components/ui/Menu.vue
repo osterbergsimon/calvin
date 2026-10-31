@@ -7,12 +7,14 @@
         role="menuitem"
         class="menu__item"
         :class="{ 'menu__item--danger': item.danger }"
+        :data-test="item.testId || undefined"
         :disabled="item.disabled"
         tabindex="-1"
         @click="choose(item)"
         @focus="activeKey = item.key"
       >
-        {{ item.label }}
+        <span class="menu__label">{{ item.label }}</span>
+        <span v-if="item.meta" class="menu__meta">{{ item.meta }}</span>
       </button>
     </li>
   </ul>
@@ -26,9 +28,12 @@ import { computed, nextTick, onMounted, ref } from "vue";
 // so "Remove" is never the first thing a thumb lands on. Arrow keys, Home and
 // End move focus; Escape and Tab close the owning popover.
 const props = defineProps({
-  // [{ key, label, danger?, disabled? }]
+  // [{ key, label, meta?, danger?, disabled?, testId? }]
   items: { type: Array, default: () => [] },
   label: { type: String, default: "" },
+  // A picker puts a search field above the list; it owns focus first, so the
+  // menu must not steal it on mount (the field can call focusFirst()).
+  autofocus: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["select", "close"]);
@@ -95,12 +100,18 @@ function choose(item) {
   emit("select", item.key);
 }
 
+// Exposed so a search field above the list can hand focus down on ArrowDown.
+function focusFirst() {
+  const first = enabledItems()[0];
+  if (first) focusItem(first.key);
+}
+
 onMounted(() => {
-  nextTick(() => {
-    const first = orderedItems.value.find(item => !item.disabled);
-    if (first) focusItem(first.key);
-  });
+  if (!props.autofocus) return;
+  nextTick(() => focusFirst());
 });
+
+defineExpose({ focusFirst });
 </script>
 
 <style scoped>
@@ -113,10 +124,13 @@ onMounted(() => {
 
 .menu__item {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--gap-tight);
   width: 100%;
   min-height: var(--touch-target);
-  padding: 0 var(--gap-3);
+  padding: var(--gap-1) var(--gap-3);
   font-family: var(--font-ui);
   font-size: var(--text-body);
   font-weight: var(--weight-body);
@@ -126,6 +140,18 @@ onMounted(() => {
   border: 0;
   border-radius: var(--radius-control);
   cursor: pointer;
+}
+
+.menu__label {
+  display: block;
+}
+
+.menu__meta {
+  display: block;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-body);
+  line-height: 1.3;
+  color: var(--ink-3);
 }
 
 .menu__item:hover:not(:disabled),
