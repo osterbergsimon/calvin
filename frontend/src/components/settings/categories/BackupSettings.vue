@@ -51,6 +51,7 @@
           accept=".zip,.json,application/zip,application/json"
           class="backup-file"
           data-test="restore-file"
+          aria-label="Backup file to restore"
           @change="onFile"
         />
         <SegmentedControl

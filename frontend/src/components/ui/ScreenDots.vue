@@ -3,7 +3,8 @@
     v-if="screens.length > 1"
     class="screen-dots"
     :class="{ 'screen-dots--vertical': vertical }"
-    role="tablist"
+    role="group"
+    aria-label="Screens"
   >
     <button
       v-for="screen in screens"

@@ -310,6 +310,7 @@ function openSettings() {
   line-height: 1.3;
 }
 .admin-dialog__title:focus {
+  /* a11y-allow-no-outline: dialog heading receives programmatic focus only */
   outline: none;
 }
 .admin-dialog__lead {

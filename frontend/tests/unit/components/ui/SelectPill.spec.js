@@ -90,7 +90,7 @@ describe("SelectPill", () => {
 
   it("labels the trigger with ariaLabel so the control's purpose is announced", () => {
     const w = mountPill({ modelValue: "backlit", options: OPTS, ariaLabel: "Theme mode" });
-    expect(w.find(".pill").attributes("aria-label")).toBe("Theme mode");
+    expect(w.find(".pill").attributes("aria-label")).toBe("Theme mode: Backlit");
   });
 
   it("omits aria-label when none is provided (falls back to the value text)", () => {

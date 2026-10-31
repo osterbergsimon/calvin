@@ -36,9 +36,16 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      // The phone suite is a real 390x844 touch viewport; it lives in
-      // tests/e2e/phone and runs as its own project.
-      testIgnore: "**/phone/**",
+      // The phone suite is a real 390x844 touch viewport and the accessibility
+      // suite drives its own viewports/themes; both run as their own projects.
+      testIgnore: ["**/phone/**", "**/a11y/**"],
+    },
+    {
+      // CLV-65: axe audits at phone and kiosk sizes, light and dark. The specs
+      // set viewport/colorScheme themselves per describe block.
+      name: "a11y",
+      testDir: "./tests/e2e/a11y",
+      use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "phone",
