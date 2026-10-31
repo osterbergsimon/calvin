@@ -11,17 +11,19 @@
     </div>
 
     <!-- Loading -->
-    <p v-if="loading" class="pm-status">Loading plugins…</p>
+    <InlineNote v-if="loading" class="pm-status">Loading plugins…</InlineNote>
 
     <!-- Empty -->
-    <p v-else-if="activePlugins.length === 0" class="pm-status">{{ emptyMessage }}</p>
+    <InlineNote v-else-if="activePlugins.length === 0" class="pm-status">
+      {{ emptyMessage }}
+    </InlineNote>
 
     <!-- Plugin cards -->
     <div v-else class="pm-list">
       <!-- Theme install hint -->
-      <p v-if="activeTab === 'theme' && showThemeInfo" class="pm-note">
+      <InlineNote v-if="activeTab === 'theme' && showThemeInfo" class="pm-note">
         Themes are plugins too: install them here, then choose one in Dashboard › Appearance.
-      </p>
+      </InlineNote>
 
       <PluginCard
         v-for="plugin in activePlugins"
@@ -64,6 +66,7 @@
 
 <script setup>
 import { computed } from "vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import PluginCard from "./PluginCard.vue";
 import { pluginKindFilters, pluginKindKey } from "@/utils/pluginKind";
@@ -200,39 +203,27 @@ const handleDeleteImage = imageId => emit("delete-image", imageId);
 <style scoped>
 .plugin-manager {
   width: 100%;
-  padding: 1.25rem;
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
 
 .pm-tabs {
-  margin-bottom: 1.25rem;
   max-width: 100%;
+  margin-bottom: var(--gap-5);
   overflow-x: auto;
 }
 
 .pm-status {
-  padding: 1.5rem;
+  padding: var(--gap-5) 0;
   text-align: center;
-  color: var(--ink-3);
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  margin: 0;
 }
 
 .pm-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--gap-stack);
 }
 
 .pm-note {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--ink-2);
-  font-family: var(--font-ui);
-  font-size: var(--fs-control);
-  line-height: 1.5;
+  margin-bottom: var(--gap-stack);
 }
 </style>

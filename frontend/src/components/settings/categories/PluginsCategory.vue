@@ -94,34 +94,30 @@
     />
 
     <!-- Pip Security Warning Modal -->
-    <div v-if="showPipWarningModal" class="modal-overlay" @click.self="cancelPipInstall">
-      <div class="modal-content pip-warning-modal">
-        <div class="modal-header">
-          <h3>⚠️ Security Warning</h3>
-          <IconButton variant="ghost" label="Close" @click="cancelPipInstall">×</IconButton>
-        </div>
-        <div class="modal-body">
-          <p>
-            <strong>{{ pipWarningPluginName }}</strong> requires installing the following Python
-            {{ pipWarningPackages.length === 1 ? "package" : "packages" }}
-            into the server environment:
-          </p>
-          <ul class="pip-package-list">
-            <li v-for="pkg in pipWarningPackages" :key="pkg">
-              <code>{{ pkg }}</code>
-            </li>
-          </ul>
-          <p class="pip-warning-text">
-            Only install plugins from people you trust. A plugin runs on your Calvin server and can
-            do anything Calvin can.
-          </p>
-        </div>
-        <div class="modal-footer">
-          <button class="btn-secondary" @click="cancelPipInstall">Cancel</button>
-          <button class="btn-danger" @click="confirmPipInstall">Install Anyway</button>
-        </div>
-      </div>
-    </div>
+    <Dialog
+      :model-value="showPipWarningModal"
+      title="Security warning"
+      @update:model-value="handlePipDialog"
+    >
+      <p>
+        <strong>{{ pipWarningPluginName }}</strong> requires installing the following Python
+        {{ pipWarningPackages.length === 1 ? "package" : "packages" }}
+        into the server environment:
+      </p>
+      <ul>
+        <li v-for="pkg in pipWarningPackages" :key="pkg">
+          <code>{{ pkg }}</code>
+        </li>
+      </ul>
+      <InlineNote tone="warn">
+        Only install plugins from people you trust. A plugin runs on your Calvin server and can do
+        anything Calvin can.
+      </InlineNote>
+      <template #actions>
+        <Button @click="cancelPipInstall">Cancel</Button>
+        <Button variant="primary" @click="confirmPipInstall">Install anyway</Button>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -134,7 +130,9 @@ import { useImagesStore } from "@/stores/images";
 import { useNotificationsStore } from "@/stores/notifications";
 import * as pluginsApi from "@/services/pluginsApi";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
-import IconButton from "@/components/ui/IconButton.vue";
+import Button from "@/components/ui/Button.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
 import ConfirmModal from "../shared/ConfirmModal.vue";
@@ -257,6 +255,12 @@ const confirmPipInstall = async () => {
 const cancelPipInstall = () => {
   showPipWarningModal.value = false;
   pendingInstallAction.value = null;
+};
+
+// The shared Dialog closes itself (scrim, Escape or its close button); the
+// warning has nothing to save, so closing is the same as Cancel.
+const handlePipDialog = open => {
+  if (!open) cancelPipInstall();
 };
 
 // Mirrors what PluginCard renders when expanded: plugin-level settings,
@@ -645,140 +649,3 @@ onMounted(async () => {
   }
 });
 </script>
-
-<style scoped>
-.plugins-category {
-  width: 100%;
-}
-
-/* Pip warning modal — mirrors ConfirmModal layout */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--ink) 55%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: var(--bg-1);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 20px var(--shadow);
-  max-width: 480px;
-  width: 90%;
-  max-height: 90vh;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.modal-body {
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.modal-body p {
-  margin: 0;
-  color: var(--ink);
-  line-height: 1.5;
-  font-size: var(--fs-md);
-}
-
-.pip-package-list {
-  margin: 0;
-  padding-left: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.pip-package-list li {
-  font-size: var(--fs-control);
-}
-
-.pip-package-list code {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  padding: 0.1rem 0.4rem;
-  font-family: monospace;
-  font-size: var(--fs-sm);
-  color: var(--ink);
-}
-
-.pip-warning-text {
-  color: var(--warn-text) !important;
-  background: color-mix(in srgb, var(--warn) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
-  border-radius: var(--radius-xs);
-  padding: 0.6rem 0.75rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1.25rem;
-  border-top: 1px solid var(--line);
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-height: var(--touch-target);
-}
-
-.btn-secondary:hover {
-  border-color: var(--focus);
-}
-
-.btn-danger {
-  padding: 0.5rem 1rem;
-  background: var(--err);
-  color: var(--err-ink);
-  border: none;
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  min-height: var(--touch-target);
-}
-
-.btn-danger:hover {
-  background: color-mix(in srgb, var(--err) 88%, var(--ink));
-}
-
-.btn-secondary:focus-visible,
-.btn-danger:focus-visible,
-.btn-close-modal:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-</style>
