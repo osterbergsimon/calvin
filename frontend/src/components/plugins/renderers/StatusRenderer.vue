@@ -1,13 +1,18 @@
 <template>
   <!-- list: the quiet table — label left, value right, hairline rows -->
   <ul v-if="layout === 'list'" class="status status--list calvin-plugin-list">
-    <li v-for="(item, i) in items" :key="i" class="status__line calvin-plugin-row">
-      <span class="status__line-label calvin-plugin-readout__label" :class="alertClass(item)">
+    <li
+      v-for="(item, i) in items"
+      :key="i"
+      class="status__line calvin-plugin-row"
+      :class="readoutClass(item)"
+    >
+      <span class="status__line-label calvin-plugin-readout__label">
         <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
         <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
         {{ labelFor(item) }}
       </span>
-      <span class="status__line-value" :class="alertClass(item)">
+      <span class="status__line-value calvin-plugin-readout__value">
         {{ valueFor(item)
         }}<span v-if="unitFor(item)" class="status__line-unit">{{ unitFor(item) }}</span>
       </span>
@@ -16,11 +21,13 @@
 
   <!-- row: inline instrument strip with hairline dividers (statusbar default) -->
   <span v-else-if="layout === 'row'" class="status status--row">
-    <span v-for="(item, i) in items" :key="i" class="status__cell" :class="alertClass(item)">
+    <span v-for="(item, i) in items" :key="i" class="status__cell" :class="readoutClass(item)">
       <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
       <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
-      <span v-if="labelFor(item)" class="status__cell-label">{{ labelFor(item) }}</span>
-      <span v-if="hasValue(item)" class="status__cell-value">
+      <span v-if="labelFor(item)" class="status__cell-label calvin-plugin-readout__label">
+        {{ labelFor(item) }}
+      </span>
+      <span v-if="hasValue(item)" class="status__cell-value calvin-plugin-readout__value">
         {{ valueFor(item)
         }}<span v-if="unitFor(item)" class="status__cell-unit">{{ unitFor(item) }}</span>
       </span>
@@ -107,16 +114,11 @@ function statusFor(item) {
 }
 
 // Color appears only when something needs attention: "ok" stays monochrome.
+// The tint itself lives in the plugin readout vocabulary (main.css), so no
+// layout draws its own warning or error colours.
 function isAlert(item) {
   const s = statusFor(item);
   return s === "warn" || s === "error";
-}
-
-function alertClass(item) {
-  const s = statusFor(item);
-  if (s === "warn") return "status--warn";
-  if (s === "error") return "status--error";
-  return null;
 }
 
 function readoutClass(item) {
@@ -133,7 +135,7 @@ function readoutClass(item) {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 1rem 2rem;
+  gap: var(--gap-4) var(--gap-8);
 }
 
 /* row: inline strip, hairline dividers between cells */
@@ -163,32 +165,23 @@ function readoutClass(item) {
   border-left: 1px solid var(--line-soft);
 }
 
-.status__cell-label {
-  font-family: var(--font-ui);
-  font-size: var(--fs-micro);
-  font-weight: 600;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
 /* Scale the microlabel with content only in a scaled panel — StatusRenderer also
    renders in the statusbar (non-scaled), where the label must keep its fixed rem. */
 .schema-renderer__body--scaled .status__cell-label {
   font-size: 0.7em;
 }
 
-.status__cell-value {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
+/* The readout vocabulary owns the type and colour; these rules only set the
+   small variant the compact layouts use. */
+.status__cell-value,
+.status__line-value {
   font-size: var(--plugin-value-size-sm);
-  font-weight: 600;
-  color: var(--ink);
 }
 
-.status__cell-unit {
+.status__cell-unit,
+.status__line-unit {
   font-size: 0.75em;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink-3);
   margin-left: 0.1em;
 }
@@ -202,24 +195,8 @@ function readoutClass(item) {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 1rem;
+  gap: var(--gap-4);
   min-width: 0;
-}
-
-.status__line-value {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--plugin-value-size-sm);
-  font-weight: 600;
-  color: var(--ink);
-  white-space: nowrap;
-}
-
-.status__line-unit {
-  font-size: 0.75em;
-  font-weight: 500;
-  color: var(--ink-3);
-  margin-left: 0.1em;
 }
 
 .status__icon {
@@ -230,20 +207,5 @@ function readoutClass(item) {
 /* the lamp sits on the baseline row of whatever it's in */
 .calvin-plugin-lamp {
   align-self: center;
-}
-
-/* alert tint: label keeps its case/tracking, value takes the state color */
-.status--warn,
-.status--warn .status__cell-label,
-.status--warn .status__cell-value,
-.status--warn .status__line-value {
-  color: var(--warn-text);
-}
-
-.status--error,
-.status--error .status__cell-label,
-.status--error .status__cell-value,
-.status--error .status__line-value {
-  color: var(--err-text);
 }
 </style>

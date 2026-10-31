@@ -14,10 +14,9 @@
       @error="handleError"
     />
 
-    <div v-if="error" class="iframe-renderer__error">
-      <div class="iframe-renderer__error-content">
-        <h3>This site won't embed</h3>
-        <p>It blocks being shown inside another page (X-Frame-Options/CSP).</p>
+    <div v-if="error" class="iframe-renderer__fallback">
+      <Card class="iframe-renderer__fallback-card" title="This site won't embed">
+        <InlineNote>It blocks being shown inside another page (X-Frame-Options/CSP).</InlineNote>
         <p v-if="url" class="iframe-renderer__url">{{ url }}</p>
         <div class="iframe-renderer__actions">
           <a
@@ -25,15 +24,13 @@
             :href="url"
             target="_blank"
             rel="noopener noreferrer"
-            class="iframe-renderer__btn iframe-renderer__btn--primary"
+            class="iframe-renderer__open"
           >
             Open in new window
           </a>
-          <button class="iframe-renderer__btn iframe-renderer__btn--secondary" @click="retry">
-            Retry
-          </button>
+          <Button variant="secondary" @click="retry">Retry</Button>
         </div>
-      </div>
+      </Card>
     </div>
   </div>
 </template>
@@ -41,6 +38,9 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
+import Button from "../../ui/Button.vue";
+import Card from "../../ui/Card.vue";
+import InlineNote from "../../ui/InlineNote.vue";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -126,78 +126,60 @@ onUnmounted(clearTimer);
   opacity: 0.3;
 }
 
-.iframe-renderer__error {
+/* The embed was refused: a card over the dead frame, not a notice of its own. */
+.iframe-renderer__fallback {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: var(--gap-4);
   background: var(--bg-1);
-  z-index: 10;
+  z-index: var(--z-raised);
 }
 
-.iframe-renderer__error-content {
+.iframe-renderer__fallback-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-3);
+  width: min(32rem, 100%);
   text-align: center;
-  padding: 2rem;
-  max-width: 500px;
-}
-
-.iframe-renderer__error-content h3 {
-  margin: 0 0 0.75rem 0;
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: var(--fs-lg);
-  font-weight: 700;
-}
-
-.iframe-renderer__error-content p {
-  margin: 0.4rem 0;
-  color: var(--ink-2);
-  font-size: var(--fs-md);
 }
 
 .iframe-renderer__url {
+  margin: 0;
   font-family: var(--font-data);
-  font-size: var(--fs-xs);
-  word-break: break-all;
+  font-size: var(--text-caption);
   color: var(--ink-2);
-  background: var(--bg-2);
-  border: 1px solid var(--line-soft);
-  padding: 0.5rem;
-  border-radius: var(--radius-xs);
-  margin: 1rem 0;
+  word-break: break-all;
 }
 
 .iframe-renderer__actions {
   display: flex;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  margin-top: 1.25rem;
+  gap: var(--gap-inline);
 }
 
-.iframe-renderer__btn {
-  padding: 0.6rem 1.25rem;
-  border-radius: var(--radius-xs);
+/* A real link to the site (it leaves the page), so it stays an anchor; it is
+   styled as the doctrine's text link, never as a button. */
+.iframe-renderer__open {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--line);
-  background: var(--bg-2);
+  font-size: var(--text-body);
   color: var(--ink);
-  text-decoration: none;
-  transition: border-color 0.2s;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.iframe-renderer__btn--primary {
-  border-color: var(--focus);
+.iframe-renderer__open:hover {
+  color: var(--focus-text);
 }
 
-.iframe-renderer__btn:hover {
-  border-color: var(--focus);
-}
-
-.iframe-renderer__btn:focus-visible {
+.iframe-renderer__open:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
