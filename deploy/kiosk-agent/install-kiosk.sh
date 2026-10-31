@@ -46,11 +46,10 @@ Options:
   --backend-url <URL>        Calvin server (default: the server this script came from${SERVER_URL:+, $SERVER_URL})
   --signing-key-file <FILE>  File holding the server's kiosk-signing.key (hex)
   --signing-key <HEX>        Same, inline (ends up in shell history; prefer the file)
-  --display-stack <STACK>    auto (default; cog on Pi 3-class boards, x11
-                             elsewhere), x11, wayland (labwc) or cog (WPE
-                             WebKit on DRM/KMS). Re-run with another value to
-                             switch an existing kiosk in place; all stacks stay
-                             installed.
+  --display-stack <STACK>    auto (default; cog on every board), x11 (Chromium),
+                             wayland (labwc) or cog (WPE WebKit on DRM/KMS).
+                             Re-run with another value to switch an existing
+                             kiosk in place; all stacks stay installed.
   --no-reboot                Do not reboot when done
   -h, --help                 Show this help
 EOF
