@@ -4,9 +4,9 @@
     <Tag :tone="online ? 'ok' : 'neutral'">
       {{ online ? "Online" : "Offline" }} · seen {{ lastSeenLabel }}
     </Tag>
-    <Tag :tone="config.tone" :icon="config.icon" data-test="hardware-config-status">{{
-      config.label
-    }}</Tag>
+    <Tag :tone="config.tone" :icon="config.icon" data-test="hardware-config-status">
+      {{ config.label }}
+    </Tag>
   </InlineNote>
 </template>
 
