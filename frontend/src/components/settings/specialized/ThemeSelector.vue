@@ -250,7 +250,7 @@ const hasHueWarning = theme =>
   height: 1rem;
   border-radius: var(--radius-xs);
   font-size: var(--fs-3xs);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 
 .mini-tag {
@@ -261,7 +261,7 @@ const hasHueWarning = theme =>
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   font-size: var(--fs-3xs);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
 }
 
 .theme-selected-badge {
@@ -277,7 +277,7 @@ const hasHueWarning = theme =>
   align-items: center;
   justify-content: center;
   font-size: var(--fs-control);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   box-shadow: 0 2px 4px var(--shadow);
 }
 

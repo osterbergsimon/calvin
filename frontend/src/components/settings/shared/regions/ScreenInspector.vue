@@ -1,7 +1,7 @@
 <template>
   <div class="ins">
     <div v-if="!hideHeading" class="ins-mode">
-      <h3 class="ins-title">{{ clockSelected ? "Clock bar" : "Page" }}</h3>
+      <h3 class="ins-title heading-title">{{ clockSelected ? "Clock bar" : "Page" }}</h3>
       <span class="ins-sub">{{ headingSub }}</span>
     </div>
 
@@ -205,13 +205,6 @@ const positionOptions = computed(() => {
   gap: var(--gap-1);
   padding: var(--gap-4) var(--panel-pad-x) 0;
   margin-bottom: var(--gap-3);
-}
-.ins-title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
-  color: var(--ink);
 }
 .ins-sub {
   font-size: var(--text-meta);

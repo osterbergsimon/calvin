@@ -74,7 +74,7 @@ const emitChange = () => {
   align-items: center;
   gap: 0.5rem;
   font-family: var(--font-ui);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   cursor: pointer;
 }
 .schedule-day-times {

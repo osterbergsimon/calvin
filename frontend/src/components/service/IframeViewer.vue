@@ -152,9 +152,8 @@ onUnmounted(() => {
 }
 
 .error-content h3 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 var(--gap-4);
   color: var(--err-text);
-  font-size: var(--fs-2xl);
 }
 
 .error-content p {

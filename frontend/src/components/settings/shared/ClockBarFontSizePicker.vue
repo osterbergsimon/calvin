@@ -307,7 +307,7 @@ const handlePluginItemInput = event => {
 .control-label {
   font-size: var(--fs-control);
   font-family: var(--font-ui);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
 }
 
@@ -404,7 +404,7 @@ const handlePluginItemInput = event => {
 .preview-label {
   font-size: var(--fs-control);
   font-family: var(--font-ui);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink-2);
 }
 

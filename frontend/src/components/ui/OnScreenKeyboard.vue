@@ -362,7 +362,7 @@ defineExpose({
   box-shadow: 0 6px 18px -8px var(--shadow-hover);
   font-family: var(--font-ui);
   font-size: var(--fs-sm);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   animation: osk-open-in 120ms ease-out;
@@ -477,7 +477,7 @@ defineExpose({
   color: var(--ink-2);
   font-family: var(--font-ui);
   font-size: var(--fs-md);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
 }
 .osk--compact :deep(.hg-button.hg-functionBtn) {
   font-size: var(--fs-sm);
@@ -488,7 +488,7 @@ defineExpose({
   background: var(--bg-2);
   color: var(--ink);
   font-size: var(--fs-xl);
-  font-weight: 400;
+  font-weight: var(--weight-body);
 }
 
 /* The layout key is a 1× function key showing the active layout's code. */
@@ -511,7 +511,7 @@ defineExpose({
 :deep(.osk-space-name) {
   color: var(--ink-3);
   font-size: var(--fs-sm);
-  font-weight: 400;
+  font-weight: var(--weight-body);
 }
 
 /* Layout picker: replaces the key rows inside the same panel, so the field
@@ -552,7 +552,7 @@ defineExpose({
   box-shadow: 0 1px 0 var(--line);
   font-family: var(--font-ui);
   font-size: var(--fs-md);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -590,7 +590,7 @@ defineExpose({
   border-radius: var(--radius-sm);
   font-family: var(--font-ui);
   font-size: var(--fs-md);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   cursor: pointer;
 }
 .osk-picker__abc:focus-visible {
@@ -631,7 +631,7 @@ defineExpose({
   border-color: var(--focus);
   color: var(--focus-ink);
   font-size: var(--fs-md);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 
 :deep(.hg-button.hg-button-shift.k--on) {

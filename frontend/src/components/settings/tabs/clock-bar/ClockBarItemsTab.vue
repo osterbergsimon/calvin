@@ -171,7 +171,7 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   font-family: var(--font-ui);
   font-size: var(--fs-md);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   cursor: pointer;
 }
 
@@ -219,13 +219,13 @@ onMounted(async () => {
 
 .meta .title {
   font-family: var(--font-ui);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--ink);
 }
 
 .meta .subtitle {
   margin-top: 0.15rem;
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   font-family: var(--font-ui);
   color: var(--ink-2);
 }
