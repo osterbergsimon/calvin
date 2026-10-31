@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:phone": "playwright test --project=phone",
+    "test:e2e:a11y": "playwright test --project=a11y",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "lint": "eslint .",
@@ -41,6 +42,7 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.0.0",
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.1.0",
