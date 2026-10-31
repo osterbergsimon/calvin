@@ -7,6 +7,7 @@ validation, renderer-specific pass-through keys, and the sub-schema models.
 """
 
 import pytest
+from loguru import logger
 from pydantic import ValidationError
 
 from app.plugins.base import PluginType
@@ -54,6 +55,48 @@ class TestPluginMetadataDefaults:
         # and the UI falls back to the first letter.
         assert PluginMetadata(type_id="test_plugin", name="Test Plugin").icon is None
         assert PluginMetadata(type_id="test_plugin", name="Test Plugin", icon="🖼").icon == "🖼"
+
+
+@pytest.mark.unit
+class TestIconValidation:
+    """`mdi:` tile icons are shape-checked; a typo warns, it never fails load."""
+
+    @staticmethod
+    def _warnings_for(**kwargs) -> list[str]:
+        messages: list[str] = []
+        sink_id = logger.add(lambda message: messages.append(str(message)), level="WARNING")
+        try:
+            PluginMetadata(type_id="test_plugin", name="Test Plugin", **kwargs)
+        finally:
+            logger.remove(sink_id)
+        return messages
+
+    def test_valid_mdi_icon_is_accepted_silently(self):
+        messages = self._warnings_for(icon="mdi:silverware-fork-knife")
+        assert messages == []
+
+    def test_unknown_but_well_formed_mdi_icon_is_not_a_host_error(self):
+        # The curated list lives in the frontend; the host only pins the shape.
+        messages = self._warnings_for(icon="mdi:no-such-icon")
+        assert messages == []
+
+    def test_malformed_mdi_icon_warns_but_still_loads(self):
+        messages = self._warnings_for(icon="mdi:Silverware Fork")
+        assert len(messages) == 1
+        assert "not a valid mdi icon" in messages[0]
+
+    def test_empty_mdi_name_warns(self):
+        messages = self._warnings_for(icon="mdi:")
+        assert len(messages) == 1
+        assert "not a valid mdi icon" in messages[0]
+
+    def test_emoji_and_file_icons_are_unchanged(self):
+        assert self._warnings_for(icon="🖼") == []
+        assert self._warnings_for(icon="icon.svg") == []
+
+    def test_non_string_icon_is_still_rejected(self):
+        with pytest.raises(ValidationError):
+            PluginMetadata(type_id="test_plugin", name="Test Plugin", icon=42)  # type: ignore[arg-type]
 
 
 @pytest.mark.unit
