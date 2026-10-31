@@ -8,7 +8,7 @@
     <SettingsSection id="device-hardware" title="Versions & status">
       <SettingRow label="Version">
         <span class="maint-version" data-test="version-readout">
-          {{ version || "Unknown" }}
+          {{ version || "Not available" }}
           <span v-if="screenVersion">(screen {{ screenVersion }})</span>
         </span>
       </SettingRow>
@@ -35,8 +35,8 @@
           </button>
         </SettingRow>
         <SettingRow
-          label="Restart kiosk browser"
-          description="Restarts the browser on this Pi's screen. The server keeps running."
+          label="Restart this screen"
+          description="Reloads this screen's browser. Calvin keeps running."
         >
           <button
             type="button"
@@ -78,7 +78,7 @@
       <SettingRow label="Reload this screen" data-test="reload-ui">
         <template #description>
           <p v-if="isContainer" class="maint-hint" data-test="docker-restart-hint">
-            To restart the server, restart the Calvin container from Docker (Unraid: Docker tab).
+            To restart Calvin, restart its container in Docker (on Unraid: the Docker tab).
           </p>
         </template>
         <button type="button" class="maint-btn" @click="reloadUi">Reload</button>

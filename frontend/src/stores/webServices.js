@@ -4,6 +4,7 @@ import api from "../services/api";
 import { fetchWithCache } from "../utils/cache";
 import { useConnectionStore } from "./connection";
 import { logDebug, logError, logInfo, logWarn } from "../utils/logger";
+import { friendlyError } from "../utils/friendlyError";
 
 /**
  * Generated API types from backend OpenAPI snapshot.
@@ -16,6 +17,8 @@ export const useWebServicesStore = defineStore("webServices", () => {
   const currentServiceIndex = ref(0);
   const loading = ref(false);
   const error = ref(null);
+  // One friendly sentence for the screen; `error` keeps the raw text for logs.
+  const errorText = ref("");
   // True while the shown services came from the offline cache.
   const stale = ref(false);
 
@@ -103,9 +106,20 @@ export const useWebServicesStore = defineStore("webServices", () => {
     return { responseData, complete };
   };
 
+  const clearError = () => {
+    error.value = null;
+    errorText.value = "";
+  };
+
+  const captureError = (err, action, message) => {
+    error.value = err.message;
+    errorText.value = friendlyError(err, action);
+    logError("[WebServicesStore]", message, err);
+  };
+
   const fetchServices = async () => {
     loading.value = true;
-    error.value = null;
+    clearError();
 
     const connectionStore = useConnectionStore();
     const cacheKey = "web_services";
@@ -134,8 +148,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       stale.value = result.stale;
       return result.data;
     } catch (err) {
-      error.value = err.message;
-      logError("[WebServicesStore]", "Failed to fetch web services:", err);
+      captureError(err, "load your sources", "Failed to fetch web services:");
       throw err;
     } finally {
       loading.value = false;
@@ -160,8 +173,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       await fetchServices();
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      logError("[WebServicesStore]", "Failed to add web service:", err);
+      captureError(err, "add that page", "Failed to add web service:");
       throw err;
     }
   };
@@ -181,8 +193,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       await fetchServices();
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      logError("[WebServicesStore]", "Failed to update web service:", err);
+      captureError(err, "save that page", "Failed to update web service:");
       throw err;
     }
   };
@@ -193,8 +204,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       await api.delete(`/plugins/instances/${serviceId}`);
       await fetchServices();
     } catch (err) {
-      error.value = err.message;
-      logError("[WebServicesStore]", "Failed to remove web service:", err);
+      captureError(err, "remove that page", "Failed to remove web service:");
       throw err;
     }
   };
@@ -236,8 +246,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
       await fetchServices();
       logInfo("[WebServices]", "Current service refreshed");
     } catch (err) {
-      error.value = err.message;
-      logError("[WebServices]", "Failed to refresh current service:", err);
+      captureError(err, "refresh this page", "Failed to refresh current service:");
       throw err;
     }
   };
@@ -247,6 +256,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     currentServiceIndex,
     loading,
     error,
+    errorText,
     stale,
     fetchServices,
     addService,

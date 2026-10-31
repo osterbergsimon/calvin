@@ -191,7 +191,8 @@ const show = (type, iconValue, messageValue, duration = null) => {
 
 const showKeyboardFeedback = (key, actionName) => {
   const keyLabel = keyLabels[key] || key.replace("KEY_", "");
-  const actionLabel = actionLabels[actionName] || actionName || "Unknown";
+  // No action name at all: a neutral label, never "Unknown".
+  const actionLabel = actionLabels[actionName] || actionName || "Button pressed";
   show("keyboard", keyLabel, actionLabel);
 };
 
