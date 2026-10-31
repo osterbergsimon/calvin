@@ -74,4 +74,19 @@ describe("settingsLink", () => {
       "http://h:8000/settings?setting=content-calendars"
     );
   });
+
+  it("carries the one-time setup code on the server screen's QR", () => {
+    expect(settingsLink("http://h:8000", "content-calendars", "ABCD-EFGH")).toBe(
+      "http://h:8000/settings?setting=content-calendars&setup=ABCD-EFGH"
+    );
+    expect(settingsLink("http://h:8000", null, "ABCD-EFGH")).toBe(
+      "http://h:8000/settings?setup=ABCD-EFGH"
+    );
+  });
+
+  it("omits setup= without a code (every non-loopback page)", () => {
+    expect(settingsLink("http://h:8000", "content-calendars", "")).toBe(
+      "http://h:8000/settings?setting=content-calendars"
+    );
+  });
 });

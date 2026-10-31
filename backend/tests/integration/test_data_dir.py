@@ -37,6 +37,8 @@ OVERRIDES = (
     "KIOSK_SIGNING_KEY_PATH",
     "BACKUP_DIR",
     "CALVIN_RESTORE_FROM",
+    "CALVIN_ADMIN_PASSWORD",
+    "CALVIN_SETUP_CODE",
 )
 
 SCRIPT = r"""
@@ -71,8 +73,11 @@ if sys.argv[1] == "gallery":
 
 png = bytes.fromhex(sys.argv[1])
 with TestClient(app) as client:
-    # Admin routes need a session; first run: claim the password (CLV-9).
-    r = client.post("/api/auth/setup", json={"password": "test-admin-password"})
+    # Admin routes need a session; first run: claim the password (CLV-9/CLV-61).
+    r = client.post(
+        "/api/auth/setup",
+        json={"password": "test-admin-password", "code": os.environ["CALVIN_SETUP_CODE"]},
+    )
     assert r.status_code == 200, r.text
     r = client.post(
         "/api/images/upload", files={"file": ("photo.png", io.BytesIO(png), "image/png")}
@@ -122,6 +127,7 @@ def _runner(data_dir: Path, cwd: Path, legacy_dir: Path):
     env = {k: v for k, v in os.environ.items() if k not in OVERRIDES}
     env["CALVIN_DATA_DIR"] = str(data_dir)
     env["CALVIN_TEST_LEGACY_DIR"] = str(legacy_dir)
+    env["CALVIN_SETUP_CODE"] = "test-setup-code"
     env["PYTHONPATH"] = str(BACKEND_DIR)
 
     def run(arg: str) -> subprocess.CompletedProcess:

@@ -76,11 +76,37 @@
           role="status"
           aria-live="off"
         >
-          Too many wrong passwords. Try again in {{ rateRemaining }}.
+          {{ rateMessage }}
         </p>
         <p class="auth-card__live" aria-live="polite">{{ liveMessage }}</p>
 
         <div v-if="mode === 'setup'" class="auth-card__fields">
+          <PasswordField
+            ref="codeField"
+            v-model="setupCode"
+            type="text"
+            label="Setup code"
+            autocomplete="one-time-code"
+            autocapitalize="characters"
+            :maxlength="9"
+            :error="error3"
+            :disabled="submitting || rateLocked"
+            input-id="auth-setup-code"
+          >
+            <template #hint>
+              <template v-if="codePrefilled">{{ codePrefillHint }}</template>
+              <template v-else>
+                Calvin printed it in its log when it first started.
+                <a
+                  class="auth-card__hint-link"
+                  href="https://osterbergsimon.github.io/calvin/setup/GETTING_STARTED/#first-sign-in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  >Where to find it</a
+                >
+              </template>
+            </template>
+          </PasswordField>
           <PasswordField
             ref="firstField"
             v-model="password"
@@ -156,6 +182,7 @@
         <PhoneSetupCard
           class="auth-lock__phone"
           :compact="isShort"
+          :setup-code="mode === 'setup' ? shownSetupCode : ''"
           :title="mode === 'setup' ? 'Set it up from your phone' : 'Sign in from your phone'"
           :hint="isShort ? '' : undefined"
         />
@@ -171,6 +198,7 @@ import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { useOskState } from "@/composables/useOnScreenKeyboard";
 import { useNotificationsStore } from "@/stores/notifications";
+import { isLoopbackPage } from "@/utils/serverUrl";
 import PasswordField from "@/components/ui/PasswordField.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 
@@ -191,19 +219,29 @@ const lead = computed(() =>
 
 const password = ref("");
 const repeat = ref("");
+const setupCode = ref("");
 const revealed = ref(false);
 const error1 = ref("");
 const error2 = ref("");
+const error3 = ref("");
 const notice = ref("");
 const networkError = ref(false);
 const submitting = ref(false);
 const retrying = ref(false);
+const shownSetupCode = ref("");
+const prefilledFromLink = ref(false);
+
+const codePrefilled = computed(() => Boolean(shownSetupCode.value || prefilledFromLink.value));
+const codePrefillHint = computed(() =>
+  prefilledFromLink.value ? "Filled in from the Calvin screen." : "Filled in from this screen."
+);
 
 const submitLabel = computed(() => {
   if (mode.value === "setup") return submitting.value ? "Setting password…" : "Set password";
   return submitting.value ? "Signing in…" : "Sign in";
 });
 
+const codeField = ref(null);
 const firstField = ref(null);
 const secondField = ref(null);
 
@@ -213,13 +251,19 @@ const {
   start: startCountdown,
 } = useRateLimitCountdown();
 const liveMessage = ref("");
+const rateMessage = computed(() =>
+  mode.value === "setup"
+    ? `Too many wrong tries. Try again in ${rateRemaining.value}.`
+    : `Too many wrong passwords. Try again in ${rateRemaining.value}.`
+);
 
 watch(rateLocked, lockedNow => {
   if (lockedNow) {
-    liveMessage.value = "Too many wrong passwords.";
+    liveMessage.value =
+      mode.value === "setup" ? "Too many wrong tries." : "Too many wrong passwords.";
   } else if (liveMessage.value) {
     liveMessage.value = "You can try again now.";
-    nextTick(() => firstField.value?.focus());
+    nextTick(() => focusField());
   }
 });
 
@@ -257,15 +301,69 @@ onUnmounted(() => {
 
 // ── Focus: autofocus only on non-touch (a kiosk keyboard would pop unasked) ──
 function focusField() {
-  nextTick(() => firstField.value?.focus());
+  nextTick(() => {
+    if (mode.value === "setup") codeField.value?.focus();
+    else firstField.value?.focus();
+  });
 }
+
+/** The kiosk screen may show the code itself when the server allows it (loopback). */
+async function loadSetupCode() {
+  if (!isLoopbackPage()) return;
+  const code = await auth.fetchSetupCode();
+  shownSetupCode.value = code || "";
+  if (code && !prefilledFromLink.value) setupCode.value = code;
+}
+
+/**
+ * A phone that scanned the server screen's QR arrives with `?setup=CODE`.
+ * Apply it once (still editable) and drop it from the address bar so it is
+ * not kept in history or shared by copy-paste.
+ */
+const SETUP_PARAM = "setup";
+let linkParamApplied = false;
+
+function readSetupParam() {
+  if (typeof window === "undefined") return "";
+  const raw = new URLSearchParams(window.location.search).get(SETUP_PARAM) || "";
+  const normalized = raw.replace(/[\s-]/g, "").toUpperCase();
+  if (!/^[A-Z0-9]{8}$/.test(normalized)) return "";
+  return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+}
+
+function stripSetupParam() {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has(SETUP_PARAM)) return;
+  url.searchParams.delete(SETUP_PARAM);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+function applySetupParam() {
+  if (linkParamApplied) return;
+  linkParamApplied = true;
+  const fromLink = readSetupParam();
+  if (!fromLink) return;
+  setupCode.value = fromLink;
+  prefilledFromLink.value = true;
+  stripSetupParam();
+}
+
 watch(
   () => auth.status,
   value => {
+    if (value === "setup") {
+      applySetupParam();
+      loadSetupCode();
+    }
     if (!isTouch.value && (value === "setup" || value === "locked")) focusField();
   }
 );
 onMounted(() => {
+  if (auth.status === "setup") {
+    applySetupParam();
+    loadSetupCode();
+  }
   if (!isTouch.value && (auth.status === "setup" || auth.status === "locked")) focusField();
 });
 
@@ -274,6 +372,9 @@ watch(password, () => {
 });
 watch(repeat, () => {
   error2.value = "";
+});
+watch(setupCode, () => {
+  error3.value = "";
 });
 
 function onFirstBlur() {
@@ -287,6 +388,11 @@ function onSecondBlur() {
 }
 
 function validateSetup() {
+  if (!setupCode.value.trim()) {
+    error3.value = "Enter the setup code.";
+    nextTick(() => codeField.value?.focus());
+    return false;
+  }
   if ([...password.value].length < 8) {
     error1.value = "Use at least 8 characters.";
     nextTick(() => firstField.value?.focus());
@@ -303,8 +409,10 @@ function validateSetup() {
 function resetSetupFields() {
   password.value = "";
   repeat.value = "";
+  setupCode.value = "";
   error1.value = "";
   error2.value = "";
+  error3.value = "";
   revealed.value = false;
 }
 
@@ -327,6 +435,7 @@ async function submit() {
 function submitBannerClear() {
   error1.value = "";
   error2.value = "";
+  error3.value = "";
 }
 
 async function submitSetup() {
@@ -334,7 +443,7 @@ async function submitSetup() {
 
   submitting.value = true;
   try {
-    await auth.setup(password.value);
+    await auth.setup(password.value, setupCode.value.trim());
     resetSetupFields();
     notifications.notify({ severity: "success", message: "Admin password set." });
   } catch (err) {
@@ -346,6 +455,9 @@ async function submitSetup() {
         "Someone else set the admin password a moment ago. Sign in with it, or ask them for it.";
       resetSetupFields();
       focusField();
+    } else if (code === "bad_setup_code") {
+      error3.value = "That's not the setup code.";
+      nextTick(() => codeField.value?.focus());
     } else if (err?.response?.status === 422 || err?.response?.status === 400) {
       const detail = err.response?.data?.detail;
       error1.value =
@@ -458,6 +570,16 @@ async function submitLogin() {
   font-size: var(--fs-md);
   line-height: 1.45;
   color: var(--ink-2);
+}
+.auth-card__hint-link {
+  margin-left: 4px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.auth-card__hint-link:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .auth-card__username {
   position: absolute;

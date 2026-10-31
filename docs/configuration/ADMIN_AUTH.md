@@ -7,11 +7,36 @@ on a kiosk (next photo, switch screen, calendar view, theme), stay open.
 ## First run
 
 On a fresh install — or after upgrading from a version without admin auth — open
-**Settings**. Calvin shows one card: choose an admin password. It can be any
-characters, at least 8. Whoever does this first claims the install, and is
-logged in immediately; the browser keeps that session for up to 400 days.
+**Settings**. Calvin shows one card: a **setup code** and an admin password to
+choose. The password can be any characters, at least 8. Whoever does this first
+claims the install, and is signed in immediately; the browser keeps that session
+for up to 400 days.
 
-Kiosks never see this card: they do not open Settings.
+The setup code is what stops someone else on the network from claiming the
+install before you do. Calvin generates an 8-character code (shown as
+`XXXX-XXXX`) the first time it starts without an admin password and:
+
+- logs it at startup as `Calvin setup code: XXXX-XXXX`, and
+- writes it to `setup-code.txt` (mode `0600`) next to `admin-auth.json` in the
+  [data directory](DATA_DIR.md).
+
+Enter that code with the new password. The code is single-use: once a password
+exists Calvin deletes the file and the code stops working. A restart keeps the
+same code until it is used. A wrong code is rate limited like a wrong password
+(5 within 60 seconds → `429`, then a cooldown).
+
+Where to read it:
+
+| How Calvin runs | Read the code |
+|---|---|
+| Docker / Compose | `docker logs calvin` — look for `Calvin setup code:` |
+| Unraid | Docker tab → Calvin → Logs, or `docker logs calvin` |
+| Pi all-in-one | `sudo journalctl -u calvin-app -n 100` |
+| Native / development | the server's terminal output, or `<data dir>/setup-code.txt` |
+| Kiosk on the same server | the kiosk's setup screen shows it when the browser reaches Calvin over loopback (`http://localhost:8000`). Through Docker's port mapping the request no longer looks like loopback, so use `docker logs calvin`. |
+
+Kiosks do not open Settings, so the card appears on the server's own screen or a
+phone/laptop. The setup code is never returned to a public request.
 
 If you want no window in which another LAN device could claim the install, set
 [`CALVIN_ADMIN_PASSWORD`](#calvin_admin_password) before the first start.
@@ -29,12 +54,22 @@ compares it with the stored password:
 An empty or unset value leaves the stored password alone. The value must be at
 least 8 characters.
 
+## `CALVIN_SETUP_CODE`
+
+Set this to pre-seed the [one-time setup code](#first-run) instead of letting
+Calvin generate one — useful for headless installs where you would rather hand
+the owner a known code. Case does not matter and `-`/spaces are ignored, so
+`abcd-efgh` matches `ABCD-EFGH`. It is ignored once an admin password exists.
+Leave it unset to use the generated code in the log and
+`setup-code.txt`.
+
 ## Forgot the password
 
 Either:
 
 - delete `<data dir>/admin-auth.json` (override the path with `ADMIN_AUTH_PATH`)
-  and restart, then choose a new password in Settings; or
+  and restart, then choose a new password in Settings with the new setup code
+  from the log; or
 - set `CALVIN_ADMIN_PASSWORD` to a new value and restart.
 
 Deleting the file also discards the session-signing secret, so every old cookie
