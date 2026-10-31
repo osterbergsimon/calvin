@@ -53,6 +53,7 @@ vi.mock("@/composables", () => ({
 }));
 
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
+import ColourField from "@/components/ui/ColourField.vue";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -77,7 +78,9 @@ const STUBS = {
 function mountComp(config = baseConfig) {
   return mount(CalendarSourcesTab, {
     props: { config },
-    global: { stubs: STUBS },
+    // The row menu lives in a teleported Popover; render it in place so the
+    // assertions can find its items on the wrapper.
+    global: { stubs: { ...STUBS, teleport: true } },
   });
 }
 
@@ -111,8 +114,12 @@ describe("CalendarSourcesTab", () => {
     const row = w.find(".sl-row");
     expect(row.find(".list-row__name").text()).toBe("Work Calendar");
     expect(row.text()).toContain("Google Calendar");
-    // Colour is the only calendar-only extra on the row.
-    expect(row.find('input[type="color"]').exists()).toBe(true);
+    // Calendar-only extras stay on the row: the shared colour field, not a
+    // bare native colour input plus hex box.
+    const colour = row.findComponent(ColourField);
+    expect(colour.exists()).toBe(true);
+    expect(colour.props("compact")).toBe(true);
+    expect(colour.props("label")).toBe("Colour for Work Calendar");
     // Show event times lives in the Edit dialog, so the row carries exactly one
     // toggle (enabled) and never two side by side.
     expect(row.text()).not.toContain("Show event times");
@@ -160,20 +167,33 @@ describe("CalendarSourcesTab", () => {
     expect(mockFetchSources).toHaveBeenCalled();
   });
 
-  it("color change calls updateSource with full source spread + new hex", async () => {
+  it("colour change calls updateSource with full source spread + new hex", async () => {
     mockSources.value = [{ ...sampleSource }];
     const w = mountComp();
     await flushPromises();
 
-    const colorInput = w.find('input[type="color"]');
-    colorInput.element.value = "#ff0000";
-    await colorInput.trigger("change");
+    w.findComponent(ColourField).vm.$emit("update:modelValue", "#ff0000");
     await flushPromises();
 
     expect(mockUpdateSource).toHaveBeenCalledWith(
       sampleSource.id,
       expect.objectContaining({ ...sampleSource, color: "#ff0000" })
     );
+  });
+
+  it("the row colour field opens the theme swatches in a popover", async () => {
+    mockSources.value = [{ ...sampleSource }];
+    const w = mountComp();
+    await flushPromises();
+
+    const trigger = w.find("button.colour-field__trigger");
+    expect(trigger.exists()).toBe(true);
+    expect(trigger.attributes("aria-label")).toContain("Colour for Work Calendar");
+    await trigger.trigger("click");
+    await nextTick();
+
+    expect(w.find('[role="dialog"]').attributes("aria-label")).toBe("Colour for Work Calendar");
+    expect(w.find('.colour-field__swatches[role="radiogroup"]').exists()).toBe(true);
   });
 
   it("enabled toggle calls updateSource with full object + updated enabled", async () => {
@@ -199,8 +219,11 @@ describe("CalendarSourcesTab", () => {
     await flushPromises();
     mockFetchSources.mockClear();
 
-    await w.find(".sl-more-btn").trigger("click");
-    await w.find(".sl-menu-item").trigger("click");
+    await w.find('button[aria-label="More actions for Work Calendar"]').trigger("click");
+    await nextTick();
+    const menu = w.find('[role="menu"]');
+    expect(menu.exists()).toBe(true);
+    await menu.findAll('[role="menuitem"]')[0].trigger("click");
     await flushPromises();
 
     const confirmBtn = w.find(".btn-danger");
@@ -257,12 +280,12 @@ describe("CalendarSourcesTab", () => {
     await flushPromises();
   });
 
-  it("source with named color 'green' renders the mapped hex #4caf50", async () => {
+  it("source with named color 'green' passes the mapped hex #4caf50 to the field", async () => {
     mockSources.value = [{ ...sampleSource, color: "green" }];
     const w = mountComp();
     await flushPromises();
 
-    expect(w.find('input[type="color"]').element.value).toBe("#4caf50");
+    expect(w.findComponent(ColourField).props("modelValue")).toBe("#4caf50");
   });
 
   it("running dot is absent when no matching plugin instance exists", async () => {
