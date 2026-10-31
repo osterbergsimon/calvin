@@ -12,12 +12,36 @@
     ]"
     data-test="connection-status"
   >
-    <button
-      v-if="hasPill"
+    <Button
+      v-if="hasPill && !compact"
       ref="pillEl"
-      type="button"
-      class="connection-status__pill"
-      :aria-label="compact ? pillText : null"
+      variant="secondary"
+      size="sm"
+      shape="pill"
+      aria-haspopup="dialog"
+      :aria-expanded="open ? 'true' : 'false'"
+      data-test="connection-pill"
+      @click="togglePopover"
+    >
+      <template #icon>
+        <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path :d="iconPath" />
+        </svg>
+      </template>
+      <span class="connection-status__text"
+        >{{ pillBaseText
+        }}<span v-if="dataFrom" class="connection-status__from">
+          · data from {{ dataFrom }}</span
+        ></span
+      >
+    </Button>
+    <IconButton
+      v-else-if="hasPill"
+      ref="pillEl"
+      variant="ghost"
+      size="sm"
+      shape="circle"
+      :label="pillText"
       aria-haspopup="dialog"
       :aria-expanded="open ? 'true' : 'false'"
       data-test="connection-pill"
@@ -26,13 +50,7 @@
       <svg class="connection-status__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path :d="iconPath" />
       </svg>
-      <span v-if="!compact" class="connection-status__text"
-        >{{ pillBaseText
-        }}<span v-if="dataFrom" class="connection-status__from">
-          · data from {{ dataFrom }}</span
-        ></span
-      >
-    </button>
+    </IconButton>
     <span
       v-else-if="showConnecting"
       class="connection-status__connecting"
@@ -70,19 +88,23 @@
           Check that the Calvin server is on and that this screen is on the same network.
         </p>
         <p v-else>It isn't connected to the network. Check its Wi-Fi or cable.</p>
-        <button
+        <Button
           ref="tryButtonEl"
-          type="button"
-          class="connection-popover__try"
+          variant="secondary"
           data-test="connection-try-now"
           :disabled="trying"
           @click="tryNow"
         >
           {{ trying ? "Checking…" : "Try now" }}
-        </button>
-        <p v-if="tryFailed" class="connection-popover__result" data-test="connection-try-failed">
+        </Button>
+        <InlineNote
+          v-if="tryFailed"
+          class="connection-popover__result"
+          tone="err"
+          data-test="connection-try-failed"
+        >
           Still can't reach it.
-        </p>
+        </InlineNote>
       </div>
     </Teleport>
   </div>
@@ -94,6 +116,9 @@ import { mdiCloudOffOutline, mdiLanDisconnect } from "@mdi/js";
 import { useConfigStore } from "../stores/config";
 import { useConnectionStore } from "../stores/connection";
 import { formatDataFrom } from "../utils/connectionTime";
+import Button from "./ui/Button.vue";
+import IconButton from "./ui/IconButton.vue";
+import InlineNote from "./ui/InlineNote.vue";
 
 /**
  * The dashboard's single connection indicator (CLV-48).
@@ -205,8 +230,11 @@ watch(
   { immediate: true }
 );
 
+// Component refs expose the instance; the DOM node is their $el.
+const pillNode = () => pillEl.value?.$el ?? pillEl.value;
+
 const updatePopoverPosition = () => {
-  const pill = pillEl.value;
+  const pill = pillNode();
   const popover = popoverEl.value;
   if (!pill) return;
   const rect = pill.getBoundingClientRect();
@@ -258,7 +286,8 @@ const openPopover = async () => {
   addDocumentListeners();
   await nextTick();
   updatePopoverPosition();
-  tryButtonEl.value?.focus?.();
+  const tryButton = tryButtonEl.value?.$el ?? tryButtonEl.value;
+  tryButton?.focus?.();
 };
 
 const closePopover = () => {
@@ -269,7 +298,7 @@ const closePopover = () => {
     rootEl.value?.contains(document.activeElement);
   open.value = false;
   removeDocumentListeners();
-  if (focusWasInside) pillEl.value?.focus?.();
+  if (focusWasInside) pillNode()?.focus?.();
 };
 
 const togglePopover = () => {
@@ -297,29 +326,16 @@ onUnmounted(() => {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--gap-1);
   min-width: 0;
 }
 
-.connection-status__pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  color: var(--ink);
-  white-space: nowrap;
-  background: var(--bg-1);
-  border: 1px solid color-mix(in srgb, var(--warn) 55%, var(--line));
-  border-radius: var(--radius-pill);
-  cursor: pointer;
-}
-
-.connection-status__pill:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+/* The status glyph keeps the warn tone; the button chrome comes from ui/. */
+.connection-status__icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  fill: var(--warn);
 }
 
 /* On a phone-width clock bar the age of the data is the first thing that does
@@ -330,36 +346,23 @@ onUnmounted(() => {
   }
 }
 
-.connection-status__icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 auto;
-  fill: var(--warn);
-}
-
 .connection-status__connecting {
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--text-body);
   color: var(--ink-2);
   white-space: nowrap;
 }
 
 .connection-status__connected {
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--text-body);
   color: var(--ok-text);
   white-space: nowrap;
 }
 
-/* Vertical clock bar: a 28px pill with the icon only, time underneath. */
-.connection-status--compact .connection-status__pill {
-  height: 28px;
-  padding: 0 8px;
-}
-
 .connection-status__compact-time {
   font-family: var(--font-data);
-  font-size: var(--fs-xs);
+  font-size: var(--text-meta);
   color: var(--ink-2);
   white-space: nowrap;
 }
@@ -367,13 +370,13 @@ onUnmounted(() => {
 /* Floating fallback when no clock bar is visible: status, not chrome. */
 .connection-status--floating {
   position: fixed;
-  left: 16px;
-  bottom: 16px;
-  z-index: 1003;
+  left: var(--gap-4);
+  bottom: var(--gap-4);
+  z-index: calc(var(--z-dialog) + 3);
 }
 
 .connection-status--floating.connection-status--top-left {
-  top: 16px;
+  top: var(--gap-4);
   bottom: auto;
 }
 
@@ -391,50 +394,32 @@ onUnmounted(() => {
 
 .connection-popover {
   position: fixed;
-  z-index: 2100;
+  z-index: var(--z-dialog);
   width: 20rem;
-  padding: 16px;
+  padding: var(--gap-4);
   color: var(--ink);
   text-align: left;
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 18px 50px -16px var(--shadow-hover);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elev-2);
 }
 
 .connection-popover__title {
-  margin: 0 0 8px;
+  margin: 0 0 var(--gap-2);
   font-family: var(--font-ui);
-  font-size: var(--fs-base);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
 }
 
 .connection-popover p {
-  margin: 0 0 10px;
-  font-size: var(--fs-sm);
+  margin: 0 0 var(--gap-3);
+  font-size: var(--text-body);
   line-height: 1.4;
   color: var(--ink-2);
 }
 
-.connection-popover__try {
-  min-height: 44px;
-  padding: 0 16px;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.connection-popover__try:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .connection-popover__result {
-  margin: 10px 0 0 !important;
+  margin-top: var(--gap-3);
 }
 </style>
