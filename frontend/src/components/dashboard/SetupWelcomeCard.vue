@@ -1,6 +1,6 @@
 <template>
   <Transition name="setup-welcome-fade">
-    <section
+    <Card
       v-if="mode === 'welcome'"
       ref="cardEl"
       class="setup-welcome"
@@ -18,42 +18,37 @@
         <p v-if="!compact" class="setup-welcome__lead" data-test="setup-welcome-lead">
           {{ lead }}
         </p>
-        <ul class="setup-welcome__list">
-          <li
+        <div class="setup-welcome__list">
+          <ListRow
             v-for="(item, index) in items"
             :key="item.kind"
-            class="setup-welcome__row"
+            :name="item.label"
+            :meta="!compact && !item.added ? ['Not added yet'] : []"
             data-test="setup-welcome-row"
           >
-            <span class="setup-welcome__label">
-              {{ item.label }}
-              <small v-if="!compact && !item.added" class="setup-welcome__sub">
-                Not added yet
-              </small>
-            </span>
-            <span v-if="item.added" class="setup-welcome__done" data-test="setup-welcome-done">
-              ✓ Added
-            </span>
-            <Button
-              v-else-if="showActions"
-              :variant="isPhoneWidth && index === 0 ? 'primary' : 'secondary'"
-              size="sm"
-              data-test="setup-welcome-add"
-              :data-setting="item.settingId"
-              :aria-label="`Add ${item.label.toLowerCase()}`"
-              @click="openSetting(item.settingId)"
-            >
-              {{ addLabel }}
-            </Button>
-          </li>
-        </ul>
-        <p
+            <template v-if="item.added || showActions" #actions>
+              <Tag v-if="item.added" tone="ok" data-test="setup-welcome-done">✓ Added</Tag>
+              <Button
+                v-else
+                :variant="isPhoneWidth && index === 0 ? 'primary' : 'secondary'"
+                size="sm"
+                data-test="setup-welcome-add"
+                :data-setting="item.settingId"
+                :aria-label="`Add ${item.label.toLowerCase()}`"
+                @click="openSetting(item.settingId)"
+              >
+                {{ addLabel }}
+              </Button>
+            </template>
+          </ListRow>
+        </div>
+        <InlineNote
           v-if="!showActions && !isPhoneHandoff"
           class="setup-welcome__hint-line"
           data-test="setup-welcome-no-actions"
         >
           Open Settings on a phone or computer to add these.
-        </p>
+        </InlineNote>
         <div class="setup-welcome__foot">
           <Button variant="ghost" size="sm" data-test="setup-welcome-dismiss" @click="dismiss">
             Not now
@@ -73,15 +68,15 @@
           :title="compact ? 'Or use your phone' : 'Set it up from your phone'"
           :hint="compact ? '' : 'Scan the code or open this address on the same network.'"
         />
-        <p
+        <InlineNote
           v-if="auth.status === 'setup'"
           class="setup-welcome__auth"
           data-test="setup-welcome-auth"
         >
           Your phone asks you to choose an admin password first.
-        </p>
+        </InlineNote>
       </div>
-    </section>
+    </Card>
   </Transition>
 </template>
 
@@ -97,6 +92,10 @@ import { useSetupCode } from "@/composables/useSetupCode";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
+import Tag from "@/components/ui/Tag.vue";
 
 /**
  * First-run welcome card (CLV-20 §4.1): one non-modal card over the dashboard
@@ -162,7 +161,8 @@ watch(
 );
 
 function observeArea() {
-  const parent = cardEl.value?.parentElement;
+  const el = cardEl.value?.$el || cardEl.value;
+  const parent = el?.parentElement;
   if (!parent) return;
   const measured =
     parent.clientHeight || parent.getBoundingClientRect?.().height || window.innerHeight;
@@ -210,99 +210,63 @@ function dismiss() {
 </script>
 
 <style scoped>
+/* Card owns the surface; the welcome card only positions itself over the
+   dashboard and lays out its two columns. */
 .setup-welcome {
   position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  z-index: 20;
-  width: min(46rem, calc(100% - 32px));
-  padding: 1.75rem;
+  z-index: var(--z-raised);
+  width: min(46rem, calc(100% - var(--gap-6)));
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 28px;
+  gap: var(--gap-6);
   color: var(--ink);
   text-align: left;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
-  box-shadow: 0 18px 50px -16px var(--shadow-hover);
 }
 .setup-welcome--solo {
   grid-template-columns: 1fr;
 }
 /* 800×480-class dashboard: keep the checklist and QR, drop the prose. */
 .setup-welcome--compact {
-  width: calc(100% - 24px);
-  padding: 1.1rem 1.25rem;
-  gap: 18px;
+  width: calc(100% - var(--gap-5));
+  gap: var(--gap-4);
 }
 /* Phone width: 1 column, docked at the bottom. No QR — you can type here. */
 .setup-welcome--phone {
   top: auto;
-  bottom: 16px;
+  bottom: var(--gap-4);
   transform: translateX(-50%);
   grid-template-columns: 1fr;
-  width: calc(100% - 32px);
+  width: calc(100% - var(--gap-6));
 }
 .setup-welcome__title {
-  margin: 0 0 6px;
+  margin: 0 0 var(--gap-1);
   font-family: var(--font-ui);
-  font-size: var(--fs-xl);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
 }
 .setup-welcome--compact .setup-welcome__title {
-  font-size: var(--fs-lg);
+  font-size: var(--text-label);
 }
 .setup-welcome__lead {
-  margin: 0 0 14px;
-  font-size: var(--fs-md);
+  margin: 0 0 var(--gap-3);
+  font-size: var(--text-body);
   color: var(--ink-2);
 }
 .setup-welcome__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-}
-.setup-welcome__row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 3.5rem;
-  padding: 6px 8px 6px 14px;
-}
-.setup-welcome--compact .setup-welcome__row {
-  min-height: 3rem;
-}
-.setup-welcome__row + .setup-welcome__row {
-  border-top: 1px solid var(--line-soft);
-}
-.setup-welcome__label {
-  font-weight: 500;
-}
-.setup-welcome__sub {
-  display: block;
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-}
-.setup-welcome__done {
-  color: var(--ok-text);
-  font-size: var(--fs-sm);
-  font-weight: 500;
+  flex-direction: column;
+  gap: var(--gap-2);
 }
 .setup-welcome__foot {
   display: flex;
   justify-content: flex-start;
-  margin-top: 10px;
+  margin-top: var(--gap-2);
 }
 .setup-welcome__hint-line {
-  margin: 10px 0 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
+  margin-top: var(--gap-2);
 }
 .setup-welcome__side {
   display: flex;
@@ -314,11 +278,7 @@ function dismiss() {
   width: 12.5rem;
 }
 .setup-welcome__auth {
-  margin: 8px 0 0;
-  padding-top: 8px;
-  font-size: var(--fs-xs);
-  color: var(--ink-2);
-  border-top: 1px solid var(--line-soft);
+  margin-top: var(--gap-3);
 }
 .setup-welcome__announce {
   position: absolute;
@@ -334,7 +294,7 @@ function dismiss() {
 
 .setup-welcome-fade-enter-active,
 .setup-welcome-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity var(--dur) var(--ease);
 }
 .setup-welcome-fade-enter-from,
 .setup-welcome-fade-leave-to {
