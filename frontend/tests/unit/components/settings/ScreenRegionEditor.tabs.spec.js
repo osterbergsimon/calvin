@@ -153,7 +153,10 @@ describe("ScreenRegionEditor page tabs", () => {
     const screens = tab.find(".tabs__meta");
     expect(screens.text()).toBe("Kitchen, Hallway");
     expect(tab.attributes("title")).toContain("Kitchen, Hallway");
-    expect(tab.attributes("aria-label")).toBe("Home · Kitchen, Hallway");
+    // No aria-label override: the visible text (including the full screens
+    // line, not just the truncated meta) is the accessible name.
+    expect(tab.attributes("aria-label")).toBeUndefined();
+    expect(tab.text()).toContain("Kitchen, Hallway");
     const meta = ruleBody(TABS_STYLE, ".tabs__meta");
     expect(meta).toContain("max-width: 16ch");
     expect(meta).toContain("text-overflow: ellipsis");

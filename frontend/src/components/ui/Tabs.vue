@@ -13,12 +13,12 @@
           :aria-selected="i === activeIndex ? 'true' : 'false'"
           :tabindex="i === activeIndex ? 0 : -1"
           :title="item.title || undefined"
-          :aria-label="item.ariaLabel || undefined"
           :disabled="item.disabled"
           @click="select(i)"
         >
-          <span class="tabs__label">{{ item.label }}</span>
-          <span
+          <span class="tabs__label">{{ item.label }}</span
+          >{{ " "
+          }}<span
             v-if="item.meta && !hideMeta"
             class="tabs__meta"
             :class="{ 'tabs__meta--warn': item.metaTone === 'warn' }"
@@ -48,7 +48,7 @@ import { computed, nextTick, ref } from "vue";
 // renders beside the tabs, outside the tablist (the editor's Add page).
 const props = defineProps({
   modelValue: { type: [String, Number], default: null },
-  // [{ value, label, meta?, metaTone?: "neutral"|"warn", title?, ariaLabel?, dimmed?, disabled? }]
+  // [{ value, label, meta?, metaTone?: "neutral"|"warn", title?, dimmed?, disabled? }]
   items: { type: Array, required: true },
   ariaLabel: { type: String, default: "" },
   // The phone layout drops the meta line but keeps the name (CLV-47).

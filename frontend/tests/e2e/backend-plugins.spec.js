@@ -49,16 +49,16 @@ test.describe("Backend Plugins", () => {
     await expect(page.locator(".plugins-category")).toBeVisible();
   });
 
-  const kindFilter = page => page.locator('[role="radiogroup"][aria-label="Plugin kind"]');
+  const kindFilter = page => page.locator('[role="tablist"][aria-label="Plugin kind"]');
 
   test("should display background tab in plugin manager", async ({ page }) => {
     await expect(
-      kindFilter(page).getByRole("radio", { name: "Background", exact: true })
+      kindFilter(page).getByRole("tab", { name: "Background", exact: true })
     ).toBeVisible();
   });
 
   test("should show background plugins when background tab is active", async ({ page }) => {
-    await kindFilter(page).getByRole("radio", { name: "Background", exact: true }).click();
+    await kindFilter(page).getByRole("tab", { name: "Background", exact: true }).click();
 
     const card = page.locator('[data-plugin-id="imap-background"]');
     await expect(card).toBeVisible();
@@ -68,7 +68,7 @@ test.describe("Backend Plugins", () => {
   });
 
   test("should label the background kind in plain words", async ({ page }) => {
-    await kindFilter(page).getByRole("radio", { name: "Background", exact: true }).click();
+    await kindFilter(page).getByRole("tab", { name: "Background", exact: true }).click();
 
     const card = page.locator('[data-plugin-id="imap-background"]');
     await expect(card.locator(".pc-badge")).toHaveText("Background");
@@ -77,11 +77,11 @@ test.describe("Backend Plugins", () => {
 
   test("should filter plugins by background type", async ({ page }) => {
     const filter = kindFilter(page);
-    await filter.getByRole("radio", { name: "All", exact: true }).click();
+    await filter.getByRole("tab", { name: "All", exact: true }).click();
     await expect(page.locator('[data-plugin-id="imap-background"]')).toBeVisible();
     await expect(page.locator('[data-plugin-id="mealie"]')).toBeVisible();
 
-    await filter.getByRole("radio", { name: "Background", exact: true }).click();
+    await filter.getByRole("tab", { name: "Background", exact: true }).click();
     await expect(page.locator('[data-plugin-id="imap-background"]')).toBeVisible();
     await expect(page.locator('[data-plugin-id="mealie"]')).toHaveCount(0);
   });
