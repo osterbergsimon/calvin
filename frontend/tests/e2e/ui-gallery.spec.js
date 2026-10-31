@@ -75,6 +75,7 @@ for (const viewport of VIEWPORTS) {
       test("every block, light and Backlit", async ({ page }) => {
         await openGallery(page, theme);
         await expect(page.locator('[data-test="gallery-button"]')).toBeVisible();
+        await expect(page.locator('[data-test="gallery-tabs"]')).toBeVisible();
         await expect(page.locator('[data-test="gallery-dialog"]')).toBeVisible();
         await expect(page).toHaveScreenshot(`ui-gallery-${viewport.name}-${theme}.png`, {
           fullPage: true,

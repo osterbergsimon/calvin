@@ -293,6 +293,21 @@
         </SettingsSection>
       </section>
 
+      <section class="ui-gallery__section" data-test="gallery-tabs">
+        <h2 class="ui-gallery__heading">Tabs</h2>
+        <p class="ui-gallery__note">
+          Navigation between views of the same thing: an ARIA tablist with one line per tab, a 2px
+          underline on the active tab and a roving tabindex. Arrow keys, Home and End move; the row
+          scrolls sideways with edge fades. Choosing a value stays a SegmentedControl.
+        </p>
+
+        <Tabs v-model="galleryTab" :items="galleryTabs" aria-label="Gallery pages">
+          <template #action>
+            <Button variant="ghost" size="sm" :icon="mdiPlus">Page</Button>
+          </template>
+        </Tabs>
+      </section>
+
       <section class="ui-gallery__section" data-test="gallery-dialog">
         <h2 class="ui-gallery__heading">Dialog</h2>
         <p class="ui-gallery__note">
@@ -307,6 +322,9 @@
           </Button>
           <Button variant="danger" data-test="open-confirm" @click="openDialog('confirm')">
             Open destructive confirm
+          </Button>
+          <Button variant="secondary" data-test="open-full-dialog" @click="fullDialogOpen = true">
+            Open full sheet
           </Button>
         </div>
       </section>
@@ -349,6 +367,24 @@
         </Button>
       </template>
     </Dialog>
+
+    <Dialog
+      v-model="fullDialogOpen"
+      size="full"
+      title="Pages & regions"
+      close-label="Close editor"
+      scrim-blur
+    >
+      <template #subtitle>Design the pages your screens display · changes apply live</template>
+      <div class="ui-gallery__full-sheet">
+        <p class="ui-gallery__text">
+          The full size keeps the page gutter on a roomy screen and bleeds edge-to-edge when the
+          editor measures itself as compact or phone. Escape, the focus trap and the on-screen
+          keyboard layer are the same as every other dialog.
+        </p>
+        <TextField v-model="fullDialogText" label="Page name" hint="Shown on the page tabs." />
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -360,6 +396,7 @@ import {
   mdiDotsHorizontal,
   mdiImage,
   mdiMonitor,
+  mdiPlus,
   mdiRefresh,
 } from "@mdi/js";
 import { GALLERY_MODE_OPTIONS, GALLERY_THEME_OPTIONS, galleryTheme } from "./galleryThemes.js";
@@ -375,6 +412,7 @@ import Popover from "../components/ui/Popover.vue";
 import ScopeLine from "../components/ui/ScopeLine.vue";
 import SegmentedControl from "../components/ui/SegmentedControl.vue";
 import SettingGroup from "../components/ui/SettingGroup.vue";
+import Tabs from "../components/ui/Tabs.vue";
 import TextField from "../components/ui/TextField.vue";
 import ToggleSwitch from "../components/ui/ToggleSwitch.vue";
 import { eventSwatches } from "../utils/themePalettes";
@@ -414,7 +452,16 @@ const text = ref("");
 const dialogOpen = ref(false);
 const dialogMode = ref("form");
 const dialogText = ref("");
+const fullDialogOpen = ref(false);
+const fullDialogText = ref("");
 const scopeOverridden = ref(true);
+
+const galleryTab = ref("home");
+const galleryTabs = [
+  { value: "home", label: "Home", meta: "Kitchen, Hallway" },
+  { value: "week", label: "Week", meta: "All screens" },
+  { value: "chores", label: "Chores", meta: "Not shown", metaTone: "warn", dimmed: true },
+];
 
 const galleryEl = ref(null);
 const menuOpen = ref(false);
@@ -535,6 +582,13 @@ onMounted(syncGalleryColours);
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
+}
+.ui-gallery__full-sheet {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  padding: var(--gap-5);
 }
 .ui-gallery__text {
   margin: 0;

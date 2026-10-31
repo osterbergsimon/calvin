@@ -1,14 +1,13 @@
 <template>
   <div class="plugin-manager">
     <!-- Plain-kind filters, All first (§3.3) -->
-    <div class="pm-tabs">
-      <SegmentedControl
-        :model-value="activeTab"
-        :options="filterOptions"
-        aria-label="Plugin kind"
-        @update:model-value="handleTabChange"
-      />
-    </div>
+    <Tabs
+      class="pm-tabs"
+      :model-value="activeTab"
+      :items="filterOptions"
+      aria-label="Plugin kind"
+      @update:model-value="handleTabChange"
+    />
 
     <!-- Loading -->
     <InlineNote v-if="loading" class="pm-status">Loading plugins…</InlineNote>
@@ -67,7 +66,7 @@
 <script setup>
 import { computed } from "vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
-import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import PluginCard from "./PluginCard.vue";
 import { pluginKindFilters, pluginKindKey } from "@/utils/pluginKind";
 
@@ -207,9 +206,7 @@ const handleDeleteImage = imageId => emit("delete-image", imageId);
 }
 
 .pm-tabs {
-  max-width: 100%;
   margin-bottom: var(--gap-5);
-  overflow-x: auto;
 }
 
 .pm-status {

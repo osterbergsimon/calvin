@@ -193,7 +193,7 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
         },
       ],
     });
-    const lines = w.findAll('[data-test="page-screens"]').map(n => n.text());
+    const lines = w.findAll(".tabs__meta").map(n => n.text());
     expect(lines).toEqual(["Kitchen, Hallway", "Office"]);
   });
 
@@ -201,28 +201,19 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
     const { w } = await mountEditor({
       kiosks: [{ id: "hall", hostname: "pi-h", overrides: {} }],
     });
-    expect(w.findAll('[data-test="page-screens"]').map(n => n.text())).toEqual([
-      "All screens",
-      "All screens",
-    ]);
+    expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual(["All screens", "All screens"]);
   });
 
   it("says All screens when no screens are known", async () => {
     const { w } = await mountEditor({ kiosks: [] });
-    expect(w.findAll('[data-test="page-screens"]').map(n => n.text())).toEqual([
-      "All screens",
-      "All screens",
-    ]);
+    expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual(["All screens", "All screens"]);
   });
 
   it("says Not on any screen when no screen shows the page", async () => {
     const { w } = await mountEditor({
       kiosks: [{ id: "hall", overrides: { availableScreens: [] } }],
     });
-    expect(w.findAll('[data-test="page-screens"]').map(n => n.text())).toEqual([
-      "Not shown",
-      "Not shown",
-    ]);
+    expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual(["Not shown", "Not shown"]);
   });
 
   it("dims the tabs a previewed screen does not show", async () => {
@@ -230,7 +221,7 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
       kiosks: [{ id: "hall", overrides: { displayName: "Hallway", availableScreens: ["photos"] } }],
     });
     await selectPreview(w, "hall");
-    const tabs = w.findAll(".sre-tab");
+    const tabs = w.findAll(".tabs__tab");
     expect(tabs[0].classes()).toContain("is-dimmed"); // Home
     expect(tabs[1].classes()).not.toContain("is-dimmed"); // Photos
   });

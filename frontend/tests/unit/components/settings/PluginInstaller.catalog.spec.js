@@ -108,16 +108,27 @@ describe("PluginInstaller catalog (§3.3)", () => {
     expect(w.find('[data-catalog-plugin-id="mealie"]').text()).toContain("Web page & app");
   });
 
-  it("filters kinds with the same SegmentedControl the Installed list uses", () => {
+  it("filters kinds with the same Tabs the Installed list uses", () => {
     const w = mountWith({ devMode: false });
-    const segmented = w.findComponent({ name: "SegmentedControl" });
-    expect(segmented.exists()).toBe(true);
-    expect(segmented.props("options").map(option => option.label)).toEqual([
+    const tabs = w.findComponent({ name: "Tabs" });
+    expect(tabs.exists()).toBe(true);
+    expect(tabs.props("items").map(option => option.label)).toEqual([
       "All",
       "Photos",
       "Web page & app",
     ]);
-    expect(w.findComponent({ name: "TabNavigation" }).exists()).toBe(false);
+    expect(w.find('[role="tablist"]').attributes("aria-label")).toBe("Plugin kind");
+    expect(w.findComponent({ name: "SegmentedControl" }).exists()).toBe(false);
+  });
+
+  it("selects a catalog kind through the tabs", async () => {
+    const w = mountWith({ devMode: false });
+    const tabs = w.findComponent({ name: "Tabs" });
+    tabs.vm.$emit("update:modelValue", "image");
+    await w.vm.$nextTick();
+    expect(w.findComponent({ name: "Tabs" }).props("modelValue")).toBe("image");
+    expect(w.find('[data-catalog-plugin-id="immich"]').exists()).toBe(true);
+    expect(w.find('[data-catalog-plugin-id="mealie"]').exists()).toBe(false);
   });
 
   it("installs from the catalog repository, not the other-repository field", async () => {

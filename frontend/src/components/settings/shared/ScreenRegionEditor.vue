@@ -1,65 +1,35 @@
 <template>
-  <teleport to="body">
-    <div
-      v-if="open"
-      class="sre-root dialog-above-osk"
-      :class="[`size-${sizeClass}`, { 'is-coarse': coarsePointer }]"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Pages and regions"
-    >
-      <DialogScrim blur @dismiss="$emit('close')" />
-      <div ref="modalEl" class="sre-modal">
-        <!-- Header -->
-        <header class="sre-header">
-          <div class="sre-title">
-            <h2>Pages &amp; regions</h2>
-            <p class="sre-sub">
-              Design the pages your screens display · drag dividers to resize, the clock bar to
-              reposition · changes apply live
-            </p>
-          </div>
-          <IconButton
-            class="sre-close"
-            variant="ghost"
-            size="md"
-            label="Close editor"
-            @click="$emit('close')"
-          >
-            ×
-          </IconButton>
-        </header>
+  <Dialog
+    :model-value="open"
+    size="full"
+    :bleed="sizeClass !== 'wide'"
+    label="Pages and regions"
+    close-label="Close editor"
+    scrim-blur
+    @close="$emit('close')"
+  >
+    <template #title>Pages &amp; regions</template>
+    <template v-if="sizeClass === 'wide'" #subtitle>
+      Design the pages your screens display · drag dividers to resize, the clock bar to reposition ·
+      changes apply live
+    </template>
 
-        <!-- Context strip: page tabs + preview-on -->
-        <div class="sre-context">
-          <div class="sre-tabs">
-            <div class="sre-tablist" role="tablist" aria-label="Pages">
-              <button
-                v-for="page in screens.screens"
-                :key="page.id"
-                type="button"
-                role="tab"
-                class="sre-tab"
-                :class="{
-                  'is-active': page.id === activeScreenId,
-                  'is-dimmed': isPageDimmed(page.id),
-                }"
-                :aria-selected="page.id === activeScreenId"
-                :aria-label="pageTabLabel(page)"
-                :title="pageTabTitle(page)"
-                data-test="page-tab"
-                @click="selectScreen(page.id)"
-              >
-                <span class="sre-tab-name">{{ page.name }}</span
-                >{{ " "
-                }}<span
-                  class="sre-tab-screens"
-                  :class="{ 'is-not-shown': screensLine(page.id) === NOT_SHOWN }"
-                  data-test="page-screens"
-                  >{{ screensLine(page.id) }}</span
-                >
-              </button>
-            </div>
+    <div
+      ref="modalEl"
+      class="sre-root"
+      :class="[`size-${sizeClass}`, { 'is-coarse': coarsePointer }]"
+    >
+      <!-- Context strip: page tabs + preview-on -->
+      <div class="sre-context">
+        <Tabs
+          class="sre-tabs"
+          :model-value="activeScreenId"
+          :items="pageTabItems"
+          aria-label="Pages"
+          :hide-meta="isPhone"
+          @update:model-value="selectScreen"
+        >
+          <template #action>
             <Button
               class="sre-tab-add"
               variant="ghost"
@@ -71,334 +41,334 @@
             >
               Page
             </Button>
+          </template>
+        </Tabs>
+        <div class="sre-preview-as">
+          <span class="sre-preview-label">Preview on</span>
+          <SelectPill
+            :model-value="previewScreenId"
+            :options="screenOptions"
+            aria-label="Preview on screen"
+            @update:model-value="setPreviewScreen"
+          />
+          <SegmentedControl
+            v-if="previewScreenId === ANY_BROWSER"
+            class="sre-orient-toggle"
+            :model-value="anyBrowserOrientation"
+            :options="[
+              { value: 'landscape', label: 'Landscape' },
+              { value: 'portrait', label: 'Portrait' },
+            ]"
+            aria-label="Preview orientation"
+            @update:model-value="setAnyBrowserOrientation"
+          />
+          <Tag
+            v-if="previewScreenId !== ANY_BROWSER"
+            class="sre-orient-badge"
+            data-test="orientation-badge"
+          >
+            {{ orientationBadge }}
+          </Tag>
+        </div>
+      </div>
+
+      <!-- Body: stage + rail -->
+      <div v-if="placeSource" class="sre-place" data-test="place-banner">
+        <InlineNote class="sre-place__text">
+          Choose a region for <strong>{{ placeSource.name }}</strong>
+        </InlineNote>
+        <Button
+          class="sre-place__cancel"
+          variant="secondary"
+          size="sm"
+          data-test="place-cancel"
+          @click="$emit('place-cancel')"
+        >
+          Cancel
+        </Button>
+      </div>
+
+      <div class="sre-body" :class="{ 'is-sheet-open': isPhone && sheetOpen }">
+        <!-- STAGE -->
+        <div ref="stageEl" class="sre-stage" @click="onStageClick">
+          <div class="sre-stage-tag"><span class="dot" /> {{ stageTag }}</div>
+
+          <div v-if="mismatch" class="sre-mismatch" data-test="mismatch">
+            <InlineNote class="sre-mismatch__text" tone="warn">
+              <strong>{{ previewScreenName }}</strong> doesn’t show “{{ activeScreen.name }}”.
+            </InlineNote>
+            <Button
+              class="sre-mismatch__btn"
+              size="sm"
+              :disabled="showItBusy"
+              @click="showItOnScreen"
+            >
+              Show it on {{ previewScreenName }}
+            </Button>
+            <InlineNote v-if="showItError" class="sre-mismatch__error" tone="err" role="alert">
+              {{ showItError }}
+            </InlineNote>
           </div>
-          <div class="sre-preview-as">
-            <span class="sre-preview-label">Preview on</span>
-            <SelectPill
-              :model-value="previewScreenId"
-              :options="screenOptions"
-              aria-label="Preview on screen"
-              @update:model-value="setPreviewScreen"
-            />
-            <SegmentedControl
-              v-if="previewScreenId === ANY_BROWSER"
-              class="sre-orient-toggle"
-              :model-value="anyBrowserOrientation"
-              :options="[
-                { value: 'landscape', label: 'Landscape' },
-                { value: 'portrait', label: 'Portrait' },
-              ]"
-              aria-label="Preview orientation"
-              @update:model-value="setAnyBrowserOrientation"
-            />
+
+          <div class="sre-stage-focus">
+            <div class="sre-device-wrap" :class="{ dimmed: mismatch }">
+              <div
+                class="sre-device"
+                :class="[orientation, { 'is-narrow': deviceNarrow }]"
+                :style="deviceSize"
+              >
+                <div
+                  :ref="el => (screenEl = el)"
+                  class="sre-screen"
+                  :class="`dir-${layoutDir}`"
+                  :style="clockAxisStyle"
+                >
+                  <!-- perimeter drop zones (only while dragging the clock bar) -->
+                  <template v-if="clock.enabled && clockDrag && clockDraggable">
+                    <div
+                      v-if="clock.position !== 'top'"
+                      class="sre-drop perim top"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('top')"
+                    >
+                      <span>Top</span>
+                    </div>
+                    <div
+                      v-if="clock.position !== 'bottom'"
+                      class="sre-drop perim bottom"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('bottom')"
+                    >
+                      <span>Bottom</span>
+                    </div>
+                    <div
+                      v-if="clock.position !== 'left'"
+                      class="sre-drop perim left"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('left')"
+                    >
+                      <span>Left</span>
+                    </div>
+                    <div
+                      v-if="clock.position !== 'right'"
+                      class="sre-drop perim right"
+                      @dragenter.prevent
+                      @dragover.prevent
+                      @drop.prevent="dropClock('right')"
+                    >
+                      <span>Right</span>
+                    </div>
+                  </template>
+
+                  <!-- clock bar: top/left (leading perimeter) -->
+                  <div
+                    v-if="clock.enabled && clock.position === leadingPerimeter"
+                    class="sre-clockbar drag"
+                    :class="clock.mode === 'vertical' ? 'v' : 'h'"
+                    :draggable="clockDraggable"
+                    role="button"
+                    tabindex="0"
+                    :title="clockTitle"
+                    :aria-label="clockAria"
+                    @dragstart="beginClockDrag"
+                    @dragend="endClockDrag"
+                    @click.stop="selectClockBar"
+                    @keydown.enter.prevent="selectClockBar"
+                    @keydown.space.prevent="selectClockBar"
+                  >
+                    <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true">⠿</span>
+                    {{ previewClock }}
+                  </div>
+
+                  <div
+                    :ref="el => (regionsEl = el)"
+                    class="sre-regions"
+                    :class="`dir-${layoutDir}`"
+                  >
+                    <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
+                      <!-- clock drop zone at the gap before region i -->
+                      <div
+                        v-if="
+                          clock.enabled &&
+                          clockDrag &&
+                          clockDraggable &&
+                          i > 0 &&
+                          betweenIndex !== i - 1
+                        "
+                        class="sre-drop gap"
+                        :class="layoutDir === 'row' ? 'v' : 'h'"
+                        @dragenter.prevent
+                        @dragover.prevent
+                        @drop.prevent="dropClock(i - 1 === 0 ? 'between' : `between:${i - 1}`)"
+                      >
+                        <span class="sre-drop-plus">+</span>
+                      </div>
+
+                      <!-- clock bar between region i-1 and i -->
+                      <div
+                        v-if="clock.enabled && betweenIndex === i - 1"
+                        class="sre-clockbar between drag"
+                        :class="layoutDir === 'row' ? 'v' : 'h'"
+                        :draggable="clockDraggable"
+                        role="button"
+                        tabindex="0"
+                        :title="clockTitle"
+                        :aria-label="clockAria"
+                        @dragstart="beginClockDrag"
+                        @dragend="endClockDrag"
+                        @click.stop="selectClockBar"
+                        @keydown.enter.prevent="selectClockBar"
+                        @keydown.space.prevent="selectClockBar"
+                      >
+                        <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true"
+                          >⠿</span
+                        >
+                        {{ previewTime }}
+                      </div>
+
+                      <RegionNode
+                        :region="region"
+                        :path="[i]"
+                        :parent-direction="layoutDir"
+                        :selected-id="selectedRegionId"
+                        :layout-dir="layoutDir"
+                        :coarse="coarsePointer"
+                        :narrow="deviceNarrow"
+                        @select="selectRegion"
+                        @resize="onNodeResize"
+                      />
+
+                      <button
+                        v-if="i < activeScreen.layout.regions.length - 1"
+                        type="button"
+                        class="sre-resizer"
+                        :class="layoutDir === 'row' ? 'col' : 'row'"
+                        :style="coarseResizerStyle"
+                        aria-label="Resize regions"
+                        @pointerdown="startResize(i, $event)"
+                      >
+                        <span class="grip" />
+                        <span class="pill"
+                          >{{ region.size }} / {{ activeScreen.layout.regions[i + 1].size }}</span
+                        >
+                      </button>
+                    </template>
+                  </div>
+
+                  <!-- clock bar: bottom/right (trailing perimeter) -->
+                  <div
+                    v-if="clock.enabled && clock.position === trailingPerimeter"
+                    class="sre-clockbar drag"
+                    :class="clock.mode === 'vertical' ? 'v' : 'h'"
+                    :draggable="clockDraggable"
+                    role="button"
+                    tabindex="0"
+                    :title="clockTitle"
+                    :aria-label="clockAria"
+                    @dragstart="beginClockDrag"
+                    @dragend="endClockDrag"
+                    @click.stop="selectClockBar"
+                    @keydown.enter.prevent="selectClockBar"
+                    @keydown.space.prevent="selectClockBar"
+                  >
+                    <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true">⠿</span>
+                    {{ previewClock }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <Tag
-              v-if="previewScreenId !== ANY_BROWSER"
-              class="sre-orient-badge"
-              data-test="orientation-badge"
+              v-if="sizeClass === 'compact'"
+              class="sre-orient-caption"
+              data-test="orientation-caption"
             >
               {{ orientationBadge }}
             </Tag>
           </div>
+
+          <Tag v-if="!mismatch && previewScreenId !== ANY_BROWSER" class="sre-preview-note">
+            Previewing on {{ previewScreenName }} · edits change the shared “{{
+              activeScreen.name
+            }}” page
+          </Tag>
         </div>
 
-        <!-- Body: stage + rail -->
-        <div v-if="placeSource" class="sre-place" data-test="place-banner">
-          <InlineNote class="sre-place__text">
-            Choose a region for <strong>{{ placeSource.name }}</strong>
-          </InlineNote>
-          <Button
-            class="sre-place__cancel"
-            variant="secondary"
-            size="sm"
-            data-test="place-cancel"
-            @click="$emit('place-cancel')"
-          >
-            Cancel
-          </Button>
-        </div>
-
-        <div class="sre-body" :class="{ 'is-sheet-open': isPhone && sheetOpen }">
-          <!-- STAGE -->
-          <div ref="stageEl" class="sre-stage" @click="onStageClick">
-            <div class="sre-stage-tag"><span class="dot" /> {{ stageTag }}</div>
-
-            <div v-if="mismatch" class="sre-mismatch" data-test="mismatch">
-              <InlineNote class="sre-mismatch__text" tone="warn">
-                <strong>{{ previewScreenName }}</strong> doesn’t show “{{ activeScreen.name }}”.
-              </InlineNote>
-              <Button
-                class="sre-mismatch__btn"
-                size="sm"
-                :disabled="showItBusy"
-                @click="showItOnScreen"
-              >
-                Show it on {{ previewScreenName }}
-              </Button>
-              <InlineNote v-if="showItError" class="sre-mismatch__error" tone="err" role="alert">
-                {{ showItError }}
-              </InlineNote>
-            </div>
-
-            <div class="sre-stage-focus">
-              <div class="sre-device-wrap" :class="{ dimmed: mismatch }">
-                <div
-                  class="sre-device"
-                  :class="[orientation, { 'is-narrow': deviceNarrow }]"
-                  :style="deviceSize"
-                >
-                  <div
-                    :ref="el => (screenEl = el)"
-                    class="sre-screen"
-                    :class="`dir-${layoutDir}`"
-                    :style="clockAxisStyle"
-                  >
-                    <!-- perimeter drop zones (only while dragging the clock bar) -->
-                    <template v-if="clock.enabled && clockDrag && clockDraggable">
-                      <div
-                        v-if="clock.position !== 'top'"
-                        class="sre-drop perim top"
-                        @dragenter.prevent
-                        @dragover.prevent
-                        @drop.prevent="dropClock('top')"
-                      >
-                        <span>Top</span>
-                      </div>
-                      <div
-                        v-if="clock.position !== 'bottom'"
-                        class="sre-drop perim bottom"
-                        @dragenter.prevent
-                        @dragover.prevent
-                        @drop.prevent="dropClock('bottom')"
-                      >
-                        <span>Bottom</span>
-                      </div>
-                      <div
-                        v-if="clock.position !== 'left'"
-                        class="sre-drop perim left"
-                        @dragenter.prevent
-                        @dragover.prevent
-                        @drop.prevent="dropClock('left')"
-                      >
-                        <span>Left</span>
-                      </div>
-                      <div
-                        v-if="clock.position !== 'right'"
-                        class="sre-drop perim right"
-                        @dragenter.prevent
-                        @dragover.prevent
-                        @drop.prevent="dropClock('right')"
-                      >
-                        <span>Right</span>
-                      </div>
-                    </template>
-
-                    <!-- clock bar: top/left (leading perimeter) -->
-                    <div
-                      v-if="clock.enabled && clock.position === leadingPerimeter"
-                      class="sre-clockbar drag"
-                      :class="clock.mode === 'vertical' ? 'v' : 'h'"
-                      :draggable="clockDraggable"
-                      role="button"
-                      tabindex="0"
-                      :title="clockTitle"
-                      :aria-label="clockAria"
-                      @dragstart="beginClockDrag"
-                      @dragend="endClockDrag"
-                      @click.stop="selectClockBar"
-                      @keydown.enter.prevent="selectClockBar"
-                      @keydown.space.prevent="selectClockBar"
-                    >
-                      <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true">⠿</span>
-                      {{ previewClock }}
-                    </div>
-
-                    <div
-                      :ref="el => (regionsEl = el)"
-                      class="sre-regions"
-                      :class="`dir-${layoutDir}`"
-                    >
-                      <template v-for="(region, i) in activeScreen.layout.regions" :key="region.id">
-                        <!-- clock drop zone at the gap before region i -->
-                        <div
-                          v-if="
-                            clock.enabled &&
-                            clockDrag &&
-                            clockDraggable &&
-                            i > 0 &&
-                            betweenIndex !== i - 1
-                          "
-                          class="sre-drop gap"
-                          :class="layoutDir === 'row' ? 'v' : 'h'"
-                          @dragenter.prevent
-                          @dragover.prevent
-                          @drop.prevent="dropClock(i - 1 === 0 ? 'between' : `between:${i - 1}`)"
-                        >
-                          <span class="sre-drop-plus">+</span>
-                        </div>
-
-                        <!-- clock bar between region i-1 and i -->
-                        <div
-                          v-if="clock.enabled && betweenIndex === i - 1"
-                          class="sre-clockbar between drag"
-                          :class="layoutDir === 'row' ? 'v' : 'h'"
-                          :draggable="clockDraggable"
-                          role="button"
-                          tabindex="0"
-                          :title="clockTitle"
-                          :aria-label="clockAria"
-                          @dragstart="beginClockDrag"
-                          @dragend="endClockDrag"
-                          @click.stop="selectClockBar"
-                          @keydown.enter.prevent="selectClockBar"
-                          @keydown.space.prevent="selectClockBar"
-                        >
-                          <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true"
-                            >⠿</span
-                          >
-                          {{ previewTime }}
-                        </div>
-
-                        <RegionNode
-                          :region="region"
-                          :path="[i]"
-                          :parent-direction="layoutDir"
-                          :selected-id="selectedRegionId"
-                          :layout-dir="layoutDir"
-                          :coarse="coarsePointer"
-                          :narrow="deviceNarrow"
-                          @select="selectRegion"
-                          @resize="onNodeResize"
-                        />
-
-                        <button
-                          v-if="i < activeScreen.layout.regions.length - 1"
-                          type="button"
-                          class="sre-resizer"
-                          :class="layoutDir === 'row' ? 'col' : 'row'"
-                          :style="coarseResizerStyle"
-                          aria-label="Resize regions"
-                          @pointerdown="startResize(i, $event)"
-                        >
-                          <span class="grip" />
-                          <span class="pill"
-                            >{{ region.size }} / {{ activeScreen.layout.regions[i + 1].size }}</span
-                          >
-                        </button>
-                      </template>
-                    </div>
-
-                    <!-- clock bar: bottom/right (trailing perimeter) -->
-                    <div
-                      v-if="clock.enabled && clock.position === trailingPerimeter"
-                      class="sre-clockbar drag"
-                      :class="clock.mode === 'vertical' ? 'v' : 'h'"
-                      :draggable="clockDraggable"
-                      role="button"
-                      tabindex="0"
-                      :title="clockTitle"
-                      :aria-label="clockAria"
-                      @dragstart="beginClockDrag"
-                      @dragend="endClockDrag"
-                      @click.stop="selectClockBar"
-                      @keydown.enter.prevent="selectClockBar"
-                      @keydown.space.prevent="selectClockBar"
-                    >
-                      <span v-if="clockDraggable" class="sre-clock-grip" aria-hidden="true">⠿</span>
-                      {{ previewClock }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <Tag
-                v-if="sizeClass === 'compact'"
-                class="sre-orient-caption"
-                data-test="orientation-caption"
-              >
-                {{ orientationBadge }}
-              </Tag>
-            </div>
-
-            <Tag v-if="!mismatch && previewScreenId !== ANY_BROWSER" class="sre-preview-note">
-              Previewing on {{ previewScreenName }} · edits change the shared “{{
-                activeScreen.name
-              }}” page
-            </Tag>
+        <!-- RAIL (a bottom sheet on phones) -->
+        <aside
+          class="sre-rail"
+          :class="{
+            'is-sheet': isPhone,
+            'is-open': isPhone && sheetOpen,
+            'no-motion': isPhone && reduceMotion,
+          }"
+          :role="isPhone ? 'region' : null"
+          :aria-label="isPhone ? 'Inspector' : null"
+        >
+          <div v-if="isPhone" class="sre-sheet-peek" data-test="sheet-peek" @click="toggleSheet">
+            <span
+              class="sre-sheet-handle"
+              data-test="sheet-handle"
+              @pointerdown.stop="startSheetDrag"
+            />
+            <span class="sre-sheet-label" data-test="sheet-selection">{{
+              sheetSelectionLabel
+            }}</span>
+            <IconButton
+              class="sre-sheet-chevron"
+              data-test="sheet-chevron"
+              variant="ghost"
+              size="md"
+              :label="sheetOpen ? 'Hide settings' : 'Show settings'"
+              :aria-expanded="sheetOpen"
+              @click.stop="toggleSheet"
+            >
+              {{ sheetOpen ? "⌄" : "⌃" }}
+            </IconButton>
           </div>
-
-          <!-- RAIL (a bottom sheet on phones) -->
-          <aside
-            class="sre-rail"
-            :class="{
-              'is-sheet': isPhone,
-              'is-open': isPhone && sheetOpen,
-              'no-motion': isPhone && reduceMotion,
-            }"
-            :role="isPhone ? 'region' : null"
-            :aria-label="isPhone ? 'Inspector' : null"
-          >
-            <div v-if="isPhone" class="sre-sheet-peek" data-test="sheet-peek" @click="toggleSheet">
-              <span
-                class="sre-sheet-handle"
-                data-test="sheet-handle"
-                @pointerdown.stop="startSheetDrag"
-              />
-              <span class="sre-sheet-label" data-test="sheet-selection">{{
-                sheetSelectionLabel
-              }}</span>
-              <IconButton
-                class="sre-sheet-chevron"
-                data-test="sheet-chevron"
-                variant="ghost"
-                size="md"
-                :label="sheetOpen ? 'Hide settings' : 'Show settings'"
-                :aria-expanded="sheetOpen"
-                @click.stop="toggleSheet"
-              >
-                {{ sheetOpen ? "⌄" : "⌃" }}
-              </IconButton>
-            </div>
-            <div class="sre-rail-scroll">
-              <RegionInspector
-                v-if="selectedRegion"
-                :region="selectedRegion"
-                :screen="activeScreen"
-                :layout-dir="layoutDir"
-                :component-options="componentOptions"
-                :source-options="sourceOptionsFor(selectedRegion.kind)"
-                :context="selectionContext"
-                :hide-heading="isPhone"
-                @patch-view="patchSelectedView"
-                @set-component="setSelectedComponent"
-                @toggle-source="toggleSelectedSource"
-                @clear-sources="clearSelectedSources"
-                @toggle-split="toggleSplitSelected"
-                @toggle-sub-direction="toggleSubDirSelected"
-                @add-sub="addSubToSelected"
-                @remove="removeSelected"
-                @deselect="selectedRegionId = null"
-              />
-              <ScreenInspector
-                v-else
-                :screen="activeScreen"
-                :layout-dir="layoutDir"
-                :clock="clock"
-                :clock-selected="clockSelected"
-                :can-delete="screens.screens.length > 1"
-                :hide-heading="isPhone"
-                @rename="renameScreen"
-                @preset="applyPreset"
-                @add-region="addRegion"
-                @toggle-direction="toggleLayoutDir"
-                @clock-enabled="setClockEnabled"
-                @clock-position="setClockPosition"
-                @clock-inherit="clearClock"
-                @duplicate="duplicateScreen"
-                @delete="deleteActiveScreen"
-              />
-            </div>
-          </aside>
-        </div>
+          <div class="sre-rail-scroll">
+            <RegionInspector
+              v-if="selectedRegion"
+              :region="selectedRegion"
+              :screen="activeScreen"
+              :layout-dir="layoutDir"
+              :component-options="componentOptions"
+              :source-options="sourceOptionsFor(selectedRegion.kind)"
+              :context="selectionContext"
+              :hide-heading="isPhone"
+              @patch-view="patchSelectedView"
+              @set-component="setSelectedComponent"
+              @toggle-source="toggleSelectedSource"
+              @clear-sources="clearSelectedSources"
+              @toggle-split="toggleSplitSelected"
+              @toggle-sub-direction="toggleSubDirSelected"
+              @add-sub="addSubToSelected"
+              @remove="removeSelected"
+              @deselect="selectedRegionId = null"
+            />
+            <ScreenInspector
+              v-else
+              :screen="activeScreen"
+              :layout-dir="layoutDir"
+              :clock="clock"
+              :clock-selected="clockSelected"
+              :can-delete="screens.screens.length > 1"
+              :hide-heading="isPhone"
+              @rename="renameScreen"
+              @preset="applyPreset"
+              @add-region="addRegion"
+              @toggle-direction="toggleLayoutDir"
+              @clock-enabled="setClockEnabled"
+              @clock-position="setClockPosition"
+              @clock-inherit="clearClock"
+              @duplicate="duplicateScreen"
+              @delete="deleteActiveScreen"
+            />
+          </div>
+        </aside>
       </div>
 
       <ConfirmModal
@@ -410,7 +380,7 @@
         @cancel="replaceTarget = null"
       />
     </div>
-  </teleport>
+  </Dialog>
 </template>
 
 <script setup>
@@ -422,11 +392,12 @@ import { useConfigStore } from "@/stores/config";
 import { usePlugins } from "@/composables";
 import { buildComponentOptions } from "@/utils/componentPicker";
 import Button from "@/components/ui/Button.vue";
-import DialogScrim from "@/components/ui/DialogScrim.vue";
+import Dialog from "@/components/ui/Dialog.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import Tag from "@/components/ui/Tag.vue";
 import { mdiPlus } from "@mdi/js";
 import { getKioskId } from "@/utils/kioskId";
@@ -642,12 +613,27 @@ const screensLine = pageId => {
   if (showing.length === 0) return NOT_SHOWN;
   return showing.map(kioskName).join(", ");
 };
-// The tab reads as one sentence for screen readers, including the screens
-// text that is truncated visually at 16ch.
-const pageTabLabel = page => `${page.name} · ${screensLine(page.id)}`;
+// The title carries the full screens text (the meta line is truncated visually
+// at 16ch but its DOM text stays complete for screen readers too).
 const pageTabTitle = page => `${page.name} · ${screensLine(page.id)}`;
 const isPageDimmed = pageId =>
   previewScreenId.value !== ANY_BROWSER && !kioskShowsPage(previewKiosk.value, pageId);
+// The tabs are navigation between the shared pages (§3); each one reads as a
+// single sentence for screen readers, including the screens line that is
+// truncated visually at 16ch.
+const pageTabItems = computed(() =>
+  screens.value.screens.map(page => {
+    const screensText = screensLine(page.id);
+    return {
+      value: page.id,
+      label: page.name,
+      meta: screensText,
+      metaTone: screensText === NOT_SHOWN ? "warn" : "neutral",
+      title: pageTabTitle(page),
+      dimmed: isPageDimmed(page.id),
+    };
+  })
+);
 const mismatch = computed(
   () =>
     previewScreenId.value !== ANY_BROWSER &&
@@ -1259,66 +1245,15 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* The shell (surface, border, radius, elevation, header, Escape, focus trap and
+   the OSK layer) comes from ui/Dialog size="full"; the editor fills its body. */
 .sre-root {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-dialog);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2.5vh 2vw;
-}
-.sre-modal {
-  position: relative;
-  z-index: calc(var(--z-dialog) + 1);
-  width: min(1240px, 100%);
-  height: min(820px, 100%);
-  display: grid;
-  grid-template-rows: auto auto 1fr;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-panel);
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  box-shadow: var(--elev-2);
-  animation: sre-rise var(--dur) var(--ease);
-}
-@keyframes sre-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sre-modal {
-    animation: none;
-  }
-}
-
-.sre-header {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-4);
-  padding: var(--gap-4) var(--gap-5);
-  border-bottom: 1px solid var(--line);
-}
-.sre-title h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
-  color: var(--ink);
-}
-.sre-sub {
-  margin: 0.15rem 0 0;
-  font-size: var(--text-meta);
-  color: var(--ink-3);
-}
-.sre-close {
-  margin-left: auto;
 }
 
 .sre-context {
@@ -1329,85 +1264,11 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--line);
   background: var(--bg-1);
 }
-/* One-line underline tabs. The row scrolls sideways on overflow and fades
-   at the ends instead of wrapping or showing a scrollbar. */
+/* ui/Tabs owns the row's one-line look, underline, scrolling and edge fades;
+   the editor only gives it the width left beside Preview on. */
 .sre-tabs {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  height: var(--tab-height);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    var(--ink) var(--gap-3),
-    var(--ink) calc(100% - var(--gap-3)),
-    transparent
-  );
-}
-.sre-tabs::-webkit-scrollbar {
-  display: none;
-}
-/* The tablist is the ARIA container; the scroll container stays .sre-tabs so
-   the "Add page" action sits beside the tabs without becoming a tab itself. */
-.sre-tablist {
-  display: flex;
-  align-items: stretch;
-}
-.sre-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--gap-3);
-  padding: 0 var(--gap-3);
-  border: 0;
-  background: transparent;
-  color: var(--ink-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.sre-tab:hover {
-  color: var(--ink);
-}
-.sre-tab:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
-}
-.sre-tab.is-active {
-  color: var(--ink);
-  font-weight: var(--weight-title);
-}
-.sre-tab.is-active::after {
-  content: "";
-  position: absolute;
-  left: var(--gap-3);
-  right: var(--gap-3);
-  bottom: 0;
-  height: var(--tab-indicator);
-  background: var(--focus);
-}
-.sre-tab-name {
-  display: inline-block;
-}
-.sre-tab-screens {
-  max-width: 16ch;
-  overflow: hidden;
-  color: var(--ink-3);
-  font-size: var(--text-meta);
-  font-weight: var(--weight-body);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sre-tab-screens.is-not-shown {
-  color: color-mix(in srgb, var(--warn) 45%, var(--ink));
-}
-.sre-tab.is-dimmed {
-  opacity: 0.5;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .sre-preview-as {
   margin-left: auto;
@@ -1422,6 +1283,7 @@ onUnmounted(() => {
 }
 .sre-body {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: 1fr 340px;
   min-height: 0;
 }
@@ -1733,23 +1595,8 @@ onUnmounted(() => {
 /* --- size classes (§1) ----------------------------------------------------
    The class comes from the measured modal, never a viewport media query, so a
    kiosk whose on-screen keyboard shrinks the dialog re-evaluates it too. */
-.sre-root.size-compact,
-.sre-root.size-phone {
-  padding: 0;
-}
-.sre-root.size-compact .sre-modal,
-.sre-root.size-phone .sre-modal {
-  width: 100%;
-  height: 100%;
-  border: 0;
-  border-radius: 0;
-}
 .sre-root.size-compact .sre-body {
   grid-template-columns: 1fr 280px;
-}
-.sre-root.size-compact .sre-sub,
-.sre-root.size-phone .sre-sub {
-  display: none;
 }
 /* The orientation badge moves under the device as a caption in Compact. */
 .sre-root.size-compact .sre-orient-badge,
@@ -1768,9 +1615,6 @@ onUnmounted(() => {
   gap: var(--gap-2);
   padding: var(--gap-2) var(--gap-3);
 }
-.sre-root.size-phone .sre-tab-screens {
-  display: none;
-}
 .sre-root.size-phone .sre-preview-as {
   margin-left: 0;
   width: 100%;
@@ -1782,6 +1626,7 @@ onUnmounted(() => {
 .sre-root.size-phone .sre-body {
   position: relative;
   display: block;
+  flex: 1 1 auto;
   min-height: 0;
   --sre-sheet-height: 64px;
 }

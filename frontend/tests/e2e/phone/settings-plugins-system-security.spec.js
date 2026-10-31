@@ -25,12 +25,12 @@ test.describe("phone: Plugins", () => {
     await expect(category.locator(".list-row__name", { hasText: "Web page" })).toBeVisible();
     await expectPhoneLayout(page, "Plugins category");
 
-    // Kind filters are a segmented control; each one narrows the list.
-    const filters = category.locator(".seg").first();
+    // Kind filters are the shared Tabs block; each one narrows the list.
+    const filters = category.locator(".tabs").first();
     for (const kind of ["Calendar", "Photos", "Web page & app", "Theme", "All"]) {
-      await filters.getByRole("radio", { name: kind, exact: true }).click();
-      await expect(filters.getByRole("radio", { name: kind, exact: true })).toHaveAttribute(
-        "aria-checked",
+      await filters.getByRole("tab", { name: kind, exact: true }).click();
+      await expect(filters.getByRole("tab", { name: kind, exact: true })).toHaveAttribute(
+        "aria-selected",
         "true"
       );
       if (kind === "Theme") {

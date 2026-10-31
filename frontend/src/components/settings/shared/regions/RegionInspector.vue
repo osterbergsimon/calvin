@@ -33,57 +33,40 @@
       <SettingGroup title="Shows">
         <div class="ins-field">
           <div class="picker">
-            <Button
-              class="picker-trigger"
-              variant="secondary"
-              :icon="kindIcon"
-              :aria-expanded="pickerOpen"
-              @click="pickerOpen = !pickerOpen"
+            <Popover
+              v-model="pickerOpen"
+              label="What this region shows"
+              haspopup="dialog"
+              role="dialog"
+              :initial-focus="pickerInitialFocus"
+              @close="onPickerClose"
             >
-              {{ componentLabel }}
-              <span class="picker-caret" aria-hidden="true">▾</span>
-            </Button>
-            <Card v-if="pickerOpen" class="picker-menu">
-              <TextField
-                v-model="search"
-                class="picker-search"
-                label="Filter components"
-                type="search"
-              />
-              <Button
-                v-for="opt in filtered"
-                :key="opt.value"
-                variant="ghost"
-                size="sm"
-                class="picker-option"
-                @click="choose(opt)"
-              >
-                <span class="picker-option-label">{{ opt.label }}</span>
-                <span
-                  v-if="opt.pluginName && opt.pluginName !== opt.label"
-                  class="picker-option-type"
-                >
-                  {{ opt.pluginName }}
-                </span>
-              </Button>
-              <InlineNote v-if="filtered.length === 0">No matches</InlineNote>
-              <!-- F4: with no services yet the menu only offers Calendar/Photos;
-                   say where web services come from instead of hiding them. -->
-              <div v-if="!hasServices" class="picker-add">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="picker-option"
-                  data-test="picker-add-service"
-                  @click="addService"
-                >
-                  <span class="picker-option-label">＋ Add a web service…</span>
-                  <span class="picker-option-type">
-                    Web pages and dashboards, from Content › Web pages &amp; services
-                  </span>
+              <template #trigger="{ attrs }">
+                <Button v-bind="attrs" class="picker-trigger" variant="secondary" :icon="kindIcon">
+                  {{ componentLabel }}
+                  <span class="picker-caret" aria-hidden="true">▾</span>
                 </Button>
+              </template>
+              <div class="picker-panel">
+                <TextField
+                  v-if="showPickerSearch"
+                  v-model="search"
+                  class="picker-search"
+                  label="Search"
+                  type="search"
+                  @keydown.down.prevent="menuRef?.focusFirst()"
+                />
+                <Menu
+                  ref="menuRef"
+                  :items="pickerItems"
+                  label="Options"
+                  :autofocus="false"
+                  @select="chooseKey"
+                  @close="pickerOpen = false"
+                />
+                <InlineNote v-if="filtered.length === 0">No matches</InlineNote>
               </div>
-            </Card>
+            </Popover>
           </div>
         </div>
 
@@ -225,20 +208,22 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { mdiCalendarBlankOutline, mdiChevronLeft, mdiImageOutline, mdiPlus, mdiWeb } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
-import Card from "@/components/ui/Card.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
+import Menu from "@/components/ui/Menu.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import Popover from "@/components/ui/Popover.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SettingGroup from "@/components/ui/SettingGroup.vue";
 import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
 import { filterComponentOptions } from "@/utils/componentPicker";
 
 const props = defineProps({
@@ -266,7 +251,9 @@ const emit = defineEmits([
 const router = useRouter();
 const pickerOpen = ref(false);
 const search = ref("");
+const menuRef = ref(null);
 const hasServices = computed(() => props.componentOptions.some(o => o.kind === "service"));
+const { isTouch } = useTouchCapability();
 // Leaves the region editor for the Service plugins tab (Settings re-routes on ?setting=).
 const addService = () => {
   pickerOpen.value = false;
@@ -278,6 +265,55 @@ const choose = opt => {
   pickerOpen.value = false;
   search.value = "";
 };
+
+// The shared Menu is the option list inside the Popover. Service options carry
+// their plugin's name as a second line, and with no services yet the list ends
+// with where web services come from (F4) instead of hiding them.
+const ADD_SERVICE_KEY = "__add-service__";
+const pickerItems = computed(() => {
+  const items = filtered.value.map(opt => ({
+    key: opt.value,
+    label: opt.label,
+    meta: opt.pluginName && opt.pluginName !== opt.label ? opt.pluginName : "",
+  }));
+  if (!hasServices.value) {
+    items.push({
+      key: ADD_SERVICE_KEY,
+      label: "＋ Add a web service…",
+      meta: "Web pages and dashboards, from Content › Web pages & services",
+      testId: "picker-add-service",
+    });
+  }
+  return items;
+});
+// A short list needs no filter (and an empty one would only get in the way).
+// Count the whole menu, not the filtered rows, so typing cannot hide the field.
+const pickerOptionCount = computed(
+  () => props.componentOptions.length + (hasServices.value ? 0 : 1)
+);
+const showPickerSearch = computed(() => pickerOptionCount.value > 8);
+// A touch keyboard would cover half the editor and flip the popover over the
+// header, so touch opens on the first option and leaves the filter unfocused.
+const pickerInitialFocus = computed(() =>
+  showPickerSearch.value && !isTouch.value ? "input" : '[role="menuitem"]'
+);
+const chooseKey = key => {
+  if (key === ADD_SERVICE_KEY) {
+    addService();
+    return;
+  }
+  const opt = props.componentOptions.find(option => option.value === key);
+  if (opt) choose(opt);
+};
+const onPickerClose = () => {
+  pickerOpen.value = false;
+  search.value = "";
+};
+// Menu's Escape/Tab close and a chosen item both end with the picker closed;
+// clearing the filter keeps the next open showing every component.
+watch(pickerOpen, open => {
+  if (!open) search.value = "";
+});
 
 const kindIcon = computed(() =>
   props.region.kind === "calendar"
@@ -413,8 +449,14 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
 :deep(.ins-sources.chips) {
   justify-content: flex-start;
 }
+/* The floating shell (surface, border, radius, elevation, placement, Escape and
+   outside close, focus return) comes from ui/Popover; the option list and its
+   keyboard handling come from ui/Menu. Only the panel's inset is local. */
 .picker {
-  position: relative;
+  width: 100%;
+}
+.picker :deep(.popover) {
+  display: flex;
   width: 100%;
 }
 .picker-trigger {
@@ -425,39 +467,16 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
   margin-left: var(--gap-2);
   color: var(--ink-3);
 }
-.picker-menu {
-  position: absolute;
-  top: calc(100% + var(--gap-1));
-  left: 0;
-  right: 0;
-  z-index: var(--z-raised);
-  max-height: 260px;
-  overflow: auto;
+.picker-panel {
+  width: 20rem;
+  max-width: calc(100vw - 2 * var(--gap-4));
+  padding: var(--gap-3);
   display: flex;
   flex-direction: column;
-  gap: var(--gap-1);
+  gap: var(--gap-2);
 }
 .picker-search {
   margin-bottom: var(--gap-1);
-}
-.picker-option {
-  width: 100%;
-  justify-content: flex-start;
-  text-align: left;
-}
-.picker-option :deep(.btn__label) {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--gap-tight);
-}
-.picker-option-type {
-  font-size: var(--text-caption);
-  color: var(--ink-3);
-}
-.picker-add {
-  padding-top: var(--gap-1);
-  border-top: 1px solid var(--line-soft);
 }
 .ins-note {
   padding: 0 var(--panel-pad-x) var(--gap-3);

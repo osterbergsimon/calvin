@@ -75,6 +75,24 @@ describe("Dialog", () => {
     expect(w.emitted("update:modelValue")).toEqual([[false]]);
   });
 
+  it("leaves Escape to a nested floating surface", async () => {
+    const w = mountOpen(
+      {},
+      { default: '<div role="listbox"><button type="button" class="inner">Inner</button></div>' }
+    );
+    await nextTick();
+    w.find(".inner").element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    );
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toBeUndefined();
+
+    // The same key from the dialog itself still dismisses it.
+    keydown("Escape");
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toEqual([[false]]);
+  });
+
   it("does not dismiss a non-dismissible dialog", async () => {
     const w = mountOpen({ dismissible: false });
     expect(w.find("[aria-label='Close']").exists()).toBe(false);
@@ -139,6 +157,55 @@ describe("Dialog", () => {
     const dialog = w.find("[role='dialog']");
     expect(dialog.attributes("aria-label")).toBe("Admin sign in");
     expect(dialog.attributes("aria-labelledby")).toBeUndefined();
+  });
+
+  it("renders the full-size editor sheet with its header and subtitle", () => {
+    const w = mountOpen(
+      {
+        title: "Pages & regions",
+        size: "full",
+        scrimBlur: true,
+        closeLabel: "Close editor",
+      },
+      { subtitle: "Design the pages your screens display" }
+    );
+    const overlay = w.find(".dialog-overlay");
+    expect(overlay.classes()).toContain("dialog-overlay--full");
+    expect(overlay.classes()).not.toContain("dialog-overlay--bleed");
+    const panel = w.find("[role='dialog']");
+    expect(panel.classes()).toContain("dialog--full");
+    expect(panel.classes()).not.toContain("dialog--bleed");
+    expect(w.find(".dialog__subtitle").text()).toBe("Design the pages your screens display");
+    expect(w.find("[aria-label='Close editor']").exists()).toBe(true);
+    expect(w.findComponent(DialogScrim).props("blur")).toBe(true);
+    expect(STYLE).toContain(".dialog--full");
+    expect(STYLE).toMatch(/height:\s*min\(820px, 100%\)/);
+  });
+
+  it("bleeds the full sheet edge-to-edge without losing Escape or focus return", async () => {
+    const opener = document.createElement("button");
+    opener.textContent = "Open";
+    document.body.appendChild(opener);
+    opener.focus();
+
+    const w = mountOpen({ modelValue: false, size: "full", bleed: true });
+    await w.setProps({ modelValue: true });
+    await nextTick();
+    await nextTick();
+    const overlay = w.find(".dialog-overlay");
+    expect(overlay.classes()).toContain("dialog-overlay--bleed");
+    expect(w.find("[role='dialog']").classes()).toContain("dialog--bleed");
+    // The OSK layer and focus trap are the same as every other dialog.
+    expect(overlay.classes()).toContain("dialog-above-osk");
+    expect(document.activeElement).toBe(w.find(".dialog__actions button").element);
+
+    keydown("Escape");
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toEqual([[false]]);
+    await w.setProps({ modelValue: false });
+    await nextTick();
+    await nextTick();
+    expect(document.activeElement).toBe(opener);
   });
 
   it("uses the panel radius, elevation and motion roles", () => {

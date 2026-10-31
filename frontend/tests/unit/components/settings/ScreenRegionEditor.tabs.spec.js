@@ -24,6 +24,29 @@ const SOURCE = readFileSync(
   "utf-8"
 );
 const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
+const TABS_SOURCE = readFileSync(
+  resolve(__dirname, "../../../../src/components/ui/Tabs.vue"),
+  "utf-8"
+);
+const TABS_STYLE = TABS_SOURCE.slice(
+  TABS_SOURCE.indexOf("<style"),
+  TABS_SOURCE.indexOf("</style>")
+);
+
+const observers = [];
+class FakeResizeObserver {
+  constructor(callback) {
+    this.callback = callback;
+    this.elements = [];
+    observers.push(this);
+  }
+  observe(el) {
+    this.elements.push(el);
+  }
+  disconnect() {
+    this.elements = [];
+  }
+}
 
 const region = (over = {}) => ({ size: 50, instanceIds: [], ...over });
 const config = () => ({
@@ -64,15 +87,28 @@ const mountEditor = async (kiosks = []) => {
   return w;
 };
 
-const ruleBody = selector => {
+const resizeModal = async (w, width, height) => {
+  const observer = [...observers]
+    .reverse()
+    .find(candidate => candidate.elements.some(node => node.matches?.(".sre-root")));
+  if (!observer) throw new Error("no ResizeObserver watching .sre-root");
+  observer.callback([
+    { target: observer.elements[0], contentRect: { width, height, top: 0, left: 0 } },
+  ]);
+  await w.vm.$nextTick();
+};
+
+const ruleBody = (style, selector) => {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(STYLE)?.[1] ?? "";
+  return new RegExp(`${escaped}\\s*\\{([^}]*)\\}`).exec(style)?.[1] ?? "";
 };
 
 describe("ScreenRegionEditor page tabs", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     sessionStorage.clear();
+    observers.length = 0;
+    global.ResizeObserver = FakeResizeObserver;
   });
 
   it("keeps the Add page action outside the tablist", async () => {
@@ -80,6 +116,7 @@ describe("ScreenRegionEditor page tabs", () => {
     const tablist = w.find('[role="tablist"]');
     expect(tablist.findAll('[role="tab"]')).toHaveLength(2);
     expect(tablist.find(".sre-tab-add").exists()).toBe(false);
+    expect(w.find(".tabs__action .sre-tab-add").exists()).toBe(true);
   });
 
   it("renders one line per tab: name then where it shows", async () => {
@@ -87,22 +124,23 @@ describe("ScreenRegionEditor page tabs", () => {
       { id: "kitchen", overrides: { displayName: "Kitchen", availableScreens: ["home"] } },
       { id: "hall", overrides: { displayName: "Hallway", availableScreens: ["week"] } },
     ]);
-    const tab = w.findAll('[data-test="page-tab"]')[0];
-    expect(tab.find(".sre-tab-name").text()).toBe("Home");
-    expect(tab.find(".sre-tab-screens").text()).toBe("Kitchen");
+    const tab = w.findAll(".tabs__tab")[0];
+    expect(tab.find(".tabs__label").text()).toBe("Home");
+    expect(tab.find(".tabs__meta").text()).toBe("Kitchen");
     // The name and the screens text are siblings on one row, not a stacked body.
-    expect(tab.find(".sre-tab-body").exists()).toBe(false);
-    expect(tab.findAll(".sre-tab-name, .sre-tab-screens")).toHaveLength(2);
+    expect(tab.find(".tabs__body").exists()).toBe(false);
+    expect(tab.findAll(".tabs__label, .tabs__meta")).toHaveLength(2);
   });
 
   it("marks the active tab selected and draws the underline", async () => {
     const w = await mountEditor();
-    const tabs = w.findAll('[data-test="page-tab"]');
+    const tabs = w.findAll(".tabs__tab");
     expect(tabs[0].classes()).toContain("is-active");
     expect(tabs[0].attributes("aria-selected")).toBe("true");
     expect(tabs[1].attributes("aria-selected")).toBe("false");
-    expect(ruleBody(".sre-tab.is-active::after")).toContain("height: var(--tab-indicator)");
-    expect(ruleBody(".sre-tab.is-active::after")).toContain("background: var(--focus)");
+    const underline = ruleBody(TABS_STYLE, ".tabs__tab.is-active::after");
+    expect(underline).toContain("height: var(--tab-indicator)");
+    expect(underline).toContain("background: var(--focus)");
   });
 
   it("truncates the screens text at 16ch with the full text in the title", async () => {
@@ -111,26 +149,30 @@ describe("ScreenRegionEditor page tabs", () => {
       { id: "hall", overrides: { displayName: "Hallway", availableScreens: ["home"] } },
       { id: "office", overrides: { displayName: "Office", availableScreens: ["week"] } },
     ]);
-    const tab = w.findAll('[data-test="page-tab"]')[0];
-    const screens = tab.find(".sre-tab-screens");
+    const tab = w.findAll(".tabs__tab")[0];
+    const screens = tab.find(".tabs__meta");
     expect(screens.text()).toBe("Kitchen, Hallway");
     expect(tab.attributes("title")).toContain("Kitchen, Hallway");
-    expect(tab.attributes("aria-label")).toBe("Home · Kitchen, Hallway");
-    expect(ruleBody(".sre-tab-screens")).toContain("max-width: 16ch");
-    expect(ruleBody(".sre-tab-screens")).toContain("text-overflow: ellipsis");
+    // No aria-label override: the visible text (including the full screens
+    // line, not just the truncated meta) is the accessible name.
+    expect(tab.attributes("aria-label")).toBeUndefined();
+    expect(tab.text()).toContain("Kitchen, Hallway");
+    const meta = ruleBody(TABS_STYLE, ".tabs__meta");
+    expect(meta).toContain("max-width: 16ch");
+    expect(meta).toContain("text-overflow: ellipsis");
   });
 
   it("says Not shown in warn ink instead of the old wording", async () => {
     const w = await mountEditor([{ id: "hall", overrides: { availableScreens: [] } }]);
-    const screens = w.findAll(".sre-tab-screens")[0];
+    const screens = w.findAll(".tabs__meta")[0];
     expect(screens.text()).toBe("Not shown");
-    expect(screens.classes()).toContain("is-not-shown");
-    expect(ruleBody(".sre-tab-screens.is-not-shown")).toContain("var(--warn)");
+    expect(screens.classes()).toContain("tabs__meta--warn");
+    expect(ruleBody(TABS_STYLE, ".tabs__meta--warn")).toContain("var(--warn)");
   });
 
   it("drops the orange dot", async () => {
     const w = await mountEditor();
-    expect(w.find(".sre-tab-dot").exists()).toBe(false);
+    expect(w.find(".tabs__tab .dot").exists()).toBe(false);
   });
 
   it("renders + Page as a labelled ghost button", async () => {
@@ -141,13 +183,16 @@ describe("ScreenRegionEditor page tabs", () => {
     expect(add.find("svg").exists()).toBe(true);
     expect(add.classes()).toContain("btn--ghost");
     expect(add.classes()).toContain("btn--sm");
-    expect(ruleBody(".sre-tab-add")).not.toContain("dashed");
+    expect(ruleBody(STYLE, ".sre-tab-add")).not.toContain("dashed");
   });
 
   it("drops the screens text on phones but keeps the name", async () => {
     const w = await mountEditor();
-    expect(ruleBody(".sre-root.size-phone .sre-tab-screens")).toContain("display: none");
-    expect(w.find(".sre-tab-name").text()).toBe("Home");
+    await resizeModal(w, 390, 844);
+    const tabs = w.findComponent({ name: "Tabs" });
+    expect(tabs.props("hideMeta")).toBe(true);
+    expect(w.find(".tabs__meta").exists()).toBe(false);
+    expect(w.find(".tabs__label").text()).toBe("Home");
   });
 });
 

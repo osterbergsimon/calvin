@@ -58,7 +58,7 @@ const TEXT_SELECTORS = [
   ".pp-desc",
   ".list-row__name",
   ".list-row__meta",
-  ".sre-tab-name",
+  ".tabs__label",
   ".sre-preview-label",
   ".auth-card__title",
   ".auth-card__lead",
