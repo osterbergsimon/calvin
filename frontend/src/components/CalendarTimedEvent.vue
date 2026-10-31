@@ -60,9 +60,10 @@ const handleFocus = () => emit("focus", props.event, props.date);
 <style scoped>
 .timed-event {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.35rem;
   min-width: 0;
+  min-height: 24px;
   padding: 0.05rem 0.1rem;
   font-family: var(--font-display);
   font-size: var(--fs-micro);

@@ -138,6 +138,7 @@ onUnmounted(() => {
 }
 
 .settings-search__input:focus-visible {
+  /* a11y-allow-no-outline: the focused input is ringed by .settings-search__bar:focus-within */
   outline: none;
 }
 

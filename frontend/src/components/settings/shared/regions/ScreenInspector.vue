@@ -27,7 +27,7 @@
             type="button"
             class="preset"
             :class="{ active: screen.layout.preset === p.value }"
-            :aria-label="p.label"
+            :aria-label="p.label.includes(p.short) ? p.label : `${p.label}, ${p.short}`"
             @click="$emit('preset', p.value)"
           >
             <span class="mini"><i v-for="n in p.cols" :key="n" /></span>
