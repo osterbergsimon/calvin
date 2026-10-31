@@ -213,6 +213,29 @@ def test_reconcile_applies_only_on_change():
     assert last is True and applied == [False, True]
 
 
+def test_reconcile_retries_when_the_platform_apply_fails():
+    """A failed panel command must not advance the state (CLV-102).
+
+    The next poll has to retry the same transition instead of waiting for the
+    next schedule boundary, or a boot inside the off window can leave the panel
+    dark for the rest of the on window.
+    """
+    cfg = _cfg()
+    at_off = datetime(2026, 7, 11, 23, 0)
+    at_on = datetime(2026, 7, 11, 9, 0)
+
+    # First run failed: stay "never applied" so the next poll tries again.
+    assert agent.reconcile(cfg, at_off, None, applier=lambda on: "none") is None
+    # A failed ON keeps the previous OFF state, so the loop retries the wake-up.
+    assert agent.reconcile(cfg, at_on, False, applier=lambda on: "none") is False
+    # A failed OFF keeps the previous ON state, so the loop retries the blank.
+    assert agent.reconcile(cfg, at_off, True, applier=lambda on: "none") is True
+    # A successful apply advances the state; a test applier returning None counts
+    # as success (only the platform helpers' documented "none" is a failure).
+    assert agent.reconcile(cfg, at_on, False, applier=lambda on: "cog") is True
+    assert agent.reconcile(cfg, at_on, False, applier=lambda on: None) is True
+
+
 def test_now_in_naive_when_no_tz():
     n = agent.now_in({"timezone": None})
     assert n.tzinfo is None
@@ -262,6 +285,96 @@ def test_run_survives_non_dict_config(monkeypatch):
     )
     assert applied == []  # never touched the display
     assert slept == [agent.BACKOFF_SECONDS]
+
+
+# --- boot inside the scheduled screen-off window (CLV-102) -------------------
+# The cog stack powers the panel through its root helper ("off" = stop the unit
+# and blank the framebuffer, "on" = unblank and start it). A Pi that boots at
+# 23:00 has to survive the agent's first OFF (the unit may not have started yet)
+# and bring the page back at the 06:00 boundary.
+
+
+def _cog_run(monkeypatch, times, fake_run):
+    moments = list(times)
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "cog")
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    monkeypatch.setattr(agent, "now_in", lambda cfg: moments.pop(0))
+    agent.run(
+        "http://x",
+        900,
+        fetch=lambda url: _cfg(),
+        sleep=lambda s: None,
+        iterations=len(moments),
+        apply_device=lambda cfg: None,
+    )
+
+
+def test_boot_in_off_window_then_on_starts_cog_again(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    _cog_run(
+        monkeypatch,
+        iter([datetime(2026, 7, 11, 23, 0), datetime(2026, 7, 12, 6, 0)]),
+        fake_run,
+    )
+    # First poll inside the off window stops the unit (a unit that has not
+    # started yet is left stopped); the on boundary always starts it again.
+    assert calls == [
+        ["sudo", "-n", agent.COG_PANEL_HELPER, "off"],
+        ["sudo", "-n", agent.COG_PANEL_HELPER, "on"],
+    ]
+
+
+def test_screen_on_that_fails_is_retried_on_the_next_poll(monkeypatch):
+    """A wake-up the helper could not apply is retried, not forgotten."""
+    calls = []
+    on_attempts = 0
+
+    def fake_run(cmd, **kw):
+        nonlocal on_attempts
+        calls.append(cmd)
+        if cmd[-1] == "on":
+            on_attempts += 1
+            if on_attempts == 1:
+                # systemd was still stopping the unit when "on" ran.
+                return SimpleNamespace(
+                    returncode=1, stdout="", stderr="unit is stopping"
+                )
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    _cog_run(
+        monkeypatch,
+        iter(
+            [
+                datetime(2026, 7, 11, 23, 0),
+                datetime(2026, 7, 12, 6, 0),
+                datetime(2026, 7, 12, 6, 15),
+            ]
+        ),
+        fake_run,
+    )
+    assert [cmd[-1] for cmd in calls] == ["off", "on", "on"]
+    assert on_attempts == 2
+
+
+def test_repeated_on_is_idempotent_on_the_cog_helper(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(agent.subprocess, "run", fake_run)
+    for _ in range(2):
+        assert agent.apply_on_cog(True) == "cog"
+    assert calls == [
+        ["sudo", "-n", agent.COG_PANEL_HELPER, "on"],
+        ["sudo", "-n", agent.COG_PANEL_HELPER, "on"],
+    ]
 
 
 def test_apply_rotation_invalid_is_skipped(monkeypatch):

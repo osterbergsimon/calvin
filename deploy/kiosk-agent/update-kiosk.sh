@@ -35,7 +35,7 @@ BASE="${CALVIN_BACKEND_URL%/}"
 log() { printf '[update-kiosk] %s\n' "$*"; }
 
 # Display stack of THIS kiosk (x11|wayland|cog). setup-kiosk records the resolved
-# stack (including the Pi 3-class cog auto), so auto/missing only appears on an
+# stack (cog by default on every board), so auto/missing only appears on an
 # older or hand-edited config; X11 is the safe owner there, and it matches legacy
 # kiosks installed before the stack setting existed.
 display_stack() {

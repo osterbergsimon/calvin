@@ -52,12 +52,18 @@ write_rotation() {  # $1 = 0..3
 
 case "${1:-}" in
     off)
+        # A kiosk that boots inside its scheduled off window can reach this
+        # before systemd has started the unit: stop is idempotent (an inactive
+        # unit simply stays stopped), so the first off never fails the boot.
         log "stop ${UNIT}"
         "$SYSTEMCTL" stop "$UNIT" || log "stop ${UNIT} failed; blanking anyway"
         blank 4
         ;;
     on)
-        blank 0
+        # Unblanking is best-effort: on a boot inside the off window fb0 can be
+        # missing or unavailable. cog must be started regardless (start on an
+        # already-running unit is a no-op), or the page never comes back.
+        blank 0 || log "unblank failed; starting ${UNIT} anyway"
         log "start ${UNIT}"
         "$SYSTEMCTL" start "$UNIT"
         ;;

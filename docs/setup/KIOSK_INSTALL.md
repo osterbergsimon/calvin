@@ -11,11 +11,11 @@ the Pi, and nothing comes from GitHub, so the kiosk always matches the server's 
 
 | | Supported | Notes |
 |---|---|---|
-| **Pi model** | Raspberry Pi 5, Pi 4 (2 GB+), Pi 400 | Recommended. |
-| | Pi 3B / 3B+ | Auto-installs **cog** (WPE WebKit) instead of Chromium; see [Display stack](#display-stack-cog-on-pi-3-class-wayland-opt-in). |
-| | Pi Zero 2 W | Uses cog (WPE WebKit) via auto; still unmeasured on 512 MB, so not recommended yet. |
+| **Pi model** | Raspberry Pi 5, Pi 4 (2 GB+), Pi 400 | Recommended. cog (WPE WebKit) by default. |
+| | Pi 3B / 3B+ | Supported. cog by default; verified end to end on a 3B+ (2026-10-31). |
+| | Pi Zero 2 W | Uses cog (WPE WebKit) by default; still unmeasured on 512 MB, so not recommended yet. |
 | | Older Pis (Pi 1/2, Zero) | Not supported (too little RAM for the dashboard). |
-| **OS** | **Raspberry Pi OS Lite (64-bit), Trixie** (Debian 13) | Verified on a Pi 3B+ with the cog stack (2026-10-31); Pi 4/5 Wayland test pending. |
+| **OS** | **Raspberry Pi OS Lite (64-bit), Trixie** (Debian 13) | Verified with cog on a Pi 3B+ and a Pi 400 (boot/reboot, rotation, screen off/on, real sites, 60 min soak; 2026-10-31). |
 | | Raspberry Pi OS Lite (64-bit), Bookworm (Debian 12) | Should work; 64-bit is preferred. |
 | | Raspberry Pi OS Lite 32-bit, Bookworm | Should work; 64-bit is preferred. |
 | | Raspberry Pi OS **Desktop** | Not supported: Calvin starts its own X session on tty1, which conflicts with the desktop. |
@@ -82,7 +82,7 @@ server's address on your LAN.
 
    Either way, the install takes a few minutes, mostly package installs, and the Pi
    then reboots.
-3. **Done.** After the reboot the Pi starts Chromium in kiosk mode on the dashboard.
+3. **Done.** After the reboot the Pi starts the kiosk browser (cog by default) on the dashboard.
    Within a minute it appears in **Settings → Screens** on the server.
 
 The quick form bakes in the URL the server saw the request on. Behind a reverse proxy
@@ -143,7 +143,7 @@ sudo bash scripts/bake-kiosk-firstrun.sh --backend-url http://tower:8000 ...
 ```
 
 `GIT_BRANCH=v0.1.0` pins the scripts and the checkout the server side uses; it
-never selects an image for the Pi (a kiosk runs Chromium, not Calvin). The
+never selects an image for the Pi (a kiosk runs a browser, not Calvin). The
 server container's image tag (`CALVIN_IMAGE_TAG`) is the version that matters,
 and `setup.sh` sets it from the same tag.
 
@@ -158,13 +158,13 @@ install-kiosk.sh (over SSH, piped  ◀──── GET /api/kiosks/install.sh  (
   ├─ fetch manifest, verify HMAC     ◀──── GET /api/kiosks/agent/manifest (signed)
   ├─ fetch setup scripts, check sha  ◀──── GET /api/kiosks/installer/setup-{kiosk,common}.sh
   └─ setup-kiosk.sh
-       ├─ apt: X, openbox, Chromium, sudo (+ labwc, wlr-randr, wlopm
-       │       on Wayland; + cog on the Pi 3 class or --display-stack cog)
+       ├─ apt: cog (WPE WebKit) + the X11/Chromium fallback packages, sudo
+       │       (+ labwc, wlr-randr, wlopm on the opt-in Wayland stack)
        ├─ /etc/default/calvin-kiosk (server URL, kiosk id, hostname,
        │                            display stack; other keys kept)
        └─ update-kiosk.sh --bootstrap ◀─── GET /api/kiosks/agent/files/*  (verified)
-            └─ display agent + calvin-x / calvin-kiosk-remote / calvin-display-agent units
-reboot → Chromium shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Screens
+            └─ display agent + calvin-cog (or calvin-x / calvin-wayland) + calvin-display-agent units
+reboot → cog shows Calvin; the agent polls /api/kiosks/<id>/config → listed in Settings → Screens
 ```
 
 **Trust boundary:** with a key, every file after the installer is verified against the
@@ -181,7 +181,8 @@ Chromium's GPU path: the dashboard's renderer crashes within seconds with
 same page load and stay up, so the installers add that flag on those boards — and
 only there. Pi 4/5 have a working GPU path and keep it. This covers both
 deployment shapes: the remote kiosk installer (`setup-kiosk.sh`) and the
-all-in-one install (`setup.sh`).
+all-in-one install (`setup.sh`). It only matters when a kiosk runs Chromium (the
+X11/Wayland fallback); the cog default does not run Chromium at all.
 
 | Board (`/proc/device-tree/model`) | `CALVIN_CHROMIUM_GPU=auto` (the default) |
 |---|---|
@@ -273,27 +274,32 @@ exists only for this probe. Settings live in `/etc/default/calvin-kiosk`:
 the watchdog out of the way: it never touches a unit that is not running (systemd
 owns that case) or one that started less than two minutes ago.
 
-## Display stack (cog on Pi 3-class, Wayland opt-in)
+## Display stack (cog default everywhere, Wayland opt-in)
 
-A kiosk normally runs **X11 + openbox**. On the **Pi 3-class boards** it installs
-**cog** (WPE WebKit directly on DRM/KMS) instead, because the low-RAM / VC4
-boards cannot run Chromium's GPU path and are tight on memory. Every other board
-keeps X11; **Wayland + labwc** and an explicit **cog** stay opt-in everywhere.
-FULL (all-in-one) installs are unchanged (always X11), and switching is an
-installer re-run — not a re-flash.
+A kiosk installs **cog** (WPE WebKit directly on DRM/KMS) by default on **every
+board** — no X server, no compositor, no Chromium. This is the owner decision of
+2026-10-31 after cog passed boot/reboot, rotation, screen off/on, real sites and a
+60 minute soak on both a Pi 3B+ and a Pi 400 (cog ~67 MB + WPE ~273 MB, CPU ~94 %
+idle). See [../research/2026-10-29-kiosk-cog.md](../research/2026-10-29-kiosk-cog.md).
+
+**X11 + Chromium stays available as the fallback** for a site WPE cannot show
+(native `<select>` dropdowns are the known one, see the limitations below);
+**Wayland + labwc** is opt-in and still experimental. Both alternate stacks stay
+installed, so switching is an installer re-run — **not** a re-flash. Your server
+URL, kiosk id, hostname, signing key and display settings are kept.
+
+Every board follows the same rule: a fresh install selects cog. An existing
+kiosk keeps the stack recorded in `/etc/default/calvin-kiosk` — the default does
+not silently migrate an X11 kiosk — and you switch it with an explicit
+`--display-stack` (see [Switch an existing kiosk](#switch-an-existing-kiosk)).
+FULL (all-in-one) installs (`scripts/setup.sh`, which also runs the server) are
+unchanged and keep X11 + Chromium.
+
+### Choose Wayland on a fresh install (opt-in, experimental)
 
 Wayland is a phase-1 pilot tracked in bead `calvin-8by7`; see the design notes in
 [../research/2026-10-29-kiosk-wayland.md](../research/2026-10-29-kiosk-wayland.md).
-cog was adopted for **Pi 3-class boards** (owner decision 2026-10-30, gate
-`g-10`); see [../research/2026-10-29-kiosk-cog.md](../research/2026-10-29-kiosk-cog.md).
-On the owner's Pi 3B+ (Trixie, cog 0.18.4) it renders the dashboard in portrait
-and the display schedule works through the framebuffer blank path below.
-
-All stacks stay installed, so switching is a re-run of the installer — **not** a
-re-flash. Your server URL, kiosk id, hostname, signing key and display settings are
-kept.
-
-### Choose Wayland on a fresh install
+It is not the default on any board.
 
 Add `--display-stack wayland` to the installer:
 
@@ -315,12 +321,11 @@ packages, writes `~/.config/labwc/autostart` and `rc.xml`, and enables
 `calvin-wayland.service` instead of `calvin-x.service`. Chromium runs with the same
 kiosk flags plus `--ozone-platform=wayland`.
 
-### cog on a Pi 3-class board (the default)
+### cog (the default on every board)
 
-On a Pi 3, 3B, 3B+, 3A+, Zero 2 W or Compute Module 3 the installer reads
-`/proc/device-tree/model` and selects **cog automatically** — no flag needed. To
-be explicit, or to force cog on a board that auto-detects as X11, add
-`--display-stack cog`:
+A fresh install reads `/proc/device-tree/model` only for the Chromium GPU flags;
+the stack itself is **cog on every board** — no flag needed. To be explicit, or
+to move an existing kiosk, add `--display-stack cog`:
 
 ```bash
 curl -fsSL http://tower:8000/api/kiosks/install.sh \
@@ -358,7 +363,11 @@ cog --platform=drm \
 - **Screen power** (display schedule) works: cog is the only DRM client, so the
   agent's root helper stops `calvin-cog.service`, writes `4` to
   `/sys/class/graphics/fb0/blank` (DPMS off), and on wake writes `0` and starts
-  the unit again (the dashboard is back in ~5 s). cog aborts on SIGTERM
+  the unit again (the dashboard is back in ~5 s). Starting is idempotent, and a
+  kiosk that boots inside its off window recovers at the next on boundary: the
+  agent retries a panel command that failed (for example while the unit was
+  still transitioning) on its next poll instead of waiting for the next schedule
+  change. cog aborts on SIGTERM
   (SIGSEGV as root, SIGABRT as `calvin`), so the unit lists both in
   `SuccessExitStatus` and a scheduled screen-off does not leave it `failed`. The
   helper (`/usr/local/bin/calvin-cog-panel.sh`) is the only thing `calvin` may
@@ -369,18 +378,21 @@ cog --platform=drm \
 
 ### Switch an existing kiosk
 
-Re-run the installer on the Pi with the other stack. Everything else is preserved:
+Re-run the installer on the Pi with the other stack. Everything else is preserved.
+An existing kiosk is **not** migrated by the new default: it keeps the stack in
+`/etc/default/calvin-kiosk` until you pass a flag.
 
 ```bash
-# X11 -> Wayland
+# X11 -> cog (what the default does on a fresh install)
 curl -fsSL http://tower:8000/api/kiosks/install.sh -o /tmp/install-kiosk.sh
-sudo bash /tmp/install-kiosk.sh --display-stack wayland
-
-# X11 -> cog (or cog -> X11 / Wayland)
 sudo bash /tmp/install-kiosk.sh --display-stack cog
 
-# X11 -> Wayland, from a server checkout over SSH (signed installs use the stored key)
-ssh -t $PI "sudo bash /tmp/install-kiosk.sh --display-stack wayland"
+# cog -> X11/Chromium, or -> Wayland
+sudo bash /tmp/install-kiosk.sh --display-stack x11
+sudo bash /tmp/install-kiosk.sh --display-stack wayland
+
+# From a server checkout over SSH (signed installs use the stored key)
+ssh -t $PI "sudo bash /tmp/install-kiosk.sh --display-stack cog"
 ```
 
 The installer disables the other display units, enables the chosen one (and
@@ -403,33 +415,34 @@ a service switch, not a re-image; `sudo apt remove cog` only frees space.
 
 The stack comes from, in order: the `--display-stack` flag, an exported
 `CALVIN_DISPLAY_STACK`, the value already in `/etc/default/calvin-kiosk`
-(`auto`, `x11`, `wayland`, `cog`), then `auto`. `auto` means **cog on the
-Pi 3-class boards** (Pi 3, 3B, 3B+, 3A+, Zero 2 W, Compute Module 3; the same
-VC4 detection as `--disable-gpu`) and **X11 everywhere else**. Wayland stays
-opt-in on every board.
+(`auto`, `x11`, `wayland`, `cog`), then `auto`. `auto` means **cog on every
+board**; only an explicit `x11` selects Chromium and only an explicit `wayland`
+selects labwc.
 
 The installer records the resolved stack in `/etc/default/calvin-kiosk`, so a
 re-run with no flag keeps the stack an existing kiosk already has — an existing
-X11 kiosk on a Pi 3B+ does not jump to cog. Kiosks installed before the setting
-existed have no stored stack; they also stay on X11 and only move with an
-explicit flag. To switch, pass it (`--display-stack x11` to go back to
-Chromium, `cog` or `wayland` to move).
+X11 kiosk does not jump to cog. Kiosks installed before the setting existed have
+no stored stack; they also stay on X11 and only move with an explicit flag. To
+switch, pass it (`--display-stack x11` to go back to Chromium, `cog` or
+`wayland` to move).
 
 ### Known limitations in phase 1
 
 - **OS:** validated on **Raspberry Pi OS Trixie (Lite, 64-bit)** only. Bookworm
   ships an older labwc and no `wlopm`, so the installer warns and panel power will
   not work there.
-- **Pi 3B/3B+:** cog is now the default there. It was verified end to end on the
-  owner's 3B+ (install, rotation via the agent, screen off/on, reboot, 24 h soak);
-  the 1 GB / VideoCore IV margin stays worth watching (`calvin-8by7`). If anything
-  misbehaves, `--display-stack x11` switches back to Chromium in place.
+- **Hardware:** cog is the default on every board. It was verified end to end on
+  the owner's Pi 3B+ and Pi 400 (install, rotation via the agent, screen off/on,
+  reboot, real sites, 60 min soak). If anything misbehaves,
+  `--display-stack x11` switches back to Chromium in place.
 - **Cursor:** labwc has no idle-hide. `rc.xml` binds `HideCursor` + `WarpCursor` and
   the autostart fires it once; the pointer reappears on pointer/touch input.
-- **Rotation:** the agent uses `wlr-randr --transform`, which counts counter-clockwise
-  (`left` -> `90`, `inverted` -> `180`, `right` -> `270`). Verify it on the panel.
-- **Panel power:** `wlopm --off/--on`, with `wlr-randr --on` as the wake fallback. A
-  monitor that fakes a hotplug can still wake; `autoEnableOutputs` is off in `rc.xml`.
+- **Rotation:** on Wayland the agent uses `wlr-randr --transform`, which counts
+  counter-clockwise (`left` -> `90`, `inverted` -> `180`, `right` -> `270`). Verify
+  it on the panel.
+- **Panel power:** on Wayland, `wlopm --off/--on`, with `wlr-randr --on` as the wake
+  fallback. A monitor that fakes a hotplug can still wake; `autoEnableOutputs` is
+  off in `rc.xml`. On cog, the framebuffer-blank path below is used.
 - **Fullscreen/mode:** output names differ (`HDMI-1` -> `HDMI-A-1`); the agent accepts
   both and auto-detects the first connected output.
 - **Remote update:** a bundle update installs the Wayland unit and labwc config but
@@ -440,9 +453,10 @@ Chromium, `cog` or `wayland` to move).
 
 ### Known limitations of cog
 
-- **OS/hardware:** validated on **Raspberry Pi OS Trixie (Lite, 64-bit)** and a
-  **Pi 3B+**. Debian's `cog`/WPE packaging is older than Trixie's on Bookworm, so the
-  installer warns there.
+- **OS/hardware:** validated on **Raspberry Pi OS Trixie (Lite, 64-bit)** with a
+  **Pi 3B+** and a **Pi 400** (boot/reboot, rotation, screen off/on, real sites,
+  60 min soak). Debian's `cog`/WPE packaging is older than Trixie's on Bookworm, so
+  the installer warns there.
 - **Native `<select>` dropdowns do not open** under cog's DRM backend (upstream
   issues #793/#503). Configure such settings from a phone/desktop; the rest of the
   dashboard and Settings work.
