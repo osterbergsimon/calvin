@@ -18,7 +18,9 @@
           <template v-if="row.inClockBar">In the clock bar</template>
           <template v-else>Hidden from the clock bar</template>
           ·
-          <button type="button" class="cbs-link" @click="openClockBarItems">Clock bar items</button>
+          <Button variant="link" class="cbs-link" @click="openClockBarItems">
+            Clock bar items
+          </Button>
         </span>
       </template>
     </SourceList>
@@ -40,6 +42,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import * as pluginsApi from "@/services/pluginsApi";
+import Button from "@/components/ui/Button.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
@@ -168,31 +171,3 @@ onMounted(async () => {
   if (route?.query?.add === "clock") addButton.value?.open();
 });
 </script>
-
-<style scoped>
-.clock-bar-sources {
-  width: 100%;
-}
-.cbs-place {
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  color: var(--ink-2);
-}
-.cbs-link {
-  padding: 0;
-  background: transparent;
-  color: var(--ink-2);
-  border: 0;
-  border-bottom: 1px dotted currentColor;
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-.cbs-link:hover {
-  color: var(--ink);
-}
-.cbs-link:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-</style>
