@@ -23,6 +23,9 @@ import { ref } from "vue";
  * Pair with `overflow-y: auto` on the popover. Re-run `reposition()` on scroll/resize
  * while open so the popover tracks its trigger. `matchTriggerWidth` pins the popover's
  * min-width to the trigger (for menus that should be at least as wide as their pill).
+ * `bottomInset` reserves space at the bottom of the viewport — the on-screen
+ * keyboard publishes its height as `--osk-height`, so a popover never opens
+ * underneath it.
  */
 export function usePopoverPlacement({
   minHeight = 160,
@@ -30,10 +33,16 @@ export function usePopoverPlacement({
   margin = 16,
   gap = 6,
   matchTriggerWidth = false,
+  bottomInset = 0,
 } = {}) {
   const openUp = ref(false);
   const popoverStyle = ref({});
   let lastTrigger = null;
+
+  const inset = () => {
+    const value = typeof bottomInset === "function" ? bottomInset() : bottomInset;
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  };
 
   const place = trigger => {
     if (trigger !== undefined) lastTrigger = trigger;
@@ -41,7 +50,8 @@ export function usePopoverPlacement({
     const el = t && "value" in t ? t.value : t;
     if (!el || typeof el.getBoundingClientRect !== "function") return;
     const r = el.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const viewportBottom = window.innerHeight - inset();
+    const spaceBelow = viewportBottom - r.bottom - margin;
     const spaceAbove = r.top - margin;
     const up = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
     openUp.value = up;

@@ -85,6 +85,40 @@ for (const viewport of VIEWPORTS) {
         });
       });
 
+      test("the popover, menu and colour field states", async ({ page }) => {
+        await openGallery(page, theme);
+
+        await page.locator('[data-test="gallery-menu-trigger"]').click();
+        const menu = page.getByRole("menu", { name: "More actions for Family calendar" });
+        await expect(menu).toBeVisible();
+        await expect(menu).toHaveScreenshot(`ui-gallery-menu-${viewport.name}-${theme}.png`, {
+          animations: "disabled",
+          maxDiffPixelRatio: 0.01,
+        });
+        await page.keyboard.press("Escape");
+        await expect(menu).toBeHidden();
+
+        await page.locator('[data-test="gallery-popover-trigger"]').click();
+        const explainer = page.getByRole("dialog", { name: "About the connection" });
+        await expect(explainer).toBeVisible();
+        await expect(explainer).toHaveScreenshot(
+          `ui-gallery-popover-${viewport.name}-${theme}.png`,
+          { animations: "disabled", maxDiffPixelRatio: 0.01 }
+        );
+        await page.keyboard.press("Escape");
+        await expect(explainer).toBeHidden();
+
+        await page.locator('[data-test="gallery-colour-field"] .colour-field__trigger').click();
+        const colourPicker = page.getByRole("dialog", { name: "Colour for Family calendar" });
+        await expect(colourPicker).toBeVisible();
+        await expect(colourPicker).toHaveScreenshot(
+          `ui-gallery-colour-field-${viewport.name}-${theme}.png`,
+          { animations: "disabled", maxDiffPixelRatio: 0.01 }
+        );
+        await page.keyboard.press("Escape");
+        await expect(colourPicker).toBeHidden();
+      });
+
       test("the dialog states", async ({ page }) => {
         await openGallery(page, theme);
 

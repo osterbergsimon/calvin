@@ -184,6 +184,8 @@
 
   /* Layer roles */
   --z-raised: 10;
+  /* A popover is a raised surface; the alias keeps its layer explicit. */
+  --z-popover: var(--z-raised);
   --z-sticky: 100;
   --z-dialog: 1000;
   --z-osk: 1100;
