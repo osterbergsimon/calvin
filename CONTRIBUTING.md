@@ -115,6 +115,30 @@ cd backend && uv sync --extra docs
 uv run mkdocs build --strict --config-file ../mkdocs.yml
 ```
 
+### Accessibility (axe)
+
+An automated accessibility baseline runs on every PR that touches
+`frontend/**`. It audits the dashboard, every Settings category (including one
+screen's page and the pages editor) and the lock / first-run screens at phone
+(390x844) and kiosk (1280x800) sizes, in one light and one dark theme. Serious
+and critical axe violations fail CI; moderate findings are attached to the
+Playwright report and should be noted in the PR body.
+
+```bash
+cd frontend
+npm run test:e2e:a11y                # uses the dev server on port 5173
+E2E_PORT=5273 npm run test:e2e:a11y  # or a dedicated port, leaving a running stack alone
+```
+
+The suite mocks the backend with route interception, so it needs no Calvin
+server and never calls host-acting routes. Colour contrast is covered
+separately by the theme contrast tests; the axe run deliberately skips it.
+Two smaller contracts guard the baseline itself: visible focus rings
+(`tests/unit/styles/focusVisible.spec.js`), and a global
+`prefers-reduced-motion` rule (`tests/unit/styles/reducedMotion.spec.js`),
+backed by an end-to-end focus walk and motion audit in
+`tests/e2e/a11y/`.
+
 ### House rules that review will check
 
 - **Test-first.** A bug fix comes with a test that fails without it.
