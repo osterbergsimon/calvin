@@ -1,6 +1,6 @@
 <template>
   <div class="ins">
-    <div class="ins-mode">
+    <div v-if="!hideHeading" class="ins-mode">
       <h3 class="ins-title">Region</h3>
       <span class="ins-sub">· in {{ screen.name }}</span>
     </div>
@@ -31,7 +31,7 @@
 
     <template v-else>
       <SettingGroup title="Shows">
-        <SettingRow label="Component" stacked>
+        <div class="ins-field">
           <div class="picker">
             <Button
               class="picker-trigger"
@@ -85,10 +85,11 @@
               </div>
             </Card>
           </div>
-        </SettingRow>
+        </div>
 
         <SettingRow v-if="sourceOptions.length" label="Sources" stacked>
           <ChipMultiSelect
+            class="ins-sources"
             :model-value="sourceSelection"
             :options="sourceChipOptions"
             aria-label="Sources"
@@ -111,6 +112,7 @@
           />
         </SettingRow>
         <SettingRow
+          class="ins-toggle-row"
           label="Rolling window"
           description="Start from today instead of the calendar month"
         >
@@ -129,7 +131,11 @@
             @update:model-value="v => $emit('patch-view', { weeks: v })"
           />
         </SettingRow>
-        <SettingRow label="Week numbers" description="Show the week number beside each week">
+        <SettingRow
+          class="ins-toggle-row"
+          label="Week numbers"
+          description="Show the week number beside each week"
+        >
           <ToggleSwitch
             :model-value="region.view?.weekNumbers === true"
             aria-label="Week numbers"
@@ -242,6 +248,8 @@ const props = defineProps({
   componentOptions: { type: Array, default: () => [] },
   sourceOptions: { type: Array, default: () => [] },
   context: { type: Object, default: null },
+  // The phone sheet bar already names the selection, so it hides this heading.
+  hideHeading: { type: Boolean, default: false },
 });
 const emit = defineEmits([
   "patch-view",
@@ -388,6 +396,22 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
 .ins-sub {
   font-size: var(--text-meta);
   color: var(--ink-3);
+}
+.ins-field {
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+}
+/* Keep every toggle on the right of its label; a long description wraps
+   instead of pushing the switch onto the next line. */
+.ins-toggle-row :deep(.setting-row__info) {
+  flex: 1 1 0;
+}
+.ins-toggle-row :deep(.setting-row__control) {
+  flex: 0 0 auto;
+}
+/* A stacked control lines up with its label, not the far edge of the rail.
+   The class lands on ChipMultiSelect's root, which is also its .chips row. */
+:deep(.ins-sources.chips) {
+  justify-content: flex-start;
 }
 .picker {
   position: relative;

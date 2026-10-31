@@ -1,6 +1,6 @@
 <template>
   <div class="ins">
-    <div class="ins-mode">
+    <div v-if="!hideHeading" class="ins-mode">
       <h3 class="ins-title">{{ clockSelected ? "Clock bar" : "Page" }}</h3>
       <span class="ins-sub">{{ headingSub }}</span>
     </div>
@@ -47,7 +47,11 @@
     </SettingRow>
 
     <SettingGroup title="Clock bar">
-      <SettingRow label="Show clock bar" description="A slim time strip on this page">
+      <SettingRow
+        class="ins-toggle-row"
+        label="Show clock bar"
+        description="A slim time strip on this page"
+      >
         <ToggleSwitch
           :model-value="clock.enabled"
           aria-label="Show clock bar"
@@ -117,6 +121,8 @@ const props = defineProps({
   clock: { type: Object, required: true },
   clockSelected: { type: Boolean, default: false },
   canDelete: { type: Boolean, default: true },
+  // The phone sheet bar already names the selection, so it hides this heading.
+  hideHeading: { type: Boolean, default: false },
 });
 const emit = defineEmits([
   "rename",
@@ -213,6 +219,14 @@ const positionOptions = computed(() => {
 }
 .ins-field {
   padding: var(--panel-pad-y) var(--panel-pad-x);
+}
+/* Keep every toggle on the right of its label; a long description wraps
+   instead of pushing the switch onto the next line. */
+.ins-toggle-row :deep(.setting-row__info) {
+  flex: 1 1 0;
+}
+.ins-toggle-row :deep(.setting-row__control) {
+  flex: 0 0 auto;
 }
 .ins-tag {
   margin-left: var(--gap-1);
