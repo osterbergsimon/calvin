@@ -13,9 +13,14 @@
     <InlineNote v-if="loading" class="pm-status">Loading plugins…</InlineNote>
 
     <!-- Empty -->
-    <InlineNote v-else-if="activePlugins.length === 0" class="pm-status">
-      {{ emptyMessage }}
-    </InlineNote>
+    <EmptyState
+      v-else-if="activePlugins.length === 0"
+      compact
+      :inset="false"
+      data-test="plugin-manager-empty"
+      :icon="mdiPuzzleOutline"
+      :message="emptyMessage"
+    />
 
     <!-- Plugin cards -->
     <div v-else class="pm-list">
@@ -65,6 +70,8 @@
 
 <script setup>
 import { computed } from "vue";
+import { mdiPuzzleOutline } from "@mdi/js";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import Tabs from "@/components/ui/Tabs.vue";
 import PluginCard from "./PluginCard.vue";

@@ -59,12 +59,12 @@ describe("ThemePicker", () => {
       attachTo: document.body,
     });
     await flushPromises();
-    expect(w.find(".theme-picker__popover").exists()).toBe(false);
+    expect(w.find(".theme-picker__panel").exists()).toBe(false);
     await w.get(".theme-picker__trigger").trigger("click");
-    expect(w.find(".theme-picker__popover").exists()).toBe(true);
+    expect(w.find(".theme-picker__panel").exists()).toBe(true);
     await w.get(".theme-selector-stub").trigger("click");
     expect(w.emitted("select")[0]).toEqual(["midnight"]);
-    expect(w.find(".theme-picker__popover").exists()).toBe(false); // closes after select
+    expect(w.find(".theme-picker__panel").exists()).toBe(false); // closes after select
     w.unmount();
   });
 

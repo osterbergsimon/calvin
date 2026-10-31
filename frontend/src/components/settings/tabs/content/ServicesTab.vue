@@ -5,6 +5,7 @@
       drag
       add-label="Add a web page or app"
       empty-text="No web pages or apps yet. Add one to show it in a page region."
+      :empty-icon="mdiWeb"
       :highlight-id="savedHighlightId || highlightId"
       :highlight-provider="highlightProvider"
       remove-title="Remove web page or app"
@@ -60,6 +61,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { mdiWeb } from "@mdi/js";
 import { useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";

@@ -82,7 +82,7 @@ describe("SourceList", () => {
       addLabel: "Add photos from…",
       emptyText: "No photo sources yet.",
     });
-    expect(w.find(".sl-empty").text()).toBe("No photo sources yet.");
+    expect(w.find('[data-test="source-list-empty"]').text()).toBe("No photo sources yet.");
     const add = w.find(".sl-add-row button");
     expect(add.text()).toBe("Add photos from…");
     // The only button in an empty list is the primary one (§4.6).

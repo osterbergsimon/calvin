@@ -4,6 +4,7 @@
       :rows="rows"
       add-label="Add a calendar"
       empty-text="No calendar sources yet."
+      :empty-icon="mdiCalendarBlankOutline"
       :highlight-id="savedHighlightId || highlightId"
       :highlight-provider="highlightProvider"
       remove-title="Remove calendar source"
@@ -71,6 +72,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import { mdiCalendarBlankOutline } from "@mdi/js";
 import { useCalendarStore } from "@/stores/calendar";
 import { usePlugins } from "@/composables";
 import * as calendarApi from "@/services/calendarApi";

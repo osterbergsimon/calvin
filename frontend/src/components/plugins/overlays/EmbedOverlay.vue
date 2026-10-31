@@ -1,76 +1,33 @@
 <template>
   <teleport to="body">
-    <div class="link-overlay" role="dialog" aria-modal="true" @click.self="$emit('close')">
-      <div class="link-overlay__panel link-overlay__panel--frame calvin-plugin-surface">
-        <button
-          type="button"
-          class="link-overlay__close"
-          data-test="close"
-          aria-label="Close"
-          @click="$emit('close')"
-        >
-          ×
-        </button>
-        <div class="link-overlay__frame">
-          <IframeViewer :url="url" @error="$emit('fallback')" />
-        </div>
+    <Dialog
+      :model-value="true"
+      label="Embedded page"
+      size="full"
+      scrim-blur
+      @close="$emit('close')"
+    >
+      <div class="embed-overlay__frame">
+        <IframeViewer :url="url" @error="$emit('fallback')" />
       </div>
-    </div>
+    </Dialog>
   </teleport>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted } from "vue";
+import Dialog from "@/components/ui/Dialog.vue";
 import IframeViewer from "@/components/service/IframeViewer.vue";
 
+// A plugin link that asks for an embed opens the one Dialog shell in its full
+// size: scrim, focus trap, Escape, close button and the OSK layer all come from
+// Dialog. The frame fills the body; IframeViewer keeps its own error fallback.
 defineProps({ url: { type: String, required: true } });
-const emit = defineEmits(["close", "fallback"]);
-
-const onKeydown = e => {
-  if (e.key === "Escape") emit("close");
-};
-onMounted(() => document.addEventListener("keydown", onKeydown, true));
-onBeforeUnmount(() => document.removeEventListener("keydown", onKeydown, true));
+defineEmits(["close", "fallback"]);
 </script>
 
 <style scoped>
-.link-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--bg-1) 82%, transparent);
-}
-.link-overlay__panel--frame {
-  position: relative;
-  width: min(92vw, 900px);
-  height: min(88vh, 720px);
-  padding: 0;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 12px 40px var(--shadow);
-  overflow: hidden;
-}
-.link-overlay__frame {
-  width: 100%;
-  height: 100%;
-}
-.link-overlay__close {
-  position: absolute;
-  top: 0.4rem;
-  right: 0.55rem;
-  z-index: 2;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--bg-2);
-  color: var(--ink);
-  font-size: var(--fs-xl);
-  line-height: 1;
-  cursor: pointer;
+.embed-overlay__frame {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 </style>

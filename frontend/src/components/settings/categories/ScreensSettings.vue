@@ -13,11 +13,15 @@
               {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
             </Button>
           </template>
-          <InlineNote v-if="kiosks.length === 0" class="screens-empty" data-test="screens-empty">
-            No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
-            Raspberry Pi installed with the command under “Add a screen”, or any browser that opens
-            the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
-          </InlineNote>
+          <EmptyState
+            v-if="kiosks.length === 0"
+            compact
+            class="screens-empty"
+            data-test="screens-empty"
+            :icon="mdiMonitorDashboard"
+            title="No screens have connected yet"
+            help="A screen shows up here once it is set up as a kiosk: a Raspberry Pi installed with the command under “Add a screen”, or any browser that opens the dashboard with ?kiosk=<name> in its address."
+          />
           <AddKioskPanel v-if="addOpen" />
           <SettingRow
             v-if="agentKiosks.length > 0"
@@ -542,8 +546,10 @@ import {
   withoutAllOverrides,
   withoutPromotedSettings,
 } from "@/utils/screenOverrides";
+import { mdiMonitorDashboard } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
 import Card from "@/components/ui/Card.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
