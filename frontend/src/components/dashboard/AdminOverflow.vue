@@ -1,17 +1,18 @@
 <template>
   <div class="admin-overflow">
-    <button
+    <Button
       ref="triggerEl"
-      type="button"
       class="admin-overflow__trigger"
-      aria-label="More controls"
+      variant="ghost"
+      size="md"
+      icon-only
+      label="More controls"
+      :icon="mdiDotsHorizontal"
       :aria-expanded="open ? 'true' : 'false'"
       aria-haspopup="menu"
       @click="toggle"
       @keydown.escape="close"
-    >
-      ⋯
-    </button>
+    />
     <div
       v-if="open"
       class="admin-overflow__menu"
@@ -19,34 +20,37 @@
       role="menu"
       @keydown.escape="close"
     >
-      <button
-        type="button"
-        role="menuitem"
+      <Button
+        variant="ghost"
+        size="sm"
         class="admin-overflow__item"
+        role="menuitem"
         data-admin="settings"
         @click="onSettings"
       >
         Settings
-      </button>
-      <button
+      </Button>
+      <Button
         v-if="canResizeRegions"
-        type="button"
-        role="menuitem"
+        variant="ghost"
+        size="sm"
         class="admin-overflow__item"
+        role="menuitem"
         data-admin="lock-layout"
         @click="onToggleLock"
       >
         {{ configStore.regionsLocked ? "Unlock layout" : "Lock layout" }}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
         class="admin-overflow__item"
+        role="menuitem"
         data-admin="hide-ui"
         @click="onHideUi"
       >
         Hide controls
-      </button>
+      </Button>
     </div>
     <!-- F7: hiding is global (every screen) and the way back is a hidden
          long-press, so say both before doing it. -->
@@ -65,11 +69,13 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from "vue";
+import { mdiDotsHorizontal } from "@mdi/js";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
 import { getActiveDashboardScreen } from "../../utils/layout";
 import { normalizeHotCornerPosition } from "../../utils/hotCorner";
+import Button from "../ui/Button.vue";
 import ConfirmModal from "../settings/shared/ConfirmModal.vue";
 
 const configStore = useConfigStore();
@@ -99,7 +105,9 @@ const toggle = () => {
   open.value ? close() : openMenu();
 };
 const openMenu = () => {
-  const rect = triggerEl.value?.getBoundingClientRect();
+  // A component ref exposes the instance; the button element is its $el.
+  const trigger = triggerEl.value?.$el ?? triggerEl.value;
+  const rect = trigger?.getBoundingClientRect?.();
   if (rect && typeof window !== "undefined") {
     // Lower half of the viewport → open upward; left half → anchor left edge
     // (menu grows rightward into the content) instead of the default right anchor.
@@ -155,75 +163,39 @@ const onToggleLock = () => {
   position: relative;
   display: inline-flex;
 }
-.admin-overflow__trigger {
-  min-width: 46px;
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--fs-xl);
-  /* Discreet by default: just the glyph, no chrome. A muted resting colour and a
-     hover-only surface keep it from competing with the clock, while the full
-     46px hit target and focus ring stay intact. */
-  color: var(--ink-3);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-.admin-overflow__trigger:hover {
-  color: var(--ink);
-  background: var(--bg-2);
-}
-.admin-overflow__trigger:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
+
+/* Placement only: the trigger's chrome, focus ring and 48px target come from
+   ui/Button. The menu anchors to the trigger and flips at the screen edges. */
 .admin-overflow__menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + var(--gap-2));
   right: 0;
-  z-index: 20;
+  z-index: var(--z-raised);
   min-width: 200px;
-  max-height: calc(100vh - 16px);
+  max-height: calc(100vh - var(--gap-4));
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.4rem;
+  gap: var(--gap-1);
+  padding: var(--gap-2);
   background: var(--bg-1);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 18px 50px -16px var(--focus-glow);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elev-1);
 }
 .admin-overflow__menu--up {
   top: auto;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% + var(--gap-2));
 }
 .admin-overflow__menu--left {
   right: auto;
   left: 0;
 }
+/* The shared Button is inline-flex; a menu item fills the menu and reads
+   left-aligned like every other action list. */
 .admin-overflow__item {
-  min-height: 46px;
+  justify-content: flex-start;
+  width: 100%;
   text-align: left;
-  padding: 0 0.85rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.admin-overflow__item:hover {
-  background: var(--bg-2);
-}
-.admin-overflow__item:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
 }
 </style>
