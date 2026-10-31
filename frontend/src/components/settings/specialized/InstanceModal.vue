@@ -78,12 +78,32 @@
                   v-model="formData.color"
                   type="text"
                   class="form-input"
-                  placeholder="#2196f3"
+                  placeholder="#275f86"
                   aria-label="Colour value"
                   style="flex: 1"
                 />
               </div>
-              <span class="help-text">Choose a colour for events from this calendar source</span>
+              <div
+                v-if="swatches.length"
+                class="colour-swatches"
+                role="group"
+                aria-label="Calendar colours"
+              >
+                <button
+                  v-for="swatch in swatches"
+                  :key="swatch.token"
+                  type="button"
+                  class="colour-swatch"
+                  :class="{ selected: formData.color?.toLowerCase() === swatch.hex }"
+                  :style="{ background: swatch.hex }"
+                  :aria-label="`Calendar colour ${swatch.number}`"
+                  :aria-pressed="formData.color?.toLowerCase() === swatch.hex"
+                  @click="formData.color = swatch.hex"
+                />
+              </div>
+              <span class="help-text"
+                >These eight follow the theme; pick one or enter a custom colour</span
+              >
             </div>
             <div class="form-group">
               <div class="toggle-row">
@@ -153,6 +173,7 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { isHiddenField } from "@/utils/pluginFields";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
+import { eventSwatches, nextEventColour } from "@/utils/themePalettes";
 import { errorDetailMessage } from "@/utils/apiErrors";
 
 // Plain words: the form adds a source, never an "instance". The plugin's own
@@ -189,7 +210,7 @@ const formData = ref({
   name: "",
   enabled: true,
   // Calendar-specific fields
-  color: "#2196f3",
+  color: "#275f86",
   show_time: true,
 });
 const error = ref("");
@@ -198,6 +219,9 @@ const testing = ref(false);
 const testStatus = ref(null);
 const geocoding = ref(false);
 const geocodeStatus = ref(null);
+
+// The eight curated calendar colours, in the theme currently in use.
+const swatches = computed(() => eventSwatches());
 
 const instanceLabel = computed(() => {
   const plugin = currentPlugin.value;
@@ -271,7 +295,7 @@ const initializeForm = async () => {
     name: "",
     enabled: true,
     // Calendar-specific defaults
-    color: "#2196f3",
+    color: "#275f86",
     show_time: true,
   };
 
@@ -302,7 +326,7 @@ const initializeForm = async () => {
               const colorMap = {
                 green: "#4caf50",
                 red: "#f44336",
-                blue: "#2196f3",
+                blue: "#275f86",
                 yellow: "#ffeb3b",
                 orange: "#ff9800",
                 purple: "#9c27b0",
@@ -314,7 +338,7 @@ const initializeForm = async () => {
                 grey: "#9e9e9e",
                 gray: "#9e9e9e",
               };
-              form.color = colorMap[source.color.toLowerCase()] || "#2196f3";
+              form.color = colorMap[source.color.toLowerCase()] || "#275f86";
             }
           }
           form.show_time = source.show_time !== false;
@@ -335,6 +359,16 @@ const initializeForm = async () => {
         } else {
           form[key] = "";
         }
+      }
+    }
+
+    // A new calendar takes the next unused palette colour (audit §3).
+    if (currentPlugin.value.type === "calendar") {
+      try {
+        await calendarStore.fetchSources();
+        form.color = nextEventColour((calendarStore.sources || []).map(source => source.color));
+      } catch (error) {
+        console.error("Failed to pick a calendar colour:", error);
       }
     }
   }
@@ -575,7 +609,7 @@ const handleSave = async () => {
           if (source) {
             await calendarStore.updateSource(editingInstance.value.id, {
               ...source,
-              color: formData.value.color || "#2196f3",
+              color: formData.value.color || "#275f86",
               show_time: formData.value.show_time !== false,
             });
           }
@@ -605,7 +639,7 @@ const handleSave = async () => {
             isCalendar: true,
             instanceName: formData.value.name.trim(),
             calendarConfig: {
-              color: formData.value.color || "#2196f3",
+              color: formData.value.color || "#275f86",
               show_time: formData.value.show_time !== false,
               ical_url: config.ical_url || "",
               type: pluginId,
@@ -708,6 +742,32 @@ const handleSave = async () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.colour-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.colour-swatch {
+  width: 1.75rem; /* 28px */
+  height: 1.75rem;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.colour-swatch.selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
+.colour-swatch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .toggle-row {

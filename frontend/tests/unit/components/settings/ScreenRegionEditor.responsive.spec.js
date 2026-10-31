@@ -190,7 +190,7 @@ describe("ScreenRegionEditor device fit", () => {
     await resize(w, ".sre-stage", 300, 600);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
     expect(w.findAll(".sre-region-name").length).toBeGreaterThan(0);
-    expect(w.findAll(".sre-region-emoji")).toHaveLength(0);
+    expect(w.findAll(".sre-region-icon")).toHaveLength(0);
     expect(w.findAll(".sre-region-size")).toHaveLength(0);
   });
 
@@ -199,7 +199,7 @@ describe("ScreenRegionEditor device fit", () => {
     await resize(w, ".sre-modal", 1280, 720);
     await resize(w, ".sre-stage", 1280, 700);
     expect(w.find(".sre-device").classes()).not.toContain("is-narrow");
-    expect(w.findAll(".sre-region-emoji").length).toBeGreaterThan(0);
+    expect(w.findAll(".sre-region-icon").length).toBeGreaterThan(0);
     expect(w.findAll(".sre-region-size").length).toBeGreaterThan(0);
   });
 
@@ -209,7 +209,7 @@ describe("ScreenRegionEditor device fit", () => {
     // The stage left above an open 65% inspector sheet.
     await resize(w, ".sre-stage", 390, 204);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
-    expect(w.findAll(".sre-region-emoji")).toHaveLength(0);
+    expect(w.findAll(".sre-region-icon")).toHaveLength(0);
     expect(w.findAll(".sre-region-size")).toHaveLength(0);
   });
 });
