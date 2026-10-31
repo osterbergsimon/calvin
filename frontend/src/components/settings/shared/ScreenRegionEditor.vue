@@ -1268,6 +1268,7 @@ onUnmounted(() => {
 }
 .sre-modal {
   position: relative;
+  z-index: calc(var(--z-dialog) + 1);
   width: min(1240px, 100%);
   height: min(820px, 100%);
   display: grid;
