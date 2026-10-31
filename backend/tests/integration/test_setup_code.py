@@ -139,12 +139,12 @@ def test_get_setup_code_is_loopback_only(test_client):
         assert loopback.get("/api/auth/setup-code").status_code == 404
 
 
-def test_get_setup_code_refuses_a_lan_peer(test_client):
+def test_get_setup_code_refuses_a_non_loopback_peer(test_client):
     get_admin_store().reset()
     ensure_setup_code()
 
-    with TestClient(test_client.app, client=("192.168.1.50", 50000)) as lan:
-        response = lan.get("/api/auth/setup-code")
+    with TestClient(test_client.app, client=("192.0.2.50", 50000)) as remote:
+        response = remote.get("/api/auth/setup-code")
     assert response.status_code == 403
     assert _code(response) == "loopback_only"
 
@@ -152,12 +152,12 @@ def test_get_setup_code_refuses_a_lan_peer(test_client):
 @pytest.mark.parametrize(
     ("header", "value"),
     [
-        ("Forwarded", "for=192.168.1.50"),
-        ("X-Forwarded-For", "192.168.1.50"),
+        ("Forwarded", "for=192.0.2.50"),
+        ("X-Forwarded-For", "192.0.2.50"),
         ("X-Forwarded-For", "127.0.0.1"),  # a spoofed loopback address
         ("X-Forwarded-Host", "calvin.example.com"),
         ("X-Forwarded-Proto", "https"),
-        ("X-Real-IP", "192.168.1.50"),
+        ("X-Real-IP", "192.0.2.50"),
     ],
 )
 def test_get_setup_code_refuses_loopback_with_any_proxy_header(test_client, header, value):
