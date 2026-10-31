@@ -27,7 +27,7 @@ Declared as a class attribute; validated by Pydantic at class-definition time
 | `type_id` | `str`, required | Unique plugin type id. Keep it equal to `plugin.json` `id`: the `calvin-plugins` validator checks this, though the host itself does not cross-check. |
 | `name` | `str`, required | Human-readable name. |
 | `description` | `str \| None` | One-line description. |
-| `icon` | `str \| None` | Optional tile icon (CLV-45): an emoji (`"🖼"`) or a file in the plugin's own `frontend/` dir (`"icon.svg"`, served from `/api/plugins/{id}/static/`). Absent → the UI shows the plugin name's first letter. Optional addition to contract 1.0 — plugins that never set it load unchanged. |
+| `icon` | `str \| None` | Optional tile icon (CLV-45, CLV-94): an `mdi:<name>` icon from the host's curated set (`"mdi:cast"`, `"mdi:silverware-fork-knife"`), an emoji (`"🖼"`), or a file in the plugin's own `frontend/` dir (`"icon.svg"`, served from `/api/plugins/{id}/static/`). The UI resolves `mdi:` from a small curated map and renders it as an SVG glyph; an unknown name, an emoji, or an absent icon falls back to the plugin name's first letter. A malformed `mdi:` form is a load-time warning, never a load failure. Optional addition to contract 1.0 — plugins that never set it load unchanged. |
 | `version` | `str = "1.0.0"` | Release label (not a contract signal — that's `api_version` in `plugin.json`). |
 | `supports_multiple_instances` | `bool = True` | `False` for single-instance plugins. |
 | `instance_label` | `str \| None` | Noun for one instance in the settings UI (e.g. `"Server"`). |
@@ -59,6 +59,11 @@ Validation at class definition (so errors surface at import, not render):
   `http(s)://` URL. **CIDR / IP ranges are rejected** (not expressible in CSP —
   use a wildcard domain). A malformed entry rejects the plugin at load. Entries
   are normalized (host lowercased) and deduped.
+- `icon`, when written as `mdi:<name>`, must use lowercase letters, digits and
+  hyphens (`^mdi:[a-z0-9-]+$`). The host logs a load-time warning for a
+  malformed form and keeps loading; the UI falls back to the first letter. The
+  curated names are listed in `frontend/src/utils/pluginIcon.js`; an unknown
+  (but well-formed) name is not a host error.
 
 **When to set `browser_origins`.** Leave it empty (the default) unless the
 plugin's frontend genuinely must load from a *fixed* external origin the plugin

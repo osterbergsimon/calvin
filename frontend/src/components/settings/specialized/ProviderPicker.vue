@@ -11,8 +11,12 @@
         >
           <template #icon>
             <span class="pp-icon" aria-hidden="true">
-              <svg v-if="provider.svg" class="pp-icon-svg" viewBox="0 0 24 24">
-                <path :d="provider.svg" fill="currentColor" />
+              <svg
+                v-if="provider.svg || pluginIconPath(provider)"
+                class="pp-icon-svg"
+                viewBox="0 0 24 24"
+              >
+                <path :d="provider.svg || pluginIconPath(provider)" fill="currentColor" />
               </svg>
               <img
                 v-else-if="isIconFile(provider.icon)"
@@ -20,7 +24,6 @@
                 :src="iconUrl(provider)"
                 alt=""
               />
-              <template v-else-if="provider.icon">{{ provider.icon }}</template>
               <template v-else>{{ providerLetter(provider) }}</template>
             </span>
           </template>
@@ -51,8 +54,15 @@
           >
             <template #lead>
               <span class="pp-icon" aria-hidden="true">
-                <img v-if="isIconFile(item.icon)" class="pp-icon-img" :src="iconUrl(item)" alt="" />
-                <template v-else-if="item.icon">{{ item.icon }}</template>
+                <svg v-if="pluginIconPath(item)" class="pp-icon-svg" viewBox="0 0 24 24">
+                  <path :d="pluginIconPath(item)" fill="currentColor" />
+                </svg>
+                <img
+                  v-else-if="isIconFile(item.icon)"
+                  class="pp-icon-img"
+                  :src="iconUrl(item)"
+                  alt=""
+                />
                 <template v-else>{{ providerLetter(item) }}</template>
               </span>
             </template>
@@ -106,7 +116,7 @@ import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import Tag from "@/components/ui/Tag.vue";
-import { isIconFile, pluginIconLetter, pluginIconUrl } from "@/utils/pluginIcon";
+import { isIconFile, pluginIconLetter, pluginIconPath, pluginIconUrl } from "@/utils/pluginIcon";
 
 // A small chooser of providers (plugins) for one kind of source. It carries no
 // plugin-specific knowledge: the caller decides which plugins are candidates,
