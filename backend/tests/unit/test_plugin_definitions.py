@@ -201,6 +201,20 @@ class TestSubSchemaModels:
         assert field.type == "string"
         assert field.ui == {"component": "input"}
 
+    def test_config_field_definition_declares_label_and_hidden(self):
+        # CLV-74: the schema form reads `label` for the field name and
+        # `description` as the hint line; `hidden: true` keeps internals out.
+        field = ConfigFieldDefinition(
+            type="string",
+            label="Calendar address",
+            description="The .ics address to read events from.",
+            hidden=True,
+        )
+        assert field.label == "Calendar address"
+        assert field.description == "The .ics address to read events from."
+        assert field.hidden is True
+        assert ConfigFieldDefinition(type="string").hidden is False
+
     def test_action_definition_requires_id_and_type(self):
         action = ActionDefinition(id="refresh", type="fetch", label="Refresh")
         assert action.id == "refresh"
