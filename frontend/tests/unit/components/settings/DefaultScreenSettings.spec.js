@@ -50,10 +50,9 @@ describe("DefaultScreenSettings", () => {
     forgetOskHardware();
   });
 
-  it("renders Name, Pages, Display, Power and Touch & keyboard", () => {
+  it("renders Pages, Display, Power and Touch & keyboard", () => {
     const wrapper = mountDefault();
     expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
-      "section-default-name",
       "section-default-pages",
       "section-layout",
       "section-device-power",
@@ -78,6 +77,13 @@ describe("DefaultScreenSettings", () => {
     expect(wrapper.find("#section-screen-software").exists()).toBe(false);
     expect(wrapper.find("#section-screen-hardware").exists()).toBe(false);
     expect(wrapper.findComponent({ name: "KioskStatusHeader" }).exists()).toBe(false);
+  });
+
+  it("has no Room name row (the name is per screen, CLV-84)", () => {
+    const wrapper = mountDefault();
+    expect(wrapper.text()).not.toContain("Room name");
+    expect(wrapper.find("[data-test='default-room-name']").exists()).toBe(false);
+    expect(wrapper.find("#section-default-name").exists()).toBe(false);
   });
 
   it("emits orientation changes", () => {

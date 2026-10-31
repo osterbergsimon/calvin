@@ -1,18 +1,21 @@
 <template>
-  <div class="kiosk-status" data-test="kiosk-status-header">
-    <span class="kiosk-status__id">{{ kioskId }}</span>
-    <span class="kiosk-status__presence" :class="online ? 'is-online' : 'is-offline'">
-      {{ online ? "● Online" : "○ Offline" }} · seen {{ lastSeenLabel }}
-    </span>
-    <span class="kiosk-status__config" :class="config.cls" data-test="hardware-config-status">
-      {{ config.label }}
-    </span>
-  </div>
+  <InlineNote class="kiosk-status" data-test="kiosk-status-header">
+    <strong>{{ kioskId }}</strong>
+    <Tag :tone="online ? 'ok' : 'neutral'">
+      {{ online ? "Online" : "Offline" }} · seen {{ lastSeenLabel }}
+    </Tag>
+    <Tag :tone="config.tone" data-test="hardware-config-status">{{ config.label }}</Tag>
+  </InlineNote>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import Tag from "@/components/ui/Tag.vue";
 
+// The selected screen's status strip: who it is, whether it is here, and
+// whether it has confirmed the display settings. Built from the shared note and
+// tag blocks so it carries no card styling of its own.
 const props = defineProps({
   kioskId: { type: String, required: true },
   online: { type: Boolean, default: false },
@@ -23,52 +26,27 @@ const props = defineProps({
 
 const config = computed(() => {
   if (props.appliedVersion == null) {
-    return { cls: "is-unknown", label: "Display settings · Not confirmed yet" };
+    return { tone: "neutral", label: "Display settings · Not confirmed yet" };
   }
   if (props.desiredVersion != null && props.appliedVersion !== props.desiredVersion) {
     return props.online
-      ? { cls: "is-pending", label: "Display settings · Applying…" }
+      ? { tone: "warn", label: "Display settings · Applying…" }
       : {
-          cls: "is-pending",
+          tone: "warn",
           label: "Display settings · Applies when this screen comes back online",
         };
   }
-  return { cls: "is-applied", label: "Display settings ✓ Applied" };
+  return { tone: "ok", label: "Display settings ✓ Applied" };
 });
 </script>
 
 <style scoped>
-.kiosk-status {
-  display: flex;
+/* The name and each tag sit on one line with the bar's inline gap. They are
+   inside InlineNote's text span, so the gap lives there. */
+.kiosk-status :deep(.inline-note__text) {
+  display: inline-flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 16px;
-  padding: 10px 12px;
-  margin-bottom: 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
-  background: var(--bg-1);
-}
-.kiosk-status__id {
-  font-weight: 600;
-}
-.kiosk-status__presence {
-  font-size: 0.85em;
-}
-.kiosk-status__presence.is-online {
-  color: var(--ok-text);
-}
-.kiosk-status__presence.is-offline {
-  color: var(--ink-3);
-}
-.kiosk-status__config {
-  font-size: 0.85em;
-  opacity: 0.85;
-}
-.kiosk-status__config.is-pending {
-  color: var(--warn-text);
-}
-.kiosk-status__config.is-applied {
-  color: var(--ok-text);
+  align-items: center;
+  gap: var(--gap-inline);
 }
 </style>

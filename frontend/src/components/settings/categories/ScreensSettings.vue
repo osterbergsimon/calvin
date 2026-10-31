@@ -1,290 +1,251 @@
 <!-- frontend/src/components/settings/categories/ScreensSettings.vue -->
 <template>
-  <div
-    class="screens"
-    :class="{
-      'screens--detail': Boolean(selection),
-      'screens--two-pane': Boolean(selection) && !narrow,
-      'screens--single-pane': Boolean(selection) && narrow,
-    }"
-    data-test="screens-category"
-  >
-    <!-- LIST: Default, every screen, then This browser -->
-    <div class="screens__list" data-test="screens-list">
-      <SettingsSection id="screens-list" title="Screens">
-        <template #action>
-          <button
-            type="button"
-            class="screens__add"
-            data-test="add-screen-btn"
-            :aria-expanded="addOpen ? 'true' : 'false'"
-            @click="addOpen = !addOpen"
-          >
-            {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
-          </button>
-        </template>
-        <p
-          v-if="kiosks.length === 0"
-          class="screens__empty screens__intro"
-          data-test="screens-empty"
-        >
-          No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
-          Raspberry Pi installed with the command under “Add a screen”, or any browser that opens
-          the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
-        </p>
-        <AddKioskPanel v-if="addOpen" />
-        <SettingRow
-          v-if="agentKiosks.length > 0"
-          class="kiosk-software"
-          label="Kiosk software"
-          data-test="kiosk-software-summary"
-        >
-          <template #description>
-            <p class="kiosk-software__desc" data-test="kiosk-software-state">
-              <template v-if="manifestChecking">Checking for updates…</template>
-              <template v-else-if="availableVersion == null">
-                Couldn't check for kiosk updates. The kiosks keep working.
-              </template>
-              <template v-else-if="updatingKiosks.length > 0">{{ updatingCopy }}</template>
-              <template v-else-if="blocked.length > 0 && behind.length === 0">
-                No kiosk can be updated right now.
-                {{ blocked.length }} {{ blocked.length === 1 ? "needs" : "need" }} a newer OS first.
-              </template>
-              <template v-else-if="behind.length === 0">
-                All kiosks are up to date (<span class="kiosk-software__v">{{
-                  shortVersion(availableVersion)
-                }}</span
-                >).
-              </template>
-              <template v-else>
-                {{ behindCopy }}
-                <span class="kiosk-software__v">{{ shortVersion(availableVersion) }}</span
-                >.
-              </template>
-            </p>
+  <ScreensLayout :detail="Boolean(selection)" :narrow="narrow" data-test="screens-category">
+    <template #list>
+      <div data-test="screens-list">
+        <SettingsSection id="screens-list" title="Screens">
+          <template #action>
+            <Button
+              data-test="add-screen-btn"
+              :aria-expanded="addOpen ? 'true' : 'false'"
+              @click="addOpen = !addOpen"
+            >
+              {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
+            </Button>
           </template>
-          <button
-            v-if="manifestChecking === false && availableVersion == null"
-            type="button"
-            class="kiosk-software__btn"
-            data-test="kiosk-software-retry"
-            @click="checkManifest"
+          <InlineNote v-if="kiosks.length === 0" class="screens-empty" data-test="screens-empty">
+            No screens have connected yet. A screen shows up here once it is set up as a kiosk: a
+            Raspberry Pi installed with the command under “Add a screen”, or any browser that opens
+            the dashboard with <code>?kiosk=&lt;name&gt;</code> in its address.
+          </InlineNote>
+          <AddKioskPanel v-if="addOpen" />
+          <SettingRow
+            v-if="agentKiosks.length > 0"
+            class="kiosk-software"
+            label="Kiosk software"
+            data-test="kiosk-software-summary"
           >
-            Try again
-          </button>
-          <button
-            v-else-if="behind.length > 0"
-            type="button"
-            class="kiosk-software__btn kiosk-software__btn--primary"
-            data-test="kiosk-software-update-all"
-            :disabled="updatingKiosks.length > 0"
-            @click="updateAll"
-          >
-            {{ updatingKiosks.length > 0 ? "Updating…" : "Update all" }}
-          </button>
-        </SettingRow>
+            <template #description>
+              <InlineNote data-test="kiosk-software-state">
+                <template v-if="manifestChecking">Checking for updates…</template>
+                <template v-else-if="availableVersion == null">
+                  Couldn't check for kiosk updates. The kiosks keep working.
+                </template>
+                <template v-else-if="updatingKiosks.length > 0">{{ updatingCopy }}</template>
+                <template v-else-if="blocked.length > 0 && behind.length === 0">
+                  No kiosk can be updated right now.
+                  {{ blocked.length }} {{ blocked.length === 1 ? "needs" : "need" }} a newer OS
+                  first.
+                </template>
+                <template v-else-if="behind.length === 0">
+                  All kiosks are up to date ({{ shortVersion(availableVersion) }}).
+                </template>
+                <template v-else>
+                  {{ behindCopy }}
+                  {{ shortVersion(availableVersion) }}.
+                </template>
+              </InlineNote>
+            </template>
+            <Button
+              v-if="manifestChecking === false && availableVersion == null"
+              data-test="kiosk-software-retry"
+              @click="checkManifest"
+            >
+              Try again
+            </Button>
+            <Button
+              v-else-if="behind.length > 0"
+              data-test="kiosk-software-update-all"
+              variant="primary"
+              :disabled="updatingKiosks.length > 0"
+              @click="updateAll"
+            >
+              {{ updatingKiosks.length > 0 ? "Updating…" : "Update all" }}
+            </Button>
+          </SettingRow>
 
-        <div class="screens__cards">
-          <!-- The Default is a screen too, edited on its own page (§2). -->
-          <button
-            type="button"
-            class="screen-card screen-card--default"
-            :class="{ 'is-selected': defaultOpen }"
-            data-test="screen-default-card"
-            @click="openDefault"
-          >
-            <PageThumbnail
-              :page="startPage(null)"
-              :orientation="orientationFor(null)"
-              data-test="all-screens-thumbnail"
-            />
-            <div class="screen-card__body">
-              <span class="screen-card__name" data-test="default-title">Default</span>
-              <span class="screen-card__summary"
-                >Used by new screens and by browsers that aren't set up as a screen</span
-              >
-              <span class="screen-card__meta" data-test="default-summary">{{
-                defaultSummary
-              }}</span>
-            </div>
-          </button>
+          <div class="screens-list-items">
+            <!-- The Default is a screen too, edited on its own page (§2). -->
+            <ListRow
+              class="screen-card screen-card--default"
+              :name="'Default'"
+              :selected="defaultOpen"
+              data-test="screen-default-card"
+              role="button"
+              tabindex="0"
+              @click="openDefault"
+              @keydown.enter="openDefault"
+              @keydown.space.prevent="openDefault"
+            >
+              <template #lead>
+                <PageThumbnail
+                  :page="startPage(null)"
+                  :orientation="orientationFor(null)"
+                  data-test="all-screens-thumbnail"
+                />
+              </template>
+              <template #meta>
+                <InlineNote>
+                  Used by new screens and by browsers that aren't set up as a screen
+                </InlineNote>
+                <InlineNote data-test="default-summary">{{ defaultSummary }}</InlineNote>
+              </template>
+            </ListRow>
 
-          <button
-            v-for="k in kiosks"
-            :key="k.id"
-            type="button"
-            class="screen-card"
-            :class="{ 'is-selected': k.id === selectedId }"
-            data-test="screen-card"
-            @click="select(k.id)"
-          >
-            <PageThumbnail
-              :page="startPage(k)"
-              :orientation="orientationFor(k)"
-              :aria-label="`${nameFor(k)} start page`"
-            />
-            <div class="screen-card__body">
-              <span class="screen-card__name">
-                {{ nameFor(k) }}
-                <span
-                  class="screen-card__status"
-                  :class="isOnline(k) ? 'is-online' : 'is-offline'"
-                  data-test="screen-status"
+            <ListRow
+              v-for="k in kiosks"
+              :key="k.id"
+              class="screen-card"
+              :name="nameFor(k)"
+              :selected="k.id === selectedId"
+              data-test="screen-card"
+              role="button"
+              tabindex="0"
+              @click="select(k.id)"
+              @keydown.enter="select(k.id)"
+              @keydown.space.prevent="select(k.id)"
+            >
+              <template #lead>
+                <PageThumbnail
+                  :page="startPage(k)"
+                  :orientation="orientationFor(k)"
+                  :aria-label="`${nameFor(k)} start page`"
+                />
+              </template>
+              <template #meta>
+                <InlineNote data-test="screen-id">{{ k.id }}</InlineNote>
+                <InlineNote data-test="screen-summary">{{ summaryFor(k) }}</InlineNote>
+                <InlineNote
+                  v-if="changedSettingCount(k.overrides) > 0"
+                  data-test="screen-changed-count"
                 >
-                  {{ isOnline(k) ? "● Online" : "○ Offline" }}
-                </span>
+                  {{ changedSettingCount(k.overrides) }}
+                  {{ changedSettingCount(k.overrides) === 1 ? "setting" : "settings" }} changed
+                </InlineNote>
+                <InlineNote
+                  v-if="softwareLine(k)"
+                  :tone="softwareTone(k)"
+                  data-test="kiosk-version-line"
+                >
+                  {{ softwareLine(k) }}
+                </InlineNote>
+              </template>
+              <template #actions>
+                <Tag data-test="screen-status" :tone="isOnline(k) ? 'ok' : 'neutral'">
+                  {{ isOnline(k) ? "Online" : "Offline" }}
+                </Tag>
                 <Tag
                   v-if="isPending(k)"
-                  class="screen-card__badge"
                   tone="warn"
                   data-test="kiosk-pending-badge"
                   role="img"
                   :aria-label="`${nameFor(k)}: offline, display settings waiting`"
                   title="Offline. It will apply the new display settings when it's back."
-                  >⚠</Tag
                 >
-              </span>
-              <span class="screen-card__id" data-test="screen-id">{{ k.id }}</span>
-              <span class="screen-card__meta" data-test="screen-summary">{{ summaryFor(k) }}</span>
-              <span
-                v-if="changedSettingCount(k.overrides) > 0"
-                class="screen-card__changed"
-                data-test="screen-changed-count"
-                >{{ changedSettingCount(k.overrides) }}
-                {{ changedSettingCount(k.overrides) === 1 ? "setting" : "settings" }} changed</span
-              >
-              <span
-                v-if="k.agentVersion != null"
-                class="screen-card__software"
-                :class="softwareClass(k)"
-                data-test="kiosk-version-line"
-              >
-                <template v-if="k.agentUpdateRequested">
-                  Updating to
-                  <span class="screen-card__v">{{ shortVersion(availableVersion) }}</span
-                  >…
-                </template>
-                <template v-else-if="isUpdateBlocked(k)">
-                  Kiosk software
-                  <span class="screen-card__v">{{ shortVersion(k.agentVersion) }}</span>
-                  · update needs a newer OS
-                </template>
-                <template v-else-if="hasUpdateError(k)">
-                  Kiosk software
-                  <span class="screen-card__v">{{ shortVersion(k.agentVersion) }}</span>
-                  · last update failed, kept this version
-                </template>
-                <template v-else-if="availableVersion == null">
-                  Kiosk software
-                  <span class="screen-card__v">{{ shortVersion(k.agentVersion) }}</span>
-                </template>
-                <template v-else-if="!isVersionBehind(k, availableVersion)">
-                  Kiosk software
-                  <span class="screen-card__v">{{ shortVersion(k.agentVersion) }}</span>
-                  · up to date
-                </template>
-                <template v-else>
-                  Kiosk software
-                  <span class="screen-card__v">{{ shortVersion(k.agentVersion) }}</span>
-                  ·
-                  <span class="screen-card__v">{{ shortVersion(availableVersion) }}</span> available
-                </template>
-              </span>
-            </div>
-          </button>
+                  ⚠
+                </Tag>
+              </template>
+            </ListRow>
 
-          <!-- Only on a browser that is not itself a set-up screen (§2). -->
-          <button
-            v-if="!kioskId"
-            type="button"
-            class="screen-card screen-card--browser"
-            :class="{ 'is-selected': browserOpen }"
-            data-test="screen-browser-card"
-            @click="openBrowser"
-          >
-            <div class="screen-card__body">
-              <span class="screen-card__name" data-test="browser-title">This browser</span>
-              <span class="screen-card__meta" data-test="browser-summary">{{
-                browserSummary
-              }}</span>
-            </div>
-          </button>
-        </div>
-      </SettingsSection>
-    </div>
-
-    <!-- DETAIL: Default, one screen, or this browser -->
-    <div v-if="selection" class="screens__detail" data-test="screens-detail">
-      <button type="button" class="screens__back" data-test="screens-back" @click="closeDetail">
-        ‹ Screens
-      </button>
-
-      <DefaultScreenSettings
-        v-if="defaultOpen"
-        :config="config"
-        @update:config="patch => emit('update:config', patch)"
-      />
-      <ThisBrowserSettings
-        v-else-if="browserOpen"
-        :config="config"
-        @changed="refreshBrowserCount"
-      />
-
-      <template v-else-if="selectedKiosk">
-        <KioskStatusHeader
-          :kiosk-id="nameFor(selectedKiosk)"
-          :online="isOnline(selectedKiosk)"
-          :last-seen-label="relativeTime(selectedKiosk.lastSeen)"
-          :applied-version="selectedKiosk.lastAppliedVersion ?? null"
-          :desired-version="desiredVersions[selectedId] ?? null"
-        />
-
-        <SettingsSection id="screen-name" title="Name">
-          <SettingRow label="Name" description="Shown in this screen's clock bar.">
-            <input
-              class="screen-name-input"
-              type="text"
-              data-test="screen-name-input"
-              :value="nameValue"
-              :placeholder="namePlaceholder"
-              aria-label="Name"
-              @change="e => setName(e.target.value)"
-            />
-          </SettingRow>
-          <p v-if="nameMsg" class="screens__saved" role="status" aria-live="polite">
-            {{ nameMsg }}
-          </p>
-        </SettingsSection>
-
-        <SettingsSection id="screen-pages" title="Pages">
-          <div class="screen-pages__head">
-            <div class="screen-pages__meta">
-              <p v-if="pages.length === 1" class="screen-pages__hint" data-test="only-one-page">
-                Only one page so far.
-              </p>
-              <p class="screen-pages__scope-label">Pages shown</p>
-              <KioskScope
-                :overridden="availableOverridden"
-                reset-test="reset-screens-shown"
-                @reset="resetAvailable"
-              />
-            </div>
-            <button
-              type="button"
-              class="screen-pages__edit"
-              data-test="edit-pages-btn"
-              @click="editorOpen = true"
+            <!-- Only on a browser that is not itself a set-up screen (§2). -->
+            <ListRow
+              v-if="!kioskId"
+              class="screen-card screen-card--browser"
+              name="This browser"
+              :selected="browserOpen"
+              data-test="screen-browser-card"
+              role="button"
+              tabindex="0"
+              @click="openBrowser"
+              @keydown.enter="openBrowser"
+              @keydown.space.prevent="openBrowser"
             >
-              Edit pages
-            </button>
+              <template #meta>
+                <InlineNote data-test="browser-summary">{{ browserSummary }}</InlineNote>
+              </template>
+            </ListRow>
           </div>
-          <div
-            v-for="page in pages"
-            :key="page.id"
-            class="screen-page"
-            :class="{ 'is-hidden-page': !showsPage(page.id) }"
-            data-test="screen-page-row"
-          >
+        </SettingsSection>
+      </div>
+    </template>
+
+    <Button variant="link" size="sm" data-test="screens-back" @click="closeDetail">
+      ‹ Screens
+    </Button>
+
+    <DefaultScreenSettings
+      v-if="defaultOpen"
+      :config="config"
+      @update:config="patch => emit('update:config', patch)"
+    />
+    <ThisBrowserSettings v-else-if="browserOpen" :config="config" @changed="refreshBrowserCount" />
+
+    <template v-else-if="selectedKiosk">
+      <KioskStatusHeader
+        :kiosk-id="nameFor(selectedKiosk)"
+        :online="isOnline(selectedKiosk)"
+        :last-seen-label="relativeTime(selectedKiosk.lastSeen)"
+        :applied-version="selectedKiosk.lastAppliedVersion ?? null"
+        :desired-version="desiredVersions[selectedId] ?? null"
+      />
+
+      <SettingsSection id="screen-name" title="Name">
+        <SettingRow label="Name" description="Shown in this screen's clock bar.">
+          <TextField
+            input-test="screen-name-input"
+            hide-label
+            label="Name"
+            :model-value="nameDraft"
+            :placeholder="namePlaceholder"
+            @update:model-value="v => (nameDraft = v)"
+            @blur="setName(nameDraft)"
+          />
+        </SettingRow>
+        <InlineNote
+          v-if="nameMsg"
+          class="screens-saved"
+          :tone="toneFor(nameMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ nameMsg }}
+        </InlineNote>
+      </SettingsSection>
+
+      <SettingsSection id="screen-pages" title="Pages">
+        <SettingRow label="Pages shown">
+          <template #description>
+            <InlineNote v-if="pages.length === 1" data-test="only-one-page">
+              Only one page so far.
+            </InlineNote>
+            <ScopeLine
+              :overridden="availableOverridden"
+              reset-test="reset-screens-shown"
+              @reset="resetAvailable"
+            />
+          </template>
+          <Button data-test="edit-pages-btn" @click="editorOpen = true">Edit pages</Button>
+        </SettingRow>
+        <ListRow
+          v-for="page in pages"
+          :key="page.id"
+          :name="page.name"
+          :disabled="!showsPage(page.id)"
+          data-test="screen-page-row"
+          class="screen-page"
+        >
+          <template #lead>
+            <PageThumbnail
+              :page="page"
+              :orientation="effOrientation"
+              size="page"
+              data-test="screen-page-thumbnail"
+            />
+          </template>
+          <template #meta>
+            <InlineNote v-if="!showsPage(page.id)">Not shown here</InlineNote>
+          </template>
+          <template #actions>
             <label class="screen-page__show">
               <input
                 type="checkbox"
@@ -294,16 +255,6 @@
               />
               <span>Show</span>
             </label>
-            <PageThumbnail
-              :page="page"
-              :orientation="effOrientation"
-              size="page"
-              data-test="screen-page-thumbnail"
-            />
-            <span class="screen-page__body">
-              <span class="screen-page__name">{{ page.name }}</span>
-              <span v-if="!showsPage(page.id)" class="screen-page__not-shown">Not shown here</span>
-            </span>
             <label class="screen-page__start">
               <input
                 type="radio"
@@ -315,285 +266,247 @@
               />
               <span>Start here</span>
             </label>
-          </div>
-          <div class="screen-pages__start-scope">
-            <span class="screen-pages__scope-label">Start page</span>
-            <KioskScope
+          </template>
+        </ListRow>
+        <SettingRow label="Start page">
+          <template #description>
+            <ScopeLine
               :overridden="defaultOverridden"
               reset-test="reset-default-screen"
               @reset="resetDefaultScreen"
             />
-          </div>
-          <p v-if="pagesMsg" class="screens__saved" role="status" aria-live="polite">
-            {{ pagesMsg }}
-          </p>
-        </SettingsSection>
-
-        <div class="screen-detail__grid">
-          <SettingsSection id="screen-display" title="Display">
-            <div class="screen-display">
-              <div class="screen-display__rows">
-                <SettingRow label="Orientation">
-                  <template #description>
-                    <KioskScope
-                      :overridden="orientationOverridden"
-                      reset-test="reset-orientation-row"
-                      @reset="resetOrientationRow"
-                    />
-                  </template>
-                  <SegmentedControl
-                    :model-value="effOrientation"
-                    aria-label="Orientation"
-                    :options="[
-                      { value: 'landscape', label: 'Landscape' },
-                      { value: 'portrait', label: 'Portrait' },
-                    ]"
-                    @update:model-value="setOrientation"
-                  />
-                </SettingRow>
-                <SettingRow label="Upside down">
-                  <template #description>
-                    <KioskScope
-                      :overridden="flipOverridden"
-                      reset-test="reset-flip"
-                      @reset="resetFlip"
-                    />
-                  </template>
-                  <ToggleSwitch
-                    :model-value="effFlipped"
-                    aria-label="Upside down"
-                    @update:model-value="setFlipped"
-                  />
-                </SettingRow>
-                <SettingRow label="Rotate the screen output">
-                  <template #description>
-                    <KioskScope
-                      :overridden="applyOverridden"
-                      reset-test="reset-apply-rotation"
-                      @reset="resetApply"
-                    />
-                  </template>
-                  <ToggleSwitch
-                    :model-value="effApply"
-                    aria-label="Rotate the screen output"
-                    @update:model-value="setApply"
-                  />
-                </SettingRow>
-              </div>
-              <div class="screen-display__preview" data-test="screen-live-preview">
-                <PageThumbnail
-                  :page="selectedStartPage"
-                  :orientation="effOrientation"
-                  size="live"
-                  data-test="screen-live-thumbnail"
-                />
-                <span class="screen-display__caption">{{ previewCaption }}</span>
-              </div>
-            </div>
-            <p v-if="displayMsg" class="screens__saved" role="status" aria-live="polite">
-              {{ displayMsg }}
-            </p>
-          </SettingsSection>
-
-          <SettingsSection id="screen-power" title="Power">
-            <SettingRow label="Screen on/off schedule">
-              <template #description>
-                <KioskScope
-                  :overridden="scheduleEnabledOverridden"
-                  reset-test="reset-schedule-enabled"
-                  @reset="resetScheduleEnabled"
-                />
-              </template>
-              <ToggleSwitch
-                :model-value="effScheduleEnabled"
-                aria-label="Screen on/off schedule"
-                @update:model-value="setScheduleEnabled"
-              />
-            </SettingRow>
-            <SettingRow v-if="effScheduleEnabled" label="Daily schedule">
-              <template #description>
-                <KioskScope
-                  :overridden="scheduleOverridden"
-                  reset-test="reset-daily-schedule"
-                  @reset="resetDailySchedule"
-                />
-              </template>
-              <DisplayScheduleGrid
-                :model-value="effSchedule || []"
-                @update:model-value="setSchedule"
-              />
-            </SettingRow>
-            <SettingRow label="Turn off when idle">
-              <template #description>
-                <KioskScope
-                  :overridden="idleOverridden"
-                  reset-test="reset-idle-timeout"
-                  @reset="resetIdle"
-                />
-              </template>
-              <SelectPill
-                :model-value="idleValue"
-                :options="idleOptions"
-                aria-label="Turn off when idle"
-                @update:model-value="setIdle"
-              />
-            </SettingRow>
-            <p v-if="powerMsg" class="screens__saved" role="status" aria-live="polite">
-              {{ powerMsg }}
-            </p>
-          </SettingsSection>
-
-          <SettingsSection id="screen-touch" title="Touch & keyboard">
-            <SettingRow label="Touchscreen">
-              <template #description>
-                <KioskScope
-                  :overridden="touchOverridden"
-                  reset-test="reset-touchscreen"
-                  @reset="resetTouch"
-                />
-              </template>
-              <SegmentedControl
-                :model-value="effTouch"
-                aria-label="Touchscreen"
-                :options="[
-                  { value: 'auto', label: 'Auto' },
-                  { value: 'on', label: 'On' },
-                  { value: 'off', label: 'Off' },
-                ]"
-                @update:model-value="setTouch"
-              />
-            </SettingRow>
-            <SettingRow label="On-screen keyboard">
-              <template #description>
-                <KioskScope
-                  :overridden="oskOverridden"
-                  reset-test="osk-use-shared"
-                  @reset="resetOsk"
-                />
-              </template>
-              <SegmentedControl
-                :model-value="effOsk"
-                aria-label="On-screen keyboard"
-                :options="[
-                  { value: 'auto', label: 'Auto' },
-                  { value: 'on', label: 'Always' },
-                  { value: 'off', label: 'Never' },
-                ]"
-                @update:model-value="setOsk"
-              />
-            </SettingRow>
-            <p v-if="touchMsg" class="screens__saved" role="status" aria-live="polite">
-              {{ touchMsg }}
-            </p>
-          </SettingsSection>
-        </div>
-
-        <SettingsSection id="screen-software" title="Software">
-          <SettingRow
-            v-if="selectedKiosk.agentVersion != null"
-            label="Kiosk software"
-            data-test="screen-software-row"
-          >
-            <template #description>
-              <p class="screen-software__desc" data-test="screen-software-state">
-                <template v-if="selectedKiosk.agentUpdateRequested">
-                  Updating to
-                  <span class="screen-software__v">{{ shortVersion(availableVersion) }}</span
-                  >…
-                </template>
-                <template v-else-if="isUpdateBlocked(selectedKiosk)">
-                  <span class="screen-software__v">{{
-                    shortVersion(selectedKiosk.agentVersion)
-                  }}</span>
-                  · update needs a newer OS
-                </template>
-                <template v-else-if="hasUpdateError(selectedKiosk)">
-                  <span class="screen-software__v">{{
-                    shortVersion(selectedKiosk.agentVersion)
-                  }}</span>
-                  · last update failed, kept this version
-                </template>
-                <template v-else-if="availableVersion == null">
-                  <span class="screen-software__v">{{
-                    shortVersion(selectedKiosk.agentVersion)
-                  }}</span>
-                </template>
-                <template v-else-if="!isVersionBehind(selectedKiosk, availableVersion)">
-                  <span class="screen-software__v">{{
-                    shortVersion(selectedKiosk.agentVersion)
-                  }}</span>
-                  · up to date
-                </template>
-                <template v-else>
-                  <span class="screen-software__v">{{
-                    shortVersion(selectedKiosk.agentVersion)
-                  }}</span>
-                  ·
-                  <span class="screen-software__v">{{ shortVersion(availableVersion) }}</span>
-                  available
-                </template>
-              </p>
-              <p v-if="isUpdateBlocked(selectedKiosk)" class="screen-software__reinstall">
-                Reinstall this kiosk with a current Raspberry Pi OS, then update.
-              </p>
-            </template>
-            <button
-              v-if="showUpdateButton(selectedKiosk) || selectedKiosk.agentUpdateRequested"
-              type="button"
-              class="kiosk-software__btn"
-              data-test="kiosk-update-btn"
-              :disabled="selectedKiosk.agentUpdateRequested"
-              @click="onUpdate(selectedId)"
-            >
-              <template v-if="selectedKiosk.agentUpdateRequested">Updating…</template>
-              <template v-else-if="hasUpdateError(selectedKiosk)">Try again</template>
-              <template v-else>Update</template>
-            </button>
-          </SettingRow>
-          <p v-else class="screen-software__empty" data-test="screen-software-empty">
-            This screen runs in a browser, so there is no kiosk software to update.
-          </p>
-        </SettingsSection>
-
-        <!-- Page footer: only when this screen differs from Default (§4). -->
-        <div
-          v-if="selectedChangedCount > 0"
-          class="screen-footer"
-          data-test="screen-override-footer"
+          </template>
+        </SettingRow>
+        <InlineNote
+          v-if="pagesMsg"
+          class="screens-saved"
+          :tone="toneFor(pagesMsg)"
+          role="status"
+          aria-live="polite"
         >
-          <p class="screen-footer__copy">{{ footerCopy }}</p>
-          <div class="screen-footer__actions">
-            <button
-              type="button"
-              class="screen-footer__btn"
-              data-test="reset-everything"
-              @click="askResetEverything"
-            >
-              Reset everything to default
-            </button>
-            <button
-              type="button"
-              class="screen-footer__btn screen-footer__btn--ghost"
-              data-test="use-as-default"
-              @click="askUseAsDefault"
-            >
-              Use these as the default
-            </button>
-          </div>
-          <p v-if="footerMsg" class="screens__saved" role="status" aria-live="polite">
-            {{ footerMsg }}
-          </p>
-        </div>
+          {{ pagesMsg }}
+        </InlineNote>
+      </SettingsSection>
 
-        <ScreenRegionEditor
-          :config="config"
-          :open="editorOpen"
-          :initial-preview-kiosk="selectedId"
-          @update:config="patch => emit('update:config', patch)"
-          @close="editorOpen = false"
-        />
-      </template>
-    </div>
+      <SettingsSection id="screen-display" title="Display">
+        <SettingRow label="Orientation">
+          <template #description>
+            <ScopeLine
+              :overridden="orientationOverridden"
+              reset-test="reset-orientation-row"
+              @reset="resetOrientationRow"
+            />
+          </template>
+          <SegmentedControl
+            :model-value="effOrientation"
+            aria-label="Orientation"
+            :options="[
+              { value: 'landscape', label: 'Landscape' },
+              { value: 'portrait', label: 'Portrait' },
+            ]"
+            @update:model-value="setOrientation"
+          />
+        </SettingRow>
+        <SettingRow label="Upside down">
+          <template #description>
+            <ScopeLine :overridden="flipOverridden" reset-test="reset-flip" @reset="resetFlip" />
+          </template>
+          <ToggleSwitch
+            :model-value="effFlipped"
+            aria-label="Upside down"
+            @update:model-value="setFlipped"
+          />
+        </SettingRow>
+        <SettingRow label="Rotate the screen output">
+          <template #description>
+            <ScopeLine
+              :overridden="applyOverridden"
+              reset-test="reset-apply-rotation"
+              @reset="resetApply"
+            />
+          </template>
+          <ToggleSwitch
+            :model-value="effApply"
+            aria-label="Rotate the screen output"
+            @update:model-value="setApply"
+          />
+        </SettingRow>
+        <Card data-test="screen-live-preview">
+          <PageThumbnail
+            :page="selectedStartPage"
+            :orientation="effOrientation"
+            size="live"
+            data-test="screen-live-thumbnail"
+          />
+          <InlineNote>{{ previewCaption }}</InlineNote>
+        </Card>
+        <InlineNote
+          v-if="displayMsg"
+          class="screens-saved"
+          :tone="toneFor(displayMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ displayMsg }}
+        </InlineNote>
+      </SettingsSection>
+
+      <SettingsSection id="screen-power" title="Power">
+        <SettingRow label="Screen on/off schedule">
+          <template #description>
+            <ScopeLine
+              :overridden="scheduleEnabledOverridden"
+              reset-test="reset-schedule-enabled"
+              @reset="resetScheduleEnabled"
+            />
+          </template>
+          <ToggleSwitch
+            :model-value="effScheduleEnabled"
+            aria-label="Screen on/off schedule"
+            @update:model-value="setScheduleEnabled"
+          />
+        </SettingRow>
+        <SettingRow v-if="effScheduleEnabled" label="Daily schedule">
+          <template #description>
+            <ScopeLine
+              :overridden="scheduleOverridden"
+              reset-test="reset-daily-schedule"
+              @reset="resetDailySchedule"
+            />
+          </template>
+          <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
+        </SettingRow>
+        <SettingRow label="Turn off when idle">
+          <template #description>
+            <ScopeLine
+              :overridden="idleOverridden"
+              reset-test="reset-idle-timeout"
+              @reset="resetIdle"
+            />
+          </template>
+          <SelectPill
+            :model-value="idleValue"
+            :options="idleOptions"
+            aria-label="Turn off when idle"
+            @update:model-value="setIdle"
+          />
+        </SettingRow>
+        <InlineNote
+          v-if="powerMsg"
+          class="screens-saved"
+          :tone="toneFor(powerMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ powerMsg }}
+        </InlineNote>
+      </SettingsSection>
+
+      <SettingsSection id="screen-touch" title="Touch & keyboard">
+        <SettingRow label="Touchscreen">
+          <template #description>
+            <ScopeLine
+              :overridden="touchOverridden"
+              reset-test="reset-touchscreen"
+              @reset="resetTouch"
+            />
+          </template>
+          <SegmentedControl
+            :model-value="effTouch"
+            aria-label="Touchscreen"
+            :options="[
+              { value: 'auto', label: 'Auto' },
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]"
+            @update:model-value="setTouch"
+          />
+        </SettingRow>
+        <SettingRow label="On-screen keyboard">
+          <template #description>
+            <ScopeLine :overridden="oskOverridden" reset-test="osk-use-shared" @reset="resetOsk" />
+          </template>
+          <SegmentedControl
+            :model-value="effOsk"
+            aria-label="On-screen keyboard"
+            :options="[
+              { value: 'auto', label: 'Auto' },
+              { value: 'on', label: 'Always' },
+              { value: 'off', label: 'Never' },
+            ]"
+            @update:model-value="setOsk"
+          />
+        </SettingRow>
+        <InlineNote
+          v-if="touchMsg"
+          class="screens-saved"
+          :tone="toneFor(touchMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ touchMsg }}
+        </InlineNote>
+      </SettingsSection>
+
+      <SettingsSection id="screen-software" title="Software">
+        <SettingRow
+          v-if="selectedKiosk.agentVersion != null"
+          label="Kiosk software"
+          data-test="screen-software-row"
+        >
+          <template #description>
+            <InlineNote data-test="screen-software-state">
+              {{ softwareLine(selectedKiosk) }}
+            </InlineNote>
+            <InlineNote v-if="isUpdateBlocked(selectedKiosk)">
+              Reinstall this kiosk with a current Raspberry Pi OS, then update.
+            </InlineNote>
+          </template>
+          <Button
+            v-if="showUpdateButton(selectedKiosk) || selectedKiosk.agentUpdateRequested"
+            data-test="kiosk-update-btn"
+            :loading="selectedKiosk.agentUpdateRequested"
+            loading-label="Updating…"
+            @click="onUpdate(selectedId)"
+          >
+            <template v-if="selectedKiosk.agentUpdateRequested">Updating…</template>
+            <template v-else-if="hasUpdateError(selectedKiosk)">Try again</template>
+            <template v-else>Update</template>
+          </Button>
+        </SettingRow>
+        <SettingRow v-else label="Kiosk software" data-test="screen-software-empty">
+          <template #description>
+            <InlineNote>
+              This screen runs in a browser, so there is no kiosk software to update.
+            </InlineNote>
+          </template>
+        </SettingRow>
+      </SettingsSection>
+
+      <!-- Page footer: only when this screen differs from Default (§4). -->
+      <Card v-if="selectedChangedCount > 0" data-test="screen-override-footer">
+        <InlineNote>
+          {{ footerCopy }}
+          <template #action>
+            <Button data-test="reset-everything" @click="askResetEverything">
+              Reset everything to default
+            </Button>
+            <Button variant="ghost" data-test="use-as-default" @click="askUseAsDefault">
+              Use these as the default
+            </Button>
+          </template>
+        </InlineNote>
+        <InlineNote v-if="footerMsg" :tone="toneFor(footerMsg)">{{ footerMsg }}</InlineNote>
+      </Card>
+
+      <ScreenRegionEditor
+        :config="config"
+        :open="editorOpen"
+        :initial-preview-kiosk="selectedId"
+        @update:config="patch => emit('update:config', patch)"
+        @close="editorOpen = false"
+      />
+    </template>
 
     <ConfirmModal
       :show="confirm.show"
@@ -604,11 +517,11 @@
       @confirm="onConfirm"
       @cancel="confirm.show = false"
     />
-  </div>
+  </ScreensLayout>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
 import {
@@ -629,18 +542,24 @@ import {
   withoutAllOverrides,
   withoutPromotedSettings,
 } from "@/utils/screenOverrides";
-import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
-import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
+import ScopeLine from "@/components/ui/ScopeLine.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import Tag from "@/components/ui/Tag.vue";
+import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
-import KioskScope from "@/components/settings/shared/KioskScope.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import ScreensLayout from "@/components/settings/shared/ScreensLayout.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
@@ -878,6 +797,8 @@ function closeDetail() {
 
 // --- effective values on the selected screen -----------------------------
 const nameValue = computed(() => overrides.value.displayName || "");
+const nameDraft = ref("");
+watch(nameValue, value => (nameDraft.value = value), { immediate: true });
 const namePlaceholder = computed(() =>
   selectedKiosk.value ? nameFallback(selectedKiosk.value) : ""
 );
@@ -1002,6 +923,10 @@ async function persist(next, messageRef, onlineCopy, offlineCopy) {
 }
 
 const OFFLINE_COPY = "Saved. Changes apply when this screen reconnects.";
+
+function toneFor(message) {
+  return message.startsWith("Couldn't") || message.startsWith("Pick ") ? "err" : "ok";
+}
 
 function setName(value) {
   const trimmed = value.trim();
@@ -1211,10 +1136,26 @@ async function onConfirm() {
 function showUpdateButton(k) {
   return isVersionBehind(k, availableVersion.value) && !isUpdateBlocked(k);
 }
-function softwareClass(k) {
-  if (isUpdateBlocked(k)) return "is-warn";
-  if (hasUpdateError(k)) return "is-err";
-  return "";
+function softwareTone(k) {
+  if (isUpdateBlocked(k)) return "warn";
+  if (hasUpdateError(k)) return "err";
+  return "neutral";
+}
+function softwareLine(k) {
+  const tone = softwareTone(k);
+  if (k?.agentVersion == null) return "";
+  if (k.agentUpdateRequested) return `Updating to ${shortVersion(availableVersion.value)}…`;
+  if (tone === "warn") {
+    return `Kiosk software ${shortVersion(k.agentVersion)} · update needs a newer OS`;
+  }
+  if (tone === "err") {
+    return `Kiosk software ${shortVersion(k.agentVersion)} · last update failed, kept this version`;
+  }
+  if (availableVersion.value == null) return `Kiosk software ${shortVersion(k.agentVersion)}`;
+  if (!isVersionBehind(k, availableVersion.value)) {
+    return `Kiosk software ${shortVersion(k.agentVersion)} · up to date`;
+  }
+  return `Kiosk software ${shortVersion(k.agentVersion)} · ${shortVersion(availableVersion.value)} available`;
 }
 async function checkManifest() {
   manifestChecking.value = true;
@@ -1293,402 +1234,3 @@ onUnmounted(() => {
   }
 });
 </script>
-
-<style scoped>
-.screens {
-  display: block;
-}
-/* Kiosk width: the list and the selected page side by side (list 320px). */
-.screens--two-pane {
-  display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: var(--space-lg);
-  align-items: start;
-}
-/* Phone: one pane at a time — the list hides while a page is open. */
-.screens--single-pane {
-  display: block;
-}
-.screens--single-pane .screens__list {
-  display: none;
-}
-.screens--single-pane .screen-display {
-  grid-template-columns: 1fr;
-}
-.screens__list,
-.screens__detail {
-  min-width: 0;
-}
-.screens__intro {
-  padding: 0.75rem 1.25rem;
-}
-.screens__empty {
-  flex: 1 1 20rem;
-  margin: 0;
-  opacity: 0.8;
-}
-/* Secondary .btn (mock S1), right-aligned in the Screens section header. */
-.screens__add {
-  flex: none;
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.screens__add:hover {
-  border-color: var(--focus);
-}
-.screens__add:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.screens__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-  padding: 6px 1.25rem 16px;
-}
-.screen-card {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 4px 12px;
-  align-items: start;
-  width: 100%;
-  padding: 12px;
-  text-align: left;
-  color: inherit;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  cursor: pointer;
-}
-/* The Default is a real screen now: no dashed "shared" treatment. */
-.screen-card--default {
-  border-style: solid;
-}
-/* This browser is a single column of words, with no thumbnail. */
-.screen-card--browser {
-  grid-template-columns: 1fr;
-}
-.screen-card.is-selected {
-  border-color: var(--focus);
-}
-.screen-card__body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.screen-card__name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-  font-weight: 600;
-  color: var(--ink);
-}
-.screen-card__id {
-  font-family: var(--font-data);
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-}
-.screen-card__meta,
-.screen-card__summary {
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-/* The Default card has two prose lines; keep the summary visually separate. */
-.screen-card--default .screen-card__meta {
-  margin-top: 2px;
-  display: block;
-}
-.screen-card__changed {
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  color: var(--ink);
-}
-.screen-card__status {
-  font-size: var(--fs-xs);
-  font-weight: 500;
-}
-.screen-card__status.is-online {
-  color: var(--ok-text);
-}
-.screen-card__status.is-offline {
-  color: var(--ink-3);
-}
-.screen-card__software {
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.screen-card__software.is-warn {
-  color: var(--warn-text);
-}
-.screen-card__software.is-err {
-  color: var(--err-text);
-}
-.screen-card__v,
-.kiosk-software__v,
-.screen-software__v {
-  font-family: var(--font-data);
-}
-/* Kiosk software summary row (CLV-19). */
-.kiosk-software__desc {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-.kiosk-software__btn {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.kiosk-software__btn:hover:not(:disabled) {
-  border-color: var(--focus);
-}
-.kiosk-software__btn--primary {
-  color: var(--focus-ink);
-  background: var(--focus);
-  border-color: var(--focus);
-  font-weight: 600;
-}
-.kiosk-software__btn--primary:hover:not(:disabled) {
-  filter: brightness(1.08);
-}
-.kiosk-software__btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.screens__saved {
-  margin: 8px 1.25rem;
-  font-size: 0.85em;
-  opacity: 0.7;
-}
-.screens__back {
-  margin-bottom: 10px;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--ink-2);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.screens__back:hover {
-  color: var(--ink);
-}
-.screens__back:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.screen-name-input {
-  min-width: 180px;
-  height: var(--control-height);
-  min-height: var(--touch-target);
-  padding: 0 0.875rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-control-lg);
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-}
-.screen-name-input:focus {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.screen-pages__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 12px 1.25rem 6px;
-}
-.screen-pages__hint {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
-}
-.screen-pages__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.screen-pages__scope-label {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink);
-}
-.screen-pages__start-scope {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 8px 1.25rem;
-  border-top: 1px solid var(--line-soft);
-}
-.screen-pages__edit {
-  margin-left: auto;
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.screen-page {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 1.25rem;
-  border-top: 1px solid var(--line-soft);
-}
-.screen-page.is-hidden-page {
-  opacity: 0.65;
-}
-.screen-page__show,
-.screen-page__start {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.screen-page__start {
-  margin-left: auto;
-}
-.screen-page__body {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-.screen-page__name {
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-}
-.screen-page__not-shown {
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-}
-.screen-detail__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-lg);
-  align-items: start;
-}
-.screen-display {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: start;
-  gap: var(--space-md);
-}
-.screen-display__rows {
-  min-width: 0;
-}
-.screen-display__preview {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 12px 1.25rem;
-}
-.screen-display__caption {
-  font-size: var(--fs-xs);
-  color: var(--ink-3);
-}
-.screen-software__empty {
-  margin: 0;
-  padding: 0.75rem 1.25rem;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.screen-software__desc {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-.screen-software__reinstall {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-/* Page footer: only a screen with overrides gets the two default actions. */
-.screen-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  margin-top: 1.25rem;
-  padding: 1rem 1.25rem;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-2xl);
-}
-.screen-footer__copy {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.screen-footer__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-.screen-footer__btn {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.screen-footer__btn--ghost {
-  background: none;
-}
-.screen-footer__btn:hover {
-  border-color: var(--focus);
-}
-.screen-footer__btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-/* The summary row stacks its control full-width on phone-sized screens. */
-@media (max-width: 480px) {
-  .kiosk-software {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-  }
-  .kiosk-software :deep(.setting-row__control) {
-    width: 100%;
-  }
-  .kiosk-software__btn {
-    width: 100%;
-  }
-}
-</style>

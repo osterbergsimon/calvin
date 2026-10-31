@@ -125,7 +125,6 @@ describe("DashboardSettings copy (§3.2)", () => {
 
   const COPY = [
     ["Settings text size", "Only changes Settings. The dashboard has its own size below."],
-    ["Room name", 'Shown in the clock bar, e.g. "Kitchen".'],
     ["Hide controls", "Hides the ⋯ menu and region headers for a calm wall display."],
     ["Tap anywhere to show controls", "A tap on calendar or photos brings controls back."],
     ["Dashboard size", "Size of labels and touch buttons on the dashboard."],
@@ -142,6 +141,12 @@ describe("DashboardSettings copy (§3.2)", () => {
     const r = row(w, label);
     expect(r).toBeTruthy();
     expect(r.props("description")).toBe(description);
+  });
+
+  it("has no Room name row (the name is per screen, CLV-84)", () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    expect(w.text()).not.toContain("Room name");
+    expect(w.find("[aria-label='Room name']").exists()).toBe(false);
   });
 
   const WITHOUT_DESCRIPTION = ["Theme", "Light or dark", "Font", "Keep the clock bar when hidden"];
