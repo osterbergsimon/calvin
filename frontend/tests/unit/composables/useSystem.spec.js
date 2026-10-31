@@ -95,7 +95,11 @@ describe("useSystem", () => {
       const health = await system.getBackendHealth();
 
       expect(health.status).toBe("unhealthy");
+      // Raw detail stays for the Settings › Details line; the readout is friendly.
       expect(system.backendHealth.value.error).toBe("down");
+      expect(system.backendHealth.value.errorText).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(system.backendHealthLoading.value).toBe(false);
     });
   });
@@ -220,13 +224,16 @@ describe("useSystem", () => {
 
     it("sets error message when restart returns an HTTP error response", async () => {
       const error = new Error("Failed to restart");
-      error.response = { data: { detail: "Service unavailable" } };
+      error.response = { status: 500, data: { detail: "Service unavailable" } };
       systemApi.restartBackend.mockRejectedValue(error);
 
       const system = useSystem();
       await system.restartBackend();
 
-      expect(system.updateMessage.value).toBe("Service unavailable");
+      // A 5xx detail is server text, not copy (CLV-63).
+      expect(system.updateMessage.value).toBe(
+        "Something went wrong on the Calvin server while trying to restart Calvin."
+      );
       expect(system.updateMessageClass.value).toBe("error");
       expect(systemApi.getHealth).not.toHaveBeenCalled();
     });
@@ -264,9 +271,9 @@ describe("useSystem", () => {
       expect(reloadSpy).toHaveBeenCalled();
     });
 
-    it("sets error message when restart returns an HTTP error response", async () => {
+    it("shows a validation detail written for people", async () => {
       const error = new Error("Failed to restart");
-      error.response = { data: { detail: "Service unavailable" } };
+      error.response = { status: 422, data: { detail: "Service unavailable" } };
       systemApi.restartFrontend.mockRejectedValue(error);
 
       const system = useSystem();
@@ -302,7 +309,7 @@ describe("useSystem", () => {
 
       expect(systemApi.triggerUpdate).toHaveBeenCalled();
       expect(system.updating.value).toBe(false);
-      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
       expect(system.updateMessageClass.value).toBe("success");
     });
 
@@ -313,7 +320,9 @@ describe("useSystem", () => {
       await system.triggerUpdate();
 
       expect(system.updating.value).toBe(false);
-      expect(system.updateMessage.value).toBe("Update failed");
+      expect(system.updateMessage.value).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(system.updateMessageClass.value).toBe("error");
     });
 
@@ -331,7 +340,9 @@ describe("useSystem", () => {
       });
       await promise;
 
-      expect(system.updateMessage.value).toBe("Update failed: Build failed");
+      expect(system.updateMessage.value).toBe(
+        "The update didn't finish. Calvin is still on the previous version."
+      );
       expect(system.updateMessageClass.value).toBe("error");
     });
 
@@ -407,7 +418,7 @@ describe("useSystem", () => {
       // Test functionality: status was checked and stored
       expect(systemApi.getUpdateStatus).toHaveBeenCalled();
       expect(system.updateStatus.value).toEqual(mockStatus);
-      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
     });
 
     it("should handle in-progress status", async () => {
@@ -423,7 +434,7 @@ describe("useSystem", () => {
 
       // Test functionality: transitions from running -> idle
       expect(system.updateStatus.value?.status).toBe("idle");
-      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
       expect(systemApi.getUpdateStatus).toHaveBeenCalledTimes(2);
     });
 
@@ -438,7 +449,9 @@ describe("useSystem", () => {
 
       // Test functionality: error status is stored and message is set
       expect(system.updateStatus.value?.status).toBe("error");
-      expect(system.updateMessage.value).toContain("Update failed");
+      expect(system.updateMessage.value).toBe(
+        "The update didn't finish. Calvin is still on the previous version."
+      );
       expect(system.updateMessageClass.value).toBe("error");
     });
   });

@@ -30,7 +30,7 @@
             v-if="instance.running !== undefined"
             class="pi-dot"
             :class="instance.running ? 'pi-dot--on' : 'pi-dot--off'"
-            :title="instance.running ? 'Running' : 'Stopped'"
+            :title="instance.running ? 'Working' : 'Off'"
           />
           <div class="pi-info">
             <span class="pi-name">{{ instance.name }}</span>

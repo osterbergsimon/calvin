@@ -5,7 +5,9 @@
     stacked
   >
     <div v-if="store.loading" class="kb-msg">Loading mappings…</div>
-    <div v-else-if="store.error" class="kb-msg kb-msg--err" role="alert">{{ store.error }}</div>
+    <div v-else-if="store.error" class="kb-msg kb-msg--err" role="alert">
+      {{ store.errorText }}
+    </div>
 
     <KeyBindingBoard
       v-else

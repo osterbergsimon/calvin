@@ -2,12 +2,15 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import api from "@/services/api";
 import { logError } from "@/utils/logger";
+import { friendlyError } from "@/utils/friendlyError";
 
 export const useKeyboardStore = defineStore("keyboard", () => {
   const mappings = ref({}); // { KEY_x: action }
   const available = ref(false);
   const loading = ref(false);
   const error = ref(null);
+  // One friendly sentence for the screen; `error` keeps the raw text for logs.
+  const errorText = ref("");
 
   const captureActive = ref(false);
   let captureResolver = null;
@@ -15,6 +18,7 @@ export const useKeyboardStore = defineStore("keyboard", () => {
   const fetchMappings = async () => {
     loading.value = true;
     error.value = null;
+    errorText.value = "";
     try {
       const response = await api.get("/keyboard/mappings");
       mappings.value = response.data.mappings || {};
@@ -22,6 +26,7 @@ export const useKeyboardStore = defineStore("keyboard", () => {
       return response.data;
     } catch (err) {
       error.value = err.message;
+      errorText.value = friendlyError(err, "load the keyboard settings");
       available.value = false;
       logError("[Keyboard]", "Failed to fetch mappings:", err);
       throw err;
@@ -77,6 +82,7 @@ export const useKeyboardStore = defineStore("keyboard", () => {
     available,
     loading,
     error,
+    errorText,
     captureActive,
     fetchMappings,
     setMapping,

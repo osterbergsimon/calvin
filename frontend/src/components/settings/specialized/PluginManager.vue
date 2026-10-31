@@ -20,9 +20,7 @@
     <div v-else class="pm-list">
       <!-- Theme install hint -->
       <p v-if="activeTab === 'theme' && showThemeInfo" class="pm-note">
-        Themes install just like plugins — list a repository above, then install any theme that
-        appears. Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always available under
-        Dashboard › Appearance › Theme.
+        Themes are plugins too: install them here, then choose one in Dashboard › Appearance.
       </p>
 
       <PluginCard

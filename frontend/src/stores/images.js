@@ -2,6 +2,8 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import api, { LONG_REQUEST_TIMEOUT } from "../services/api";
 import { getCachedData, setCachedData } from "../utils/cache";
+import { friendlyError } from "../utils/friendlyError";
+import { logError } from "../utils/logger";
 
 // Persist the wall-display feed so a kiosk refresh/reboot during a backend
 // outage keeps showing the last-known photo instead of "No images available".
@@ -17,6 +19,8 @@ export const useImagesStore = defineStore("images", () => {
   const currentImagesBySourceKey = ref({});
   const loading = ref(false);
   const error = ref(null);
+  // One friendly sentence for the screen; `error` keeps the raw text for logs.
+  const errorText = ref("");
 
   const normalizeSourceIds = sourceIds =>
     Array.isArray(sourceIds)
@@ -47,9 +51,20 @@ export const useImagesStore = defineStore("images", () => {
     return config ? api.post(url, null, config) : api.post(url);
   };
 
+  const clearError = () => {
+    error.value = null;
+    errorText.value = "";
+  };
+
+  const captureError = (err, action, message) => {
+    error.value = err.message;
+    errorText.value = friendlyError(err, action);
+    logError("[Images]", message, err);
+  };
+
   const fetchImages = async (sourceIds = []) => {
     loading.value = true;
-    error.value = null;
+    clearError();
     const sourceKey = getSourceKey(sourceIds);
     try {
       const response = await getWithSources("/images/list", sourceIds);
@@ -66,8 +81,7 @@ export const useImagesStore = defineStore("images", () => {
       }
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      console.error("Failed to fetch images:", err);
+      captureError(err, "load your photos", "Failed to fetch images:");
       // Serve the last-known feed so the wall display survives a backend outage.
       if (sourceKey === "__all__") {
         const cached = getCachedData(IMAGES_CACHE_KEY, IMAGE_CACHE_TTL, { allowStale: true });
@@ -94,7 +108,7 @@ export const useImagesStore = defineStore("images", () => {
       }
       return response.data;
     } catch (err) {
-      console.error("Failed to fetch current image:", err);
+      logError("[Images]", "Failed to fetch current image:", err);
       // Fall back to the last-known image so the frame isn't blank during an outage.
       if (sourceKey === "__all__") {
         const cached = getCachedData(CURRENT_IMAGE_CACHE_KEY, IMAGE_CACHE_TTL, {
@@ -118,7 +132,7 @@ export const useImagesStore = defineStore("images", () => {
       if (sourceKey === "__all__") currentImage.value = response.data.image;
       return response.data;
     } catch (err) {
-      console.error("Failed to go to next image:", err);
+      logError("[Images]", "Failed to go to next image:", err);
       throw err;
     }
   };
@@ -131,7 +145,7 @@ export const useImagesStore = defineStore("images", () => {
       if (sourceKey === "__all__") currentImage.value = response.data.image;
       return response.data;
     } catch (err) {
-      console.error("Failed to go to previous image:", err);
+      logError("[Images]", "Failed to go to previous image:", err);
       throw err;
     }
   };
@@ -167,7 +181,7 @@ export const useImagesStore = defineStore("images", () => {
 
   const uploadImage = async file => {
     loading.value = true;
-    error.value = null;
+    clearError();
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -179,8 +193,7 @@ export const useImagesStore = defineStore("images", () => {
       await fetchImages();
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      console.error("Failed to upload image:", err);
+      captureError(err, "upload that photo", "Failed to upload image:");
       throw err;
     } finally {
       loading.value = false;
@@ -189,7 +202,7 @@ export const useImagesStore = defineStore("images", () => {
 
   const deleteImage = async imageId => {
     loading.value = true;
-    error.value = null;
+    clearError();
     try {
       const response = await api.delete(`/images/${imageId}`);
       // Refresh images list
@@ -200,8 +213,7 @@ export const useImagesStore = defineStore("images", () => {
       }
       return response.data;
     } catch (err) {
-      error.value = err.message;
-      console.error("Failed to delete image:", err);
+      captureError(err, "delete that photo", "Failed to delete image:");
       throw err;
     } finally {
       loading.value = false;
@@ -215,6 +227,7 @@ export const useImagesStore = defineStore("images", () => {
     currentImagesBySourceKey,
     loading,
     error,
+    errorText,
     fetchImages,
     fetchCurrentImage,
     nextImage,

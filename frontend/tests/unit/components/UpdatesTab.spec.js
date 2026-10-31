@@ -78,10 +78,56 @@ describe("UpdatesTab", () => {
       },
     });
 
-    expect(wrapper.text()).toContain("Backend API");
-    expect(wrapper.text()).toContain("healthy");
-    expect(wrapper.text()).toContain("Pulling Code");
+    expect(wrapper.text()).toContain("Calvin");
+    expect(wrapper.text()).toContain("Running");
+    expect(wrapper.text()).toContain("Updates");
+    expect(wrapper.text()).toContain("Updating");
+    expect(wrapper.text()).toContain("Downloading");
     expect(wrapper.text()).toContain("Pulling latest code");
+    // Never the raw server vocabulary (CLV-63).
+    expect(wrapper.text()).not.toContain("Backend API");
+    expect(wrapper.text()).not.toContain("healthy");
+    expect(wrapper.text()).not.toContain("pulling_code");
+  });
+
+  it("maps every update status to plain words", async () => {
+    const labelFor = async status => {
+      systemMock.updateStatus.value = { status };
+      const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
+      const row = wrapper.findAll(".readout-line")[1];
+      return row.find(".readout-val").text();
+    };
+
+    expect(await labelFor("idle")).toBe("Up to date");
+    expect(await labelFor("running")).toBe("Updating");
+    expect(await labelFor("error")).toBe("Update failed");
+    // Unknown or not-yet-checked statuses never print the raw value.
+    expect(await labelFor("scheduled")).toBe("Not checked yet");
+    expect(await labelFor(undefined)).toBe("Not checked yet");
+  });
+
+  it("hides an unknown update phase", async () => {
+    systemMock.updateStatus.value = { status: "running", phase: "quantum_flux" };
+    const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
+    expect(wrapper.text()).not.toContain("quantum_flux");
+    expect(wrapper.text()).not.toContain("Quantum Flux");
+  });
+
+  it("puts the raw health detail behind Details", async () => {
+    systemMock.backendHealth.value = {
+      status: "unhealthy",
+      error: "Request failed with status code 500",
+      errorText: "Something went wrong on the Calvin server while trying to check on Calvin.",
+    };
+    const wrapper = mount(UpdatesTab, { props: { gitRepoUrl: "", gitBranch: "main" } });
+
+    expect(wrapper.find(".readout-note").text()).toBe(
+      "Something went wrong on the Calvin server while trying to check on Calvin."
+    );
+    const details = wrapper.find("details.readout-details");
+    expect(details.exists()).toBe(true);
+    expect(details.find("summary").text()).toBe("Details");
+    expect(details.text()).toContain("Request failed with status code 500");
   });
 
   it("no longer renders the System restart/reload section", () => {
