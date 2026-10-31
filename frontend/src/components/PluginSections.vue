@@ -100,9 +100,12 @@
               Remote
             </span>
           </div>
-          <div v-if="filteredImages.length === 0" class="empty-state">
-            <p>No images available</p>
-          </div>
+          <EmptyState
+            v-if="filteredImages.length === 0"
+            compact
+            :icon="mdiImageOutline"
+            message="No images available"
+          />
         </div>
       </div>
     </div>
@@ -111,6 +114,8 @@
 
 <script setup>
 import { ref, computed } from "vue";
+import { mdiImageOutline } from "@mdi/js";
+import EmptyState from "@/components/ui/EmptyState.vue";
 
 const props = defineProps({
   pluginId: {
@@ -270,12 +275,6 @@ const formatFileSize = bytes => {
 
 .image-details {
   font-size: var(--fs-control);
-  color: var(--ink-2);
-}
-
-.empty-state {
-  text-align: center;
-  padding: 2rem;
   color: var(--ink-2);
 }
 
