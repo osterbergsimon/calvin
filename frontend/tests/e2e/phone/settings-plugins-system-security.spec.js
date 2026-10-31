@@ -21,8 +21,8 @@ test.describe("phone: Plugins", () => {
     await selectCategory(page, "Plugins");
 
     const category = page.locator(".plugins-category");
-    await expect(category.locator(".pc-name", { hasText: "ICS calendar" })).toBeVisible();
-    await expect(category.locator(".pc-name", { hasText: "Web page" })).toBeVisible();
+    await expect(category.locator(".list-row__name", { hasText: "ICS calendar" })).toBeVisible();
+    await expect(category.locator(".list-row__name", { hasText: "Web page" })).toBeVisible();
     await expectPhoneLayout(page, "Plugins category");
 
     // Kind filters are a segmented control; each one narrows the list.

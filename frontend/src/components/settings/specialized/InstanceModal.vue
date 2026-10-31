@@ -1,154 +1,131 @@
 <template>
-  <div v-if="show" class="modal-overlay dialog-above-osk" @click.self="handleClose">
-    <div class="modal-content instance-modal">
-      <div class="modal-header">
-        <h3>
-          {{ editingInstance ? `Edit ${editingInstance.name || instanceLabel}` : addTitle }}
-        </h3>
-        <IconButton variant="ghost" label="Close" @click="handleClose">×</IconButton>
-      </div>
-      <div class="modal-body">
-        <div v-if="error" class="error-message">
-          {{ error }}
+  <Dialog :model-value="show" :title="dialogTitle" @update:model-value="handleDialog">
+    <InlineNote v-if="error" class="instance-modal__note" tone="err">{{ error }}</InlineNote>
+    <form id="instance-form" class="instance-form" @submit.prevent="handleSave">
+      <TextField v-model="formData.name" label="Name" :placeholder="namePlaceholder" required />
+
+      <!-- Instance-specific fields from instance_config_schema -->
+      <template v-if="instanceFields.length > 0">
+        <div v-for="[key, schema] in instanceFields" :key="key" class="form-group">
+          <PluginFieldRenderer
+            :plugin-id="currentPlugin.id"
+            :field-key="key"
+            :schema="fieldSchema(key, schema)"
+            :value="getFormValue(key, schema)"
+            @update="updateFormValue(key, $event)"
+          />
+          <!-- Geocode button for location field (for weather plugins like YR.no) -->
+          <Button
+            v-if="key === 'location' && hasGeocodeAction"
+            variant="secondary"
+            class="instance-modal__geocode"
+            :disabled="geocoding || !formData.location"
+            :loading="geocoding"
+            loading-label="Getting coordinates…"
+            @click="handleGeocode"
+          >
+            Get coordinates
+          </Button>
+          <InlineNote
+            v-if="key === 'location' && geocodeStatus"
+            class="instance-modal__note"
+            :tone="geocodeStatus.success ? 'ok' : 'err'"
+          >
+            {{ geocodeStatus.message }}
+          </InlineNote>
         </div>
-        <form @submit.prevent="handleSave">
-          <div class="form-group">
-            <label>Name</label>
+      </template>
+
+      <!-- Fallback for plugins without instance_config_schema -->
+      <template v-else>
+        <InlineNote>This plugin type has no settings of its own.</InlineNote>
+      </template>
+
+      <!-- Calendar-specific fields (colour and show_time) -->
+      <template v-if="currentPlugin?.type === 'calendar'">
+        <div class="form-group">
+          <div class="colour-row">
             <input
-              v-model="formData.name"
-              type="text"
-              class="form-input"
-              :placeholder="namePlaceholder"
-              required
+              id="instance-calendar-colour"
+              v-model="formData.color"
+              type="color"
+              class="color-input"
+              aria-label="Colour"
+            />
+            <TextField
+              v-model="formData.color"
+              class="colour-value"
+              label="Colour"
+              placeholder="#2196f3"
             />
           </div>
+          <InlineNote>Choose a colour for events from this calendar source</InlineNote>
+        </div>
+        <SettingRow
+          label="Show event times"
+          description="Display time information for events from this calendar"
+        >
+          <ToggleSwitch
+            :model-value="formData.show_time"
+            aria-label="Show event times"
+            @update:model-value="formData.show_time = $event"
+          />
+        </SettingRow>
+      </template>
 
-          <!-- Instance-specific fields from instance_config_schema -->
-          <template v-if="instanceFields.length > 0">
-            <div v-for="[key, schema] in instanceFields" :key="key" class="form-group">
-              <PluginFieldRenderer
-                :plugin-id="currentPlugin.id"
-                :field-key="key"
-                :schema="fieldSchema(key, schema)"
-                :value="getFormValue(key, schema)"
-                @update="updateFormValue(key, $event)"
-              />
-              <!-- Geocode button for location field (for weather plugins like YR.no) -->
-              <Button
-                v-if="key === 'location' && hasGeocodeAction"
-                variant="secondary"
-                class="instance-modal__geocode"
-                :disabled="geocoding || !formData.location"
-                :loading="geocoding"
-                loading-label="Getting coordinates…"
-                @click="handleGeocode"
-              >
-                Get coordinates
-              </Button>
-              <div
-                v-if="key === 'location' && geocodeStatus"
-                :class="geocodeStatus.success ? 'success-message' : 'error-message'"
-                style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
-              >
-                {{ geocodeStatus.message }}
-              </div>
-            </div>
-          </template>
+      <!-- Enable/Disable -->
+      <SettingRow label="Enabled">
+        <ToggleSwitch
+          :model-value="formData.enabled"
+          aria-label="Enabled"
+          @update:model-value="formData.enabled = $event"
+        />
+      </SettingRow>
 
-          <!-- Fallback for plugins without instance_config_schema -->
-          <template v-else>
-            <div class="form-group">
-              <p class="help-text">This plugin type has no settings of its own.</p>
-            </div>
-          </template>
-
-          <!-- Calendar-specific fields (colour and show_time) -->
-          <template v-if="currentPlugin?.type === 'calendar'">
-            <div class="form-group">
-              <label for="instance-calendar-colour">Colour</label>
-              <div class="colour-row">
-                <input
-                  id="instance-calendar-colour"
-                  v-model="formData.color"
-                  type="color"
-                  class="color-input"
-                  style="width: 60px; height: 40px; cursor: pointer"
-                />
-                <input
-                  v-model="formData.color"
-                  type="text"
-                  class="form-input"
-                  placeholder="#2196f3"
-                  aria-label="Colour value"
-                  style="flex: 1"
-                />
-              </div>
-              <span class="help-text">Choose a colour for events from this calendar source</span>
-            </div>
-            <div class="form-group">
-              <div class="toggle-row">
-                <span class="toggle-row__label">Show event times</span>
-                <ToggleSwitch
-                  :model-value="formData.show_time"
-                  aria-label="Show event times"
-                  @update:model-value="formData.show_time = $event"
-                />
-              </div>
-              <span class="help-text">
-                Display time information for events from this calendar
-              </span>
-            </div>
-          </template>
-
-          <!-- Enable/Disable -->
-          <div class="form-group">
-            <div class="toggle-row">
-              <span class="toggle-row__label">Enabled</span>
-              <ToggleSwitch
-                :model-value="formData.enabled"
-                aria-label="Enabled"
-                @update:model-value="formData.enabled = $event"
-              />
-            </div>
-          </div>
-
-          <!-- Test connection Button (if plugin supports it) -->
-          <div v-if="hasTestAction" class="form-group">
-            <Button
-              variant="secondary"
-              :disabled="testing"
-              :loading="testing"
-              loading-label="Testing…"
-              @click="handleTest"
-            >
-              Test connection
-            </Button>
-            <div
-              v-if="testStatus"
-              :class="testStatus.success ? 'success-message' : 'error-message'"
-              style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
-            >
-              {{ testStatus.message }}
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <Button @click="handleClose">Cancel</Button>
-            <Button type="submit" variant="primary" :loading="saving" loading-label="Saving…">
-              Save
-            </Button>
-          </div>
-        </form>
+      <!-- Test connection Button (if plugin supports it) -->
+      <div v-if="hasTestAction" class="form-group">
+        <Button
+          variant="secondary"
+          :disabled="testing"
+          :loading="testing"
+          loading-label="Testing…"
+          @click="handleTest"
+        >
+          Test connection
+        </Button>
+        <InlineNote
+          v-if="testStatus"
+          class="instance-modal__note"
+          :tone="testStatus.success ? 'ok' : 'err'"
+        >
+          {{ testStatus.message }}
+        </InlineNote>
       </div>
-    </div>
-  </div>
+    </form>
+
+    <template #actions>
+      <Button @click="handleClose">Cancel</Button>
+      <Button
+        type="submit"
+        form="instance-form"
+        variant="primary"
+        :loading="saving"
+        loading-label="Saving…"
+      >
+        Save
+      </Button>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
 import { ref, watch, computed } from "vue";
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
-import IconButton from "@/components/ui/IconButton.vue";
 import Button from "@/components/ui/Button.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { isHiddenField } from "@/utils/pluginFields";
 import * as pluginsApi from "@/services/pluginsApi";
@@ -392,6 +369,18 @@ const updateFormValue = (key, value) => {
   formData.value[key] = value;
 };
 
+const dialogTitle = computed(() =>
+  editingInstance.value
+    ? `Edit ${editingInstance.value.name || instanceLabel.value}`
+    : addTitle.value
+);
+
+// The shared Dialog closes itself (scrim, Escape or its close button); the
+// form treats that as Cancel and leaves saving to the Save button.
+const handleDialog = open => {
+  if (!open) handleClose();
+};
+
 const handleClose = () => {
   emit("close");
 };
@@ -625,147 +614,39 @@ const handleSave = async () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: color-mix(in srgb, var(--ink) 55%, transparent);
+.instance-form {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.instance-modal {
-  background: var(--bg-1);
-  border-radius: var(--radius-sm);
-  box-shadow: 0 4px 12px var(--shadow);
-  max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: var(--fs-xl);
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.modal-body {
-  padding: 1.5rem;
+  flex-direction: column;
+  gap: var(--gap-group);
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  display: block;
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 0.5rem;
-  font-size: var(--fs-md);
-  font-family: var(--font-ui);
-}
-
-.form-input {
-  width: 100%;
-  height: var(--control-height);
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-md);
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--focus);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent);
-}
-
-.form-input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-inline);
 }
 
 .colour-row {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  align-items: flex-end;
+  gap: var(--gap-inline);
 }
 
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+.color-input {
+  width: 3.75rem;
+  height: var(--control-height);
+  cursor: pointer;
 }
 
-.toggle-row__label {
-  font-weight: 600;
-  color: var(--ink);
-  font-size: var(--fs-md);
-  font-family: var(--font-ui);
-}
-
-.help-text {
-  font-size: var(--text-meta);
-  color: var(--ink-2);
-  margin-top: var(--gap-1);
-  line-height: normal;
-}
-
-.error-message {
-  padding: 0.75rem 1rem;
-  background: color-mix(in srgb, var(--err) 10%, transparent);
-  color: var(--err-text);
-  border: 1px solid color-mix(in srgb, var(--err) 30%, transparent);
-  border-radius: var(--radius-xs);
-  margin-bottom: 1rem;
-}
-
-.success-message {
-  padding: 0.75rem 1rem;
-  background: color-mix(in srgb, var(--ok) 10%, transparent);
-  color: var(--ok-text);
-  border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent);
-  border-radius: var(--radius-xs);
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  /* Sticky footer: on a short 800x480 kiosk the modal scrolls internally, so
-     pin Save/Cancel to the bottom edge instead of leaving them below the fold
-     (calvin-g7v). Negative margins bleed the bar to the body edges and cancel
-     modal-body's bottom padding so it sits flush. */
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-  margin: 2rem -1.5rem -1.5rem;
-  padding: 1.25rem 1.5rem;
-  background: var(--bg-1);
-  border-top: 1px solid var(--line);
+.colour-value {
+  flex: 1;
 }
 
 .instance-modal__geocode {
-  margin-top: 0.5rem;
+  align-self: flex-start;
+}
+
+.instance-modal__note {
+  margin-top: var(--gap-1);
 }
 </style>

@@ -1,64 +1,67 @@
 <template>
   <div class="pc-card" :class="{ 'pc-card--off': !plugin.enabled && !isTheme }">
-    <!-- Header: identity + enable -->
-    <div class="pc-head">
-      <span class="pc-name">{{ plugin.name }}</span>
-      <Tag class="pc-badge">{{ kindLabel }}</Tag>
-      <span v-if="plugin.version" class="pc-ver">v{{ plugin.version }}</span>
-      <span class="pc-spacer" />
-      <ToggleSwitch
-        v-if="!isTheme"
-        :model-value="plugin.enabled"
-        :aria-label="`Enable ${plugin.name}`"
-        @update:model-value="$emit('toggle-enabled', plugin.id, $event)"
-      />
-    </div>
+    <ListRow :name="plugin.name || plugin.id" class="pc-row">
+      <template #meta>
+        <span class="pc-meta-line">
+          <Tag class="pc-badge">{{ kindLabel }}</Tag>
+          <span v-if="plugin.version" class="pc-ver">v{{ plugin.version }}</span>
+          <span class="pc-summary">
+            <template v-if="isTheme">
+              Choose it in
+              <Button variant="link" size="sm" class="pc-link" @click="$emit('open-appearance')">
+                Dashboard › Appearance
+              </Button>
+            </template>
+            <template v-else-if="isBackground">
+              Works in the background. No sources to add.
+            </template>
+            <template v-else-if="!plugin.enabled">
+              Turned off<template v-if="sourceCount">
+                · {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}</template
+              ><template v-else> · not used</template>
+            </template>
+            <template v-else-if="sourceCount">
+              <Button variant="link" size="sm" class="pc-link" @click="$emit('used-by', plugin.id)">
+                Used by {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}
+              </Button>
+            </template>
+            <template v-else>
+              Not used yet<template v-if="canAddSource">
+                ·
+                <Button
+                  variant="link"
+                  size="sm"
+                  class="pc-link"
+                  @click="$emit('add-source', plugin.id)"
+                >
+                  Add a source
+                </Button></template
+              >
+            </template>
+          </span>
+        </span>
+      </template>
 
-    <!-- Meta: how many sources use it, and where they live -->
-    <div class="pc-meta">
-      <span class="pc-summary">
-        <template v-if="isTheme">
-          Choose it in
-          <button type="button" class="pc-link" @click="$emit('open-appearance')">
-            Dashboard › Appearance
-          </button>
-        </template>
-        <template v-else-if="isBackground"> Works in the background. No sources to add. </template>
-        <template v-else-if="!plugin.enabled">
-          Turned off<template v-if="sourceCount">
-            · {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}</template
-          ><template v-else> · not used</template>
-        </template>
-        <template v-else-if="sourceCount">
-          <button type="button" class="pc-link" @click="$emit('used-by', plugin.id)">
-            Used by {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}
-          </button>
-        </template>
-        <template v-else>
-          Not used yet<template v-if="canAddSource">
-            ·
-            <button type="button" class="pc-link" @click="$emit('add-source', plugin.id)">
-              Add a source
-            </button></template
-          >
-        </template>
-      </span>
-
-      <div class="pc-actions">
-        <button
+      <template #actions>
+        <ToggleSwitch
+          v-if="!isTheme"
+          :model-value="plugin.enabled"
+          :aria-label="`Enable ${plugin.name}`"
+          @update:model-value="$emit('toggle-enabled', plugin.id, $event)"
+        />
+        <Button
           v-if="showUpdate"
-          type="button"
-          class="pc-btn pc-btn--update"
-          :disabled="updating"
+          variant="primary"
+          class="pc-btn--update"
+          :loading="updating"
+          loading-label="Updating…"
           @click="$emit('update', plugin.id)"
         >
-          {{ updating ? "Updating…" : `Update to v${latestVersion}` }}
-        </button>
-        <button
+          Update to v{{ latestVersion }}
+        </Button>
+        <Button
           v-if="hasSettings && plugin.enabled"
-          type="button"
-          class="pc-btn"
-          :class="{ 'pc-btn--on': expanded }"
+          variant="secondary"
           :aria-expanded="expanded ? 'true' : 'false'"
           @click="$emit('toggle-expand', plugin.id)"
         >
@@ -66,20 +69,20 @@
           <span class="pc-chevron" :class="{ 'pc-chevron--open': expanded }" aria-hidden="true"
             >›</span
           >
-        </button>
-        <button
+        </Button>
+        <Button
           v-if="plugin._installed"
-          type="button"
-          class="pc-btn pc-btn--danger"
+          variant="danger"
+          class="pc-btn--danger"
           @click="$emit('uninstall', plugin.id, plugin.type)"
         >
           Uninstall
-        </button>
-      </div>
-    </div>
+        </Button>
+      </template>
+    </ListRow>
 
     <!-- Body: plugin-level settings only. Sources live in Content. -->
-    <div v-if="plugin.enabled && expanded" class="pc-body">
+    <Card v-if="plugin.enabled && expanded" class="pc-body">
       <div v-if="hasGlobalSettings" class="pc-section">
         <h4 class="pc-section-title">Settings</h4>
         <div v-for="(schema, key) in globalConfigSchema" :key="key" class="pc-field">
@@ -122,12 +125,15 @@
         @upload="$emit('upload', $event)"
         @delete-image="$emit('delete-image', $event)"
       />
-    </div>
+    </Card>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import Tag from "@/components/ui/Tag.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { pluginKindLabel } from "@/utils/pluginKind";
@@ -272,162 +278,63 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
 
 <style scoped>
 .pc-card {
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  transition: border-color 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
 }
-.pc-card:hover {
-  border-color: color-mix(in srgb, var(--focus) 45%, var(--line));
-}
+
 .pc-card--off {
   opacity: 0.72;
 }
 
-/* Header */
-.pc-head {
+.pc-meta-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-lg) var(--space-2xl);
-}
-.pc-name {
-  font-family: var(--font-ui);
-  font-size: var(--fs-base);
-  font-weight: 500;
-  color: var(--ink);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.pc-badge {
-  flex-shrink: 0;
-}
-.pc-ver {
-  font-family: var(--font-data);
-  font-size: var(--fs-2xs);
-  color: var(--ink-3);
-  flex-shrink: 0;
-}
-.pc-spacer {
-  flex: 1;
+  gap: var(--gap-inline);
 }
 
-/* Meta row */
-.pc-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-lg);
-  padding: 0 var(--space-2xl) var(--space-lg);
-  flex-wrap: wrap;
-}
 .pc-summary {
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
+  color: var(--ink-2);
+}
+
+.pc-ver {
+  flex-shrink: 0;
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
   color: var(--ink-3);
 }
-.pc-link {
-  padding: 0;
-  background: transparent;
-  color: var(--ink-2);
-  border: 0;
-  border-bottom: 1px dotted currentColor;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.pc-link:hover {
-  color: var(--ink);
-}
-.pc-link:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.pc-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-.pc-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3xs);
-  padding: var(--space-xs) var(--space-lg);
-  min-height: var(--touch-target);
-  background: var(--bg-1);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s;
-}
-.pc-btn:hover {
-  border-color: var(--focus);
-}
-.pc-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.pc-btn--on {
-  border-color: var(--focus);
-  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
-}
-.pc-btn--danger {
-  color: var(--err-text);
-}
-.pc-btn--danger:hover {
-  border-color: var(--err);
-  background: color-mix(in srgb, var(--err) 10%, transparent);
-}
-.pc-btn--update {
-  background: var(--focus);
-  color: var(--focus-ink);
-  border-color: var(--focus);
-  font-weight: 600;
-}
-.pc-btn--update:hover {
-  background: color-mix(in srgb, var(--focus) 88%, var(--ink));
-  border-color: var(--focus);
-}
-.pc-btn--update:disabled {
-  opacity: 0.6;
-  cursor: progress;
-}
+
 .pc-chevron {
-  font-size: var(--fs-lg);
+  font-size: var(--text-title);
   line-height: 1;
-  transition: transform 0.15s;
+  transition: transform var(--dur-fast) var(--ease);
 }
+
 .pc-chevron--open {
   transform: rotate(90deg);
 }
 
-/* Body */
 .pc-body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3xl);
-  padding: var(--space-2xl);
-  border-top: 1px solid var(--line);
+  gap: var(--gap-stack);
 }
+
+.pc-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+}
+
 .pc-section-title {
-  margin: 0 0 var(--space-xl);
+  margin: 0;
   font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 600;
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
   color: var(--ink);
-}
-.pc-field {
-  margin-bottom: 1rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

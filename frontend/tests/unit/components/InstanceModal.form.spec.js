@@ -45,7 +45,7 @@ describe("InstanceModal form", () => {
   it("renders the declared label and the description as a hint", async () => {
     const wrapper = await mountModal();
 
-    expect(wrapper.get("label[for]").text()).toBe("Calendar address");
+    expect(wrapper.get(".plugin-field label").text()).toBe("Calendar address");
     expect(wrapper.text()).toContain("The .ics address to read events from.");
   });
 
@@ -53,7 +53,7 @@ describe("InstanceModal form", () => {
     const wrapper = await mountModal();
 
     expect(wrapper.text()).not.toContain("display_order");
-    expect(wrapper.find(".form-group > label").text()).not.toBe("Order");
+    expect(wrapper.find(".text-field__label").text()).toBe("Name");
   });
 
   it("uses sentence-case copy for the calendar fields and test action", async () => {
