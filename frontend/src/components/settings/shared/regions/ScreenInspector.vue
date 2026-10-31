@@ -5,18 +5,17 @@
       <span class="ins-sub">{{ headingSub }}</span>
     </div>
 
-    <SettingRow label="Name" stacked>
+    <div class="ins-field">
       <TextField
         data-test="page-name"
         :model-value="draftName"
         label="Page name"
-        hide-label
         @update:model-value="draftName = $event"
         @focus="keepInView"
         @blur="commitName"
         @keydown.enter.prevent="commitName"
       />
-    </SettingRow>
+    </div>
 
     <SettingRow label="Layout" stacked>
       <template #label-extra>
@@ -211,6 +210,9 @@ const positionOptions = computed(() => {
 .ins-sub {
   font-size: var(--text-meta);
   color: var(--ink-3);
+}
+.ins-field {
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
 .ins-tag {
   margin-left: var(--gap-1);

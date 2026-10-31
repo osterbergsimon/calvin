@@ -49,8 +49,6 @@
                 class="picker-search"
                 label="Filter components"
                 type="search"
-                hide-label
-                placeholder="Filter components"
               />
               <Button
                 v-for="opt in filtered"
