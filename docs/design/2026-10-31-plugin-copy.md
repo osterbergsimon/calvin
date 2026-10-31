@@ -123,7 +123,7 @@ The hint is optional, one sentence, ending with a full stop. Units go in the hin
 ### sl_departures
 | Field | `label` | hint | Notes |
 |---|---|---|---|
-| stop_name | Stop | Type the stop's name, then choose Test connection. | req (unless site_id) |
+| stop_name | Stop | Type the stop's name, then choose Test connection, or set a Stop ID. | optional: either this or site_id (validate_config) |
 | site_id | Stop ID | Filled in by Test connection. | keep visible; read-only after Test if the renderer supports `readonly` |
 | lines | Lines | Only these lines, separated by commas. Empty shows all. | |
 | modes | Transport types | Only these: bus, metro, train, tram, ship. Empty shows all. | should become a multi-select (`ui.component: "multiselect"`) when the renderer has one |
@@ -155,7 +155,7 @@ The hint is optional, one sentence, ending with a full stop. Units go in the hin
 ### yr_weather
 | Field | `label` | hint | Notes |
 |---|---|---|---|
-| location | Place | A town, city or address. | req (or latitude + longitude) |
+| location | Place | A town, city or address, or set the coordinates below instead. | optional: either this or latitude + longitude (validate_config) |
 | latitude | Latitude | Filled in from Place; change only to be exact. | |
 | longitude | Longitude | Filled in from Place; change only to be exact. | |
 | altitude | Altitude | In metres. Leave 0 if you don't know. | `hidden: true` (advanced) |
