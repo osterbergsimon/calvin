@@ -7,13 +7,13 @@
 
     <SettingsSection id="device-hardware" title="Versions & status">
       <SettingRow label="Version">
-        <span class="maint-version" data-test="version-readout">
+        <span data-test="version-readout">
           {{ version || "Not available" }}
           <span v-if="screenVersion">(screen {{ screenVersion }})</span>
         </span>
       </SettingRow>
       <SettingRow label="System status">
-        <span class="maint-status" :class="statusClass">{{ statusText }}</span>
+        <Tag :tone="connectionStore.isBackendOnline ? 'ok' : 'err'">{{ statusText }}</Tag>
       </SettingRow>
     </SettingsSection>
 
@@ -25,27 +25,15 @@
           label="Restart Calvin server"
           description="Restarts Calvin. Screens reconnect on their own in about 15 seconds."
         >
-          <button
-            type="button"
-            class="maint-btn"
-            data-test="restart-backend"
-            @click="askRestartBackend"
-          >
-            Restart server
-          </button>
+          <Button data-test="restart-backend" @click="askRestartBackend">Restart server</Button>
         </SettingRow>
         <SettingRow
           label="Restart this screen"
           description="Reloads this screen's browser. Calvin keeps running."
         >
-          <button
-            type="button"
-            class="maint-btn"
-            data-test="restart-frontend"
-            @click="askRestartFrontend"
-          >
+          <Button data-test="restart-frontend" @click="askRestartFrontend">
             Restart browser
-          </button>
+          </Button>
         </SettingRow>
       </template>
       <!-- "Screen now" left Screens (Default-is-a-screen §3): it drives the
@@ -56,32 +44,16 @@
         label="This server's screen"
         data-test="server-display-row"
       >
-        <div class="maint-display-actions">
-          <button
-            type="button"
-            class="maint-btn"
-            data-test="server-display-off"
-            @click="onDisplayOff"
-          >
-            Turn off
-          </button>
-          <button
-            type="button"
-            class="maint-btn"
-            data-test="server-display-on"
-            @click="onDisplayOn"
-          >
-            Turn on
-          </button>
-        </div>
+        <Button data-test="server-display-off" @click="onDisplayOff">Turn off</Button>
+        <Button data-test="server-display-on" @click="onDisplayOn">Turn on</Button>
       </SettingRow>
       <SettingRow label="Reload this screen" data-test="reload-ui">
         <template #description>
-          <p v-if="isContainer" class="maint-hint" data-test="docker-restart-hint">
+          <InlineNote v-if="isContainer" data-test="docker-restart-hint">
             To restart Calvin, restart its container in Docker (on Unraid: the Docker tab).
-          </p>
+          </InlineNote>
         </template>
-        <button type="button" class="maint-btn" @click="reloadUi">Reload</button>
+        <Button @click="reloadUi">Reload</Button>
       </SettingRow>
     </SettingsSection>
 
@@ -154,6 +126,9 @@
 import { computed, onMounted, reactive } from "vue";
 import { useSystem } from "@/composables";
 import { useConnectionStore } from "@/stores/connection";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import Tag from "@/components/ui/Tag.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import CollapsibleSettingsSection from "@/components/settings/shell/CollapsibleSettingsSection.vue";
@@ -192,8 +167,7 @@ const screenVersion = computed(() => {
   return props.frontendVersion === props.version ? null : props.frontendVersion;
 });
 
-const statusText = computed(() => (connectionStore.isBackendOnline ? "● Online" : "○ Offline"));
-const statusClass = computed(() => (connectionStore.isBackendOnline ? "is-online" : "is-offline"));
+const statusText = computed(() => (connectionStore.isBackendOnline ? "Online" : "Offline"));
 
 // Gate on the capability the backend actually reports, not on deployment or
 // host control: a native Pi can control the host yet lack the restart helper.
@@ -261,54 +235,3 @@ const reloadUi = () => {
   window.location.reload();
 };
 </script>
-
-<style scoped>
-.maintenance-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-.maint-btn {
-  min-height: var(--touch-target);
-  padding: 0 1rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  font-weight: 500;
-  color: var(--ink);
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.maint-btn:hover {
-  border-color: var(--focus);
-}
-.maint-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.maint-status {
-  font-family: var(--font-data);
-  font-weight: 600;
-}
-.maint-status.is-online {
-  color: var(--ok-text);
-}
-.maint-status.is-offline {
-  color: var(--err-text);
-}
-.maint-version {
-  font-family: var(--font-data);
-  color: var(--ink);
-}
-.maint-display-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-.maint-hint {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-</style>

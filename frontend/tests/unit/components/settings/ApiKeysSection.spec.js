@@ -42,7 +42,7 @@ async function openForm() {
   await get("api-keys-create").trigger("click");
 }
 async function fillName(name) {
-  await get("api-key-name").setValue(name);
+  await wrapper.get("#api-key-name").setValue(name);
 }
 async function submit() {
   await get("api-key-form").trigger("submit");
@@ -87,9 +87,12 @@ describe("ApiKeysSection", () => {
       await mountSection();
       expect(wrapper.find("#section-security-api-keys").exists()).toBe(true);
       expect(wrapper.text()).toContain("API keys");
-      expect(wrapper.text()).toContain(
+      expect(wrapper.find(".settings-section__intro").text()).toBe(
         "Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each one its own key."
       );
+      // The sentence is the panel intro, not a "Keys" row label.
+      const labels = wrapper.findAll(".setting-row__label").map(label => label.text());
+      expect(labels).not.toContain("Keys");
     });
 
     it("requires a name and does not send the request", async () => {
@@ -103,8 +106,8 @@ describe("ApiKeysSection", () => {
     it("limits the name to 40 characters", async () => {
       await mountSection();
       await openForm();
-      expect(get("api-key-name").attributes("maxlength")).toBe("40");
-      expect(get("api-key-name").attributes("placeholder")).toBe("Home Assistant");
+      expect(wrapper.get("#api-key-name").attributes("maxlength")).toBe("40");
+      expect(wrapper.get("#api-key-name").attributes("placeholder")).toBe("Home Assistant");
       expect(wrapper.text()).toContain("So you know which app uses it.");
     });
 
@@ -222,7 +225,7 @@ describe("ApiKeysSection", () => {
       api.post.mockRejectedValueOnce(httpError(500));
       await submit();
       expect(wrapper.text()).toContain("Couldn't create the key. Try again.");
-      expect(get("api-key-name").element.value).toBe("Script");
+      expect(wrapper.get("#api-key-name").element.value).toBe("Script");
       expect(get("scope-admin").element.checked).toBe(true);
     });
 
@@ -232,7 +235,7 @@ describe("ApiKeysSection", () => {
       await fillName("Script");
       api.post.mockRejectedValueOnce(httpError(401, { code: "admin_required" }));
       await submit();
-      expect(get("api-key-name").element.value).toBe("Script");
+      expect(wrapper.get("#api-key-name").element.value).toBe("Script");
       expect(wrapper.text()).not.toContain("Couldn't create the key.");
     });
 
@@ -259,10 +262,12 @@ describe("ApiKeysSection", () => {
       expect(wrapper.text()).toContain(
         "You won't be able to see it again. If you lose it, revoke it and create a new one."
       );
-      const input = get("api-key-secret");
+      const input = wrapper.get("#api-key-secret");
       expect(input.element.value).toBe(SECRET);
       expect(input.attributes("readonly")).toBeDefined();
-      expect(input.attributes("aria-label")).toBe("New API key for Home Assistant");
+      expect(wrapper.get("label[for='api-key-secret']").text()).toBe(
+        "New API key for Home Assistant"
+      );
       expect(wrapper.text()).toContain("Authorization: Bearer <key>");
       expect(document.activeElement).toBe(get("api-key-result-title").element);
     });
@@ -395,6 +400,20 @@ describe("ApiKeysSection", () => {
       expect(text("Days")).toContain("Last used 2 days ago");
       expect(text("Old")).toContain("Last used 2 Sep");
       expect(text("Now")).toContain("Last used just now");
+    });
+
+    it("renders the key meta line in ListRow's meta role", async () => {
+      await mountSection([key()]);
+      const meta = wrapper.find("[data-test='api-key-row'] .list-row__meta");
+      expect(meta.exists()).toBe(true);
+      expect(meta.text()).toBe("clv_7Hq2… · Created 28 Oct · Never used");
+    });
+
+    it("drops an invalid created date instead of printing NaN", async () => {
+      await mountSection([key({ createdAt: "not-a-date" })]);
+      const row = find("api-key-row");
+      expect(row.text()).not.toContain("NaN");
+      expect(row.find(".list-row__meta").text()).toBe("clv_7Hq2… · Never used");
     });
 
     it("explains a host key that can't act on this server", async () => {
