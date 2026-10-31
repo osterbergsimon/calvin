@@ -131,9 +131,14 @@
             <span class="layout-unlock-banner__text"
               >Layout unlocked — drag the dividers to resize</span
             >
-            <button type="button" class="layout-unlock-banner__lock" @click="lockLayout">
+            <Button
+              class="layout-unlock-banner__lock"
+              variant="primary"
+              size="sm"
+              @click="lockLayout"
+            >
               Lock
-            </button>
+            </Button>
           </div>
 
           <!-- Horizontal Clock Bar at Bottom -->
@@ -176,6 +181,7 @@ import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
 import PerimeterProgress from "../components/PerimeterProgress.vue";
+import Button from "../components/ui/Button.vue";
 
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
@@ -627,26 +633,26 @@ onUnmounted(() => {
      clipped at their edge. The bars never overlap region content spatially,
      so only the neon bloom bleeds across — matching the between-bar behaviour. */
   position: relative;
-  z-index: 101;
+  z-index: calc(var(--z-sticky) + 1);
 }
 
 .dashboard-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--gap-4);
   min-height: 0;
   min-width: 0;
   /* Same rationale one level down: sit above the vertical (left/right) bars. */
   position: relative;
-  z-index: 101;
+  z-index: calc(var(--z-sticky) + 1);
 }
 
 .mode-content {
   width: 100%;
   flex: 1 1 auto;
   display: flex;
-  gap: 0.5rem;
+  gap: var(--gap-2);
   min-height: 0;
   min-width: 0;
 }
@@ -655,14 +661,14 @@ onUnmounted(() => {
    equal clearance on all sides (edge padding ≈ half the inter-panel gap),
    giving the focus-light room to glow uniformly around the whole region. */
 .mode-content.dashboard-view {
-  padding: 0.5rem;
+  padding: var(--gap-2);
   position: relative; /* anchor the absolute drag-resize handles */
 }
 
 /* When unlocked, reserve room at the bottom so the fixed .layout-unlock-banner
    (a centered pill at bottom: 1rem) doesn't occlude the bottom region's label. */
 .mode-content.dashboard-view.dashboard-view--unlocked {
-  padding-bottom: 4.5rem;
+  padding-bottom: calc(var(--gap-8) * 2 + var(--gap-2));
 }
 
 .mode-content.dashboard-view.layout-portrait {
@@ -694,7 +700,7 @@ onUnmounted(() => {
 /* ── Drag-to-resize handles (calvin-fou) ─────────────────────────────────── */
 .region-resizer {
   position: absolute;
-  z-index: 6; /* above lit regions (z-index:3) so the grip is always grabbable */
+  z-index: var(--z-raised); /* above lit regions so the grip is always grabbable */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -717,8 +723,8 @@ onUnmounted(() => {
 .region-resizer__grip {
   background: var(--focus);
   border: 1px solid var(--focus-edge);
-  border-radius: 999px;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent);
+  border-radius: var(--radius-round);
+  box-shadow: 0 0 0 3px var(--focus-glow);
 }
 .region-resizer--row .region-resizer__grip {
   width: 6px;
@@ -733,46 +739,30 @@ onUnmounted(() => {
 .region-resizer:hover .region-resizer__grip,
 .region-resizer:active .region-resizer__grip {
   background: var(--focus);
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--focus) 28%, transparent);
+  box-shadow: 0 0 0 5px var(--focus-glow);
 }
 
 /* Unlocked-layout banner */
 .layout-unlock-banner {
   position: fixed;
   left: 50%;
-  bottom: 1rem;
+  bottom: var(--gap-4);
   transform: translateX(-50%);
-  z-index: 1002;
+  z-index: calc(var(--z-dialog) + 2);
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  gap: var(--gap-3);
+  padding: var(--gap-2) var(--gap-2) var(--gap-2) var(--gap-4);
   background: var(--bg-1);
   border: 1px solid var(--focus-edge);
-  border-radius: 999px;
-  box-shadow: 0 10px 30px -10px var(--focus-glow);
+  border-radius: var(--radius-round);
+  box-shadow: var(--elev-1);
   font-family: var(--font-ui);
 }
 .layout-unlock-banner__text {
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink);
   white-space: nowrap;
-}
-.layout-unlock-banner__lock {
-  min-height: 36px;
-  padding: 0 0.9rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--focus-ink);
-  background: var(--focus);
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.layout-unlock-banner__lock:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
 }
 
 .photos-mode,
@@ -797,11 +787,11 @@ onUnmounted(() => {
   flex-direction: column;
   box-sizing: border-box;
   position: relative;
-  z-index: 0;
+  isolation: isolate;
 }
 /* Raise the focused region so its glow paints over the neighbouring panels
    instead of being clipped by a later-painted sibling. */
 .dashboard-region-section--lit {
-  z-index: 3;
+  z-index: var(--z-raised);
 }
 </style>

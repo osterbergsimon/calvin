@@ -183,9 +183,11 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0.75rem;
+  gap: var(--gap-3);
   position: relative;
-  z-index: 200;
+  /* Above the dashboard stage (--z-sticky + 1) so the bar never sits under a
+     region's focus glow. */
+  z-index: calc(var(--z-sticky) * 2);
   user-select: none;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -198,17 +200,17 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 }
 
 .clock-bar-vertical.position-between {
-  z-index: 100;
+  z-index: var(--z-sticky);
   border: none;
   background: color-mix(in srgb, var(--ink) 5%, transparent);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
 }
 
 .clock-bar-top {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--gap-2);
   flex: 0 0 auto;
 }
 
@@ -218,7 +220,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--gap-3);
   min-height: 0;
 }
 
@@ -228,7 +230,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.75rem;
+  gap: var(--gap-3);
   min-height: 0;
 }
 
@@ -237,18 +239,18 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.35rem;
+  gap: var(--gap-1);
   white-space: nowrap;
   text-align: center;
 }
 
 .clock-bar-content.layout-two-lines {
-  gap: 0.15rem;
+  gap: var(--gap-1);
 }
 
 .clock-bar-content.layout-vertical-compact {
   flex-direction: column;
-  gap: 0.45rem;
+  gap: var(--gap-2);
   writing-mode: horizontal-tb;
   text-orientation: mixed;
 }
@@ -263,7 +265,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 }
 
 .compact-period {
-  margin-top: 0.2rem;
+  margin-top: var(--gap-1);
   font-size: 0.45em;
   line-height: 1;
 }
@@ -280,7 +282,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.05rem;
+  gap: 0;
   max-height: none;
   writing-mode: horizontal-tb;
   text-orientation: mixed;
@@ -296,7 +298,7 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 .clock-time {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums lining-nums;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--ink);
   line-height: 1.1;
 }
@@ -309,11 +311,11 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
 }
 
 .clock-bar-vertical.position-between .clock-time {
-  font-size: var(--fs-control);
+  font-size: var(--text-body);
 }
 
 .clock-bar-vertical.position-between .clock-date {
-  font-size: var(--fs-2xs);
+  font-size: var(--text-caption);
 }
 
 .clock-bar-actions {

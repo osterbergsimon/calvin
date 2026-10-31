@@ -1,53 +1,26 @@
 <template>
   <div class="admin-overflow">
-    <button
-      ref="triggerEl"
-      type="button"
-      class="admin-overflow__trigger"
-      aria-label="More controls"
-      :aria-expanded="open ? 'true' : 'false'"
-      aria-haspopup="menu"
-      @click="toggle"
-      @keydown.escape="close"
-    >
-      ⋯
-    </button>
-    <div
-      v-if="open"
-      class="admin-overflow__menu"
-      :class="{ 'admin-overflow__menu--up': openUp, 'admin-overflow__menu--left': alignLeft }"
+    <Popover
+      v-model="open"
+      label="More controls"
+      haspopup="menu"
       role="menu"
-      @keydown.escape="close"
+      initial-focus="button"
+      @close="open = false"
     >
-      <button
-        type="button"
-        role="menuitem"
-        class="admin-overflow__item"
-        data-admin="settings"
-        @click="onSettings"
-      >
-        Settings
-      </button>
-      <button
-        v-if="canResizeRegions"
-        type="button"
-        role="menuitem"
-        class="admin-overflow__item"
-        data-admin="lock-layout"
-        @click="onToggleLock"
-      >
-        {{ configStore.regionsLocked ? "Unlock layout" : "Lock layout" }}
-      </button>
-      <button
-        type="button"
-        role="menuitem"
-        class="admin-overflow__item"
-        data-admin="hide-ui"
-        @click="onHideUi"
-      >
-        Hide controls
-      </button>
-    </div>
+      <template #trigger="{ attrs }">
+        <Button
+          class="admin-overflow__trigger"
+          variant="ghost"
+          size="md"
+          icon-only
+          label="More controls"
+          :icon="mdiDotsHorizontal"
+          v-bind="attrs"
+        />
+      </template>
+      <Menu :items="menuItems" label="More controls" @select="onSelect" @close="open = false" />
+    </Popover>
     <!-- F7: hiding is global (every screen) and the way back is a hidden
          long-press, so say both before doing it. -->
     <Teleport to="body">
@@ -64,12 +37,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from "vue";
+import { ref, computed } from "vue";
+import { mdiDotsHorizontal } from "@mdi/js";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "../../stores/config";
 import { useModeStore } from "../../stores/mode";
 import { getActiveDashboardScreen } from "../../utils/layout";
 import { normalizeHotCornerPosition } from "../../utils/hotCorner";
+import Button from "../ui/Button.vue";
+import Menu from "../ui/Menu.vue";
+import Popover from "../ui/Popover.vue";
 import ConfirmModal from "../settings/shared/ConfirmModal.vue";
 
 const configStore = useConfigStore();
@@ -84,43 +61,32 @@ const canResizeRegions = computed(() => {
 });
 
 const open = ref(false);
-const triggerEl = ref(null);
-// Placement is decided from the trigger's position so the menu never opens
-// off-screen — e.g. on a vertical/side clock bar the ⋯ sits at a bottom corner,
-// so the menu must open upward and toward the content rather than down/right.
-const openUp = ref(false);
-const alignLeft = ref(false);
 
-const onDocClick = event => {
-  if (!event.target.closest(".admin-overflow")) close();
-};
-
-const toggle = () => {
-  open.value ? close() : openMenu();
-};
-const openMenu = () => {
-  const rect = triggerEl.value?.getBoundingClientRect();
-  if (rect && typeof window !== "undefined") {
-    // Lower half of the viewport → open upward; left half → anchor left edge
-    // (menu grows rightward into the content) instead of the default right anchor.
-    openUp.value = rect.top + rect.height / 2 > window.innerHeight / 2;
-    alignLeft.value = rect.left + rect.width / 2 < window.innerWidth / 2;
+// Menu sorts danger items last; these are all neutral actions.
+const menuItems = computed(() => {
+  const items = [{ key: "settings", label: "Settings" }];
+  if (canResizeRegions.value) {
+    items.push({
+      key: "lock-layout",
+      label: configStore.regionsLocked ? "Unlock layout" : "Lock layout",
+    });
   }
-  open.value = true;
-  document.addEventListener("click", onDocClick, true);
-};
-const close = () => {
-  if (!open.value) return;
+  items.push({ key: "hide-ui", label: "Hide controls" });
+  return items;
+});
+
+const onSelect = key => {
   open.value = false;
-  document.removeEventListener("click", onDocClick, true);
+  if (key === "settings") onSettings();
+  else if (key === "lock-layout") onToggleLock();
+  else if (key === "hide-ui") onHideUi();
 };
-onUnmounted(() => document.removeEventListener("click", onDocClick, true));
 
 const onSettings = () => {
   modeStore.setMode(modeStore.MODES.SETTINGS);
   router.push("/settings");
-  close();
 };
+
 const confirmHide = ref(false);
 const hideMessage = computed(() => {
   const corner = normalizeHotCornerPosition(configStore.hotCornerPosition).replace("-", " ");
@@ -132,7 +98,6 @@ const hideMessage = computed(() => {
   );
 });
 const onHideUi = () => {
-  close();
   // Bringing controls back needs no confirmation.
   if (!configStore.shouldShowUI) {
     configStore.toggleUI();
@@ -146,84 +111,11 @@ const onConfirmHide = () => {
 };
 const onToggleLock = () => {
   configStore.toggleRegionsLock();
-  close();
 };
 </script>
 
 <style scoped>
 .admin-overflow {
-  position: relative;
   display: inline-flex;
-}
-.admin-overflow__trigger {
-  min-width: 46px;
-  min-height: 46px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--fs-xl);
-  /* Discreet by default: just the glyph, no chrome. A muted resting colour and a
-     hover-only surface keep it from competing with the clock, while the full
-     46px hit target and focus ring stay intact. */
-  color: var(--ink-3);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-.admin-overflow__trigger:hover {
-  color: var(--ink);
-  background: var(--bg-2);
-}
-.admin-overflow__trigger:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.admin-overflow__menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 20;
-  min-width: 200px;
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.4rem;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xl);
-  box-shadow: 0 18px 50px -16px var(--focus-glow);
-}
-.admin-overflow__menu--up {
-  top: auto;
-  bottom: calc(100% + 8px);
-}
-.admin-overflow__menu--left {
-  right: auto;
-  left: 0;
-}
-.admin-overflow__item {
-  min-height: 46px;
-  text-align: left;
-  padding: 0 0.85rem;
-  font-family: var(--font-ui);
-  font-size: var(--fs-md);
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-.admin-overflow__item:hover {
-  background: var(--bg-2);
-}
-.admin-overflow__item:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: -2px;
 }
 </style>

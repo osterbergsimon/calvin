@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="galleryEl"
     class="ui-gallery"
     :class="{ dark: preset.dark }"
     :style="preset.vars"
@@ -165,6 +166,88 @@
         </div>
       </section>
 
+      <section class="ui-gallery__section" data-test="gallery-popover">
+        <h2 class="ui-gallery__heading">Popover and Menu</h2>
+        <p class="ui-gallery__note">
+          The one small floating surface: anchored to its trigger, flipping above when the viewport
+          runs out below, closed by Escape or an outside tap, with focus returned to the opener. It
+          stays clear of the on-screen keyboard. A Menu on top is the action list: arrow keys move,
+          Home and End jump, and a destructive item sorts last.
+        </p>
+
+        <h3 class="ui-gallery__group">Menu</h3>
+        <div class="ui-gallery__row">
+          <Popover
+            :model-value="menuOpen"
+            label="More actions for Family calendar"
+            haspopup="menu"
+            @update:model-value="menuOpen = $event"
+          >
+            <template #trigger="{ attrs }">
+              <IconButton
+                v-bind="attrs"
+                size="md"
+                variant="ghost"
+                label="More actions for Family calendar"
+                data-test="gallery-menu-trigger"
+              >
+                <svg class="ui-gallery__glyph" viewBox="0 0 24 24" aria-hidden="true">
+                  <path :d="mdiDotsHorizontal" fill="currentColor" />
+                </svg>
+              </IconButton>
+            </template>
+            <Menu
+              :items="galleryMenuItems"
+              label="More actions for Family calendar"
+              @select="onMenuSelect"
+              @close="menuOpen = false"
+            />
+          </Popover>
+          <span class="ui-gallery__text" aria-live="polite">{{ menuNote }}</span>
+        </div>
+
+        <h3 class="ui-gallery__group">Explainer</h3>
+        <div class="ui-gallery__row">
+          <Popover v-model="infoOpen" label="About the connection" role="dialog" haspopup="dialog">
+            <template #trigger="{ attrs }">
+              <Button v-bind="attrs" data-test="gallery-popover-trigger">
+                Connection details
+              </Button>
+            </template>
+            <div class="ui-gallery__popover-body">
+              <p class="ui-gallery__text">
+                Calvin checks the plugin repository every hour. A failed check keeps the last
+                working copy and shows a warning in Settings.
+              </p>
+              <InlineNote tone="ok">Last checked just now.</InlineNote>
+            </div>
+          </Popover>
+        </div>
+      </section>
+
+      <section class="ui-gallery__section" data-test="gallery-colour-field">
+        <h2 class="ui-gallery__heading">ColourField</h2>
+        <p class="ui-gallery__note">
+          The theme's eight event colours first, as a radio group, then Custom… opening the native
+          picker. It shows the chosen swatch and its name; there is no raw hex box. In a list row
+          the compact form shows the same picker in a Popover.
+        </p>
+
+        <div class="ui-gallery__grid">
+          <ColourField
+            v-model="themeColour"
+            label="Calendar colour"
+            hint="These eight follow the theme."
+          />
+          <ColourField
+            v-model="customColour"
+            label="Custom calendar colour"
+            hint="A colour outside the theme is kept as a custom value."
+          />
+          <ColourField v-model="rowColour" label="Colour for Family calendar" compact />
+        </div>
+      </section>
+
       <section class="ui-gallery__section" data-test="gallery-setting-group">
         <h2 class="ui-gallery__heading">SettingGroup</h2>
         <p class="ui-gallery__note">
@@ -270,7 +353,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import {
   mdiCalendar,
   mdiCheck,
@@ -282,14 +365,19 @@ import {
 import { GALLERY_MODE_OPTIONS, GALLERY_THEME_OPTIONS, galleryTheme } from "./galleryThemes.js";
 import Button from "../components/ui/Button.vue";
 import Card from "../components/ui/Card.vue";
+import ColourField from "../components/ui/ColourField.vue";
 import Dialog from "../components/ui/Dialog.vue";
+import IconButton from "../components/ui/IconButton.vue";
 import InlineNote from "../components/ui/InlineNote.vue";
 import ListRow from "../components/ui/ListRow.vue";
+import Menu from "../components/ui/Menu.vue";
+import Popover from "../components/ui/Popover.vue";
 import ScopeLine from "../components/ui/ScopeLine.vue";
 import SegmentedControl from "../components/ui/SegmentedControl.vue";
 import SettingGroup from "../components/ui/SettingGroup.vue";
 import TextField from "../components/ui/TextField.vue";
 import ToggleSwitch from "../components/ui/ToggleSwitch.vue";
+import { eventSwatches } from "../utils/themePalettes";
 import SettingRow from "../components/settings/shell/SettingRow.vue";
 import SettingsSection from "../components/settings/shell/SettingsSection.vue";
 
@@ -306,16 +394,64 @@ const mode = ref(
   requestedMode === "dark" || (!requestedMode && requestedTheme === "dark") ? "dark" : "light"
 );
 const preset = computed(() => galleryTheme(themeName.value, mode.value));
+
+// Popover, Menu and Dialog teleport to <body>, outside the wrapper above, so
+// mirror the preset onto the root the way the app's theme does; otherwise
+// their dark-mode states render with the light palette.
+let rootVarKeys = [];
+watch(
+  preset,
+  value => {
+    const root = document.documentElement;
+    root.classList.toggle("dark", value.dark);
+    for (const key of rootVarKeys) root.style.removeProperty(key);
+    rootVarKeys = Object.keys(value.vars || {});
+    for (const key of rootVarKeys) root.style.setProperty(key, value.vars[key]);
+  },
+  { immediate: true }
+);
 const text = ref("");
 const dialogOpen = ref(false);
 const dialogMode = ref("form");
 const dialogText = ref("");
 const scopeOverridden = ref(true);
 
+const galleryEl = ref(null);
+const menuOpen = ref(false);
+const infoOpen = ref(false);
+const menuNote = ref("No action chosen.");
+const themeColour = ref("");
+const customColour = ref("#3c7a5a");
+const rowColour = ref("");
+
+// The destructive item is authored in the middle on purpose: Menu sorts it last.
+const galleryMenuItems = [
+  { key: "edit", label: "Edit" },
+  { key: "remove", label: "Remove", danger: true },
+  { key: "duplicate", label: "Duplicate" },
+];
+
+const onMenuSelect = key => {
+  menuNote.value = `Chose ${key}.`;
+  menuOpen.value = false;
+};
+
 const openDialog = mode => {
   dialogMode.value = mode;
   dialogOpen.value = true;
 };
+
+// Keep the demo's selected colours inside the theme that is showing, so the
+// gallery renders the "chosen swatch + name" state in every palette.
+const syncGalleryColours = async () => {
+  await nextTick();
+  const palette = eventSwatches(galleryEl.value || undefined);
+  themeColour.value = palette[0]?.hex || "";
+  rowColour.value = palette[5]?.hex || palette[0]?.hex || "";
+};
+
+watch([themeName, mode], syncGalleryColours);
+onMounted(syncGalleryColours);
 </script>
 
 <style scoped>
@@ -405,6 +541,17 @@ const openDialog = mode => {
   font-size: var(--text-body);
   line-height: 1.5;
   color: var(--ink);
+}
+.ui-gallery__glyph {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.ui-gallery__popover-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  max-width: 22rem;
+  padding: var(--gap-3);
 }
 
 /* The doctrine's phone width (below 600px): one column, 16px gutter. */

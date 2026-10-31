@@ -159,7 +159,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  z-index: 200;
+  /* Above the dashboard stage (--z-sticky + 1) so the bar never sits under a
+     region's focus glow. */
+  z-index: calc(var(--z-sticky) * 2);
   user-select: none;
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -172,28 +174,28 @@ onMounted(() => {
 }
 
 .clock-bar-horizontal.position-between {
-  z-index: 100;
+  z-index: var(--z-sticky);
   border: none;
   background: color-mix(in srgb, var(--ink) 5%, transparent);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
 }
 
 .clock-bar-content {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--gap-4);
 }
 
 .clock-bar-content.layout-two-lines {
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--gap-1);
   align-items: center;
 }
 
 .clock-time {
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums lining-nums;
-  font-weight: 600;
+  font-weight: var(--weight-title);
   color: var(--ink);
   white-space: nowrap;
 }
@@ -208,7 +210,7 @@ onMounted(() => {
 .clock-bar-room {
   font-family: var(--font-ui);
   color: var(--ink-3);
-  font-size: var(--fs-md);
+  font-size: var(--text-body);
 }
 
 /* On a phone the bar cannot hold the wordmark, the room, the clock, the
@@ -220,23 +222,23 @@ onMounted(() => {
     display: none;
   }
   .clock-bar-outer {
-    gap: 0.5rem;
+    gap: var(--gap-2);
   }
 }
 
 .clock-bar-horizontal.position-between .clock-time {
-  font-size: var(--fs-control);
+  font-size: var(--text-body);
 }
 
 .clock-bar-horizontal.position-between .clock-date {
-  font-size: var(--fs-2xs);
+  font-size: var(--text-caption);
 }
 
 .clock-bar-outer {
   display: flex;
   align-items: center;
   width: 100%;
-  gap: 1rem;
+  gap: var(--gap-4);
   min-width: 0;
 }
 

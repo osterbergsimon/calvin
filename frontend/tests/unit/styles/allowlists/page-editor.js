@@ -6,31 +6,13 @@
  */
 
 export const roleLint = {
-  allowlist: [
-    "components/settings/shared/ScreenRegionEditor.vue",
-    "components/settings/shared/regions/RegionInspector.vue",
-    "components/settings/shared/regions/RegionNode.vue",
-    "components/settings/shared/regions/ScreenInspector.vue",
-  ],
-  baseline: [
-    "components/settings/shared/ScreenRegionEditor.vue",
-    "components/settings/shared/regions/RegionInspector.vue",
-    "components/settings/shared/regions/RegionNode.vue",
-    "components/settings/shared/regions/ScreenInspector.vue",
-  ],
+  allowlist: [],
+  baseline: [],
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/settings/shared/ScreenRegionEditor.vue",
-    "components/settings/shared/regions/RegionInspector.vue",
-    "components/settings/shared/regions/ScreenInspector.vue",
-  ],
-  baseline: [
-    "components/settings/shared/ScreenRegionEditor.vue",
-    "components/settings/shared/regions/RegionInspector.vue",
-    "components/settings/shared/regions/ScreenInspector.vue",
-  ],
+  allowlist: [],
+  baseline: [],
 };
 
 export const settingsNoStyle = {

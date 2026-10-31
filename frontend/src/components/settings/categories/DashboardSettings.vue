@@ -2,17 +2,12 @@
   <div class="dashboard-settings">
     <!-- DASHBOARD SCREENS / REGIONS -->
     <SettingsSection id="regions" title="Pages & regions">
-      <div class="regions-launch">
-        <div class="regions-launch__summary">
-          <span class="regions-launch__count">{{ screenSummary }}</span>
-          <span class="regions-launch__hint"
-            >Design each page’s regions in the full-size editor.</span
-          >
-        </div>
-        <button type="button" class="regions-launch__btn" @click="editorOpen = true">
-          Open editor
-        </button>
-      </div>
+      <SettingRow
+        :label="screenSummary"
+        description="Design each page’s regions in the full-size editor."
+      >
+        <Button variant="primary" @click="editorOpen = true">Open editor</Button>
+      </SettingRow>
       <ScreenRegionEditor
         :config="config"
         :open="editorOpen"
@@ -51,25 +46,24 @@
         />
       </SettingRow>
       <SettingRow v-if="config.themeMode === 'time'" label="Dark from">
-        <div class="dash-hours">
-          <input
-            class="dash-time"
-            type="time"
-            step="3600"
-            :value="hourToTime(config.darkModeStart, 18)"
-            aria-label="Dark from"
-            @change="e => emit('update:config', { darkModeStart: timeToHour(e.target.value) })"
-          />
-          <span class="dash-hours__to">to</span>
-          <input
-            class="dash-time"
-            type="time"
-            step="3600"
-            :value="hourToTime(config.darkModeEnd, 6)"
-            aria-label="Dark to"
-            @change="e => emit('update:config', { darkModeEnd: timeToHour(e.target.value) })"
-          />
-        </div>
+        <TextField
+          label="Dark from"
+          hide-label
+          type="time"
+          step="3600"
+          :model-value="hourToTime(config.darkModeStart, 18)"
+          @update:model-value="v => emit('update:config', { darkModeStart: timeToHour(v) })"
+        />
+      </SettingRow>
+      <SettingRow v-if="config.themeMode === 'time'" label="Dark to">
+        <TextField
+          label="Dark to"
+          hide-label
+          type="time"
+          step="3600"
+          :model-value="hourToTime(config.darkModeEnd, 6)"
+          @update:model-value="v => emit('update:config', { darkModeEnd: timeToHour(v) })"
+        />
       </SettingRow>
       <SettingRow label="Font">
         <TypefacePicker />
@@ -254,7 +248,9 @@
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ScopeChip from "@/components/settings/shell/ScopeChip.vue";
+import Button from "@/components/ui/Button.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
@@ -361,79 +357,3 @@ const timeToHour = value => {
   return Number.isNaN(hour) ? 0 : Math.max(0, Math.min(23, hour));
 };
 </script>
-
-<style scoped>
-.dashboard-settings {
-  width: 100%;
-}
-
-.dash-hours {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.dash-hours__to {
-  color: var(--ink-2);
-  font-size: var(--fs-sm);
-}
-.dash-time {
-  height: var(--control-height);
-  min-height: var(--touch-target);
-  padding: 0 0.75rem;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  font-family: var(--font-data);
-  font-size: var(--fs-control-lg);
-  color: var(--ink);
-}
-.dash-time:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.regions-launch {
-  display: flex;
-  align-items: center;
-  gap: var(--space-xl);
-  padding: var(--space-xl) var(--space-2xl);
-}
-.regions-launch__summary {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-}
-.regions-launch__count {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  color: var(--ink);
-}
-.regions-launch__hint {
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.regions-launch__btn {
-  margin-left: auto;
-  flex: 0 0 auto;
-  height: var(--control-height);
-  min-height: var(--touch-target);
-  padding: 0 1.25rem;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--focus);
-  color: var(--focus-ink);
-  font-family: var(--font-ui);
-  font-size: var(--fs-control-lg);
-  font-weight: 600;
-  cursor: pointer;
-}
-.regions-launch__btn:hover {
-  filter: brightness(1.06);
-}
-.regions-launch__btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-</style>
