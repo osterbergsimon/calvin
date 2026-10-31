@@ -93,4 +93,35 @@ if run off >/dev/null; then fail "screen off claimed success without a framebuff
 grep -qx 'stop calvin-cog.service' "$SYSTEMCTL_LOG" || fail "screen off skipped stopping cog"
 pass "a missing framebuffer fails loudly"
 
+# --- 6. Boot inside the off window: OFF then ON (CLV-102) ---------------------
+# The agent's first OFF can run before systemd has started the unit. It must
+# leave the kiosk stopped and blanked, and the next ON must always issue start
+# so the page comes back.
+rm -f "$SYSTEMCTL_LOG"
+printf '0\n' > "$CALVIN_FB_BLANK"
+run off >/dev/null
+run on >/dev/null
+grep -qx 'stop calvin-cog.service' "$SYSTEMCTL_LOG" || fail "boot off did not stop cog"
+grep -qx 'start calvin-cog.service' "$SYSTEMCTL_LOG" || fail "boot on did not start cog"
+stop_line="$(grep -n 'stop calvin-cog.service' "$SYSTEMCTL_LOG" | cut -d: -f1)"
+start_line="$(grep -n 'start calvin-cog.service' "$SYSTEMCTL_LOG" | cut -d: -f1)"
+[ "$start_line" -gt "$stop_line" ] || fail "start ran before the boot off"
+
+# A repeated ON is idempotent: start is issued again and the helper succeeds.
+rm -f "$SYSTEMCTL_LOG"
+run on >/dev/null
+grep -qx 'start calvin-cog.service' "$SYSTEMCTL_LOG" || fail "repeated on did not start cog"
+pass "off at boot then on always starts cog"
+
+# --- 7. ON survives a missing framebuffer ------------------------------------
+# The unblank is best-effort: without fb0 the unit must still be started, or a
+# kiosk that booted in the off window stays black for the rest of the day.
+rm -f "$SYSTEMCTL_LOG" "$CALVIN_FB_BLANK"
+out="$(run on 2>&1)" || fail "screen on failed when only the framebuffer was missing"
+grep -qx 'start calvin-cog.service' "$SYSTEMCTL_LOG" \
+    || fail "screen on skipped starting cog without a framebuffer"
+echo "$out" | grep -q 'unblank failed' || fail "missing framebuffer was not reported"
+printf '0\n' > "$CALVIN_FB_BLANK"
+pass "screen on starts cog even when the framebuffer is missing"
+
 echo "PASS"
