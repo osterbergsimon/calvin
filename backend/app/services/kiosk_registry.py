@@ -199,14 +199,53 @@ async def request_agent_update(kiosk_id: str) -> bool:
     return True
 
 
+_CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
+
+def _spelling_signature(key: str) -> str:
+    """Token shared by the snake_case and camelCase spellings of one setting."""
+    return re.sub(r"[^a-z0-9]", "", key.lower())
+
+
+def _alternate_spelling(key: str) -> str:
+    """Return the other spelling of a config key (camelCase <-> snake_case)."""
+    if "_" in key:
+        head, *rest = key.split("_")
+        return head + "".join(part[:1].upper() + part[1:] for part in rest if part)
+    return _CAMEL_BOUNDARY_RE.sub("_", key).lower()
+
+
 def merge_overrides(base: dict, overrides: dict | None) -> dict:
     """Shallow top-level merge: each override key replaces that base key wholesale.
 
     No recursion, no array merge. Returns a new dict; `base` is not mutated.
+
+    Per-screen overrides may arrive in either spelling: the Settings UI writes
+    camelCase while the stored household config and the kiosk agent use
+    snake_case (the agent reads snake first). An override therefore replaces
+    both spellings of its setting, so it wins regardless of which one the
+    reader asks for first (CLV-101). Host-internal keys (leading ``_``) are
+    exempt.
     """
     if not overrides:
         return dict(base)
-    return {**base, **overrides}
+    merged = {**base, **overrides}
+    for key, value in overrides.items():
+        if key.startswith("_"):
+            continue
+        signature = _spelling_signature(key)
+        spellings = [
+            existing
+            for existing in merged
+            if not existing.startswith("_") and _spelling_signature(existing) == signature
+        ]
+        if len(spellings) < 2:
+            twin = _alternate_spelling(key)
+            if twin != key and not twin.startswith("_"):
+                spellings.append(twin)
+        for spelling in spellings:
+            merged[spelling] = value
+    return merged
 
 
 def device_config_version(merged: dict) -> str:

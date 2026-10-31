@@ -204,6 +204,80 @@ def test_merge_overrides_empty_and_none():
     assert merge_overrides(base, {}) == {"a": 1}
 
 
+# snake_case/camelCase pairs the kiosk agent reads; an override in either
+# spelling must win for both (CLV-101).
+_SPELLING_PAIRS = [
+    ("displayScheduleEnabled", "display_schedule_enabled"),
+    ("displaySchedule", "display_schedule"),
+    ("displayTimeoutEnabled", "display_timeout_enabled"),
+    ("displayTimeout", "display_timeout"),
+    ("orientationFlipped", "orientation_flipped"),
+    ("displayOutput", "display_output"),
+    ("displayResolution", "display_resolution"),
+    ("applyDisplayRotation", "apply_display_rotation"),
+]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("camel", "snake"), _SPELLING_PAIRS)
+def test_merge_overrides_camel_override_wins_for_both_spellings(camel, snake):
+    base = {snake: "household", camel: "household"}
+    merged = merge_overrides(base, {camel: "override"})
+    assert merged[snake] == "override"
+    assert merged[camel] == "override"
+    assert base == {snake: "household", camel: "household"}  # base not mutated
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("camel", "snake"), _SPELLING_PAIRS)
+def test_merge_overrides_snake_override_wins_for_both_spellings(camel, snake):
+    base = {snake: "household", camel: "household"}
+    merged = merge_overrides(base, {snake: "override"})
+    assert merged[snake] == "override"
+    assert merged[camel] == "override"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("camel", "snake"), _SPELLING_PAIRS)
+def test_merge_overrides_without_override_keeps_household(camel, snake):
+    base = {snake: "household", camel: "household"}
+    assert merge_overrides(base, None) == base
+    assert merge_overrides(base, {"unrelated": 1}) == {**base, "unrelated": 1}
+
+
+@pytest.mark.unit
+def test_merge_overrides_regression_display_schedule_camel_override():
+    """The exact Settings UI case (CLV-101): camel override must disable the schedule.
+
+    The household config carries both spellings (true) and the agent reads the
+    snake spelling first, so the override has to replace both.
+    """
+    base = {
+        "display_schedule_enabled": True,
+        "displayScheduleEnabled": True,
+        "display_schedule": [{"day": 0, "enabled": True, "onTime": "06:00", "offTime": "22:00"}],
+        "displaySchedule": [{"day": 0, "enabled": True, "onTime": "06:00", "offTime": "22:00"}],
+    }
+    merged = merge_overrides(base, {"displayScheduleEnabled": False})
+    assert merged["display_schedule_enabled"] is False
+    assert merged["displayScheduleEnabled"] is False
+    assert merged["display_schedule"] == base["display_schedule"]
+    assert merged["displaySchedule"] == base["displaySchedule"]
+
+
+@pytest.mark.unit
+def test_merge_overrides_adds_spelling_missing_from_base():
+    merged = merge_overrides({"display_schedule_enabled": True}, {"displayScheduleEnabled": False})
+    assert merged["display_schedule_enabled"] is False
+    assert merged["displayScheduleEnabled"] is False
+
+
+@pytest.mark.unit
+def test_merge_overrides_leaves_host_internal_keys_alone():
+    merged = merge_overrides({}, {"_agentUpdateRequested": True})
+    assert merged == {"_agentUpdateRequested": True}
+
+
 @pytest.mark.unit
 def test_device_config_version_stable_and_selective():
     merged = {"orientation": "portrait", "displayScheduleEnabled": True, "themeMode": "dark"}

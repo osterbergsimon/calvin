@@ -48,6 +48,20 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_camel_override_wins_for_both_spellings(test_client: TestClient):
+    """CLV-101: the Settings UI writes camelCase; the household config and the
+    agent's snake-first lookup must see the override, not the household value."""
+    test_client.post("/api/config", json={"displayScheduleEnabled": True})
+    test_client.put(
+        "/api/kiosks/hall-schedule/overrides",
+        json={"overrides": {"displayScheduleEnabled": False}},
+    )
+    body = test_client.get("/api/kiosks/hall-schedule/config").json()
+    assert body["displayScheduleEnabled"] is False
+    assert body["display_schedule_enabled"] is False
+
+
+@pytest.mark.integration
 def test_config_fetch_records_viewport(test_client: TestClient):
     """The kiosk reports vw/vh on its config fetch; GET /kiosks returns them (CLV-36)."""
     resp = test_client.get("/api/kiosks/hall-viewport/config?vw=1080&vh=1920")
