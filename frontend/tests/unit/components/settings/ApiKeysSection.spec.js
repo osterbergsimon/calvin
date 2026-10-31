@@ -87,9 +87,12 @@ describe("ApiKeysSection", () => {
       await mountSection();
       expect(wrapper.find("#section-security-api-keys").exists()).toBe(true);
       expect(wrapper.text()).toContain("API keys");
-      expect(wrapper.text()).toContain(
+      expect(wrapper.find(".settings-section__intro").text()).toBe(
         "Let apps and scripts, like Home Assistant, use Calvin without the admin password. Give each one its own key."
       );
+      // The sentence is the panel intro, not a "Keys" row label.
+      const labels = wrapper.findAll(".setting-row__label").map(label => label.text());
+      expect(labels).not.toContain("Keys");
     });
 
     it("requires a name and does not send the request", async () => {
@@ -397,6 +400,20 @@ describe("ApiKeysSection", () => {
       expect(text("Days")).toContain("Last used 2 days ago");
       expect(text("Old")).toContain("Last used 2 Sep");
       expect(text("Now")).toContain("Last used just now");
+    });
+
+    it("renders the key meta line in ListRow's meta role", async () => {
+      await mountSection([key()]);
+      const meta = wrapper.find("[data-test='api-key-row'] .list-row__meta");
+      expect(meta.exists()).toBe(true);
+      expect(meta.text()).toBe("clv_7Hq2… · Created 28 Oct · Never used");
+    });
+
+    it("drops an invalid created date instead of printing NaN", async () => {
+      await mountSection([key({ createdAt: "not-a-date" })]);
+      const row = find("api-key-row");
+      expect(row.text()).not.toContain("NaN");
+      expect(row.find(".list-row__meta").text()).toBe("clv_7Hq2… · Never used");
     });
 
     it("explains a host key that can't act on this server", async () => {

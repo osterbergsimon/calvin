@@ -4,11 +4,22 @@
       <div class="settings-section__eyebrow">{{ title }}</div>
       <slot name="action" />
     </div>
-    <div class="settings-section__panel"><slot /></div>
+    <div class="settings-section__panel">
+      <div v-if="description || $slots.description" class="settings-section__intro">
+        <slot name="description">{{ description }}</slot>
+      </div>
+      <slot />
+    </div>
   </section>
 </template>
 <script setup>
-defineProps({ id: { type: String, required: true }, title: { type: String, required: true } });
+defineProps({
+  id: { type: String, required: true },
+  title: { type: String, required: true },
+  // One sentence introducing what the panel's rows are for, above the first
+  // row. Keeps a category from inventing its own intro row or paragraph.
+  description: { type: String, default: "" },
+});
 </script>
 <style scoped>
 .settings-section {
@@ -34,5 +45,14 @@ defineProps({ id: { type: String, required: true }, title: { type: String, requi
   border: 1px solid var(--line);
   border-radius: var(--radius-2xl);
   overflow: hidden;
+}
+.settings-section__intro {
+  margin: 0;
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+  font-family: var(--font-ui);
+  font-size: var(--text-meta);
+  line-height: 1.4;
+  color: var(--ink-2);
+  border-bottom: 1px solid var(--line-soft);
 }
 </style>

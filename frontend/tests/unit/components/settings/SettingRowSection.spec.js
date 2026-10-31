@@ -31,4 +31,11 @@ describe("SettingRow + SettingsSection", () => {
     expect(w.find(".settings-section").attributes("id")).toBe("section-layout");
     expect(w.find(".settings-section__eyebrow").text()).toBe("Layout");
   });
+  it("SettingsSection shows an optional panel intro above the rows", () => {
+    const w = mount(SettingsSection, {
+      props: { id: "keys", title: "API keys", description: "What these keys are for." },
+      slots: { default: "<p>rows</p>" },
+    });
+    expect(w.find(".settings-section__intro").text()).toBe("What these keys are for.");
+  });
 });
