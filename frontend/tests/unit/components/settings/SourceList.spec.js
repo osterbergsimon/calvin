@@ -17,7 +17,8 @@ const row = (over = {}) => ({
 const mountList = (props = {}) =>
   mount(SourceList, {
     props: { rows: [row()], ...props },
-    global: { stubs: { draggable: false } },
+    // The ⋯ menu lives in a teleported Popover; render it in place.
+    global: { stubs: { draggable: false, teleport: true } },
   });
 
 describe("SourceList", () => {
@@ -58,8 +59,12 @@ describe("SourceList", () => {
     await edit.trigger("click");
     expect(w.emitted("edit")?.[0][0].id).toBe("immich-1");
 
-    await item.find(".sl-more-btn").trigger("click");
-    await item.find(".sl-menu-item").trigger("click");
+    const more = item.find('button[aria-label="More actions for Family albums"]');
+    expect(more.attributes("aria-haspopup")).toBe("menu");
+    await more.trigger("click");
+    const menu = w.find('[role="menu"]');
+    expect(menu.exists()).toBe(true);
+    await menu.findAll('[role="menuitem"]')[0].trigger("click");
     const confirm = w.findComponent({ name: "ConfirmModal" });
     expect(confirm.props("show")).toBe(true);
     confirm.vm.$emit("confirm");
@@ -78,8 +83,10 @@ describe("SourceList", () => {
       emptyText: "No photo sources yet.",
     });
     expect(w.find(".sl-empty").text()).toBe("No photo sources yet.");
-    const add = w.find(".sl-add");
+    const add = w.find(".sl-add-row button");
     expect(add.text()).toBe("Add photos from…");
+    // The only button in an empty list is the primary one (§4.6).
+    expect(add.classes()).toContain("btn--primary");
     await add.trigger("click");
     expect(w.emitted("add")?.length).toBe(1);
   });

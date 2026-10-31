@@ -23,6 +23,9 @@ import { ref } from "vue";
  * Pair with `overflow-y: auto` on the popover. Re-run `reposition()` on scroll/resize
  * while open so the popover tracks its trigger. `matchTriggerWidth` pins the popover's
  * min-width to the trigger (for menus that should be at least as wide as their pill).
+ * `bottomInset` reserves space at the bottom of the viewport — the on-screen
+ * keyboard publishes its height as `--osk-height`, so a popover never opens
+ * underneath it.
  */
 export function usePopoverPlacement({
   minHeight = 160,
@@ -30,27 +33,44 @@ export function usePopoverPlacement({
   margin = 16,
   gap = 6,
   matchTriggerWidth = false,
+  bottomInset = 0,
 } = {}) {
   const openUp = ref(false);
   const popoverStyle = ref({});
   let lastTrigger = null;
+  let lastPanel = null;
 
-  const place = trigger => {
+  const inset = () => {
+    const value = typeof bottomInset === "function" ? bottomInset() : bottomInset;
+    return Number.isFinite(value) ? Math.max(0, value) : 0;
+  };
+
+  const place = (trigger, panel) => {
     if (trigger !== undefined) lastTrigger = trigger;
+    if (panel !== undefined) lastPanel = panel;
     const t = lastTrigger;
     const el = t && "value" in t ? t.value : t;
     if (!el || typeof el.getBoundingClientRect !== "function") return;
     const r = el.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const viewportBottom = window.innerHeight - inset();
+    const spaceBelow = viewportBottom - r.bottom - margin;
     const spaceAbove = r.top - margin;
     const up = spaceBelow < flipThreshold && spaceAbove > spaceBelow;
     openUp.value = up;
     const style = {
       position: "fixed",
-      // Right-aligned to the trigger, matching the original in-flow `right: 0` anchor.
-      right: `${Math.round(window.innerWidth - r.right)}px`,
       maxHeight: `${Math.max(minHeight, Math.round(up ? spaceAbove : spaceBelow))}px`,
     };
+    // Right-aligned to the trigger (the original in-flow `right: 0` anchor). A
+    // trigger near the left edge would push a wider panel off-screen, so then
+    // the panel's left edge is clamped to the margin instead.
+    const panelEl = lastPanel && "value" in lastPanel ? lastPanel.value : lastPanel;
+    const panelWidth = panelEl?.offsetWidth || 0;
+    if (panelWidth && r.right - panelWidth < margin) {
+      style.left = `${margin}px`;
+    } else {
+      style.right = `${Math.round(window.innerWidth - r.right)}px`;
+    }
     if (up) {
       style.bottom = `${Math.round(window.innerHeight - r.top + gap)}px`;
     } else {

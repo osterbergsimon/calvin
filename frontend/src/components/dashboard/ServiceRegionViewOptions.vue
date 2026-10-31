@@ -2,20 +2,13 @@
   <RegionViewOptions :active="!!view?.linkAction" label="Service view options">
     <div class="svo-row">
       <span class="svo-label">Link behavior</span>
-      <div class="svo-seg" role="radiogroup" aria-label="Link behavior">
-        <button
-          v-for="opt in linkOptions"
-          :key="opt.value"
-          type="button"
-          role="radio"
-          :class="{ on: current === opt.value }"
-          :aria-checked="current === opt.value ? 'true' : 'false'"
-          :aria-label="`Link behavior ${opt.value}`"
-          @click="setLink(opt.value)"
-        >
-          {{ opt.label }}
-        </button>
-      </div>
+      <SegmentedControl
+        class="svo-seg"
+        :model-value="current"
+        :options="linkOptions"
+        aria-label="Link behavior"
+        @update:model-value="setLink"
+      />
     </div>
     <div class="svo-row">
       <span class="svo-label">Card size</span>
@@ -29,15 +22,16 @@
     </div>
     <div class="svo-row">
       <span class="svo-label">Refresh</span>
-      <button
-        type="button"
-        class="svo-seg-btn"
+      <Button
+        class="svo-refresh"
+        variant="secondary"
+        size="sm"
         data-action="refresh-now"
         aria-label="Refresh service now"
         @click="refreshNow"
       >
         Refresh now
-      </button>
+      </Button>
     </div>
   </RegionViewOptions>
 </template>
@@ -47,6 +41,8 @@ import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
 import RegionViewOptions from "./RegionViewOptions.vue";
+import Button from "@/components/ui/Button.vue";
+import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import { DEFAULT_CARD_SIZE } from "@/styles/cardSizeScale.js";
 
@@ -98,66 +94,20 @@ const setCardSize = value => {
 </script>
 
 <style scoped>
+/* Layout only: the controls are shared ui/ blocks. */
 .svo-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--gap-3);
 }
 .svo-label {
   font-family: var(--font-ui);
-  font-size: var(--fs-sm);
+  font-size: var(--text-body);
   color: var(--ink);
-}
-.svo-seg {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
-.svo-seg button {
-  font-family: var(--font-ui);
-  font-size: var(--fs-micro);
-  line-height: 1;
-  color: var(--ink-2);
-  background: transparent;
-  border: 0;
-  border-radius: var(--radius-xs);
-  padding: 0.2rem 0.4rem;
-  min-height: 22px;
-  cursor: pointer;
-}
-.svo-seg button.on {
-  background: var(--focus);
-  color: var(--focus-ink);
-}
-.svo-seg button:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
 }
 .svo-size {
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-.svo-seg-btn {
-  font-family: var(--font-ui);
-  font-size: var(--fs-micro);
-  color: var(--ink-2);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 0.2rem 0.5rem;
-  min-height: 22px;
-  cursor: pointer;
-}
-.svo-seg-btn:hover {
-  border-color: var(--focus-edge);
-  color: var(--ink);
-}
-.svo-seg-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 1px;
 }
 </style>

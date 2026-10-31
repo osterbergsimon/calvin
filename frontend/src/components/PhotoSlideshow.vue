@@ -341,7 +341,7 @@ watch(sourceKey, async () => {
   display: flex;
   flex-direction: column;
   background: var(--scrim-solid);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-control);
   overflow: visible; /* let the focused panel glow bloom out */
   min-height: 0;
   min-width: 0;
@@ -351,9 +351,9 @@ watch(sourceKey, async () => {
 
 .fs-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  z-index: 6;
+  top: var(--gap-4);
+  right: var(--gap-4);
+  z-index: var(--z-raised);
 }
 
 .photo-slideshow.fullscreen {
@@ -362,14 +362,8 @@ watch(sourceKey, async () => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: var(--z-dialog);
   border-radius: 0;
-}
-
-.slideshow-controls {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 .slideshow-content {
@@ -416,10 +410,10 @@ watch(sourceKey, async () => {
 
 .photo-image {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-raised);
   max-width: 100%;
   max-height: 100%;
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity var(--dur) var(--ease);
 }
 
 /* Display mode styles */

@@ -88,7 +88,7 @@ test("a Settings chunk that cannot load recovers with a full navigation (CLV-28)
   await page.waitForSelector(".admin-overflow__trigger");
 
   await page.locator(".admin-overflow__trigger").first().click();
-  await page.locator('[data-admin="settings"]').first().click();
+  await page.getByRole("menuitem", { name: "Settings" }).first().click();
 
   // The app must not stay silently on the dashboard: it does what the address
   // bar does, a full navigation to /settings (which reloads the current build).

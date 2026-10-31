@@ -15,6 +15,7 @@
       :value="modelValue"
       :data-test="inputTest || undefined"
       :name="name || undefined"
+      :step="step || undefined"
       :placeholder="placeholder || undefined"
       :autocomplete="autocomplete"
       :autocapitalize="autocapitalize"
@@ -60,7 +61,7 @@ const props = defineProps({
   type: {
     type: String,
     default: "text",
-    validator: value => ["text", "email", "url", "search", "tel"].includes(value),
+    validator: value => ["text", "email", "url", "search", "tel", "time"].includes(value),
   },
   name: { type: String, default: "" },
   placeholder: { type: String, default: "" },
@@ -70,6 +71,8 @@ const props = defineProps({
   // Attach a test id to the input itself; a plain data-test attribute still
   // lands on the wrapper (the gallery relies on that).
   inputTest: { type: String, default: "" },
+  // Time inputs step in seconds ("3600" = whole hours).
+  step: { type: [String, Number], default: undefined },
   hint: { type: String, default: "" },
   // Keep the label for assistive tech when a visible label already names the
   // group (e.g. the colour swatch and its hex value share one label).

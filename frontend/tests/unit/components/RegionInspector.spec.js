@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import RegionInspector from "@/components/settings/shared/regions/RegionInspector.vue";
 
-const mountWith = (region, context, screenRegions) =>
+const mountWith = (region, context, screenRegions, extraProps = {}) =>
   mount(RegionInspector, {
     props: {
       region,
@@ -11,6 +11,7 @@ const mountWith = (region, context, screenRegions) =>
       componentOptions: [],
       sourceOptions: [],
       context,
+      ...extraProps,
     },
     global: {
       stubs: {
@@ -80,6 +81,98 @@ describe("RegionInspector split toggle", () => {
     const t = toggleText(w);
     expect(t.some(x => x.includes("Split region"))).toBe(false);
     expect(t.some(x => x.includes("Unsplit"))).toBe(false);
+  });
+});
+
+describe("RegionInspector doctrine rows (CLV-87)", () => {
+  const context = { depth: 1, isSub: false, canSplit: false, canAddSub: false, splitDir: "row" };
+  const leaf = () => ({ id: "r1", kind: "calendar", size: 100, instanceIds: [] });
+  const toggleRows = w =>
+    w
+      .findAllComponents({ name: "SettingRow" })
+      .filter(row => row.findAllComponents({ name: "ToggleSwitch" }).length > 0);
+
+  it("labels the picker once, under the Shows heading", () => {
+    const w = mountWith(leaf(), context);
+    expect(w.find(".ins-field .picker").exists()).toBe(true);
+    expect(w.findAll(".setting-row__label").map(n => n.text())).not.toContain("Component");
+  });
+
+  it("keeps every toggle on the right of its label", () => {
+    const rows = toggleRows(mountWith(leaf(), context));
+    expect(rows.length).toBe(2);
+    for (const row of rows) expect(row.classes()).toContain("ins-toggle-row");
+  });
+
+  it("lines the source chips up with their label", () => {
+    const w = mountWith(leaf(), context, undefined, {
+      sourceOptions: [{ id: "family", name: "Family" }],
+    });
+    expect(w.findComponent({ name: "ChipMultiSelect" }).classes()).toContain("ins-sources");
+  });
+
+  it("hides its heading when the phone sheet supplies one", () => {
+    expect(mountWith(leaf(), context).find(".ins-mode").exists()).toBe(true);
+    expect(
+      mountWith(leaf(), context, undefined, { hideHeading: true }).find(".ins-mode").exists()
+    ).toBe(false);
+  });
+});
+
+describe("RegionInspector sources", () => {
+  const sources = [
+    { id: "family", name: "Family" },
+    { id: "work", name: "Work" },
+  ];
+  const mountSources = region =>
+    mount(RegionInspector, {
+      props: {
+        region,
+        screen: { name: "Home", layout: { regions: [region] } },
+        layoutDir: "row",
+        componentOptions: [],
+        sourceOptions: sources,
+        context: { depth: 1, isSub: false, canSplit: false, canAddSub: false, splitDir: "row" },
+      },
+      global: {
+        stubs: {
+          SegmentedControl: true,
+          ToggleSwitch: true,
+          NumberStepper: true,
+          SelectPill: true,
+        },
+      },
+    });
+  const chips = w => w.findAllComponents({ name: "ChipMultiSelect" })[0];
+
+  it("marks All sources while the region inherits every source", () => {
+    const w = mountSources({ id: "r1", kind: "calendar", size: 100, instanceIds: [] });
+    expect(chips(w).props("modelValue")).toEqual(["__all__"]);
+  });
+
+  it("narrows to a picked source while All sources is on", () => {
+    const w = mountSources({ id: "r1", kind: "calendar", size: 100, instanceIds: [] });
+    chips(w).vm.$emit("update:modelValue", ["__all__", "family"]);
+    expect(w.emitted("toggle-source")[0]).toEqual(["family", true]);
+    expect(w.emitted("clear-sources")).toBeUndefined();
+  });
+
+  it("goes back to every source when All sources is picked", () => {
+    const w = mountSources({ id: "r1", kind: "calendar", size: 100, instanceIds: ["family"] });
+    chips(w).vm.$emit("update:modelValue", ["__all__"]);
+    expect(w.emitted("clear-sources")?.length).toBe(1);
+    expect(w.emitted("toggle-source")).toBeUndefined();
+  });
+
+  it("toggles one source off an explicit list", () => {
+    const w = mountSources({
+      id: "r1",
+      kind: "calendar",
+      size: 100,
+      instanceIds: ["family", "work"],
+    });
+    chips(w).vm.$emit("update:modelValue", ["work"]);
+    expect(w.emitted("toggle-source")[0]).toEqual(["family", false]);
   });
 });
 

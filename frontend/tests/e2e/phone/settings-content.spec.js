@@ -58,29 +58,30 @@ test.describe("phone: Content", () => {
     await expect(modal.getByRole("button", { name: "Test connection" })).toBeVisible();
     await expect(modal.locator('input[type="checkbox"]')).toHaveCount(0);
 
-    // CLV-80 review: "Colour" names the whole swatch + hex row and sits above
-    // it; the hex field keeps an accessible name without a second visible one.
+    // CLV-83: the add form uses ColourField: a "Colour" label above a radiogroup
+    // of named theme swatches plus "Custom…", with no hex box or native input.
     const colourLayout = await page.evaluate(() => {
       const root = document.querySelector(".dialog");
-      const label = root.querySelector(".colour-label");
-      const row = root.querySelector(".colour-row");
+      const label = root.querySelector(".colour-field__label");
+      const group = root.querySelector('.colour-field [role="radiogroup"]');
       const labelRect = label.getBoundingClientRect();
-      const rowRect = row.getBoundingClientRect();
-      const hexLabel = row.querySelector(".text-field__label");
+      const groupRect = group.getBoundingClientRect();
       return {
         labelText: label.textContent.trim(),
-        labelAboveRow: labelRect.bottom <= rowRect.top + 1,
-        labelLeftOfSwatch: labelRect.left <= row.getBoundingClientRect().left + 1,
-        hexLabelHidden: getComputedStyle(hexLabel).clip !== "auto",
-        hexFieldWidth: row.querySelector(".text-field__input").getBoundingClientRect().width,
-        swatchWidth: row.querySelector('input[type="color"]').getBoundingClientRect().width,
+        labelAboveGroup: labelRect.bottom <= groupRect.top + 1,
+        groupName: group.getAttribute("aria-labelledby") === label.id,
+        radios: group.querySelectorAll('input[type="radio"]').length,
+        hexInputs: root.querySelectorAll(
+          ".colour-row, .colour-label, .colour-field .text-field__input"
+        ).length,
       };
     });
     expect(colourLayout.labelText).toBe("Colour");
-    expect(colourLayout.labelAboveRow).toBe(true);
-    expect(colourLayout.labelLeftOfSwatch).toBe(true);
-    expect(colourLayout.hexLabelHidden).toBe(true);
-    expect(colourLayout.hexFieldWidth).toBeGreaterThan(colourLayout.swatchWidth);
+    expect(colourLayout.labelAboveGroup).toBe(true);
+    expect(colourLayout.groupName).toBe(true);
+    expect(colourLayout.radios).toBeGreaterThan(1);
+    expect(colourLayout.hexInputs).toBe(0);
+    await expect(modal.getByRole("button", { name: "Custom…" })).toBeVisible();
 
     // Both switches share the dialog's own inset (no panel padding on top) and
     // keep label-left / toggle-right on a phone.
@@ -159,6 +160,29 @@ test.describe("phone: Content", () => {
     await expect.poll(() => api.requests).toContain("POST /api/plugins/calendar-ics/instances");
     await expect.poll(() => api.requests).toContain("POST /api/calendar/sources");
     expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("opens a row's more-actions menu inside the viewport", async ({ page, consoleErrors }) => {
+    await openContent(page);
+    const trigger = page
+      .locator(".content-settings")
+      .getByRole("button", { name: /^More actions for / })
+      .last();
+    await trigger.scrollIntoViewIfNeeded();
+    await trigger.click();
+    const menu = page.getByRole("menu").first();
+    await expect(menu).toBeVisible();
+    const box = await menu.boundingBox();
+    const vp = page.viewportSize();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(vp.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(vp.height);
+    // Opening must not have scrolled the trigger itself out of view.
+    const tb = await trigger.boundingBox();
+    expect(tb.y).toBeGreaterThanOrEqual(0);
+    expect(tb.y + tb.height).toBeLessThanOrEqual(vp.height);
     expect(consoleErrors).toEqual([]);
   });
 
