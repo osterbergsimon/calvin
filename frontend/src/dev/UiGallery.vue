@@ -509,8 +509,8 @@ const fullDialogText = ref("");
 const scopeOverridden = ref(true);
 const fieldTableColumns = [
   { label: "" },
-  { label: "On", width: "7rem" },
-  { label: "Off", width: "7rem" },
+  { label: "On", width: "minmax(0, 7rem)" },
+  { label: "Off", width: "minmax(0, 7rem)" },
   { label: "" },
 ];
 const fieldTableRows = ref([
