@@ -186,7 +186,8 @@ const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent || "");
 const isStandalone = () =>
   window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true;
 const showIosTip = computed(() => state.value === "ready" && isIos() && !isStandalone());
-const isAndroidFirefox = () => /android/i.test(navigator.userAgent || "") && /firefox\//i.test(navigator.userAgent || "");
+const isAndroidFirefox = () =>
+  /android/i.test(navigator.userAgent || "") && /firefox\//i.test(navigator.userAgent || "");
 const showFirefoxTip = computed(() => state.value === "ready" && isAndroidFirefox());
 const recentTitle = computed(() => (seeAll.value ? "Photos added with this link" : "Your photos"));
 const recentNote = computed(() =>

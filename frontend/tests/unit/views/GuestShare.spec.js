@@ -198,9 +198,7 @@ describe("GuestShare", () => {
   it("asks Firefox users to open the link in Chrome for the Share menu", async () => {
     const agent = vi
       .spyOn(navigator, "userAgent", "get")
-      .mockReturnValue(
-        "Mozilla/5.0 (Android 14; Mobile; rv:132.0) Gecko/132.0 Firefox/132.0"
-      );
+      .mockReturnValue("Mozilla/5.0 (Android 14; Mobile; rv:132.0) Gecko/132.0 Firefox/132.0");
     respond();
     await mountPage();
     expect(get("guest-firefox-tip").text()).toBe(
