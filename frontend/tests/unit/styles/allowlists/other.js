@@ -8,7 +8,6 @@
 export const roleLint = {
   allowlist: [
     "components/StatusRail.vue",
-    "components/settings/categories/ThisBrowserSettings.vue",
     "components/settings/shared/CollapsibleSection.vue",
     "components/settings/shared/DefaultEditNote.vue",
     "components/settings/shared/DefaultOnlyNote.vue",
@@ -63,7 +62,6 @@ export const controlLint = {
 
 export const settingsNoStyle = {
   allowlist: [
-    "components/settings/categories/ThisBrowserSettings.vue",
     "components/settings/tabs/layout/keyboard/ActionPicker.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingBoard.vue",
     "components/settings/tabs/layout/keyboard/KeyBindingTile.vue",

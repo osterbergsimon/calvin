@@ -36,21 +36,14 @@
           @update:model-value="v => emit('update:config', { clockBarLayout: v })"
         />
       </SettingRow>
-      <SettingRow stacked label="Top or bottom bar size">
-        <ClockBarFontSizePicker
-          :time-size="config.clockBarFontSize || 16"
-          :date-size="config.clockBarDateFontSize || 14"
-          :layout="config.clockBarLayout || 'single-line'"
-          :padding="config.clockBarPadding ?? 8"
-          :plugin-item-size="config.clockBarPluginItemSize ?? 16"
-          :show-date="config.clockShowDate"
-          :is-vertical="false"
-          @update:time-size="v => emit('update:config', { clockBarFontSize: v })"
-          @update:date-size="v => emit('update:config', { clockBarDateFontSize: v })"
-          @update:padding="v => emit('update:config', { clockBarPadding: v })"
-          @update:plugin-item-size="v => emit('update:config', { clockBarPluginItemSize: v })"
-        />
-      </SettingRow>
+      <ClockBarSizePicker
+        label="Top or bottom bar"
+        orientation="horizontal"
+        :time-size="config.clockBarFontSize || 16"
+        :padding="config.clockBarPadding ?? 8"
+        :plugin-item-size="config.clockBarPluginItemSize ?? 16"
+        @update="patch => emit('update:config', clockBarSizePatch(patch, 'horizontal'))"
+      />
       <SettingRow label="Side bar">
         <SelectPill
           :model-value="config.clockBarVerticalLayout || 'upright'"
@@ -63,24 +56,16 @@
           @update:model-value="v => emit('update:config', { clockBarVerticalLayout: v })"
         />
       </SettingRow>
-      <SettingRow stacked label="Side bar size">
-        <ClockBarFontSizePicker
-          :time-size="config.clockBarVerticalFontSize || 18"
-          :date-size="config.clockBarVerticalDateFontSize || 11"
-          :layout="config.clockBarVerticalLayout || 'upright'"
-          :padding="config.clockBarVerticalPadding ?? 8"
-          :plugin-item-size="config.clockBarVerticalPluginItemSize ?? 16"
-          :show-date="config.clockShowDate"
-          :is-vertical="true"
-          :max="48"
-          @update:time-size="v => emit('update:config', { clockBarVerticalFontSize: v })"
-          @update:date-size="v => emit('update:config', { clockBarVerticalDateFontSize: v })"
-          @update:padding="v => emit('update:config', { clockBarVerticalPadding: v })"
-          @update:plugin-item-size="
-            v => emit('update:config', { clockBarVerticalPluginItemSize: v })
-          "
-        />
-      </SettingRow>
+      <ClockBarSizePicker
+        label="Side bar"
+        orientation="vertical"
+        :max="48"
+        :time-size="config.clockBarVerticalFontSize || 18"
+        :padding="config.clockBarVerticalPadding ?? 8"
+        :plugin-item-size="config.clockBarVerticalPluginItemSize ?? 16"
+        @update="patch => emit('update:config', clockBarSizePatch(patch, 'vertical'))"
+      />
+      <ClockBarPreview :config="config" />
     </SettingsSection>
 
     <SettingsSection id="clock-bar-items" title="Clock bar items">
@@ -94,17 +79,11 @@ import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
-import ClockBarFontSizePicker from "@/components/settings/shared/ClockBarFontSizePicker.vue";
+import ClockBarSizePicker from "@/components/settings/shared/ClockBarSizePicker.vue";
+import ClockBarPreview from "@/components/settings/shared/ClockBarPreview.vue";
 import ClockBarItemsTab from "@/components/settings/tabs/clock-bar/ClockBarItemsTab.vue";
+import { clockBarSizePatch } from "@/utils/clockBarSizes";
 
 defineProps({ config: { type: Object, required: true } });
 const emit = defineEmits(["update:config"]);
 </script>
-
-<style scoped>
-.clock-bar-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-</style>

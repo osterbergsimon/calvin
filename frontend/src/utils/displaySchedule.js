@@ -45,7 +45,8 @@ export function normalizeSchedule(value) {
 }
 
 const sameTimes = days =>
-  days.length > 0 && days.every(day => day.onTime === days[0].onTime && day.offTime === days[0].offTime);
+  days.length > 0 &&
+  days.every(day => day.onTime === days[0].onTime && day.offTime === days[0].offTime);
 
 const groupEnabled = days => days.every(day => day.enabled);
 
@@ -151,9 +152,10 @@ function joinNames(names) {
  * seven days in the configured week order (`weekStartDay`: 0 = Sunday).
  */
 export function scheduleRows(value, mode, weekStartDay = 1) {
-  const schedule = normalizeSchedule(value);
   if (mode === "every-day") {
-    return [{ key: "every-day", label: "Every day", a11y: "Every day", days: [0, 1, 2, 3, 4, 5, 6] }];
+    return [
+      { key: "every-day", label: "Every day", a11y: "Every day", days: [0, 1, 2, 3, 4, 5, 6] },
+    ];
   }
   if (mode === "weekdays") {
     return [
@@ -174,5 +176,3 @@ export function scheduleRows(value, mode, weekStartDay = 1) {
     days: [day],
   }));
 }
-
-export const scheduleRowValue = (schedule, row) => schedule[row.days[0]];

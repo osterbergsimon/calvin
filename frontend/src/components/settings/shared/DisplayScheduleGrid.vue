@@ -135,9 +135,7 @@ const sameTime = row => {
 
 // A grouped row (Every day, Mon–Fri, Sat–Sun) writes every day it covers.
 function setRow(row, patch) {
-  const next = local.value.map(day =>
-    row.days.includes(day.day) ? { ...day, ...patch } : day
-  );
+  const next = local.value.map(day => (row.days.includes(day.day) ? { ...day, ...patch } : day));
   local.value = next;
   emit("update:modelValue", next);
 }

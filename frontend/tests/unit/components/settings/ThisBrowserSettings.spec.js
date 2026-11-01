@@ -34,7 +34,7 @@ describe("ThisBrowserSettings", () => {
   it("lists only the per-browser rows", () => {
     const wrapper = mountBrowser();
     expect(row(wrapper, "Touchscreen")).toBeTruthy();
-    expect(row(wrapper, "Show it")).toBeTruthy();
+    expect(row(wrapper, "On-screen keyboard")).toBeTruthy();
     expect(row(wrapper, "Settings text size")).toBeTruthy();
     expect(wrapper.findAllComponents({ name: "SettingRow" })).toHaveLength(3);
     expect(wrapper.text()).toContain("Same as Default");
@@ -75,14 +75,14 @@ describe("ThisBrowserSettings", () => {
       expect(wrapper.text()).toContain(
         "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
       );
-      expect(wrapper.find(".device-osk-show-again").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-show-again']").exists()).toBe(false);
     });
 
     it("describes Auto after a keyboard was used, with a way back", () => {
       learnHardwareKeyboard();
       const wrapper = mountBrowser();
       expect(wrapper.text()).toContain("Hidden here because a keyboard was used.");
-      expect(wrapper.find(".device-osk-show-again").text()).toBe("Show it again");
+      expect(wrapper.find("[data-test='osk-show-again']").text()).toBe("Show it again");
     });
 
     it("describes Always and Never", () => {
@@ -96,7 +96,7 @@ describe("ThisBrowserSettings", () => {
 
     it("saves the chosen mode for this browser", async () => {
       const wrapper = mountBrowser();
-      control(wrapper, "Show it").vm.$emit("update:modelValue", "off");
+      control(wrapper, "On-screen keyboard").vm.$emit("update:modelValue", "off");
       await flushPromises();
       expect(window.localStorage.getItem("calvin-osk-mode")).toBe("off");
     });
@@ -104,13 +104,15 @@ describe("ThisBrowserSettings", () => {
     it("Show it again clears the learned flag and announces it", async () => {
       learnHardwareKeyboard();
       const wrapper = mountBrowser();
-      await wrapper.find(".device-osk-show-again").trigger("click");
+      await wrapper.find("[data-test='osk-show-again']").trigger("click");
 
       expect(window.localStorage.getItem("calvin-osk-hardware-seen")).toBeNull();
       expect(wrapper.text()).toContain(
         "Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen."
       );
-      expect(wrapper.find(".device-live").text()).toBe("On-screen keyboard will show again.");
+      expect(wrapper.find("[data-test='osk-live']").text()).toBe(
+        "On-screen keyboard will show again."
+      );
     });
   });
 

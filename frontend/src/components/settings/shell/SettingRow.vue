@@ -32,7 +32,11 @@ defineProps({
 <style scoped>
 .setting-row {
   display: flex;
-  flex-wrap: wrap;
+  /* Side by side at every width a control up to half the row fits: a long
+     description wraps in the left column instead of pushing the control below
+     it (docs/design/2026-11-01-screen-schedule.md §4). `stacked` is the opt-in
+     for wide controls — chip groups, tables, sliders with a preview. */
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
@@ -45,6 +49,7 @@ defineProps({
   border-top: 1px solid var(--line-soft);
 }
 .setting-row__info {
+  flex: 1 1 auto;
   min-width: 0;
 }
 .setting-row__label {
@@ -102,5 +107,12 @@ defineProps({
    dialog rows with a toggle keep the same label-left / toggle-right layout. */
 .setting-row--flush .setting-row__info {
   flex: 1 1 0;
+}
+
+/* A phone stacks the control under the label, as every other row does. */
+@media (--bp-phone) {
+  .setting-row {
+    flex-wrap: wrap;
+  }
 }
 </style>

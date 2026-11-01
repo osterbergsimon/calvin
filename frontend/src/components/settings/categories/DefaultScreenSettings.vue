@@ -25,25 +25,22 @@
           <InlineNote v-if="!showsPage(page.id)">Not shown here</InlineNote>
         </template>
         <template #actions>
-          <label class="screen-page__show">
-            <ToggleSwitch
-              :model-value="showsPage(page.id)"
-              :aria-label="`Show ${page.name} to browsers and new screens`"
-              @update:model-value="value => togglePage(page.id, value)"
-            />
-            <span>Show</span>
-          </label>
-          <label class="screen-page__start">
-            <input
-              type="radio"
-              name="default-start-page"
-              :checked="startPageId === page.id"
-              :disabled="!showsPage(page.id)"
-              :aria-label="`Start on ${page.name}`"
-              @change="setDefaultPage(page.id)"
-            />
-            <span>Start here</span>
-          </label>
+          <ToggleSwitch
+            :model-value="showsPage(page.id)"
+            :aria-label="`Show ${page.name} to browsers and new screens`"
+            @update:model-value="value => togglePage(page.id, value)"
+          />
+          <Button
+            size="sm"
+            :variant="startPageId === page.id ? 'primary' : 'secondary'"
+            :aria-pressed="startPageId === page.id ? 'true' : 'false'"
+            :icon="startPageId === page.id ? mdiCheck : undefined"
+            :disabled="!showsPage(page.id)"
+            :aria-label="`Start on ${page.name}`"
+            @click="setDefaultPage(page.id)"
+          >
+            Start here
+          </Button>
         </template>
       </ListRow>
       <InlineNote v-if="pagesMsg" class="screens-saved" tone="err" role="status" aria-live="polite">
@@ -174,7 +171,7 @@
     <SettingsSection id="device-keyboard" title="Touch & keyboard">
       <SettingRow
         label="Touchscreen"
-        description="Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse."
+        description="Shows touch buttons: arrows, page dots and close. Auto works for most screens; choose On if a touch panel acts like a mouse."
       >
         <SegmentedControl
           :model-value="config.touchControls || 'auto'"
@@ -194,8 +191,8 @@
         @dismiss="dismissNote"
       />
       <SettingRow
-        label="Show it"
-        description="The on-screen keyboard. Auto shows it on touchscreens when you tap a text field."
+        label="On-screen keyboard"
+        description="Auto shows it on touchscreens when you tap a text field."
       >
         <SegmentedControl
           :model-value="config.onScreenKeyboard || 'auto'"
@@ -204,7 +201,7 @@
             { value: 'on', label: 'Always' },
             { value: 'off', label: 'Never' },
           ]"
-          aria-label="Show it"
+          aria-label="On-screen keyboard"
           @update:model-value="v => emitChange({ onScreenKeyboard: v })"
         />
       </SettingRow>
@@ -214,18 +211,14 @@
         @change-them-too="changeThemToo"
         @dismiss="dismissNote"
       />
-      <SettingRow
-        class="device-osk-layout"
-        :class="{ 'setting-row--muted': oskOff }"
-        label="Keyboard layout"
-      >
+      <SettingRow label="Keyboard layout">
         <template #description>
           <InlineNote>
             The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.
           </InlineNote>
           <DefaultOnlyNote />
         </template>
-        <div class="device-control device-osk-control" :inert="oskOff ? '' : undefined">
+        <div :inert="oskOff ? '' : undefined">
           <SelectPill
             :model-value="mainLayout"
             :options="layoutOptions"
@@ -233,31 +226,20 @@
             aria-label="Keyboard layout"
             @update:model-value="onLayoutChange"
           />
-          <InlineNote v-if="deviceLayout" class="device-osk-device">
+          <InlineNote v-if="deviceLayout">
             This screen uses {{ oskLayoutName(deviceLayout) }}, chosen on the keyboard.
             <template #action>
-              <Button
-                class="device-osk-use-default"
-                variant="link"
-                size="sm"
-                @click="useDefaultLayout"
-              >
-                Use default
-              </Button>
+              <Button variant="link" size="sm" @click="useDefaultLayout"> Use default </Button>
             </template>
           </InlineNote>
         </div>
       </SettingRow>
-      <SettingRow
-        class="device-osk-extra"
-        :class="{ 'setting-row--muted': oskOff }"
-        label="Also switch to"
-      >
+      <SettingRow label="Also switch to" stacked>
         <template #description>
           <InlineNote>{{ extraLayoutsDescription }}</InlineNote>
           <DefaultOnlyNote />
         </template>
-        <div class="device-control" :inert="oskOff ? '' : undefined">
+        <div :inert="oskOff ? '' : undefined">
           <ChipMultiSelect
             :model-value="extraLayouts"
             :options="extraLayoutOptions"
@@ -266,6 +248,19 @@
           />
         </div>
       </SettingRow>
+    </SettingsSection>
+
+    <SettingsSection id="device-behaviour" title="Behaviour">
+      <ScreenBehaviourRows
+        :photo-frame-enabled="behaviour.photoFrameEnabled"
+        :photo-frame-timeout="behaviour.photoFrameTimeout"
+        :photo-frame-source-ids="behaviour.photoFrameSourceIds"
+        :loading-light="behaviour.loadingLight"
+        :layout-mode="behaviour.layoutMode"
+        :overridden="behaviourOverridden"
+        @set="setBehaviour"
+        @reset="resetBehaviour"
+      />
     </SettingsSection>
 
     <ScreenRegionEditor
@@ -280,7 +275,10 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import { mdiCheck } from "@mdi/js";
+import { useConfigStore } from "@/stores/config";
 import { useKiosksStore } from "@/stores/kiosks";
+import { useScreenSetting } from "@/composables/useScreenSetting";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
@@ -296,7 +294,10 @@ import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
+import { LAYOUT_STORAGE_KEY } from "@/utils/layoutMode";
+import { getKioskId } from "@/utils/kioskId";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { screensOverriding } from "@/utils/screenOverrides";
 import { screenLabel } from "@/utils/screenLabel";
@@ -498,4 +499,54 @@ onMounted(() => window.addEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLa
 onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
 
 const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezone));
+
+// --- Behaviour: per screen (moved out of Dashboard › Focus & remote, §4) ----
+// The rows keep their per-screen storage: on a kiosk this screen's overrides,
+// on any other browser localStorage, with the Default values underneath.
+const configStore = useConfigStore();
+// Existing per-screen rows keep following the Settings form value on a kiosk;
+// these want the kiosk's merged config instead (an override may already differ
+// from the global form value).
+const screenServerValue = (key, fallback) => () => (getKioskId() ? configStore[key] : fallback());
+
+const photoFrameSetting = useScreenSetting("photoFrameEnabled", {
+  serverValue: screenServerValue("photoFrameEnabled", () => props.config.photoFrameEnabled),
+});
+const photoFrameTimeoutSetting = useScreenSetting("photoFrameTimeout", {
+  serverValue: screenServerValue("photoFrameTimeout", () => props.config.photoFrameTimeout),
+});
+const photoFrameSourceSetting = useScreenSetting("photoFrameSourceIds", {
+  serverValue: screenServerValue("photoFrameSourceIds", () => props.config.photoFrameSourceIds),
+});
+const loadingLightSetting = useScreenSetting("loadingLight", {
+  serverValue: () => props.config.loadingLight,
+});
+const layoutSetting = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
+
+const behaviourSettings = {
+  photoFrameEnabled: photoFrameSetting,
+  photoFrameTimeout: photoFrameTimeoutSetting,
+  photoFrameSourceIds: photoFrameSourceSetting,
+  loadingLight: loadingLightSetting,
+  layoutMode: layoutSetting,
+};
+
+const behaviour = computed(() => ({
+  photoFrameEnabled: photoFrameSetting.value.value,
+  photoFrameTimeout: photoFrameTimeoutSetting.value.value,
+  photoFrameSourceIds: photoFrameSourceSetting.value.value,
+  loadingLight: loadingLightSetting.value.value,
+  layoutMode: layoutSetting.value.value,
+}));
+
+const behaviourOverridden = computed(() => ({
+  photoFrameEnabled: photoFrameSetting.overridden.value,
+  photoFrameTimeout: photoFrameTimeoutSetting.overridden.value,
+  photoFrameSourceIds: photoFrameSourceSetting.overridden.value,
+  loadingLight: loadingLightSetting.overridden.value,
+  layoutMode: layoutSetting.overridden.value,
+}));
+
+const setBehaviour = (key, value) => behaviourSettings[key]?.set(value);
+const resetBehaviour = key => behaviourSettings[key]?.reset();
 </script>
