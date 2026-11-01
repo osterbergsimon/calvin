@@ -2540,6 +2540,16 @@ export interface components {
       expires_in_days?: number | null;
       /** Folder */
       folder: string;
+      /**
+       * Max Mb
+       * @default 2048
+       */
+      max_mb: number;
+      /**
+       * Max Photos
+       * @default 500
+       */
+      max_photos: number;
       /** Name */
       name: string;
     };

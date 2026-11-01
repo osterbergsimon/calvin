@@ -272,6 +272,54 @@ describe("service worker", () => {
     });
   });
 
+  describe("share links (calvin-mwqo)", () => {
+    const TOKEN = "0123456789abcdef.SECRET";
+
+    it("leaves a /share/ page to the network and never stores it as the shell", async () => {
+      sw.fetchMock.mockResolvedValueOnce(html("dashboard shell"));
+      await sw.dispatchFetch(navigation("/"));
+
+      expect(await sw.dispatchFetch(navigation(`/share/${TOKEN}/`))).toBeNull();
+      expect(await sw.dispatchFetch(navigation(`/share/${TOKEN}`))).toBeNull();
+
+      // The dashboard shell is untouched, and no cache holds the token.
+      const shell = await sw.caches.open("calvin-shell-test-build");
+      expect(await (await shell.match("/")).text()).toBe("dashboard shell");
+      for (const name of await sw.caches.keys()) {
+        const keys = await (await sw.caches.open(name)).keys();
+        expect(keys.map(r => r.url).join(" ")).not.toContain(TOKEN);
+      }
+    });
+
+    it("never falls back to the dashboard shell for a /share/ page offline", async () => {
+      sw.fetchMock.mockResolvedValueOnce(html("dashboard shell"));
+      await sw.dispatchFetch(navigation("/"));
+
+      sw.fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+      expect(await sw.dispatchFetch(navigation(`/share/${TOKEN}/`))).toBeNull();
+    });
+
+    it.each([
+      [`/api/guest/${TOKEN}`],
+      [`/api/guest/${TOKEN}/uploads`],
+      [`/api/guest/${TOKEN}/uploads/abc/thumbnail`],
+      [`/api/guest/${TOKEN}/manifest.webmanifest`],
+    ])("leaves %s to the network, uncached", async path => {
+      expect(await sw.dispatchFetch(req(path))).toBeNull();
+      expect(sw.fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("lets the share-target POST pass through untouched", async () => {
+      const body = new FormData();
+      body.append("photos", new Blob(["x"], { type: "image/jpeg" }), "a.jpg");
+      const request = req(`/share/${TOKEN}/receive`, { method: "POST", body });
+      Object.defineProperty(request, "mode", { value: "navigate" });
+
+      expect(await sw.dispatchFetch(request)).toBeNull();
+      expect(sw.fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   it("leaves non-GET and cross-origin requests to the browser", async () => {
     expect(await sw.dispatchFetch(req("/api/config", { method: "POST", body: "{}" }))).toBeNull();
     expect(await sw.dispatchFetch(new Request("https://example.com/x.js"))).toBeNull();
