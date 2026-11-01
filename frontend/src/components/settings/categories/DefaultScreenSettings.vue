@@ -211,14 +211,14 @@
         @change-them-too="changeThemToo"
         @dismiss="dismissNote"
       />
-      <SettingRow label="Keyboard layout">
+      <SettingRow label="Keyboard layout" data-test="osk-layout-row">
         <template #description>
           <InlineNote>
             The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.
           </InlineNote>
           <DefaultOnlyNote />
         </template>
-        <div :inert="oskOff ? '' : undefined">
+        <div data-test="osk-layout-control" :inert="oskOff ? '' : undefined">
           <SelectPill
             :model-value="mainLayout"
             :options="layoutOptions"
@@ -226,7 +226,7 @@
             aria-label="Keyboard layout"
             @update:model-value="onLayoutChange"
           />
-          <InlineNote v-if="deviceLayout">
+          <InlineNote v-if="deviceLayout" data-test="osk-device-layout">
             This screen uses {{ oskLayoutName(deviceLayout) }}, chosen on the keyboard.
             <template #action>
               <Button variant="link" size="sm" @click="useDefaultLayout"> Use default </Button>
@@ -234,12 +234,12 @@
           </InlineNote>
         </div>
       </SettingRow>
-      <SettingRow label="Also switch to" stacked>
+      <SettingRow label="Also switch to" stacked data-test="osk-extra-row">
         <template #description>
           <InlineNote>{{ extraLayoutsDescription }}</InlineNote>
           <DefaultOnlyNote />
         </template>
-        <div :inert="oskOff ? '' : undefined">
+        <div data-test="osk-extra-control" :inert="oskOff ? '' : undefined">
           <ChipMultiSelect
             :model-value="extraLayouts"
             :options="extraLayoutOptions"

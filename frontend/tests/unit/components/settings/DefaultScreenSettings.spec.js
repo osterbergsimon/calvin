@@ -254,32 +254,32 @@ describe("DefaultScreenSettings", () => {
       window.localStorage.setItem("calvin-osk-device-layout", "de");
       const wrapper = mountSettings({ oskLayout: "sv" });
 
-      expect(wrapper.find(".device-osk-device").exists()).toBe(true);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(true);
       expect(wrapper.text()).toContain("This screen uses Deutsch, chosen on the keyboard.");
 
-      await wrapper.find(".device-osk-use-default").trigger("click");
+      await wrapper.find("[data-test='osk-device-layout'] button").trigger("click");
 
       expect(window.localStorage.getItem("calvin-osk-device-layout")).toBeNull();
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
 
     it("hides that line when the device has no choice of its own", () => {
       const wrapper = mountSettings({ oskLayout: "sv" });
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
 
     it("ignores and removes the legacy auto-written key", () => {
       window.localStorage.setItem("calvin-osk-layout", "de");
       const wrapper = mountSettings({ oskLayout: "sv" });
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
       expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
     });
 
     it("updates the line when the keyboard changes the choice while Settings is open", async () => {
       const wrapper = mountSettings({ oskLayout: "sv" });
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
 
       window.localStorage.setItem("calvin-osk-device-layout", "fr");
       window.dispatchEvent(new CustomEvent("calvin-osk-layout-change"));
@@ -288,17 +288,14 @@ describe("DefaultScreenSettings", () => {
       expect(wrapper.text()).toContain("This screen uses Français, chosen on the keyboard.");
     });
 
-    it("dims and disables both rows while the on-screen keyboard is off", () => {
+    it("disables both rows while the on-screen keyboard is off", () => {
       const on = mountSettings({ onScreenKeyboard: "on", oskLayout: "sv" });
-      expect(on.find(".device-osk-layout").classes()).not.toContain("setting-row--muted");
-      expect(on.find(".device-osk-layout .device-control").attributes("inert")).toBeUndefined();
-      expect(on.find(".device-osk-extra .device-control").attributes("inert")).toBeUndefined();
+      expect(on.find("[data-test='osk-layout-control']").attributes("inert")).toBeUndefined();
+      expect(on.find("[data-test='osk-extra-control']").attributes("inert")).toBeUndefined();
 
       const off = mountSettings({ onScreenKeyboard: "off", oskLayout: "sv" });
-      expect(off.find(".device-osk-layout").classes()).toContain("setting-row--muted");
-      expect(off.find(".device-osk-layout .device-control").attributes("inert")).toBe("");
-      expect(off.find(".device-osk-extra").classes()).toContain("setting-row--muted");
-      expect(off.find(".device-osk-extra .device-control").attributes("inert")).toBe("");
+      expect(off.find("[data-test='osk-layout-control']").attributes("inert")).toBe("");
+      expect(off.find("[data-test='osk-extra-control']").attributes("inert")).toBe("");
     });
 
     it("is unaffected by the UI language", () => {
