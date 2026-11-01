@@ -43,7 +43,6 @@
         :save-status="saveStatus[plugin.id]"
         :test-status="testStatus[plugin.id]"
         :fetch-status="fetchStatus[plugin.id]"
-        :images="images"
         :uploading="uploading"
         :upload-error="uploadError"
         :upload-success="uploadSuccess"
@@ -62,7 +61,6 @@
         @open-appearance="emit('open-appearance')"
         @update="pluginId => emit('update', pluginId)"
         @upload="handleUpload"
-        @delete-image="handleDeleteImage"
       />
     </div>
   </div>
@@ -127,10 +125,6 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
-  images: {
-    type: Array,
-    default: () => [],
-  },
   uploading: {
     type: Boolean,
     default: false,
@@ -173,7 +167,6 @@ const emit = defineEmits([
   "open-appearance",
   "update",
   "upload",
-  "delete-image",
 ]);
 
 const filterOptions = computed(() =>
@@ -203,7 +196,6 @@ const handleTestConnection = pluginId => emit("test-connection", pluginId);
 const handleFetchNow = pluginId => emit("fetch-now", pluginId);
 const handleCustomAction = (pluginId, action) => emit("custom-action", pluginId, action);
 const handleUpload = file => emit("upload", file);
-const handleDeleteImage = imageId => emit("delete-image", imageId);
 </script>
 
 <style scoped>

@@ -3,6 +3,7 @@
 import hashlib
 import os
 import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,12 +49,6 @@ class LocalImagePlugin(ImagePlugin):
                 "accept": "image/*",
                 "multiple": True,
                 "help_text": "Select one or more image files to upload (JPG, PNG, WebP, GIF)",
-            },
-            {
-                "id": "manage",
-                "type": "manage_images",
-                "title": "Manage Images",
-                "collapsible": True,
             },
         ],
     )
@@ -182,7 +177,8 @@ class LocalImagePlugin(ImagePlugin):
                     # Get image metadata
                     with Image.open(file_path) as img:
                         width, height = img.size
-                        file_size = file_path.stat().st_size
+                        file_stat = file_path.stat()
+                        file_size = file_stat.st_size
 
                         # Generate image ID from file path hash
                         image_id = hashlib.md5(
@@ -201,6 +197,8 @@ class LocalImagePlugin(ImagePlugin):
                             "width": width,
                             "height": height,
                             "size": file_size,
+                            # The Local photos browser shows when each photo was written.
+                            "modified": datetime.fromtimestamp(file_stat.st_mtime, UTC).isoformat(),
                             "format": file_path.suffix.lower(),
                             # "" for the image dir itself, else its one-level subfolder.
                             "folder": (

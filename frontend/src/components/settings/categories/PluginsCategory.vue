@@ -15,7 +15,6 @@
         :save-status="pluginSaveStatus"
         :test-status="pluginTestStatus"
         :fetch-status="pluginFetchStatus"
-        :images="imagesList"
         :uploading="uploading"
         :upload-error="uploadError"
         :upload-success="uploadSuccess"
@@ -36,7 +35,6 @@
         @update="handleUpdate"
         @open-appearance="openAppearance"
         @upload="handleUpload"
-        @delete-image="handleDeleteImage"
       />
     </SettingsSection>
 
@@ -198,8 +196,6 @@ const uploadError = ref("");
 const uploadSuccess = ref("");
 
 // Computed for images
-const imagesList = computed(() => imagesStore.images);
-
 // Computed
 const hasInstalledThemes = computed(() => {
   return plugins.value.some(p => p.type === "theme" && p._installed);
@@ -616,14 +612,6 @@ const handleUpload = async event => {
     }, 10000);
   } finally {
     uploading.value = false;
-  }
-};
-
-const handleDeleteImage = async imageId => {
-  try {
-    await imagesStore.deleteImage(imageId);
-  } catch (error) {
-    console.error("Failed to delete image:", error);
   }
 };
 

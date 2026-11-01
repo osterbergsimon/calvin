@@ -224,7 +224,17 @@ const sampleInstances = {
       config: { ical_url: "https://example.com/family.ics" },
     },
   ],
-  "image-local": [],
+  "image-local": [
+    {
+      id: "local-images",
+      plugin_id: "image-local",
+      name: "Local photos",
+      enabled: true,
+      running: true,
+      display_order: 0,
+      config: {},
+    },
+  ],
   "web-embed": [
     {
       id: "svc-weather",
@@ -284,8 +294,27 @@ const sampleCalendarSources = [
 ];
 
 const sampleImages = [
-  { id: "img-1", filename: "garden.jpg", source: "image-local" },
-  { id: "img-2", filename: "harbour.jpg", source: "image-local" },
+  {
+    id: "img-1",
+    filename: "garden.jpg",
+    source: "local-images",
+    folder: "",
+    modified: "2026-10-28T10:00:00Z",
+  },
+  {
+    id: "img-2",
+    filename: "harbour.jpg",
+    source: "local-images",
+    folder: "",
+    modified: "2026-10-27T10:00:00Z",
+  },
+  {
+    id: "img-3",
+    filename: "party.jpg",
+    source: "local-images",
+    folder: "Guests",
+    modified: "2026-10-29T10:00:00Z",
+  },
 ];
 
 const sampleKeys = [
@@ -334,8 +363,11 @@ export async function installApiMock(page, options = {}) {
     down: false,
     requests: [],
     unmatched: [],
+    // Local photos (calvin-n2my): the browser's own mutable library.
+    images: JSON.parse(JSON.stringify(sampleImages)),
     // Share links (calvin-mwqo): what Settings › Content › Photos lists.
-    shareLinks: [],
+    shareLinks: options.shareLinks ? [...options.shareLinks] : [],
+    shareFolders: options.shareFolders ? [...options.shareFolders] : ["Guests", "Party"],
   };
 
   await page.route("**/api/**", async route => {
@@ -424,17 +456,23 @@ export async function installApiMock(page, options = {}) {
     if (path === "/api/calendar/refresh") return json(route, { ok: true });
     if (path === "/api/calendar/events") return json(route, { events: [] });
 
-    if (path === "/api/images/list") return json(route, { images: sampleImages });
-    if (path === "/api/images/current") return json(route, { image: sampleImages[0] });
+    if (path === "/api/images/list") return json(route, { images: state.images });
+    if (path === "/api/images/current") return json(route, { image: state.images[0] });
     if (path === "/api/images/next" || path === "/api/images/previous") {
-      return json(route, { image: sampleImages[0] });
+      return json(route, { image: state.images[0] });
     }
-    if (path === "/api/images/upload") return json(route, { ok: true, images: sampleImages });
+    if (path === "/api/images/upload") return json(route, { ok: true, images: state.images });
+    if (/^\/api\/images\/[^/]+\/thumbnail$/.test(path)) {
+      // Thumbnails: a real 1x1 PNG so the grid's <img> renders.
+      return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1PX });
+    }
     if (/^\/api\/images\/[^/]+$/.test(path) && method === "DELETE") {
+      const imageId = path.split("/").pop();
+      state.images = state.images.filter(image => image.id !== imageId);
       return json(route, { ok: true });
     }
     if (/^\/api\/images\/[^/]+$/.test(path)) {
-      // Thumbnails/photo bytes: a real 1x1 PNG so the <img> renders.
+      // Full photo bytes: a real 1x1 PNG so the <img> renders.
       return route.fulfill({ status: 200, contentType: "image/png", body: PNG_1PX });
     }
 
@@ -556,7 +594,7 @@ export async function installApiMock(page, options = {}) {
       return json(route, { ok: true, files: [] });
     }
 
-    if (path === "/api/share/folders") return json(route, { folders: ["Party"] });
+    if (path === "/api/share/folders") return json(route, { folders: state.shareFolders });
     if (path === "/api/share/links") {
       if (method === "POST") {
         const body = request.postDataJSON() || {};
