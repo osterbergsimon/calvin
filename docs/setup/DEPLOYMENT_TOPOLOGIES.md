@@ -160,9 +160,10 @@ Calvin's screen on/off schedule is authored in the dashboard UI, but the
 backend cannot reach a remote kiosk's display. `setup-kiosk.sh` therefore
 installs **`calvin-display-agent.service`**, a small local agent that reads the
 schedule from `${CALVIN_BACKEND_URL}/api/config` and powers the panel with
-`vcgencmd`/`xset`. It computes on/off boundaries locally (no per-minute
-polling) and re-checks the schedule every `CALVIN_DISPLAY_REFRESH_SECONDS`
-(default 900) to pick up edits. Set the schedule in the UI as usual; the kiosk
+`vcgencmd`/`xset`. It computes on/off boundaries locally and wakes exactly at
+the next one, and re-reads the config every `CALVIN_DISPLAY_REFRESH_SECONDS`
+(default 60, set in `/etc/default/calvin-kiosk` to override), so a schedule
+edit reaches the panel within about a minute. Set the schedule in the UI as usual; the kiosk
 follows it. Logs: `journalctl -u calvin-display-agent.service`.
 
 ### Screen rotation on a Mode-B kiosk

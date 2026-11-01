@@ -374,7 +374,10 @@ cog --platform=drm \
   kiosk that boots inside its off window recovers at the next on boundary: the
   agent retries a panel command that failed (for example while the unit was
   still transitioning) on its next poll instead of waiting for the next schedule
-  change. cog aborts on SIGTERM
+  change. The agent polls its config every `CALVIN_DISPLAY_REFRESH_SECONDS`
+  (default 60, override in `/etc/default/calvin-kiosk`) and also wakes at each
+  schedule boundary, so a schedule edit made in Settings reaches the panel
+  within about a minute. cog aborts on SIGTERM
   (SIGSEGV as root, SIGABRT as `calvin`), so the unit lists both in
   `SuccessExitStatus` and a scheduled screen-off does not leave it `failed`. The
   helper (`/usr/local/bin/calvin-cog-panel.sh`) is the only thing `calvin` may
