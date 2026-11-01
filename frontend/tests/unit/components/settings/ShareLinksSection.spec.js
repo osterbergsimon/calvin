@@ -23,6 +23,7 @@ const link = (over = {}) => ({
   expiresAt: null,
   expired: false,
   uploadCount: 0,
+  guestsSeeAll: true,
   path: "/share/l1.TOKEN/",
   ...over,
 });
@@ -98,6 +99,7 @@ describe("ShareLinksSection", () => {
       name: "Grandma",
       folder: "Guests",
       max_photos: 500,
+      guests_see_all: true,
     });
     expect(find("share-link-form").exists()).toBe(false);
     expect(rows()).toHaveLength(1);
@@ -120,6 +122,7 @@ describe("ShareLinksSection", () => {
       folder: "Guests",
       expires_in_days: 7,
       max_photos: 100,
+      guests_see_all: true,
     });
   });
 
@@ -145,6 +148,35 @@ describe("ShareLinksSection", () => {
     expect(get("share-link-qr").text()).toContain("http://calvin.local:8000/share/l1.TOKEN/");
     await get("share-link-show").trigger("click");
     expect(find("share-link-qr").exists()).toBe(false);
+  });
+
+  it("lets the owner turn off guests seeing all photos at create time", async () => {
+    await mountSection();
+    await get("share-links-create").trigger("click");
+    await wrapper.get("#share-link-name").setValue("Party");
+    const toggle = get("share-link-see-all");
+    expect(toggle.attributes("aria-checked")).toBe("true");
+    await toggle.trigger("click");
+    api.post.mockResolvedValueOnce({ data: { link: link({ guestsSeeAll: false }) } });
+    await get("share-link-form").trigger("submit");
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledWith(
+      "/share/links",
+      expect.objectContaining({ guests_see_all: false })
+    );
+  });
+
+  it("shows and changes whether guests see all photos on each link", async () => {
+    await mountSection([link(), link({ id: "l2", name: "Party", guestsSeeAll: false })]);
+    expect(rows()[0].text()).toContain("Guests see all photos");
+    expect(rows()[1].text()).toContain("Guests see their own photos");
+    const toggles = wrapper.findAll("[data-test='share-link-row-see-all']");
+    expect(toggles[0].attributes("aria-label")).toBe("Guests see all photos added with Grandma");
+    api.patch.mockResolvedValueOnce({ data: { link: link({ guestsSeeAll: false }) } });
+    await toggles[0].trigger("click");
+    await flushPromises();
+    expect(api.patch).toHaveBeenCalledWith("/share/links/l1", { guests_see_all: false });
+    expect(rows()[0].text()).toContain("Guests see their own photos");
   });
 
   it("renames a link", async () => {

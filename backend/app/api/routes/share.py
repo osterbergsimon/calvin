@@ -9,8 +9,13 @@ to ``request.state.share_link`` before a handler runs, and these handlers only
 ever act on that link's own folder and uploads.
 
 A guest's phone is told apart by the random ``calvin_guest`` cookie (only its
-hash is stored), so a guest sees and removes only the photos sent from that
-phone.
+hash is stored). A link with "guests see all photos" on (the default) shows
+every guest all of the link's photos; otherwise a guest sees and removes only
+the photos sent from that phone (that browser).
+
+The share target never sets the cookie (calvin-p954): a share that arrives
+without it is recorded under a one-time claim id carried in the redirect, and
+the guest page, which does send the cookie, claims those photos for its device.
 """
 
 import asyncio
@@ -35,6 +40,7 @@ from app.security.share_links import (
     DEFAULT_MAX_BYTES,
     DEFAULT_MAX_PHOTOS,
     MAX_NAME_LEN,
+    PENDING_PREFIX,
     DuplicateLinkName,
     InvalidFolder,
     get_share_link_store,
@@ -138,10 +144,14 @@ def _link_not_found() -> HTTPException:
     )
 
 
+def _valid_id(value: str) -> bool:
+    return 16 <= len(value) <= 64 and value.replace("-", "").replace("_", "").isalnum()
+
+
 def _device(request: Request) -> tuple[str, bool]:
     """This phone's device id, and whether it is new (and must be set as a cookie)."""
     value = request.cookies.get(DEVICE_COOKIE, "")
-    if 16 <= len(value) <= 64 and value.replace("-", "").replace("_", "").isalnum():
+    if _valid_id(value):
         return value, False
     return secrets.token_urlsafe(24), True
 
@@ -338,9 +348,12 @@ class CreateLinkBody(BaseModel):
     max_photos: int = Field(default=DEFAULT_MAX_PHOTOS, ge=1, le=MAX_LINK_PHOTOS)
     max_mb: int = Field(default=DEFAULT_MAX_BYTES // 2**20, ge=1, le=MAX_LINK_MB)
 
+    guests_see_all: bool = True
 
-class RenameLinkBody(BaseModel):
-    name: str = Field(min_length=1, max_length=MAX_NAME_LEN)
+
+class UpdateLinkBody(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=MAX_NAME_LEN)
+    guests_see_all: bool | None = None
 
 
 def _clean_name(raw: str) -> str:
@@ -385,6 +398,7 @@ async def create_share_link(body: CreateLinkBody):
             expires_at=expires_at,
             max_photos=body.max_photos,
             max_bytes=body.max_mb * 2**20,
+            guests_see_all=body.guests_see_all,
         )
     except DuplicateLinkName:
         raise _duplicate(name) from None
@@ -405,12 +419,18 @@ async def create_share_link(body: CreateLinkBody):
 
 
 @router.patch("/share/links/{link_id}")
-async def rename_share_link(link_id: str, body: RenameLinkBody):
-    name = _clean_name(body.name)
+async def update_share_link(link_id: str, body: UpdateLinkBody):
+    """Rename a link and/or change whether guests see all of its photos."""
+    if body.name is None and body.guests_see_all is None:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "nothing_to_change", "message": "Nothing to change."},
+        )
+    name = _clean_name(body.name) if body.name is not None else None
     try:
-        link = get_share_link_store().rename(link_id, name)
+        link = get_share_link_store().update(link_id, name=name, guests_see_all=body.guests_see_all)
     except DuplicateLinkName:
-        raise _duplicate(name) from None
+        raise _duplicate(str(name)) from None
     if link is None:
         raise _link_not_found()
     return {"link": _with_path(link)}
@@ -456,6 +476,7 @@ async def guest_info(token: str, request: Request, response: Response):
         "maxBytes": MAX_GUEST_UPLOAD_BYTES,
         "maxFiles": MAX_FILES_PER_REQUEST,
         "available": _local_photos() is not None,
+        "seeAll": link["guestsSeeAll"],
     }
 
 
@@ -499,11 +520,10 @@ async def guest_manifest(token: str, request: Request):
 
 @router.get("/guest/{token}/uploads")
 async def guest_uploads(token: str, request: Request):
-    """Photos sent from this phone through this link, newest first."""
+    """The photos this guest may see through this link, newest first."""
     link = _guest_link(request)
-    device, _ = _device(request)
     plugin = _local_photos()
-    uploads = get_share_link_store().uploads_for(link["id"], device)
+    uploads = get_share_link_store().uploads_for(link["id"], _scope_device(request, link))
     if plugin is not None:
         uploads = [u for u in uploads if _is_upload_file(plugin, u)]
     return {"uploads": [_upload_view(token, upload) for upload in uploads]}
@@ -530,11 +550,36 @@ async def guest_upload(
     return {"uploaded": uploaded, "failed": failed}
 
 
+def _scope_device(request: Request, link: dict[str, Any]) -> str | None:
+    """The device a guest's view is limited to; ``None`` (the whole link) with see-all on."""
+    if link["guestsSeeAll"]:
+        return None
+    return _device(request)[0]
+
+
+class ClaimBody(BaseModel):
+    claim: str
+
+
+@router.post("/guest/{token}/claim")
+async def guest_claim(token: str, body: ClaimBody, request: Request, response: Response):
+    """Take the photos a share sent without this phone's cookie (one time)."""
+    if not _valid_id(body.claim):
+        raise HTTPException(
+            status_code=422, detail={"code": "invalid_claim", "message": "Invalid claim."}
+        )
+    link = _guest_link(request)
+    device, new = _device(request)
+    claimed = get_share_link_store().claim_uploads(link["id"], body.claim, device)
+    if new:
+        _set_device(response, device)
+    return {"claimed": claimed}
+
+
 def _own_upload(request: Request, image_id: str) -> dict[str, Any]:
     link = _guest_link(request)
-    device, _ = _device(request)
     plugin = _local_photos()
-    for upload in get_share_link_store().uploads_for(link["id"], device):
+    for upload in get_share_link_store().uploads_for(link["id"], _scope_device(request, link)):
         if upload["imageId"] == image_id and plugin is not None and _is_upload_file(plugin, upload):
             return upload
     raise HTTPException(
@@ -545,14 +590,13 @@ def _own_upload(request: Request, image_id: str) -> dict[str, Any]:
 
 @router.delete("/guest/{token}/uploads/{image_id}", status_code=204)
 async def guest_remove_upload(token: str, image_id: str, request: Request):
-    """Remove one of this phone's own uploads (file and record)."""
+    """Remove one upload this guest may see (file and record)."""
     from app.services import plugin_image_service
 
     _own_upload(request, image_id)
     link = _guest_link(request)
-    device, _ = _device(request)
     await plugin_image_service.delete_image(image_id)
-    get_share_link_store().remove_upload(link["id"], image_id, device)
+    get_share_link_store().remove_upload(link["id"], image_id, _scope_device(request, link))
     return Response(status_code=204)
 
 
@@ -572,16 +616,22 @@ async def share_target(
     request: Request,
     photos: list[UploadFile] = File(default=[]),
 ):
-    """Web Share Target action: Android's Share → Calvin lands here."""
+    """Web Share Target action: Android's Share → Calvin lands here.
+
+    It never sets the device cookie: a share that arrives without the cookie
+    must not replace the phone's id, which would hide its earlier photos. Its
+    photos wait under a one-time claim id that the guest page claims.
+    """
     link = _guest_link(request)
     device, new = _device(request)
+    claim = secrets.token_urlsafe(24) if new else None
+    owner = PENDING_PREFIX + claim if claim else device
     try:
-        uploaded, failed = await _save_files(request, link, device, photos)
+        uploaded, failed = await _save_files(request, link, owner, photos)
         query = f"added={len(uploaded)}&failed={len(failed)}"
+        if claim and uploaded:
+            query += f"&claim={claim}"
     except HTTPException as exc:
         code = exc.detail.get("code") if isinstance(exc.detail, dict) else "upload_failed"
         query = f"error={code}"
-    redirect = RedirectResponse(share_page(token, query), status_code=303)
-    if new:
-        _set_device(redirect, device)
-    return redirect
+    return RedirectResponse(share_page(token, query), status_code=303)

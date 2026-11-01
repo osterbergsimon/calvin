@@ -164,6 +164,61 @@ describe("GuestShare", () => {
     expect(router.currentRoute.value.query).toEqual({});
   });
 
+  it("claims the photos a share sent, then lists them", async () => {
+    respond({ uploads: [upload("a")] });
+    api.post.mockResolvedValueOnce({ data: { claimed: 1 } });
+    await mountPage("?added=1&failed=0&claim=CLAIM1234567890abcdef");
+    expect(api.post).toHaveBeenCalledWith(`/guest/${encodeURIComponent(TOKEN)}/claim`, {
+      claim: "CLAIM1234567890abcdef",
+    });
+    const listCall = api.get.mock.calls.findIndex(([url]) => url.endsWith("/uploads"));
+    expect(api.post.mock.invocationCallOrder[0]).toBeLessThan(
+      api.get.mock.invocationCallOrder[listCall]
+    );
+    expect(get("guest-status").text()).toBe("1 photo added.");
+    expect(router.currentRoute.value.query).toEqual({});
+  });
+
+  it("still loads when the claim fails", async () => {
+    respond({ uploads: [upload("a")] });
+    api.post.mockRejectedValueOnce(new Error("offline"));
+    await mountPage("?added=1&failed=0&claim=CLAIM1234567890abcdef");
+    expect(wrapper.findAll("[data-test='guest-thumb']")).toHaveLength(1);
+  });
+
+  it("says everyone with the link sees the photos when the link shows all", async () => {
+    respond({ info: { name: "Grandma", available: true, seeAll: true }, uploads: [upload("a")] });
+    await mountPage();
+    expect(get("guest-recent").text()).toContain("Photos added with this link");
+    expect(get("guest-recent").text()).toContain(
+      "Everyone with this link can see and remove these."
+    );
+  });
+
+  it("asks Firefox users to open the link in Chrome for the Share menu", async () => {
+    const agent = vi
+      .spyOn(navigator, "userAgent", "get")
+      .mockReturnValue("Mozilla/5.0 (Android 14; Mobile; rv:132.0) Gecko/132.0 Firefox/132.0");
+    respond();
+    await mountPage();
+    expect(get("guest-firefox-tip").text()).toBe(
+      "To add Calvin to the Share menu, open this link in Chrome."
+    );
+    agent.mockRestore();
+  });
+
+  it("shows no Firefox tip in Chrome", async () => {
+    const agent = vi
+      .spyOn(navigator, "userAgent", "get")
+      .mockReturnValue(
+        "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36"
+      );
+    respond();
+    await mountPage();
+    expect(find("guest-firefox-tip").exists()).toBe(false);
+    agent.mockRestore();
+  });
+
   it("explains a share that was too large", async () => {
     respond();
     await mountPage("?error=too_large");

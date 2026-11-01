@@ -15,16 +15,31 @@ export async function listFolders() {
   return data?.folders ?? [];
 }
 
-export async function createLink({ name, folder, expiresInDays = null, maxPhotos = null }) {
+export async function createLink({
+  name,
+  folder,
+  expiresInDays = null,
+  maxPhotos = null,
+  guestsSeeAll = true,
+}) {
   const body = { name, folder };
   if (expiresInDays) body.expires_in_days = expiresInDays;
   if (maxPhotos) body.max_photos = maxPhotos;
+  body.guests_see_all = Boolean(guestsSeeAll);
   const { data } = await api.post("/share/links", body);
   return data.link;
 }
 
 export async function renameLink(id, name) {
   const { data } = await api.patch(`/share/links/${encodeURIComponent(id)}`, { name });
+  return data.link;
+}
+
+/** Change whether guests see every photo added with the link, or only their own. */
+export async function setGuestsSeeAll(id, guestsSeeAll) {
+  const { data } = await api.patch(`/share/links/${encodeURIComponent(id)}`, {
+    guests_see_all: Boolean(guestsSeeAll),
+  });
   return data.link;
 }
 
@@ -42,6 +57,12 @@ export async function getGuest(token) {
 export async function listGuestUploads(token) {
   const { data } = await api.get(`${guestBase(token)}/uploads`);
   return data?.uploads ?? [];
+}
+
+/** Take the photos a share from the gallery sent without this phone's cookie. */
+export async function claimGuestUploads(token, claim) {
+  const { data } = await api.post(`${guestBase(token)}/claim`, { claim });
+  return data?.claimed ?? 0;
 }
 
 /** Upload one photo; `onProgress` gets 0..1. Resolves to `{ uploaded, failed }`. */

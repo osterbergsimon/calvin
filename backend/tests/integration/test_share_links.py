@@ -256,7 +256,7 @@ def test_only_bad_files_is_400(admin, guest):
 
 
 def test_guest_sees_and_removes_only_own_uploads(admin, app, image_dir):
-    _, token = _make_link(admin)
+    _, token = _make_link(admin, guests_see_all=False)
     phone_a, phone_b = TestClient(app), TestClient(app)
     phone_a.get(f"/api/guest/{token}")
     phone_b.get(f"/api/guest/{token}")
@@ -370,12 +370,8 @@ def test_share_target_post_uploads_and_redirects(admin, guest, image_dir):
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"] == f"/share/{token}/?added=1&failed=1"
+    assert response.headers["location"].startswith(f"/share/{token}/?added=1&failed=1")
     assert (image_dir / "Guests" / "IMG_9.jpg").exists()
-    # The share counts as this device's upload.
-    assert "calvin_guest" in response.cookies
-    mine = guest.get(f"/api/guest/{token}/uploads").json()["uploads"]
-    assert len(mine) == 1
 
 
 def test_share_target_with_revoked_link_redirects_to_the_page(admin, guest):
@@ -457,7 +453,7 @@ def test_share_target_allows_same_origin_and_direct(admin, guest, image_dir, sit
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"].endswith("?added=1&failed=0")
+    assert "?added=1&failed=0" in response.headers["location"]
 
 
 def test_location_quotes_the_token(guest):
@@ -686,7 +682,7 @@ def _delete_photo(app, image_id):
 
 
 def test_reused_image_id_cannot_be_deleted_by_the_earlier_guest(admin, app, image_dir):
-    _, token = _make_link(admin)
+    _, token = _make_link(admin, guests_see_all=False)
     phone_a, phone_b = TestClient(app), TestClient(app)
     phone_a.get(f"/api/guest/{token}")
     phone_b.get(f"/api/guest/{token}")
@@ -737,13 +733,14 @@ def test_revoke_with_remove_spares_a_file_that_replaced_the_upload(admin, guest,
     assert path.exists()
 
 
-def test_guest_cannot_delete_a_file_that_replaced_their_upload(admin, guest, image_dir):
+@pytest.mark.parametrize("see_all", [False, True])
+def test_guest_cannot_delete_a_file_that_replaced_their_upload(admin, guest, image_dir, see_all):
     import os
     import time
 
     from tests.test_utils import create_test_image_file
 
-    _, token = _make_link(admin)
+    _, token = _make_link(admin, guests_see_all=see_all)
     guest.get(f"/api/guest/{token}")
     (a,) = _upload(guest, token, ("x.jpg", _photo())).json()["uploaded"]
     path = image_dir / "Guests" / "x.jpg"
@@ -754,3 +751,151 @@ def test_guest_cannot_delete_a_file_that_replaced_their_upload(admin, guest, ima
 
     assert guest.delete(f"/api/guest/{token}/uploads/{a['imageId']}").status_code == 404
     assert path.exists()
+
+
+# -- device identity across the share target (calvin-p954) -----------------
+
+
+def _share(client, token, name="shared.jpg", **headers):
+    return client.post(
+        f"/share/{token}/receive",
+        files=[("photos", (name, _photo(), "image/jpeg"))],
+        headers={"Sec-Fetch-Site": "none", **headers},
+        follow_redirects=False,
+    )
+
+
+def _claim_of(location):
+    from urllib.parse import parse_qs, urlsplit
+
+    return parse_qs(urlsplit(location).query).get("claim", [None])[0]
+
+
+def test_share_target_without_the_cookie_keeps_the_phones_photos(admin, app, image_dir):
+    """Android's share sheet POST arrives without the SameSite=Lax cookie.
+
+    It must not mint a new device id over the phone's cookie: that orphaned
+    every photo the guest had added before (owner testing, calvin-p954).
+    """
+    _, token = _make_link(admin, guests_see_all=False)
+    phone = TestClient(app)
+    phone.get(f"/api/guest/{token}")
+    device = phone.cookies["calvin_guest"]
+    (before,) = _upload(phone, token, ("before.jpg", _photo())).json()["uploaded"]
+
+    share_sheet = TestClient(app)  # same phone, but the cookie is not sent
+    response = _share(share_sheet, token)
+    assert response.status_code == 303
+    assert "set-cookie" not in response.headers
+    claim = _claim_of(response.headers["location"])
+    assert claim
+
+    # The redirected page (same site, cookie sent) claims the share for its device.
+    claimed = phone.post(f"/api/guest/{token}/claim", json={"claim": claim})
+    assert claimed.status_code == 200
+    assert claimed.json() == {"claimed": 1}
+    assert phone.cookies["calvin_guest"] == device
+    mine = phone.get(f"/api/guest/{token}/uploads").json()["uploads"]
+    assert len(mine) == 2
+    assert before["imageId"] in {u["imageId"] for u in mine}
+
+    # One time only: nobody else can take it afterwards.
+    other = TestClient(app)
+    other.get(f"/api/guest/{token}")
+    again = other.post(f"/api/guest/{token}/claim", json={"claim": claim})
+    assert again.json() == {"claimed": 0}
+    assert other.get(f"/api/guest/{token}/uploads").json()["uploads"] == []
+
+
+def test_share_target_with_the_cookie_counts_as_that_device(admin, app, image_dir):
+    _, token = _make_link(admin, guests_see_all=False)
+    phone = TestClient(app)
+    phone.get(f"/api/guest/{token}")
+    response = _share(phone, token)
+    assert response.status_code == 303
+    assert "set-cookie" not in response.headers
+    assert _claim_of(response.headers["location"]) is None
+    assert len(phone.get(f"/api/guest/{token}/uploads").json()["uploads"]) == 1
+
+
+def test_claim_sets_a_cookie_for_a_new_device(admin, app, image_dir):
+    _, token = _make_link(admin, guests_see_all=False)
+    claim = _claim_of(_share(TestClient(app), token).headers["location"])
+    fresh = TestClient(app)
+    response = fresh.post(f"/api/guest/{token}/claim", json={"claim": claim})
+    assert response.json() == {"claimed": 1}
+    assert "calvin_guest" in response.cookies
+    assert len(fresh.get(f"/api/guest/{token}/uploads").json()["uploads"]) == 1
+
+
+def test_claim_is_scoped_to_its_link(admin, app, image_dir):
+    _, token_a = _make_link(admin, "A", "A", guests_see_all=False)
+    _, token_b = _make_link(admin, "B", "B", guests_see_all=False)
+    claim = _claim_of(_share(TestClient(app), token_a).headers["location"])
+    phone = TestClient(app)
+    assert phone.post(f"/api/guest/{token_b}/claim", json={"claim": claim}).json() == {"claimed": 0}
+    assert phone.post("/api/guest/nope/claim", json={"claim": claim}).status_code == 404
+    assert phone.post(f"/api/guest/{token_a}/claim", json={"claim": "x"}).status_code == 422
+
+
+# -- guests see all photos added with the link (calvin-p954) ---------------
+
+
+def test_guests_see_all_is_on_by_default_and_editable(admin, guest):
+    link, token = _make_link(admin)
+    assert link["guestsSeeAll"] is True
+    assert guest.get(f"/api/guest/{token}").json()["seeAll"] is True
+    own, own_token = _make_link(admin, "Party", "Party", guests_see_all=False)
+    assert own["guestsSeeAll"] is False
+    assert guest.get(f"/api/guest/{own_token}").json()["seeAll"] is False
+
+    response = admin.patch(f"/api/share/links/{link['id']}", json={"guests_see_all": False})
+    assert response.status_code == 200
+    assert response.json()["link"]["guestsSeeAll"] is False
+    assert response.json()["link"]["name"] == "Grandma"
+    listed = {item["id"]: item for item in admin.get("/api/share/links").json()["links"]}
+    assert listed[link["id"]]["guestsSeeAll"] is False
+    assert admin.patch(f"/api/share/links/{link['id']}", json={}).status_code == 422
+
+
+def test_with_see_all_every_guest_sees_and_removes_the_links_photos(admin, app, image_dir):
+    _, token = _make_link(admin)
+    phone_a, phone_b = TestClient(app), TestClient(app)
+    phone_a.get(f"/api/guest/{token}")
+    phone_b.get(f"/api/guest/{token}")
+    (a,) = _upload(phone_a, token, ("a.jpg", _photo())).json()["uploaded"]
+    (b,) = _upload(phone_b, token, ("b.jpg", _photo())).json()["uploaded"]
+
+    listed = phone_b.get(f"/api/guest/{token}/uploads").json()["uploads"]
+    assert {u["imageId"] for u in listed} == {a["imageId"], b["imageId"]}
+    assert phone_b.get(f"/api/guest/{token}/uploads/{a['imageId']}/thumbnail").status_code == 200
+    assert phone_b.delete(f"/api/guest/{token}/uploads/{a['imageId']}").status_code == 204
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+    assert [u["imageId"] for u in phone_a.get(f"/api/guest/{token}/uploads").json()["uploads"]] == [
+        b["imageId"]
+    ]
+
+
+def test_see_all_stays_inside_its_own_link(admin, app, image_dir):
+    from tests.test_utils import create_test_image_file
+
+    create_test_image_file(image_dir / "family.jpg")
+    _, token_a = _make_link(admin, "A", "Guests")
+    _, token_b = _make_link(admin, "B", "Guests")
+    phone = TestClient(app)
+    (a,) = _upload(phone, token_a, ("a.jpg", _photo())).json()["uploaded"]
+    _upload(phone, token_b, ("b.jpg", _photo()))
+
+    # Same folder, other link: link B lists and removes only its own uploads.
+    assert [u["imageId"] for u in phone.get(f"/api/guest/{token_b}/uploads").json()["uploads"]]
+    assert a["imageId"] not in {
+        u["imageId"] for u in phone.get(f"/api/guest/{token_b}/uploads").json()["uploads"]
+    }
+    assert phone.delete(f"/api/guest/{token_b}/uploads/{a['imageId']}").status_code == 404
+    assert phone.get(f"/api/guest/{token_b}/uploads/{a['imageId']}/thumbnail").status_code == 404
+    import hashlib
+
+    other_id = hashlib.md5(str(image_dir / "family.jpg").encode()).hexdigest()  # noqa: S324
+    assert phone.delete(f"/api/guest/{token_a}/uploads/{other_id}").status_code == 404
+    assert (image_dir / "family.jpg").exists()
+    assert (image_dir / "Guests" / "a.jpg").exists()

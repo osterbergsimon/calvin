@@ -556,6 +556,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/guest/{token}/claim": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Guest Claim
+     * @description Take the photos a share sent without this phone's cookie (one time).
+     */
+    post: operations["guest_claim_api_guest__token__claim_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/guest/{token}/manifest.webmanifest": {
     parameters: {
       query?: never;
@@ -585,7 +605,7 @@ export interface paths {
     };
     /**
      * Guest Uploads
-     * @description Photos sent from this phone through this link, newest first.
+     * @description The photos this guest may see through this link, newest first.
      */
     get: operations["guest_uploads_api_guest__token__uploads_get"];
     put?: never;
@@ -609,7 +629,7 @@ export interface paths {
     post?: never;
     /**
      * Guest Remove Upload
-     * @description Remove one of this phone's own uploads (file and record).
+     * @description Remove one upload this guest may see (file and record).
      */
     delete: operations["guest_remove_upload_api_guest__token__uploads__image_id__delete"];
     options?: never;
@@ -1916,8 +1936,11 @@ export interface paths {
     delete: operations["revoke_share_link_api_share_links__link_id__delete"];
     options?: never;
     head?: never;
-    /** Rename Share Link */
-    patch: operations["rename_share_link_api_share_links__link_id__patch"];
+    /**
+     * Update Share Link
+     * @description Rename a link and/or change whether guests see all of its photos.
+     */
+    patch: operations["update_share_link_api_share_links__link_id__patch"];
     trace?: never;
   };
   "/api/system/display/power/off": {
@@ -2411,6 +2434,11 @@ export interface components {
       /** New */
       new: string;
     };
+    /** ClaimBody */
+    ClaimBody: {
+      /** Claim */
+      claim: string;
+    };
     /**
      * ConfigUpdate
      * @description Configuration update model.
@@ -2540,6 +2568,11 @@ export interface components {
       expires_in_days?: number | null;
       /** Folder */
       folder: string;
+      /**
+       * Guests See All
+       * @default true
+       */
+      guests_see_all: boolean;
       /**
        * Max Mb
        * @default 2048
@@ -2718,11 +2751,6 @@ export interface components {
       /** Success */
       success: boolean;
     };
-    /** RenameLinkBody */
-    RenameLinkBody: {
-      /** Name */
-      name: string;
-    };
     /** SealedModeBody */
     SealedModeBody: {
       /** Sealed Mode */
@@ -2742,6 +2770,13 @@ export interface components {
     SingleMapping: {
       /** Action */
       action: string;
+    };
+    /** UpdateLinkBody */
+    UpdateLinkBody: {
+      /** Guests See All */
+      guests_see_all?: boolean | null;
+      /** Name */
+      name?: string | null;
     };
     /** ValidationError */
     ValidationError: {
@@ -3603,6 +3638,41 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  guest_claim_api_guest__token__claim_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClaimBody"];
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
@@ -5704,7 +5774,7 @@ export interface operations {
       };
     };
   };
-  rename_share_link_api_share_links__link_id__patch: {
+  update_share_link_api_share_links__link_id__patch: {
     parameters: {
       query?: never;
       header?: never;
@@ -5715,7 +5785,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["RenameLinkBody"];
+        "application/json": components["schemas"]["UpdateLinkBody"];
       };
     };
     responses: {
