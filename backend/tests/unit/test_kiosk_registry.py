@@ -457,35 +457,46 @@ async def test_global_room_name_moves_to_the_only_unnamed_screen(test_db):
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_global_room_name_is_dropped_when_two_screens_are_unnamed(test_db):
-    from loguru import logger
-
+async def test_global_room_name_is_copied_to_every_unnamed_screen(test_db):
     from app.services import kiosk_registry as kr
     from app.services.config_service import config_service
 
     await kr.record_kiosk("kitchen")
     await kr.record_kiosk("hallway")
+    await kr.set_overrides("office", {"displayName": "Office"})
+    await kr.set_overrides("porch", {"displayName": "  ", "orientation": "portrait"})
     await config_service.set_value("displayName", "Lounge")
 
-    messages: list[str] = []
-    sink = logger.add(lambda message: messages.append(message.record["message"]), level="WARNING")
-    try:
-        await kr.migrate_global_room_name()
-    finally:
-        logger.remove(sink)
+    await kr.migrate_global_room_name()
 
-    assert await kr.get_overrides("kitchen") == {}
-    assert await kr.get_overrides("hallway") == {}
+    assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
+    assert await kr.get_overrides("hallway") == {"displayName": "Lounge"}
+    assert await kr.get_overrides("office") == {"displayName": "Office"}
+    assert await kr.get_overrides("porch") == {
+        "displayName": "Lounge",
+        "orientation": "portrait",
+    }
     assert await config_service.get_value("displayName") is None
-    assert (
-        "Dropped the global room name 'Lounge': 2 unnamed screens; "
-        "set it per screen in Settings › Screens" in messages
-    )
 
 
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_global_room_name_is_dropped_with_no_screens(test_db):
+async def test_global_room_name_is_cleared_when_every_screen_is_named(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.set_overrides("office", {"displayName": "Office"})
+    await config_service.set_value("displayName", "Lounge")
+
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("office") == {"displayName": "Office"}
+    assert await config_service.get_value("displayName") is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_room_name_is_kept_until_a_screen_exists(test_db):
     from app.services import kiosk_registry as kr
     from app.services.config_service import config_service
 
@@ -493,6 +504,13 @@ async def test_global_room_name_is_dropped_with_no_screens(test_db):
 
     await kr.migrate_global_room_name()
 
+    # Nothing to copy it to yet: the old key stays so a later run can migrate it.
+    assert await config_service.get_value("displayName") == "Lounge"
+
+    await kr.record_kiosk("kitchen")
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
     assert await config_service.get_value("displayName") is None
 
 
@@ -510,6 +528,14 @@ async def test_global_room_name_migration_is_idempotent(test_db):
 
     assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
     assert await config_service.get_value("displayName") is None
+
+    # A later rename and a new unnamed screen survive further runs untouched.
+    await kr.set_overrides("kitchen", {"displayName": "Kitchen"})
+    await kr.record_kiosk("hallway")
+    await kr.migrate_global_room_name()
+
+    assert await kr.get_overrides("kitchen") == {"displayName": "Kitchen"}
+    assert await kr.get_overrides("hallway") == {}
 
 
 @pytest.mark.asyncio

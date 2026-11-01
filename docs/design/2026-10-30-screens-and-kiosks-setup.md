@@ -108,7 +108,8 @@ its overrides:
 - With no override, the card falls back to the hostname, then the id; the clock bar shows nothing for a screen with
   no name.
 - There is no global room name (CLV-84). A browser that isn't a known screen shows no room name, and a one-time
-  migration moves an existing global value onto the only unnamed screen (or drops it when the choice is ambiguous).
+  migration copies an existing global value onto every screen without a Name, then clears the global key (CLV-111).
+  With no screens registered yet, the global key is kept until a later startup can copy it.
 
 ### 3.4 The editor knows the screens (mock S3)
 
