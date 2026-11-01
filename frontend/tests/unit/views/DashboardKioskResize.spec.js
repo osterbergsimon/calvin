@@ -84,7 +84,7 @@ const stubs = {
   ClockBarHorizontal: true,
   ClockBarVertical: true,
   MinimalUIOverlay: true,
-  PerimeterProgress: true,
+  LoadingLight: true,
   LayoutManager: { template: "<div><slot /></div>" },
 };
 
@@ -279,7 +279,7 @@ describe("Dashboard top-level region path wiring (nested resize)", () => {
           ClockBarHorizontal: true,
           ClockBarVertical: true,
           MinimalUIOverlay: true,
-          PerimeterProgress: true,
+          LoadingLight: true,
           LayoutManager: { template: "<div><slot /></div>" },
         },
       },
@@ -406,7 +406,7 @@ describe("Dashboard nested drag-resize", () => {
           ClockBarHorizontal: true,
           ClockBarVertical: true,
           MinimalUIOverlay: true,
-          PerimeterProgress: true,
+          LoadingLight: true,
           LayoutManager: { template: "<div><slot /></div>" },
         },
       },

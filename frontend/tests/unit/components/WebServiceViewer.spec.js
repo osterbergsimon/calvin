@@ -5,6 +5,7 @@ import WebServiceViewer from "@/components/WebServiceViewer.vue";
 import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useModeStore } from "@/stores/mode";
+import { useProgressStore } from "@/stores/progress";
 
 // ---------------------------------------------------------------------------
 // Helpers for the link-wiring tests (Task 8)
@@ -232,5 +233,64 @@ describe("WebServiceViewer empty state (F4)", () => {
     expect(w.text()).toContain("Settings › Content › Web pages & services");
     expect(w.find('[data-test="empty-state-action"]').text()).toBe("Add a web page");
     w.unmount();
+  });
+});
+
+// CLV-115: the region's loading light replaces the in-region spinner.
+describe("WebServiceViewer loading light (CLV-115)", () => {
+  const stubs = { ServiceViewer: { template: "<div class='service-stub'><slot name='actions' /></div>" } };
+
+  it("a plugin data fetch lights this region's frame", async () => {
+    vi.useFakeTimers();
+    try {
+      setActivePinia(createPinia());
+      const store = useWebServicesStore();
+      let resolve;
+      store.fetchServices = vi.fn(() => new Promise(r => (resolve = r)));
+      store.services = [];
+      const progress = useProgressStore();
+
+      mount(WebServiceViewer, { props: { regionId: "svc-1", view: {} }, global: { stubs } });
+      await vi.advanceTimersByTimeAsync(500);
+      expect(progress.isFrameVisible("svc-1")).toBe(true);
+      expect(progress.appVisible).toBe(false);
+
+      resolve();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(progress.isFrameVisible("svc-1")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows no spinner on first load with nothing to show yet", async () => {
+    setActivePinia(createPinia());
+    const store = useWebServicesStore();
+    store.fetchServices = vi.fn().mockResolvedValue();
+    store.services = [];
+    store.loading = true;
+
+    const w = mount(WebServiceViewer, { props: { regionId: "svc-1", view: {} }, global: { stubs } });
+    await w.vm.$nextTick();
+    expect(w.find(".spinner").exists()).toBe(false);
+    expect(w.text()).not.toContain("Loading service");
+    // Not the empty state either: nothing is known yet.
+    expect(w.findComponent({ name: "EmptyState" }).exists()).toBe(false);
+  });
+
+  it("keeps showing a cached service during a refresh instead of a spinner", async () => {
+    setActivePinia(createPinia());
+    const store = useWebServicesStore();
+    store.fetchServices = vi.fn().mockResolvedValue();
+    store.services = [{ id: "a", name: "A", display_schema: { kind: "card-grid" }, config: {} }];
+    store.loading = true;
+
+    const w = mount(WebServiceViewer, {
+      props: { regionId: "svc-1", serviceId: "a", view: {} },
+      global: { stubs },
+    });
+    await w.vm.$nextTick();
+    expect(w.find(".spinner").exists()).toBe(false);
+    expect(w.find(".service-stub").exists()).toBe(true);
   });
 });
