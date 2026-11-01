@@ -67,6 +67,20 @@ const focus = async element => {
 
 const waitForFrame = () => new Promise(resolve => setTimeout(resolve, 30));
 
+// jsdom has no TouchEvent; the composable only reads clientX/clientY.
+const touchTap = (element, from = { clientX: 10, clientY: 10 }, to = from) => {
+  const fire = (type, point, list) => {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "touches", { value: list === "touches" ? [point] : [] });
+    Object.defineProperty(event, "changedTouches", { value: list === "changed" ? [point] : [] });
+    element.dispatchEvent(event);
+  };
+  fire("touchstart", from, "touches");
+  fire("touchend", to, "changed");
+};
+
+const waitForOutsideHide = () => new Promise(resolve => setTimeout(resolve, 160));
+
 const setNavigatorLanguage = tag =>
   Object.defineProperty(navigator, "language", { configurable: true, value: tag });
 
@@ -192,6 +206,34 @@ describe("OnScreenKeyboard", () => {
       expect(vmValue("target")).toBeNull();
     });
 
+    // WebKit does not always send a click for a tap on non-focusable content.
+    it("hides after a touch tap outside even when the browser sends no click", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      const outside = addContainer({ "data-test": "outside-touch" });
+      touchTap(outside);
+      await waitForOutsideHide();
+
+      expect(isShown()).toBe(false);
+      expect(document.activeElement).not.toBe(input);
+    });
+
+    it("keeps the keyboard on a drag that starts outside", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      const outside = addContainer({ "data-test": "outside-drag" });
+      touchTap(outside, { clientX: 10, clientY: 10 }, { clientX: 10, clientY: 90 });
+      await waitForOutsideHide();
+
+      expect(isShown()).toBe(true);
+    });
+
     it("does not steal the click from a real control outside the keyboard", async () => {
       mountOsk();
       const input = addInput();
@@ -237,6 +279,18 @@ describe("OnScreenKeyboard", () => {
       expect(vmValue("target")).toBe(input);
     });
 
+    it("ignores the Keyboard button click left over from the Hide tap", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+
+      await key("{hide}");
+      wrapper.vm.showKeyboard();
+      await nextTick();
+
+      expect(isShown()).toBe(false);
+    });
+
     it("reopens a dismissed field when asked directly (the Keyboard button)", async () => {
       mountOsk();
       const input = addInput();
@@ -244,6 +298,9 @@ describe("OnScreenKeyboard", () => {
       await key("{hide}");
       expect(isShown()).toBe(false);
 
+      // The button ignores the click that closes the panel; a real press comes
+      // later.
+      await new Promise(resolve => setTimeout(resolve, 450));
       input.focus();
       await nextTick();
       wrapper.vm.showKeyboard();
