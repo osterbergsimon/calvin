@@ -171,9 +171,7 @@ describe("ShareLinksSection", () => {
     expect(rows()[0].text()).toContain("Guests see all photos");
     expect(rows()[1].text()).toContain("Guests see their own photos");
     const toggles = wrapper.findAll("[data-test='share-link-row-see-all']");
-    expect(toggles[0].attributes("aria-label")).toBe(
-      "Guests see all photos added with Grandma"
-    );
+    expect(toggles[0].attributes("aria-label")).toBe("Guests see all photos added with Grandma");
     api.patch.mockResolvedValueOnce({ data: { link: link({ guestsSeeAll: false }) } });
     await toggles[0].trigger("click");
     await flushPromises();
