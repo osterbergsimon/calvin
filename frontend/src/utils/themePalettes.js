@@ -70,13 +70,13 @@ export function themePalette(theme, dark) {
 // light, mid and deep shades of eight hues. Event text picks its own ink by
 // luminance, so every one of these stays readable on the dashboard.
 const MORE_HUES = [
-  ["red", ["#e57373", "#e53935", "#b71c1c"]],
+  ["red", ["#e57373", "#e53935", "#c62828"]],
   ["orange", ["#ffb74d", "#fb8c00", "#e65100"]],
-  ["lime", ["#dce775", "#c0ca33", "#827717"]],
+  ["lime", ["#dce775", "#c0ca33", "#9e9d24"]],
   ["green", ["#81c784", "#43a047", "#1b5e20"]],
-  ["teal", ["#4db6ac", "#00897b", "#004d40"]],
+  ["teal", ["#4db6ac", "#00897b", "#00695c"]],
   ["blue", ["#64b5f6", "#1e88e5", "#0d47a1"]],
-  ["violet", ["#9575cd", "#5e35b1", "#311b92"]],
+  ["violet", ["#9575cd", "#5e35b1", "#4527a0"]],
   ["pink", ["#f06292", "#d81b60", "#880e4f"]],
 ];
 const SHADE_NAMES = ["Light", "", "Dark"];

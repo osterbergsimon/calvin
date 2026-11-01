@@ -76,8 +76,8 @@
               placeholder="#4caf50"
               :maxlength="7"
               :error="codeError"
-              @keydown.enter.prevent="applyCode"
-              @blur="applyCode"
+              @keydown.enter.prevent="applyCode(true)"
+              @blur="applyCode(false)"
             />
           </div>
         </div>
@@ -156,8 +156,8 @@
           placeholder="#4caf50"
           :maxlength="7"
           :error="codeError"
-          @keydown.enter.prevent="applyCode"
-          @blur="applyCode"
+          @keydown.enter.prevent="applyCode(true)"
+          @blur="applyCode(false)"
         />
       </div>
     </template>
@@ -251,6 +251,8 @@ const safeColour = value => {
 const isSelected = swatch => Boolean(normalisedValue.value) && swatch.hex === normalisedValue.value;
 
 function choose(swatch) {
+  code.value = "";
+  codeError.value = "";
   emit("update:modelValue", swatch.hex);
   if (props.compact) open.value = false;
 }
@@ -261,8 +263,10 @@ function toggleCustom() {
   code.value = customOpen.value && !selectedSwatch.value ? normalisedValue.value : "";
 }
 
-// #rgb or #rrggbb, with or without the #, case-insensitive.
-function applyCode() {
+// #rgb or #rrggbb, with or without the #, case-insensitive. Enter applies and
+// closes the compact popover; leaving the field (blur, e.g. tabbing on to the
+// swatches) applies but keeps it open.
+function applyCode(close = true) {
   const raw = code.value.trim();
   if (!raw) return;
   const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
@@ -275,7 +279,7 @@ function applyCode() {
   codeError.value = "";
   if (hex === normalisedValue.value) return;
   emit("update:modelValue", hex);
-  if (props.compact) nextTick(() => (open.value = false));
+  if (close && props.compact) nextTick(() => (open.value = false));
 }
 
 // A theme switch only changes CSS variables, not this component's props; watch
@@ -353,6 +357,8 @@ onBeforeUnmount(() => observer?.disconnect());
 .colour-field__dot--choice {
   width: 1.75rem;
   height: 1.75rem;
+  /* A visible edge so the deepest shades still read on a dark surface. */
+  border-color: color-mix(in srgb, var(--ink) 25%, transparent);
 }
 
 .colour-field__swatch--selected .colour-field__dot--choice {
