@@ -65,3 +65,26 @@ export function themePalette(theme, dark) {
   const palette = (dark ? theme.dark_mode : theme.variables) || theme.variables || {};
   return palette;
 }
+
+// "More colours" for a custom calendar colour (ColourField's Custom… panel):
+// light, mid and deep shades of eight hues. Event text picks its own ink by
+// luminance, so every one of these stays readable on the dashboard.
+const MORE_HUES = [
+  ["red", ["#e57373", "#e53935", "#c62828"]],
+  ["orange", ["#ffb74d", "#fb8c00", "#e65100"]],
+  ["lime", ["#dce775", "#c0ca33", "#9e9d24"]],
+  ["green", ["#81c784", "#43a047", "#1b5e20"]],
+  ["teal", ["#4db6ac", "#00897b", "#00695c"]],
+  ["blue", ["#64b5f6", "#1e88e5", "#0d47a1"]],
+  ["violet", ["#9575cd", "#5e35b1", "#4527a0"]],
+  ["pink", ["#f06292", "#d81b60", "#880e4f"]],
+];
+const SHADE_NAMES = ["Light", "", "Dark"];
+const capitalise = text => text.charAt(0).toUpperCase() + text.slice(1);
+
+export const MORE_COLOURS = SHADE_NAMES.flatMap((shade, row) =>
+  MORE_HUES.map(([hue, hexes]) => ({
+    hex: hexes[row],
+    name: shade ? `${shade} ${hue}` : capitalise(hue),
+  }))
+);

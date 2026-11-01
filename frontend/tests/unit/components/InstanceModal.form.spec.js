@@ -90,16 +90,14 @@ describe("InstanceModal form", () => {
     expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false);
   });
 
-  it("uses the shared ColourField, not a native colour input plus hex box", async () => {
+  it("uses the shared ColourField, never the browser's colour dialog", async () => {
     const wrapper = await mountModal();
 
     const colour = wrapper.findComponent(ColourField);
     expect(colour.exists()).toBe(true);
     expect(colour.props("label")).toBe("Colour");
     expect(wrapper.find('input[type="text"][aria-label="Colour value"]').exists()).toBe(false);
-    expect(wrapper.find('input[type="color"]').attributes("aria-label")).toBe(
-      "Custom colour picker"
-    );
+    expect(wrapper.find('input[type="color"]').exists()).toBe(false);
   });
 
   it("wires the show-event-times toggle to the form value", async () => {
