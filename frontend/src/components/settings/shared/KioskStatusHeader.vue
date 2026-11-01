@@ -4,6 +4,9 @@
     <Tag :tone="online ? 'ok' : 'neutral'">
       {{ online ? "Online" : "Offline" }} · seen {{ lastSeenLabel }}
     </Tag>
+    <Tag v-if="stackReadout" data-test="kiosk-display-stack">
+      {{ stackReadout }}
+    </Tag>
     <Tag :tone="config.tone" :icon="config.icon" data-test="hardware-config-status">
       {{ config.label }}
     </Tag>
@@ -15,6 +18,7 @@ import { computed } from "vue";
 import { mdiCheck } from "@mdi/js";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import Tag from "@/components/ui/Tag.vue";
+import { displayStackReadout } from "@/utils/kioskSoftware";
 
 // The selected screen's status strip: who it is, whether it is here, and
 // whether it has confirmed the display settings. Built from the shared note and
@@ -25,7 +29,13 @@ const props = defineProps({
   lastSeenLabel: { type: String, default: "" },
   appliedVersion: { type: String, default: null },
   desiredVersion: { type: String, default: null },
+  displayStack: { type: String, default: null },
+  agentVersion: { type: String, default: null },
 });
+
+const stackReadout = computed(() =>
+  displayStackReadout({ displayStack: props.displayStack, agentVersion: props.agentVersion })
+);
 
 const config = computed(() => {
   if (props.appliedVersion == null) {
