@@ -33,4 +33,8 @@ regexes = [
   '''clv_YOUR_KEY_HERE''',
   '''clv_7Hq2[A-Za-z0-9]+''',
   '''clv_Qa81''',
+  # Fake share-link tokens in the share-link unit and e2e tests (calvin-mwqo).
+  '''abc123\.SECRET''',
+  '''abc123\.SAMPLETOKEN''',
+  '''0123456789abcdef\.SECRET''',
 ]

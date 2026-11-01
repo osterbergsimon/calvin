@@ -126,6 +126,7 @@ Rules:
 | Setting | `SettingRow` | label/description markup by hand |
 | Item in a list (source, screen, key, plugin) | **`ListRow.vue` (new)**, extracted from `SourceList`: lead (dot/thumb/icon), body (name `--text-label` + meta lines), trailing actions group | per-feature cards |
 | Empty | `EmptyState` | an ad-hoc centred paragraph |
+| Progress of a long task (uploads) | **`ProgressBar.vue`**: ARIA `progressbar` with a label, `--progress-h` track on `--bg-2`, `--focus` fill (progress is action feedback, so it may use orange); the visible "3 of 8" text sits beside it, outside any live region | a styled `<div>` bar, a spinner |
 | Confirm / dialog | `ConfirmModal`, `DialogScrim`; `Dialog` with `size` = `sm` / `md` (default) / **`full`** (edge-to-edge, for the pages editor; same focus trap, Escape and OSK rules) | custom overlays, hand-built full-screen shells |
 | Navigation between views of the same thing (editor pages, catalog kinds) | **`Tabs.vue` (new)**: ARIA `tablist`, one line per tab (label + optional `--ink-3` meta), 2px `--focus` underline on the active tab, arrow keys move, scrolls horizontally with edge fades | local tablists, filter pills used as tabs. Choosing a *value* (Light/Dark, Month/Week) stays `SegmentedControl` |
 | Small floating surface anchored to a control (⋯ menus, pickers, the connection explainer) | **`Popover.vue` (new)**: anchored, flips at viewport edges, Escape/outside tap closes, focus returns, `--elev-1`, `--radius-card`, `--z-popover`; **`Menu.vue`** on top of it for action lists (items ≥ `--touch-target`, danger item last) | per-feature popovers (SourceList ⋯, ThemePicker, ActionPicker, RegionViewOptions, ConnectionStatus) |
@@ -196,7 +197,7 @@ makes any visual change to a block show up as a diff, so drift becomes visible i
 | Error | `--err` text line under the control (`--text-meta`), plus `aria-invalid`; never a red box |
 | Status | `Tag` tones only (`ok`/`warn`/`err`) |
 
-- **Orange (`--focus`)** is for primary actions, selection and focus only. Never use it for decoration,
+- **Orange (`--focus`)** is for primary actions, selection, focus and the `ProgressBar` fill only. Never use it for decoration,
   headings, dots that mean nothing, or links (links use `--ink` + underline).
 - **Status colours** never decorate. A plugin type, a category or a page is never coloured.
 - **No blue.** Calvin's palette has none, so a browser-default blue (checkbox, link) is a bug. Use

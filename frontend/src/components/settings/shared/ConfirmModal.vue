@@ -1,6 +1,8 @@
 <template>
   <Dialog :model-value="show" :title="title" size="sm" @update:model-value="onDialogUpdate">
     <p class="confirm-modal__message">{{ message }}</p>
+    <!-- Optional extra body under the message, e.g. a SettingRow with a ToggleSwitch. -->
+    <slot />
     <template #actions>
       <Button variant="secondary" data-test="confirm-cancel" @click="handleCancel">Cancel</Button>
       <Button

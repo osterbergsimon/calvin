@@ -318,6 +318,7 @@ def test_client(
         kiosks,
         plugins,
         security,
+        share,
         system,
     )
 
@@ -342,6 +343,8 @@ def test_client(
     test_app.include_router(system.router, prefix="/api/system", tags=["system"])
     test_app.include_router(security.router, prefix="/api", tags=["security"])
     test_app.include_router(backup.router, prefix="/api", tags=["backup"])
+    test_app.include_router(share.router, prefix="/api", tags=["share"])
+    test_app.include_router(share.share_target_router)
     install_security(test_app)
 
     @test_app.get("/")
