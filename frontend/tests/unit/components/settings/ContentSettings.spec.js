@@ -78,25 +78,17 @@ describe("ContentSettings", () => {
     expect(sawRandomize).toBe(true);
   });
 
-  it("emits both photoFrameEnabled and photoFrameMode when the photo-frame toggle changes", async () => {
+  it("points the photo-frame row at its per-screen home instead of editing it", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
-    const toggles = wrapper.findAll('[role="switch"]');
-    for (const t of toggles) await t.trigger("click");
-    const frameEmit = (wrapper.emitted("update:config") || []).find(e =>
-      Object.prototype.hasOwnProperty.call(e[0], "photoFrameEnabled")
-    );
-    expect(frameEmit).toBeTruthy();
-    expect(frameEmit[0]).toHaveProperty("photoFrameMode");
-  });
-
-  it("reveals the photo-frame start-after choice only when photo-frame mode is on", () => {
-    const off = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
-    expect(off.text()).not.toContain("Start after");
-    const on = mount(ContentSettings, {
-      props: { config: { ...baseConfig, photoFrameEnabled: true } },
-      global: { stubs },
-    });
-    expect(on.text()).toContain("Start after");
+    const row = wrapper
+      .findAllComponents({ name: "SettingRow" })
+      .find(r => r.props("label") === "Photo frame when idle");
+    expect(row).toBeTruthy();
+    expect(row.find('[data-test="open-photo-frame-settings"]').exists()).toBe(true);
+    // No per-screen value is written from Content any more.
+    expect(wrapper.emitted("update:config") || []).not.toContainEqual([
+      expect.objectContaining({ photoFrameEnabled: true }),
+    ]);
   });
 
   it("labels Calendar basics without the moved display rows", () => {
@@ -107,40 +99,6 @@ describe("ContentSettings", () => {
     expect(labels).not.toContain("Show week numbers");
     expect(labels).not.toContain("Events per day");
     expect(labels).not.toContain("Fit photos");
-  });
-
-  it("describes the photo frame as the idle mode it is, and starts at 5 min", () => {
-    const w = mount(ContentSettings, {
-      props: { config: { ...baseConfig, photoFrameEnabled: true, photoFrameTimeout: undefined } },
-      global: { stubs },
-    });
-    expect(w.text()).toContain(
-      "After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back."
-    );
-    const startAfter = w
-      .findAllComponents({ name: "SelectPill" })
-      .find(c => c.props("ariaLabel") === "Start the photo frame after");
-    // Missing config falls back to the store's 300 s, not the old 60 s.
-    expect(startAfter.props("modelValue")).toBe(300);
-    expect(startAfter.props("options").map(o => o.label)).toEqual([
-      "1 min",
-      "2 min",
-      "5 min",
-      "10 min",
-      "15 min",
-      "30 min",
-    ]);
-  });
-
-  it("writes the photo-frame start-after in seconds", async () => {
-    const w = mount(ContentSettings, {
-      props: { config: { ...baseConfig, photoFrameEnabled: true } },
-      global: { stubs },
-    });
-    w.findAllComponents({ name: "SelectPill" })
-      .find(c => c.props("ariaLabel") === "Start the photo frame after")
-      .vm.$emit("update:modelValue", 600);
-    expect(w.emitted("update:config").some(c => c[0].photoFrameTimeout === 600)).toBe(true);
   });
 
   it("no longer offers Fit photos in Content", () => {
@@ -161,7 +119,7 @@ describe("ContentSettings copy (§3.1)", () => {
     ["Highlight holidays", "Marks public holidays on the calendar."],
     [
       "Photo frame when idle",
-      "After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back.",
+      "Per screen now: choose Off/On, the idle wait and the photo sources in Dashboard › Focus & remote.",
     ],
   ];
 

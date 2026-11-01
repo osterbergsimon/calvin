@@ -15,6 +15,7 @@ const leafStub = name => ({
   name,
   props: [
     "focused",
+    "controlsVisible",
     "dim",
     "sourceIds",
     "isFullscreen",
@@ -22,7 +23,7 @@ const leafStub = name => ({
     "rotationInterval",
     "serviceId",
   ],
-  template: `<div class="leaf" :data-focused="focused" :data-dim="dim" />`,
+  template: `<div class="leaf" :data-focused="focused" :data-controls="controlsVisible" :data-dim="dim" />`,
 });
 
 const stubs = {
@@ -74,6 +75,21 @@ describe("DashboardRegion focus", () => {
       global: { stubs },
     });
     expect(w.find(".leaf").attributes("data-focused")).toBe("false");
+  });
+
+  it("keeps the leaf's controls when the controls are shown but the light is idle", () => {
+    const w = mount(DashboardRegion, {
+      props: {
+        region: calRegion,
+        photoRotationInterval: 30,
+        activeRegionId: "cal",
+        lightActive: false,
+        controlsVisible: true,
+      },
+      global: { stubs },
+    });
+    expect(w.find(".leaf").attributes("data-focused")).toBe("false");
+    expect(w.find(".leaf").attributes("data-controls")).toBe("true");
   });
 
   it("raises only the focused sub-region so its glow isn't clipped by siblings (calvin-ltx)", () => {

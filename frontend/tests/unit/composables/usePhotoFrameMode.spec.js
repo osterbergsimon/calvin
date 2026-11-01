@@ -1,17 +1,22 @@
 /**
- * Unit tests for usePhotoFrameMode composable
+ * Unit tests for usePhotoFrameMode composable (calvin-3xz9: per-screen frame).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { usePhotoFrameMode, resetPhotoFrameInstance } from "@/composables/usePhotoFrameMode";
 import { useConfigStore } from "@/stores/config";
+import { useImagesStore } from "@/stores/images";
 import { useModeStore } from "@/stores/mode";
 import { useRouter } from "vue-router";
 
 // Mock stores
 vi.mock("@/stores/config", () => ({
   useConfigStore: vi.fn(),
+}));
+
+vi.mock("@/stores/images", () => ({
+  useImagesStore: vi.fn(),
 }));
 
 vi.mock("@/stores/mode", () => ({
@@ -25,13 +30,21 @@ vi.mock("vue-router", () => ({
 
 describe("usePhotoFrameMode", () => {
   let mockConfigStore;
+  let mockImagesStore;
   let mockModeStore;
   let mockRouter;
+
+  const enable = ({ enabled = true, timeout = 5, sourceIds = [] } = {}) => {
+    mockConfigStore.photoFrameEnabled = enabled;
+    mockConfigStore.photoFrameTimeout = timeout;
+    mockConfigStore.photoFrameSourceIds = sourceIds;
+  };
 
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     vi.useFakeTimers();
+    window.localStorage.clear();
 
     // Reset singleton instance between tests
     resetPhotoFrameInstance();
@@ -39,9 +52,15 @@ describe("usePhotoFrameMode", () => {
     mockConfigStore = {
       photoFrameEnabled: false,
       photoFrameTimeout: 300,
+      photoFrameSourceIds: [],
       lastSideViewMode: "photos",
       fetchConfig: vi.fn().mockResolvedValue({}),
       setLastSideViewMode: vi.fn(),
+    };
+
+    mockImagesStore = {
+      fetchImages: vi.fn().mockResolvedValue({ images: [{ id: "photo-1" }] }),
+      getImagesForSource: vi.fn(() => [{ id: "photo-1" }]),
     };
 
     mockModeStore = {
@@ -63,12 +82,14 @@ describe("usePhotoFrameMode", () => {
     };
 
     useConfigStore.mockReturnValue(mockConfigStore);
+    useImagesStore.mockReturnValue(mockImagesStore);
     useModeStore.mockReturnValue(mockModeStore);
     useRouter.mockReturnValue(mockRouter);
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    resetPhotoFrameInstance();
   });
 
   describe("Initialization", () => {
@@ -80,33 +101,50 @@ describe("usePhotoFrameMode", () => {
   });
 
   describe("resetInactivityTimer", () => {
-    it("should reset inactivity timer", async () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5; // 5 seconds
+    it("should enter the frame with this screen's timeout and all sources", async () => {
+      enable({ timeout: 5 });
 
       const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
-
-      // Trigger activity
       photoFrame.resetInactivityTimer();
 
-      // Fast-forward time
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
-      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS);
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS, {
+        sourceIds: [],
+      });
       expect(photoFrame.isPhotoFrameActive.value).toBe(true);
       expect(mockRouter.push).toHaveBeenCalledWith("/");
     });
 
-    it("should exit photo frame mode when resetting timer", async () => {
-      mockConfigStore.photoFrameEnabled = true;
+    it("should pass this screen's chosen photo sources to the slideshow", async () => {
+      enable({ timeout: 5, sourceIds: ["src-b", "src-a"] });
 
       const photoFrame = usePhotoFrameMode();
+      photoFrame.resetInactivityTimer();
+      await vi.advanceTimersByTimeAsync(5000);
 
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
+      expect(mockImagesStore.fetchImages).toHaveBeenCalledWith(["src-a", "src-b"]);
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS, {
+        sourceIds: ["src-a", "src-b"],
+      });
+    });
+
+    it("should use this browser's own per-screen choice over the global fallback", async () => {
+      enable({ enabled: false, timeout: 300 });
+      window.localStorage.setItem("calvin-screen-photoFrameEnabled", "true");
+      window.localStorage.setItem("calvin-screen-photoFrameTimeout", "2");
+
+      const photoFrame = usePhotoFrameMode();
+      photoFrame.resetInactivityTimer();
+      await vi.advanceTimersByTimeAsync(2000);
+
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
+    });
+
+    it("should exit photo frame mode when resetting timer", () => {
+      enable();
+
+      const photoFrame = usePhotoFrameMode();
 
       // Manually set active state (bypassing enterPhotoFrameMode)
       photoFrame.isPhotoFrameActive.value = true;
@@ -117,78 +155,209 @@ describe("usePhotoFrameMode", () => {
       expect(photoFrame.isPhotoFrameActive.value).toBe(false);
     });
 
-    it("should not start timer if photo frame is disabled", () => {
-      mockConfigStore.photoFrameEnabled = false;
+    it("should not start timer if photo frame is disabled", async () => {
+      enable({ enabled: false });
 
       const photoFrame = usePhotoFrameMode();
 
       photoFrame.resetInactivityTimer();
 
-      vi.advanceTimersByTime(10000);
+      await vi.advanceTimersByTimeAsync(10000);
 
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
     });
 
     it("should clear existing timer when resetting", async () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5;
+      enable({ timeout: 5 });
 
       const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
 
       // Start first timer
       photoFrame.resetInactivityTimer();
 
       // Reset before timeout
-      vi.advanceTimersByTime(2000);
+      await vi.advanceTimersByTimeAsync(2000);
       photoFrame.resetInactivityTimer();
 
       // Should not trigger yet
-      vi.advanceTimersByTime(3000);
+      await vi.advanceTimersByTimeAsync(3000);
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
 
       // Now should trigger
-      vi.advanceTimersByTime(2000);
+      await vi.advanceTimersByTimeAsync(2000);
       expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
     });
   });
 
   describe("enterPhotoFrameMode", () => {
     it("should enter photo frame mode", async () => {
-      mockConfigStore.photoFrameEnabled = true;
+      enable();
 
       const photoFrame = usePhotoFrameMode();
 
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
+      await photoFrame.enterPhotoFrameMode();
 
-      photoFrame.enterPhotoFrameMode();
-
-      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS);
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalledWith(mockModeStore.MODES.PHOTOS, {
+        sourceIds: [],
+      });
       expect(photoFrame.isPhotoFrameActive.value).toBe(true);
       expect(mockRouter.push).toHaveBeenCalledWith("/");
     });
 
-    it("should not enter if photo frame is disabled", () => {
-      mockConfigStore.photoFrameEnabled = false;
+    it("should not enter if photo frame is disabled", async () => {
+      enable({ enabled: false });
 
       const photoFrame = usePhotoFrameMode();
 
-      photoFrame.enterPhotoFrameMode();
+      await photoFrame.enterPhotoFrameMode();
 
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
       expect(photoFrame.isPhotoFrameActive.value).toBe(false);
     });
+
+    it("should stay on the dashboard when the chosen sources have no photos", async () => {
+      enable({ sourceIds: ["empty-source"] });
+      mockImagesStore.getImagesForSource.mockReturnValue([]);
+
+      const photoFrame = usePhotoFrameMode();
+      const entered = await photoFrame.enterPhotoFrameMode();
+
+      expect(entered).toBe(false);
+      expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
+      expect(photoFrame.isPhotoFrameActive.value).toBe(false);
+      expect(mockRouter.push).not.toHaveBeenCalled();
+    });
+
+    it("should stay on the dashboard when the photo list cannot be loaded", async () => {
+      enable();
+      mockImagesStore.fetchImages.mockRejectedValue(new Error("offline"));
+
+      const photoFrame = usePhotoFrameMode();
+      const entered = await photoFrame.enterPhotoFrameMode();
+
+      expect(entered).toBe(false);
+      expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("waking the frame", () => {
+    const enterAndListen = async () => {
+      enable();
+      const photoFrame = usePhotoFrameMode();
+      photoFrame.setupEventListeners();
+      await photoFrame.enterPhotoFrameMode();
+      return photoFrame;
+    };
+
+    it("swallows the key that wakes the screen", async () => {
+      const photoFrame = await enterAndListen();
+      const event = new KeyboardEvent("keydown", { key: "ArrowRight", cancelable: true });
+
+      window.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(mockModeStore.exitFullscreen).toHaveBeenCalled();
+      expect(photoFrame.isPhotoFrameActive.value).toBe(false);
+    });
+
+    it("swallows the whole tap gesture, not just its first event", async () => {
+      const photoFrame = await enterAndListen();
+      const gesture = ["pointerdown", "touchstart", "mousedown", "click"].map(
+        type => new Event(type, { cancelable: true, bubbles: true })
+      );
+
+      for (const event of gesture) window.dispatchEvent(event);
+
+      for (const event of gesture) expect(event.defaultPrevented).toBe(true);
+      expect(mockModeStore.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(photoFrame.isPhotoFrameActive.value).toBe(false);
+    });
+
+    it("ends the wake window on release so the next real tap is not eaten", async () => {
+      await enterAndListen();
+      const down = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(down);
+      expect(down.defaultPrevented).toBe(true);
+
+      // No click (a drag/long-press): the release closes the window.
+      const up = new Event("pointerup", { cancelable: true, bubbles: true });
+      window.dispatchEvent(up);
+      expect(up.defaultPrevented).toBe(true);
+      // The trailing click of this gesture is still swallowed ...
+      const click = new Event("click", { cancelable: true, bubbles: true });
+      window.dispatchEvent(click);
+      expect(click.defaultPrevented).toBe(true);
+
+      // ... and the window closes right after it.
+      await vi.advanceTimersByTimeAsync(0);
+
+      const nextTap = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(nextTap);
+      expect(nextTap.defaultPrevented).toBe(false);
+    });
+
+    it("keeps the touch window open for the later compat mouse/click tasks", async () => {
+      await enterAndListen();
+      const down = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(down);
+      const end = new Event("touchend", { cancelable: true, bubbles: true });
+      window.dispatchEvent(end);
+      expect(end.defaultPrevented).toBe(true);
+
+      // WPE WebKit dispatches the compat mouse events in later tasks.
+      await vi.advanceTimersByTimeAsync(0);
+      const compat = ["mousedown", "mouseup", "click"].map(
+        type => new Event(type, { cancelable: true, bubbles: true })
+      );
+      for (const event of compat) window.dispatchEvent(event);
+
+      for (const event of compat) expect(event.defaultPrevented).toBe(true);
+
+      // The click ended the window; the next real tap is not eaten.
+      const nextTap = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(nextTap);
+      expect(nextTap.defaultPrevented).toBe(false);
+    });
+
+    it("lets modifier-only keys and browser chords through", async () => {
+      await enterAndListen();
+      const shift = new KeyboardEvent("keydown", { key: "Shift", cancelable: true });
+      window.dispatchEvent(shift);
+      expect(shift.defaultPrevented).toBe(false);
+      expect(mockModeStore.exitFullscreen).toHaveBeenCalledTimes(1);
+
+      // Re-enter for the browser chord.
+      await enterAndListen();
+      const reload = new KeyboardEvent("keydown", { key: "r", ctrlKey: true, cancelable: true });
+      window.dispatchEvent(reload);
+      expect(reload.defaultPrevented).toBe(false);
+    });
+
+    it("registers non-passive wake listeners only while the frame is up", async () => {
+      enable();
+      const add = vi.spyOn(window, "addEventListener");
+      const remove = vi.spyOn(window, "removeEventListener");
+      const photoFrame = usePhotoFrameMode();
+      photoFrame.setupEventListeners();
+
+      const pointerdownOptions = () =>
+        add.mock.calls.filter(([type]) => type === "pointerdown").map(([, , options]) => options);
+      expect(pointerdownOptions()).toEqual([{ capture: true, passive: true }]);
+
+      await photoFrame.enterPhotoFrameMode();
+      expect(pointerdownOptions()).toContainEqual({ capture: true, passive: false });
+
+      const key = new KeyboardEvent("keydown", { key: "ArrowRight", cancelable: true });
+      window.dispatchEvent(key);
+      expect(
+        remove.mock.calls.some(([type, , options]) => type === "pointerdown" && options?.capture)
+      ).toBe(true);
+    });
   });
 
   describe("exitPhotoFrameMode", () => {
-    it("should exit photo frame mode", async () => {
+    it("should exit photo frame mode", () => {
       const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
 
       // Manually set active state (bypassing enterPhotoFrameMode)
       photoFrame.isPhotoFrameActive.value = true;
@@ -212,13 +381,9 @@ describe("usePhotoFrameMode", () => {
     });
 
     it("should reset timer after exiting", async () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5;
+      enable({ timeout: 5 });
 
       const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
 
       // Manually set active state (bypassing enterPhotoFrameMode)
       photoFrame.isPhotoFrameActive.value = true;
@@ -226,10 +391,10 @@ describe("usePhotoFrameMode", () => {
       photoFrame.exitPhotoFrameMode();
 
       // Wait for throttling from exit
-      vi.advanceTimersByTime(600);
+      await vi.advanceTimersByTimeAsync(600);
 
       // Timer should be reset, so we need to wait the full timeout
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
     });
@@ -237,56 +402,32 @@ describe("usePhotoFrameMode", () => {
 
   describe("handleActivity", () => {
     it("should reset inactivity timer on activity", async () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5;
+      enable({ timeout: 5 });
 
       const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
 
       // Start timer
       photoFrame.resetInactivityTimer();
 
-      // Simulate activity before timeout - handleActivity is called internally via resetInactivityTimer
-      vi.advanceTimersByTime(3000);
-      photoFrame.resetInactivityTimer(); // This calls handleActivity internally
+      // Simulate activity before timeout
+      await vi.advanceTimersByTimeAsync(3000);
+      photoFrame.resetInactivityTimer();
 
       // Wait for throttling
-      vi.advanceTimersByTime(600);
+      await vi.advanceTimersByTimeAsync(600);
 
       // Should not have entered photo frame yet
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
 
       // Need to wait full timeout again (the timer was reset)
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
       expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
     });
   });
 
   describe("Config watching", () => {
-    it("should react to photoFrameEnabled changes", async () => {
-      const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
-
-      // Enable photo frame
-      mockConfigStore.photoFrameEnabled = true;
-      // Trigger watch by accessing the store property (in real usage, Vue watch would trigger)
-      await photoFrame.resetInactivityTimer();
-
-      // Wait for throttling
-      vi.advanceTimersByTime(600);
-
-      vi.advanceTimersByTime(300000); // 5 minutes
-
-      expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
-    });
-
     it("should stop timer when photo frame is disabled", () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5;
+      enable({ timeout: 5 });
 
       const photoFrame = usePhotoFrameMode();
       photoFrame.resetInactivityTimer();
@@ -299,33 +440,6 @@ describe("usePhotoFrameMode", () => {
 
       // Should not enter photo frame after disabling
       expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
-    });
-
-    it("should reset timer when timeout changes", async () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5;
-
-      const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
-
-      photoFrame.resetInactivityTimer();
-
-      // Change timeout
-      mockConfigStore.photoFrameTimeout = 10;
-      photoFrame.resetInactivityTimer();
-
-      // Wait for throttling
-      vi.advanceTimersByTime(600);
-
-      // Old timeout should not trigger
-      vi.advanceTimersByTime(5000);
-      expect(mockModeStore.enterFullscreen).not.toHaveBeenCalled();
-
-      // New timeout should trigger
-      vi.advanceTimersByTime(5000);
-      expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
     });
   });
 
@@ -340,21 +454,14 @@ describe("usePhotoFrameMode", () => {
     });
 
     it("should initialize timer on mount if photo frame is enabled", async () => {
-      mockConfigStore.photoFrameEnabled = true;
-      mockConfigStore.photoFrameTimeout = 5;
+      enable({ timeout: 5 });
 
       const photoFrame = usePhotoFrameMode();
-
-      // Wait for any throttling to complete
-      vi.advanceTimersByTime(600);
 
       await mockConfigStore.fetchConfig();
       photoFrame.resetInactivityTimer();
 
-      // Wait for throttling
-      vi.advanceTimersByTime(600);
-
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
     });

@@ -22,6 +22,7 @@
           :parent-direction="splitDirection"
           :active-region-id="activeRegionId"
           :light-active="lightActive"
+          :controls-visible="controlsVisible"
           :dim-others="dimOthers"
           @click.stop
           @focus-region="emit('focus-region', $event)"
@@ -50,6 +51,7 @@
         :view="region.view"
         :region-id="region.id"
         :focused="isFocused(region.id)"
+        :controls-visible="controlsFor(region.id)"
         :dim="isDim(region.id)"
         @vue:mounted="onContentMounted"
       />
@@ -62,6 +64,7 @@
         :region-id="region.id"
         :fit="region.view?.fit"
         :focused="isFocused(region.id)"
+        :controls-visible="controlsFor(region.id)"
         :dim="isDim(region.id)"
         @vue:mounted="onContentMounted"
       />
@@ -72,6 +75,7 @@
         :region-id="region.id"
         :view="region.view"
         :focused="isFocused(region.id)"
+        :controls-visible="controlsFor(region.id)"
         :dim="isDim(region.id)"
         @vue:mounted="onContentMounted"
       />
@@ -116,6 +120,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Whether the region's own controls (calendar header, photo arrows, service
+  // actions) should be reachable. Kept separate from `lightActive`: the focus
+  // light follows input, while the controls follow hide/show controls.
+  // null = fall back to lightActive for standalone use/tests.
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
   dimOthers: {
     type: Boolean,
     default: true,
@@ -133,6 +145,8 @@ const resizeCtx = inject("dashboardResize", null);
 const splitContainerEl = ref(null);
 
 const isFocused = leafId => props.lightActive && leafId === props.activeRegionId;
+const controlsFor = leafId =>
+  (props.controlsVisible ?? props.lightActive) && leafId === props.activeRegionId;
 const isDim = leafId => props.lightActive && props.dimOthers && leafId !== props.activeRegionId;
 
 const subtreeContainsActive = node => {

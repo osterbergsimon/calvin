@@ -63,10 +63,28 @@ function setup(configMutator) {
 describe("Dashboard focus-light", () => {
   beforeEach(() => focusRegion.mockClear());
 
-  it("lightActive is true in interaction mode when UI is shown", () => {
+  it("interaction mode follows input, whether or not the controls are shown", async () => {
     const w = setup(s => {
       s.focusLightMode = "interaction";
+      s.showUI = true;
     });
+    // Showing the controls no longer means the light is permanently on.
+    expect(w.find(".region-stub").attributes("data-light")).toBe("false");
+
+    window.dispatchEvent(new Event("pointerdown"));
+    await w.vm.$nextTick();
+    expect(w.find(".region-stub").attributes("data-light")).toBe("true");
+  });
+
+  it("interaction mode lights on input with the controls hidden", async () => {
+    const w = setup(s => {
+      s.focusLightMode = "interaction";
+      s.showUI = false;
+    });
+    expect(w.find(".region-stub").attributes("data-light")).toBe("false");
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    await w.vm.$nextTick();
     expect(w.find(".region-stub").attributes("data-light")).toBe("true");
   });
 
