@@ -12,8 +12,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref } from "vue";
-import Comet from "./indicators/Comet.vue";
-import Pulse from "./indicators/Pulse.vue";
+import CometIndicator from "./indicators/CometIndicator.vue";
+import PulseIndicator from "./indicators/PulseIndicator.vue";
 import { APP_FRAME, LOADING_LIGHT_STYLES, useProgressStore } from "../stores/progress";
 import { useScreenSetting } from "../composables/useScreenSetting";
 
@@ -58,8 +58,8 @@ const styleName = computed(() => {
 });
 
 const indicator = computed(() => {
-  if (styleName.value === "comet") return Comet;
-  if (styleName.value === "pulse") return Pulse;
+  if (styleName.value === "comet") return CometIndicator;
+  if (styleName.value === "pulse") return PulseIndicator;
   return null;
 });
 </script>

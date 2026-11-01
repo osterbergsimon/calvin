@@ -238,7 +238,9 @@ describe("WebServiceViewer empty state (F4)", () => {
 
 // CLV-115: the region's loading light replaces the in-region spinner.
 describe("WebServiceViewer loading light (CLV-115)", () => {
-  const stubs = { ServiceViewer: { template: "<div class='service-stub'><slot name='actions' /></div>" } };
+  const stubs = {
+    ServiceViewer: { template: "<div class='service-stub'><slot name='actions' /></div>" },
+  };
 
   it("a plugin data fetch lights this region's frame", async () => {
     vi.useFakeTimers();
@@ -270,7 +272,10 @@ describe("WebServiceViewer loading light (CLV-115)", () => {
     store.services = [];
     store.loading = true;
 
-    const w = mount(WebServiceViewer, { props: { regionId: "svc-1", view: {} }, global: { stubs } });
+    const w = mount(WebServiceViewer, {
+      props: { regionId: "svc-1", view: {} },
+      global: { stubs },
+    });
     await w.vm.$nextTick();
     expect(w.find(".spinner").exists()).toBe(false);
     expect(w.text()).not.toContain("Loading service");

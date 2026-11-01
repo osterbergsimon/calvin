@@ -272,7 +272,10 @@ describe("DashboardSettings loading light", () => {
   const loadingControl = w =>
     w
       .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Loading light" || c.attributes("aria-label") === "Loading light");
+      .find(
+        c =>
+          c.props("ariaLabel") === "Loading light" || c.attributes("aria-label") === "Loading light"
+      );
 
   it("offers Comet · Pulse · Off under Focus & remote, Comet by default", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
