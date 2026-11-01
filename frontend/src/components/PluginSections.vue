@@ -286,7 +286,7 @@ const formatFileSize = bytes => {
   padding: 0.75rem 1.5rem;
   font-size: var(--fs-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
   font-weight: var(--weight-strong);
 }
 
@@ -309,7 +309,7 @@ const formatFileSize = bytes => {
   padding: 0.5rem 1rem;
   font-size: var(--fs-control);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
 }
 
 .btn-remove:hover {

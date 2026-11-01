@@ -117,8 +117,8 @@ const handleFocus = () => emit("focus", props.ribbon);
   border-left: 2px solid var(--ribbon-hue);
   border-radius: var(--radius-xs);
   transition:
-    background 0.15s,
-    box-shadow 0.15s;
+    background var(--dur-fast),
+    box-shadow var(--dur-fast);
 }
 
 /* Endcaps carry the story: a squared, edge-bleeding end means the event runs
@@ -177,7 +177,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   box-shadow:
     inset 0 0 0 1px var(--bg-1),
     0 0 0 2px var(--focus);
-  z-index: 5;
+  z-index: var(--z-raised);
 }
 
 .ribbon.selected {

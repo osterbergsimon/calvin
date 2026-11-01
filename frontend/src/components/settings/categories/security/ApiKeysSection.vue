@@ -176,6 +176,7 @@
 </template>
 
 <script setup>
+import { isPhoneWidth } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import Tag from "@/components/ui/Tag.vue";
@@ -240,7 +241,7 @@ const width = ref(typeof window === "undefined" ? 1024 : window.innerWidth);
 const onResize = () => {
   width.value = window.innerWidth;
 };
-const showTouchHint = computed(() => isTouch.value && width.value >= 720);
+const showTouchHint = computed(() => isTouch.value && !isPhoneWidth(width.value));
 const hostUnavailable = computed(() => environment.value?.host_control === false);
 const copyLabel = computed(() =>
   copyState.value === "copied"

@@ -158,7 +158,7 @@ const hasHueWarning = theme =>
   border: 2px solid var(--line);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
 }
 
 .theme-selection-item:hover {

@@ -46,9 +46,9 @@ describe("fixed sets: z-index, weight, duration, breakpoints", () => {
       expect(kinds(".a { font-weight: 700; }")).toEqual(["font-weight"]);
       expect(kinds(".a { font-weight: bold; }")).toEqual(["font-weight"]);
       expect(kinds(".a { font: 600 1rem/1 sans-serif; }")).toEqual(["font-weight"]);
-      expect(kinds(".a { font-weight: var(--weight-title); } .b { font-weight: inherit; }")).toEqual(
-        []
-      );
+      expect(
+        kinds(".a { font-weight: var(--weight-title); } .b { font-weight: inherit; }")
+      ).toEqual([]);
     });
 
     it("durations outside --dur-fast / --dur", () => {

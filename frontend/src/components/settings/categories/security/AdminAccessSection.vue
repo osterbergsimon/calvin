@@ -78,6 +78,7 @@
 </template>
 
 <script setup>
+import { isPhoneWidth } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";
 import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
@@ -134,7 +135,7 @@ const onResize = () => {
 };
 onMounted(() => window.addEventListener("resize", onResize));
 onUnmounted(() => window.removeEventListener("resize", onResize));
-const isPhone = computed(() => width.value < 480);
+const isPhone = computed(() => isPhoneWidth(width.value));
 
 async function signOut() {
   signingOut.value = true;

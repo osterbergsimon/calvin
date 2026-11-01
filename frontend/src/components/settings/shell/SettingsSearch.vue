@@ -168,7 +168,7 @@ onUnmounted(() => {
   top: calc(100% + var(--space-1, 4px));
   left: 0;
   right: 0;
-  z-index: 100;
+  z-index: var(--z-sticky);
   background: var(--bg-2);
   border: 1px solid var(--line);
   border-radius: var(--radius, var(--radius-xs));

@@ -68,6 +68,7 @@ Components stop referencing these (§7 migration).
 | Elevation | `--elev-1` (raised: menus, popovers), `--elev-2` (dialogs, sheets) | `0 6px 18px -8px var(--shadow-hover)` / `0 18px 50px -16px var(--shadow-hover)` | nothing else casts shadows |
 | Motion | `--dur-fast` 120ms, `--dur` 200ms, `--ease` `cubic-bezier(.2,.7,.2,1)` | | all transitions; zero under `prefers-reduced-motion` |
 | Layers | `--z-raised` 10, `--z-sticky` 100, `--z-dialog` 1000, `--z-popover` 1050 (popovers teleport to body, so they must clear an open dialog), `--z-osk` 1100, `--z-toast` 1200 | | no other z-index values |
+| Breakpoints | `--bp-phone` (`max-width: 600px`), `--bp-wide` (`min-width: 1024px`) | `src/styles/breakpoints.js` | every width `@media` and every JS width check; nothing else |
 
 **Component tokens** are allowed when a component has geometry of its own. They're prefixed with the component
 name and built from roles, e.g. `--tag-*`, `--toggle-*`, `--tab-height`, `--osk-height`, `--touch-target`,

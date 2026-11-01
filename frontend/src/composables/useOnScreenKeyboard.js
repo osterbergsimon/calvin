@@ -1,5 +1,6 @@
 import { computed, inject, nextTick, onScopeDispose, readonly, ref, watch } from "vue";
 import { routeLocationKey } from "vue-router";
+import { isPhoneWidth } from "../styles/breakpoints.js";
 import { useConfigStore } from "../stores/config";
 import { useScreenSetting } from "./useScreenSetting";
 import { useTouchCapability } from "./useTouchCapability";
@@ -30,7 +31,7 @@ import {
  * Show rules (docs/design/2026-10-29-on-screen-keyboard.md §3, amended by
  * docs/design/2026-10-30-osk-hardware-keyboard.md):
  *   - `onScreenKeyboard` is per screen: Auto · On · Off. Auto shows on touch
- *     screens at least 720px wide until a real keyboard is used there; On
+ *     screens wider than a phone (src/styles/breakpoints.js) until a real keyboard is used there; On
  *     always; Off never by itself;
  *   - text-like inputs and textareas, never native pickers/readonly fields,
  *     never inside `[data-osk="off"]`;
@@ -48,7 +49,6 @@ export const OSK_HARDWARE_SEEN_KEY = "calvin-osk-hardware-seen";
 const TEXT_INPUT_TYPES = new Set(["text", "search", "url", "email", "password", "number"]);
 const CARETLESS_TYPES = new Set(["number", "email"]);
 const NUMERIC_INPUTMODES = new Set(["numeric", "decimal"]);
-const MIN_AUTO_WIDTH = 720;
 const MAX_HEIGHT = 300;
 const HEIGHT_RATIO = 0.45;
 const SHIFT_LOCK_WINDOW_MS = 400;
@@ -286,7 +286,7 @@ export function useOnScreenKeyboard() {
     if (value === "on") return true;
     if (value === "off") return false;
     if (typeof window === "undefined") return false;
-    return isTouch.value && viewportWidth.value >= MIN_AUTO_WIDTH;
+    return isTouch.value && !isPhoneWidth(viewportWidth.value);
   });
 
   // Auto stops showing the keyboard on a screen after someone typed on a real

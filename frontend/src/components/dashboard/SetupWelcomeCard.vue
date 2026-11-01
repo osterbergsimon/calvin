@@ -89,6 +89,7 @@
 </template>
 
 <script setup>
+import { isPhoneWidth as isPhoneViewport } from "@/styles/breakpoints.js";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { mdiCheck } from "@mdi/js";
 import { useRouter } from "vue-router";
@@ -114,7 +115,6 @@ import Tag from "@/components/ui/Tag.vue";
 
 // The dashboard area below the clock bar, measured for the fit rules.
 const COMPACT_AREA_HEIGHT = 520;
-const PHONE_WIDTH = 480;
 
 const router = useRouter();
 const configStore = useConfigStore();
@@ -141,7 +141,7 @@ const cardEl = ref(null);
 const areaHeight = ref(typeof window === "undefined" ? 0 : window.innerHeight);
 let resizeObserver = null;
 
-const isPhoneWidth = computed(() => width.value < PHONE_WIDTH);
+const isPhoneWidth = computed(() => isPhoneViewport(width.value));
 // "Add here" belongs to a wall kiosk; a phone/laptop (narrow or fine pointer)
 // is already the place you would add things, so it just says "Add".
 const addLabel = computed(() => (isTouch.value && !isPhoneWidth.value ? "Add here" : "Add"));

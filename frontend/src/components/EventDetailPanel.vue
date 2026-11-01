@@ -243,7 +243,7 @@ const getSourceName = sourceId => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 1000;
+  z-index: var(--z-dialog);
   display: flex;
   min-width: 400px;
   max-width: 460px;

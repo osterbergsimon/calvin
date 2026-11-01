@@ -236,12 +236,13 @@
       </div>
     </DashboardPanel>
     <!-- Event Detail Panel -->
+    <!-- Scrim first: both sit on --z-dialog, so the panel after it paints on top. -->
+    <DialogScrim v-if="calendarStore.selectedEvent" @dismiss="closeEventDetail" />
     <EventDetailPanel
       v-if="calendarStore.selectedEvent"
       :event="calendarStore.selectedEvent"
       @close="closeEventDetail"
     />
-    <DialogScrim v-if="calendarStore.selectedEvent" @dismiss="closeEventDetail" />
   </div>
 </template>
 
@@ -1420,7 +1421,7 @@ onActivated(() => {
 .calendar-header {
   /* Stays above the first-run empty overlay so month navigation still works. */
   position: relative;
-  z-index: calc(var(--z-raised) + 1);
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1483,7 +1484,7 @@ onActivated(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: calc(var(--z-raised) + 2);
+  z-index: var(--z-raised);
   pointer-events: none;
 }
 
@@ -1929,7 +1930,7 @@ onActivated(() => {
 
 /* Responsive styles for smaller screens and portrait mode */
 /* Use viewport units and scale everything proportionally */
-@media (max-width: 768px), (orientation: portrait) {
+@media (--bp-phone), (orientation: portrait) {
   .calendar-grid {
     padding: clamp(0.25rem, 1vw, 0.75rem);
     width: 100%;
@@ -1979,7 +1980,7 @@ onActivated(() => {
 }
 
 /* Extra small screens - more aggressive scaling */
-@media (max-width: 480px) {
+@media (--bp-phone) {
   .calendar-grid {
     padding: clamp(0.15rem, 1vw, 0.5rem);
     width: 100%;

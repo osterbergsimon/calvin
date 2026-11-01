@@ -19,7 +19,6 @@ export const roleLint = {
     "components/ui/SegmentedControl.vue",
     "components/ui/SelectPill.vue",
     "components/ui/Tag.vue",
-    "components/ui/ToggleSwitch.vue",
   ],
   baseline: [
     "components/ui/ChipMultiSelect.vue",

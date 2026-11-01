@@ -183,7 +183,7 @@ const dotClass = computed(() => {
   font-size: var(--fs-control);
   font-weight: var(--weight-title);
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--dur-fast);
 }
 
 .settings-topbar__phone {
@@ -225,7 +225,7 @@ const dotClass = computed(() => {
 
 /* You are already on the phone: the hand-off lives on a touch kiosk, and the
    button only squeezes the bar on a 390px screen. */
-@media (max-width: 600px) {
+@media (--bp-phone) {
   .settings-topbar__phone {
     display: none;
   }
