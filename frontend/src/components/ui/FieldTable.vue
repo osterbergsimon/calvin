@@ -1,18 +1,20 @@
 <template>
   <div class="field-table" :style="tableStyle" data-test="field-table">
-    <div v-if="columns.length" class="field-table__head" data-test="field-table-head">
-      <span
-        v-for="(column, index) in columns"
-        :key="index"
-        class="field-table__header"
-        :class="{ 'field-table__header--label': index === 0 }"
-        >{{ column.label }}</span
-      >
-    </div>
-    <div v-for="(row, index) in rows" :key="row.key ?? index" class="field-table__row">
-      <span class="field-table__label">{{ row.label }}</span>
-      <div class="field-table__cells">
-        <slot :row="row" :index="index" />
+    <div class="field-table__body">
+      <div v-if="columns.length" class="field-table__head" data-test="field-table-head">
+        <span
+          v-for="(column, index) in columns"
+          :key="index"
+          class="field-table__header"
+          :class="{ 'field-table__header--label': index === 0 }"
+          >{{ column.label }}</span
+        >
+      </div>
+      <div v-for="(row, index) in rows" :key="row.key ?? index" class="field-table__row">
+        <span class="field-table__label">{{ row.label }}</span>
+        <div class="field-table__cells">
+          <slot :row="row" :index="index" />
+        </div>
       </div>
     </div>
   </div>
@@ -25,7 +27,8 @@ import { computed } from "vue";
 // §2.2): one header row, then label + controls per row. The screen schedule is
 // its first user; any later editor with the same shape reuses it. Row height is
 // the touch target, cells sit --gap-inline apart, headers are --text-meta, and
-// under 360px the label stacks above its controls.
+// when the table is narrower than 340px (a 360px viewport) the label stacks
+// above its controls.
 //
 // `columns` describes the header row: [{ label: "On", width: "7rem" }, …]. The
 // first column is the row label. A column without `width` takes 1fr, so the row
@@ -47,17 +50,26 @@ const tableStyle = computed(() => {
 </script>
 
 <style scoped>
+/* The query container is the outer block; keeping the flex column and the
+   grid inside it lets the tracks shrink (a container on the flex column made
+   Chromium size them at max-content and overflow the phone). */
 .field-table {
+  container-type: inline-size;
+}
+
+.field-table__body {
   display: flex;
   flex-direction: column;
   gap: var(--gap-1);
   padding: 0 var(--panel-pad-x) var(--panel-pad-y);
-  container-type: inline-size;
 }
 
 .field-table__head,
 .field-table__row {
   display: grid;
+  /* The row is a flex child: without min-width: 0 it refuses to shrink below
+     its tracks' min-content and the table scrolls sideways on a phone. */
+  min-width: 0;
   grid-template-columns: var(--field-table-columns);
   align-items: center;
   gap: var(--gap-inline);
@@ -102,10 +114,10 @@ const tableStyle = computed(() => {
   grid-column: 1 / -1;
 }
 
-/* When the table's own column is too narrow for a label and two time fields
-   (a 360px viewport leaves ~300px inside the panel), stack. The query is on
-   the table, so a narrow two-pane detail stacks even on a wide screen. */
-@container (max-width: 300px) {
+/* When the table is too narrow for a label and two time fields (a 360px
+   viewport leaves ~328px inside the panel), stack. The query is on the
+   table's own box, so a narrow two-pane detail stacks even on a wide screen. */
+@container (max-width: 340px) {
   .field-table__head {
     display: none;
   }
