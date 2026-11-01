@@ -9,6 +9,7 @@ from app.main import app as main_app
 from app.security.admin_auth import get_admin_store
 from app.security.route_policy import (
     ADMIN_READS,
+    GUEST_ROUTES,
     PUBLIC_WRITES,
     UNSAFE_METHODS,
 )
@@ -53,6 +54,12 @@ def test_every_unsafe_route_needs_admin(test_client):
         for method in sorted(route.methods & UNSAFE_METHODS):
             path = route.path_format
             if (method, path) in PUBLIC_WRITES:
+                continue
+            if (method, path) in GUEST_ROUTES:
+                # Only a valid share token opens these; a bad one is a 404.
+                response = test_client.request(method, _fill(path), json={})
+                if response.status_code not in (303, 404):
+                    unprotected.append((method, path, response.status_code))
                 continue
             response = test_client.request(method, _fill(path), json={})
             if response.status_code != 401 or _error_code(response) != "admin_required":
@@ -124,3 +131,14 @@ def test_host_routes_match_the_routes_that_call_require_host_control():
         for method in route.methods
     }
     assert guarded == set(HOST_ROUTES)
+
+
+def test_the_app_gates_guest_bodies_before_routing():
+    """Share tokens are checked in ASGI middleware, before a form is parsed (calvin-mwqo)."""
+    from app.security.guest_gate import GuestGateMiddleware
+    from app.security.host_origin import HostOriginMiddleware
+
+    classes = [middleware.cls for middleware in main_app.user_middleware]
+    assert GuestGateMiddleware in classes
+    # Host/Origin stays outermost: it is added after the gate.
+    assert classes.index(HostOriginMiddleware) < classes.index(GuestGateMiddleware)

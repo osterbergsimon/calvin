@@ -13,6 +13,9 @@
  * - Never handled (straight to the network, failures stay failures): non-GET
  *   requests, other origins, /api/health, /api/system/* (status, updates,
  *   display power), server-sent event streams and full-size images.
+ * - Share links (calvin-mwqo): /share/* and /api/guest/* are never handled
+ *   either. Their URLs carry the link's token, and a share-link page is not
+ *   the dashboard shell, so neither may land in (or be served from) a cache.
  *
  * BUILD_ID is replaced at build time (vite.config.js) with a hash of the
  * build's asset names, so each deploy gets its own caches and the previous
@@ -32,6 +35,10 @@ const APP_SHELL_URL = "/";
 const API_CACHE_MAX_ENTRIES = 100;
 const SW_CACHE_HEADER = "x-calvin-sw-cache";
 
+function isShareLinkPath(path) {
+  return path === "/share" || path.startsWith("/share/") || path.startsWith("/api/guest/");
+}
+
 function isUncachedApi(url, request) {
   const path = url.pathname;
   if (path === "/api/health" || path.startsWith("/api/health/")) return true;
@@ -46,6 +53,7 @@ function strategyFor(request) {
   if (request.method !== "GET") return null;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return null;
+  if (isShareLinkPath(url.pathname)) return null;
   if (url.pathname.startsWith("/api/")) {
     return isUncachedApi(url, request) ? null : "api";
   }

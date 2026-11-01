@@ -334,6 +334,8 @@ export async function installApiMock(page, options = {}) {
     down: false,
     requests: [],
     unmatched: [],
+    // Share links (calvin-mwqo): what Settings › Content › Photos lists.
+    shareLinks: [],
   };
 
   await page.route("**/api/**", async route => {
@@ -552,6 +554,40 @@ export async function installApiMock(page, options = {}) {
     }
     if (path === "/api/backup/preview" || path === "/api/backup/restore") {
       return json(route, { ok: true, files: [] });
+    }
+
+    if (path === "/api/share/folders") return json(route, { folders: ["Party"] });
+    if (path === "/api/share/links") {
+      if (method === "POST") {
+        const body = request.postDataJSON() || {};
+        const id = `link${state.shareLinks.length + 1}`;
+        const link = {
+          id,
+          name: body.name,
+          folder: body.folder,
+          createdAt: "2026-11-01T09:00:00Z",
+          lastUsedAt: null,
+          expiresAt: null,
+          expired: false,
+          uploadCount: 0,
+          path: `/share/${id}.SAMPLETOKEN/`,
+        };
+        state.shareLinks = [link, ...state.shareLinks];
+        return json(route, { link }, 201);
+      }
+      return json(route, { links: state.shareLinks });
+    }
+    const shareLink = path.match(/^\/api\/share\/links\/([^/]+)$/);
+    if (shareLink) {
+      if (method === "DELETE") {
+        state.shareLinks = state.shareLinks.filter(link => link.id !== shareLink[1]);
+        return route.fulfill({ status: 204, body: "" });
+      }
+      const body = request.postDataJSON() || {};
+      state.shareLinks = state.shareLinks.map(link =>
+        link.id === shareLink[1] ? { ...link, ...body } : link
+      );
+      return json(route, { link: state.shareLinks.find(link => link.id === shareLink[1]) });
     }
 
     if (path === "/api/keyboard/mappings") {

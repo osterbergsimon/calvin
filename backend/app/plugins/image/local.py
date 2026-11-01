@@ -12,6 +12,10 @@ from PIL import Image, ImageOps
 from app.config import resolve_path, settings
 from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ImagePlugin
+from app.utils.photo_folders import RESERVED_FOLDERS, InvalidFolder, normalize_folder
+
+# A share-link folder holds this hidden file; only such subfolders are scanned.
+SHARE_FOLDER_MARKER = ".calvin-share"
 
 
 def _default_image_dir() -> Path:
@@ -168,10 +172,10 @@ class LocalImagePlugin(ImagePlugin):
             self._images = []
             return []
 
-        all_files = list(self.image_dir.iterdir())
+        all_files = self._candidate_files()
         logger.debug(f"[Local Images] Found {len(all_files)} files/dirs in image_dir")
 
-        for file_path in sorted(self.image_dir.iterdir()):
+        for file_path in all_files:
             if file_path.is_file() and file_path.suffix.lower() in self.supported_formats:
                 try:
                     logger.debug(f"[Local Images] Processing image file: {file_path.name}")
@@ -198,6 +202,10 @@ class LocalImagePlugin(ImagePlugin):
                             "height": height,
                             "size": file_size,
                             "format": file_path.suffix.lower(),
+                            # "" for the image dir itself, else its one-level subfolder.
+                            "folder": (
+                                file_path.parent.name if file_path.parent != self.image_dir else ""
+                            ),
                             "source": self.plugin_id,  # Mark which plugin provided this
                         }
                         images.append(image_metadata)
@@ -245,7 +253,43 @@ class LocalImagePlugin(ImagePlugin):
         self._images = images
         return images
 
-    def _safe_upload_path(self, filename: str) -> Path:
+    def _folder_dirs(self) -> list[Path]:
+        """Share-link folders: one-level subfolders that carry the share marker.
+
+        Any other subfolder (an owner's archive, backups) stays out of the
+        library, exactly as before share links existed. The marker stays when a
+        link is revoked, so photos kept after a revoke stay on show.
+        """
+        if not self.image_dir.exists():
+            return []
+        return sorted(
+            child
+            for child in self.image_dir.iterdir()
+            if child.is_dir()
+            and not child.name.startswith(".")
+            and child.name.casefold() not in RESERVED_FOLDERS
+            and (child / SHARE_FOLDER_MARKER).is_file()
+        )
+
+    def mark_share_folder(self, folder: str) -> Path:
+        """Create ``folder`` if needed and make it part of the library (share links)."""
+        target = self.image_dir / normalize_folder(folder)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / SHARE_FOLDER_MARKER).touch(exist_ok=True)
+        return target
+
+    def _candidate_files(self) -> list[Path]:
+        """Entries of the image dir, then of each photo subfolder (calvin-mwqo)."""
+        entries = sorted(self.image_dir.iterdir())
+        for folder in self._folder_dirs():
+            entries.extend(sorted(folder.iterdir()))
+        return entries
+
+    def list_folders(self) -> list[str]:
+        """Names of the share-link folders, sorted."""
+        return [folder.name for folder in self._folder_dirs()]
+
+    def _safe_upload_path(self, filename: str, target_dir: Path | None = None) -> Path:
         """
         Turn an untrusted upload filename into a new file path inside image_dir.
 
@@ -258,22 +302,24 @@ class LocalImagePlugin(ImagePlugin):
             suffix = Path(name).suffix.lower()
             suffix = suffix if suffix in self.supported_formats else ".jpg"
             name = f"upload-{uuid.uuid4().hex[:12]}{suffix}"
-        file_path = self.image_dir / name
+        directory = target_dir or self.image_dir
+        file_path = directory / name
         if file_path.exists():
-            file_path = (
-                self.image_dir / f"{file_path.stem}-{uuid.uuid4().hex[:8]}{file_path.suffix}"
-            )
-        if file_path.resolve().parent != self.image_dir.resolve():
+            file_path = directory / f"{file_path.stem}-{uuid.uuid4().hex[:8]}{file_path.suffix}"
+        if file_path.resolve().parent != directory.resolve():
             raise ValueError(f"Upload filename escapes the image directory: {filename!r}")
         return file_path
 
-    async def upload_image(self, file_data: bytes, filename: str) -> dict[str, Any] | None:
+    async def upload_image(
+        self, file_data: bytes, filename: str, folder: str | None = None
+    ) -> dict[str, Any] | None:
         """
         Upload an image to the local filesystem.
 
         Args:
             file_data: Image file data as bytes
             filename: Original filename
+            folder: Optional subfolder of the image dir (created if missing)
 
         Returns:
             Image metadata dictionary or None if upload failed
@@ -281,7 +327,10 @@ class LocalImagePlugin(ImagePlugin):
         try:
             # Ensure image directory exists
             self.image_dir.mkdir(parents=True, exist_ok=True)
-            file_path = self._safe_upload_path(filename)
+            target_dir = self.image_dir
+            if folder is not None:
+                target_dir = self.mark_share_folder(folder)
+            file_path = self._safe_upload_path(filename, target_dir)
             with open(file_path, "xb") as f:
                 f.write(file_data)
 
@@ -291,6 +340,9 @@ class LocalImagePlugin(ImagePlugin):
             # Return the new image
             image_id = hashlib.md5(str(file_path).encode(), usedforsecurity=False).hexdigest()
             return await self.get_image(image_id)
+        except InvalidFolder:
+            logger.warning("Refused upload into invalid folder {!r}", folder)
+            return None
         except Exception:
             logger.exception("Error uploading image {}", filename)
             return None

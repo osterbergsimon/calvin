@@ -41,6 +41,8 @@ ADMIN_READS = frozenset(
         "/api/config/git/branches",
         "/api/plugins/{plugin_id}/scan",
         "/api/plugins/local/suggest",
+        "/api/share/folders",
+        "/api/share/links",
         "/api/system/update/stream",
     }
 )
@@ -60,6 +62,25 @@ HOST_ROUTES = frozenset(
         ("POST", "/api/system/reboot"),
     }
 )
+
+# Share-link guest routes (calvin-mwqo). The ``{token}`` in the path is the
+# only credential: the policy resolves it to its link before the handler runs
+# and ignores any cookie or bearer key, so a token opens these routes for its
+# own link and nothing else. An unknown, revoked or expired token is a 404.
+GUEST_ROUTES = frozenset(
+    {
+        ("GET", "/api/guest/{token}"),
+        ("GET", "/api/guest/{token}/manifest.webmanifest"),
+        ("GET", "/api/guest/{token}/uploads"),
+        ("POST", "/api/guest/{token}/uploads"),
+        ("DELETE", "/api/guest/{token}/uploads/{image_id}"),
+        ("GET", "/api/guest/{token}/uploads/{image_id}/thumbnail"),
+        ("POST", "/share/{token}/receive"),
+    }
+)
+# The Web Share Target action is a browser navigation, so a dead link sends the
+# guest back to the page (which explains) instead of showing raw JSON.
+SHARE_TARGET_ROUTE = ("POST", "/share/{token}/receive")
 
 # Config keys the dashboard itself writes (callers listed in the PR body).
 # A request without admin is accepted only when every key is in this set.
@@ -160,15 +181,45 @@ def _insufficient_scope(needed: str) -> HTTPException:
     )
 
 
+def _authenticate_guest(request: Request, route_id: tuple[str, str]) -> None:
+    """Resolve the path's share token to its link, or refuse (429 / 404 / 303).
+
+    :class:`~app.security.guest_gate.GuestGateMiddleware` normally did this
+    already, before the body was read; this is the same check for an app
+    without the middleware.
+    """
+    from app.security.guest_gate import GuestRefusal, guest_ip, resolve_guest, share_page
+
+    if getattr(request.state, "share_link", None) is not None:
+        return
+    token = str(request.path_params.get("token", ""))
+    ip = guest_ip(request.scope)
+    try:
+        request.state.share_link = resolve_guest(token, ip)
+        request.state.guest_ip = ip
+    except GuestRefusal as refusal:
+        if route_id == SHARE_TARGET_ROUTE:
+            raise HTTPException(
+                status_code=303, headers={"Location": share_page(token, "error=invalid")}
+            ) from None
+        raise HTTPException(
+            status_code=refusal.status, detail=refusal.detail, headers=refusal.headers or None
+        ) from None
+
+
 async def enforce_route_policy(request: Request) -> None:
     """FastAPI app-level dependency implementing the three route tiers.
 
     A bearer key replaces the cookie entirely: when the header is present the
     cookie is ignored, so the weaker credential can't be topped up by the stronger.
+    Guest routes take neither: only their share token counts.
     """
     route = request.scope.get("route")
     path = getattr(route, "path_format", None) or request.url.path
     method = request.method.upper()
+    if (method, path) in GUEST_ROUTES:
+        _authenticate_guest(request, (method, path))
+        return
     key = _authenticate_bearer(request)
     if key is not None:
         request.state.api_key = key

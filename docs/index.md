@@ -52,6 +52,7 @@ New to Calvin? Get started quickly:
 - [Backup and restore](configuration/BACKUP_RESTORE.md)
 - [Data directory (`CALVIN_DATA_DIR`)](configuration/DATA_DIR.md)
 - [Host control (`CALVIN_HOST_CONTROL`)](configuration/HOST_CONTROL.md)
+- [Share links: let guests add photos](configuration/SHARE_LINKS.md)
 - System configuration
 
 ### Integrations

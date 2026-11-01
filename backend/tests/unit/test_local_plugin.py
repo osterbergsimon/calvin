@@ -281,3 +281,66 @@ class TestUploadFilenameSafety:
 
         (written,) = [p for p in temp_image_dir.iterdir() if p.is_file()]
         assert written.suffix == suffix
+
+
+class TestFolders:
+    """Share links upload into one subfolder of Local photos (calvin-mwqo)."""
+
+    @pytest.fixture
+    def temp_image_dir(self, tmp_path):
+        image_dir = tmp_path / "images"
+        image_dir.mkdir()
+        return image_dir
+
+    async def test_upload_into_folder_creates_it_and_is_listed(self, local_plugin, temp_image_dir):
+        from tests.test_utils import create_test_image
+
+        image = await local_plugin.upload_image(create_test_image(), "a.jpg", folder="Guests")
+
+        assert image is not None
+        assert (temp_image_dir / "Guests" / "a.jpg").is_file()
+        assert image["folder"] == "Guests"
+        assert image["id"] in {img["id"] for img in await local_plugin.get_images()}
+
+    async def test_scan_includes_share_folders_only(self, local_plugin, temp_image_dir):
+        from tests.test_utils import create_test_image_file
+
+        create_test_image_file(temp_image_dir / "root.jpg")
+        local_plugin.mark_share_folder("Party")
+        create_test_image_file(temp_image_dir / "Party" / "p.jpg")
+        # An owner's own subfolder is not part of the library, as before.
+        (temp_image_dir / "Archive").mkdir()
+        create_test_image_file(temp_image_dir / "Archive" / "old.jpg")
+        (temp_image_dir / ".trash").mkdir()
+        (temp_image_dir / ".trash" / ".calvin-share").touch()
+        create_test_image_file(temp_image_dir / ".trash" / "gone.jpg")
+
+        images = await local_plugin.scan_images()
+
+        names = sorted(img["filename"] for img in images)
+        assert names == ["p.jpg", "root.jpg"]
+        root = next(img for img in images if img["filename"] == "root.jpg")
+        assert root["folder"] == ""
+        # Thumbnails (written to thumbnails/) never show up as photos.
+        assert all("thumbnails" not in img["path"] for img in images)
+
+    async def test_list_folders_lists_share_folders(self, local_plugin, temp_image_dir):
+        local_plugin.mark_share_folder("Party")
+        local_plugin.mark_share_folder("Guests")
+        (temp_image_dir / "Archive").mkdir()
+        (temp_image_dir / ".hidden").mkdir()
+
+        assert local_plugin.list_folders() == ["Guests", "Party"]
+
+    async def test_mark_share_folder_refuses_bad_names(self, local_plugin, temp_image_dir):
+        with pytest.raises(ValueError):
+            local_plugin.mark_share_folder("../x")
+        assert not (temp_image_dir.parent / "x").exists()
+
+    @pytest.mark.parametrize("folder", ["../x", "a/b", ".hidden", "thumbnails", ""])
+    async def test_bad_folder_is_refused(self, local_plugin, temp_image_dir, folder):
+        result = await local_plugin.upload_image(b"\x89PNG data", "a.png", folder=folder)
+
+        assert result is None
+        assert not (temp_image_dir.parent / "x").exists()
+        assert [p.name for p in temp_image_dir.rglob("*.png")] == []

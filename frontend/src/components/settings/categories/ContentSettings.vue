@@ -100,6 +100,7 @@
           Open Focus &amp; remote
         </Button>
       </SettingRow>
+      <ShareLinksSection />
     </SettingsSection>
 
     <SettingsSection id="content-services" title="Web pages & apps">
@@ -129,6 +130,7 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
+import ShareLinksSection from "@/components/settings/tabs/content/ShareLinksSection.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
 import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 

@@ -149,4 +149,35 @@ describe("App shell", () => {
 
     wrapper.unmount();
   });
+
+  it("renders only the guest page on a share link, without the dashboard shell", async () => {
+    window.history.replaceState({}, "", "/share/abc.TOKEN/");
+    try {
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [{ path: "/share/:token/", component: { template: "<p data-test='guest' />" } }],
+      });
+      router.push("/share/abc.TOKEN/");
+      await router.isReady();
+      const wrapper = mount(App, {
+        global: {
+          plugins: [createPinia(), router],
+          stubs: { KeyboardHandler: true, StatusRail: true, AdminSignInDialog: true },
+        },
+      });
+      await flushPromises();
+
+      expect(wrapper.find("[data-test='guest']").exists()).toBe(true);
+      // No connection polling, theme or config loading, keyboard or admin sign-in.
+      expect(initialize).not.toHaveBeenCalled();
+      expect(loadTheme).not.toHaveBeenCalled();
+      expect(syncWithConfig).not.toHaveBeenCalled();
+      expect(wrapper.findComponent({ name: "KeyboardHandler" }).exists()).toBe(false);
+      expect(wrapper.findComponent({ name: "AdminSignInDialog" }).exists()).toBe(false);
+      expect(document.body.querySelector(".osk")).toBeNull();
+      wrapper.unmount();
+    } finally {
+      window.history.replaceState({}, "", "/");
+    }
+  });
 });
