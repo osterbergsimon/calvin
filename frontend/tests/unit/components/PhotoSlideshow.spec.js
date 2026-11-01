@@ -170,6 +170,14 @@ describe("PhotoSlideshow", () => {
       ]);
       for (const button of buttons) expect(button.text()).toBe("");
     });
+
+    it("uses the neutral fullscreen control, matching calendar and service", () => {
+      const wrapper = createWrapper({ focused: true });
+      const fullscreen = wrapper.find('.region-header-controls [data-action="expand"]');
+
+      expect(fullscreen.classes()).toContain("icon-btn--default");
+      expect(fullscreen.classes()).not.toContain("icon-btn--primary");
+    });
   });
 
   describe("Image Display", () => {
