@@ -78,6 +78,18 @@ describe("useScreenSetting", () => {
     setItem.mockRestore();
   });
 
+  it("a kiosk reads its merged config, not the Settings form's global value", () => {
+    window.sessionStorage.setItem(KIOSK_KEY, "hallway");
+    const config = useConfigStore();
+    config.photoFrameEnabled = true; // merged config from /kiosks/hallway/config
+    const setting = useScreenSetting("photoFrameEnabled", {
+      serverValue: () => false, // global GET /api/config value
+    });
+
+    expect(setting.scope).toBe("kiosk");
+    expect(setting.value.value).toBe(true);
+  });
+
   it("merges a kiosk choice into that kiosk's whole overrides object", async () => {
     window.sessionStorage.setItem(KIOSK_KEY, "hallway");
     api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });

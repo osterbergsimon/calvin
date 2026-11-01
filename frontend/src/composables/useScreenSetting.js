@@ -27,10 +27,20 @@ const readStorage = storageKey => {
   }
 };
 
-const localRef = storageKey => {
+const parseStored = (storageKey, parse) => {
+  const raw = readStorage(storageKey);
+  if (raw === null) return null;
+  try {
+    return parse(raw);
+  } catch {
+    return null;
+  }
+};
+
+const localRef = (storageKey, parse) => {
   let stored = localRefs.get(storageKey);
   if (!stored) {
-    stored = ref(readStorage(storageKey));
+    stored = ref(parseStored(storageKey, parse));
     localRefs.set(storageKey, stored);
   }
   return stored;
@@ -38,15 +48,27 @@ const localRef = storageKey => {
 
 /**
  * @param {string} key config key, e.g. "onScreenKeyboard"
- * @param {{ storageKey?: string, serverValue?: () => any }} options
+ * @param {{
+ *   storageKey?: string,
+ *   serverValue?: () => any,
+ *   serialize?: (value: any) => string,
+ *   parse?: (raw: string) => any
+ * }} options
  *   storageKey: localStorage key for browser scope
  *   serverValue: where the seed comes from when this screen has no choice of
  *   its own (defaults to the config store; pass the Settings form's own value
  *   when the row must reflect what Settings loaded)
+ *   serialize/parse: localStorage encoding for non-string choices (booleans,
+ *   lists). Defaults keep the historical plain string form.
  */
 export function useScreenSetting(
   key,
-  { storageKey = `calvin-screen-${key}`, serverValue: readServerValue } = {}
+  {
+    storageKey = `calvin-screen-${key}`,
+    serverValue: readServerValue,
+    serialize = value => String(value),
+    parse = raw => raw,
+  } = {}
 ) {
   const configStore = useConfigStore();
   const kiosksStore = useKiosksStore();
@@ -55,12 +77,15 @@ export function useScreenSetting(
 
   // Re-read on creation so a fresh caller sees the current value even if a
   // previous instance left the shared ref behind (tests, remounts).
-  const stored = localRef(storageKey);
-  if (scope === "browser") stored.value = readStorage(storageKey);
+  const stored = localRef(storageKey, parse);
+  if (scope === "browser") stored.value = parseStored(storageKey, parse);
 
-  const serverValue = computed(() =>
-    readServerValue ? readServerValue() : (configStore[key] ?? null)
-  );
+  const serverValue = computed(() => {
+    // A kiosk always reads its own merged config (override or global), never
+    // the Settings form's global value: the screen's value is the server's.
+    if (scope === "kiosk") return configStore[key] ?? null;
+    return readServerValue ? readServerValue() : (configStore[key] ?? null);
+  });
 
   const value = computed(() => {
     if (scope === "kiosk") return serverValue.value;
@@ -85,7 +110,7 @@ export function useScreenSetting(
 
     stored.value = next;
     try {
-      window.localStorage.setItem(storageKey, String(next));
+      window.localStorage.setItem(storageKey, serialize(next));
     } catch {
       // Storage blocked: the choice lasts for this page load.
     }
