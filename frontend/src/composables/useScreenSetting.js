@@ -1,7 +1,14 @@
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
 import { getKioskId } from "../utils/kioskId";
+import {
+  decodeScreenValue,
+  encodeScreenValue,
+  readScreenStorage,
+  screenSettingRef,
+  screenStorageKey,
+} from "../utils/screenSetting";
 
 /**
  * One setting, scoped to the screen you are changing it on.
@@ -14,28 +21,6 @@ import { getKioskId } from "../utils/kioskId";
  * Returns { value, set, scope } for the settings audit's "This screen" rows.
  */
 
-// localStorage keys are per setting; sharing one ref per key keeps every
-// caller (Settings row, keyboard composable, ...) in sync in the same page.
-const localRefs = new Map();
-
-const readStorage = storageKey => {
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    return raw === null || raw === "" ? null : raw;
-  } catch {
-    return null;
-  }
-};
-
-const localRef = storageKey => {
-  let stored = localRefs.get(storageKey);
-  if (!stored) {
-    stored = ref(readStorage(storageKey));
-    localRefs.set(storageKey, stored);
-  }
-  return stored;
-};
-
 /**
  * @param {string} key config key, e.g. "onScreenKeyboard"
  * @param {{ storageKey?: string, serverValue?: () => any }} options
@@ -46,7 +31,7 @@ const localRef = storageKey => {
  */
 export function useScreenSetting(
   key,
-  { storageKey = `calvin-screen-${key}`, serverValue: readServerValue } = {}
+  { storageKey = screenStorageKey(key), serverValue: readServerValue } = {}
 ) {
   const configStore = useConfigStore();
   const kiosksStore = useKiosksStore();
@@ -55,8 +40,8 @@ export function useScreenSetting(
 
   // Re-read on creation so a fresh caller sees the current value even if a
   // previous instance left the shared ref behind (tests, remounts).
-  const stored = localRef(storageKey);
-  if (scope === "browser") stored.value = readStorage(storageKey);
+  const stored = screenSettingRef(storageKey);
+  if (scope === "browser") stored.value = readScreenStorage(storageKey);
 
   const serverValue = computed(() =>
     readServerValue ? readServerValue() : (configStore[key] ?? null)
@@ -64,7 +49,7 @@ export function useScreenSetting(
 
   const value = computed(() => {
     if (scope === "kiosk") return serverValue.value;
-    return stored.value ?? serverValue.value;
+    return decodeScreenValue(stored.value, serverValue.value) ?? serverValue.value;
   });
 
   // A browser choice of its own, as opposed to falling back to the server
@@ -83,9 +68,9 @@ export function useScreenSetting(
       return;
     }
 
-    stored.value = next;
+    stored.value = encodeScreenValue(next);
     try {
-      window.localStorage.setItem(storageKey, String(next));
+      window.localStorage.setItem(storageKey, stored.value);
     } catch {
       // Storage blocked: the choice lasts for this page load.
     }

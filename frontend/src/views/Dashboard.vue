@@ -6,7 +6,7 @@
         v-if="showHorizontalBarTop"
         position="top"
         :show-in-non-kiosk="true"
-        :show-in-kiosk="configStore.clockBarShowInKiosk"
+        :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
         :enabled="true"
       />
 
@@ -27,7 +27,7 @@
           v-if="showVerticalBarLeft"
           position="left"
           :show-in-non-kiosk="true"
-          :show-in-kiosk="configStore.clockBarShowInKiosk"
+          :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
           :enabled="true"
         />
 
@@ -93,7 +93,7 @@
                 v-else-if="elementType === 'horizontalBarBetween'"
                 position="between"
                 :show-in-non-kiosk="true"
-                :show-in-kiosk="configStore.clockBarShowInKiosk"
+                :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
                 :enabled="true"
               />
 
@@ -102,7 +102,7 @@
                 v-else-if="elementType === 'verticalBarBetween'"
                 position="between"
                 :show-in-non-kiosk="true"
-                :show-in-kiosk="configStore.clockBarShowInKiosk"
+                :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
                 :enabled="true"
               />
             </template>
@@ -146,7 +146,7 @@
             v-if="showHorizontalBarBottom"
             position="bottom"
             :show-in-non-kiosk="true"
-            :show-in-kiosk="configStore.clockBarShowInKiosk"
+            :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
             :enabled="true"
           />
         </div>
@@ -155,7 +155,7 @@
           v-if="showVerticalBarRight"
           position="right"
           :show-in-non-kiosk="true"
-          :show-in-kiosk="configStore.clockBarShowInKiosk"
+          :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
           :enabled="true"
         />
       </div>
@@ -232,7 +232,9 @@ const mainLayoutClass = computed(() => {
   return `layout-${configStore.orientation} layout-direction-${layoutDirection.value}`;
 });
 
-const barVisible = computed(() => configStore.shouldShowUI || configStore.clockBarShowInKiosk);
+const barVisible = computed(
+  () => configStore.shouldShowUI || configStore.effectiveClockBarShowInKiosk
+);
 
 const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
@@ -509,7 +511,10 @@ const onFocusRegion = regionId => {
   // Focusing a region (for the focus-light / touch nav) must not bring the
   // chrome back while the UI is hidden — the hot corner is the deliberate
   // reveal. Only tap-anywhere opt-in re-shows the UI on a content tap.
-  if (configStore.tapAnywhereReveal && typeof configStore.showUITemporarily === "function") {
+  if (
+    configStore.effectiveTapAnywhereReveal &&
+    typeof configStore.showUITemporarily === "function"
+  ) {
     configStore.showUITemporarily(60);
   }
   focusRegion(regionId);

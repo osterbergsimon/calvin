@@ -78,6 +78,28 @@ describe("useScreenSetting", () => {
     setItem.mockRestore();
   });
 
+  it("round-trips a boolean choice without reading 'false' as true", async () => {
+    const config = useConfigStore();
+    config.showUI = true;
+    const setting = useScreenSetting("showUI");
+
+    expect(setting.value.value).toBe(true);
+    await setting.set(false);
+
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBe("false");
+    expect(setting.value.value).toBe(false);
+  });
+
+  it("reads a stored boolean false after a reload", () => {
+    window.localStorage.setItem("calvin-screen-showUI", "false");
+    const config = useConfigStore();
+    config.showUI = true;
+
+    const setting = useScreenSetting("showUI");
+
+    expect(setting.value.value).toBe(false);
+  });
+
   it("merges a kiosk choice into that kiosk's whole overrides object", async () => {
     window.sessionStorage.setItem(KIOSK_KEY, "hallway");
     api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });

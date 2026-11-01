@@ -88,31 +88,59 @@
         label="Hide controls"
         description="Hides the ⋯ menu and region headers for a calm wall display."
       >
+        <template #label-extra><ScopeChip /></template>
+        <template #description>
+          <p class="setting-row__desc">
+            Hides the ⋯ menu and region headers for a calm wall display.
+          </p>
+          <ScopeLine
+            :overridden="showUISetting.overridden.value"
+            reset-test="reset-hide-controls"
+            @reset="showUISetting.reset()"
+          />
+        </template>
         <ToggleSwitch
-          :model-value="!config.showUI"
+          :model-value="controlsHidden"
           aria-label="Hide controls"
-          @update:model-value="v => emit('update:config', { showUI: !v })"
+          @update:model-value="v => setControlsHidden(v)"
         />
       </SettingRow>
       <SettingRow label="Keep the clock bar when hidden">
+        <template #label-extra><ScopeChip /></template>
+        <template #description>
+          <ScopeLine
+            :overridden="clockBarInKioskSetting.overridden.value"
+            reset-test="reset-clock-bar-in-kiosk"
+            @reset="clockBarInKioskSetting.reset()"
+          />
+        </template>
         <ToggleSwitch
-          :model-value="config.clockBarShowInKiosk"
+          :model-value="clockBarInKiosk"
           aria-label="Keep the clock bar when hidden"
-          @update:model-value="v => emit('update:config', { clockBarShowInKiosk: v })"
+          @update:model-value="v => clockBarInKioskSetting.set(v)"
         />
       </SettingRow>
       <SettingRow
         label="Tap anywhere to show controls"
         description="A tap on calendar or photos brings controls back."
       >
+        <template #label-extra><ScopeChip /></template>
+        <template #description>
+          <p class="setting-row__desc">A tap on calendar or photos brings controls back.</p>
+          <ScopeLine
+            :overridden="tapAnywhereSetting.overridden.value"
+            reset-test="reset-tap-anywhere-reveal"
+            @reset="tapAnywhereSetting.reset()"
+          />
+        </template>
         <ToggleSwitch
-          :model-value="config.tapAnywhereReveal"
+          :model-value="tapAnywhereReveal"
           aria-label="Tap anywhere to show controls"
-          @update:model-value="v => emit('update:config', { tapAnywhereReveal: v })"
+          @update:model-value="v => tapAnywhereSetting.set(v)"
         />
       </SettingRow>
       <!-- The corner rows only matter while the controls are hidden. -->
-      <template v-if="!config.showUI">
+      <template v-if="controlsHidden">
         <SettingRow
           label="Show-controls corner"
           description="Press and hold this corner to bring hidden controls back."
@@ -304,6 +332,7 @@ import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
+import { useConfigStore } from "@/stores/config";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { LAYOUT_STORAGE_KEY, normalizeLayoutMode } from "@/utils/layoutMode";
 import { useScreenSetting } from "@/composables/useScreenSetting";
@@ -388,6 +417,29 @@ const setUiSize = async value => {
   // Apply immediately, without waiting for the config store to round-trip.
   applyUiScale(value);
 };
+
+// --- Controls: per screen (calvin-hi6w) ------------------------------------
+// A wall panel hides its controls; a laptop showing the same dashboard keeps
+// them. On a kiosk the choice is that screen's override; any other browser
+// remembers it locally and falls back to the Default value.
+const configStore = useConfigStore();
+const showUISetting = useScreenSetting("showUI", {
+  serverValue: () => props.config.showUI,
+});
+const controlsHidden = computed(() => !showUISetting.value.value);
+const setControlsHidden = async hidden => {
+  // Hiding from Settings is a permanent choice, not a temporary reveal.
+  configStore.clearTemporaryUI();
+  await showUISetting.set(!hidden);
+};
+const clockBarInKioskSetting = useScreenSetting("clockBarShowInKiosk", {
+  serverValue: () => props.config.clockBarShowInKiosk,
+});
+const clockBarInKiosk = computed(() => Boolean(clockBarInKioskSetting.value.value));
+const tapAnywhereSetting = useScreenSetting("tapAnywhereReveal", {
+  serverValue: () => props.config.tapAnywhereReveal,
+});
+const tapAnywhereReveal = computed(() => Boolean(tapAnywhereSetting.value.value));
 
 // --- Loading light: per screen, like the rows above (CLV-115) --------------
 // A wall panel and a laptop may want different lights; the Default value is

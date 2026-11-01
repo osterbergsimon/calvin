@@ -31,7 +31,11 @@ const sectionIds = wrapper =>
   wrapper.findAll("section.settings-section").map(section => section.attributes("id"));
 
 describe("DashboardSettings", () => {
-  beforeEach(() => setActivePinia(createPinia()));
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
 
   it("renders the dashboard sections in the new order, with the clock sections folded in", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
@@ -69,13 +73,17 @@ describe("DashboardSettings", () => {
     expect(w.emitted("update:config").some(c => c[0].focusLightMode === "always")).toBe(true);
   });
 
-  it("inverts the kiosk toggle (Hide controls → showUI:false)", async () => {
+  it("stores Hide controls for this screen instead of the global config", async () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    const toggles = w.findAllComponents({ name: "ToggleSwitch" });
-    // the kiosk row's toggle shows !showUI (=false); toggling emits true → showUI:false
-    // Drive every toggle and assert a showUI:false emit appears for the inverted one.
-    for (const t of toggles) t.vm.$emit("update:modelValue", true);
-    expect(w.emitted("update:config").some(c => c[0].showUI === false)).toBe(true);
+    const row = w
+      .findAllComponents({ name: "SettingRow" })
+      .find(r => r.props("label") === "Hide controls");
+    // The row shows the inverse (hidden = on); turning it on means showUI false.
+    row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBe("false");
+    expect(w.emitted("update:config")).toBeUndefined();
   });
 
   it("splits the touch story into Controls and Focus & remote", () => {
@@ -102,13 +110,28 @@ describe("DashboardSettings", () => {
     expect(w.findComponent({ name: "KeyboardTab" }).exists()).toBe(true);
   });
 
-  it("emits clockBarShowInKiosk from the moved keep-clock-bar toggle", () => {
+  it("stores keep-clock-bar for this screen instead of the global config", async () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const row = w
       .findAllComponents({ name: "SettingRow" })
       .find(r => r.props("label") === "Keep the clock bar when hidden");
     row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
-    expect(w.emitted("update:config").some(c => c[0].clockBarShowInKiosk === true)).toBe(true);
+    await flushPromises();
+
+    expect(window.localStorage.getItem("calvin-screen-clockBarShowInKiosk")).toBe("true");
+    expect(w.emitted("update:config")).toBeUndefined();
+  });
+
+  it("stores tap-anywhere-reveal for this screen instead of the global config", async () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    const row = w
+      .findAllComponents({ name: "SettingRow" })
+      .find(r => r.props("label") === "Tap anywhere to show controls");
+    row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(window.localStorage.getItem("calvin-screen-tapAnywhereReveal")).toBe("true");
+    expect(w.emitted("update:config")).toBeUndefined();
   });
 });
 
@@ -211,7 +234,8 @@ describe("DashboardSettings copy (§3.2)", () => {
   });
 });
 
-// Settings copy audit §2 — the per-screen Settings text size row stays here.
+// Settings copy audit §2 — the per-screen Settings text size row stays here,
+// and the three Controls rows became per-screen too (calvin-hi6w).
 // Touchscreen moved to Screens with decision C.
 describe("DashboardSettings per-screen settings (§2)", () => {
   beforeEach(() => {
@@ -219,11 +243,11 @@ describe("DashboardSettings per-screen settings (§2)", () => {
     window.localStorage.clear();
   });
 
-  it("chips Settings text size as This screen", () => {
+  it("chips the per-screen rows as This screen", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const chips = w.findAll(".setting-scope-chip");
-    expect(chips).toHaveLength(1);
-    expect(chips[0].text()).toBe("This screen");
+    expect(chips).toHaveLength(4);
+    expect(chips.every(chip => chip.text() === "This screen")).toBe(true);
   });
 
   it("stores Settings text size in this browser, not on the server", async () => {
