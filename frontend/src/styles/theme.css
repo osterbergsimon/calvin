@@ -295,8 +295,8 @@ body {
   background-color: var(--bg-0);
   color: var(--ink);
   transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
+    background-color var(--dur) ease,
+    color var(--dur) ease;
 }
 
 /* Utility classes for theme-aware components */

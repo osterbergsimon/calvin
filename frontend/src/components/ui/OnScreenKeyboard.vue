@@ -355,7 +355,7 @@ defineExpose({
   position: fixed;
   right: 16px;
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  z-index: 1100;
+  z-index: var(--z-osk);
   height: 48px;
   display: inline-flex;
   align-items: center;
@@ -371,7 +371,7 @@ defineExpose({
   font-weight: var(--weight-strong);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  animation: osk-open-in 120ms ease-out;
+  animation: osk-open-in var(--dur-fast) ease-out;
 }
 .osk-open__ic {
   width: 20px;
@@ -401,7 +401,7 @@ defineExpose({
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1100;
+  z-index: var(--z-osk);
   height: min(300px, 45dvh);
   display: flex;
   flex-direction: column;
@@ -411,12 +411,12 @@ defineExpose({
   border-top: 1px solid var(--line);
   box-shadow: 0 -10px 30px -18px var(--shadow-hover);
   transform: translateY(100%);
-  transition: transform 120ms ease-in;
+  transition: transform var(--dur-fast) ease-in;
   pointer-events: none;
 }
 .osk--shown {
   transform: translateY(0);
-  transition: transform 180ms ease-out;
+  transition: transform var(--dur) ease-out;
   pointer-events: auto;
 }
 .osk--compact {
@@ -467,7 +467,7 @@ defineExpose({
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   box-shadow: 0 1px 0 var(--line);
-  font: 400 1.25rem var(--font-ui);
+  font: var(--weight-body) 1.25rem var(--font-ui);
   line-height: 1;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -625,7 +625,7 @@ defineExpose({
   flex-basis: 44px;
 }
 
-@media (max-width: 480px) {
+@media (--bp-phone) {
   .osk-picker__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

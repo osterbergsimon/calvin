@@ -300,7 +300,7 @@ onUnmounted(() => {
 .pill__panel {
   /* position/coords come from :style (fixed, teleported to <body> to escape the
      rounded settings panel's overflow:hidden). */
-  z-index: 1000;
+  z-index: var(--z-popover);
   display: flex;
   flex-direction: column;
   background: var(--bg-1);

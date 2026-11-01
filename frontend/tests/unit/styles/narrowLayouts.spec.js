@@ -63,7 +63,7 @@ const mediaBlock = (css, query) => {
 
 describe("clock bar at phone width", () => {
   const css = styleOf("components/ClockBarHorizontal.vue");
-  const phone = mediaBlock(css, "(max-width: 600px)");
+  const phone = mediaBlock(css, "(--bp-phone)");
 
   it("uses the doctrine's phone breakpoint", () => {
     expect(phone).not.toBe("");
@@ -182,7 +182,7 @@ describe("calendar header in a narrow region", () => {
 
 describe("settings top bar at phone width", () => {
   const css = styleOf("components/settings/shell/SettingsTopBar.vue");
-  const phone = mediaBlock(css, "(max-width: 600px)");
+  const phone = mediaBlock(css, "(--bp-phone)");
 
   it("uses the doctrine's phone breakpoint", () => {
     expect(phone).not.toBe("");

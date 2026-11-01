@@ -138,7 +138,7 @@ onMounted(async () => {
 .phone-setup--stacked .phone-setup__url {
   font-size: var(--fs-xs);
 }
-@media (max-width: 480px) {
+@media (--bp-phone) {
   .phone-setup {
     flex-direction: column;
     align-items: flex-start;

@@ -298,7 +298,7 @@ async function runScan() {
   padding: 0.75rem 1.5rem;
   font-size: var(--fs-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
   white-space: nowrap;
 }
 
@@ -320,7 +320,7 @@ async function runScan() {
   background: var(--bg-2);
   color: var(--ink);
   font-size: var(--fs-md);
-  transition: border-color 0.2s ease;
+  transition: border-color var(--dur) ease;
 }
 
 /* Match the modal's Name control; textareas stay content-sized. */

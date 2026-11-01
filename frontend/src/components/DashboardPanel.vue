@@ -171,7 +171,7 @@ const panelClasses = computed(() => [
   padding: 0;
 }
 
-@media (max-width: 768px), (orientation: portrait) {
+@media (--bp-phone), (orientation: portrait) {
   .dashboard-panel__header {
     min-height: 64px;
     padding: clamp(var(--gap-2), 1.5vw, var(--gap-4));

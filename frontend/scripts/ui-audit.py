@@ -51,10 +51,13 @@ z=distinct('z-index'); sh=distinct('box-shadow'); fw=distinct('font-weight'); tr
 for f,s,p in rules:
     for k in ('transition',):
         if k in p:
-            for d in re.findall(r'(\d*\.?\d+m?s)',p[k]): tr[d]+=1
+            for d in re.findall(r'(\d*\.?\d+m?s\b|var\(--dur(?:-fast)?\))',p[k]): tr[d]+=1
 media=collections.Counter()
 for f in files+css:
-    for m in re.findall(r'@media[^{]*\((?:max|min)-width:\s*([0-9.]+(?:px|rem|em))',open(f).read()): media[m]+=1
+    src=open(f).read()
+    for m in re.findall(r'@media[^{]*\((?:max|min)-width:\s*([0-9.]+(?:px|rem|em))',src): media[m]+=1
+    # The shared breakpoint names (src/styles/breakpoints.js), e.g. (--bp-phone).
+    for m in re.findall(r'@media[^{]*?\((--bp-[\w-]+)\)',src): media[m]+=1
 raw=collections.Counter()
 for f,s,p in rules:
     for k in ('padding','margin','gap','row-gap','column-gap'):

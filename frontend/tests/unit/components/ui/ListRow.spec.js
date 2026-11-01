@@ -71,8 +71,6 @@ describe("ListRow", () => {
     expect(STYLE).toMatch(/border-radius:\s*var\(--radius-card\)/);
     expect(STYLE).toMatch(/font-size:\s*var\(--text-label\)/);
     expect(STYLE).toMatch(/\.list-row__actions\s*\{[^}]*flex-wrap:\s*nowrap/s);
-    expect(STYLE).toMatch(
-      /@media \(max-width: 600px\)[\s\S]*\.list-row__actions\s*\{[^}]*width:\s*100%/
-    );
+    expect(STYLE).toMatch(/@media \(--bp-phone\)[\s\S]*\.list-row__actions\s*\{[^}]*width:\s*100%/);
   });
 });

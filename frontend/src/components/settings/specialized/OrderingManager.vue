@@ -207,8 +207,8 @@ const handleInstanceDragEnd = pluginId => {
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
   overflow: hidden;
 }
 
@@ -294,7 +294,7 @@ const handleInstanceDragEnd = pluginId => {
   background: var(--bg-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
-  transition: border-color 0.15s ease;
+  transition: border-color var(--dur-fast) ease;
 }
 
 .instance-tree-item:hover {

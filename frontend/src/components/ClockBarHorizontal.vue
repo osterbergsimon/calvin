@@ -159,9 +159,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
-  /* Above the dashboard stage (--z-sticky + 1) so the bar never sits under a
+  /* Above the dashboard stage (--z-raised) so the bar never sits under a
      region's focus glow. */
-  z-index: calc(var(--z-sticky) * 2);
+  z-index: var(--z-sticky);
   user-select: none;
   flex: 0 0 auto;
   box-sizing: border-box;
@@ -217,7 +217,7 @@ onMounted(() => {
    connection pill and the ⋯ menu on one line: the row ran past the screen and
    scrolled sideways, cutting the clock (CLV-66). The room name is the least
    load-bearing piece there and still shows in Settings. */
-@media (max-width: 600px) {
+@media (--bp-phone) {
   .clock-bar-horizontal .clock-bar-room {
     display: none;
   }

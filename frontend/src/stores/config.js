@@ -94,7 +94,7 @@ export const useConfigStore = defineStore("config", () => {
   const hotCornerLongPressMs = ref(500); // Press-and-hold duration to trigger the reveal, ms
   const touchControls = ref("auto"); // 'auto' (detect) | 'on' (force) | 'off' (hide) touch chrome
   const touchControlSize = ref("medium"); // 'small' | 'medium' | 'large' — region touch control size
-  const onScreenKeyboard = ref("auto"); // 'auto' (touch ≥720px) | 'on' (always) | 'off' (never)
+  const onScreenKeyboard = ref("auto"); // 'auto' (touch, wider than a phone) | 'on' (always) | 'off' (never)
   // On-screen keyboard letter layout. Independent of the UI language: null
   // means "use the device's one-time navigator.language hint".
   const oskLayout = ref(null); // 'en' | 'sv' | 'fi' | 'no' | 'da' | 'de' | 'fr' | null

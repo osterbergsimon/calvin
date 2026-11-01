@@ -148,7 +148,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   background: var(--bg-1);
-  z-index: 10;
+  z-index: var(--z-raised);
 }
 
 .error-content {
@@ -201,7 +201,7 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   font-size: var(--fs-base);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--dur);
 }
 
 .btn-open-new {

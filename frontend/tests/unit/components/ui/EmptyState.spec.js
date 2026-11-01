@@ -160,7 +160,7 @@ describe("EmptyState setup prompt (CLV-20)", () => {
     );
   });
 
-  it("hides the QR on a non-touch screen or under 720px", async () => {
+  it("hides the QR on a non-touch screen or at phone width", async () => {
     const cal = await mountRegion(MOUNTS[0]);
     prompt.report("r-cal", { area: 600, height: 500 });
     await nextTick();
