@@ -387,6 +387,26 @@ async def _migrate_room_name(out: _Outcome) -> None:
         )
 
 
+async def _migrate_photo_frame(out: _Outcome) -> None:
+    """Move a restored global photo frame onto the screens (calvin-3xz9).
+
+    A backup taken before the photo frame became per screen still carries the
+    global ``photo_frame_enabled``/``photo_frame_timeout``. Runs after config and
+    kiosks are restored. Best effort: the restore has already been applied, so a
+    failure is a warning, and startup retries it.
+    """
+    from app.services.kiosk_registry import migrate_global_photo_frame
+
+    try:
+        await migrate_global_photo_frame()
+    except Exception as exc:  # noqa: BLE001 - the restore itself succeeded
+        logger.warning(f"Could not move the restored photo frame onto the screens: {exc}")
+        out.warnings.append(
+            "The backup's photo frame settings could not be copied to the screens; "
+            "it will be retried at the next restart."
+        )
+
+
 async def _stop_and_unregister(instance_id: str) -> None:
     from app.plugins.manager import plugin_manager
     from app.plugins.protocols import BackendPlugin
@@ -562,6 +582,7 @@ async def apply_restore(
         await _restore_plugin_types(doc, out)
         await _restore_kiosks(doc)
         await _migrate_room_name(out)
+        await _migrate_photo_frame(out)
 
         if loaded.signing_key and restore_signing_key:
             _write_signing_key(loaded.signing_key)

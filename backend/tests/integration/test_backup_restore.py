@@ -628,6 +628,57 @@ def test_restore_moves_global_room_name_onto_unnamed_screens(test_client, mode):
     assert _run(config_service.get_value("displayName")) is None
 
 
+def _photo_frame_seed() -> dict:
+    return {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [
+                {"key": "photo_frame_enabled", "value": "true", "value_type": "bool"},
+                {"key": "photo_frame_timeout", "value": "600", "value_type": "int"},
+            ],
+            "kiosks": [
+                {"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}},
+                {
+                    "id": "office-4d5e6f",
+                    "hostname": "office",
+                    "overrides": {"photoFrameEnabled": False, "photoFrameTimeout": 60},
+                },
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_moves_global_photo_frame_onto_screens_without_one(test_client, mode):
+    """calvin-3xz9: a backup from before the photo frame was per screen.
+
+    The restore runs the migration itself, so a screen without its own choice
+    inherits the old global value without a restart.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(_photo_frame_seed()).encode(), "application/json")},
+        data={"mode": mode},
+    )
+    assert r.status_code == 200, r.text
+
+    assert _run(kr.get_overrides("kitchen-1a2b3c")) == {
+        "photoFrameEnabled": True,
+        "photoFrameTimeout": 600,
+    }
+    assert _run(kr.get_overrides("office-4d5e6f")) == {
+        "photoFrameEnabled": False,
+        "photoFrameTimeout": 60,
+    }
+    # Kept as the fallback for browsers that are not a known screen.
+    assert _run(config_service.get_value("photo_frame_enabled")) is True
+    assert _run(config_service.get_value("photo_frame_timeout")) == 600
+
+
 def test_restore_succeeds_with_a_warning_when_room_name_migration_fails(test_client, monkeypatch):
     """The migration is best effort: the restore is already applied when it runs."""
     from app.services import kiosk_registry as kr
