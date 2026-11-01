@@ -74,15 +74,62 @@ def test_filename_is_reduced_to_a_safe_stem():
     assert name == "pass wd.jpg"
 
 
-def test_animated_gif_is_kept_as_is():
-    frames = [Image.new("RGB", (8, 8), (i * 80, 0, 0)) for i in range(3)]
+def _gif(frames: int = 3, size=(8, 8), trailer: bytes = b"") -> bytes:
+    images = [Image.new("RGB", size, (i * 80 % 256, 0, 0)) for i in range(frames)]
     buffer = BytesIO()
-    frames[0].save(buffer, "GIF", save_all=True, append_images=frames[1:])
+    images[0].save(
+        buffer, "GIF", save_all=True, append_images=images[1:], duration=120, loop=0
+    )
+    return buffer.getvalue() + trailer
 
-    data, name = prepare_guest_image(buffer.getvalue(), "fun.gif")
 
-    assert data == buffer.getvalue()
+def test_animated_gif_is_re_encoded_with_its_frames():
+    source = _gif(3)
+
+    data, name = prepare_guest_image(source, "fun.gif")
+
+    out = _open(data)
     assert name == "fun.gif"
+    assert out.format == "GIF"
+    assert out.is_animated and out.n_frames == 3
+    assert out.info.get("loop") == 0
+
+
+def test_animated_gif_drops_bytes_after_the_trailer():
+    trailer = b"<script>alert(1)</script>"
+
+    data, _ = prepare_guest_image(_gif(3, trailer=trailer), "fun.gif")
+
+    assert trailer not in data
+    assert data.endswith(b"\x3b")  # the GIF trailer byte
+
+
+def test_animated_gif_long_edge_is_capped():
+    from app.services.guest_image import MAX_ANIMATED_EDGE
+
+    data, _ = prepare_guest_image(_gif(2, size=(MAX_ANIMATED_EDGE * 2, 40)), "wide.gif")
+
+    out = _open(data)
+    assert out.n_frames == 2
+    assert max(out.size) == MAX_ANIMATED_EDGE
+
+
+def test_animated_gif_with_too_many_frames_is_refused():
+    from app.services.guest_image import MAX_GIF_FRAMES
+
+    with pytest.raises(HTTPException) as exc:
+        prepare_guest_image(_gif(MAX_GIF_FRAMES + 1, size=(4, 4)), "long.gif")
+    assert exc.value.status_code == 400
+
+
+def test_animated_gif_over_the_pixel_budget_is_refused(monkeypatch):
+    import app.services.guest_image as guest_image
+
+    # Every frame counts: 3 frames of 100x100 is 30 000 pixels to decode.
+    monkeypatch.setattr(guest_image, "MAX_PIXELS", 25_000)
+    with pytest.raises(HTTPException) as exc:
+        prepare_guest_image(_gif(3, size=(100, 100)), "big.gif")
+    assert exc.value.status_code == 400
 
 
 @pytest.mark.parametrize(
