@@ -174,6 +174,32 @@ def test_overrides_get_unknown_404(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_screen_now_override_is_stored_and_returned_in_config(test_client: TestClient):
+    """Settings › Screens › "Screen now" rides in the kiosk override layer.
+
+    The UI writes camelCase; the agent reads snake_case first, so the merged
+    config must carry the same object under both spellings.
+    """
+    screen_now = {"power": "off", "setAt": "2026-11-01T20:00:00Z"}
+    put = test_client.put(
+        "/api/kiosks/hall-now/overrides",
+        json={"overrides": {"screenNow": screen_now}},
+    )
+    assert put.status_code == 200
+    stored = dict(test_client.get("/api/kiosks/hall-now/overrides").json()["overrides"])
+    stored.pop("showUI", None)  # per-screen control migrated on first touch
+    assert stored == {"screenNow": screen_now}
+
+    body = test_client.get("/api/kiosks/hall-now/config").json()
+    assert body["screenNow"] == screen_now
+    assert body["screen_now"] == screen_now
+
+    listed = test_client.get("/api/kiosks").json()["kiosks"]
+    kiosk = next(k for k in listed if k["id"] == "hall-now")
+    assert kiosk["overrides"]["screenNow"] == screen_now
+
+
+@pytest.mark.integration
 def test_overrides_put_bad_id_400(test_client: TestClient):
     assert (
         test_client.put("/api/kiosks/bad id/overrides", json={"overrides": {}}).status_code == 400

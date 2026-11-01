@@ -744,6 +744,121 @@ describe("ScreensSettings — Power", () => {
       displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
     });
   });
+
+  it("shows the current state, when the schedule takes over, and Follow schedule", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T09:00:00+02:00"));
+    try {
+      const { wrapper, store } = mountScreens({
+        cfg: config({
+          timezone: "Europe/Stockholm",
+          displayScheduleEnabled: true,
+          displaySchedule: [
+            { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" },
+            { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" },
+          ],
+        }),
+        overrides: {
+          screenNow: { power: "off", setAt: "2026-07-11T07:00:00.000Z" }, // 09:00 local
+        },
+      });
+      await flushPromises();
+      await selectFirst(wrapper);
+
+      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
+      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("Off until 22:00");
+      expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
+      expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeUndefined();
+
+      await wrapper.find("[data-test='screen-now-follow']").trigger("click");
+      await flushPromises();
+      expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Turn off now saves the choice with the UTC set time, not a computed boundary", async () => {
+    const { wrapper, store } = mountScreens({ cfg: config({ displayScheduleEnabled: false }) });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='screen-now-off']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      screenNow: { power: "off", setAt: expect.any(String) },
+    });
+    const saved = store.saveOverrides.mock.calls[0][1].screenNow;
+    expect(Number.isNaN(Date.parse(saved.setAt))).toBe(false);
+  });
+
+  it("says 'until the next scheduled change' when the screen uses the system timezone", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        timezone: "system",
+        displayScheduleEnabled: true,
+        displaySchedule: [0, 1, 2, 3, 4, 5, 6].map(day => ({
+          day,
+          enabled: true,
+          onTime: "06:00",
+          offTime: "22:00",
+        })),
+      }),
+      overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.find("[data-test='screen-now-until']").text()).toBe(
+      "Off until the next scheduled change"
+    );
+  });
+
+  it("drops the override at its boundary as the clock ticks", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T21:59:00+02:00"));
+    try {
+      const { wrapper } = mountScreens({
+        cfg: config({
+          timezone: "Europe/Stockholm",
+          displayScheduleEnabled: true,
+          displaySchedule: [
+            { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" },
+            { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" },
+          ],
+        }),
+        overrides: { screenNow: { power: "on", setAt: "2026-07-11T07:00:00.000Z" } },
+      });
+      await flushPromises();
+      await selectFirst(wrapper);
+      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
+      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("On until 22:00");
+
+      vi.setSystemTime(new Date("2026-07-11T22:00:01+02:00"));
+      vi.advanceTimersByTime(30000);
+      await flushPromises();
+      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
+      expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores an expired Screen now override and follows the schedule again", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        displayScheduleEnabled: true,
+        displaySchedule: [{ day: 5, enabled: true, onTime: "06:00", offTime: "22:00" }],
+      }),
+      overrides: { screenNow: { power: "off", setAt: "2020-01-01T00:00:00.000Z" } },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
+    expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
+  });
 });
 
 describe("ScreensSettings — Touch & keyboard", () => {

@@ -104,4 +104,53 @@ test.describe("phone: Screens", () => {
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
+
+  test("turns a screen on and off now without calling a host route", async ({
+    page,
+    consoleErrors,
+  }) => {
+    const week = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+      day,
+      enabled: true,
+      onTime: "06:00",
+      offTime: "22:00",
+    }));
+    const api = await installApiMock(page, {
+      config: {
+        timezone: "Europe/Stockholm",
+        displayScheduleEnabled: true,
+        displaySchedule: week,
+      },
+    });
+    await gotoSettings(page);
+    await expectSettingsReady(page);
+    await selectCategory(page, "Screens");
+    await page.locator('[data-test="screen-card"]').first().click();
+    await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+
+    // Either choice can be the one that is available, depending on the wall
+    // clock the CI runs at. Pick the enabled one so the test is time-agnostic.
+    const offButton = page.locator('[data-test="screen-now-off"]');
+    const onButton = page.locator('[data-test="screen-now-on"]');
+    const turningOff = await offButton.isEnabled();
+    await (turningOff ? offButton : onButton).click();
+    const power = turningOff ? "off" : "on";
+    const state = turningOff ? "Off now" : "On now";
+    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe(power);
+    // The choice carries the UTC instant; the agent computes the boundary.
+    expect(api.overridesByKiosk.hallway.screenNow.setAt).toBeTruthy();
+    expect(Number.isNaN(Date.parse(api.overridesByKiosk.hallway.screenNow.setAt))).toBe(false);
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(state);
+    await expect(page.locator('[data-test="screen-now-until"]')).toHaveText(
+      /^(On|Off) until \d{2}:\d{2}$/
+    );
+
+    await page.getByRole("button", { name: "Follow schedule" }).click();
+    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow).toBeUndefined();
+
+    // The manual choice is a kiosk override, never a host-acting route.
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
 });
