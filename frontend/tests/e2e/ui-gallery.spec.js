@@ -80,6 +80,8 @@ for (const viewport of VIEWPORTS) {
         // calvin-mwqo: the ProgressBar block is newer than these baselines.
         // Hidden here until CI-rendered baselines that include it are adopted;
         // the a11y gallery audit and ProgressBar.spec.js still cover it.
+        // Follow-up calvin-4qdt: generate the baselines in CI, then delete
+        // this addStyleTag.
         await page.addStyleTag({
           content: '[data-test="gallery-progress-bar"] { display: none !important; }',
         });

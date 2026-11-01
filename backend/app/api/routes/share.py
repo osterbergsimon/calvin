@@ -13,6 +13,7 @@ hash is stored), so a guest sees and removes only the photos sent from that
 phone.
 """
 
+import asyncio
 import math
 import re
 import secrets
@@ -83,8 +84,22 @@ class UploadRateLimiter:
     def record(self, key: str, now: float | None = None) -> None:
         self._events.setdefault(key, deque()).append(time.time() if now is None else now)
 
+    def release(self, key: str) -> None:
+        """Take back the latest event (its write failed)."""
+        events = self._events.get(key)
+        if events:
+            events.pop()
+
 
 guest_upload_limiter = UploadRateLimiter()
+
+# One lock per link: the quota and limiter check, the reservation and the write
+# run as one step, so parallel requests can't all pass the same check.
+_link_locks: dict[str, asyncio.Lock] = {}
+
+
+def _link_lock(link_id: str) -> asyncio.Lock:
+    return _link_locks.setdefault(link_id, asyncio.Lock())
 
 
 # -- helpers -----------------------------------------------------------------
@@ -162,6 +177,15 @@ def _guest_link(request: Request) -> dict[str, Any]:
     return link
 
 
+def _is_upload_file(plugin: Any, upload: dict[str, Any]) -> bool:
+    """Whether the file at the upload's path is still the one the upload wrote."""
+    try:
+        stat = (plugin.image_dir / upload["path"]).stat()
+    except (OSError, ValueError):
+        return False
+    return bool(stat.st_size == upload["size"] and stat.st_mtime_ns == upload["mtimeNs"])
+
+
 def _upload_view(token: str, upload: dict[str, Any]) -> dict[str, Any]:
     return {
         "imageId": upload["imageId"],
@@ -174,8 +198,6 @@ async def _save_files(
     request: Request, link: dict[str, Any], device: str, files: list[UploadFile]
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
     """Store each photo in the link's folder. Returns ``(uploaded, failed)``."""
-    from app.services import plugin_image_service
-
     plugin = _local_photos()
     if plugin is None:
         raise _local_photos_off()
@@ -209,17 +231,19 @@ async def _save_files(
 
     store = get_share_link_store()
     token = str(request.path_params["token"])
-    photo_count = int(link.get("uploadCount", 0))
-    byte_count = int(link.get("uploadBytes", 0))
-    max_photos = int(link.get("maxPhotos", DEFAULT_MAX_PHOTOS))
-    max_bytes = int(link.get("maxBytes", DEFAULT_MAX_BYTES))
-    full = f"This link has reached its limit of {max_photos} photos."
     uploaded: list[dict[str, Any]] = []
     failed: list[dict[str, str]] = []
     for file in files:
         filename = file.filename or "photo"
-        if photo_count >= max_photos:
-            failed.append({"filename": filename, "message": full})
+        current = store.get(link["id"])
+        if current is not None and current["uploadCount"] >= current["maxPhotos"]:
+            # Already full: skip decoding. The authoritative check is under the lock.
+            failed.append(
+                {
+                    "filename": filename,
+                    "message": f"This link has reached its limit of {current['maxPhotos']} photos.",
+                }
+            )
             continue
         data = await file.read(MAX_GUEST_UPLOAD_BYTES + 1)
         try:
@@ -227,35 +251,63 @@ async def _save_files(
         except HTTPException as exc:
             failed.append({"filename": filename, "message": str(exc.detail)})
             continue
-        if byte_count + len(prepared) > max_bytes:
-            failed.append({"filename": filename, "message": "This link has run out of space."})
+        async with _link_lock(link["id"]):
+            outcome = await _save_one(store, plugin, link, device, limit_key, prepared, name)
+        if isinstance(outcome, str):
+            failed.append({"filename": filename, "message": outcome})
             continue
-        if _free_bytes(plugin.image_dir) - len(prepared) < MIN_FREE_BYTES:
-            failed.append({"filename": filename, "message": "Calvin is out of space for photos."})
-            continue
-        if guest_upload_limiter.check(limit_key):
-            failed.append({"filename": filename, "message": "Too many photos. Try again later."})
-            continue
-        image = await plugin_image_service.upload_to_local_folder(prepared, name, link["folder"])
-        if not image:
-            failed.append({"filename": filename, "message": "Couldn't save this photo."})
-            continue
-        guest_upload_limiter.record(limit_key)
-        photo_count += 1
-        byte_count += len(prepared)
-        relative = Path(image["path"]).relative_to(plugin.image_dir).as_posix()
-        store.record_upload(link["id"], relative, image["id"], device, size=len(prepared))
-        uploaded.append(
-            _upload_view(
-                token,
-                {"imageId": image["id"], "uploadedAt": datetime.now(UTC).isoformat()},
-            )
-        )
+        uploaded.append(_upload_view(token, outcome))
     if uploaded:
         logger.info(
             "Share link {} ({}): {} photo(s) added", link["id"], link["name"], len(uploaded)
         )
     return uploaded, failed
+
+
+async def _save_one(
+    store: Any,
+    plugin: Any,
+    link: dict[str, Any],
+    device: str,
+    limit_key: str,
+    prepared: bytes,
+    name: str,
+) -> dict[str, Any] | str:
+    """Check, reserve and write one photo; the caller holds the link's lock.
+
+    The counts are re-read from the store (not the snapshot the gate took),
+    and the limiter event is recorded before the write and taken back if the
+    write fails. Returns the upload, or the message for a refused photo.
+    """
+    from app.services import plugin_image_service
+
+    current = store.get(link["id"])
+    if current is None:
+        return "This link doesn't work any more."
+    max_photos = int(current["maxPhotos"])
+    if int(current["uploadCount"]) >= max_photos:
+        return f"This link has reached its limit of {max_photos} photos."
+    if int(current["uploadBytes"]) + len(prepared) > int(current["maxBytes"]):
+        return "This link has run out of space."
+    if _free_bytes(plugin.image_dir) - len(prepared) < MIN_FREE_BYTES:
+        return "Calvin is out of space for photos."
+    if guest_upload_limiter.check(limit_key):
+        return "Too many photos. Try again later."
+    guest_upload_limiter.record(limit_key)
+    image = await plugin_image_service.upload_to_local_folder(prepared, name, link["folder"])
+    if not image:
+        guest_upload_limiter.release(limit_key)
+        return "Couldn't save this photo."
+    path = Path(image["path"])
+    try:
+        mtime_ns: int | None = path.stat().st_mtime_ns
+    except OSError:
+        mtime_ns = None
+    relative = path.relative_to(plugin.image_dir).as_posix()
+    store.record_upload(
+        link["id"], relative, image["id"], device, size=len(prepared), mtime_ns=mtime_ns
+    )
+    return {"imageId": image["id"], "uploadedAt": datetime.now(UTC).isoformat()}
 
 
 _TOKEN_CHARS = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
@@ -373,9 +425,13 @@ async def revoke_share_link(link_id: str, remove_photos: bool = False):
     if revoked is None:
         raise _link_not_found()
     removed = 0
-    if remove_photos:
+    plugin = _local_photos()
+    if remove_photos and plugin is not None:
         for upload in revoked["uploads"]:
-            if await plugin_image_service.delete_image(upload["imageId"]):
+            # Only the file this upload wrote: not a later file at the same path.
+            if _is_upload_file(plugin, upload) and await plugin_image_service.delete_image(
+                upload["imageId"]
+            ):
                 removed += 1
     logger.info(
         "Share link revoked: {} ({}), {} photo(s) removed", link_id, revoked["name"], removed
@@ -449,7 +505,7 @@ async def guest_uploads(token: str, request: Request):
     plugin = _local_photos()
     uploads = get_share_link_store().uploads_for(link["id"], device)
     if plugin is not None:
-        uploads = [u for u in uploads if (plugin.image_dir / u["path"]).is_file()]
+        uploads = [u for u in uploads if _is_upload_file(plugin, u)]
     return {"uploads": [_upload_view(token, upload) for upload in uploads]}
 
 
@@ -477,8 +533,9 @@ async def guest_upload(
 def _own_upload(request: Request, image_id: str) -> dict[str, Any]:
     link = _guest_link(request)
     device, _ = _device(request)
+    plugin = _local_photos()
     for upload in get_share_link_store().uploads_for(link["id"], device):
-        if upload["imageId"] == image_id:
+        if upload["imageId"] == image_id and plugin is not None and _is_upload_file(plugin, upload):
             return upload
     raise HTTPException(
         status_code=404,

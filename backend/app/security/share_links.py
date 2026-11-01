@@ -85,6 +85,10 @@ def _public_upload(upload: dict[str, Any]) -> dict[str, Any]:
         "imageId": upload["image_id"],
         "path": upload["path"],
         "uploadedAt": _iso(upload["uploaded_at"]),
+        # The stamp of the file this upload wrote: a file later found at the
+        # same path (same image id) with another stamp is not this upload's.
+        "size": int(upload.get("size", 0)),
+        "mtimeNs": upload.get("mtime_ns"),
     }
 
 
@@ -268,24 +272,34 @@ class ShareLinkStore:
         device: str,
         now: float | None = None,
         size: int = 0,
+        mtime_ns: int | None = None,
     ) -> None:
+        """Note an upload; ``size`` and ``mtime_ns`` stamp the file it wrote.
+
+        Image ids derive from the path, so a new file at a reused path gets an
+        old id. Any other record holding ``image_id`` (on any link) belongs to
+        a file that is gone, and is dropped so it can't delete this one.
+        """
         current = time.time() if now is None else now
         with self._lock:
             links = self._load()
+            target = next((entry for entry in links if entry["id"] == link_id), None)
+            if target is None:
+                return
             for entry in links:
-                if entry["id"] == link_id:
-                    entry["uploads"].append(
-                        {
-                            "path": path,
-                            "image_id": image_id,
-                            "device": _hash(device),
-                            "uploaded_at": current,
-                            "size": size,
-                        }
-                    )
-                    entry["last_used_at"] = current
-                    self._write(links)
-                    return
+                entry["uploads"] = [u for u in entry["uploads"] if u["image_id"] != image_id]
+            target["uploads"].append(
+                {
+                    "path": path,
+                    "image_id": image_id,
+                    "device": _hash(device),
+                    "uploaded_at": current,
+                    "size": size,
+                    "mtime_ns": mtime_ns,
+                }
+            )
+            target["last_used_at"] = current
+            self._write(links)
 
     def uploads_for(self, link_id: str, device: str) -> builtins.list[dict[str, Any]]:
         """This device's uploads through this link, newest first."""

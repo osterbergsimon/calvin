@@ -96,8 +96,9 @@ this link** (only that link's photos go; anything else in the folder stays).
 - Each link accepts at most 100 photos per 10 minutes from one device, its
   photo limit and 2 GB in total. Calvin refuses guest photos when less than
   512 MB of disk space is left.
-- One upload request may be at most 256 MB; larger requests are refused before
-  Calvin reads them. A request from another website to the share target is
+- An upload from the guest page (one photo per request) may be at most 26 MB,
+  and one Android share (all the shared photos at once) at most 256 MB; larger
+  requests are refused before Calvin reads them. A request from another website to the share target is
   refused.
 
 ### On your home network

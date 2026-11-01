@@ -9,10 +9,21 @@ Share Target action ``/share/{token}/receive``):
 * an unknown, revoked or expired token is refused (404, or a redirect back to
   the page for the share target), and only failures count toward the per-IP
   limit, so a valid token always gets through;
-* a body needs a ``Content-Length`` no larger than ``MAX_GUEST_REQUEST_BYTES``;
+* a body needs a ``Content-Length``: at most ``MAX_GUEST_API_REQUEST_BYTES``
+  on ``/api/guest/*`` (the page sends one photo per request) and at most
+  ``MAX_GUEST_REQUEST_BYTES`` on the share target (Android sends every shared
+  photo at once). Starlette spools the body to /tmp (tmpfs on the Pi) before
+  any handler runs, so the cap is the most a valid link can make it spool;
 * the share target refuses ``Sec-Fetch-Site: cross-site``.
 
 The resolved link is put on ``request.state.share_link`` for the handlers.
+
+A locked-out IP can still tell a valid token from an invalid one: a valid
+token always gets through (200), and an invalid one gets 429 instead of 404.
+That is deliberate, so one stranger behind a shared proxy IP can't lock every
+guest out, and it is acceptable because the lockout is not what protects the
+tokens: each one carries a 256-bit HMAC-SHA256, which no rate of guessing can
+find. The lockout only keeps the log and the CPU quiet.
 """
 
 import re
@@ -25,11 +36,15 @@ from starlette.responses import JSONResponse, RedirectResponse, Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.security.admin_auth import guest_token_limiter
+from app.services.guest_image import MAX_GUEST_UPLOAD_BYTES
 
 # One share-target request may carry many photos (Android shares them all at
-# once); the page itself sends one photo per request. Keep the Caddy example's
-# request_body max_size in docs/configuration/SHARE_LINKS.md in step.
+# once). Keep the Caddy example's request_body max_size in
+# docs/configuration/SHARE_LINKS.md in step.
 MAX_GUEST_REQUEST_BYTES = 256 * 1024 * 1024
+# The guest page sends one photo per request: the largest photo plus 1 MB for
+# the multipart framing.
+MAX_GUEST_API_REQUEST_BYTES = MAX_GUEST_UPLOAD_BYTES + 1024 * 1024
 
 _GUEST_API = re.compile(r"^/api/guest/(?P<token>[^/]+)(?:/.*)?$")
 _SHARE_TARGET = re.compile(r"^/share/(?P<token>[^/]+)/receive$")
@@ -99,7 +114,7 @@ def guest_ip(scope: Scope) -> str:
     )
 
 
-def _check_body(headers: Headers) -> None:
+def _check_body(headers: Headers, cap: int) -> None:
     length = headers.get("content-length")
     if length is None:
         raise GuestRefusal(411, "length_required", "Send the photos as a normal upload.")
@@ -107,11 +122,9 @@ def _check_body(headers: Headers) -> None:
         size = int(length)
     except ValueError:
         raise GuestRefusal(400, "bad_request", "Send the photos as a normal upload.") from None
-    if size > MAX_GUEST_REQUEST_BYTES:
+    if size > cap:
         raise GuestRefusal(
-            413,
-            "too_large",
-            f"Too much at once. Send at most {MAX_GUEST_REQUEST_BYTES // 2**20} MB at a time.",
+            413, "too_large", f"Too much at once. Send at most {cap // 2**20} MB at a time."
         )
 
 
@@ -144,7 +157,8 @@ class GuestGateMiddleware:
             if share_target and headers.get("sec-fetch-site") == "cross-site":
                 raise GuestRefusal(403, "cross_origin", "Cross-site requests are not allowed.")
             if method in _BODY_METHODS:
-                _check_body(headers)
+                cap = MAX_GUEST_REQUEST_BYTES if share_target else MAX_GUEST_API_REQUEST_BYTES
+                _check_body(headers, cap)
         except GuestRefusal as refusal:
             response: Response
             if share_target and refusal.status != 403:
