@@ -24,7 +24,6 @@ export const roleLint = {
     "components/EventDetailPanel.vue",
     "components/WebServiceViewer.vue",
     "components/service/IframeViewer.vue",
-    "components/settings/shared/ClockBarFontSizePicker.vue",
     "components/settings/specialized/ProviderPicker.vue",
     "components/settings/specialized/SourceList.vue",
     "components/settings/specialized/WhereItShows.vue",
@@ -51,10 +50,7 @@ export const controlLint = {
 };
 
 export const settingsNoStyle = {
-  allowlist: [
-    "components/settings/categories/ClockBarSections.vue",
-    "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
-  ],
+  allowlist: ["components/settings/tabs/clock-bar/ClockBarItemsTab.vue"],
   baseline: [
     "components/settings/categories/ClockBarSections.vue",
     "components/settings/categories/ContentSettings.vue",

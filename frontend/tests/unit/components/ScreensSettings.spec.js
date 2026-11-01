@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
@@ -66,6 +64,7 @@ function mountScreens({
   cfg = config(),
   availableVersion = null,
   narrow,
+  initialSection = null,
 } = {}) {
   setActivePinia(createPinia());
   if (narrow === undefined) {
@@ -89,7 +88,11 @@ function mountScreens({
   });
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = vi.fn(async () => availableVersion);
-  return { wrapper: mount(ScreensSettings, { props: { config: cfg } }), store, cfg };
+  return {
+    wrapper: mount(ScreensSettings, { props: { config: cfg, initialSection } }),
+    store,
+    cfg,
+  };
 }
 
 async function selectFirst(wrapper) {
@@ -337,6 +340,7 @@ describe("ScreensSettings — one screen's page", () => {
       "section-screen-display",
       "section-screen-power",
       "section-screen-touch",
+      "section-screen-behaviour",
       "section-screen-software",
     ]);
   });
@@ -461,15 +465,6 @@ describe("ScreensSettings — Name", () => {
 describe("ScreensSettings — Pages", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("accents the Show and Start here controls and keeps a tight gap", () => {
-    const source = readFileSync(
-      resolve(__dirname, "../../../src/components/settings/shared/ScreensLayout.vue"),
-      "utf-8"
-    );
-    expect(source).toMatch(/\.screen-page__show\)[\s\S]*?gap: var\(--gap-tight\)/);
-    expect(source).toMatch(/\.screen-page__start input\)[\s\S]*?accent-color: var\(--focus\)/);
-  });
-
   it("lists every page with Show and Start here, marking the effective start page", async () => {
     const { wrapper } = mountScreens({ overrides: { defaultScreenId: "photos" } });
     await flushPromises();
@@ -477,9 +472,12 @@ describe("ScreensSettings — Pages", () => {
 
     const rows = wrapper.findAll("[data-test='screen-page-row']");
     expect(rows).toHaveLength(2);
-    const radios = rows.map(row => row.find('input[type="radio"]').element);
-    expect(radios[0].checked).toBe(false);
-    expect(radios[1].checked).toBe(true);
+    const startButtons = rows.map(row => row.find("button[aria-pressed]"));
+    expect(startButtons[0].attributes("aria-pressed")).toBe("false");
+    expect(startButtons[1].attributes("aria-pressed")).toBe("true");
+    // The visible "Start here" stays part of the accessible name (axe).
+    expect(startButtons[0].text()).toBe("Start here");
+    expect(startButtons[0].attributes("aria-label")).toBe("Start here: Home");
   });
 
   it("unchecking Show saves an availableScreens allowlist", async () => {
@@ -528,7 +526,7 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
-    await row.find('input[type="radio"]').setValue(true);
+    await row.find("button[aria-pressed]").trigger("click");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -1239,6 +1237,7 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
       "section-layout",
       "section-device-power",
       "section-device-keyboard",
+      "section-device-behaviour",
     ]);
     // No status header, no Software section, no per-row reset links.
     expect(wrapper.find("#section-screen-software").exists()).toBe(false);
@@ -1275,7 +1274,7 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     await openDefault(wrapper);
 
     const rows = wrapper.findAll("[data-test='default-page-row']");
-    await rows[1].find('input[type="radio"]').setValue(true);
+    await rows[1].find("button[aria-pressed]").trigger("click");
     expect(wrapper.emitted("update:config")).toContainEqual([{ defaultScreenId: "photos" }]);
 
     expect(rows[1].find('[role="switch"]').attributes("aria-checked")).toBe("true");
@@ -1493,7 +1492,7 @@ describe("ScreensSettings — This browser page (§6)", () => {
 
     expect(wrapper.find("[data-test='this-browser-page']").exists()).toBe(true);
     expect(rowByLabel(wrapper, "Touchscreen")).toBeTruthy();
-    expect(rowByLabel(wrapper, "Show it")).toBeTruthy();
+    expect(rowByLabel(wrapper, "On-screen keyboard")).toBeTruthy();
     expect(rowByLabel(wrapper, "Settings text size")).toBeTruthy();
     expect(wrapper.text()).toContain("Same as Default");
   });
@@ -1518,5 +1517,76 @@ describe("ScreensSettings — This browser page (§6)", () => {
     await wrapper.find("[data-test='screens-back']").trigger("click");
     await flushPromises();
     expect(wrapper.find("[data-test='browser-summary']").text()).toBe("Same as Default");
+  });
+});
+
+// §4: Photo frame, Loading light and Layout live on the screen page now.
+describe("ScreensSettings — Behaviour (§4)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the moved rows in a Behaviour section on a screen's page", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.find("#section-screen-behaviour").exists()).toBe(true);
+    expect(rowByLabel(wrapper, "Photo frame")).toBeTruthy();
+    expect(rowByLabel(wrapper, "Loading light")).toBeTruthy();
+    expect(rowByLabel(wrapper, "Layout")).toBeTruthy();
+  });
+
+  it("reads the Default value until this screen has its own", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({ photoFrameEnabled: true, loadingLight: "off" }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const frame = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Photo frame");
+    expect(frame.props("modelValue")).toBe(true);
+    const light = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Loading light");
+    expect(light.props("modelValue")).toBe("off");
+    expect(rowByLabel(wrapper, "Photo frame").text()).toContain("Same as Default");
+  });
+
+  it("saves a photo frame choice as this screen's override", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const frame = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Photo frame");
+    frame.vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      photoFrameEnabled: true,
+    });
+    expect(rowByLabel(wrapper, "Photo frame").text()).toContain("Changed here");
+  });
+
+  it("resets one behaviour override without touching the others", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { loadingLight: "pulse", layoutMode: "phone" },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find('[data-test="reset-loading-light"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { layoutMode: "phone" });
+  });
+
+  it("opens the Default page on the Behaviour section from a deep link", async () => {
+    const { wrapper } = mountScreens({ initialSection: "device-behaviour" });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+    expect(wrapper.find("#section-device-behaviour").exists()).toBe(true);
   });
 });

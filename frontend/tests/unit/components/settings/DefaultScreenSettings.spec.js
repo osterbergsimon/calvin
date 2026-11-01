@@ -1,6 +1,6 @@
 // frontend/tests/unit/components/settings/DefaultScreenSettings.spec.js
 // Default is a screen (docs/design/2026-10-30-default-screen.md §3).
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
@@ -56,6 +56,7 @@ describe("DefaultScreenSettings", () => {
       "section-layout",
       "section-device-power",
       "section-device-keyboard",
+      "section-device-behaviour",
     ]);
     expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe("Display");
     expect(wrapper.find("#section-device-power .settings-section__eyebrow").text()).toBe("Power");
@@ -100,7 +101,7 @@ describe("DefaultScreenSettings", () => {
     const wrapper = mountDefault({ onScreenKeyboard: "auto" });
     const control = wrapper
       .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Show it");
+      .find(c => c.props("ariaLabel") === "On-screen keyboard");
 
     expect(control.props("options").map(o => o.label)).toEqual(["Auto", "Always", "Never"]);
     control.vm.$emit("update:modelValue", "on");
@@ -253,32 +254,32 @@ describe("DefaultScreenSettings", () => {
       window.localStorage.setItem("calvin-osk-device-layout", "de");
       const wrapper = mountSettings({ oskLayout: "sv" });
 
-      expect(wrapper.find(".device-osk-device").exists()).toBe(true);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(true);
       expect(wrapper.text()).toContain("This screen uses Deutsch, chosen on the keyboard.");
 
-      await wrapper.find(".device-osk-use-default").trigger("click");
+      await wrapper.find("[data-test='osk-device-layout'] button").trigger("click");
 
       expect(window.localStorage.getItem("calvin-osk-device-layout")).toBeNull();
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
 
     it("hides that line when the device has no choice of its own", () => {
       const wrapper = mountSettings({ oskLayout: "sv" });
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
       expect(wrapper.text()).not.toContain("chosen on the keyboard");
     });
 
     it("ignores and removes the legacy auto-written key", () => {
       window.localStorage.setItem("calvin-osk-layout", "de");
       const wrapper = mountSettings({ oskLayout: "sv" });
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
       expect(window.localStorage.getItem("calvin-osk-layout")).toBeNull();
     });
 
     it("updates the line when the keyboard changes the choice while Settings is open", async () => {
       const wrapper = mountSettings({ oskLayout: "sv" });
-      expect(wrapper.find(".device-osk-device").exists()).toBe(false);
+      expect(wrapper.find("[data-test='osk-device-layout']").exists()).toBe(false);
 
       window.localStorage.setItem("calvin-osk-device-layout", "fr");
       window.dispatchEvent(new CustomEvent("calvin-osk-layout-change"));
@@ -287,17 +288,14 @@ describe("DefaultScreenSettings", () => {
       expect(wrapper.text()).toContain("This screen uses Français, chosen on the keyboard.");
     });
 
-    it("dims and disables both rows while the on-screen keyboard is off", () => {
+    it("disables both rows while the on-screen keyboard is off", () => {
       const on = mountSettings({ onScreenKeyboard: "on", oskLayout: "sv" });
-      expect(on.find(".device-osk-layout").classes()).not.toContain("setting-row--muted");
-      expect(on.find(".device-osk-layout .device-control").attributes("inert")).toBeUndefined();
-      expect(on.find(".device-osk-extra .device-control").attributes("inert")).toBeUndefined();
+      expect(on.find("[data-test='osk-layout-control']").attributes("inert")).toBeUndefined();
+      expect(on.find("[data-test='osk-extra-control']").attributes("inert")).toBeUndefined();
 
       const off = mountSettings({ onScreenKeyboard: "off", oskLayout: "sv" });
-      expect(off.find(".device-osk-layout").classes()).toContain("setting-row--muted");
-      expect(off.find(".device-osk-layout .device-control").attributes("inert")).toBe("");
-      expect(off.find(".device-osk-extra").classes()).toContain("setting-row--muted");
-      expect(off.find(".device-osk-extra .device-control").attributes("inert")).toBe("");
+      expect(off.find("[data-test='osk-layout-control']").attributes("inert")).toBe("");
+      expect(off.find("[data-test='osk-extra-control']").attributes("inert")).toBe("");
     });
 
     it("is unaffected by the UI language", () => {
@@ -331,7 +329,7 @@ describe("DefaultScreenSettings copy (§3.3)", () => {
     ["Screen on/off schedule", "Turns the screen off and on at set times."],
     [
       "Touchscreen",
-      "Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse.",
+      "Shows touch buttons: arrows, page dots and close. Auto works for most screens; choose On if a touch panel acts like a mouse.",
     ],
   ];
 
@@ -484,5 +482,168 @@ describe("DefaultScreenSettings — override notes (§5)", () => {
 
     await w.find(".default-note__dismiss").trigger("click");
     expect(w.find("[data-test='default-override-note']").exists()).toBe(false);
+  });
+});
+
+// §4: Photo frame, Loading light and Layout moved here from Dashboard › Focus
+// & remote; they keep their per-screen storage.
+describe("DefaultScreenSettings behaviour (§4)", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    window.sessionStorage.clear();
+  });
+
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+
+  it("puts Photo frame, Start after and Photos from under Behaviour", async () => {
+    const w = mountDefault();
+    expect(w.find("#section-device-behaviour").exists()).toBe(true);
+    expect(row(w, "Photo frame")).toBeTruthy();
+    expect(row(w, "Start after")).toBeUndefined();
+    expect(row(w, "Photos from")).toBeUndefined();
+
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(row(w, "Start after")).toBeTruthy();
+    expect(row(w, "Photos from")).toBeTruthy();
+    expect(w.find("#section-device-behaviour").text()).toContain("Photo frame");
+    expect(w.find("#section-kiosk-touch-focus").exists()).toBe(false);
+  });
+
+  it("offers the shared 1–30 minute start-after choices, 5 min by default", async () => {
+    const w = mountDefault();
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+    const start = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Start the photo frame after");
+    expect(start.props("modelValue")).toBe(300);
+    expect(start.props("options").map(o => o.label)).toEqual([
+      "1 min",
+      "2 min",
+      "5 min",
+      "10 min",
+      "15 min",
+      "30 min",
+    ]);
+  });
+
+  it("stores the choice on this screen, not in the global config", async () => {
+    const w = mountDefault();
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBe("true");
+    expect((w.emitted("update:config") || []).some(c => "photoFrameEnabled" in c[0])).toBe(false);
+    expect(row(w, "Photo frame").text()).toContain("Changed here");
+
+    await w.find('[data-test="reset-photo-frame"]').trigger("click");
+    await flushPromises();
+    expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBeNull();
+    expect(row(w, "Photo frame").text()).toContain("Same as Default");
+  });
+
+  it("stores the chosen photo sources as a list for this screen", async () => {
+    const w = mountDefault();
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    const picker = w.findComponent({ name: "PhotoSourcePicker" });
+    expect(picker.props("modelValue")).toEqual([]);
+    picker.vm.$emit("update:modelValue", ["image-1"]);
+    await flushPromises();
+
+    expect(JSON.parse(localStorage.getItem("calvin-screen-photoFrameSourceIds"))).toEqual([
+      "image-1",
+    ]);
+  });
+
+  it("reads the kiosk's merged photo frame but leaves the form value for global rows", () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "hallway");
+    useConfigStore().photoFrameEnabled = true;
+    const w = mountDefault();
+    expect(
+      row(w, "Photo frame").findComponent({ name: "SegmentedControl" }).props("modelValue")
+    ).toBe(true);
+  });
+
+  it("falls back to the old global value until this screen chooses", () => {
+    const w = mountDefault({ photoFrameEnabled: true, photoFrameTimeout: 600 });
+    const frame = row(w, "Photo frame").findComponent({ name: "SegmentedControl" });
+    expect(frame.props("modelValue")).toBe(true);
+    const start = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Start the photo frame after");
+    expect(start.props("modelValue")).toBe(600);
+  });
+
+  const loadingControl = w =>
+    w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Loading light");
+
+  it("offers Comet · Pulse · Off under Behaviour, Comet by default", () => {
+    const w = mountDefault();
+    const control = loadingControl(w);
+    expect(control.props("options").map(o => o.label)).toEqual(["Comet", "Pulse", "Off"]);
+    expect(control.props("modelValue")).toBe("comet");
+    expect(row(w, "Loading light").text()).toContain("Same as Default");
+  });
+
+  it("saves the loading light for this screen, then resets to the Default", async () => {
+    const w = mountDefault();
+    loadingControl(w).vm.$emit("update:modelValue", "pulse");
+    await flushPromises();
+    expect(localStorage.getItem("calvin-screen-loadingLight")).toBe("pulse");
+    expect(loadingControl(w).props("modelValue")).toBe("pulse");
+    expect(row(w, "Loading light").text()).toContain("Changed here");
+
+    await w.find('[data-test="reset-loading-light"]').trigger("click");
+    await flushPromises();
+    expect(localStorage.getItem("calvin-screen-loadingLight")).toBeNull();
+    expect(loadingControl(w).props("modelValue")).toBe("comet");
+  });
+
+  it("explains the pulse when the device prefers less motion", () => {
+    window.matchMedia = vi.fn(query => ({
+      matches: /prefers-reduced-motion:\s*reduce/.test(query),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    }));
+    const w = mountDefault();
+    expect(row(w, "Loading light").text()).toContain(
+      "This device prefers less motion, so it pulses."
+    );
+  });
+
+  it("saves the layout for this screen", async () => {
+    const w = mountDefault();
+    const layout = w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Layout");
+    layout.vm.$emit("update:modelValue", "phone");
+    await flushPromises();
+    expect(localStorage.getItem("calvin-layout-mode")).toBe("phone");
+    expect(row(w, "Layout").text()).toContain("Changed here");
   });
 });

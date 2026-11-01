@@ -22,7 +22,8 @@
 import { ref } from "vue";
 
 const props = defineProps({
-  modelValue: { type: [String, Number], default: null },
+  // A segment can carry a boolean (e.g. Photo frame Off/On).
+  modelValue: { type: [String, Number, Boolean], default: null },
   options: { type: Array, required: true },
   ariaLabel: { type: String, default: null },
 });

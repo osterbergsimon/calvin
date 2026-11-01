@@ -251,25 +251,22 @@
             <InlineNote v-if="!showsPage(page.id)">Not shown here</InlineNote>
           </template>
           <template #actions>
-            <label class="screen-page__show">
-              <ToggleSwitch
-                :model-value="showsPage(page.id)"
-                :aria-label="`Show ${page.name} on this screen`"
-                @update:model-value="value => togglePage(page.id, value)"
-              />
-              <span>Show</span>
-            </label>
-            <label class="screen-page__start">
-              <input
-                type="radio"
-                name="screens-start-page"
-                :checked="effDefault === page.id"
-                :disabled="!showsPage(page.id)"
-                :aria-label="`Start on ${page.name}`"
-                @change="setDefault(page.id)"
-              />
-              <span>Start here</span>
-            </label>
+            <ToggleSwitch
+              :model-value="showsPage(page.id)"
+              :aria-label="`Show ${page.name} on this screen`"
+              @update:model-value="value => togglePage(page.id, value)"
+            />
+            <Button
+              size="sm"
+              :variant="effDefault === page.id ? 'primary' : 'secondary'"
+              :aria-pressed="effDefault === page.id ? 'true' : 'false'"
+              :icon="effDefault === page.id ? mdiCheck : undefined"
+              :disabled="!showsPage(page.id)"
+              :aria-label="`Start here: ${page.name}`"
+              @click="setDefault(page.id)"
+            >
+              Start here
+            </Button>
           </template>
         </ListRow>
         <SettingRow label="Start page">
@@ -370,16 +367,17 @@
             @update:model-value="setScheduleEnabled"
           />
         </SettingRow>
-        <SettingRow v-if="effScheduleEnabled" label="Daily schedule">
-          <template #description>
-            <ScopeLine
-              :overridden="scheduleOverridden"
-              reset-test="reset-daily-schedule"
-              @reset="resetDailySchedule"
-            />
-          </template>
-          <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
-        </SettingRow>
+        <DisplayScheduleGrid
+          v-if="effScheduleEnabled"
+          :model-value="effSchedule || []"
+          :week-start="config.weekStartDay ?? 1"
+          :time-format="config.timeFormat || '24h'"
+          show-scope
+          :overridden="scheduleOverridden"
+          reset-test="reset-daily-schedule"
+          @update:model-value="setSchedule"
+          @reset="resetDailySchedule"
+        />
         <SettingRow label="Turn off when idle">
           <template #description>
             <ScopeLine
@@ -476,6 +474,28 @@
         </InlineNote>
       </SettingsSection>
 
+      <SettingsSection id="screen-behaviour" title="Behaviour">
+        <ScreenBehaviourRows
+          :photo-frame-enabled="behaviour.photoFrameEnabled"
+          :photo-frame-timeout="behaviour.photoFrameTimeout"
+          :photo-frame-source-ids="behaviour.photoFrameSourceIds"
+          :loading-light="behaviour.loadingLight"
+          :layout-mode="behaviour.layoutMode"
+          :overridden="behaviourOverridden"
+          @set="setBehaviour"
+          @reset="resetBehaviour"
+        />
+        <InlineNote
+          v-if="behaviourMsg"
+          class="screens-saved"
+          :tone="toneFor(behaviourMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ behaviourMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-software" title="Software">
         <SettingRow
           v-if="selectedKiosk.agentVersion != null"
@@ -550,7 +570,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
-import { mdiAlert } from "@mdi/js";
+import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
 import {
@@ -603,6 +623,7 @@ import ScreensLayout from "@/components/settings/shared/ScreensLayout.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
+import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -626,7 +647,12 @@ const editorOpen = ref(false);
 
 // --- which page is open ----------------------------------------------------
 // null (the list) · "default" · "browser" · a screen id on a kiosk selection.
-const DEFAULT_SECTION_IDS = new Set(["layout", "device-power", "device-keyboard"]);
+const DEFAULT_SECTION_IDS = new Set([
+  "layout",
+  "device-power",
+  "device-keyboard",
+  "device-behaviour",
+]);
 const selection = ref(
   props.initialSection && DEFAULT_SECTION_IDS.has(props.initialSection) ? { kind: "default" } : null
 );
@@ -659,6 +685,7 @@ const pagesMsg = ref("");
 const displayMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
+const behaviourMsg = ref("");
 const footerMsg = ref("");
 const overrides = ref({});
 
@@ -792,6 +819,7 @@ function clearMessages() {
   displayMsg.value = "";
   powerMsg.value = "";
   touchMsg.value = "";
+  behaviourMsg.value = "";
   footerMsg.value = "";
 }
 
@@ -1149,6 +1177,54 @@ function resetOsk() {
   const next = { ...overrides.value };
   delete next.onScreenKeyboard;
   persistTouch(next);
+}
+
+// --- Behaviour: photo frame, loading light and layout (§4) -----------------
+// These rows moved here from Dashboard › Focus & remote; the keys stay the
+// same, so a screen's existing override (or this browser's stored choice) is
+// untouched.
+const behaviourOverridden = computed(() => ({
+  photoFrameEnabled: "photoFrameEnabled" in overrides.value,
+  photoFrameTimeout: "photoFrameTimeout" in overrides.value,
+  photoFrameSourceIds: "photoFrameSourceIds" in overrides.value,
+  loadingLight: "loadingLight" in overrides.value,
+  layoutMode: "layoutMode" in overrides.value,
+}));
+
+const behaviour = computed(() => ({
+  photoFrameEnabled:
+    "photoFrameEnabled" in overrides.value
+      ? overrides.value.photoFrameEnabled
+      : props.config.photoFrameEnabled,
+  photoFrameTimeout:
+    "photoFrameTimeout" in overrides.value
+      ? overrides.value.photoFrameTimeout
+      : props.config.photoFrameTimeout,
+  photoFrameSourceIds:
+    "photoFrameSourceIds" in overrides.value
+      ? overrides.value.photoFrameSourceIds
+      : props.config.photoFrameSourceIds,
+  loadingLight:
+    "loadingLight" in overrides.value ? overrides.value.loadingLight : props.config.loadingLight,
+  // The global config has no layout mode: Auto is the default.
+  layoutMode: "layoutMode" in overrides.value ? overrides.value.layoutMode : "auto",
+}));
+
+function persistBehaviour(next) {
+  persist(
+    next,
+    behaviourMsg,
+    "Saved. This screen picks up the change at its next check-in (~30s).",
+    OFFLINE_COPY
+  );
+}
+function setBehaviour(key, value) {
+  persistBehaviour({ ...overrides.value, [key]: value });
+}
+function resetBehaviour(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistBehaviour(next);
 }
 
 // --- footer: reset everything · use these as the default (§4) ------------

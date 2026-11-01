@@ -4,13 +4,13 @@
     <SettingsSection id="this-browser" title="This browser">
       <SettingRow
         label="Touchscreen"
-        description="Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse."
+        description="Shows touch buttons: arrows, page dots and close. Auto works for most screens; choose On if a touch panel acts like a mouse."
       >
         <template #description>
-          <p class="setting-row__desc">
-            Shows touch buttons: arrows, page dots, the ✕ in fullscreen. Auto works for most
-            screens; choose On if a touch panel acts like a mouse.
-          </p>
+          <span>
+            Shows touch buttons: arrows, page dots and close. Auto works for most screens; choose On
+            if a touch panel acts like a mouse.
+          </span>
           <ScopeLine
             :overridden="touchSetting.overridden.value"
             reset-test="reset-browser-touch"
@@ -29,19 +29,18 @@
         />
       </SettingRow>
 
-      <SettingRow label="Show it">
+      <SettingRow label="On-screen keyboard">
         <template #description>
-          <p class="setting-row__desc">
-            <span>{{ oskDescription }}</span>
-            <button
-              v-if="oskMode === 'auto' && oskHardwareSeen"
-              type="button"
-              class="device-osk-show-again"
-              @click="showOskAgain"
-            >
-              Show it again
-            </button>
-          </p>
+          <span>{{ oskDescription }}</span>
+          <Button
+            v-if="oskMode === 'auto' && oskHardwareSeen"
+            variant="link"
+            size="sm"
+            data-test="osk-show-again"
+            @click="showOskAgain"
+          >
+            Show it again
+          </Button>
           <ScopeLine
             :overridden="oskSetting.overridden.value"
             reset-test="reset-browser-osk"
@@ -55,20 +54,26 @@
             { value: 'on', label: 'Always' },
             { value: 'off', label: 'Never' },
           ]"
-          aria-label="Show it"
+          aria-label="On-screen keyboard"
           @update:model-value="setOskMode"
         />
       </SettingRow>
-      <p class="device-live" aria-live="polite">{{ oskLiveMessage }}</p>
+      <InlineNote
+        v-if="oskLiveMessage"
+        data-test="osk-live"
+        tone="ok"
+        role="status"
+        aria-live="polite"
+      >
+        {{ oskLiveMessage }}
+      </InlineNote>
 
       <SettingRow
         label="Settings text size"
         description="Only changes Settings. The dashboard has its own size below."
       >
         <template #description>
-          <p class="setting-row__desc">
-            Only changes Settings. The dashboard has its own size below.
-          </p>
+          <span>Only changes Settings. The dashboard has its own size below.</span>
           <ScopeLine
             :overridden="uiSizeSetting.overridden.value"
             reset-test="reset-browser-text-size"
@@ -90,6 +95,8 @@
 import { computed, ref } from "vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import { useScreenSetting } from "@/composables/useScreenSetting";
@@ -169,46 +176,3 @@ const resetUiSize = async () => {
   emit("changed");
 };
 </script>
-
-<style scoped>
-.this-browser-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-/* Slot content is in this component's scope, not SettingRow's. */
-.setting-row__desc {
-  margin: 0.2rem 0 0;
-  font-size: var(--fs-sm);
-  line-height: 1.4;
-  color: var(--ink-2);
-}
-.device-osk-show-again {
-  margin-left: 4px;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--ink);
-  font-family: var(--font-ui);
-  font-size: inherit;
-  font-weight: var(--weight-strong);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-.device-osk-show-again:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-.device-live {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-</style>
