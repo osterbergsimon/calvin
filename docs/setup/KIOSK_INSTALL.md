@@ -361,9 +361,14 @@ cog --platform=drm \
   The `renderer=gles` part is required: cog's default `modeset` renderer cannot
   rotate.
 - **Screen power** (display schedule) works: cog is the only DRM client, so the
-  agent's root helper stops `calvin-cog.service`, writes `4` to
-  `/sys/class/graphics/fb0/blank` (DPMS off), and on wake writes `0` and starts
-  the unit again (the dashboard is back in ~5 s). Starting is idempotent, and a
+  agent's root helper stops `calvin-cog.service`, waits up to 5 s for its
+  `MainPID` to disappear (the kernel restores the console mode when the last DRM
+  client closes, which would otherwise turn DPMS back on), clears tty1, then
+  writes `0` and `4` to `/sys/class/graphics/fb0/blank` (DPMS off), verifies the
+  connected connectors report `dpms=Off` and retries the `0`/`4` pair once
+  before failing, so the agent retries on its next poll. On wake it clears tty1,
+  writes `0` and starts the unit again (the dashboard is back in ~5 s).
+  Starting is idempotent, and a
   kiosk that boots inside its off window recovers at the next on boundary: the
   agent retries a panel command that failed (for example while the unit was
   still transitioning) on its next poll instead of waiting for the next schedule
