@@ -138,6 +138,103 @@ describe("OnScreenKeyboard", () => {
       expect(vmValue("target")).toBe(input);
     });
 
+    // CLV-114: on touch the browser focuses the field with the mouse events it
+    // sends after touchend, hit-tested at that moment. Opening on pointerdown
+    // re-laid out the lock screen first, so the tap focused whatever slid
+    // under the finger and the field never got focus.
+    it("does not open on pointerdown of an unfocused field, only once it has focus", async () => {
+      mountOsk();
+      const input = addInput();
+
+      input.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(false);
+
+      await focus(input);
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("reopens on a tap of the already-focused field, once the tap has finished", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+      expect(document.activeElement).toBe(input);
+
+      input.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(false);
+
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    // CLV-114: WebKit sends the compatibility mousedown of a touch tap even
+    // though the panel prevented pointerdown. Its default action moves focus
+    // to the key button (tabindex=-1 is still focusable), the field blurs and
+    // the keyboard hides after the first key.
+    describe("compatibility mousedown of a tap", () => {
+      // jsdom has no PointerEvent, so simple-keyboard would fall back to mouse
+      // handlers that prevent mousedown themselves. Every target browser has
+      // one, and then simple-keyboard only binds pointerdown.
+      const hadPointerEvent = "PointerEvent" in window;
+      beforeEach(() => {
+        if (!hadPointerEvent) window.PointerEvent = class PointerEvent extends MouseEvent {};
+      });
+      afterEach(() => {
+        if (!hadPointerEvent) delete window.PointerEvent;
+      });
+
+      it("default-prevents a key's mousedown so focus stays on the field", async () => {
+        mountOsk();
+        const input = addInput();
+        await focus(input);
+        expect(isShown()).toBe(true);
+
+        const button = oskRoot().querySelector('.hg-button[data-skbtn="a"]');
+        expect(button.onmousedown).toBeNull();
+        const mousedown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+        button.dispatchEvent(mousedown);
+        expect(mousedown.defaultPrevented).toBe(true);
+
+        // jsdom has no default action for mousedown: play the browser's part.
+        if (!mousedown.defaultPrevented) button.focus();
+        await waitForFrame();
+
+        expect(document.activeElement).toBe(input);
+        expect(isShown()).toBe(true);
+      });
+
+      it("default-prevents mousedown anywhere on the panel, the layout picker included", async () => {
+        mountOsk();
+        const input = addInput();
+        await focus(input);
+        wrapper.vm.openLayoutPicker();
+        await nextTick();
+        expect(pickerOptions().length).toBeGreaterThan(0);
+
+        for (const node of [oskRoot(), ...pickerOptions()]) {
+          const mousedown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
+          node.dispatchEvent(mousedown);
+          expect(mousedown.defaultPrevented).toBe(true);
+        }
+      });
+    });
+
+    it("does not open on a click of a field that is not focused", async () => {
+      mountOsk();
+      const input = addInput();
+
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(isShown()).toBe(false);
+    });
+
     it("ignores time inputs, readonly inputs and data-osk=off areas", async () => {
       mountOsk();
       const time = addInput({ type: "time" });

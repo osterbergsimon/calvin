@@ -44,7 +44,9 @@ and no keyboard.
 never get it.
 
 **Show:** on focus of a target. Also when an already-focused target is tapped again after the keyboard was
-hidden (a `pointerdown` on `target`).
+hidden (a `click` on `target`). Never open on `pointerdown`: on touch the browser focuses the field with the
+mouse events it sends after `touchend`, and a keyboard that opened earlier has already moved the field out
+from under the finger, so it never gets focus (CLV-114).
 **Hide:**
 - the Hide key;
 - focus moving to a non-target element or to nothing (wait one `requestAnimationFrame` before deciding, so
