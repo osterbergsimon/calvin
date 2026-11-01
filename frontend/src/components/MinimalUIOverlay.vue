@@ -68,7 +68,9 @@ const cornerStyle = computed(() => ({
    over any background. Rest opacity + size are user-set. */
 .hot-corner {
   position: fixed;
-  z-index: calc(var(--z-dialog) + 1); /* above the clock (--z-sticky) */
+  /* Same layer as the clock bars but later in the DOM, so it paints over the
+     top bar; the dashboard stage below sits on --z-raised. */
+  z-index: var(--z-sticky);
   width: var(--hot-corner-size, 64px);
   height: var(--hot-corner-size, 64px);
   color: var(--on-scrim);

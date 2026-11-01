@@ -6,7 +6,7 @@
       class="setup-welcome"
       :class="{
         'setup-welcome--compact': compact,
-        'setup-welcome--phone': isPhoneWidth,
+        'setup-welcome--phone': isPhone,
         'setup-welcome--solo': !isPhoneHandoff,
       }"
       data-test="setup-welcome"
@@ -38,7 +38,7 @@
               </Tag>
               <Button
                 v-else
-                :variant="isPhoneWidth && index === 0 ? 'primary' : 'secondary'"
+                :variant="isPhone && index === 0 ? 'primary' : 'secondary'"
                 size="sm"
                 data-test="setup-welcome-add"
                 :data-setting="item.settingId"
@@ -114,13 +114,12 @@ import Tag from "@/components/ui/Tag.vue";
 
 // The dashboard area below the clock bar, measured for the fit rules.
 const COMPACT_AREA_HEIGHT = 520;
-const PHONE_WIDTH = 480;
 
 const router = useRouter();
 const configStore = useConfigStore();
 const modeStore = useModeStore();
 const auth = useAuthStore();
-const { isPhoneHandoff, width } = usePhoneHandoff();
+const { isPhoneHandoff, isPhone } = usePhoneHandoff();
 const { isTouch } = useTouchCapability();
 const setupPrompt = useSetupPrompt();
 const { code: setupCode, load: loadSetupCode } = useSetupCode();
@@ -141,10 +140,9 @@ const cardEl = ref(null);
 const areaHeight = ref(typeof window === "undefined" ? 0 : window.innerHeight);
 let resizeObserver = null;
 
-const isPhoneWidth = computed(() => width.value < PHONE_WIDTH);
 // "Add here" belongs to a wall kiosk; a phone/laptop (narrow or fine pointer)
 // is already the place you would add things, so it just says "Add".
-const addLabel = computed(() => (isTouch.value && !isPhoneWidth.value ? "Add here" : "Add"));
+const addLabel = computed(() => (isTouch.value && !isPhone.value ? "Add here" : "Add"));
 const compact = computed(() => areaHeight.value > 0 && areaHeight.value < COMPACT_AREA_HEIGHT);
 const showActions = computed(() => configStore.shouldShowUI);
 
@@ -242,7 +240,7 @@ function dismiss() {
   width: calc(100% - var(--gap-5));
   gap: var(--gap-4);
 }
-/* Phone width: 1 column, docked at the bottom. No QR — you can type here. */
+/* Phone: 1 column, docked at the bottom. No QR — you can type here. */
 .setup-welcome--phone {
   top: auto;
   bottom: var(--gap-4);

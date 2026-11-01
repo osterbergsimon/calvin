@@ -384,6 +384,7 @@
 </template>
 
 <script setup>
+import { WIDE_MIN_WIDTH, isPhoneWidth } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
@@ -474,9 +475,7 @@ const modalEl = ref(null);
 const stageEl = ref(null);
 const modalSize = ref({ width: 0, height: 0 });
 const stageSize = ref({ width: 0, height: 0 });
-const WIDE_MIN_WIDTH = 1024;
 const WIDE_MIN_HEIGHT = 640;
-const COMPACT_MIN_WIDTH = 600;
 
 const sizeClass = computed(() => {
   const { width, height } = modalSize.value;
@@ -484,7 +483,7 @@ const sizeClass = computed(() => {
   // today's layout until the observer reports.
   if (!width || !height) return "wide";
   if (width >= WIDE_MIN_WIDTH && height >= WIDE_MIN_HEIGHT) return "wide";
-  if (width >= COMPACT_MIN_WIDTH) return "compact";
+  if (!isPhoneWidth(width)) return "compact";
   return "phone";
 });
 const isPhone = computed(() => sizeClass.value === "phone");

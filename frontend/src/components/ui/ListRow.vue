@@ -144,7 +144,7 @@ const metaLines = computed(() =>
   margin-left: auto;
 }
 
-@media (max-width: 600px) {
+@media (--bp-phone) {
   .list-row {
     align-items: flex-start;
   }

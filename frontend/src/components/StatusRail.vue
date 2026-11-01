@@ -97,7 +97,7 @@ onUnmounted(() => {
   position: fixed;
   right: 1rem;
   bottom: 1rem;
-  z-index: 10000;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -139,8 +139,8 @@ onUnmounted(() => {
   overflow: hidden;
   cursor: pointer;
   transition:
-    border-color 0.2s,
-    transform 0.2s;
+    border-color var(--dur),
+    transform var(--dur);
 }
 
 .annunciator:hover {
@@ -170,12 +170,12 @@ onUnmounted(() => {
     0 0 0 1px color-mix(in srgb, var(--sev) 60%, transparent),
     0 0 6px 0 var(--sev),
     0 0 14px 1px color-mix(in srgb, var(--sev) 55%, transparent);
-  animation: lamp-arrive 0.5s ease-out both;
+  animation: lamp-arrive calc(var(--dur) * 2.5) ease-out both; /* 500ms */
 }
 
 .annunciator--error .annunciator__lamp,
 .annunciator--warning .annunciator__lamp {
-  animation: lamp-alert 0.9s ease-out both;
+  animation: lamp-alert calc(var(--dur) * 4.5) ease-out both; /* 900ms */
 }
 
 .annunciator__body {
@@ -217,8 +217,8 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition:
-    background 0.2s,
-    color 0.2s;
+    background var(--dur),
+    color var(--dur);
 }
 
 .annunciator__close:hover {
@@ -303,13 +303,13 @@ onUnmounted(() => {
 /* Tiles slide up into the corner with the house easing. */
 .tile-enter-active {
   transition:
-    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
-    opacity 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transform var(--dur) cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity var(--dur) cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .tile-leave-active {
   transition:
-    transform 0.25s ease-in,
-    opacity 0.25s ease-in;
+    transform var(--dur) ease-in,
+    opacity var(--dur) ease-in;
   position: absolute;
   width: 100%;
 }
@@ -322,7 +322,7 @@ onUnmounted(() => {
   transform: translateX(12px);
 }
 .tile-move {
-  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: transform var(--dur) cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {

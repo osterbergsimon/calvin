@@ -5,6 +5,7 @@ import { execSync } from "child_process";
 import { join, dirname } from "path";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import { createHash } from "crypto";
+import customMedia from "./src/styles/customMedia.js";
 
 // Get git version (commit short hash) for frontend version
 function getGitVersion() {
@@ -99,6 +100,10 @@ export default defineConfig({
       },
     },
   ],
+  css: {
+    // `@media (--bp-phone)` etc.: the shared breakpoint set (src/styles/breakpoints.js).
+    postcss: { plugins: [customMedia()] },
+  },
   define: {
     __FRONTEND_VERSION__: JSON.stringify(frontendVersion),
   },

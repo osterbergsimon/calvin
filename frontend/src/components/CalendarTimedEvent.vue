@@ -106,6 +106,6 @@ const handleFocus = () => emit("focus", props.event, props.date);
 .timed-event.focused,
 .timed-event.selected {
   box-shadow: 0 0 0 2px var(--focus);
-  z-index: 5;
+  z-index: var(--z-raised);
 }
 </style>

@@ -203,6 +203,7 @@
 </template>
 
 <script setup>
+import { isPhone as isPhoneViewport } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";
 import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
@@ -291,9 +292,9 @@ const onResize = () => {
 onMounted(() => window.addEventListener("resize", onResize));
 onUnmounted(() => window.removeEventListener("resize", onResize));
 
-const isPhone = computed(() => width.value < 480);
+const isPhone = computed(() => isPhoneViewport(width.value, height.value));
 const isShort = computed(() => height.value < 600);
-const showPhone = computed(() => isTouch.value && width.value >= 720);
+const showPhone = computed(() => isTouch.value && !isPhone.value);
 const oskVisible = computed(() => osk.visible.value);
 const oskCollapsed = computed(() => oskVisible.value && height.value - 64 - osk.height.value < 320);
 const showIcon = computed(() => !isPhone.value && !isShort.value && !oskCollapsed.value);
@@ -720,7 +721,7 @@ async function submitLogin() {
 }
 
 /* Phone width: full-width card, top-aligned, no icon or phone hand-off. */
-@media (max-width: 480px) {
+@media (--bp-phone) {
   .auth-lock,
   .auth-lock--short {
     align-items: flex-start;

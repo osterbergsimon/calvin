@@ -130,7 +130,7 @@ const conflictHint = computed(() => {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 50%;
-  z-index: 5;
+  z-index: var(--z-raised);
   /* Size to content (not the narrow tile), wrapping only when very long. */
   width: max-content;
   max-width: 14rem;
@@ -147,8 +147,8 @@ const conflictHint = computed(() => {
   visibility: hidden;
   transform: translate(-50%, 4px);
   transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+    opacity var(--dur-fast) ease,
+    transform var(--dur-fast) ease;
   pointer-events: none;
 }
 /* Little caret pointing down at the tile. */

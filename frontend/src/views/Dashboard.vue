@@ -618,12 +618,10 @@ onUnmounted(() => {
   flex-direction: row;
   min-height: 0;
   min-width: 0;
-  /* Lift the region area above the perimeter clock bars (z-index:100) so a
-     focused region's glow blooms over the top/bottom bars instead of being
-     clipped at their edge. The bars never overlap region content spatially,
-     so only the neon bloom bleeds across — matching the between-bar behaviour. */
+  /* Its own layer (--z-raised) under the perimeter clock bars (--z-sticky), so
+     a focused region's glow stays inside the stage and the bars stay on top. */
   position: relative;
-  z-index: calc(var(--z-sticky) + 1);
+  z-index: var(--z-raised);
 }
 
 .dashboard-main {
@@ -633,9 +631,9 @@ onUnmounted(() => {
   gap: var(--gap-4);
   min-height: 0;
   min-width: 0;
-  /* Same rationale one level down: sit above the vertical (left/right) bars. */
+  /* Same rationale one level down: under the vertical (left/right) bars. */
   position: relative;
-  z-index: calc(var(--z-sticky) + 1);
+  z-index: var(--z-raised);
 }
 
 .mode-content {
@@ -738,7 +736,7 @@ onUnmounted(() => {
   left: 50%;
   bottom: var(--gap-4);
   transform: translateX(-50%);
-  z-index: calc(var(--z-dialog) + 2);
+  z-index: var(--z-dialog);
   display: flex;
   align-items: center;
   gap: var(--gap-3);

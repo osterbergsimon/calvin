@@ -82,7 +82,7 @@ body {
   gap: 0.4rem;
   font-family: var(--font-ui);
   font-size: var(--fs-micro);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -93,7 +93,7 @@ body {
   font-family: var(--font-data);
   font-variant-numeric: tabular-nums;
   font-size: var(--plugin-value-size);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   line-height: 1.05;
   color: var(--ink);
   white-space: nowrap;
@@ -101,7 +101,7 @@ body {
 
 .calvin-plugin-readout__unit {
   font-size: 0.55em;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink-3);
   margin-left: 0.18em;
   letter-spacing: 0.02em;

@@ -260,7 +260,7 @@ onUnmounted(() => {
 
 /* On a phone-width clock bar the age of the data is the first thing that does
    not fit; the popover still spells it out (CLV-66). */
-@media (max-width: 600px) {
+@media (--bp-phone) {
   .connection-status__from {
     display: none;
   }
@@ -302,7 +302,7 @@ onUnmounted(() => {
   position: fixed;
   left: var(--gap-4);
   bottom: var(--gap-4);
-  z-index: calc(var(--z-dialog) + 3);
+  z-index: var(--z-dialog);
 }
 
 .connection-status--floating.connection-status--top-left {

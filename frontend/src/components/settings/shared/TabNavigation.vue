@@ -122,7 +122,7 @@ const handleKeydown = event => {
   font-family: var(--font-ui);
   font-weight: var(--weight-strong);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
   white-space: nowrap;
   position: relative;
   margin-bottom: -2px;

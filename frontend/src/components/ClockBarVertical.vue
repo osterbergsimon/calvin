@@ -185,9 +185,9 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   align-items: stretch;
   gap: var(--gap-3);
   position: relative;
-  /* Above the dashboard stage (--z-sticky + 1) so the bar never sits under a
+  /* Above the dashboard stage (--z-raised) so the bar never sits under a
      region's focus glow. */
-  z-index: calc(var(--z-sticky) * 2);
+  z-index: var(--z-sticky);
   user-select: none;
   flex-shrink: 0;
   box-sizing: border-box;

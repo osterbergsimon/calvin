@@ -551,7 +551,7 @@ onUnmounted(() => {
 }
 
 /* Responsive */
-@media (max-width: 768px) {
+@media (--bp-phone) {
   .settings-body {
     padding: var(--space-3, 1rem);
     overflow: visible;
@@ -579,7 +579,7 @@ onUnmounted(() => {
    keep the constrained internal scroll above: a chromeless kiosk has no page
    scroll, so overflow:visible would push content below the fold unreachably
    (calvin-g7v). */
-@media (max-height: 600px) and (max-width: 768px) {
+@media (max-height: 600px) and (--bp-phone) {
   .settings-page {
     height: auto;
     min-height: 100dvh;
