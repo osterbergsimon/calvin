@@ -262,3 +262,31 @@ def test_bundle_version_cache_invalidated_on_same_size_edit(tmp_path):
     st = target.stat()
     os.utime(target, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
     assert kiosk_bundle.bundle_version(tmp_path) != v1
+
+
+def test_bundle_version_cache_invalidated_on_atomic_rename_with_preserved_mtime(tmp_path):
+    """An atomic replace (write temp, rename over) that keeps mtime and size is
+    still caught: the new file has a new inode."""
+    import os
+
+    _seed(tmp_path)
+    target = tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path
+    v1 = kiosk_bundle.bundle_version(tmp_path)
+    st = target.stat()
+    tmp = target.with_name(target.name + ".new")
+    tmp.write_text(target.read_text().upper())  # same length, different bytes
+    os.utime(tmp, ns=(st.st_atime_ns, st.st_mtime_ns))
+    os.replace(tmp, target)
+    new_st = target.stat()
+    assert (new_st.st_mtime_ns, new_st.st_size) == (st.st_mtime_ns, st.st_size)
+    assert new_st.st_ino != st.st_ino
+    assert kiosk_bundle.bundle_version(tmp_path) != v1
+
+
+def test_bundle_version_raises_for_removed_file_after_caching(tmp_path):
+    """A cached version must not mask a bundle file that has since gone."""
+    _seed(tmp_path)
+    kiosk_bundle.bundle_version(tmp_path)
+    (tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path).unlink()
+    with pytest.raises(FileNotFoundError):
+        kiosk_bundle.bundle_version(tmp_path)
