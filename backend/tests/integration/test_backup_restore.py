@@ -620,11 +620,14 @@ def test_restore_moves_global_room_name_onto_unnamed_screens(test_client, mode):
     r = _restore_room_name_seed(test_client, mode)
     assert r.status_code == 200, r.text
 
-    assert _run(kr.get_overrides("kitchen-1a2b3c")) == {"displayName": "Lounge"}
-    assert _run(kr.get_overrides("office-4d5e6f")) == {
-        "displayName": "Office",
-        "orientation": "portrait",
-    }
+    # A merge restore also adopts the global show-UI controls on screens with
+    # no value of their own (calvin-hi6w); the name migration is what is tested.
+    kitchen = dict(_run(kr.get_overrides("kitchen-1a2b3c")))
+    kitchen.pop("showUI", None)
+    assert kitchen == {"displayName": "Lounge"}
+    office = dict(_run(kr.get_overrides("office-4d5e6f")))
+    office.pop("showUI", None)
+    assert office == {"displayName": "Office", "orientation": "portrait"}
     assert _run(config_service.get_value("displayName")) is None
 
 
@@ -645,3 +648,57 @@ def test_restore_succeeds_with_a_warning_when_room_name_migration_fails(test_cli
         "The backup's room name could not be copied to the screens; "
         "it will be retried at the next restart."
     ) in body["warnings"]
+
+
+def _controls_seed() -> dict:
+    return {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [
+                {"key": "show_ui", "value": "false", "value_type": "bool"},
+                {"key": "clock_bar_show_in_kiosk", "value": "true", "value_type": "bool"},
+                {"key": "tap_anywhere_reveal", "value": "true", "value_type": "bool"},
+            ],
+            "kiosks": [
+                {"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}},
+                {
+                    "id": "office-4d5e6f",
+                    "hostname": "office",
+                    "overrides": {"showUI": True, "orientation": "portrait"},
+                },
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_copies_global_controls_onto_screens(test_client, mode):
+    """calvin-hi6w: a backup from before the per-screen controls keeps them.
+
+    The restore runs the control migration itself, so screens with no value of
+    their own get the global one without a restart or a new screen.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(_controls_seed()).encode(), "application/json")},
+        data={"mode": mode},
+    )
+    assert r.status_code == 200, r.text
+
+    assert _run(kr.get_overrides("kitchen-1a2b3c")) == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+    assert _run(kr.get_overrides("office-4d5e6f")) == {
+        "showUI": True,
+        "orientation": "portrait",
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+    # Still the fallback for a screen that has no value of its own.
+    assert _run(config_service.get_value("show_ui")) is False

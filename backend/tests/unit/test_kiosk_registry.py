@@ -630,6 +630,215 @@ async def test_global_room_name_migration_handles_the_snake_case_key(test_db):
     assert await config_service.get_value("display_name") is None
 
 
+# --- calvin-hi6w: the global show-UI controls become per-screen values ------
+
+
+async def _set_control_globals() -> None:
+    from app.services.config_service import config_service
+
+    await config_service.set_value("show_ui", False)
+    await config_service.set_value("clock_bar_show_in_kiosk", True)
+    await config_service.set_value("tap_anywhere_reveal", True)
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_controls_are_copied_to_screens_without_their_own_value(test_db):
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk("kitchen")
+    await kr.set_overrides("hallway", {"showUI": True, "orientation": "portrait"})
+    await _set_control_globals()
+
+    await kr.migrate_global_screen_controls()
+
+    assert await kr.get_overrides("kitchen") == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+    # A screen's own value wins; the other controls still move across.
+    assert await kr.get_overrides("hallway") == {
+        "showUI": True,
+        "orientation": "portrait",
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_controls_stay_as_the_fallback(test_db):
+    """The globals are copied, not retired: a screen with no value still reads them."""
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await _set_control_globals()
+    await kr.record_kiosk("kitchen")
+
+    await kr.migrate_global_screen_controls()
+
+    assert await config_service.get_value("show_ui") is False
+    assert await config_service.get_value("clock_bar_show_in_kiosk") is True
+    assert await config_service.get_value("tap_anywhere_reveal") is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_controls_are_kept_until_a_screen_exists(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await _set_control_globals()
+
+    await kr.migrate_global_screen_controls()
+
+    assert await config_service.get_value("show_ui") is False
+    assert await config_service.get_value("clock_bar_show_in_kiosk") is True
+    assert await config_service.get_value("tap_anywhere_reveal") is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_screen_registering_after_startup_gets_the_global_controls(test_db):
+    from app.services import kiosk_registry as kr
+
+    # Startup migration finds no screens yet; the first screen registers later.
+    await _set_control_globals()
+    await kr.migrate_global_screen_controls()
+
+    await kr.record_kiosk("kitchen", hostname="kitchen-pi")
+
+    assert await kr.get_overrides("kitchen") == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_screen_created_by_set_overrides_gets_the_global_controls(test_db):
+    from app.services import kiosk_registry as kr
+
+    await _set_control_globals()
+    await kr.migrate_global_screen_controls()
+
+    await kr.set_overrides("kitchen", {"orientation": "portrait"})
+
+    assert await kr.get_overrides("kitchen") == {
+        "orientation": "portrait",
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_controls_migration_is_idempotent(test_db):
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk("kitchen")
+    await _set_control_globals()
+
+    await kr.migrate_global_screen_controls()
+    await kr.migrate_global_screen_controls()
+
+    assert await kr.get_overrides("kitchen") == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+
+    # A later per-screen choice survives further runs untouched.
+    await kr.set_overrides(
+        "kitchen",
+        {
+            "showUI": True,
+            "clockBarShowInKiosk": False,
+            "tapAnywhereReveal": False,
+        },
+    )
+    await kr.migrate_global_screen_controls()
+
+    assert await kr.get_overrides("kitchen") == {
+        "showUI": True,
+        "clockBarShowInKiosk": False,
+        "tapAnywhereReveal": False,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_controls_migration_handles_snake_case_own_values(test_db):
+    from app.services import kiosk_registry as kr
+
+    await _set_control_globals()
+    await kr.set_overrides("kitchen", {"show_ui": True, "tap_anywhere_reveal": False})
+
+    await kr.migrate_global_screen_controls()
+
+    assert await kr.get_overrides("kitchen") == {
+        "show_ui": True,
+        "tap_anywhere_reveal": False,
+        "clockBarShowInKiosk": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_controls_migration_reads_the_camel_case_globals(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await config_service.set_value("showUI", False)
+    await config_service.set_value("clockBarShowInKiosk", True)
+    await config_service.set_value("tapAnywhereReveal", True)
+    await kr.record_kiosk("kitchen")
+
+    await kr.migrate_global_screen_controls()
+
+    assert await kr.get_overrides("kitchen") == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_screen_control_migration_writes_only_the_overrides_column(test_db, monkeypatch):
+    from app.models.db_models import KioskDB
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk("kitchen", agent_version="1.0")
+    await _set_control_globals()
+
+    # The migration reads a snapshot; a heartbeat lands before it writes back.
+    stale_rows = await KioskDB.objects.all()
+    await kr.record_kiosk("kitchen", agent_version="2.0")
+
+    class _StaleObjects:
+        async def all(self):
+            return stale_rows
+
+    class _StaleKioskDB:
+        objects = _StaleObjects()
+
+    monkeypatch.setattr(kr, "KioskDB", _StaleKioskDB)
+    await kr.migrate_global_screen_controls()
+    monkeypatch.undo()
+
+    row = await KioskDB.objects.get(id="kitchen")
+    assert row.overrides == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+    assert row.agent_version == "2.0"
+
+
 async def _count_kiosk_updates(monkeypatch) -> list:
     calls: list = []
     real_update = KioskDB.update

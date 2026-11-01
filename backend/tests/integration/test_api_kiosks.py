@@ -81,7 +81,11 @@ def test_list_kiosks_includes_overrides_without_agent_keys(test_client: TestClie
     test_client.post("/api/kiosks/hall-overrides/update")
     listed = test_client.get("/api/kiosks").json()["kiosks"]
     kiosk = next(k for k in listed if k["id"] == "hall-overrides")
-    assert kiosk["overrides"] == {"displayName": "Hallway", "availableScreens": ["home"]}
+    # New screens also adopt the global show-UI controls (calvin-hi6w); this
+    # test is about the override layer and the stripped agent key.
+    overrides = dict(kiosk["overrides"])
+    overrides.pop("showUI", None)
+    assert overrides == {"displayName": "Hallway", "availableScreens": ["home"]}
     assert kiosk["agentUpdateRequested"] is True
     assert "_agentUpdateRequested" not in kiosk["overrides"]
 
@@ -127,7 +131,12 @@ def test_overrides_put_then_get_roundtrip(test_client: TestClient):
     )
     assert put.status_code == 200
     got = test_client.get("/api/kiosks/kitchen-1/overrides").json()
-    assert got == {"id": "kitchen-1", "overrides": {"orientation": "portrait", "timeFormat": "12h"}}
+    # A newly registered screen also adopts the global show-UI controls
+    # (calvin-hi6w); the values written here must survive that migration.
+    overrides = dict(got["overrides"])
+    overrides.pop("showUI", None)
+    assert got["id"] == "kitchen-1"
+    assert overrides == {"orientation": "portrait", "timeFormat": "12h"}
 
 
 @pytest.mark.integration
