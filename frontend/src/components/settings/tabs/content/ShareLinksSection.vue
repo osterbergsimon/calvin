@@ -1,9 +1,12 @@
 <template>
-  <div data-test="share-links">
-    <SettingRow
-      label="Share links"
-      description="Let family and friends add photos from their phone. Each link only adds photos to its own folder in Local photos."
-    >
+  <SettingGroup title="Share links" data-test="share-links">
+    <SettingRow label="Guest photos">
+      <template #description>
+        <InlineNote
+          >Let guests add photos to one folder in Local photos from their phone.</InlineNote
+        >
+        <InlineNote aria-live="polite" data-test="share-links-live">{{ liveMessage }}</InlineNote>
+      </template>
       <Button
         v-if="!formOpen"
         data-test="share-links-create"
@@ -13,15 +16,13 @@
         Create link
       </Button>
     </SettingRow>
-    <InlineNote v-if="liveMessage" aria-live="polite">{{ liveMessage }}</InlineNote>
 
-    <SettingRow v-if="formOpen" label="Create a share link" stacked>
+    <SettingRow v-if="formOpen" label="New share link" stacked>
       <form data-test="share-link-form" novalidate @submit.prevent="submit">
         <TextField
           v-model="name"
           label="Name"
           input-id="share-link-name"
-          maxlength="40"
           placeholder="Grandma"
           hint="Who the link is for, so you know which one to revoke."
           :error="nameError"
@@ -30,7 +31,6 @@
           v-model="folder"
           label="Folder in Local photos"
           input-id="share-link-folder"
-          maxlength="40"
           :hint="folderHint"
           :error="folderError"
         />
@@ -41,6 +41,13 @@
             aria-label="Link works for"
           />
         </SettingRow>
+        <SettingRow
+          label="Photo limit"
+          description="The link stops taking photos after this many."
+          flush
+        >
+          <SelectPill v-model="maxPhotos" :options="photoLimitOptions" aria-label="Photo limit" />
+        </SettingRow>
         <Button
           type="submit"
           variant="primary"
@@ -48,7 +55,7 @@
           :loading="creating"
           loading-label="Creating…"
         >
-          Create link
+          Create
         </Button>
         <Button data-test="share-link-cancel" :disabled="creating" @click="closeForm">
           Cancel
@@ -59,27 +66,55 @@
 
     <SettingRow
       v-if="store.loadFailed && !store.links.length"
-      label="Share links"
+      label="Your links"
       description="Couldn't load share links."
     >
       <Button data-test="share-links-retry" @click="load">Try again</Button>
     </SettingRow>
 
-    <InlineNote
+    <EmptyState
       v-else-if="!store.loading && !store.links.length && !formOpen"
+      compact
+      :icon="mdiLinkVariant"
+      title="No share links yet."
+      :phone-hint="false"
       data-test="share-links-empty"
-    >
-      No share links yet.
-    </InlineNote>
+    />
 
-    <SettingRow v-if="store.links.length" label="Your links" stacked>
-      <ListRow
-        v-for="item in store.links"
-        :key="item.id"
-        :name="item.name"
-        :meta="[linkMeta(item)]"
-        data-test="share-link-row"
-      >
+    <SettingGroup v-if="store.links.length" title="Your links" list>
+      <template v-for="item in store.links" :key="item.id">
+        <ListRow :name="item.name" :meta="linkMeta(item)" data-test="share-link-row">
+          <template #actions>
+            <Tag v-if="item.expired" tone="warn" data-test="share-link-expired">Expired</Tag>
+            <Button
+              size="sm"
+              data-test="share-link-show"
+              :aria-label="`${shownId === item.id ? 'Hide' : 'Show'} QR code for ${item.name}`"
+              :aria-expanded="shownId === item.id ? 'true' : 'false'"
+              @click="toggleQr(item)"
+            >
+              {{ shownId === item.id ? "Hide QR" : "Show QR" }}
+            </Button>
+            <Button
+              size="sm"
+              data-test="share-link-rename"
+              :aria-label="`Rename ${item.name}`"
+              @click="startRename(item)"
+            >
+              Rename
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              data-test="share-link-revoke"
+              :aria-label="`Revoke ${item.name}`"
+              @click="askRevoke(item)"
+            >
+              Revoke
+            </Button>
+          </template>
+        </ListRow>
+
         <form
           v-if="renamingId === item.id"
           data-test="share-link-rename-form"
@@ -88,16 +123,15 @@
         >
           <TextField
             v-model="renameValue"
-            label="New name"
+            :label="`New name for ${item.name}`"
             :input-id="`share-link-rename-${item.id}`"
-            maxlength="40"
             :error="renameError"
           />
           <Button type="submit" size="sm" variant="primary">Save</Button>
           <Button size="sm" @click="renamingId = null">Cancel</Button>
         </form>
 
-        <div v-if="shownId === item.id" data-test="share-link-qr">
+        <Card v-if="shownId === item.id" data-test="share-link-qr">
           <PhoneSetupCard
             :url="urlFor(item)"
             title="Scan to add photos"
@@ -107,71 +141,58 @@
           <Button size="sm" data-test="share-link-copy" @click="copyUrl(item)">
             {{ copiedId === item.id ? "Copied" : "Copy link" }}
           </Button>
-        </div>
+        </Card>
 
         <InlineNote v-if="rowErrors[item.id]" tone="err" data-test="share-link-row-error">
           {{ rowErrors[item.id] }}
         </InlineNote>
-
-        <template #actions>
-          <Tag v-if="item.expired" tone="warn" data-test="share-link-expired">Expired</Tag>
-          <Button
-            size="sm"
-            data-test="share-link-show"
-            :aria-expanded="shownId === item.id ? 'true' : 'false'"
-            @click="toggleQr(item)"
-          >
-            {{ shownId === item.id ? "Hide QR" : "Show QR" }}
-          </Button>
-          <Button size="sm" data-test="share-link-rename" @click="startRename(item)">
-            Rename
-          </Button>
-          <Button variant="danger" size="sm" data-test="share-link-revoke" @click="askRevoke(item)">
-            Revoke
-          </Button>
-        </template>
-      </ListRow>
-    </SettingRow>
-
-    <Dialog
-      :model-value="Boolean(revoking)"
-      :title="`Revoke &quot;${revoking?.name}&quot;?`"
-      size="sm"
-      @update:model-value="open => !open && (revoking = null)"
-    >
-      <p>
-        The link stops working right away. Photos already sent stay in Local photos unless you
-        remove them.
-      </p>
-      <label v-if="revoking?.uploadCount">
-        <input v-model="removePhotos" type="checkbox" data-test="share-link-remove-photos" />
-        Also remove the {{ photoCount(revoking.uploadCount) }} sent with this link
-      </label>
-      <template #actions>
-        <Button variant="secondary" @click="revoking = null">Cancel</Button>
-        <Button variant="danger" data-test="share-link-revoke-confirm" @click="revoke">
-          Revoke link
-        </Button>
       </template>
-    </Dialog>
-  </div>
+    </SettingGroup>
+
+    <ConfirmModal
+      :show="Boolean(revoking)"
+      :title="`Revoke ${revoking?.name ?? 'link'}?`"
+      message="The link stops working right away. Photos already sent stay in Local photos unless you remove them."
+      confirm-text="Revoke link"
+      :danger="true"
+      @confirm="revoke"
+      @cancel="revoking = null"
+    >
+      <SettingRow
+        v-if="revoking?.uploadCount"
+        :label="`Also remove the ${photoCount(revoking.uploadCount)} sent with this link`"
+        flush
+      >
+        <ToggleSwitch
+          v-model="removePhotos"
+          :aria-label="`Also remove the ${photoCount(revoking.uploadCount)} sent with this link`"
+          data-test="share-link-remove-photos"
+        />
+      </SettingRow>
+    </ConfirmModal>
+  </SettingGroup>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from "vue";
+import { mdiLinkVariant } from "@mdi/js";
 import { useShareLinksStore } from "@/stores/shareLinks";
 import { shareUrl } from "@/services/shareApi";
 import { resolveServerUrl } from "@/utils/serverUrl";
 import { formatKeyDate, formatLastUsed } from "@/utils/apiKeyFormat";
 import { logError } from "@/utils/logger";
 import Button from "@/components/ui/Button.vue";
-import Dialog from "@/components/ui/Dialog.vue";
+import Card from "@/components/ui/Card.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import PhoneSetupCard from "@/components/ui/PhoneSetupCard.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 // Settings › Content › Photos: share links for guest photo upload (calvin-mwqo).
@@ -185,6 +206,13 @@ const expiryOptions = [
   { value: 7, label: "1 week" },
   { value: 30, label: "30 days" },
 ];
+// The server's default per-link quota is 500 photos.
+const DEFAULT_PHOTO_LIMIT = 500;
+const photoLimitOptions = [
+  { value: 100, label: "100 photos" },
+  { value: 500, label: "500 photos" },
+  { value: 2000, label: "2,000 photos" },
+];
 
 const store = useShareLinksStore();
 const serverUrl = ref("");
@@ -193,6 +221,7 @@ const formOpen = ref(false);
 const name = ref("");
 const folder = ref(DEFAULT_FOLDER);
 const expiresInDays = ref(0);
+const maxPhotos = ref(DEFAULT_PHOTO_LIMIT);
 const nameError = ref("");
 const folderError = ref("");
 const createError = ref("");
@@ -220,18 +249,26 @@ watch(folder, () => (folderError.value = ""));
 
 const photoCount = count => `${count} photo${count === 1 ? "" : "s"}`;
 
+/** Which field a 422 is about: the server checks the length limits, not this form. */
+const invalidField = err => {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) return detail[0]?.loc?.at(-1) || "";
+  return detail?.code === "invalid_folder" ? "folder" : "";
+};
+
 const linkMeta = item => {
   const now = new Date();
   const created = formatKeyDate(item.createdAt, now);
   return [
-    `Folder ${item.folder}`,
-    created ? `Created ${created}` : "",
-    item.lastUsedAt ? `Last used ${formatLastUsed(item.lastUsedAt, now)}` : "Never used",
-    photoCount(item.uploadCount || 0),
-    item.expiresAt && !item.expired ? `Ends ${formatKeyDate(item.expiresAt, now)}` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    [`Folder ${item.folder}`, created ? `Created ${created}` : ""].filter(Boolean).join(" · "),
+    [
+      item.lastUsedAt ? `Last used ${formatLastUsed(item.lastUsedAt, now)}` : "Never used",
+      photoCount(item.uploadCount || 0),
+      item.expiresAt && !item.expired ? `Ends ${formatKeyDate(item.expiresAt, now)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  ];
 };
 
 const urlFor = item => shareUrl(serverUrl.value || window.location.origin, item.path);
@@ -260,6 +297,7 @@ function closeForm() {
   name.value = "";
   folder.value = DEFAULT_FOLDER;
   expiresInDays.value = 0;
+  maxPhotos.value = DEFAULT_PHOTO_LIMIT;
   createError.value = "";
 }
 
@@ -282,6 +320,7 @@ async function submit() {
       name: trimmed,
       folder: folderName,
       expiresInDays: expiresInDays.value || null,
+      maxPhotos: maxPhotos.value,
     });
     closeForm();
     shownId.value = link.id;
@@ -289,6 +328,8 @@ async function submit() {
   } catch (err) {
     const status = err?.response?.status;
     if (status === 409) nameError.value = `You already have a link called ${trimmed}.`;
+    else if (status === 422 && invalidField(err) === "name")
+      nameError.value = "Use a shorter name.";
     else if (status === 422) folderError.value = "Use letters, numbers, spaces, - or _.";
     else if (status !== 401) {
       createError.value = "Couldn't create the link. Try again.";

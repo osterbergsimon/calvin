@@ -34,4 +34,18 @@ describe("SettingGroup", () => {
     expect(STYLE).not.toMatch(/var\(--space-/);
     expect(STYLE).not.toMatch(/var\(--radius-(xs|sm|md|lg|xl|2xl)\)/);
   });
+
+  it("has a list variant that insets items (ListRows, a QR card) with the panel padding", () => {
+    const w = mount(SettingGroup, {
+      props: { title: "Your links", list: true },
+      slots: { default: "<div class='row'>Grandma</div>" },
+    });
+    expect(w.classes()).toContain("setting-group--list");
+    expect(mount(SettingGroup, { props: { title: "x" } }).classes()).not.toContain(
+      "setting-group--list"
+    );
+    expect(STYLE).toMatch(
+      /\.setting-group--list :slotted\(\*\)\s*\{\s*margin-inline: var\(--panel-pad-x\)/
+    );
+  });
 });

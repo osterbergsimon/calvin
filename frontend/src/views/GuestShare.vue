@@ -10,6 +10,7 @@
     <!-- Revoked and expired both land here: the server doesn't say which. -->
     <EmptyState
       v-else-if="state === 'invalid'"
+      compact
       :icon="mdiLinkOff"
       title="This link doesn't work any more"
       help="Ask the person who sent it for a new one."
@@ -19,6 +20,7 @@
 
     <EmptyState
       v-else-if="state === 'error'"
+      compact
       :icon="mdiWifiOff"
       title="Calvin can't be reached"
       help="Check that this phone is on the same Wi-Fi, then try again."

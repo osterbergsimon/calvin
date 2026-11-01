@@ -15,9 +15,10 @@ export async function listFolders() {
   return data?.folders ?? [];
 }
 
-export async function createLink({ name, folder, expiresInDays = null }) {
+export async function createLink({ name, folder, expiresInDays = null, maxPhotos = null }) {
   const body = { name, folder };
   if (expiresInDays) body.expires_in_days = expiresInDays;
+  if (maxPhotos) body.max_photos = maxPhotos;
   const { data } = await api.post("/share/links", body);
   return data.link;
 }

@@ -3,6 +3,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import api from "@/services/api";
 import ShareLinksSection from "@/components/settings/tabs/content/ShareLinksSection.vue";
+import SelectPill from "@/components/ui/SelectPill.vue";
 
 vi.mock("@/utils/serverUrl", () => ({
   resolveServerUrl: vi.fn(() => Promise.resolve("http://calvin.local:8000")),
@@ -38,6 +39,8 @@ async function mountSection(links = [], folders = []) {
 const find = sel => wrapper.find(`[data-test='${sel}']`);
 const get = sel => wrapper.get(`[data-test='${sel}']`);
 const rows = () => wrapper.findAll("[data-test='share-link-row']");
+const pill = label =>
+  wrapper.findAllComponents(SelectPill).find(c => c.props("ariaLabel") === label);
 
 describe("ShareLinksSection", () => {
   beforeEach(() => {
@@ -91,7 +94,11 @@ describe("ShareLinksSection", () => {
     await get("share-link-form").trigger("submit");
     await flushPromises();
 
-    expect(api.post).toHaveBeenCalledWith("/share/links", { name: "Grandma", folder: "Guests" });
+    expect(api.post).toHaveBeenCalledWith("/share/links", {
+      name: "Grandma",
+      folder: "Guests",
+      max_photos: 500,
+    });
     expect(find("share-link-form").exists()).toBe(false);
     expect(rows()).toHaveLength(1);
     const qr = get("share-link-qr");
@@ -103,7 +110,8 @@ describe("ShareLinksSection", () => {
     await mountSection();
     await get("share-links-create").trigger("click");
     await wrapper.get("#share-link-name").setValue("Party");
-    wrapper.findComponent({ name: "SelectPill" }).vm.$emit("update:modelValue", 7);
+    pill("Link works for").vm.$emit("update:modelValue", 7);
+    pill("Photo limit").vm.$emit("update:modelValue", 100);
     api.post.mockResolvedValueOnce({ data: { link: link({ name: "Party" }) } });
     await get("share-link-form").trigger("submit");
     await flushPromises();
@@ -111,6 +119,7 @@ describe("ShareLinksSection", () => {
       name: "Party",
       folder: "Guests",
       expires_in_days: 7,
+      max_photos: 100,
     });
   });
 
@@ -154,8 +163,12 @@ describe("ShareLinksSection", () => {
     await get("share-link-revoke").trigger("click");
     await flushPromises();
     expect(document.body.textContent).toContain("Also remove the 2 photos sent with this link");
+    // An on/off choice is a ToggleSwitch, off by default.
+    const toggle = document.querySelector("[data-test='share-link-remove-photos']");
+    expect(toggle.getAttribute("role")).toBe("switch");
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
     api.delete.mockResolvedValueOnce({});
-    document.querySelector("[data-test='share-link-revoke-confirm']").click();
+    document.querySelector("[data-test='confirm-accept']").click();
     await flushPromises();
     expect(api.delete).toHaveBeenCalledWith("/share/links/l1", { params: undefined });
     expect(rows()).toHaveLength(0);
@@ -165,11 +178,12 @@ describe("ShareLinksSection", () => {
     await mountSection([link({ uploadCount: 2 })]);
     await get("share-link-revoke").trigger("click");
     await flushPromises();
-    const box = document.querySelector("[data-test='share-link-remove-photos']");
-    box.click();
+    const toggle = document.querySelector("[data-test='share-link-remove-photos']");
+    toggle.click();
     await flushPromises();
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
     api.delete.mockResolvedValueOnce({});
-    document.querySelector("[data-test='share-link-revoke-confirm']").click();
+    document.querySelector("[data-test='confirm-accept']").click();
     await flushPromises();
     expect(api.delete).toHaveBeenCalledWith("/share/links/l1", {
       params: { remove_photos: true },
@@ -181,5 +195,66 @@ describe("ShareLinksSection", () => {
     wrapper = mount(ShareLinksSection, { attachTo: document.body });
     await flushPromises();
     expect(find("share-links-retry").exists()).toBe(true);
+  });
+
+  it("is a SettingGroup of rows, with no wrapper div", async () => {
+    await mountSection([link()]);
+    const root = wrapper.element;
+    expect(root.classList.contains("setting-group")).toBe(true);
+    expect(root.dataset.test).toBe("share-links");
+    expect(root.querySelector(".setting-group__title").textContent).toBe("Share links");
+    // "Your links" is its own group; the QR code is not inside the ListRow.
+    const groups = [...root.querySelectorAll(".setting-group__title")].map(h => h.textContent);
+    expect(groups).toContain("Your links");
+    await get("share-link-show").trigger("click");
+    await flushPromises();
+    expect(rows()[0].find("[data-test='share-link-qr']").exists()).toBe(false);
+    expect(find("share-link-qr").exists()).toBe(true);
+  });
+
+  it("describes the feature in one sentence", async () => {
+    await mountSection();
+    expect(wrapper.text()).toContain(
+      "Let guests add photos to one folder in Local photos from their phone."
+    );
+  });
+
+  it("labels each row's actions with the link's name", async () => {
+    await mountSection([link(), link({ id: "l2", name: "Party", path: "/share/l2.T/" })]);
+    const labels = sel =>
+      wrapper.findAll(`[data-test='${sel}']`).map(b => b.attributes("aria-label"));
+    expect(labels("share-link-show")).toEqual([
+      "Show QR code for Grandma",
+      "Show QR code for Party",
+    ]);
+    expect(labels("share-link-rename")).toEqual(["Rename Grandma", "Rename Party"]);
+    expect(labels("share-link-revoke")).toEqual(["Revoke Grandma", "Revoke Party"]);
+  });
+
+  it("names the submit button Create, apart from the header's Create link", async () => {
+    await mountSection([link()]);
+    await get("share-links-create").trigger("click");
+    expect(get("share-link-submit").text()).toBe("Create");
+    expect(find("share-links-create").exists()).toBe(false);
+  });
+
+  it("leaves length limits to the server (no duplicated literal)", async () => {
+    await mountSection();
+    await get("share-links-create").trigger("click");
+    expect(wrapper.get("#share-link-name").attributes("maxlength")).toBeUndefined();
+    expect(wrapper.get("#share-link-folder").attributes("maxlength")).toBeUndefined();
+  });
+
+  it("puts a too-long name error on the name field", async () => {
+    await mountSection();
+    await get("share-links-create").trigger("click");
+    await wrapper.get("#share-link-name").setValue("x".repeat(60));
+    api.post.mockRejectedValueOnce({
+      response: { status: 422, data: { detail: [{ loc: ["body", "name"], msg: "too long" }] } },
+    });
+    await get("share-link-form").trigger("submit");
+    await flushPromises();
+    expect(wrapper.text()).toContain("Use a shorter name.");
+    expect(wrapper.text()).not.toContain("Use letters, numbers");
   });
 });
