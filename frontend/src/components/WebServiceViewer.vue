@@ -360,7 +360,8 @@ onUnmounted(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: var(--z-raised);
+  /* Above everything the viewer draws, the embed fallback (--z-raised) included. */
+  z-index: var(--z-sticky);
   pointer-events: none;
 }
 

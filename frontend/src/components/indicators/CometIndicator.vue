@@ -63,7 +63,7 @@ const beadStyle = index => {
   pointer-events: none;
   z-index: var(--z-raised);
   opacity: 0;
-  transition: opacity var(--dur) ease;
+  transition: opacity var(--dur-loading-fade) ease;
 }
 
 .loading-indicator.is-active {
