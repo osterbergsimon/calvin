@@ -132,6 +132,14 @@ describe("ScreenRegionEditor size classes", () => {
     expect(classes(w)).toContain("size-phone");
   });
 
+  it("puts exactly 600px on the phone side, like every other phone check", async () => {
+    const w = await mountEditor();
+    await resize(w, ".sre-root", 600, 800);
+    expect(classes(w)).toContain("size-phone");
+    await resize(w, ".sre-root", 601, 800);
+    expect(classes(w)).toContain("size-compact");
+  });
+
   it("moves a kiosk from Wide to Compact when the OSK shrinks the modal", async () => {
     const w = await mountEditor();
     await resize(w, ".sre-root", 1280, 720);

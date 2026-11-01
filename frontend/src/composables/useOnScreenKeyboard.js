@@ -1,6 +1,6 @@
 import { computed, inject, nextTick, onScopeDispose, readonly, ref, watch } from "vue";
 import { routeLocationKey } from "vue-router";
-import { isPhoneWidth } from "../styles/breakpoints.js";
+import { isPhone } from "../styles/breakpoints.js";
 import { useConfigStore } from "../stores/config";
 import { useScreenSetting } from "./useScreenSetting";
 import { useTouchCapability } from "./useTouchCapability";
@@ -31,7 +31,8 @@ import {
  * Show rules (docs/design/2026-10-29-on-screen-keyboard.md §3, amended by
  * docs/design/2026-10-30-osk-hardware-keyboard.md):
  *   - `onScreenKeyboard` is per screen: Auto · On · Off. Auto shows on touch
- *     screens wider than a phone (src/styles/breakpoints.js) until a real keyboard is used there; On
+ *     screens that are not a phone (`isPhone`, src/styles/breakpoints.js: width <= 600, or a
+ *     short landscape screen that is not a kiosk) until a real keyboard is used there; On
  *     always; Off never by itself;
  *   - text-like inputs and textareas, never native pickers/readonly fields,
  *     never inside `[data-osk="off"]`;
@@ -193,6 +194,7 @@ export function useOnScreenKeyboard() {
 
   const visible = ref(false);
   const viewportWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
+  const viewportHeight = ref(typeof window !== "undefined" ? window.innerHeight : 0);
   const target = ref(null);
   // The OSK target that has focus even when the keyboard is hidden. The
   // "⌨ Keyboard" button needs it while `target` is cleared.
@@ -286,7 +288,7 @@ export function useOnScreenKeyboard() {
     if (value === "on") return true;
     if (value === "off") return false;
     if (typeof window === "undefined") return false;
-    return isTouch.value && !isPhoneWidth(viewportWidth.value);
+    return isTouch.value && !isPhone(viewportWidth.value, viewportHeight.value);
   });
 
   // Auto stops showing the keyboard on a screen after someone typed on a real
@@ -679,6 +681,7 @@ export function useOnScreenKeyboard() {
 
   const onResize = () => {
     viewportWidth.value = window.innerWidth;
+    viewportHeight.value = window.innerHeight;
     if (!visible.value) return;
     syncHeight();
     scrollTargetIntoView(target.value);
@@ -691,6 +694,7 @@ export function useOnScreenKeyboard() {
     if (started || typeof document === "undefined") return;
     started = true;
     viewportWidth.value = window.innerWidth;
+    viewportHeight.value = window.innerHeight;
     height.value = 0;
     hardwareSeen.value = readHardwareSeen();
     focusedTarget.value = isTargetElement(document.activeElement) ? document.activeElement : null;
