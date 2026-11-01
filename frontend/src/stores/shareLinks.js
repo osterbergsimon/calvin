@@ -44,6 +44,12 @@ export const useShareLinksStore = defineStore("shareLinks", () => {
     return link;
   }
 
+  async function setGuestsSeeAll(id, value) {
+    const link = await shareApi.setGuestsSeeAll(id, value);
+    links.value = links.value.map(l => (l.id === id ? link : l));
+    return link;
+  }
+
   async function revokeLink(id, options) {
     await shareApi.revokeLink(id, options);
     links.value = links.value.filter(l => l.id !== id);
@@ -58,6 +64,7 @@ export const useShareLinksStore = defineStore("shareLinks", () => {
     fetchFolders,
     createLink,
     renameLink,
+    setGuestsSeeAll,
     revokeLink,
   };
 });
