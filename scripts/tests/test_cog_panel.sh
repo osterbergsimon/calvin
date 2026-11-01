@@ -75,8 +75,9 @@ assert_before() {  # first second output message
     local a b
     a="$(line_of "$1" "$3")"
     b="$(line_of "$2" "$3")"
-    [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ] \
-        || fail "${4:-'$1' did not come before '$2'}"
+    if [ -z "$a" ] || [ -z "$b" ] || [ "$a" -ge "$b" ]; then
+        fail "${4:-order assertion failed: $1 before $2}"
+    fi
 }
 
 # --- 1. OFF: stop cog, wait for it to go, clear tty1, then blank 0/4 --------
