@@ -6,13 +6,10 @@
       size="lg"
       shape="circle"
       data-action="exit-fullscreen"
+      :icon="mdiClose"
       label="Exit fullscreen"
       @click="handleAction('photos_exit_fullscreen')"
-    >
-      <svg class="fs-close__glyph" viewBox="0 0 24 24" aria-hidden="true">
-        <path :d="mdiClose" fill="currentColor" />
-      </svg>
-    </IconButton>
+    />
     <DashboardPanel
       title="Photos"
       variant="media"
@@ -22,36 +19,33 @@
       :dim="dim"
     >
       <template #actions>
-        <template v-if="focused && hasPointer">
+        <RegionHeaderControls v-if="focused && hasPointer">
           <IconButton
             size="custom"
+            :icon="mdiChevronLeft"
             data-action="prev"
             label="Previous photo"
             title="Previous"
             @click="handleAction('images_prev')"
-          >
-            ‹
-          </IconButton>
+          />
           <IconButton
             size="custom"
+            :icon="mdiChevronRight"
             data-action="next"
             label="Next photo"
             title="Next"
             @click="handleAction('images_next')"
-          >
-            ›
-          </IconButton>
+          />
           <IconButton
             size="custom"
             variant="primary"
+            :icon="mdiFullscreen"
             data-action="expand"
             label="Fullscreen photos"
             title="Fullscreen"
             @click="handleAction('photos_enter_fullscreen')"
-          >
-            ⤢
-          </IconButton>
-        </template>
+          />
+        </RegionHeaderControls>
       </template>
 
       <div class="slideshow-content">
@@ -99,10 +93,11 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { mdiClose } from "@mdi/js";
+import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
 import { useImagesStore } from "../stores/images";
 import { useProgressStore } from "../stores/progress";
 import DashboardPanel from "./DashboardPanel.vue";
+import RegionHeaderControls from "./dashboard/RegionHeaderControls.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
@@ -368,11 +363,6 @@ watch(sourceKey, async () => {
   top: var(--gap-4);
   right: var(--gap-4);
   z-index: var(--z-raised);
-}
-
-.fs-close__glyph {
-  width: 1em;
-  height: 1em;
 }
 
 .photo-slideshow.fullscreen {

@@ -66,7 +66,7 @@ const onKey = e => {
 }
 .seg__btn {
   font-family: var(--font-ui);
-  font-size: var(--fs-control);
+  font-size: var(--seg-font, var(--fs-control));
   font-weight: var(--weight-strong);
   color: var(--ink-2);
   background: transparent;
