@@ -28,7 +28,7 @@ describe("Button", () => {
     }
   );
 
-  it.each(["md", "sm"])("renders the %s size class", size => {
+  it.each(["md", "sm", "custom"])("renders the %s size class", size => {
     const w = mount(Button, { props: { size }, slots: { default: "x" } });
     expect(w.classes()).toContain(`btn--${size}`);
   });
@@ -113,6 +113,15 @@ describe("Button doctrine contract", () => {
   it("sizes md by the control height and sm by the touch target", () => {
     expect(STYLE).toMatch(/\.btn--md\s*\{[^}]*min-height:\s*var\(--control-height\)/s);
     expect(STYLE).toMatch(/\.btn--sm\s*\{[^}]*min-height:\s*var\(--touch-target\)/s);
+  });
+
+  it("accepts the region-chrome custom size (--btn-height / --btn-font)", () => {
+    expect(STYLE).toMatch(
+      /\.btn--custom\s*\{[^}]*min-height:\s*var\(--btn-height,\s*var\(--control-height\)\)/s
+    );
+    expect(STYLE).toMatch(
+      /\.btn--custom\s*\{[^}]*font-size:\s*var\(--btn-font,\s*var\(--text-body\)\)/s
+    );
   });
 
   it("halves opacity and blocks the cursor when disabled", () => {

@@ -11,7 +11,10 @@
     :disabled="disabled"
     :aria-label="label"
   >
-    <slot />
+    <svg v-if="icon" class="icon-btn__glyph" viewBox="0 0 24 24" aria-hidden="true">
+      <path :d="icon" fill="currentColor" />
+    </svg>
+    <slot v-else />
   </button>
 </template>
 
@@ -37,6 +40,10 @@ defineProps({
   },
   active: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
+  // An @mdi/js path drawn at the button's font size (1em), so the glyph follows
+  // every size variant, including the region-chrome scale. Omit it and use the
+  // default slot for a custom multi-path glyph.
+  icon: { type: String, default: null },
 });
 </script>
 
@@ -53,6 +60,12 @@ defineProps({
     border-color var(--dur),
     color var(--dur);
 }
+.icon-btn__glyph {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+}
+
 .icon-btn:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;

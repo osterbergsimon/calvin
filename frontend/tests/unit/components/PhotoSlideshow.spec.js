@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
+import { mdiChevronLeft, mdiChevronRight, mdiFullscreen } from "@mdi/js";
 import PhotoSlideshow from "@/components/PhotoSlideshow.vue";
 import { useImagesStore } from "@/stores/images";
 import { useConfigStore } from "@/stores/config";
@@ -143,6 +144,39 @@ describe("PhotoSlideshow", () => {
       const wrapper = createWrapper({ isFullscreen: false });
 
       expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
+    });
+
+    it("follows Dashboard size for the header controls", () => {
+      configStore.touchControlSize = "xsmall";
+      const small = createWrapper({ focused: true });
+      configStore.touchControlSize = "xlarge";
+      const large = createWrapper({ focused: true });
+      const rail = w =>
+        w.find(".region-header-controls").element.style.getPropertyValue("--region-rail-h");
+
+      expect(rail(small)).toBe("22px");
+      expect(rail(large)).toBe("40px");
+    });
+
+    it("uses mdi chevrons and a mdi fullscreen icon, not text glyphs", () => {
+      const wrapper = createWrapper({ focused: true });
+      const buttons = wrapper.findAll(".region-header-controls .icon-btn");
+
+      expect(buttons).toHaveLength(3);
+      expect(buttons.map(b => b.find("path").attributes("d"))).toEqual([
+        mdiChevronLeft,
+        mdiChevronRight,
+        mdiFullscreen,
+      ]);
+      for (const button of buttons) expect(button.text()).toBe("");
+    });
+
+    it("uses the neutral fullscreen control, matching calendar and service", () => {
+      const wrapper = createWrapper({ focused: true });
+      const fullscreen = wrapper.find('.region-header-controls [data-action="expand"]');
+
+      expect(fullscreen.classes()).toContain("icon-btn--default");
+      expect(fullscreen.classes()).not.toContain("icon-btn--primary");
     });
   });
 
