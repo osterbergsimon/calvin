@@ -46,6 +46,13 @@
         >
           <SelectPill v-model="maxPhotos" :options="photoLimitOptions" aria-label="Photo limit" />
         </SettingRow>
+        <SettingRow label="Guests see all photos" :description="SEE_ALL_DESCRIPTION" flush>
+          <ToggleSwitch
+            v-model="guestsSeeAll"
+            aria-label="Guests see all photos added with this link"
+            data-test="share-link-see-all"
+          />
+        </SettingRow>
         <Button
           type="submit"
           variant="primary"
@@ -84,6 +91,12 @@
         <ListRow :name="item.name" :meta="linkMeta(item)" data-test="share-link-row">
           <template #actions>
             <Tag v-if="item.expired" tone="warn" data-test="share-link-expired">Expired</Tag>
+            <ToggleSwitch
+              :model-value="Boolean(item.guestsSeeAll)"
+              :aria-label="`Guests see all photos added with ${item.name}`"
+              data-test="share-link-row-see-all"
+              @update:model-value="value => saveSeeAll(item, value)"
+            />
             <Button
               size="sm"
               data-test="share-link-show"
@@ -198,6 +211,8 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 // immediate and can also remove the photos guests sent with the link.
 
 const DESCRIPTION = "Let guests add photos to one folder in Local photos from their phone.";
+const SEE_ALL_DESCRIPTION =
+  "Everyone with the link sees and can remove every photo added with it. Off: only their own.";
 const DEFAULT_FOLDER = "Guests";
 const expiryOptions = [
   { value: 0, label: "Until revoked" },
@@ -221,6 +236,7 @@ const name = ref("");
 const folder = ref(DEFAULT_FOLDER);
 const expiresInDays = ref(0);
 const maxPhotos = ref(DEFAULT_PHOTO_LIMIT);
+const guestsSeeAll = ref(true);
 const nameError = ref("");
 const folderError = ref("");
 const createError = ref("");
@@ -259,7 +275,13 @@ const linkMeta = item => {
   const now = new Date();
   const created = formatKeyDate(item.createdAt, now);
   return [
-    [`Folder ${item.folder}`, created ? `Created ${created}` : ""].filter(Boolean).join(" · "),
+    [
+      `Folder ${item.folder}`,
+      created ? `Created ${created}` : "",
+      item.guestsSeeAll ? "Guests see all photos" : "Guests see their own photos",
+    ]
+      .filter(Boolean)
+      .join(" · "),
     [
       item.lastUsedAt ? `Last used ${formatLastUsed(item.lastUsedAt, now)}` : "Never used",
       photoCount(item.uploadCount || 0),
@@ -297,6 +319,7 @@ function closeForm() {
   folder.value = DEFAULT_FOLDER;
   expiresInDays.value = 0;
   maxPhotos.value = DEFAULT_PHOTO_LIMIT;
+  guestsSeeAll.value = true;
   createError.value = "";
 }
 
@@ -320,6 +343,7 @@ async function submit() {
       folder: folderName,
       expiresInDays: expiresInDays.value || null,
       maxPhotos: maxPhotos.value,
+      guestsSeeAll: guestsSeeAll.value,
     });
     closeForm();
     shownId.value = link.id;
@@ -373,6 +397,21 @@ async function saveRename(item) {
     const status = err?.response?.status;
     if (status === 409) renameError.value = `You already have a link called ${trimmed}.`;
     else if (status !== 401) renameError.value = "Couldn't rename the link. Try again.";
+  }
+}
+
+async function saveSeeAll(item, value) {
+  rowErrors.value = { ...rowErrors.value, [item.id]: "" };
+  try {
+    await store.setGuestsSeeAll(item.id, value);
+    liveMessage.value = value
+      ? `Guests of ${item.name} now see all photos added with it.`
+      : `Guests of ${item.name} now see only their own photos.`;
+  } catch (err) {
+    if (err?.response?.status !== 401) {
+      rowErrors.value = { ...rowErrors.value, [item.id]: "Couldn't change this link. Try again." };
+      logError("[ShareLinksSection]", "update failed", err?.response?.status);
+    }
   }
 }
 
