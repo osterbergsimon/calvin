@@ -31,6 +31,9 @@ export const PROGRESS_TIMING = Object.freeze({
 /** Frame id of the whole-dashboard light. Region frames use the region id. */
 export const APP_FRAME = "app";
 
+/** Indicator styles a screen can pick (config key `loadingLight`). */
+export const LOADING_LIGHT_STYLES = Object.freeze(["comet", "pulse", "off"]);
+
 /** Reload UI / service-worker update: from the tap until the new page is up. */
 export const RELOAD_SOURCE_ID = "app:reload";
 
