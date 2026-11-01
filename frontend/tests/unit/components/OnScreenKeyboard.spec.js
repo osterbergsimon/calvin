@@ -291,22 +291,175 @@ describe("OnScreenKeyboard", () => {
       expect(isShown()).toBe(false);
     });
 
-    it("reopens a dismissed field when asked directly (the Keyboard button)", async () => {
+    // CLV-27: the ⌨ Keyboard button is the way back from Hide. The guard
+    // against the tap's own trailing click is the gesture, not a time window,
+    // so a deliberate press works immediately.
+    it("reopens a dismissed field from the Keyboard button after a fresh press", async () => {
+      setTouchPoints(5);
       mountOsk();
       const input = addInput();
       await focus(input);
       await key("{hide}");
       expect(isShown()).toBe(false);
 
-      // The button ignores the click that closes the panel; a real press comes
-      // later.
-      await new Promise(resolve => setTimeout(resolve, 450));
-      input.focus();
+      const button = document.querySelector(".osk-open");
+      expect(button).not.toBeNull();
+
+      // The leftover click of the Hide tap lands on the button that replaced
+      // the panel, and must not press it.
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       await nextTick();
-      wrapper.vm.showKeyboard();
+      expect(isShown()).toBe(false);
+
+      // A real press is a new gesture, so no waiting is needed.
+      button.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
       await nextTick();
       expect(isShown()).toBe(true);
       expect(vmValue("target")).toBe(input);
+    });
+
+    it("ignores the Hide tap even when the Keyboard button moves under the finger", async () => {
+      setTouchPoints(5);
+      mountOsk();
+      await focus(addInput());
+
+      // simple-keyboard hides on pointerdown, so the button replaces the panel
+      // before the same tap's compatibility touchstart is dispatched.
+      const hideKey = oskRoot().querySelector('.hg-button[data-skbtn="{hide}"]');
+      const down = new Event("pointerdown", { bubbles: true, cancelable: true });
+      Object.defineProperty(down, "pointerType", { value: "touch" });
+      Object.defineProperty(down, "pointerId", { value: 7 });
+      hideKey.dispatchEvent(down);
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      const button = document.querySelector(".osk-open");
+      const touchstart = new Event("touchstart", { bubbles: true, cancelable: true });
+      Object.defineProperty(touchstart, "touches", { value: [{ clientX: 10, clientY: 10 }] });
+      button.dispatchEvent(touchstart);
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(isShown()).toBe(false);
+    });
+
+    it("reopens a dismissed field after it actually loses focus and is refocused", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      input.blur();
+      await waitForFrame();
+      await focus(input);
+
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("does not judge a later click by a drag that started on the field", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      // A drag that starts on the field and ends elsewhere produces no click.
+      touchTap(input, { clientX: 10, clientY: 10 }, { clientX: 10, clientY: 200 });
+      await waitForFrame();
+      expect(isShown()).toBe(true);
+
+      const outside = addContainer({ "data-test": "after-drag" });
+      outside.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+
+      expect(isShown()).toBe(false);
+    });
+
+    it("keeps the keyboard on a tap of the label of the focused field", async () => {
+      mountOsk();
+      const input = addInput({ id: "osk-labeled-field" });
+      const label = document.createElement("label");
+      label.setAttribute("for", "osk-labeled-field");
+      label.textContent = "Name";
+      document.body.appendChild(label);
+      nodes.push(label);
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      touchTap(label);
+      await waitForOutsideHide();
+      expect(isShown()).toBe(true);
+      expect(document.activeElement).toBe(input);
+
+      label.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+      expect(isShown()).toBe(true);
+      expect(document.activeElement).toBe(input);
+    });
+
+    it("drives an OSK field inside a dialog and hides on a tap of the dialog surface", async () => {
+      mountOsk();
+      const dialog = document.createElement("dialog");
+      dialog.setAttribute("open", "");
+      const input = document.createElement("input");
+      const surface = document.createElement("p");
+      surface.textContent = "Dialog body";
+      dialog.append(input, surface);
+      document.body.appendChild(dialog);
+      nodes.push(dialog, input, surface);
+
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      await key("a");
+      expect(input.value).toBe("a");
+
+      touchTap(surface);
+      await waitForOutsideHide();
+
+      expect(isShown()).toBe(false);
+      expect(document.activeElement).not.toBe(input);
+    });
+
+    it("removes its listeners on stop()", async () => {
+      const removeListener = vi.spyOn(document, "removeEventListener");
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      wrapper.vm.stop();
+      await nextTick();
+      expect(isShown()).toBe(false);
+
+      const removed = removeListener.mock.calls.map(([type]) => type);
+      removeListener.mockRestore();
+      expect(removed).toEqual(
+        expect.arrayContaining([
+          "focusin",
+          "focusout",
+          "click",
+          "pointerdown",
+          "pointerup",
+          "pointercancel",
+          "touchstart",
+          "touchend",
+          "touchcancel",
+          "keydown",
+        ])
+      );
+
+      input.blur();
+      await waitForFrame();
+      await focus(input);
+      expect(isShown()).toBe(false);
+
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await nextTick();
+      expect(isShown()).toBe(false);
     });
 
     // CLV-114: WebKit sends the compatibility mousedown of a touch tap even

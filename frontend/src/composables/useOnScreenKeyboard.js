@@ -56,9 +56,6 @@ const HEIGHT_RATIO = 0.45;
 // events (and the real control's click) time to finish first.
 const OUTSIDE_HIDE_DELAY_MS = 120;
 const TAP_SLOP_PX = 10;
-// A Hide tap can leave a click on the Keyboard button that appears in its
-// place; ignore the button for this long after a Hide.
-const HIDE_OPEN_GUARD_MS = 400;
 const SHIFT_LOCK_WINDOW_MS = 400;
 const SHIFT_UPPER = { ß: "ẞ" };
 const CASE_CHARS = "abcdefghijklmnopqrstuvwxyzåäöæøéèüñßáàâêëíïóôúçõœã";
@@ -297,7 +294,18 @@ export function useOnScreenKeyboard() {
   let touchGesture = false;
   let touchStart = null;
   let outsideHideTimer = null;
-  let hiddenAt = 0;
+  // A fresh gesture (touchstart, or a non-compat pointerdown) has its own
+  // serial. The Hide key records the serial it was tapped in, so the trailing
+  // click of that same tap cannot press the Keyboard button that replaces the
+  // panel, while a deliberate press (a new serial) works at once.
+  let gestureSerial = 0;
+  let dismissedGesture = null;
+  let gestureResetTimer = null;
+  // Pointers that are down right now. Hiding on pointerdown can move the
+  // Keyboard button under the finger, so the compatibility touchstart of the
+  // same tap may land on the button: it continues the gesture that hid, not a
+  // new one.
+  const activePointers = new Set();
 
   const mode = () => screenSetting.value.value || "auto";
 
@@ -531,6 +539,7 @@ export function useOnScreenKeyboard() {
 
     cancelOutsideHide();
     dismissedTarget.value = null;
+    dismissedGesture = null;
     target.value = el;
     focusedTarget.value = el;
     baseLayout.value = layoutForTarget(el);
@@ -550,8 +559,13 @@ export function useOnScreenKeyboard() {
    */
   const showKeyboard = () => {
     // Hiding moves the panel away and the Keyboard button can appear in its
-    // place; the trailing click of the Hide tap must not press that button.
-    if (Date.now() - hiddenAt < HIDE_OPEN_GUARD_MS) return;
+    // place. The click that ends the Hide tap belongs to that same gesture, so
+    // it must not press the button; a real press is a new gesture and opens
+    // immediately. Identity, not a time window.
+    if (dismissedGesture !== null && dismissedGesture === gestureSerial) {
+      dismissedGesture = null;
+      return;
+    }
     const el =
       focusedTarget.value ||
       (typeof document !== "undefined" && isTargetElement(document.activeElement)
@@ -590,12 +604,51 @@ export function useOnScreenKeyboard() {
    * the way back; a fresh tap on the field clears the dismissal too.
    */
   const dismiss = () => {
-    hiddenAt = Date.now();
     dismissedTarget.value = target.value;
+    dismissedGesture = gestureSerial;
     hide();
   };
 
   const isKeyboardUi = el => !!el?.closest?.(".osk, .osk-open");
+
+  const cancelGestureReset = () => {
+    if (gestureResetTimer !== null) {
+      clearTimeout(gestureResetTimer);
+      gestureResetTimer = null;
+    }
+  };
+
+  // A drag or scroll never produces a click, so the gesture that started it
+  // must not survive to judge a later click that has no pointerdown of its own.
+  // Wait a task so the compatibility click of a real tap still sees its origin.
+  const resetGestureSoon = () => {
+    cancelGestureReset();
+    gestureResetTimer = setTimeout(() => {
+      gestureResetTimer = null;
+      gestureTarget = null;
+      touchGesture = false;
+    }, 0);
+  };
+
+  /**
+   * One predicate for the click and touch paths: a tap hides the keyboard only
+   * when it ended outside the keyboard and the field it belongs to.
+   */
+  const isOutsideTap = (el, startedOn) => {
+    if (!el) return false;
+    if (isKeyboardUi(el) || isKeyboardUi(startedOn)) return false;
+    const current = target.value;
+    if (current && (el === current || current.contains?.(el))) return false;
+    // The gesture began on the keyboard or on an OSK field (which may have
+    // moved under the finger once the keyboard appeared).
+    if (isTargetElement(startedOn)) return false;
+    if (current && (startedOn === current || current.contains?.(startedOn))) return false;
+    // A <label> for the focused field is part of that field's tap target.
+    if (current && el.closest?.("label")?.control === current) return false;
+    // Another OSK field takes over through focusin (and its click reopens).
+    if (isTargetElement(el)) return false;
+    return true;
+  };
 
   /**
    * WebKit leaves a focused input focused when a non-focusable element is
@@ -607,21 +660,10 @@ export function useOnScreenKeyboard() {
     const startedOn = gestureTarget;
     // Reset after the click has reached the target and the Keyboard button, so
     // both can still see which gesture it belongs to.
-    queueMicrotask(() => {
-      gestureTarget = null;
-      touchGesture = false;
-    });
+    resetGestureSoon();
     if (!visible.value) return;
-    const el = isElement(event.target);
-    if (!el || isKeyboardUi(el)) return;
+    if (!isOutsideTap(isElement(event.target), startedOn)) return;
     const current = target.value;
-    if (current && (el === current || current.contains?.(el))) return;
-    // The gesture began on the keyboard or on an OSK field (which may have
-    // moved under the finger once the keyboard appeared).
-    if (isKeyboardUi(startedOn) || isTargetElement(startedOn)) return;
-    if (current && (startedOn === current || current.contains?.(startedOn))) return;
-    // Another OSK field takes over through focusin (and its click reopens).
-    if (isTargetElement(el)) return;
     hide();
     if (current && document.activeElement === current) current.blur();
   };
@@ -638,12 +680,16 @@ export function useOnScreenKeyboard() {
   };
 
   // Any fresh gesture on a field clears a Hide-key dismissal. The trailing
-  // events of the Hide tap are compatibility mouse events, never pointerdown.
+  // events of the Hide tap are compatibility mouse events, not a new gesture.
   const onPointerDown = event => {
     cancelOutsideHide();
+    const isNewPointer = !activePointers.has(event.pointerId);
+    if (isNewPointer) activePointers.add(event.pointerId);
     // A touch tap's compatibility mouse events must not overwrite the element
     // the touch started on; a real mouse pointer is a new gesture.
     if (event.pointerType === "mouse" || !touchGesture) {
+      cancelGestureReset();
+      if (isNewPointer) gestureSerial += 1;
       gestureTarget = isElement(event.target);
     }
     if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
@@ -655,18 +701,25 @@ export function useOnScreenKeyboard() {
   // before the compatibility mouse events arrive.
   const onTouchStart = event => {
     cancelOutsideHide();
+    const el = isElement(event.target);
+    // With no pointer down this is a fresh touch (pointer events absent, or
+    // the browser sends touchstart first); otherwise it is the compatibility
+    // event of the pointerdown already counted.
+    if (activePointers.size === 0) {
+      cancelGestureReset();
+      gestureSerial += 1;
+      gestureTarget = el;
+    }
     touchGesture = true;
-    gestureTarget = isElement(event.target);
     const touch = event.touches?.[0];
-    touchStart = touch
-      ? { x: touch.clientX, y: touch.clientY, el: gestureTarget }
-      : { el: gestureTarget };
+    touchStart = touch ? { x: touch.clientX, y: touch.clientY, el } : { el };
     if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
   };
 
   const onTouchEnd = event => {
     const start = touchStart;
     touchStart = null;
+    resetGestureSoon();
     if (!start || !visible.value) return;
     const touch = event.changedTouches?.[0];
     if (
@@ -677,17 +730,25 @@ export function useOnScreenKeyboard() {
     ) {
       return; // A scroll or drag, not a tap.
     }
-    const el = start.el;
-    if (!el || isKeyboardUi(el)) return;
-    const current = target.value;
-    if (current && (el === current || current.contains?.(el))) return;
-    if (isTargetElement(el)) return;
+    if (!isOutsideTap(start.el, start.el)) return;
     scheduleOutsideHide();
+  };
+
+  const onPointerUp = event => {
+    activePointers.delete(event.pointerId);
+    resetGestureSoon();
+  };
+
+  const onPointerCancel = event => {
+    activePointers.delete(event.pointerId);
+    touchStart = null;
+    resetGestureSoon();
   };
 
   const onTouchCancel = () => {
     touchStart = null;
     cancelOutsideHide();
+    resetGestureSoon();
   };
 
   const scheduleHideCheck = () => {
@@ -695,6 +756,12 @@ export function useOnScreenKeyboard() {
     hideFrame = raf(() => {
       hideFrame = null;
       const active = typeof document !== "undefined" ? document.activeElement : null;
+      // The dismissed field really lost focus: a later refocus (Tab,
+      // programmatic focus) is new intent, not the tail of the Hide tap.
+      if (dismissedTarget.value && active !== dismissedTarget.value) {
+        dismissedTarget.value = null;
+        dismissedGesture = null;
+      }
       if (isTargetElement(active)) {
         focusedTarget.value = active;
         if (canShowFor(active)) {
@@ -848,6 +915,8 @@ export function useOnScreenKeyboard() {
     document.addEventListener("click", onClick, true);
     document.addEventListener("click", onDocumentClick, true);
     document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointerup", onPointerUp, true);
+    document.addEventListener("pointercancel", onPointerCancel, true);
     document.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
     document.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
     document.addEventListener("touchcancel", onTouchCancel, { capture: true, passive: true });
@@ -859,6 +928,7 @@ export function useOnScreenKeyboard() {
         () => {
           focusedTarget.value = null;
           dismissedTarget.value = null;
+          dismissedGesture = null;
           hide();
         }
       );
@@ -873,6 +943,8 @@ export function useOnScreenKeyboard() {
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("click", onDocumentClick, true);
     document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("pointerup", onPointerUp, true);
+    document.removeEventListener("pointercancel", onPointerCancel, true);
     document.removeEventListener("touchstart", onTouchStart, true);
     document.removeEventListener("touchend", onTouchEnd, true);
     document.removeEventListener("touchcancel", onTouchCancel, true);
@@ -883,9 +955,12 @@ export function useOnScreenKeyboard() {
       hideFrame = null;
     }
     cancelOutsideHide();
+    cancelGestureReset();
+    activePointers.clear();
     touchStart = null;
     touchGesture = false;
     gestureTarget = null;
+    dismissedGesture = null;
     stopRouteWatch?.();
     stopRouteWatch = null;
     visible.value = false;
