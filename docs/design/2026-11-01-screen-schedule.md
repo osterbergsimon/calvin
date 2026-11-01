@@ -37,12 +37,23 @@ control column.
    - Every day: 1 row, **Every day**.
    - Weekdays and weekends: 2 rows, **Mon–Fri** and **Sat–Sun**.
    - Each day: 7 rows, **Mon** … **Sun** (week order follows **Week starts on**).
-3. A row is 48px: the day label (`--text-label`, 4.5rem wide), then two `TextField type="time"` (`step` 900, i.e.
-   15-minute steps, `--control-height`, no per-field label; the accessible name is "Monday on" / "Monday off"), then
-   a **Screen off all day** check on the right (P3 native checkbox with `accent-color: var(--focus)` until a
-   shared checkbox exists). When checked, the two times hide and the row reads **Off all day** in `--ink-3`.
+3. A row is `--touch-target` tall:
+   - the day label (`--text-label`, 4.5rem wide);
+   - two `TextField type="time"` (`step` 900, i.e. 15-minute steps; `--control-height`; no per-field label; the
+     accessible name is "Monday on" / "Monday off");
+   - a `ToggleSwitch` on the right, accessible name **Screen on, Monday**. Off hides the two times and the row reads
+     **Off all day** in `--ink-3`.
 4. **Done** (`Button secondary sm`) collapses back to the summary. Changes save as you go (existing autosave), so
    Done only closes.
+
+**Doctrine blocks only, with no `<style>` in the feature:**
+- `SettingRow` for the summary row (label, summary as description, `Button` as control);
+- `SettingGroup` for the editor;
+- `SegmentedControl`, `TextField`, `ToggleSwitch`, `Button`, and `InlineNote` for the error;
+- the table is a **new block, `ui/FieldTable.vue`**: rows of label + controls, one header row, `--gap-inline`
+  between cells, `--touch-target` rows, `--text-meta` headers, stacking to label-over-controls under 360px. It gets a
+  gallery entry and leaves `DisplayScheduleGrid.vue` off the `settingsNoStyle` / `controlLint` allowlists. Any later
+  "same fields per row" editor reuses it.
 
 Heights: Every day ≈ 150px, Weekdays and weekends ≈ 200px, Each day ≈ 420px. All full width, so the phone shows the
 same table: day 4.5rem + two 7rem time fields fit 390px.
@@ -70,17 +81,36 @@ one override (as today): **Changed here · Reset to default** under the summary 
 
 - Row label **Schedule**; summary as in §2.1, using the user's time format (12h/24h).
 - Segments **Every day · Weekdays and weekends · Each day**.
-- Column headers **On** · **Off**; check **Screen off all day**.
+- Column headers **On** · **Off**; the row toggle is named **Screen on, {day}**.
 - An invalid range (off equal to on) gives the row an `InlineNote` err: **On and off can't be the same time.**
 - Off earlier than on means overnight. It's allowed and the summary says so: **On 22:00 · off 06:00 the next day**.
 
-## 4. Tests (vitest)
+## 4. Other sections that need the same treatment
+
+Measured with the mocked harness at 1280 (section heights):
+
+| Section | Height | Problem | Fix |
+|---|---|---|---|
+| Dashboard › **Clock bar layout** | **1,062px** | For both bar shapes: 3 sliders each, stacked under Title Case labels ("Time Font Size", "Bar Padding", "Plugin Item Size") and only half-width, plus a preview | Per bar: **Size** `SegmentedControl` **Small · Medium · Large · Custom** (presets write the 3 values). **Custom** opens a `SettingGroup` with three `SettingRow`s (**Time**, **Padding**, **Plugin info**: label left, `RangeSlider` right, value in px). One shared live preview under the section. Collapsed ≈ 250px |
+| Screens › **Touch & keyboard** | 618px | every row stacks its control under the text even at 1280; the label "Show it" lost its context | rows go side by side at ≥ 600px (§ below); "Show it" becomes **On-screen keyboard**; only **Also switch to** (6 chips) stays stacked. ≈ 380px |
+| Dashboard › **Focus & remote** | 884px | (1) three per-screen rows (**Photo frame**, **Loading light**, **Layout**) sit in a Dashboard section, while every other per-screen setting lives on the screen pages; (2) their descriptions render in `--text-body`, larger than every other description | move those three to Screens › Default / each screen, in a new section **Behaviour** (they carry "Same as Default" already); descriptions use `--text-meta`. Focus & remote keeps Focus light, Dim, Dashboard size and the button rows. ≈ 450px |
+| Screens list (875px), Content › Photos (794px) | | content-driven (cards, sources) | fine |
+
+**SettingRow rule (doctrine §4 row anatomy, clarified):**
+- side by side at ≥ 600px for any control up to 50% of the row width;
+- stacked only on phone, or for wide controls (chip groups, tables, sliders with a preview), via `:stacked`;
+- never stacked just because the description is long: the description wraps in the left column instead;
+- a height guard e2e (mocked harness) fails if a single `SettingRow` with a toggle, segmented control or select is
+  taller than 120px at 1280.
+
+## 5. Tests (vitest)
 
 - Collapsed summary for each of the three shapes, plus "Off on Sundays"; 12h formatting.
 - Mode inference from arrays (equal times, weekday/weekend split, mixed).
 - Mode switching writes the array as in §2.3; editing a grouped row updates its whole group.
 - Change expands the editor; Done collapses; the editor is full width; one header row only.
-- Screen off all day hides the times and saves `enabled: false`.
+- Turning a day's toggle off hides its times and saves `enabled: false`.
+- `FieldTable` unit tests + gallery entry; `DisplayScheduleGrid` removed from the lint allowlists.
 - Same-time error; overnight summary.
 - Screen page: Reset to default clears the schedule override.
 - Height guard (e2e, mocked harness): the collapsed Power section is ≤ 260px tall at 1280 and 390.
