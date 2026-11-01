@@ -446,6 +446,81 @@ async def _adopt_global_settings() -> None:
         logger.warning(f"Could not copy the global screen controls to a new screen: {exc}")
 
 
+# The photo frame used to be one global setting. It is per screen now
+# (calvin-3xz9). Each entry is (canonical key written per screen, both global
+# spellings read); the canonical keys are the ones the Settings UI writes.
+_PHOTO_FRAME_KEYS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("photoFrameEnabled", ("photo_frame_enabled", "photoFrameEnabled")),
+    ("photoFrameTimeout", ("photo_frame_timeout", "photoFrameTimeout")),
+)
+
+# Marks the one-time copy as done, like screenControlsMigrated (calvin-hi6w).
+# Kept in the config so a restart, a screen reset to Default, a screen
+# registering later and a restore of a post-migration backup all leave the
+# screen on the global fallback instead of being filled in again.
+PHOTO_FRAME_MIGRATED_KEY = "photoFrameMigrated"
+
+
+@retry_on_db_locked()
+async def migrate_global_photo_frame() -> None:
+    """Copy the retired global photo frame onto every screen without one (calvin-3xz9).
+
+    The global ``photo_frame_enabled``/``photo_frame_timeout`` become each
+    screen's own override where it has none; a screen that already chose keeps
+    its value. The global keys are kept (not deleted): a browser that is not a
+    known screen, and a screen that registers later, still reads them as the
+    fallback.
+
+    One-time: after the copy the done marker is stored, so a screen reset to
+    Default, a screen registering later or a restore of a post-migration backup
+    all use the global fallback instead of being filled in again. With no
+    screens registered the marker is still stored: there is nothing to copy,
+    and later screens are served by the global fallback.
+    """
+    from app.services.config_service import config_service
+
+    if await config_service.get_value(PHOTO_FRAME_MIGRATED_KEY) is True:
+        return
+
+    globals_: dict[str, Any] = {}
+    for canonical, spellings in _PHOTO_FRAME_KEYS:
+        for spelling in spellings:
+            value = await config_service.get_value(spelling)
+            if value is not None:
+                globals_[canonical] = value
+                break
+    if not globals_:
+        # Nothing to copy, but this run still completes the one-time migration.
+        # A startup unit test may call this before the config table exists; the
+        # next real startup will set it.
+        try:
+            await config_service.set_value(PHOTO_FRAME_MIGRATED_KEY, True)
+            logger.info("No global photo frame to copy; marked the migration done")
+        except Exception as exc:  # noqa: BLE001 - no config table yet
+            logger.warning(f"Could not mark the photo-frame migration done: {exc}")
+        return
+
+    rows = await KioskDB.objects.all()
+    for row in rows:
+        overrides = dict(row.overrides or {})
+        changed = False
+        for canonical, spellings in _PHOTO_FRAME_KEYS:
+            if canonical not in globals_ or _has_own_control(overrides, spellings):
+                continue
+            overrides[canonical] = globals_[canonical]
+            changed = True
+        if not changed:
+            continue
+        row.overrides = overrides
+        # Write only this column so a concurrent record_kiosk heartbeat
+        # (last_seen, agent_*) is not overwritten by this stale snapshot.
+        await row.update(_columns=["overrides"])
+        logger.info(f"Copied the global photo frame onto screen {row.id!r}")
+
+    await config_service.set_value(PHOTO_FRAME_MIGRATED_KEY, True)
+    logger.info("Retired the one-time per-screen photo-frame migration")
+
+
 @retry_on_db_locked()
 async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     """Upsert the kiosk row and replace its overrides. No-op on malformed id."""

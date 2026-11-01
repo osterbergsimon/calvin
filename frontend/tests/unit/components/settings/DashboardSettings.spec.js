@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import DashboardSettings from "@/components/settings/categories/DashboardSettings.vue";
+import { useConfigStore } from "@/stores/config";
 
 const baseConfig = () => ({
   orientation: "landscape",
@@ -272,6 +273,129 @@ describe("DashboardSettings per-screen settings (§2)", () => {
       .findAllComponents({ name: "SegmentedControl" })
       .find(c => c.props("ariaLabel") === "Settings text size");
     expect(size.props("modelValue")).toBe("compact");
+  });
+});
+
+// calvin-3xz9: Dashboard › Focus & remote › Photo frame, per screen.
+describe("DashboardSettings photo frame", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    localStorage.clear();
+  });
+
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+
+  it("puts Photo frame, Start after and Photos from under Focus & remote", async () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    expect(row(w, "Photo frame")).toBeTruthy();
+
+    // Off by default, so the dependent rows stay folded away.
+    expect(row(w, "Start after")).toBeUndefined();
+    expect(row(w, "Photos from")).toBeUndefined();
+
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(row(w, "Start after")).toBeTruthy();
+    expect(row(w, "Photos from")).toBeTruthy();
+    expect(w.find("#section-kiosk-touch-focus").text()).toContain("Photo frame");
+  });
+
+  it("offers the shared 1–30 minute start-after choices, 5 min by default", () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+
+    return flushPromises().then(() => {
+      const start = w
+        .findAllComponents({ name: "SelectPill" })
+        .find(c => c.props("ariaLabel") === "Start the photo frame after");
+      expect(start.props("modelValue")).toBe(300);
+      expect(start.props("options").map(o => o.label)).toEqual([
+        "1 min",
+        "2 min",
+        "5 min",
+        "10 min",
+        "15 min",
+        "30 min",
+      ]);
+    });
+  });
+
+  it("stores the choice on this screen, not in the global config", async () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBe("true");
+    expect((w.emitted("update:config") || []).some(c => "photoFrameEnabled" in c[0])).toBe(false);
+    expect(row(w, "Photo frame").text()).toContain("Changed here");
+
+    await w.find('[data-test="reset-photo-frame"]').trigger("click");
+    await flushPromises();
+    expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBeNull();
+    expect(row(w, "Photo frame").text()).toContain("Same as Default");
+  });
+
+  it("stores the chosen photo sources as a list for this screen", async () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    row(w, "Photo frame")
+      .findComponent({ name: "SegmentedControl" })
+      .vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    const picker = w.findComponent({ name: "PhotoSourcePicker" });
+    expect(picker.props("modelValue")).toEqual([]);
+    picker.vm.$emit("update:modelValue", ["image-1"]);
+    await flushPromises();
+
+    expect(JSON.parse(localStorage.getItem("calvin-screen-photoFrameSourceIds"))).toEqual([
+      "image-1",
+    ]);
+  });
+
+  it("reads the kiosk's merged photo frame but leaves the #256 rows on serverValue", () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "hallway");
+    const store = useConfigStore();
+    // The kiosk's merged config has the photo-frame override ...
+    store.photoFrameEnabled = true;
+    // ... while the Settings form still holds the global value.
+    const w = mount(DashboardSettings, {
+      props: { config: { ...baseConfig(), photoFrameEnabled: false, uiSize: "large" } },
+      global: { stubs },
+    });
+    expect(
+      row(w, "Photo frame").findComponent({ name: "SegmentedControl" }).props("modelValue")
+    ).toBe(true);
+
+    // The existing #256 row keeps following the serverValue it passes in.
+    store.uiSize = "compact";
+    const size = w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Settings text size");
+    expect(size.props("modelValue")).toBe("large");
+    window.sessionStorage.clear();
+  });
+
+  it("falls back to the old global value until this screen chooses", () => {
+    const w = mount(DashboardSettings, {
+      props: {
+        config: { ...baseConfig(), photoFrameEnabled: true, photoFrameTimeout: 600 },
+      },
+      global: { stubs },
+    });
+    const frame = row(w, "Photo frame").findComponent({ name: "SegmentedControl" });
+    expect(frame.props("modelValue")).toBe(true);
+    const start = w
+      .findAllComponents({ name: "SelectPill" })
+      .find(c => c.props("ariaLabel") === "Start the photo frame after");
+    expect(start.props("modelValue")).toBe(600);
   });
 });
 
