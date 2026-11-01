@@ -9,6 +9,7 @@ from app.main import app as main_app
 from app.security.admin_auth import get_admin_store
 from app.security.route_policy import (
     ADMIN_READS,
+    GUEST_ROUTES,
     PUBLIC_WRITES,
     UNSAFE_METHODS,
 )
@@ -53,6 +54,12 @@ def test_every_unsafe_route_needs_admin(test_client):
         for method in sorted(route.methods & UNSAFE_METHODS):
             path = route.path_format
             if (method, path) in PUBLIC_WRITES:
+                continue
+            if (method, path) in GUEST_ROUTES:
+                # Only a valid share token opens these; a bad one is a 404.
+                response = test_client.request(method, _fill(path), json={})
+                if response.status_code not in (303, 404):
+                    unprotected.append((method, path, response.status_code))
                 continue
             response = test_client.request(method, _fill(path), json={})
             if response.status_code != 401 or _error_code(response) != "admin_required":

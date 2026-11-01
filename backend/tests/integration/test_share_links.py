@@ -1,0 +1,466 @@
+"""Share links end to end: admin CRUD, guest token scope, revoke, expiry, share target.
+
+A stub app mounts the real share router, auth router, route policy and
+Host/Origin middleware, plus a real Local photos plugin on a temp image dir. No
+host-acting route exists on this app.
+"""
+
+import asyncio
+import logging
+import re
+from io import BytesIO
+
+import pytest
+from fastapi import Depends, FastAPI
+from fastapi.testclient import TestClient
+from PIL import Image
+
+from app.config import settings
+from app.plugins.image.local import LocalImagePlugin
+from app.plugins.manager import plugin_manager
+from app.security.admin_auth import get_admin_store
+from app.security.install import install_security
+from app.security.route_policy import (
+    ADMIN_READS,
+    GUEST_ROUTES,
+    HOST_ROUTES,
+    PUBLIC_WRITES,
+    enforce_route_policy,
+)
+from tests.test_utils import create_test_image
+
+PASSWORD = "test-admin-password"
+GPS_IFD = 0x8825
+
+
+@pytest.fixture
+def image_dir(tmp_path, monkeypatch):
+    path = tmp_path / "images"
+    path.mkdir()
+    monkeypatch.setenv("IMAGE_DIR", str(path))
+    return path
+
+
+@pytest.fixture
+def app(tmp_path, image_dir, monkeypatch):
+    monkeypatch.setattr(settings, "admin_auth_path", tmp_path / "admin-auth.json")
+    get_admin_store().set_password(PASSWORD)
+    from app.api.routes import share
+    from app.security.admin_auth import api_key_limiter, login_limiter
+
+    for limiter in (login_limiter, api_key_limiter, share.guest_token_limiter):
+        limiter._failures.clear()
+        limiter._lockouts.clear()
+    share.guest_upload_limiter.reset()
+
+    plugin = LocalImagePlugin("local-images", "Local Images", enabled=True)
+    existing = plugin_manager.get_plugin("local-images")
+    if existing is not None:
+        asyncio.run(plugin_manager.unregister("local-images"))
+    asyncio.run(plugin_manager.register(plugin))
+
+    test_app = FastAPI(dependencies=[Depends(enforce_route_policy)])
+    test_app.include_router(share.router, prefix="/api")
+    test_app.include_router(share.share_target_router)
+    install_security(test_app)
+    yield test_app
+    asyncio.run(plugin_manager.unregister("local-images"))
+    if existing is not None:
+        asyncio.run(plugin_manager.register(existing))
+
+
+@pytest.fixture
+def admin(app):
+    client = TestClient(app)
+    assert client.post("/api/auth/login", json={"password": PASSWORD}).status_code == 200
+    return client
+
+
+@pytest.fixture
+def guest(app):
+    return TestClient(app)
+
+
+def _make_link(admin, name="Grandma", folder="Guests", **extra):
+    response = admin.post("/api/share/links", json={"name": name, "folder": folder, **extra})
+    assert response.status_code == 201, response.text
+    link = response.json()["link"]
+    token = re.match(r"^/share/([^/]+)/$", link["path"]).group(1)
+    return link, token
+
+
+def _photo(fmt="JPEG", gps=False, size=(64, 48)) -> bytes:
+    img = Image.new("RGB", size, (200, 10, 10))
+    buffer = BytesIO()
+    if gps:
+        exif = Image.Exif()
+        exif.get_ifd(GPS_IFD)[2] = (59.0, 20.0, 0.0)
+        img.save(buffer, fmt, exif=exif)
+    else:
+        img.save(buffer, fmt)
+    return buffer.getvalue()
+
+
+def _upload(client, token, *files, field="photos"):
+    payload = [(field, (name, data, "image/jpeg")) for name, data in files]
+    return client.post(f"/api/guest/{token}/uploads", files=payload)
+
+
+# -- policy tables ---------------------------------------------------------
+
+
+def test_guest_routes_are_only_in_the_guest_table():
+    paths = {path for _, path in GUEST_ROUTES}
+    assert not GUEST_ROUTES & PUBLIC_WRITES
+    assert not GUEST_ROUTES & HOST_ROUTES
+    assert not paths & ADMIN_READS
+    assert all("{token}" in path for path in paths)
+
+
+def test_guest_table_matches_the_routers(app):
+    from fastapi.routing import APIRoute
+
+    guest_routes = {
+        (method, route.path_format)
+        for route in app.routes
+        if isinstance(route, APIRoute) and "{token}" in route.path_format
+        for method in route.methods
+    }
+    assert guest_routes == set(GUEST_ROUTES)
+
+
+# -- admin -----------------------------------------------------------------
+
+
+def test_admin_routes_need_admin(guest):
+    assert guest.get("/api/share/links").status_code == 401
+    assert guest.get("/api/share/folders").status_code == 401
+    assert guest.post("/api/share/links", json={"name": "x", "folder": "y"}).status_code == 401
+    assert guest.patch("/api/share/links/abc", json={"name": "x"}).status_code == 401
+    assert guest.delete("/api/share/links/abc").status_code == 401
+
+
+def test_create_list_and_reshow(admin):
+    link, token = _make_link(admin)
+    assert link["name"] == "Grandma" and link["folder"] == "Guests"
+    listed = admin.get("/api/share/links").json()["links"]
+    assert [item["id"] for item in listed] == [link["id"]]
+    # The URL can be shown again at any time.
+    assert listed[0]["path"] == f"/share/{token}/"
+    assert "hash" not in listed[0]
+
+
+def test_create_validates(admin):
+    bad = [
+        {"name": "", "folder": "Guests"},
+        {"name": "x" * 41, "folder": "Guests"},
+        {"name": "ok", "folder": "../etc"},
+        {"name": "ok", "folder": "thumbnails"},
+        {"name": "ok", "folder": "Guests", "expires_in_days": 0},
+        {"name": "ok", "folder": "Guests", "expires_in_days": 400},
+    ]
+    for body in bad:
+        assert admin.post("/api/share/links", json=body).status_code in (400, 422), body
+    _make_link(admin)
+    assert admin.post("/api/share/links", json={"name": "grandma", "folder": "x"}).status_code == (
+        409
+    )
+
+
+def test_folders_lists_local_photos_subfolders(admin, image_dir):
+    (image_dir / "Party").mkdir()
+    assert admin.get("/api/share/folders").json() == {"folders": ["Party"]}
+
+
+def test_rename(admin, guest):
+    link, token = _make_link(admin)
+    response = admin.patch(f"/api/share/links/{link['id']}", json={"name": "Nana"})
+    assert response.status_code == 200
+    assert response.json()["link"]["name"] == "Nana"
+    assert guest.get(f"/api/guest/{token}").json()["name"] == "Nana"
+    assert admin.patch("/api/share/links/missing", json={"name": "x"}).status_code == 404
+
+
+# -- guest scope -----------------------------------------------------------
+
+
+def test_guest_info_sets_a_device_cookie(admin, guest):
+    _, token = _make_link(admin)
+    response = guest.get(f"/api/guest/{token}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Grandma"
+    assert "folder" not in body
+    assert "calvin_guest" in response.cookies
+
+
+@pytest.mark.parametrize("token", ["nope", "0123456789abcdef.AAAA", "x" * 60])
+def test_bad_token_is_404_everywhere(guest, token):
+    assert guest.get(f"/api/guest/{token}").status_code == 404
+    assert guest.get(f"/api/guest/{token}/uploads").status_code == 404
+    assert _upload(guest, token, ("a.jpg", _photo())).status_code == 404
+    assert guest.get(f"/api/guest/{token}/manifest.webmanifest").status_code == 404
+
+
+def test_token_grants_nothing_outside_guest_routes(admin, guest):
+    _, token = _make_link(admin)
+    for headers in ({"Authorization": f"Bearer {token}"}, {"Cookie": f"calvin_admin={token}"}):
+        assert guest.get("/api/share/links", headers=headers).status_code == 401
+        response = guest.post(
+            "/api/share/links", json={"name": "x", "folder": "y"}, headers=headers
+        )
+        assert response.status_code == 401
+
+
+def test_guest_upload_lands_in_the_links_folder_without_gps(admin, guest, image_dir):
+    _, token = _make_link(admin)
+    response = _upload(guest, token, ("IMG_1.jpg", _photo(gps=True)))
+    assert response.status_code == 200, response.text
+    (uploaded,) = response.json()["uploaded"]
+    stored = image_dir / "Guests" / "IMG_1.jpg"
+    assert stored.is_file()
+    assert not Image.open(stored).getexif().get_ifd(GPS_IFD)
+    mine = guest.get(f"/api/guest/{token}/uploads").json()["uploads"]
+    assert [u["imageId"] for u in mine] == [uploaded["imageId"]]
+    thumb = guest.get(f"/api/guest/{token}/uploads/{uploaded['imageId']}/thumbnail")
+    assert thumb.status_code == 200
+    assert thumb.headers["content-type"] == "image/jpeg"
+    listed = admin.get("/api/share/links").json()["links"][0]
+    assert listed["uploadCount"] == 1
+    assert listed["lastUsedAt"] is not None
+
+
+def test_many_files_in_one_request_and_partial_failure(admin, guest, image_dir):
+    _, token = _make_link(admin)
+    response = _upload(
+        guest,
+        token,
+        ("a.jpg", _photo()),
+        ("b.png", _photo("PNG")),
+        ("evil.jpg", b"not a photo"),
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["uploaded"]) == 2
+    assert [f["filename"] for f in body["failed"]] == ["evil.jpg"]
+    assert sorted(p.name for p in (image_dir / "Guests").iterdir()) == ["a.jpg", "b.png"]
+
+
+def test_only_bad_files_is_400(admin, guest):
+    _, token = _make_link(admin)
+    assert _upload(guest, token, ("x.svg", b"<svg/>")).status_code == 400
+
+
+def test_guest_sees_and_removes_only_own_uploads(admin, app, image_dir):
+    _, token = _make_link(admin)
+    phone_a, phone_b = TestClient(app), TestClient(app)
+    phone_a.get(f"/api/guest/{token}")
+    phone_b.get(f"/api/guest/{token}")
+    (mine,) = _upload(phone_a, token, ("a.jpg", _photo())).json()["uploaded"]
+    _upload(phone_b, token, ("b.jpg", _photo()))
+
+    assert [u["imageId"] for u in phone_b.get(f"/api/guest/{token}/uploads").json()["uploads"]]
+    assert phone_b.delete(f"/api/guest/{token}/uploads/{mine['imageId']}").status_code == 404
+    image_id = mine["imageId"]
+    assert phone_b.get(f"/api/guest/{token}/uploads/{image_id}/thumbnail").status_code == 404
+    assert (image_dir / "Guests" / "a.jpg").exists()
+
+    assert phone_a.delete(f"/api/guest/{token}/uploads/{image_id}").status_code == 204
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+    assert (image_dir / "Guests" / "b.jpg").exists()
+
+
+def test_guest_cannot_delete_photos_that_are_not_theirs(admin, guest, image_dir):
+    from tests.test_utils import create_test_image_file
+
+    create_test_image_file(image_dir / "family.jpg")
+    _, token = _make_link(admin)
+    guest.get(f"/api/guest/{token}")
+    import hashlib
+
+    other_id = hashlib.md5(str(image_dir / "family.jpg").encode()).hexdigest()  # noqa: S324
+    assert guest.delete(f"/api/guest/{token}/uploads/{other_id}").status_code == 404
+    assert guest.get(f"/api/guest/{token}/uploads/{other_id}/thumbnail").status_code == 404
+    assert (image_dir / "family.jpg").exists()
+
+
+def test_link_a_cannot_touch_link_b_uploads(admin, guest, image_dir):
+    _, token_a = _make_link(admin, "A", "A")
+    _, token_b = _make_link(admin, "B", "B")
+    guest.get(f"/api/guest/{token_a}")
+    (photo,) = _upload(guest, token_a, ("a.jpg", _photo())).json()["uploaded"]
+    assert guest.delete(f"/api/guest/{token_b}/uploads/{photo['imageId']}").status_code == 404
+    assert guest.get(f"/api/guest/{token_b}/uploads").json()["uploads"] == []
+
+
+# -- revoke and expiry -----------------------------------------------------
+
+
+def test_revoke_is_immediate_and_keeps_photos_by_default(admin, guest, image_dir):
+    link, token = _make_link(admin)
+    _upload(guest, token, ("a.jpg", _photo()))
+    assert admin.delete(f"/api/share/links/{link['id']}").status_code == 204
+    assert guest.get(f"/api/guest/{token}").status_code == 404
+    assert _upload(guest, token, ("b.jpg", _photo())).status_code == 404
+    assert (image_dir / "Guests" / "a.jpg").exists()
+    assert admin.delete(f"/api/share/links/{link['id']}").status_code == 404
+
+
+def test_revoke_can_remove_its_photos(admin, guest, image_dir):
+    from tests.test_utils import create_test_image_file
+
+    link, token = _make_link(admin)
+    _upload(guest, token, ("a.jpg", _photo()))
+    create_test_image_file(image_dir / "Guests" / "owners.jpg")
+    response = admin.delete(f"/api/share/links/{link['id']}?remove_photos=true")
+    assert response.status_code == 204
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+    # Only the link's own uploads go; other photos in the folder stay.
+    assert (image_dir / "Guests" / "owners.jpg").exists()
+
+
+def test_expired_link_stops_working(admin, guest, monkeypatch):
+    link, token = _make_link(admin, expires_in_days=1)
+    assert link["expiresAt"] is not None
+    assert guest.get(f"/api/guest/{token}").status_code == 200
+
+    import app.security.share_links as share_links
+
+    real_time = share_links.time.time
+    monkeypatch.setattr(share_links.time, "time", lambda: real_time() + 2 * 86400)
+    assert guest.get(f"/api/guest/{token}").status_code == 404
+    assert admin.get("/api/share/links").json()["links"][0]["expired"] is True
+
+
+# -- PWA manifest and Web Share Target ---------------------------------------
+
+
+def test_manifest_declares_the_share_target(admin, guest):
+    _, token = _make_link(admin)
+    response = guest.get(f"/api/guest/{token}/manifest.webmanifest")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("application/manifest+json")
+    manifest = response.json()
+    assert manifest["start_url"] == f"/share/{token}/"
+    assert manifest["scope"] == f"/share/{token}/"
+    assert manifest["display"] == "standalone"
+    target = manifest["share_target"]
+    assert target["action"] == f"/share/{token}/receive"
+    assert target["method"] == "POST"
+    assert target["enctype"] == "multipart/form-data"
+    (files,) = target["params"]["files"]
+    assert files["name"] == "photos"
+    assert "image/*" in files["accept"]
+
+
+def test_share_target_post_uploads_and_redirects(admin, guest, image_dir):
+    _, token = _make_link(admin)
+    response = guest.post(
+        f"/share/{token}/receive",
+        files=[
+            ("photos", ("IMG_9.jpg", _photo(), "image/jpeg")),
+            ("photos", ("bad.jpg", b"nope", "image/jpeg")),
+        ],
+        # Android sends the share as a browser navigation: no Origin header.
+        headers={"Sec-Fetch-Site": "none"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/share/{token}/?added=1&failed=1"
+    assert (image_dir / "Guests" / "IMG_9.jpg").exists()
+    # The share counts as this device's upload.
+    assert "calvin_guest" in response.cookies
+    mine = guest.get(f"/api/guest/{token}/uploads").json()["uploads"]
+    assert len(mine) == 1
+
+
+def test_share_target_with_revoked_link_redirects_to_the_page(admin, guest):
+    link, token = _make_link(admin)
+    admin.delete(f"/api/share/links/{link['id']}")
+    response = guest.post(
+        f"/share/{token}/receive",
+        files=[("photos", ("a.jpg", _photo(), "image/jpeg"))],
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/share/{token}/?error=invalid"
+
+
+# -- abuse limits ------------------------------------------------------------
+
+
+def test_token_guessing_is_rate_limited(guest):
+    for _ in range(5):
+        assert guest.get("/api/guest/nope.nope").status_code == 404
+    assert guest.get("/api/guest/nope.nope").status_code == 429
+
+
+def test_uploads_are_rate_limited(admin, guest, monkeypatch):
+    from app.api.routes import share
+
+    monkeypatch.setattr(share.guest_upload_limiter, "max_events", 2)
+    _, token = _make_link(admin)
+    assert _upload(guest, token, ("a.jpg", _photo())).status_code == 200
+    assert _upload(guest, token, ("b.jpg", _photo())).status_code == 200
+    response = _upload(guest, token, ("c.jpg", _photo()))
+    assert response.status_code == 429
+    assert "retry-after" in response.headers
+
+
+def test_cross_site_guest_upload_is_refused(admin, guest):
+    _, token = _make_link(admin)
+    response = guest.post(
+        f"/api/guest/{token}/uploads",
+        files=[("photos", ("a.jpg", _photo(), "image/jpeg"))],
+        headers={"Origin": "https://evil.example"},
+    )
+    assert response.status_code == 403
+
+
+def test_local_photos_off_is_503(admin, guest):
+    _, token = _make_link(admin)
+    asyncio.run(plugin_manager.unregister("local-images"))
+    assert _upload(guest, token, ("a.jpg", _photo())).status_code == 503
+
+
+def test_tokens_are_redacted_from_access_logs(admin):
+    _, token = _make_link(admin)
+    from app.security.install import ShareTokenRedactor
+
+    record = logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("1.2.3.4", "GET", f"/share/{token}/?added=1", "1.1", 200),
+        None,
+    )
+    assert ShareTokenRedactor().filter(record) is True
+    assert token not in record.getMessage()
+    assert "/share/[redacted]/" in record.getMessage()
+
+
+def test_large_photo_is_resized(admin, guest, image_dir):
+    from app.services.guest_image import MAX_EDGE
+
+    _, token = _make_link(admin)
+    big = create_test_image("JPEG", width=MAX_EDGE + 500, height=100)
+    assert _upload(guest, token, ("big.jpg", big)).status_code == 200
+    assert max(Image.open(image_dir / "Guests" / "big.jpg").size) == MAX_EDGE
+
+
+def test_guest_page_html_links_the_links_manifest():
+    from app.api.routes.share import share_page_html
+
+    index = (
+        '<html><head><link rel="manifest" href="/site.webmanifest">'
+        "<title>Calvin Dashboard</title></head><body></body></html>"
+    )
+    html = share_page_html(index, "abc.DEF_-1")
+    assert 'href="/api/guest/abc.DEF_-1/manifest.webmanifest"' in html
+    assert "/site.webmanifest" not in html
+    assert "<title>Add photos</title>" in html
+    assert 'name="apple-mobile-web-app-title"' in html
+    # Anything that isn't token-shaped is never written into the page.
+    assert share_page_html(index, '"><script>') == index

@@ -14,6 +14,10 @@ from app.services.event_system import event_system
 # Loguru automatically includes module/function info in logs
 
 
+# The Local photos instance (LocalImagePlugin.metadata.fixed_instance_id).
+LOCAL_PHOTOS_ID = "local-images"
+
+
 class PluginImageService:
     """Image service using plugin architecture."""
 
@@ -404,6 +408,24 @@ class PluginImageService:
                 logger.error(f"Error uploading image to plugin {plugin.plugin_id}: {e}")
 
         return None
+
+    async def upload_to_local_folder(
+        self, file_data: bytes, filename: str, folder: str
+    ) -> dict[str, Any] | None:
+        """Upload into one subfolder of Local photos (share links, calvin-mwqo).
+
+        Returns ``None`` when Local photos is missing or turned off, or the
+        upload failed; the caller tells the guest.
+        """
+        from app.plugins.image.local import LocalImagePlugin
+
+        plugin = plugin_manager.get_plugin(LOCAL_PHOTOS_ID)
+        if not isinstance(plugin, LocalImagePlugin) or not plugin.enabled:
+            return None
+        result = await plugin.upload_image(file_data, filename, folder=folder)
+        if result:
+            self.invalidate_cache()
+        return result
 
     async def delete_image(self, image_id: str) -> bool:
         """

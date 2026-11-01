@@ -15,6 +15,7 @@ derived. Tokens are never logged; only the link id and name are.
 from __future__ import annotations
 
 import base64
+import builtins
 import hashlib
 import hmac
 import json
@@ -175,7 +176,7 @@ class ShareLinkStore:
 
     # -- management ------------------------------------------------------
 
-    def list(self, now: float | None = None) -> list[dict[str, Any]]:
+    def list(self, now: float | None = None) -> builtins.list[dict[str, Any]]:
         current = time.time() if now is None else now
         entries = sorted(self._load(), key=lambda e: e["created_at"], reverse=True)
         return [_public(entry, current) for entry in entries]
@@ -273,7 +274,7 @@ class ShareLinkStore:
                     self._write(links)
                     return
 
-    def uploads_for(self, link_id: str, device: str) -> list[dict[str, Any]]:
+    def uploads_for(self, link_id: str, device: str) -> builtins.list[dict[str, Any]]:
         """This device's uploads through this link, newest first."""
         device_hash = _hash(device)
         for entry in self._load():
