@@ -9,6 +9,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { CUSTOM_MEDIA } from "../../../src/styles/breakpoints.js";
 
 // Vitest provides __dirname; a plain `node` script does not.
 const HERE =
@@ -99,6 +100,88 @@ export function roleViolations(file) {
     }
   }
   return found;
+}
+
+/** The global stylesheets (theme tokens, base, plugin body vocabulary). */
+export const CSS_FILES = readdirSync(join(SRC, "styles"))
+  .filter(name => name.endsWith(".css"))
+  .map(name => `styles/${name}`)
+  .sort();
+
+const Z_ROLE = /^(auto|var\(--z-(raised|sticky|dialog|popover|osk|toast)\))$/;
+const WEIGHT_ROLE = /^(inherit|var\(--weight-(body|strong|title)\))$/;
+const DUR_ROLE = /^var\(--dur(-fast)?\)$/;
+const TIME = /(^|[\s,(])\d*\.?\d+m?s\b/;
+const WIDTH_FEATURE = /^(min-|max-)?(device-)?width\s*:/;
+
+/** Drop `@media (prefers-reduced-motion: …) { … }` blocks: the override stays literal. */
+const stripReducedMotion = css => {
+  let out = css;
+  for (;;) {
+    const start = out.search(/@media[^{]*prefers-reduced-motion[^{]*\{/);
+    if (start === -1) return out;
+    let depth = 0;
+    let end = out.indexOf("{", start);
+    for (; end < out.length; end++) {
+      if (out[end] === "{") depth++;
+      else if (out[end] === "}" && --depth === 0) break;
+    }
+    out = out.slice(0, start) + out.slice(end + 1);
+  }
+};
+
+/** The fixed z-index / weight / duration / breakpoint sets, on raw CSS. */
+export function fixedSetViolationsIn(file, rawCss) {
+  const css = stripReducedMotion(blankComments(rawCss));
+  const found = [];
+  const push = (selector, kind, value) => found.push({ file, selector, kind, value });
+
+  for (const [, params] of css.matchAll(/@media([^{]+)\{/g)) {
+    for (const [, feature] of params.matchAll(/\(([^()]*)\)/g)) {
+      const bad = feature.startsWith("--")
+        ? !(feature.trim() in CUSTOM_MEDIA)
+        : WIDTH_FEATURE.test(feature.trim());
+      if (bad) push(`@media${params.trim()}`, "breakpoint", `(${feature})`);
+    }
+  }
+
+  for (const match of css.matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    const selector = match[1].split(/\s+/).join(" ").trim();
+    for (const declaration of match[2].split(";")) {
+      const colon = declaration.indexOf(":");
+      if (colon === -1) continue;
+      const prop = declaration.slice(0, colon).trim().toLowerCase();
+      const value = declaration
+        .slice(colon + 1)
+        .replace(/!important/, "")
+        .trim()
+        .split(/\s+/)
+        .join(" ");
+      if (prop === "z-index" && !Z_ROLE.test(value)) push(selector, "z-index", value);
+      if (prop === "font-weight" && !WEIGHT_ROLE.test(value)) push(selector, "font-weight", value);
+      if (prop === "font" && (WEIGHT_IN_SHORTHAND.test(` ${value}`) || /\bbold(er)?\b/.test(value)))
+        push(selector, "font-weight", value);
+      if (prop === "transition-duration") {
+        if (!value.split(/\s*,\s*/).every(part => DUR_ROLE.test(part)))
+          push(selector, "duration", value);
+      } else if (prop === "transition" || prop === "transition-delay") {
+        const durs = value.match(/var\(--dur[\w-]*\)/g) || [];
+        if (TIME.test(value) || value.includes("calc(") || durs.some(d => !DUR_ROLE.test(d)))
+          push(selector, "duration", value);
+      } else if (prop === "animation" || prop.startsWith("animation-")) {
+        if (TIME.test(value)) push(selector, "duration", value);
+      }
+    }
+  }
+  return found;
+}
+
+export function fixedSetViolations(file) {
+  const source = read(file);
+  const css = file.endsWith(".vue")
+    ? [...source.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(m => m[1]).join("\n")
+    : source;
+  return fixedSetViolationsIn(file, css);
 }
 
 const BANNED = [
