@@ -17,23 +17,25 @@
         <!-- Always-visible header: month/year label, navigation + view switch -->
         <div ref="headerEl" class="calendar-header">
           <div class="calendar-header__label">{{ currentMonthYear }}</div>
-          <div v-if="focused && hasPointer" class="calendar-header__controls">
+          <RegionHeaderControls v-if="focused && hasPointer" class="calendar-header__controls">
             <Button
               v-if="!isCurrentPeriod"
               class="calendar-header__today"
               variant="primary"
-              size="md"
+              size="custom"
               title="Jump to today"
               aria-label="Jump to today"
               @click="goToToday"
             >
               Today
             </Button>
-            <IconButton size="lg" label="Previous" title="Previous" @click="previousMonth">
-              <svg class="calendar-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path :d="mdiChevronLeft" fill="currentColor" />
-              </svg>
-            </IconButton>
+            <IconButton
+              size="custom"
+              :icon="mdiChevronLeft"
+              label="Previous"
+              title="Previous"
+              @click="previousMonth"
+            />
             <!-- The view is picked directly. A narrow region cannot fit three
                  segments, so it gets the same choice in a SelectPill. -->
             <SegmentedControl
@@ -49,28 +51,27 @@
               class="calendar-header__view-switch"
               :model-value="viewMode"
               :options="viewOptions"
-              aria-label="Calendar view"
+              :aria-label="viewSwitchLabel"
               @update:model-value="setViewMode"
             />
-            <IconButton size="lg" label="Next" title="Next" @click="nextMonth">
-              <svg class="calendar-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path :d="mdiChevronRight" fill="currentColor" />
-              </svg>
-            </IconButton>
+            <IconButton
+              size="custom"
+              :icon="mdiChevronRight"
+              label="Next"
+              title="Next"
+              @click="nextMonth"
+            />
             <CalendarViewOptions v-if="view" :region-id="regionId" :view="view" />
             <IconButton
               v-if="!isFullscreen"
-              size="lg"
+              size="custom"
               class="calendar-header__fullscreen"
+              :icon="mdiFullscreen"
               label="Fullscreen calendar"
               title="Fullscreen"
               @click="enterFullscreen"
-            >
-              <svg class="calendar-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path :d="mdiFullscreen" fill="currentColor" />
-              </svg>
-            </IconButton>
-          </div>
+            />
+          </RegionHeaderControls>
         </div>
 
         <!-- First run: no calendar sources yet → say so and link to the fix (F4) -->
@@ -244,14 +245,11 @@
         size="lg"
         shape="circle"
         data-action="exit-fullscreen"
+        :icon="mdiClose"
         title="Close Fullscreen (ESC)"
         label="Exit fullscreen"
         @click.stop="handleCloseFullscreen"
-      >
-        <svg class="calendar-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path :d="mdiClose" fill="currentColor" />
-        </svg>
-      </IconButton>
+      />
     </div>
 
     <!-- Event Detail Panel -->
@@ -287,6 +285,7 @@ import SegmentedControl from "./ui/SegmentedControl.vue";
 import SelectPill from "./ui/SelectPill.vue";
 import EmptyState from "./ui/EmptyState.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
+import RegionHeaderControls from "./dashboard/RegionHeaderControls.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { isPhoneWidth } from "@/styles/breakpoints.js";
 import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
@@ -648,7 +647,13 @@ const formatDateRange = (startDate, endDate) => {
     startDate.getMonth() === endDate.getMonth() &&
     startDate.getFullYear() === endDate.getFullYear()
   ) {
-    return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
+    // Ask for the day and year separately: an Intl pattern with day+year but no
+    // month renders as "2026 (day: 7)" under some ICU builds, which read like
+    // debug text in the header.
+    const start = startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    const endDay = endDate.toLocaleDateString("en-US", { day: "numeric" });
+    const endYear = endDate.toLocaleDateString("en-US", { year: "numeric" });
+    return `${start} - ${endDay}, ${endYear}`;
   }
   const start = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const end = endDate.toLocaleDateString("en-US", {
@@ -1512,41 +1517,20 @@ onActivated(() => {
   min-width: 0;
 }
 
+/* Shared rail geometry (height, gap, type) comes from RegionHeaderControls;
+   only this header's placement and the shrinkable pill stay local. */
 .calendar-header__controls {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  /* If the controls themselves are wider than the region, wrap them rather
-     than letting the right edge clip. `margin-left: auto` keeps them right-
-     aligned when they move to their own row. */
-  flex-wrap: wrap;
-  justify-content: flex-end;
   margin-left: auto;
   min-width: 0;
-  /* Do not hold the row at its max-content width: that is what pushed the last
-     button past the region edge. Let the controls shrink onto their own row so
-     their buttons wrap inside it instead of disappearing (CLV-91). */
+  max-width: 100%;
+  /* Wrap under the label as a whole, then let the view selector shrink (and
+     ellipsize) if a row is still narrower than the controls themselves. */
   flex: 0 1 auto;
 }
 
-/* One glyph box for the header's chevrons and fullscreen controls. */
-.calendar-icon {
-  width: 1.25rem; /* 20px */
-  height: 1.25rem;
-  fill: currentColor;
-}
-
-/* The view selector is a compact SegmentedControl (wide region) or SelectPill
-   (narrow region). Both sit on the control height/radius shared by every other
-   control in the header instead of their roomier settings-page geometry. */
 .calendar-header__view-switch {
-  --seg-height: var(--control-height);
-  --seg-radius: var(--radius-control);
-  --seg-padding: 0;
-  --seg-btn-min-height: 0;
-  --seg-btn-padding: 0 1.125rem;
-  --seg-btn-radius: calc(var(--radius-control) - 1px);
-  --pill-radius: var(--radius-control);
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* Fullscreen close button — mirrors the photos/web-service overlay. */

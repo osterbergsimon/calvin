@@ -3,7 +3,7 @@
     <template #trigger="{ attrs }">
       <IconButton
         class="region-view-options__trigger"
-        size="lg"
+        size="custom"
         :active="active"
         :label="label"
         :title="label"
@@ -64,8 +64,9 @@ defineExpose({ open });
    component's scope, so these scoped selectors reach it. The glyph inherits
    the button's `color`, so IconButton's active state (--focus) lights it up. */
 .tune-glyph {
-  width: 1.25rem; /* 20px, the header's icon box */
-  height: 1.25rem;
+  /* 1em tracks IconButton size="custom" (--icon-font), i.e. the region glyph. */
+  width: 1em;
+  height: 1em;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
