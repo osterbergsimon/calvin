@@ -16,6 +16,14 @@ import {
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
 import { migrateDisplaySettings } from "../utils/displaySettingsMigration";
 import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
+import {
+  decodeScreenValue,
+  encodeScreenValue,
+  readScreenStorage,
+  screenSettingRef,
+  screenStorageKey,
+} from "../utils/screenSetting";
+import { useKiosksStore } from "./kiosks";
 
 // The config is what a kiosk boots from, so its offline copy is kept for a day
 // and served (flagged stale) even after that when the backend is unreachable.
@@ -202,6 +210,58 @@ export const useConfigStore = defineStore("config", () => {
     pluginCatalogRepo,
   };
 
+  // --- Per-screen control visibility (calvin-hi6w) --------------------------
+  // Hiding the controls, keeping the clock bar while hidden and tap-to-reveal
+  // used to be one household setting. They belong to the screen now: a kiosk
+  // stores its choice in its overrides (which arrive already merged into the
+  // refs above), any other browser keeps it in localStorage and falls back to
+  // the global value while it has no choice of its own. These three refs are
+  // shared with useScreenSetting, so the Settings rows and the dashboard ⋯
+  // menu always write the same value.
+  const kioskScope = Boolean(getKioskId());
+  const showUIScreenStorage = screenStorageKey("showUI");
+  const clockBarInKioskScreenStorage = screenStorageKey("clockBarShowInKiosk");
+  const tapAnywhereScreenStorage = screenStorageKey("tapAnywhereReveal");
+  const showUIScreenRaw = screenSettingRef(showUIScreenStorage);
+  const clockBarInKioskScreenRaw = screenSettingRef(clockBarInKioskScreenStorage);
+  const tapAnywhereScreenRaw = screenSettingRef(tapAnywhereScreenStorage);
+  if (!kioskScope) {
+    // A shared ref may survive a remount (tests, HMR); the page's storage wins.
+    showUIScreenRaw.value = readScreenStorage(showUIScreenStorage);
+    clockBarInKioskScreenRaw.value = readScreenStorage(clockBarInKioskScreenStorage);
+    tapAnywhereScreenRaw.value = readScreenStorage(tapAnywhereScreenStorage);
+  }
+
+  const decodeScreenChoice = (raw, fallback) => decodeScreenValue(raw, fallback);
+  const effectiveShowUI = computed(() => {
+    if (kioskScope) return showUI.value;
+    return decodeScreenChoice(showUIScreenRaw.value, true) ?? showUI.value;
+  });
+  const effectiveClockBarShowInKiosk = computed(() => {
+    if (kioskScope) return clockBarShowInKiosk.value;
+    return decodeScreenChoice(clockBarInKioskScreenRaw.value, false) ?? clockBarShowInKiosk.value;
+  });
+  const effectiveTapAnywhereReveal = computed(() => {
+    if (kioskScope) return tapAnywhereReveal.value;
+    return decodeScreenChoice(tapAnywhereScreenRaw.value, false) ?? tapAnywhereReveal.value;
+  });
+
+  const writeScreenControl = async (key, storageKey, raw, next) => {
+    if (kioskScope) {
+      const kiosksStore = useKiosksStore();
+      const overrides = (await kiosksStore.fetchOverrides(getKioskId())) || {};
+      await kiosksStore.saveOverrides(getKioskId(), { ...overrides, [key]: next });
+      configRefs[key].value = next;
+      return;
+    }
+    raw.value = encodeScreenValue(next);
+    try {
+      window.localStorage.setItem(storageKey, raw.value);
+    } catch {
+      // Storage blocked: the choice lasts for this page load.
+    }
+  };
+
   const setOrientation = newOrientation => {
     orientation.value = newOrientation;
   };
@@ -371,24 +431,24 @@ export const useConfigStore = defineStore("config", () => {
     const newValue = !currentlyVisible;
 
     // Clear any temporary UI override when toggling permanently
+    clearTemporaryUI();
+
+    // This screen's own choice: a kiosk override, or this browser's storage.
+    // The global value stays the default for screens that have no choice.
+    try {
+      await writeScreenControl("showUI", showUIScreenStorage, showUIScreenRaw, newValue);
+    } catch (err) {
+      logError("[ConfigStore]", "Failed to save UI visibility:", err);
+    }
+  };
+
+  const clearTemporaryUI = () => {
     if (temporaryUITimer.value) {
       clearTimeout(temporaryUITimer.value);
       temporaryUITimer.value = null;
     }
     teardownUiActivityListeners();
     showUITemporary.value = false;
-
-    // Update the persistent showUI value
-    showUI.value = newValue;
-
-    // Persist the change to backend
-    try {
-      await updateConfig({ showUI: newValue });
-    } catch (err) {
-      logError("[ConfigStore]", "Failed to save UI visibility:", err);
-      // Revert on error
-      showUI.value = !newValue;
-    }
   };
 
   // Show UI temporarily (for accessing settings, etc.)
@@ -450,7 +510,7 @@ export const useConfigStore = defineStore("config", () => {
   // Computed property to determine if UI should be shown
   // Shows UI if either persistent setting is on OR temporary override is active
   const shouldShowUI = computed(() => {
-    return showUI.value || showUITemporary.value;
+    return effectiveShowUI.value || showUITemporary.value;
   });
 
   const setPhotoRotationInterval = interval => {
@@ -605,6 +665,7 @@ export const useConfigStore = defineStore("config", () => {
     photoFrameEnabled,
     photoFrameTimeout,
     showUI,
+    effectiveShowUI,
     modeIndicatorTimeout,
     keyboardFeedbackEnabled,
     keyboardFeedbackMode,
@@ -634,6 +695,7 @@ export const useConfigStore = defineStore("config", () => {
     clockShowSeconds,
     clockBarMode,
     clockBarShowInKiosk,
+    effectiveClockBarShowInKiosk,
     clockBarPosition,
     clockBarFontSize,
     clockBarDateFontSize,
@@ -660,6 +722,7 @@ export const useConfigStore = defineStore("config", () => {
     layoutMode,
     regionsLocked,
     tapAnywhereReveal,
+    effectiveTapAnywhereReveal,
     hotCornerPosition,
     hotCornerOpacity,
     hotCornerSize,
@@ -688,6 +751,7 @@ export const useConfigStore = defineStore("config", () => {
     setShowUI,
     toggleUI,
     showUITemporarily,
+    clearTemporaryUI,
     shouldShowUI,
     setModeIndicatorTimeout,
     setPhotoRotationInterval,

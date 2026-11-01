@@ -35,12 +35,18 @@ test.describe("phone: Dashboard", () => {
     await expectPhoneLayout(page, "theme chooser", { scope: ".theme-picker__panel" });
     await page.keyboard.press("Escape");
 
-    // A change saves through the config route and keeps the layout intact.
+    // Hide controls is this screen's own choice (calvin-hi6w): it lands in
+    // localStorage instead of the household config, so nothing is POSTed.
     const hideControls = dashboard.getByLabel("Hide controls");
     await hideControls.click();
-    await expect(page.locator(".settings-topbar__pill-label")).toHaveText(/Saved/);
-    await expect.poll(() => api.requests).toContain("POST /api/config");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
+      .toBe("false");
+    expect(api.requests).not.toContain("POST /api/config");
     await hideControls.click();
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
+      .toBe("true");
 
     await expectPhoneLayout(page, "Dashboard settings after saving");
     expect(api.unmatched).toEqual([]);
