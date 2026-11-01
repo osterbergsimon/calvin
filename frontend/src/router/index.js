@@ -4,6 +4,7 @@ import { recoverFromChunkLoadError } from "./chunkRecovery";
 // Lazy load routes for better code splitting
 const Dashboard = () => import("../views/Dashboard.vue");
 const Settings = () => import("../views/Settings.vue");
+const GuestShare = () => import("../views/GuestShare.vue");
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,6 +18,13 @@ const router = createRouter({
       path: "/settings",
       name: "settings",
       component: Settings,
+    },
+    {
+      // Trailing slash optional: the installed PWA's scope is /share/<token>/.
+      path: "/share/:token/",
+      name: "guest-share",
+      component: GuestShare,
+      meta: { guest: true },
     },
   ],
 });
