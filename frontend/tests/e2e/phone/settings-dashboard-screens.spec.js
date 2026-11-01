@@ -104,4 +104,45 @@ test.describe("phone: Screens", () => {
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
+
+  test("turns a screen on and off now without calling a host route", async ({
+    page,
+    consoleErrors,
+  }) => {
+    const week = [0, 1, 2, 3, 4, 5, 6].map(day => ({
+      day,
+      enabled: true,
+      onTime: "06:00",
+      offTime: "22:00",
+    }));
+    const api = await installApiMock(page, {
+      config: {
+        timezone: "Europe/Stockholm",
+        displayScheduleEnabled: true,
+        displaySchedule: week,
+      },
+    });
+    await gotoSettings(page);
+    await expectSettingsReady(page);
+    await selectCategory(page, "Screens");
+    await page.locator('[data-test="screen-card"]').first().click();
+    await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+
+    await page.locator('[data-test="screen-now-off"]').click();
+    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe("off");
+    // The schedule's next boundary is saved with the choice, in the screen's zone.
+    expect(api.overridesByKiosk.hallway.screenNow.until).toBeTruthy();
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText("Off now");
+    await expect(page.locator('[data-test="screen-now-until"]')).toHaveText(
+      /^Off until \d{2}:\d{2}$/
+    );
+
+    await page.getByRole("button", { name: "Follow schedule" }).click();
+    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow).toBeUndefined();
+
+    // The manual choice is a kiosk override, never a host-acting route.
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
 });

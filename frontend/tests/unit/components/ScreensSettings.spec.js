@@ -744,6 +744,64 @@ describe("ScreensSettings — Power", () => {
       displaySchedule: [{ day: 0, enabled: false, onTime: "07:00", offTime: "23:00" }],
     });
   });
+
+  it("shows the current state, when the schedule takes over, and Follow schedule", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-11T09:00:00+02:00"));
+    try {
+      const { wrapper, store } = mountScreens({
+        cfg: config({
+          timezone: "Europe/Stockholm",
+          displayScheduleEnabled: true,
+          displaySchedule: [
+            { day: 5, enabled: true, onTime: "06:00", offTime: "22:00" },
+            { day: 6, enabled: true, onTime: "06:00", offTime: "22:00" },
+          ],
+        }),
+        overrides: {
+          screenNow: { power: "off", until: "2026-07-11T20:00:00.000Z" }, // 22:00 local
+        },
+      });
+      await flushPromises();
+      await selectFirst(wrapper);
+
+      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("Off now");
+      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe("Off until 22:00");
+      expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
+      expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeUndefined();
+
+      await wrapper.find("[data-test='screen-now-follow']").trigger("click");
+      await flushPromises();
+      expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("Turn off now saves an open-ended override when no schedule can take over", async () => {
+    const { wrapper, store } = mountScreens({ cfg: config({ displayScheduleEnabled: false }) });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='screen-now-off']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      screenNow: { power: "off", until: null },
+    });
+  });
+
+  it("ignores an expired Screen now override and follows the schedule again", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({ displayScheduleEnabled: false }),
+      overrides: { screenNow: { power: "off", until: "2020-01-01T00:00:00.000Z" } },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
+    expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
+  });
 });
 
 describe("ScreensSettings — Touch & keyboard", () => {
