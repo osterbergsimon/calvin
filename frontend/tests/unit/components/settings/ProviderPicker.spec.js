@@ -94,7 +94,8 @@ describe("ProviderPicker catalog group", () => {
     const installed = mountPicker({
       catalogProviders: [{ id: "b", label: "B", status: "installed" }],
     });
-    expect(installed.text()).toContain("Installed ✓");
+    expect(installed.text()).toContain("Installed");
+    expect(installed.find(".pp-installed .tag__icon").exists()).toBe(true);
     expect(installed.find('[data-install-id="b"]').exists()).toBe(false);
   });
 

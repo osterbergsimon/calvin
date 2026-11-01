@@ -50,47 +50,28 @@
       @input="$emit('update', $event.target.value)"
     />
 
-    <!-- Select dropdown -->
-    <select
+    <!-- Select: the shared pill, never a native select -->
+    <SelectPill
       v-else-if="ui && ui.component === 'select'"
       :id="fieldId"
-      :value="fieldValue"
-      class="form-input"
-      @change="$emit('update', $event.target.value)"
-    >
-      <option v-for="option in ui.options" :key="option.value" :value="option.value">
-        {{ option.label || option.value }}
-      </option>
-    </select>
+      :model-value="selectValue"
+      :options="selectOptions"
+      :aria-label="label"
+      @update:model-value="emitSelected"
+    />
 
     <!-- Select with scan button — fetches options from the backend -->
     <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
       <div class="scan-select-row">
-        <select
+        <SelectPill
+          class="scan-select-pill"
           :id="fieldId"
-          :value="fieldValue"
-          class="form-input"
-          @change="$emit('update', $event.target.value)"
-        >
-          <option value="" disabled>
-            {{
-              scanning
-                ? "Scanning…"
-                : scannedOptions.length
-                  ? "— Select device —"
-                  : "— Click Scan to discover —"
-            }}
-          </option>
-          <option
-            v-if="fieldValue && !scannedOptions.find(o => o.value === fieldValue)"
-            :value="fieldValue"
-          >
-            {{ fieldValue }}
-          </option>
-          <option v-for="opt in scannedOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label || opt.value }}
-          </option>
-        </select>
+          :model-value="selectValue"
+          :options="scanSelectOptions"
+          :display-label="fieldValue ? '' : scanPlaceholder"
+          :aria-label="label"
+          @update:model-value="emitSelected"
+        />
         <button type="button" class="btn-secondary" :disabled="scanning" @click="runScan">
           {{ scanning ? "Scanning…" : "Scan" }}
         </button>
@@ -159,6 +140,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import axios from "axios";
+import SelectPill from "@/components/ui/SelectPill.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { fieldLabel, isHiddenField } from "@/utils/pluginFields";
 
@@ -180,8 +162,6 @@ const props = defineProps({
     default: "",
   },
 });
-
-defineEmits(["update"]);
 
 const ui = computed(() => {
   return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
@@ -228,6 +208,41 @@ const isChecked = computed(() => {
 const scannedOptions = ref([]);
 const scanning = ref(false);
 const scanError = ref(null);
+
+// SelectPill matches the selection with ===, and the stored value is a string
+// (see emitSelected), so option values are compared as strings too. A native
+// select coerced both sides the same way.
+const toOption = option => ({
+  value: String(option.value),
+  label: option.label || String(option.value),
+});
+
+const selectValue = computed(() => {
+  const value = fieldValue.value;
+  return value === null || value === undefined || value === "" ? null : String(value);
+});
+
+const selectOptions = computed(() => (ui.value?.options || []).map(toOption));
+
+// The saved value stays pickable before (or without) a scan finding it.
+const scanSelectOptions = computed(() => {
+  const scanned = scannedOptions.value.map(toOption);
+  const saved = selectValue.value;
+  if (saved !== null && !scanned.some(option => option.value === saved)) {
+    return [{ value: saved, label: String(saved) }, ...scanned];
+  }
+  return scanned;
+});
+
+const scanPlaceholder = computed(() => {
+  if (scanning.value) return "Scanning…";
+  return scannedOptions.value.length ? "— Select device —" : "— Click Scan to discover —";
+});
+
+// A native select always reported its value as a string; keep that contract so
+// plugin configs don't change type when the control does.
+const emit = defineEmits(["update"]);
+const emitSelected = value => emit("update", String(value));
 
 async function runScan() {
   scanning.value = true;
@@ -309,8 +324,7 @@ async function runScan() {
 }
 
 /* Match the modal's Name control; textareas stay content-sized. */
-input.form-input,
-select.form-input {
+input.form-input {
   height: var(--control-height);
 }
 
@@ -343,8 +357,9 @@ select.form-input {
   align-items: center;
 }
 
-.scan-select-row .form-input {
+.scan-select-pill {
   flex: 1;
+  min-width: 0;
 }
 
 .scan-error {

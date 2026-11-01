@@ -50,7 +50,7 @@ defineProps({
 .setting-row__label {
   font-family: var(--font-ui);
   font-size: var(--fs-base);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
 }
 .setting-row__dot {

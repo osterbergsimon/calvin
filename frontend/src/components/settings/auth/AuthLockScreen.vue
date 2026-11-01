@@ -25,7 +25,7 @@
         @submit.prevent="retry"
       >
         <Card>
-          <h1 class="auth-card__title">Can't reach Calvin</h1>
+          <h1 class="auth-card__title heading-title">Can't reach Calvin</h1>
           <p class="auth-card__lead">
             Settings can't check whether you're signed in. Check that the server is running and this
             device is on the same network.
@@ -58,7 +58,7 @@
             </svg>
           </div>
 
-          <h1 v-if="!oskCollapsed" class="auth-card__title">{{ title }}</h1>
+          <h1 v-if="!oskCollapsed" class="auth-card__title heading-title">{{ title }}</h1>
 
           <InlineNote v-if="notice" class="auth-card__notice" tone="warn" role="status">
             {{ notice }}
@@ -532,9 +532,21 @@ async function submitLogin() {
   overflow: auto;
   background: var(--bg-0);
 }
-.auth-lock--osk-up {
-  align-items: center;
-  padding-bottom: calc(var(--gap-5) + var(--osk-height, 0px));
+/* On-screen keyboard up: reserve its height so the centred card sits above it.
+   Two classes so the later --short and phone padding rules can't reset it
+   (CLV-114: a 600px panel in a browser window is "short" and lost the room).
+   --osk-height is in screen pixels, but the lock screen is zoomed by the
+   Settings UI size, hence the division by --ui-scale.
+   ASSUMPTION: this component is only ever rendered inside Settings.vue's
+   `.settings-lock-scale { zoom: var(--ui-scale) }` wrapper (its only user
+   today). Rendered anywhere without that zoom, the division under-reserves
+   at sizes above 1 and over-reserves below; move the compensation to the
+   wrapper then. */
+.auth-lock.auth-lock--osk-up {
+  padding-bottom: calc(var(--gap-5) + var(--osk-height, 0px) / var(--ui-scale, 1));
+}
+.auth-lock.auth-lock--short.auth-lock--osk-up {
+  padding-bottom: calc(var(--gap-3) + var(--osk-height, 0px) / var(--ui-scale, 1));
 }
 .auth-lock__checking {
   margin: auto;
@@ -570,11 +582,7 @@ async function submitLogin() {
 }
 .auth-card__title {
   margin: 0 0 var(--gap-1);
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
   line-height: 1.3;
-  color: var(--ink);
 }
 .auth-card__lead {
   margin: 0 0 var(--gap-4);

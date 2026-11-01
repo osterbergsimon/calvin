@@ -16,6 +16,7 @@ This directory contains tests for the Calvin setup scripts.
 - `test_bake_kiosk_firstrun_envfile.sh` - Regression: the seeded `/etc/default/calvin-kiosk` stays bash-sourceable with an SSH public key in it
 - `test_install_kiosk.sh` - Verifies the one-command installer (`deploy/kiosk-agent/install-kiosk.sh`): fetch + hash/signature checks of the setup scripts, signing-key handling, reboot
 - `test_display_stack.sh` - Verifies display stack selection (x11/wayland/cog), packages, session env, and in-place switching
+- `test_full_install_display_stack.sh` - Verifies the all-in-one `setup.sh` resolves its display stack like the kiosk installer (auto -> cog, explicit flag wins, re-runs and legacy X11 installs keep their stack) and installs/enables/starts the matching units
 - `test_cog_units.sh` - Verifies the cog systemd unit (DRM/gles, tty1 session, SIGSEGV stop) and the root panel helper
 - `test_cog_panel.sh` - Verifies the cog panel helper's screen-off/on order (stop, MainPID wait, tty1 clear, blank 0/4), DPMS verification with one retry, and rotation persistence
 - `test_update_kiosk_cog.sh` - Verifies the updater installs the cog unit but never switches stacks or starts Chromium on cog

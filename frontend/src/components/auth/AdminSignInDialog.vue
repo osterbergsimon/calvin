@@ -13,7 +13,7 @@
         novalidate
         @submit.prevent="submit"
       >
-        <h2 class="admin-signin__title" tabindex="-1">{{ action.title }}</h2>
+        <h2 class="admin-signin__title heading-title" tabindex="-1">{{ action.title }}</h2>
         <p class="admin-signin__lead">{{ action.lead }}</p>
 
         <input
@@ -62,7 +62,7 @@
       </form>
 
       <div v-else class="admin-signin__form">
-        <h2 class="admin-signin__title" tabindex="-1">No admin password yet</h2>
+        <h2 class="admin-signin__title heading-title" tabindex="-1">No admin password yet</h2>
         <p class="admin-signin__lead">{{ action.setupLead }}</p>
         <div class="admin-signin__actions">
           <Button @click="dismiss">Cancel</Button>
@@ -222,11 +222,7 @@ function openSettings() {
 
 .admin-signin__title {
   margin: 0 0 var(--gap-1);
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
   line-height: 1.3;
-  color: var(--ink);
 }
 
 .admin-signin__title:focus {

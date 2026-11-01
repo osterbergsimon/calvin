@@ -264,7 +264,7 @@ describe("eyebrows stay outside cards", () => {
     const label = rule(read("shell/SettingRow.vue"), ".setting-row__label");
     expect(label).not.toContain("text-transform: uppercase");
     expect(label).toContain("font-size: var(--fs-base)");
-    expect(label).toContain("font-weight: 500");
+    expect(label).toContain("font-weight: var(--weight-strong)");
   });
 
   it("renders the region inspector sub-headings in sentence case", () => {

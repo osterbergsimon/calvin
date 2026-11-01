@@ -107,7 +107,7 @@ const items = computed(() => {
 });
 
 // The welcome card is latched open while it is on screen so filling one row
-// shows "✓ Added" instead of tearing the card down while another gap remains.
+// shows a checked "Added" tag instead of tearing the card down while another gap remains.
 // It closes on "Not now" or when nothing is missing any more.
 const scope = effectScope(true);
 scope.run(() => {

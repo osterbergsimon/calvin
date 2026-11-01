@@ -13,7 +13,7 @@ describe("DisplayScheduleGrid", () => {
     const days = wrapper.findAll(".schedule-day");
     expect(days.length).toBe(2);
 
-    await wrapper.findAll(".schedule-day input[type='checkbox']")[1].setValue(true);
+    await wrapper.findAll(".schedule-day [role='switch']")[1].trigger("click");
     const emitted = wrapper.emitted("update:modelValue");
     expect(emitted).toBeTruthy();
     expect(emitted.at(-1)[0][1].enabled).toBe(true);
