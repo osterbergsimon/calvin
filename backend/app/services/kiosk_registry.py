@@ -118,6 +118,7 @@ async def record_kiosk(
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             await _adopt_global_room_name()
+            await _adopt_global_photo_frame()
             return
         except _INTEGRITY_ERRORS:
             # Lost a create race: another request inserted this id between our
@@ -362,6 +363,84 @@ async def _adopt_global_room_name() -> None:
         logger.warning(f"Could not copy the global room name to a new screen: {exc}")
 
 
+# The photo frame used to be one global setting. It is per screen now
+# (calvin-3xz9): the old global value is copied into each screen that has no
+# choice of its own, and stays as the fallback for browsers that are not a
+# known screen. (snake_case global key, camelCase override key)
+_PHOTO_FRAME_GLOBAL_KEYS = (
+    ("photo_frame_enabled", "photoFrameEnabled"),
+    ("photo_frame_timeout", "photoFrameTimeout"),
+)
+
+
+def _has_spelling(overrides: dict | None, key: str) -> bool:
+    """Whether an override layer already carries `key` in either spelling."""
+    signature = _spelling_signature(key)
+    return any(
+        not existing.startswith("_") and _spelling_signature(existing) == signature
+        for existing in (overrides or {})
+    )
+
+
+@retry_on_db_locked()
+async def migrate_global_photo_frame() -> None:
+    """Copy the retired global photo frame onto every screen without one (calvin-3xz9).
+
+    The global ``photo_frame_enabled``/``photo_frame_timeout`` become each
+    screen's own override where it has none; a screen that already chose keeps
+    its value. The global keys are kept (not deleted): a browser that is not a
+    known screen, and a screen that registers later, still reads them as the
+    fallback. That also makes a second run a no-op for existing screens.
+
+    Runs at startup, after a backup restore, and whenever a new screen row is
+    created (see :func:`_adopt_global_photo_frame`).
+    """
+    from app.services.config_service import config_service
+
+    values: dict[str, object] = {}
+    for snake_key, camel_key in _PHOTO_FRAME_GLOBAL_KEYS:
+        value = await config_service.get_value(snake_key)
+        if value is None:
+            value = await config_service.get_value(camel_key)
+        if value is not None:
+            values[camel_key] = value
+    if not values:
+        return
+
+    rows = await KioskDB.objects.all()
+    if not rows:
+        logger.info("Kept the global photo frame settings until a screen registers")
+        return
+
+    for row in rows:
+        overrides = dict(row.overrides or {})
+        changed = False
+        for key, value in values.items():
+            if _has_spelling(overrides, key):
+                continue
+            overrides[key] = value
+            changed = True
+        if not changed:
+            continue
+        row.overrides = overrides
+        # Write only this column so a concurrent record_kiosk heartbeat
+        # (last_seen, agent_*) is not overwritten by this stale snapshot.
+        await row.update(_columns=["overrides"])
+        logger.info(f"Copied the global photo frame onto screen {row.id!r}")
+
+
+async def _adopt_global_photo_frame() -> None:
+    """Run the photo-frame migration after a new screen row is created.
+
+    Best effort: a failure is logged and never fails the registration; the
+    global keys stay, so the next new screen or restart retries it.
+    """
+    try:
+        await migrate_global_photo_frame()
+    except Exception as exc:  # noqa: BLE001 - registration must not fail on this
+        logger.warning(f"Could not copy the global photo frame to a new screen: {exc}")
+
+
 @retry_on_db_locked()
 async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     """Upsert the kiosk row and replace its overrides. No-op on malformed id."""
@@ -374,6 +453,7 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
         try:
             await KioskDB.objects.create(id=kiosk_id, last_seen=now, overrides=overrides)
             await _adopt_global_room_name()
+            await _adopt_global_photo_frame()
             return
         except _INTEGRITY_ERRORS:
             # Lost a create race: another request inserted this id between our
