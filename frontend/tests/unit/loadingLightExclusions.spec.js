@@ -8,7 +8,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { watch } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+
+// Every network call answers from here: config polls and photo rotation run
+// their real store actions, and none of them reaches a real backend.
+const IMAGES = [{ id: "1" }, { id: "2" }, { id: "3" }];
+vi.mock("@/services/api", () => {
+  const answer = url => {
+    if (url.startsWith("/images/list")) return { data: { images: IMAGES } };
+    if (url.startsWith("/images/")) return { data: { image: IMAGES[1] } };
+    return { data: {} };
+  };
+  const api = {
+    get: vi.fn(async url => answer(url)),
+    post: vi.fn(async url => answer(url)),
+    put: vi.fn(async url => answer(url)),
+    delete: vi.fn(async () => ({ data: {} })),
+  };
+  return { default: api, LONG_REQUEST_TIMEOUT: 1, isServiceWorkerReplay: () => false };
+});
+vi.mock("@/composables/useKeyboardActions", () => ({
+  useKeyboardActions: () => ({
+    handleAction: vi.fn(),
+    focusRegion: vi.fn(),
+    activateScreen: vi.fn(),
+  }),
+}));
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ path: "/" }),
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+import api from "@/services/api";
 import ClockBarHorizontal from "@/components/ClockBarHorizontal.vue";
+import PhotoSlideshow from "@/components/PhotoSlideshow.vue";
+import Dashboard from "@/views/Dashboard.vue";
+import { _resetFirstLoadLightForTests } from "@/composables/useFirstLoadLight";
 import { useConnectionStore } from "@/stores/connection";
 import { useConfigStore } from "@/stores/config";
 import { useImagesStore } from "@/stores/images";
@@ -22,6 +56,8 @@ describe("loading light: excluded sources never drive it (CLV-115)", () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.clearAllMocks();
+    _resetFirstLoadLightForTests();
     setActivePinia(createPinia());
     progress = useProgressStore();
     calls = [vi.spyOn(progress, "begin"), vi.spyOn(progress, "track")];
@@ -39,6 +75,14 @@ describe("loading light: excluded sources never drive it (CLV-115)", () => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
+
+  // Whatever a component legitimately lit while mounting (the first load, the
+  // photo-source fetch) is over; from here on nothing may touch the store.
+  const startWatching = () => {
+    expect(progress.active).toBe(false);
+    for (const spy of calls) spy.mockClear();
+    mutations = 0;
+  };
 
   const expectUntouched = () => {
     for (const spy of calls) expect(spy).not.toHaveBeenCalled();
@@ -60,19 +104,48 @@ describe("loading light: excluded sources never drive it (CLV-115)", () => {
 
   it("config polling", async () => {
     const config = useConfigStore();
-    for (let i = 0; i < 3; i += 1) await config.fetchConfig();
+    const wrapper = mount(Dashboard, {
+      global: {
+        stubs: {
+          DashboardRegion: true,
+          ClockBarHorizontal: true,
+          ClockBarVertical: true,
+          MinimalUIOverlay: true,
+          LoadingLight: true,
+          SetupWelcomeCard: true,
+          LayoutManager: { template: "<div><slot /></div>" },
+        },
+      },
+    });
+    await flushPromises();
+    // The first-load light settles once the dashboard has its config.
+    await vi.advanceTimersByTimeAsync(2000);
+    startWatching();
+
+    const configCalls = () => api.get.mock.calls.filter(([url]) => url.includes("config")).length;
+    const before = configCalls();
+    await vi.advanceTimersByTimeAsync(config.configPollInterval * 1000 * 3);
+    // The poll really ran (three ticks), and never lit the light.
+    expect(configCalls() - before).toBeGreaterThanOrEqual(3);
     expectUntouched();
+    wrapper.unmount();
   });
 
   it("photo rotation from cache and prefetching the next photo", async () => {
     const images = useImagesStore();
-    images.images = [{ id: "1" }, { id: "2" }, { id: "3" }];
-    images.currentImage = images.images[0];
-    for (let i = 0; i < 3; i += 1) {
-      await images.nextImage().catch(() => {});
-      await images.previousImage().catch(() => {});
-    }
+    const wrapper = mount(PhotoSlideshow, {
+      props: { regionId: "r1", autoRotate: true, rotationInterval: 1000 },
+    });
+    await flushPromises();
+    startWatching();
+
+    const nextCalls = () => api.post.mock.calls.filter(([url]) => url === "/images/next").length;
+    await vi.advanceTimersByTimeAsync(3000);
+    // Auto-rotation really advanced three times, and never lit the light.
+    expect(nextCalls()).toBe(3);
+    expect(images.getCurrentImageForSource([])).toEqual(IMAGES[1]);
     expectUntouched();
+    wrapper.unmount();
   });
 
   it("clock ticks in the clock bar", async () => {
