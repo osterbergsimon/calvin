@@ -13,9 +13,9 @@ import { computed } from "vue";
 
 /**
  * Pulse loading indicator: the frame's edge breathes slowly at low opacity.
- * No travelling light, so it is the style forced under reduced motion. The
- * global reduced-motion rule (base.css) stills the breathing on such devices,
- * leaving a quiet, steady frame line while work is in progress.
+ * No travelling light, so it is the style forced under reduced motion. Its
+ * slow low-opacity fade is itself the reduced-motion style, so it is exempt
+ * from the global reduced-motion rule (base.css) and keeps pulsing there.
  */
 
 const props = defineProps({
@@ -60,6 +60,16 @@ const frameKind = computed(() => (props.frame === "app" ? "app" : "region"));
 .loading-indicator--region,
 .loading-indicator--region .pulse__ring {
   border-radius: var(--radius-frame);
+}
+
+/* The global reduced-motion rule (base.css) stops every animation with
+   !important. This slow low-opacity fade *is* the reduced-motion style, so it
+   keeps breathing: the more specific selector wins among !important rules. */
+@media (prefers-reduced-motion: reduce) {
+  .pulse__ring {
+    animation-duration: calc(var(--dur) * 12) !important; /* 2.4s */
+    animation-iteration-count: infinite !important;
+  }
 }
 
 @keyframes pulse-breathe {
