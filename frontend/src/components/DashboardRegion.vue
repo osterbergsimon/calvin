@@ -1,5 +1,9 @@
 <template>
-  <div class="dashboard-region" @click="emit('focus-region', region.id)">
+  <div
+    class="dashboard-region"
+    :class="{ 'dashboard-region--leaf': !region.split }"
+    @click="emit('focus-region', region.id)"
+  >
     <template v-if="region.split">
       <div
         ref="splitContainerEl"
@@ -68,6 +72,8 @@
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
       />
+      <!-- This region's own loading light, on its focus-glow path (CLV-115) -->
+      <LoadingLight :region-id="region.id" />
     </template>
   </div>
 </template>
@@ -75,6 +81,7 @@
 <script setup>
 import { computed, defineAsyncComponent, inject, ref } from "vue";
 import { getSplitDirection } from "@/utils/layout";
+import LoadingLight from "./LoadingLight.vue";
 
 const props = defineProps({
   region: {
@@ -171,6 +178,12 @@ const subResizeHandles = computed(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* A leaf region is the containing block of its loading light, so the light
+   traces the same box as the panel's focus glow. */
+.dashboard-region--leaf {
+  position: relative;
 }
 
 /* Split container: fills the region and flows children in the split direction.

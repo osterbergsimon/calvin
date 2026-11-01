@@ -73,13 +73,6 @@
           </div>
         </div>
 
-        <!-- Loading indicator -->
-        <div v-if="loading" class="loading-overlay">
-          <div class="loading-spinner">
-            <div class="spinner" />
-            <div class="loading-text">Loading events...</div>
-          </div>
-        </div>
         <!-- First run: no calendar sources yet → say so and link to the fix (F4) -->
         <div v-if="noSources" class="calendar-empty-overlay">
           <EmptyState
@@ -98,7 +91,6 @@
             'agenda-view': isAgenda,
             'day-view': viewMode === 'day',
             'show-week-numbers': showWeekNumbers && !isAgenda && viewMode !== 'day',
-            loading: loading,
           }"
         >
           <!-- MONTH VIEW: the day-cell rows are uniform height (flex:1); each
@@ -259,6 +251,7 @@ import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
+import { useProgressStore } from "../stores/progress";
 import EventDetailPanel from "./EventDetailPanel.vue";
 import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
@@ -408,6 +401,15 @@ const viewModeLabel = computed(() => {
 });
 
 const calendarStore = useCalendarStore();
+const progressStore = useProgressStore();
+
+// Calendar fetches light this region's frame (the app frame in fullscreen, which
+// belongs to no region). The light replaces the old loading overlay (CLV-115).
+const trackLoad = (kind, work) =>
+  progressStore.track(`calendar:${kind}:${props.regionId || "fullscreen"}`, work, {
+    regionId: props.regionId || null,
+  });
+const fetchSources = () => trackLoad("sources", () => calendarStore.fetchSources());
 const modeStore = useModeStore();
 const route = useRoute();
 
@@ -506,7 +508,7 @@ const handleVisibilityChange = () => {
 
 // Load calendar sources on mount
 onMounted(async () => {
-  await calendarStore.fetchSources();
+  await fetchSources();
   sourcesChecked.value = true;
 
   // Update today's date every minute to refresh the calendar
@@ -1281,7 +1283,9 @@ const loadEvents = async (background = false) => {
     // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
     const refresh = false;
 
-    await calendarStore.fetchEvents(startDate, endDate, refresh, background, props.sourceIds);
+    await trackLoad("events", () =>
+      calendarStore.fetchEvents(startDate, endDate, refresh, background, props.sourceIds)
+    );
     console.log(
       `Loaded ${calendarStore.events.length} events (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
     );
@@ -1335,7 +1339,7 @@ watch(
     if (newPath === "/" && oldPath === "/settings") {
       loadEvents();
       // Also reload sources to ensure they're up to date
-      calendarStore.fetchSources();
+      fetchSources().catch(() => {});
     }
   },
   { immediate: false }
@@ -1359,7 +1363,7 @@ onActivated(() => {
       loadEvents();
     }
     if (calendarStore.sources.length === 0) {
-      calendarStore.fetchSources();
+      fetchSources().catch(() => {});
     }
   }
 });
@@ -1510,52 +1514,6 @@ onActivated(() => {
   }
 }
 
-.loading-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--bg-1);
-  opacity: 0.9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: calc(var(--z-raised) + 2);
-  backdrop-filter: blur(2px);
-}
-
-.loading-spinner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--line);
-  border-top: 4px solid var(--focus);
-  border-radius: 50%;
-  animation: spin calc(var(--dur) * 5) linear infinite;
-}
-
-.loading-text {
-  color: var(--ink-2);
-  font-size: var(--text-body);
-  font-weight: var(--weight-strong);
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
 /* The calendar owns its own surface + spacing, so drop the panel body's default
    1rem inset — otherwise the grid is framed by a doubled 2rem border that eats
    the day cells. The grid surface now fills the panel; a slim inner pad keeps the
@@ -1577,11 +1535,6 @@ onActivated(() => {
   box-sizing: border-box;
   overflow: hidden;
   contain: layout;
-}
-
-.calendar-grid.loading {
-  opacity: 0.5;
-  pointer-events: none;
 }
 
 /* Rolling view styles can be added here if needed */

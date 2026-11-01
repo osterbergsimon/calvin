@@ -100,10 +100,10 @@ const beadStyle = index => {
 
 /* A region frame follows the panel radius, like its focus glow. */
 .loading-indicator--region {
-  border-radius: var(--loading-light-radius, 0);
+  border-radius: var(--radius-frame);
 }
 .loading-indicator--region .comet__bead {
-  offset-path: inset(0 round var(--loading-light-radius, 0));
+  offset-path: inset(0 round var(--radius-frame));
 }
 
 @keyframes comet-orbit {

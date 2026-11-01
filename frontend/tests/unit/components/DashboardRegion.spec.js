@@ -76,3 +76,17 @@ describe("DashboardRegion recursion", () => {
     expect(byId("r1-a").classes()).not.toContain("dashboard-subregion--lit");
   });
 });
+
+describe("DashboardRegion loading light (CLV-115)", () => {
+  it("gives every leaf region its own light, keyed by the leaf id", async () => {
+    const { default: LoadingLight } = await import("../../../src/components/LoadingLight.vue");
+    const wrapper = mount(DashboardRegion, {
+      props: { region: threeLevel, photoRotationInterval: 5, parentDirection: "row" },
+      global: { stubs: { CalendarView: true, PhotoSlideshow: true, WebServiceViewer: true } },
+    });
+    await flushPromises();
+    const ids = wrapper.findAllComponents(LoadingLight).map(light => light.props("regionId"));
+    // Split nodes draw no light of their own: only the leaves load anything.
+    expect(ids.sort()).toEqual(["r1-a", "r1-b-a", "r1-b-b"]);
+  });
+});

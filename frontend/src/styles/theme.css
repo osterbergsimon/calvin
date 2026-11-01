@@ -172,6 +172,7 @@
   --radius-card: var(--radius-xl); /* 12px */
   --radius-panel: var(--radius-2xl); /* 16px */
   --radius-round: var(--radius-pill);
+  --radius-frame: var(--radius-xs); /* 6px: a dashboard region frame (FocusPanel), traced by the loading light */
 
   /* Elevation roles */
   --elev-1: 0 6px 18px -8px var(--shadow-hover);

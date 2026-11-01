@@ -49,7 +49,6 @@ const frameKind = computed(() => (props.frame === "app" ? "app" : "region"));
 .pulse__ring {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   box-shadow:
     inset 0 0 0 2px var(--focus),
     0 0 12px 1px var(--focus-edge);
@@ -57,8 +56,10 @@ const frameKind = computed(() => (props.frame === "app" ? "app" : "region"));
   animation: pulse-breathe calc(var(--dur) * 12) ease-in-out infinite; /* 2.4s */
 }
 
-.loading-indicator--region {
-  border-radius: var(--loading-light-radius, 0);
+/* A region frame follows the panel radius, like its focus glow. */
+.loading-indicator--region,
+.loading-indicator--region .pulse__ring {
+  border-radius: var(--radius-frame);
 }
 
 @keyframes pulse-breathe {
