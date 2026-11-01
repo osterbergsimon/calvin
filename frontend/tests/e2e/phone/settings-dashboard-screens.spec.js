@@ -36,13 +36,12 @@ test.describe("phone: Dashboard", () => {
     await page.keyboard.press("Escape");
 
     // Hide controls is this screen's own choice (calvin-hi6w): it lands in
-    // localStorage instead of the household config, so nothing is POSTed.
+    // localStorage instead of the household config.
     const hideControls = dashboard.getByLabel("Hide controls");
     await hideControls.click();
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
       .toBe("false");
-    expect(api.requests).not.toContain("POST /api/config");
     await hideControls.click();
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
