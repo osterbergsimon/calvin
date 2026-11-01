@@ -121,7 +121,7 @@ onMounted(async () => {
 .phone-setup__title {
   margin: 0 0 var(--space-2xs);
   font-family: var(--font-ui);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 .phone-setup__hint {
   margin: 0 0 var(--space-sm);

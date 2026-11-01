@@ -120,7 +120,7 @@ const handleKeydown = event => {
   color: var(--ink-2);
   font-size: var(--fs-control);
   font-family: var(--font-ui);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -141,7 +141,7 @@ const handleKeydown = event => {
 .tab-button.active {
   color: var(--focus-text);
   border-bottom-color: var(--focus-text);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 
 .tab-icon {

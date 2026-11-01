@@ -541,7 +541,7 @@ onUnmounted(() => {
   padding: 0.75rem 1rem;
   border-radius: var(--radius-xs);
   margin-bottom: 1rem;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
 }
 
 .settings-banner-error {

@@ -187,7 +187,7 @@ const handleFocus = () => {
   white-space: normal;
   flex: 1;
   text-align: left;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   line-height: inherit;
   font-size: inherit;
 }

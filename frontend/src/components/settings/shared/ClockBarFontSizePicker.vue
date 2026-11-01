@@ -2,111 +2,55 @@
   <div class="clock-bar-font-size-picker">
     <div class="font-size-controls">
       <div class="control-group">
-        <label class="control-label">Time Font Size</label>
-        <div class="slider-group">
-          <input
-            type="range"
-            :min="min"
-            :max="max"
-            :step="step"
-            :value="localTimeSize"
-            @input="handleTimeInput"
-            class="font-size-slider"
-          />
-          <div class="font-size-display">
-            <input
-              type="number"
-              :min="min"
-              :max="max"
-              :step="step"
-              :value="localTimeSize"
-              @input="handleTimeInput"
-              class="font-size-input"
-            />
-            <span class="font-size-unit">px</span>
-          </div>
-        </div>
+        <span class="control-label">Time Font Size</span>
+        <RangeSlider
+          :model-value="localTimeSize"
+          :min="min"
+          :max="max"
+          :step="step"
+          unit="px"
+          aria-label="Time Font Size"
+          @update:model-value="setTimeSize"
+        />
       </div>
 
       <div v-if="showDate" class="control-group">
-        <label class="control-label">Date Font Size</label>
-        <div class="slider-group">
-          <input
-            type="range"
-            :min="min"
-            :max="max"
-            :step="step"
-            :value="localDateSize"
-            @input="handleDateInput"
-            class="font-size-slider"
-          />
-          <div class="font-size-display">
-            <input
-              type="number"
-              :min="min"
-              :max="max"
-              :step="step"
-              :value="localDateSize"
-              @input="handleDateInput"
-              class="font-size-input"
-            />
-            <span class="font-size-unit">px</span>
-          </div>
-        </div>
+        <span class="control-label">Date Font Size</span>
+        <RangeSlider
+          :model-value="localDateSize"
+          :min="min"
+          :max="max"
+          :step="step"
+          unit="px"
+          aria-label="Date Font Size"
+          @update:model-value="setDateSize"
+        />
       </div>
 
       <div class="control-group">
-        <label class="control-label">Bar Padding</label>
-        <div class="slider-group">
-          <input
-            type="range"
-            :min="0"
-            :max="32"
-            :step="1"
-            :value="localPadding"
-            @input="handlePaddingInput"
-            class="font-size-slider"
-          />
-          <div class="font-size-display">
-            <input
-              type="number"
-              :min="0"
-              :max="32"
-              :step="1"
-              :value="localPadding"
-              @input="handlePaddingInput"
-              class="font-size-input"
-            />
-            <span class="font-size-unit">px</span>
-          </div>
-        </div>
+        <span class="control-label">Bar Padding</span>
+        <RangeSlider
+          :model-value="localPadding"
+          :min="0"
+          :max="32"
+          :step="1"
+          unit="px"
+          aria-label="Bar Padding"
+          @update:model-value="setPadding"
+        />
       </div>
 
       <div class="control-group">
-        <label class="control-label">Plugin Item Size</label>
-        <div class="slider-group">
-          <input
-            type="range"
-            :min="min"
-            :max="max"
-            :step="step"
-            :value="localPluginItemSize"
-            @input="handlePluginItemInput"
-            class="font-size-slider"
-          />
-          <div class="font-size-display">
-            <input
-              type="number"
-              :min="min"
-              :max="max"
-              :step="step"
-              :value="localPluginItemSize"
-              @input="handlePluginItemInput"
-              class="font-size-input"
-            />
-            <span class="font-size-unit">px</span>
-          </div>
-        </div>
+        <span class="control-label">Plugin Item Size</span>
+        <RangeSlider
+          :model-value="localPluginItemSize"
+          :min="min"
+          :max="max"
+          :step="step"
+          unit="px"
+          aria-label="Plugin Item Size"
+          @update:model-value="setPluginItemSize"
+        />
       </div>
     </div>
 
@@ -149,6 +93,7 @@
 import { ref, watch } from "vue";
 import ClockBarHorizontal from "@/components/ClockBarHorizontal.vue";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
+import RangeSlider from "@/components/ui/RangeSlider.vue";
 
 const props = defineProps({
   timeSize: {
@@ -243,40 +188,25 @@ watch(
   { immediate: true }
 );
 
-const handleTimeInput = event => {
-  const value = parseFloat(event.target.value);
-  if (!isNaN(value)) {
-    const clampedValue = Math.max(props.min, Math.min(props.max, value));
-    localTimeSize.value = clampedValue;
-    emit("update:timeSize", clampedValue);
-  }
+// RangeSlider clamps to its own min/max before emitting.
+const setTimeSize = value => {
+  localTimeSize.value = value;
+  emit("update:timeSize", value);
 };
 
-const handleDateInput = event => {
-  const value = parseFloat(event.target.value);
-  if (!isNaN(value)) {
-    const clampedValue = Math.max(props.min, Math.min(props.max, value));
-    localDateSize.value = clampedValue;
-    emit("update:dateSize", clampedValue);
-  }
+const setDateSize = value => {
+  localDateSize.value = value;
+  emit("update:dateSize", value);
 };
 
-const handlePaddingInput = event => {
-  const value = parseFloat(event.target.value);
-  if (!isNaN(value)) {
-    const clampedValue = Math.max(0, Math.min(32, value));
-    localPadding.value = clampedValue;
-    emit("update:padding", clampedValue);
-  }
+const setPadding = value => {
+  localPadding.value = value;
+  emit("update:padding", value);
 };
 
-const handlePluginItemInput = event => {
-  const value = parseFloat(event.target.value);
-  if (!isNaN(value)) {
-    const clampedValue = Math.max(props.min, Math.min(props.max, value));
-    localPluginItemSize.value = clampedValue;
-    emit("update:pluginItemSize", clampedValue);
-  }
+const setPluginItemSize = value => {
+  localPluginItemSize.value = value;
+  emit("update:pluginItemSize", value);
 };
 </script>
 
@@ -305,94 +235,10 @@ const handlePluginItemInput = event => {
 }
 
 .control-label {
-  font-size: var(--fs-control);
+  font-size: var(--text-body);
   font-family: var(--font-ui);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
-}
-
-.slider-group {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.font-size-slider {
-  flex: 1;
-  height: 6px;
-  border-radius: var(--radius-xs);
-  background: var(--bg-2);
-  outline: none;
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-.font-size-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--focus);
-  cursor: pointer;
-  border: 2px solid var(--bg-1);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.font-size-slider::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--focus);
-  cursor: pointer;
-  border: 2px solid var(--bg-1);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.font-size-slider:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-
-.font-size-display {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 80px;
-}
-
-.font-size-input {
-  width: 60px;
-  padding: 0.375rem 0.5rem;
-  background: var(--bg-2);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  font-size: var(--fs-md);
-  font-family: var(--font-data);
-  text-align: center;
-  /* Strip the browser's native spinner chrome — the up/down arrows read as
-     unstyled next to the custom sliders. The value is driven by the slider and
-     by typing; the tokenized field is the whole control. */
-  appearance: textfield;
-  -moz-appearance: textfield;
-}
-
-.font-size-input::-webkit-outer-spin-button,
-.font-size-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.font-size-input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-color: var(--focus);
-}
-
-.font-size-unit {
-  font-size: var(--fs-control);
-  color: var(--ink-2);
 }
 
 .preview-container {
@@ -402,15 +248,15 @@ const handlePluginItemInput = event => {
 }
 
 .preview-label {
-  font-size: var(--fs-control);
+  font-size: var(--text-body);
   font-family: var(--font-ui);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink-2);
 }
 
 .preview-wrapper {
   border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   background: var(--bg-1);
   overflow: hidden;
 }

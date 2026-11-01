@@ -56,7 +56,9 @@
       </template>
 
       <div class="connection-popover" data-test="connection-popover">
-        <h2 id="connection-popover-title" class="connection-popover__title">{{ popoverTitle }}</h2>
+        <h2 id="connection-popover-title" class="connection-popover__title heading-title">
+          {{ popoverTitle }}
+        </h2>
         <p>{{ popoverDataLine }}</p>
         <p v-if="status === 'unreachable'">
           Check that the Calvin server is on and that this screen is on the same network.
@@ -92,7 +94,10 @@
       class="connection-status__connected"
       data-test="connection-connected"
     >
-      <span aria-hidden="true">✓</span> Connected
+      <svg class="connection-status__check" viewBox="0 0 24 24" aria-hidden="true">
+        <path :d="mdiCheck" />
+      </svg>
+      Connected
     </span>
 
     <span v-if="compact && hasPill" class="connection-status__compact-time">{{ dataFrom }}</span>
@@ -105,7 +110,7 @@
 
 <script setup>
 import { computed, onUnmounted, ref, watch } from "vue";
-import { mdiCloudOffOutline, mdiLanDisconnect } from "@mdi/js";
+import { mdiCheck, mdiCloudOffOutline, mdiLanDisconnect } from "@mdi/js";
 import { useConfigStore } from "../stores/config";
 import { useConnectionStore } from "../stores/connection";
 import { formatDataFrom } from "../utils/connectionTime";
@@ -161,7 +166,7 @@ const showConnected = computed(() => status.value === "ok" && connectionStore.re
 const showConnecting = computed(() => status.value === "starting" && startingElapsed.value);
 
 // The clock bar shows every state; the floating fallback is status only, never
-// the short "Connecting…"/"✓ Connected" chatter.
+// the short "Connecting…"/"Connected" chatter.
 const visible = computed(() => {
   if (props.floating) return hasPill.value;
   return hasPill.value || showConnecting.value || showConnected.value;
@@ -269,10 +274,20 @@ onUnmounted(() => {
 }
 
 .connection-status__connected {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-tight);
   font-family: var(--font-ui);
   font-size: var(--text-body);
   color: var(--ok-text);
   white-space: nowrap;
+}
+
+.connection-status__check {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  fill: currentColor;
 }
 
 .connection-status__compact-time {
@@ -317,9 +332,6 @@ onUnmounted(() => {
 
 .connection-popover__title {
   margin: 0 0 var(--gap-2);
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
 }
 
 .connection-popover p {
