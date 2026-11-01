@@ -159,3 +159,48 @@ def test_corrupt_file_reads_as_empty(store):
     assert store.list() == []
     store.path.write_text(json.dumps({"links": "nope"}))
     assert store.list() == []
+
+
+def test_guests_see_all_defaults_on_and_can_be_changed(store):
+    link, _ = store.create("Grandma", "Guests")
+    assert link["guestsSeeAll"] is True
+    own, _ = store.create("Party", "Party", guests_see_all=False)
+    assert own["guestsSeeAll"] is False
+    updated = store.update(link["id"], guests_see_all=False)
+    assert updated["guestsSeeAll"] is False
+    assert store.get(link["id"])["guestsSeeAll"] is False
+    assert store.update("nope", guests_see_all=True) is None
+
+
+def test_link_saved_before_the_setting_keeps_own_device_behaviour(store):
+    link, _ = store.create("Grandma", "Guests")
+    data = json.loads(store.path.read_text())
+    del data["links"][0]["guests_see_all"]
+    store.path.write_text(json.dumps(data))
+    assert store.get(link["id"])["guestsSeeAll"] is False
+
+
+def test_uploads_for_every_device_and_remove_any(store):
+    link, _ = store.create("Grandma", "Guests")
+    store.record_upload(link["id"], "Guests/a.jpg", "img-a", device="phone-1", now=10)
+    store.record_upload(link["id"], "Guests/b.jpg", "img-b", device="phone-2", now=20)
+    assert [u["imageId"] for u in store.uploads_for(link["id"])] == ["img-b", "img-a"]
+    assert store.remove_upload(link["id"], "img-a")["path"] == "Guests/a.jpg"
+    assert [u["imageId"] for u in store.uploads_for(link["id"])] == ["img-b"]
+
+
+def test_pending_uploads_are_claimed_once(store):
+    link, _ = store.create("Grandma", "Guests")
+    store.record_upload(link["id"], "Guests/a.jpg", "img-a", device="pending:claim-1")
+    assert store.claim_uploads(link["id"], "claim-1", device="phone-1") == 1
+    assert [u["imageId"] for u in store.uploads_for(link["id"], device="phone-1")] == ["img-a"]
+    # One time only: a second claim (from any device) finds nothing.
+    assert store.claim_uploads(link["id"], "claim-1", device="phone-2") == 0
+    assert store.uploads_for(link["id"], device="phone-2") == []
+
+
+def test_a_device_id_is_not_a_claim(store):
+    link, _ = store.create("Grandma", "Guests")
+    store.record_upload(link["id"], "Guests/a.jpg", "img-a", device="phone-1")
+    assert store.claim_uploads(link["id"], "phone-1", device="phone-2") == 0
+    assert store.uploads_for(link["id"], device="phone-2") == []
