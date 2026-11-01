@@ -1,46 +1,61 @@
 <template>
   <div class="images-tab">
-    <SourceList
-      :rows="rows"
-      drag
-      add-label="Add photos from…"
-      empty-text="No photo sources yet. Add photos from this device or another app."
-      :empty-icon="mdiImageOutline"
-      :highlight-id="savedHighlightId || highlightId"
-      :highlight-provider="highlightProvider"
-      remove-title="Remove photo source"
-      :remove-message="row => `Remove ${row.name}? Its photos stop showing in the rotation.`"
-      @add="addButton?.open()"
-      @toggle="handleToggle"
-      @edit="handleEdit"
-      @remove="handleRemove"
-      @order-change="handleInstanceOrderChange"
-    />
+    <LocalPhotosBrowser v-if="showLocalPhotos" @close="showLocalPhotos = false" />
 
-    <AddSourceButton
-      ref="addButton"
-      kind="photos"
-      upload
-      @saved="handleSaved"
-      @upload="openUpload"
-    />
+    <template v-else>
+      <SourceList
+        :rows="rows"
+        drag
+        add-label="Add photos from…"
+        empty-text="No photo sources yet. Add photos from this device or another app."
+        :empty-icon="mdiImageOutline"
+        :highlight-id="savedHighlightId || highlightId"
+        :highlight-provider="highlightProvider"
+        remove-title="Remove photo source"
+        :remove-message="row => `Remove ${row.name}? Its photos stop showing in the rotation.`"
+        @add="addButton?.open()"
+        @toggle="handleToggle"
+        @edit="handleEdit"
+        @remove="handleRemove"
+        @order-change="handleInstanceOrderChange"
+      >
+        <template #extra="{ row }">
+          <Button
+            v-if="isLocalPhotos(row)"
+            size="sm"
+            data-test="manage-local-photos"
+            @click="showLocalPhotos = true"
+          >
+            Manage photos
+          </Button>
+        </template>
+      </SourceList>
 
-    <WhereItShows
-      kind="photos"
-      title="photos"
-      :config="config"
-      :sources="rows.map(row => ({ id: row.id, name: row.name }))"
-    />
+      <AddSourceButton
+        ref="addButton"
+        kind="photos"
+        upload
+        @saved="handleSaved"
+        @upload="openUpload"
+      />
 
-    <PhotoUpload ref="photoUpload" />
+      <WhereItShows
+        kind="photos"
+        title="photos"
+        :config="config"
+        :sources="rows.map(row => ({ id: row.id, name: row.name }))"
+      />
 
-    <InstanceModal
-      :show="showModal"
-      :plugin="editingPlugin"
-      :instance="editingInstance"
-      @close="closeModal"
-      @save="handleEditSaved"
-    />
+      <PhotoUpload ref="photoUpload" />
+
+      <InstanceModal
+        :show="showModal"
+        :plugin="editingPlugin"
+        :instance="editingInstance"
+        @close="closeModal"
+        @save="handleEditSaved"
+      />
+    </template>
   </div>
 </template>
 
@@ -50,6 +65,8 @@ import { mdiImageOutline } from "@mdi/js";
 import { useImagesStore } from "@/stores/images";
 import { usePlugins } from "@/composables";
 import * as pluginsApi from "@/services/pluginsApi";
+import Button from "@/components/ui/Button.vue";
+import LocalPhotosBrowser from "@/components/settings/shared/LocalPhotosBrowser.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
@@ -81,9 +98,20 @@ const { plugins, pluginInstances, loadingPlugins, loadPlugins, updateInstanceOrd
 const addButton = ref(null);
 const photoUpload = ref(null);
 const showModal = ref(false);
+const showLocalPhotos = ref(false);
 const editingPlugin = ref(null);
 const editingInstance = ref(null);
 const savedHighlightId = ref("");
+
+// Local photos is the built-in image source whose photos are plain files in
+// the data folder, so it has no settings to edit: its own sub-view is the
+// photo browser (calvin-n2my). The fixture-only id is accepted too, so the
+// phone harness can keep using its older sample id.
+const isLocalPhotos = row =>
+  row.id === "local-images" ||
+  row.providerId === "local" ||
+  row.providerId === "local-images" ||
+  row.providerId === "image-local";
 
 const imagePlugins = computed(() => {
   const filtered = plugins.value.filter(plugin => plugin.type === "image");
