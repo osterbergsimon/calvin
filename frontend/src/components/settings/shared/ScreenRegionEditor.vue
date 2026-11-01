@@ -401,6 +401,7 @@ import Tabs from "@/components/ui/Tabs.vue";
 import Tag from "@/components/ui/Tag.vue";
 import { mdiPlus } from "@mdi/js";
 import { getKioskId } from "@/utils/kioskId";
+import { screenLabel } from "@/utils/screenLabel";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
@@ -549,13 +550,10 @@ const activeIndex = computed(() =>
 );
 
 /* --- preview on a screen --- */
-// A screen's name is its `displayName` override (§3.3); without one, its
-// hostname, then its install id.
-const kioskName = kiosk => kiosk?.overrides?.displayName || kiosk?.hostname || kiosk?.id || "";
 const screenOptions = computed(() => {
   const options = [
     { value: ANY_BROWSER, label: "Any browser" },
-    ...kiosksStore.kiosks.map(k => ({ value: k.id, label: kioskName(k) })),
+    ...kiosksStore.kiosks.map(k => ({ value: k.id, label: screenLabel(k) })),
   ];
   // A kiosk preselected before the list loaded (or one that is not registered
   // yet) still needs a label, or the pill would read blank.
@@ -574,7 +572,7 @@ const previewKiosk = computed(
 // needs no extra request (CLV-36). A preselected id that is not in the list yet
 // still gets an option so the picker shows its id.
 const previewOverrides = computed(() => previewKiosk.value?.overrides || {});
-const previewScreenName = computed(() => kioskName(previewKiosk.value) || previewScreenId.value);
+const previewScreenName = computed(() => screenLabel(previewKiosk.value) || previewScreenId.value);
 const orientation = computed(() =>
   previewScreenId.value === ANY_BROWSER
     ? anyBrowserOrientation.value
@@ -611,7 +609,7 @@ const screensLine = pageId => {
   const showing = screensShowingPage(pageId);
   if (showing.length === all.length) return "All screens";
   if (showing.length === 0) return NOT_SHOWN;
-  return showing.map(kioskName).join(", ");
+  return showing.map(screenLabel).join(", ");
 };
 // The title carries the full screens text (the meta line is truncated visually
 // at 16ch but its DOM text stays complete for screen readers too).

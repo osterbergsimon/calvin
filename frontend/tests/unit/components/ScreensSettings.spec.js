@@ -12,6 +12,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 
 const AVAILABLE = "e4f5a6b7c8d9e0f1";
@@ -250,6 +251,34 @@ describe("ScreensSettings — screen list", () => {
     const cards = wrapper.findAll("[data-test='screen-card']");
     expect(cards[0].text()).toContain("kitchen-pi");
     expect(cards[1].text()).toContain("nohost");
+  });
+
+  it("titles cards and the screen header Name, then hostname, then id (CLV-103)", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({
+          id: "calvin401-aaaaaa",
+          hostname: "calvin401",
+          overrides: { displayName: "Kitchen" },
+        }),
+        kiosk({ id: "calvin400-16d03d", hostname: "calvin400" }),
+        kiosk({ id: "calvin402-bbbbbb", hostname: "" }),
+      ],
+    });
+    await flushPromises();
+    const titles = wrapper
+      .findAll("[data-test='screen-card']")
+      .map(card => card.findComponent(ListRow).props("name"));
+    expect(titles).toEqual(["Kitchen", "calvin400", "calvin402-bbbbbb"]);
+
+    const expected = ["Kitchen", "calvin400", "calvin402-bbbbbb"];
+    for (const [index, label] of expected.entries()) {
+      await wrapper.findAll("[data-test='screen-card']")[index].trigger("click");
+      await flushPromises();
+      expect(wrapper.findComponent(KioskStatusHeader).props("kioskId")).toBe(label);
+      await wrapper.find("[data-test='screens-back']").trigger("click");
+      await flushPromises();
+    }
   });
 
   it("draws each card's start page thumbnail in that screen's orientation", async () => {
