@@ -208,7 +208,7 @@ CALVIN_KIOSK_HOSTNAME=kitchen
 CALVIN_DISPLAY_ROTATION=left
 CALVIN_DISPLAY_STACK=x11
 EOF
-# setup-kiosk.sh's own helpers (install_kiosk_config, requested_display_stack).
+# setup-kiosk.sh's own helper install_kiosk_config; requested_display_stack lives in setup-common.sh.
 # shellcheck source=../setup-kiosk.sh
 . "$REPO/scripts/setup-kiosk.sh" --source-only
 BACKEND_URL="http://tower.local:8000"
