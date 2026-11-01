@@ -87,7 +87,7 @@
     <!-- Body: plugin-level settings only. Sources live in Content. -->
     <Card v-if="plugin.enabled && expanded" class="pc-body">
       <div v-if="hasGlobalSettings" class="pc-section">
-        <h4 class="pc-section-title">Settings</h4>
+        <h4 class="pc-section-title heading-group">Settings</h4>
         <div v-for="(schema, key) in globalConfigSchema" :key="key" class="pc-field">
           <PluginFieldRenderer
             :plugin-id="plugin.id"
@@ -330,14 +330,6 @@ const handleCustomAction = action => emit("custom-action", props.plugin.id, acti
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
-}
-
-.pc-section-title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-label);
-  font-weight: var(--weight-strong);
-  color: var(--ink);
 }
 
 @media (prefers-reduced-motion: reduce) {

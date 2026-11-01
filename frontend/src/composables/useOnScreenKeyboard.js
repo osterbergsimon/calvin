@@ -647,10 +647,21 @@ export function useOnScreenKeyboard() {
     scheduleHideCheck();
   };
 
-  const onPointerDown = event => {
+  /**
+   * A tap on the field that already has focus reopens a hidden keyboard (no
+   * focusin fires for it). An unfocused field opens from its focusin instead.
+   *
+   * This listens for click, not pointerdown (CLV-114): on touch the browser
+   * focuses the field with the mouse events it sends after touchend,
+   * hit-tested at that moment. Opening on pointerdown re-laid out the page
+   * first (the lock screen re-centres above the keyboard), so the tap focused
+   * whatever had slid under the finger and the field never got focus. Click
+   * is the last event of the tap, so the layout can move after it.
+   */
+  const onClick = event => {
     if (visible.value) return;
     const el = event.target;
-    if (!isTargetElement(el)) return;
+    if (!isTargetElement(el) || el !== document.activeElement) return;
     focusedTarget.value = el;
     // Auto after learning, and Off, only open from the ⌨ Keyboard button.
     if (canShowFor(el)) showFor(el);
@@ -686,7 +697,7 @@ export function useOnScreenKeyboard() {
     publishHeight();
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
-    document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("click", onClick, true);
     document.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onResize);
     if (route) {
@@ -705,7 +716,7 @@ export function useOnScreenKeyboard() {
     started = false;
     document.removeEventListener("focusin", onFocusIn);
     document.removeEventListener("focusout", onFocusOut);
-    document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("click", onClick, true);
     document.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("resize", onResize);
     if (hideFrame !== null) {

@@ -3,7 +3,7 @@
     <div v-for="section in sections" :key="section.id" class="plugin-section">
       <!-- Upload Section -->
       <div v-if="section.type === 'upload'" class="upload-section">
-        <h4 class="config-section-title">
+        <h4 class="config-section-title heading-group">
           {{ section.title || "Upload" }}
         </h4>
         <input
@@ -40,7 +40,7 @@
       >
         <div
           v-if="section.collapsible"
-          class="config-section-title collapsible-header"
+          class="config-section-title heading-group collapsible-header"
           style="
             cursor: pointer;
             display: flex;
@@ -58,7 +58,7 @@
             {{ expandedSections[section.id] ? "▼" : "▶" }}
           </span>
         </div>
-        <h4 v-else class="config-section-title">
+        <h4 v-else class="config-section-title heading-group">
           {{ section.title || "Manage Images" }}
         </h4>
 
@@ -287,7 +287,7 @@ const formatFileSize = bytes => {
   font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
 }
 
 .btn-upload:hover:not(:disabled) {
@@ -351,9 +351,6 @@ const formatFileSize = bytes => {
 }
 
 .config-section-title {
-  font-size: var(--fs-base);
-  font-weight: 600;
-  margin-bottom: 1rem;
-  color: var(--ink);
+  margin-bottom: var(--gap-4);
 }
 </style>

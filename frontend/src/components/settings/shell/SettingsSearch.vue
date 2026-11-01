@@ -212,7 +212,7 @@ onUnmounted(() => {
   font-family: var(--font-ui);
   font-size: var(--fs-control);
   color: var(--ink);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   line-height: 1.2;
 }
 

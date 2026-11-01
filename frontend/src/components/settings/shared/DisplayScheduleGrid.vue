@@ -1,21 +1,29 @@
 <template>
   <div class="schedule-days">
     <div v-for="(dayConfig, index) in localSchedule" :key="index" class="schedule-day">
-      <div class="schedule-day-header">
-        <label>
-          <input v-model="dayConfig.enabled" type="checkbox" @change="emitChange" />
-          {{ getDayName(dayConfig.day) }}
-        </label>
-      </div>
+      <label class="schedule-day-header">
+        <ToggleSwitch
+          v-model="dayConfig.enabled"
+          :aria-label="`Schedule ${getDayName(dayConfig.day)}`"
+          @update:model-value="emitChange"
+        />
+        {{ getDayName(dayConfig.day) }}
+      </label>
       <div v-if="dayConfig.enabled" class="schedule-day-times">
-        <div class="schedule-time">
-          <label>On:</label>
-          <input v-model="dayConfig.onTime" type="time" @change="emitChange" />
-        </div>
-        <div class="schedule-time">
-          <label>Off:</label>
-          <input v-model="dayConfig.offTime" type="time" @change="emitChange" />
-        </div>
+        <TextField
+          v-model="dayConfig.onTime"
+          class="schedule-time"
+          type="time"
+          label="On"
+          @update:model-value="emitChange"
+        />
+        <TextField
+          v-model="dayConfig.offTime"
+          class="schedule-time"
+          type="time"
+          label="Off"
+          @update:model-value="emitChange"
+        />
       </div>
     </div>
   </div>
@@ -23,6 +31,8 @@
 
 <script setup>
 import { ref, watch } from "vue";
+import TextField from "@/components/ui/TextField.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 
 const props = defineProps({
   modelValue: { type: Array, default: () => [] },
@@ -58,51 +68,30 @@ const emitChange = () => {
 .schedule-days {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--gap-stack);
 }
 .schedule-day {
-  padding: 0.75rem;
+  padding: var(--gap-3);
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
 }
 .schedule-day-header {
-  margin-bottom: 0.5rem;
-}
-.schedule-day-header label {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--gap-inline);
   font-family: var(--font-ui);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   cursor: pointer;
 }
 .schedule-day-times {
   display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  flex-wrap: wrap;
+  gap: var(--gap-group);
+  margin-top: var(--gap-stack);
 }
 .schedule-time {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.schedule-time label {
-  font-size: var(--fs-control);
-  font-family: var(--font-ui);
-  color: var(--ink-2);
-}
-.schedule-time input {
-  padding: 0.5rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--bg-1);
-  color: var(--ink);
-  font-family: var(--font-data);
-  min-height: var(--touch-target);
-}
-.schedule-time input:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  flex: 1 1 8rem;
+  min-width: 0;
 }
 </style>

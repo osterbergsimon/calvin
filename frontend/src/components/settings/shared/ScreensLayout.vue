@@ -65,7 +65,6 @@ defineProps({
   gap: var(--gap-tight);
 }
 
-.screens-layout__detail :deep(.screen-page__show input),
 .screens-layout__detail :deep(.screen-page__start input) {
   accent-color: var(--focus);
 }
