@@ -140,8 +140,15 @@ def _doc(zip_bytes):
 
 def _normalized(doc):
     data = doc["data"]
+    # One-time migration markers are bookkeeping, not user settings: the
+    # restored install may have completed a migration the backup predates.
+    migration_markers = {"photoFrameMigrated"}
     return {
-        "config": sorted((c["key"], c["value"], c["value_type"]) for c in data["config"]),
+        "config": sorted(
+            (c["key"], c["value"], c["value_type"])
+            for c in data["config"]
+            if c["key"] not in migration_markers
+        ),
         "keyboard": sorted((k["key_code"], k["action"]) for k in data["keyboard_mappings"]),
         "types": sorted(
             (t["type_id"], t["enabled"], json.dumps(t["common_config_schema"], sort_keys=True))
@@ -629,6 +636,75 @@ def test_restore_moves_global_room_name_onto_unnamed_screens(test_client, mode):
     office.pop("showUI", None)
     assert office == {"displayName": "Office", "orientation": "portrait"}
     assert _run(config_service.get_value("displayName")) is None
+
+
+def _photo_frame_seed() -> dict:
+    return {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [
+                {"key": "photo_frame_enabled", "value": "true", "value_type": "bool"},
+                {"key": "photo_frame_timeout", "value": "600", "value_type": "int"},
+            ],
+            "kiosks": [
+                {"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}},
+                {
+                    "id": "office-4d5e6f",
+                    "hostname": "office",
+                    "overrides": {"photoFrameEnabled": False, "photoFrameTimeout": 60},
+                },
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_moves_global_photo_frame_onto_screens_without_one(test_client, mode):
+    """calvin-3xz9: a backup from before the photo frame was per screen.
+
+    The restore runs the migration itself, so a screen without its own choice
+    inherits the old global value without a restart.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(_photo_frame_seed()).encode(), "application/json")},
+        data={"mode": mode},
+    )
+    assert r.status_code == 200, r.text
+
+    kitchen = _run(kr.get_overrides("kitchen-1a2b3c"))
+    assert kitchen["photoFrameEnabled"] is True
+    assert kitchen["photoFrameTimeout"] == 600
+    office = _run(kr.get_overrides("office-4d5e6f"))
+    assert office["photoFrameEnabled"] is False
+    assert office["photoFrameTimeout"] == 60
+    # Kept as the fallback for browsers that are not a known screen.
+    assert _run(config_service.get_value("photo_frame_enabled")) is True
+    assert _run(config_service.get_value("photo_frame_timeout")) == 600
+
+
+def test_restore_rearms_a_pre_migration_photo_frame_backup(test_client):
+    """A merge restore of an old backup clears the marker and migrates its screens."""
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    _run(config_service.set_value(kr.PHOTO_FRAME_MIGRATED_KEY, True))
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(_photo_frame_seed()).encode(), "application/json")},
+        data={"mode": "merge"},
+    )
+    assert r.status_code == 200, r.text
+
+    kitchen = _run(kr.get_overrides("kitchen-1a2b3c"))
+    assert kitchen["photoFrameEnabled"] is True
+    assert kitchen["photoFrameTimeout"] == 600
+    assert _run(config_service.get_value(kr.PHOTO_FRAME_MIGRATED_KEY)) is True
 
 
 def test_restore_succeeds_with_a_warning_when_room_name_migration_fails(test_client, monkeypatch):

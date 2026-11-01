@@ -19,7 +19,7 @@
       :dim="dim"
     >
       <template #actions>
-        <RegionHeaderControls v-if="focused && hasPointer">
+        <RegionHeaderControls v-if="showControls && hasPointer">
           <IconButton
             size="custom"
             :icon="mdiChevronLeft"
@@ -111,6 +111,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Region arrows/fullscreen follow hide/show controls, not the focus light.
+  // null = fall back to `focused` (standalone use and older callers).
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
   dim: {
     type: Boolean,
     default: false,
@@ -143,6 +149,8 @@ const props = defineProps({
     default: null,
   },
 });
+
+const showControls = computed(() => props.controlsVisible ?? props.focused);
 
 const imagesStore = useImagesStore();
 const progressStore = useProgressStore();

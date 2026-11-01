@@ -86,6 +86,11 @@ export function useConfigForm(initialConfig = {}) {
         // Photos
         photoFrameEnabled: response.photoFrameEnabled ?? response.photo_frame_enabled ?? false,
         photoFrameTimeout: response.photoFrameTimeout ?? response.photo_frame_timeout ?? 300,
+        photoFrameSourceIds: Array.isArray(
+          response.photoFrameSourceIds ?? response.photo_frame_source_ids
+        )
+          ? (response.photoFrameSourceIds ?? response.photo_frame_source_ids)
+          : [],
         photoRotationInterval:
           response.photoRotationInterval ?? response.photo_rotation_interval ?? 30,
         imageDisplayMode: response.imageDisplayMode ?? response.image_display_mode ?? "smart",

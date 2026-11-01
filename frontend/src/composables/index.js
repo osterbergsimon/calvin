@@ -12,3 +12,4 @@ export { useKeyboardActions } from "./useKeyboardActions";
 export { useEventHelpers } from "./useEventHelpers";
 export { usePersistedSettingTab } from "./usePersistedSettingTab";
 export { usePhotoFrameMode } from "./usePhotoFrameMode";
+export { useFocusLight } from "./useFocusLight";

@@ -81,6 +81,26 @@ describe("Images Store", () => {
       expect(store.getImagesForSource(["personal", "family"])).toEqual(mockImages.images);
     });
 
+    it("keeps another source set's photos when the frame loads its own sources", async () => {
+      const allImages = [{ id: "all-1", filename: "all.jpg" }];
+      const frameImages = [{ id: "frame-1", filename: "frame.jpg", source: "frame" }];
+
+      api.get.mockResolvedValueOnce({ data: { images: allImages } });
+      api.get.mockResolvedValueOnce({ data: { image: allImages[0] } });
+      const store = useImagesStore();
+      await store.fetchImages();
+
+      api.get.mockResolvedValueOnce({ data: { images: frameImages } });
+      api.get.mockResolvedValueOnce({ data: { image: frameImages[0] } });
+      await store.fetchImages(["frame"]);
+
+      // The dashboard region's all-sources feed is untouched by the frame.
+      expect(store.images).toEqual(allImages);
+      expect(store.currentImage).toEqual(allImages[0]);
+      expect(store.getImagesForSource([])).toEqual(allImages);
+      expect(store.getImagesForSource(["frame"])).toEqual(frameImages);
+    });
+
     it("should fetch current image when images are available", async () => {
       const mockImages = {
         images: [{ id: "1", filename: "image1.jpg" }],
