@@ -924,10 +924,10 @@ const untilCopy = computed(() => {
   const override = activeOverride.value;
   if (!override) return "";
   const state = override.power === "on" ? "On" : "Off";
-  if (!override.expiry) return `${state} until you change it`;
-  // The browser cannot know the Pi's zone when the screen uses the system one.
-  if (!powerTimeZone.value) return `${state} until the next scheduled change`;
-  return `${state} until ${formatUntil(override.expiry, powerTimeZone.value)}`;
+  // The browser can only show a time when it shares the screen's zone.
+  if (override.expiry) return `${state} until ${formatUntil(override.expiry, powerTimeZone.value)}`;
+  if (override.hasSchedule) return `${state} until the next scheduled change`;
+  return `${state} until you change it`;
 });
 
 function setScreenNow(power) {
@@ -935,18 +935,13 @@ function setScreenNow(power) {
     ...overrides.value,
     screenNow: buildPowerOverride({ power, now: new Date() }),
   };
-  persist(next, powerMsg, "Saved. This screen changes at its next check-in (~30s).", OFFLINE_COPY);
+  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 
 function followSchedule() {
   const next = { ...overrides.value };
   delete next.screenNow;
-  persist(
-    next,
-    powerMsg,
-    "Saved. This screen follows the schedule again at its next check-in (~30s).",
-    OFFLINE_COPY
-  );
+  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 
 const idleOverridden = computed(
@@ -1012,6 +1007,13 @@ async function persist(next, messageRef, onlineCopy, offlineCopy) {
 
 const OFFLINE_COPY = "Saved. Changes apply when this screen reconnects.";
 
+// Where a change is applied decides the wait we promise. The kiosk display
+// agent polls its merged config every 60 s (DEFAULT_REFRESH_SECONDS in
+// deploy/kiosk-agent); the dashboard page polls every 30 s (configPollInterval)
+// and applies its own rows itself. Keep one phrase per path.
+const APPLIED_BY_AGENT = "Saved. This screen updates within a minute.";
+const APPLIED_BY_PAGE = "Saved. This screen updates within 30 seconds.";
+
 function toneFor(message) {
   return message.startsWith("Couldn't") || message.startsWith("Pick ") ? "err" : "ok";
 }
@@ -1021,21 +1023,11 @@ function setName(value) {
   const next = { ...overrides.value };
   if (trimmed) next.displayName = trimmed;
   else delete next.displayName;
-  persist(
-    next,
-    nameMsg,
-    "Saved. This screen shows its new name at the next check-in (~30s).",
-    OFFLINE_COPY
-  );
+  persist(next, nameMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
 }
 
 function persistPages(next) {
-  persist(
-    next,
-    pagesMsg,
-    "Saved. This screen picks up content changes at its next check-in (~30s).",
-    OFFLINE_COPY
-  );
+  persist(next, pagesMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
 }
 
 function togglePage(pageId, checked) {
@@ -1075,12 +1067,7 @@ function resetDefaultScreen() {
 }
 
 function persistDisplay(next) {
-  persist(
-    next,
-    displayMsg,
-    "Saved. This screen applies orientation at its next check-in (~30s).",
-    OFFLINE_COPY
-  );
+  persist(next, displayMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 function setOrientation(value) {
   persistDisplay({ ...overrides.value, orientation: value });
@@ -1108,12 +1095,7 @@ function resetApply() {
 }
 
 function persistPower(next) {
-  persist(
-    next,
-    powerMsg,
-    "Saved. This screen applies the schedule at its next check-in (~30s).",
-    OFFLINE_COPY
-  );
+  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 function setScheduleEnabled(value) {
   persistPower({ ...overrides.value, displayScheduleEnabled: value });
@@ -1150,12 +1132,7 @@ function resetIdle() {
 }
 
 function persistTouch(next) {
-  persist(
-    next,
-    touchMsg,
-    "Saved. This screen picks up keyboard changes at its next check-in (~30s).",
-    OFFLINE_COPY
-  );
+  persist(next, touchMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
 }
 function setTouch(value) {
   persistTouch({ ...overrides.value, touchControls: value });

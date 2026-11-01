@@ -814,6 +814,42 @@ describe("ScreensSettings — Power", () => {
     );
   });
 
+  it("keeps the note when the admin browser's zone runs ahead of the screen's", async () => {
+    vi.useFakeTimers();
+    // The Pi uses its system zone (Stockholm, +01:00); this browser is in
+    // Athens (+02:00), so its own 22:00-06:00 window ended at 04:00Z while the
+    // Pi's ends at 05:00Z. The browser must not end the override for the Pi.
+    vi.setSystemTime(new Date("2026-11-02T04:30:00Z"));
+    const originalTz = process.env.TZ;
+    process.env.TZ = "Europe/Athens";
+    try {
+      const { wrapper } = mountScreens({
+        cfg: config({
+          timezone: "system",
+          displayScheduleEnabled: true,
+          displaySchedule: [0, 1, 2, 3, 4, 5, 6].map(day => ({
+            day,
+            enabled: true,
+            onTime: "06:00",
+            offTime: "22:00",
+          })),
+        }),
+        overrides: { screenNow: { power: "on", setAt: "2026-11-01T21:48:25.107Z" } },
+      });
+      await flushPromises();
+      await selectFirst(wrapper);
+
+      expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
+      expect(wrapper.find("[data-test='screen-now-until']").text()).toBe(
+        "On until the next scheduled change"
+      );
+    } finally {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+      vi.useRealTimers();
+    }
+  });
+
   it("drops the override at its boundary as the clock ticks", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-11T21:59:00+02:00"));
@@ -902,6 +938,82 @@ describe("ScreensSettings — Touch & keyboard", () => {
     await wrapper.find("[data-test='osk-use-shared']").trigger("click");
     await flushPromises();
     expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { orientation: "portrait" });
+  });
+});
+
+describe("ScreensSettings — save messages name the real wait", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const savedIn = (wrapper, section) => wrapper.find(`#section-${section} .screens-saved`).text();
+
+  it("says within a minute for the settings the kiosk display agent applies", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        displayScheduleEnabled: true,
+        displaySchedule: [0, 1, 2, 3, 4, 5, 6].map(day => ({
+          day,
+          enabled: true,
+          onTime: "06:00",
+          offTime: "22:00",
+        })),
+      }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    // The agent polls its merged config every 60 s. Screen now, Follow
+    // schedule, the schedule rows and the physical orientation all ride it.
+    const onButton = wrapper.find("[data-test='screen-now-on']");
+    const offButton = wrapper.find("[data-test='screen-now-off']");
+    await (onButton.attributes("disabled") === undefined ? onButton : offButton).trigger("click");
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
+
+    await wrapper.find("[data-test='screen-now-follow']").trigger("click");
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-display")).toBe("Saved. This screen updates within a minute.");
+
+    const schedule = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(c => c.props("ariaLabel") === "Screen on/off schedule");
+    schedule.vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-power")).toBe("Saved. This screen updates within a minute.");
+  });
+
+  it("says within 30 seconds for the settings the dashboard page applies", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    // The dashboard polls /api/config every 30 s (configPollInterval) and
+    // applies the name, pages, touch and keyboard itself.
+    const nameInput = wrapper.find("[data-test='screen-name-input']");
+    await nameInput.setValue("Hallway");
+    await nameInput.trigger("blur");
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-name")).toBe("Saved. This screen updates within 30 seconds.");
+
+    const pageToggle = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(c => String(c.props("ariaLabel")).startsWith("Show "));
+    pageToggle.vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-pages")).toBe("Saved. This screen updates within 30 seconds.");
+
+    const touch = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Touchscreen");
+    touch.vm.$emit("update:modelValue", "off");
+    await flushPromises();
+    expect(savedIn(wrapper, "screen-touch")).toBe("Saved. This screen updates within 30 seconds.");
   });
 });
 

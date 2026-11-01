@@ -149,10 +149,29 @@ export function scheduleDesiredOn({ enabled, schedule, now = new Date(), timeZon
     : minutes >= on.minutes && minutes < off.minutes;
 }
 
+/** Whether any enabled day has a boundary the agent could act on. */
+function hasScheduleBoundary({ enabled, schedule }) {
+  if (!enabled || !Array.isArray(schedule)) return false;
+  return schedule.some(
+    day => day && day.enabled && (parseClock(day.onTime) || parseClock(day.offTime))
+  );
+}
+
+// The screen's system zone can sit up to 14 hours away from the admin
+// browser's. Its own boundary estimate is therefore only a rough lower bound:
+// keep the override until that estimate plus this slack has passed, when it
+// must be over on the screen too.
+const UNKNOWN_ZONE_SLACK_MS = 14 * 60 * 60 * 1000;
+
 /**
- * The active `{ power, setAt, expiry }` override, or null when absent, expired
- * or invalid. `expiry` is null when no schedule can take over (it stays until
- * changed); `timeZone` only affects the display estimate.
+ * The active `{ power, setAt, expiry, hasSchedule }` override, or null when
+ * absent, expired or invalid. `expiry` is null when no schedule can take over
+ * (it stays until changed); `timeZone` only affects the display estimate.
+ *
+ * When the screen uses its system zone the browser cannot know that zone, so
+ * its own estimate only ends the override after a zone's worth of slack; until
+ * then the row says "until the next scheduled change" rather than a time.
+ * `hasSchedule` says whether a schedule will end it eventually.
  */
 export function activePowerOverride(
   override,
@@ -163,6 +182,17 @@ export function activePowerOverride(
   if (power !== "on" && power !== "off") return null;
   const setAt = Date.parse(override.setAt);
   if (!Number.isFinite(setAt)) return null;
+  const hasSchedule = hasScheduleBoundary({ enabled, schedule });
+  if (!timeZone) {
+    const estimate = firstScheduleBoundaryAfter({
+      enabled,
+      schedule,
+      moment: new Date(setAt),
+      timeZone: null,
+    });
+    if (estimate && now.getTime() >= estimate.getTime() + UNKNOWN_ZONE_SLACK_MS) return null;
+    return { power, setAt: override.setAt, expiry: null, hasSchedule };
+  }
   const expiry = firstScheduleBoundaryAfter({
     enabled,
     schedule,
@@ -170,7 +200,7 @@ export function activePowerOverride(
     timeZone,
   });
   if (expiry && now.getTime() >= expiry.getTime()) return null;
-  return { power, setAt: override.setAt, expiry };
+  return { power, setAt: override.setAt, expiry, hasSchedule };
 }
 
 /** "22:00" for a boundary, in the screen's timezone. */

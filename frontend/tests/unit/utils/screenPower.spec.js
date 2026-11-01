@@ -135,6 +135,7 @@ describe("activePowerOverride", () => {
       power: "off",
       setAt: "2026-07-11T07:00:00.000Z",
       expiry: at("2026-07-11T20:00:00.000Z"), // 22:00 local
+      hasSchedule: true,
     });
   });
 
@@ -158,6 +159,7 @@ describe("activePowerOverride", () => {
       power: "on",
       setAt: "2026-07-11T07:00:00.000Z",
       expiry: null,
+      hasSchedule: false,
     });
   });
 
@@ -175,6 +177,59 @@ describe("activePowerOverride", () => {
     // The retired shape (until) is no longer an override.
     expect(activePowerOverride({ power: "on", until: null }, options)).toBeNull();
     expect(activePowerOverride(null, options)).toBeNull();
+  });
+});
+
+describe("activePowerOverride with an unknown screen zone", () => {
+  const now = at("2026-11-02T04:30:00Z");
+  const setAt = "2026-11-01T21:48:25.107Z";
+  const options = { enabled: true, schedule: schedule(), now, timeZone: null };
+
+  // The config says "system", so the screen's zone is the Pi's, not the
+  // browser's. Pretend the admin browser is an hour ahead: its own 22:00 to
+  // 06:00 window already ended at 04:00Z, while the Pi's ends at 05:00Z.
+  const withBrowserZone = (timeZone, run) => {
+    const original = process.env.TZ;
+    process.env.TZ = timeZone;
+    try {
+      return run();
+    } finally {
+      if (original === undefined) delete process.env.TZ;
+      else process.env.TZ = original;
+    }
+  };
+
+  it("stays active past the browser's own boundary, with no time to show", () => {
+    withBrowserZone("Europe/Athens", () => {
+      expect(activePowerOverride({ power: "on", setAt }, options)).toEqual({
+        power: "on",
+        setAt,
+        expiry: null,
+        hasSchedule: true,
+      });
+    });
+  });
+
+  it("ends 14 hours after the browser's own boundary", () => {
+    withBrowserZone("Europe/Athens", () => {
+      // The browser's 06:00 boundary is 04:00Z; after 14 h of zone slack the
+      // override must be over on the screen too.
+      expect(
+        activePowerOverride({ power: "on", setAt }, { ...options, now: at("2026-11-02T17:59:59Z") })
+      ).not.toBeNull();
+      expect(
+        activePowerOverride({ power: "on", setAt }, { ...options, now: at("2026-11-02T18:00:00Z") })
+      ).toBeNull();
+    });
+  });
+
+  it("says the choice lasts until changed when no schedule can end it", () => {
+    expect(activePowerOverride({ power: "off", setAt }, { ...options, enabled: false })).toEqual({
+      power: "off",
+      setAt,
+      expiry: null,
+      hasSchedule: false,
+    });
   });
 });
 

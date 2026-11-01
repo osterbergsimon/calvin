@@ -97,7 +97,7 @@ test.describe("phone: Screens", () => {
     const nameInput = page.locator('[data-test="screen-name-input"]');
     await nameInput.fill("Hallway wall");
     await nameInput.blur();
-    await expect(page.getByText(/Saved\. This screen shows its new name/)).toBeVisible();
+    await expect(page.getByText(/Saved\. This screen updates within 30 seconds/)).toBeVisible();
     await expect.poll(() => api.requests).toContain("PUT /api/kiosks/hallway/overrides");
 
     await expectPhoneLayout(page, "Screens / one screen after rename");
