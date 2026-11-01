@@ -39,6 +39,9 @@ export const useConfigStore = defineStore("config", () => {
   const showWebServices = ref(false); // Toggle for web services view
   const photoFrameEnabled = ref(false); // Photo frame mode enabled
   const photoFrameTimeout = ref(300); // Photo frame timeout in seconds (5 minutes default)
+  // Photo sources the fullscreen photo frame cycles through. Empty = all.
+  // Per screen: a kiosk override arrives here; a browser keeps its own choice.
+  const photoFrameSourceIds = ref([]);
   const showUI = ref(true); // Show headers and UI controls (can be hidden for kiosk mode)
   const showUITemporary = ref(false); // Temporary UI override (doesn't persist)
   const temporaryUITimer = ref(null); // Timer for temporary UI override
@@ -135,6 +138,7 @@ export const useConfigStore = defineStore("config", () => {
     lastSideViewMode,
     photoFrameEnabled,
     photoFrameTimeout,
+    photoFrameSourceIds,
     showUI,
     modeIndicatorTimeout,
     photoRotationInterval,
@@ -604,6 +608,7 @@ export const useConfigStore = defineStore("config", () => {
     lastSideViewMode,
     photoFrameEnabled,
     photoFrameTimeout,
+    photoFrameSourceIds,
     showUI,
     modeIndicatorTimeout,
     keyboardFeedbackEnabled,

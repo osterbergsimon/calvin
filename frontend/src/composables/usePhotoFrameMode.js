@@ -1,14 +1,27 @@
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { computed, ref, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
+import { useImagesStore } from "../stores/images";
 import { useModeStore } from "../stores/mode";
+import { useScreenSetting } from "./useScreenSetting";
 import { useRouter } from "vue-router";
 
 /**
  * Composable for managing photo frame mode (auto full-screen after inactivity).
  * Uses singleton pattern to ensure only one instance exists across the app.
+ *
+ * Photo frame is per screen (calvin-3xz9): Off/On, the idle wait and the photo
+ * sources come from `useScreenSetting`, so a kiosk's override or this browser's
+ * own choice applies while the old global config stays the fallback.
  */
 let photoFrameInstance = null;
 let globalInitialized = false; // Track initialization at module level
+
+// The wake event itself must not reach the slideshow or the dashboard under it
+// (a tap on a photo, Escape, an arrow key). The trailing click of a tap is
+// swallowed for the same short window the hot-corner reveal uses.
+const CLICK_SUPPRESS_MS = 700;
+const WAKE_EVENTS = new Set(["pointerdown", "mousedown", "touchstart", "keydown"]);
+const ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "touchstart", "pointerdown", "click"];
 
 // Helper function to log only in development mode
 const devLog = (...args) => {
@@ -16,6 +29,15 @@ const devLog = (...args) => {
     console.log(...args);
   }
 };
+
+const asBool = value => value === true || value === "true" || value === 1 || value === "1";
+
+const normalizeSourceIds = ids =>
+  Array.isArray(ids)
+    ? [
+        ...new Set(ids.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())),
+      ].sort()
+    : [];
 
 // Export reset function for testing
 export function resetPhotoFrameInstance() {
@@ -27,6 +49,7 @@ export function resetPhotoFrameInstance() {
     if (photoFrameInstance.resetTimerThrottle?.value) {
       clearTimeout(photoFrameInstance.resetTimerThrottle.value);
     }
+    photoFrameInstance.removeEventListeners?.();
   }
   photoFrameInstance = null;
   globalInitialized = false;
@@ -42,8 +65,34 @@ export function usePhotoFrameMode() {
   devLog("[PhotoFrame] Creating new singleton instance");
 
   const configStore = useConfigStore();
+  const imagesStore = useImagesStore();
   const modeStore = useModeStore();
   const router = useRouter();
+
+  // Per-screen settings. `serialize`/`parse` keep booleans, numbers and lists
+  // intact in localStorage (the default string form would turn `false` truthy).
+  const enabledSetting = useScreenSetting("photoFrameEnabled", {
+    serverValue: () => configStore.photoFrameEnabled,
+    serialize: JSON.stringify,
+    parse: JSON.parse,
+  });
+  const timeoutSetting = useScreenSetting("photoFrameTimeout", {
+    serverValue: () => configStore.photoFrameTimeout,
+    serialize: JSON.stringify,
+    parse: JSON.parse,
+  });
+  const sourceIdsSetting = useScreenSetting("photoFrameSourceIds", {
+    serverValue: () => configStore.photoFrameSourceIds,
+    serialize: JSON.stringify,
+    parse: JSON.parse,
+  });
+
+  const photoFrameEnabled = computed(() => asBool(enabledSetting.value.value));
+  const photoFrameTimeout = computed(() => {
+    const seconds = Number(timeoutSetting.value.value);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : 300;
+  });
+  const photoFrameSourceIds = computed(() => normalizeSourceIds(sourceIdsSetting.value.value));
 
   const isPhotoFrameActive = ref(false);
   const inactivityTimer = ref(null);
@@ -51,6 +100,10 @@ export function usePhotoFrameMode() {
   const savedSideViewMode = ref(null); // Store side view mode before entering photo frame
   const resetTimerThrottle = ref(null); // Throttle for resetInactivityTimer calls
   const isResettingTimer = ref(false); // Flag to prevent concurrent timer resets
+
+  // Invalidates an in-flight "does this source have photos?" check when the
+  // user acts or the settings change before it resolves.
+  let enterToken = 0;
 
   const resetInactivityTimer = () => {
     // Prevent concurrent execution
@@ -60,6 +113,7 @@ export function usePhotoFrameMode() {
 
     isResettingTimer.value = true;
     lastActivityTime.value = Date.now();
+    enterToken += 1;
 
     // Clear throttle if it exists
     if (resetTimerThrottle.value) {
@@ -91,8 +145,8 @@ export function usePhotoFrameMode() {
     }
 
     // Start new timer if photo frame mode is enabled
-    if (configStore.photoFrameEnabled && !isPhotoFrameActive.value) {
-      const timeout = configStore.photoFrameTimeout * 1000; // Convert to milliseconds
+    if (photoFrameEnabled.value && !isPhotoFrameActive.value) {
+      const timeout = photoFrameTimeout.value * 1000; // Convert to milliseconds
 
       // Only log when actually starting a new timer, not when resetting an existing one
       if (!hadExistingTimer) {
@@ -103,24 +157,45 @@ export function usePhotoFrameMode() {
       inactivityTimer.value = setTimeout(() => {
         devLog("[PhotoFrame] Timer expired, entering photo frame mode");
         inactivityTimer.value = null; // Clear reference before entering
-        enterPhotoFrameMode();
+        enterPhotoFrameMode().catch(error => {
+          devLog("[PhotoFrame] Could not enter photo frame mode:", error);
+        });
       }, timeout);
     }
 
     isResettingTimer.value = false;
   };
 
-  const enterPhotoFrameMode = () => {
-    if (!configStore.photoFrameEnabled) {
+  const enterPhotoFrameMode = async () => {
+    if (!photoFrameEnabled.value) {
       devLog("[PhotoFrame] Cannot enter photo frame mode: disabled in config");
-      return;
+      return false;
     }
 
     // Don't enter if user is on settings page
     const currentPath = router.currentRoute.value.path;
     if (currentPath === "/settings") {
       devLog("[PhotoFrame] Cannot enter photo frame mode: user is on settings page");
-      return;
+      return false;
+    }
+
+    // A screen whose chosen sources have no photos stays on the dashboard
+    // instead of opening an empty fullscreen slideshow (calvin-3xz9).
+    const sourceIds = photoFrameSourceIds.value;
+    const token = ++enterToken;
+    try {
+      await imagesStore.fetchImages(sourceIds);
+    } catch (error) {
+      devLog("[PhotoFrame] Could not load photos, staying on the dashboard:", error);
+      return false;
+    }
+    if (token !== enterToken || isPhotoFrameActive.value) {
+      // The user acted (or the settings changed) while we checked.
+      return false;
+    }
+    if (!imagesStore.getImagesForSource(sourceIds).length) {
+      devLog("[PhotoFrame] No photos in the chosen sources, staying on the dashboard");
+      return false;
     }
 
     devLog("[PhotoFrame] Entering photo frame mode");
@@ -129,10 +204,12 @@ export function usePhotoFrameMode() {
     savedSideViewMode.value = configStore.lastSideViewMode;
     devLog("[PhotoFrame] Saved side view mode:", savedSideViewMode.value);
 
-    // Enter fullscreen photos mode
-    modeStore.enterFullscreen(modeStore.MODES.PHOTOS);
+    // Enter fullscreen photos mode, scoped to this screen's chosen sources
+    // (an empty list means all sources).
+    modeStore.enterFullscreen(modeStore.MODES.PHOTOS, { sourceIds });
     isPhotoFrameActive.value = true;
     router.push("/");
+    return true;
   };
 
   const exitPhotoFrameMode = () => {
@@ -140,6 +217,7 @@ export function usePhotoFrameMode() {
 
     devLog("[PhotoFrame] Exiting photo frame mode");
 
+    enterToken += 1;
     // Exit fullscreen - return to dashboard
     modeStore.exitFullscreen();
     isPhotoFrameActive.value = false;
@@ -169,6 +247,37 @@ export function usePhotoFrameMode() {
     }, 500); // Throttle to max once per 500ms
   };
 
+  let suppressClicksUntil = 0;
+
+  const swallow = event => {
+    event.preventDefault?.();
+    event.stopImmediatePropagation?.();
+  };
+
+  // One capture-phase handler: while the frame is up, the first touch/key wakes
+  // it and is swallowed, so it does not also act on the slideshow or the
+  // dashboard that appears underneath.
+  const handleWindowEvent = event => {
+    // The tap that woke the frame still produces a click after the frame has
+    // closed; swallow that one too so it cannot press a dashboard control.
+    if (event.type === "click" && Date.now() < suppressClicksUntil) {
+      suppressClicksUntil = 0;
+      swallow(event);
+      return;
+    }
+    if (isPhotoFrameActive.value) {
+      if (WAKE_EVENTS.has(event.type)) {
+        swallow(event);
+        if (event.type !== "keydown") {
+          suppressClicksUntil = Date.now() + CLICK_SUPPRESS_MS;
+        }
+        exitPhotoFrameMode();
+        return;
+      }
+    }
+    handleActivity();
+  };
+
   // Track if listeners are set up
   let listenersSetup = false;
 
@@ -178,31 +287,30 @@ export function usePhotoFrameMode() {
       return;
     }
 
-    // Set up activity listeners
-    const events = ["mousedown", "mousemove", "keydown", "touchstart", "click"];
-    events.forEach(event => {
-      window.addEventListener(event, handleActivity, { passive: true });
+    // Capture phase so the wake event can be swallowed before the slideshow or
+    // dashboard sees it.
+    ACTIVITY_EVENTS.forEach(event => {
+      window.addEventListener(event, handleWindowEvent, { capture: true, passive: false });
     });
 
     listenersSetup = true;
-    devLog("[PhotoFrame] Event listeners registered:", events);
+    devLog("[PhotoFrame] Event listeners registered:", ACTIVITY_EVENTS);
   };
 
   const removeEventListeners = () => {
     if (!listenersSetup) return;
 
-    const events = ["mousedown", "mousemove", "keydown", "touchstart", "click"];
-    events.forEach(event => {
-      window.removeEventListener(event, handleActivity);
+    ACTIVITY_EVENTS.forEach(event => {
+      window.removeEventListener(event, handleWindowEvent, { capture: true });
     });
 
     listenersSetup = false;
     devLog("[PhotoFrame] Event listeners removed");
   };
 
-  // Watch for config changes
+  // Watch for per-screen setting changes
   watch(
-    () => configStore.photoFrameEnabled,
+    photoFrameEnabled,
     enabled => {
       if (enabled) {
         resetInactivityTimer();
@@ -221,13 +329,23 @@ export function usePhotoFrameMode() {
   );
 
   watch(
-    () => configStore.photoFrameTimeout,
+    photoFrameTimeout,
     () => {
-      if (configStore.photoFrameEnabled) {
+      if (photoFrameEnabled.value) {
         resetInactivityTimer();
       }
     },
     { immediate: false } // Don't run on initial setup, we handle that in onMounted
+  );
+
+  watch(
+    photoFrameSourceIds,
+    () => {
+      if (photoFrameEnabled.value) {
+        resetInactivityTimer();
+      }
+    },
+    { immediate: false, deep: true }
   );
 
   // Watch for route changes to prevent activation on settings page
@@ -244,7 +362,7 @@ export function usePhotoFrameMode() {
       } else if (
         oldPath === "/settings" &&
         newPath === "/" &&
-        configStore.photoFrameEnabled &&
+        photoFrameEnabled.value &&
         !isPhotoFrameActive.value
       ) {
         // Restart timer if navigating away from settings to dashboard and photo frame is enabled
@@ -271,8 +389,9 @@ export function usePhotoFrameMode() {
     await configStore.fetchConfig();
 
     devLog("[PhotoFrame] Config loaded:", {
-      photoFrameEnabled: configStore.photoFrameEnabled,
-      photoFrameTimeout: configStore.photoFrameTimeout,
+      photoFrameEnabled: photoFrameEnabled.value,
+      photoFrameTimeout: photoFrameTimeout.value,
+      photoFrameSourceIds: photoFrameSourceIds.value,
     });
 
     // Set up activity listeners
@@ -280,8 +399,8 @@ export function usePhotoFrameMode() {
 
     // Initialize timer if photo frame mode is enabled (loaded from server)
     // This ensures the setting from the server is properly applied
-    if (configStore.photoFrameEnabled) {
-      devLog("[PhotoFrame] Initializing timer with timeout:", configStore.photoFrameTimeout);
+    if (photoFrameEnabled.value) {
+      devLog("[PhotoFrame] Initializing timer with timeout:", photoFrameTimeout.value);
       resetInactivityTimer();
     } else {
       devLog("[PhotoFrame] Photo frame mode is disabled, not starting timer");
@@ -317,9 +436,15 @@ export function usePhotoFrameMode() {
     enterPhotoFrameMode,
     exitPhotoFrameMode,
     resetInactivityTimer,
+    // Per-screen values, exposed for the settings row and tests.
+    photoFrameEnabled,
+    photoFrameTimeout,
+    photoFrameSourceIds,
     // Expose internal refs for testing cleanup
     inactivityTimer,
     resetTimerThrottle,
+    setupEventListeners,
+    removeEventListeners,
   };
 
   // Store instance for singleton pattern

@@ -47,6 +47,7 @@
               :is-fullscreen="true"
               :auto-rotate="true"
               :rotation-interval="configStore.photoRotationInterval * 1000"
+              :source-ids="modeStore.fullscreenContext?.sourceIds || []"
             />
             <!-- Fullscreen Web Services -->
             <WebServiceViewer
@@ -192,6 +193,7 @@ import { useModeStore } from "../stores/mode";
 import { useFirstLoadLight } from "../composables/useFirstLoadLight";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { useFocusLight } from "../composables/useFocusLight";
 import { useHotCornerReveal } from "../composables/useHotCornerReveal";
 import { useSetupPrompt } from "../composables/useSetupPrompt";
 import {
@@ -495,15 +497,9 @@ const lockLayout = () => {
   configStore.updateConfig({ regionsLocked: true });
 };
 
-const lightActive = computed(() => {
-  // While arranging the layout (unlocked), drop the focus spotlight: its large
-  // blur glow + raised z-index repaint on every resize frame, which flashes the
-  // neighbouring panel through. Plain opaque panels tile cleanly as you drag.
-  if (!configStore.regionsLocked) return false;
-  if (configStore.focusLightMode === "off") return false;
-  if (configStore.focusLightMode === "always") return true;
-  return configStore.shouldShowUI; // 'interaction'
-});
+// 'interaction' follows touch/key/remote input and fades after a short idle,
+// independent of hide controls (calvin-3xz9). 'always' and 'off' are unchanged.
+const { lightActive } = useFocusLight(configStore);
 
 const onFocusRegion = regionId => {
   // Focusing a region (for the focus-light / touch nav) must not bring the

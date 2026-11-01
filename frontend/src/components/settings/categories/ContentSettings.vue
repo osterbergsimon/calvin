@@ -94,23 +94,11 @@
       </SettingRow>
       <SettingRow
         label="Photo frame when idle"
-        description="After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back."
+        description="Per screen now: choose Off/On, the idle wait and the photo sources in Dashboard › Focus & remote."
       >
-        <ToggleSwitch
-          :model-value="config.photoFrameEnabled || config.photoFrameMode"
-          aria-label="Photo frame when idle"
-          @update:model-value="
-            v => emit('update:config', { photoFrameEnabled: v, photoFrameMode: v })
-          "
-        />
-      </SettingRow>
-      <SettingRow v-if="config.photoFrameEnabled || config.photoFrameMode" label="Start after">
-        <SelectPill
-          :model-value="photoFrameTimeout"
-          :options="photoFrameTimeoutOptions"
-          aria-label="Start the photo frame after"
-          @update:model-value="v => emit('update:config', { photoFrameTimeout: v })"
-        />
+        <Button data-test="open-photo-frame-settings" @click="openPhotoFrameSettings">
+          Open Focus &amp; remote
+        </Button>
       </SettingRow>
     </SettingsSection>
 
@@ -130,9 +118,10 @@
 
 <script setup>
 import { computed } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import Button from "@/components/ui/Button.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
@@ -143,7 +132,7 @@ import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
 import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
 import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 
-const props = defineProps({ config: { type: Object, required: true } });
+defineProps({ config: { type: Object, required: true } });
 const emit = defineEmits(["update:config"]);
 const route = useRoute();
 
@@ -156,29 +145,10 @@ const highlightId = computed(() =>
   typeof route?.query?.source === "string" ? route.query.source : ""
 );
 
-// Photo frame "Start after": the idle wait, in seconds. The store's default is
-// 300 s, so a missing value means 5 min (the old `|| 60` fallback showed 1 min
-// for a fresh install). Options are the minutes the control offers.
-const PHOTO_FRAME_MINUTES = [1, 2, 5, 10, 15, 30];
-const photoFrameTimeout = computed(() => {
-  const seconds = Number(props.config.photoFrameTimeout) || 300;
-  return seconds;
-});
-const minutesLabel = seconds => {
-  if (seconds % 60 !== 0) return `${seconds} s`;
-  const minutes = seconds / 60;
-  return `${minutes} min`;
+// The photo frame is per screen now (calvin-3xz9). Keep the row as a pointer to
+// its new home instead of editing the global value here.
+const router = useRouter();
+const openPhotoFrameSettings = () => {
+  router.push({ path: "/settings", query: { setting: "dashboard-kiosk-focus" } });
 };
-const photoFrameTimeoutOptions = computed(() => {
-  const options = PHOTO_FRAME_MINUTES.map(minutes => ({
-    value: minutes * 60,
-    label: `${minutes} min`,
-  }));
-  const current = photoFrameTimeout.value;
-  if (!options.some(option => option.value === current)) {
-    options.push({ value: current, label: minutesLabel(current) });
-    options.sort((a, b) => a.value - b.value);
-  }
-  return options;
-});
 </script>

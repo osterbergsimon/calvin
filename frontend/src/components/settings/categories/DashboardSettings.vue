@@ -191,6 +191,67 @@
           @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
         />
       </SettingRow>
+      <SettingRow
+        label="Photo frame"
+        description="After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back."
+      >
+        <template #description>
+          <p class="setting-row__desc">
+            After a while with no touches or key presses, photos go full screen. Any touch brings
+            the dashboard back.
+          </p>
+          <ScopeLine
+            :overridden="photoFrameSetting.overridden.value"
+            reset-test="reset-photo-frame"
+            @reset="photoFrameSetting.reset()"
+          />
+        </template>
+        <SegmentedControl
+          :model-value="photoFrameEnabled"
+          :options="[
+            { value: false, label: 'Off' },
+            { value: true, label: 'On' },
+          ]"
+          aria-label="Photo frame"
+          @update:model-value="photoFrameSetting.set($event)"
+        />
+      </SettingRow>
+      <SettingRow v-if="photoFrameEnabled" label="Start after">
+        <template #description>
+          <ScopeLine
+            :overridden="photoFrameTimeoutSetting.overridden.value"
+            reset-test="reset-photo-frame-timeout"
+            @reset="photoFrameTimeoutSetting.reset()"
+          />
+        </template>
+        <SelectPill
+          :model-value="photoFrameTimeout"
+          :options="photoFrameTimeoutOptions"
+          aria-label="Start the photo frame after"
+          @update:model-value="photoFrameTimeoutSetting.set($event)"
+        />
+      </SettingRow>
+      <SettingRow
+        v-if="photoFrameEnabled"
+        label="Photos from"
+        description="All sources, or the photo sources this screen's frame uses."
+      >
+        <template #description>
+          <p class="setting-row__desc">
+            All sources, or the photo sources this screen's frame uses.
+          </p>
+          <ScopeLine
+            :overridden="photoFrameSourceSetting.overridden.value"
+            reset-test="reset-photo-frame-sources"
+            @reset="photoFrameSourceSetting.reset()"
+          />
+        </template>
+        <PhotoSourcePicker
+          :model-value="photoFrameSourceIds"
+          :options="photoSources"
+          @update:model-value="photoFrameSourceSetting.set($event)"
+        />
+      </SettingRow>
       <SettingRow label="Loading light">
         <template #description>
           <p class="setting-row__desc">What Calvin shows while it's fetching something.</p>
@@ -299,14 +360,16 @@ import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import PhotoSourcePicker from "@/components/settings/shared/PhotoSourcePicker.vue";
 import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { LAYOUT_STORAGE_KEY, normalizeLayoutMode } from "@/utils/layoutMode";
 import { useScreenSetting } from "@/composables/useScreenSetting";
+import { usePlugins } from "@/composables/usePlugins";
 import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
 import { useRegionEditorRequest } from "@/composables/useRegionEditorRequest";
@@ -417,6 +480,68 @@ const LAYOUT_OPTIONS = [
 ];
 const layoutSetting = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
 const layoutMode = computed(() => normalizeLayoutMode(layoutSetting.value.value));
+
+// --- Photo frame: per screen (calvin-3xz9) ---------------------------------
+// Off/On, the idle wait and the sources all follow this screen's own choice
+// (a kiosk's override, or this browser's localStorage) with the old global
+// value as the Default. The frame's sources use the same picker as a photo
+// region: an empty list means every source.
+const PHOTO_FRAME_MINUTES = [1, 2, 5, 10, 15, 30];
+const photoFrameSetting = useScreenSetting("photoFrameEnabled", {
+  serverValue: () => props.config.photoFrameEnabled,
+  serialize: JSON.stringify,
+  parse: JSON.parse,
+});
+const photoFrameEnabled = computed(
+  () => photoFrameSetting.value.value === true || photoFrameSetting.value.value === "true"
+);
+const photoFrameTimeoutSetting = useScreenSetting("photoFrameTimeout", {
+  serverValue: () => props.config.photoFrameTimeout,
+  serialize: JSON.stringify,
+  parse: JSON.parse,
+});
+const photoFrameTimeout = computed(() => {
+  const seconds = Number(photoFrameTimeoutSetting.value.value);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : 300;
+});
+const minutesLabel = seconds => {
+  if (seconds % 60 !== 0) return `${seconds} s`;
+  return `${seconds / 60} min`;
+};
+const photoFrameTimeoutOptions = computed(() => {
+  const options = PHOTO_FRAME_MINUTES.map(minutes => ({
+    value: minutes * 60,
+    label: `${minutes} min`,
+  }));
+  const current = photoFrameTimeout.value;
+  if (!options.some(option => option.value === current)) {
+    options.push({ value: current, label: minutesLabel(current) });
+    options.sort((a, b) => a.value - b.value);
+  }
+  return options;
+});
+const photoFrameSourceSetting = useScreenSetting("photoFrameSourceIds", {
+  serverValue: () => props.config.photoFrameSourceIds,
+  serialize: JSON.stringify,
+  parse: JSON.parse,
+});
+const photoFrameSourceIds = computed(() =>
+  Array.isArray(photoFrameSourceSetting.value.value) ? photoFrameSourceSetting.value.value : []
+);
+
+// The photo-region picker's source list: enabled image-plugin instances.
+const { plugins, pluginInstances, loadPlugins } = usePlugins();
+const photoSources = computed(() =>
+  plugins.value
+    .filter(plugin => plugin.type === "image" && plugin.enabled)
+    .flatMap(plugin => pluginInstances.value[plugin.id] || [])
+    .filter(instance => instance.enabled !== false)
+    .map(instance => ({ id: instance.id, name: instance.name }))
+);
+onMounted(() => {
+  if (plugins.value.length === 0) loadPlugins();
+});
+
 const prefersReducedMotion =
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&
