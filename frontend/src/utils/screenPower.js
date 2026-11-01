@@ -157,11 +157,11 @@ function hasScheduleBoundary({ enabled, schedule }) {
   );
 }
 
-// The kiosk agent searches at most eight days ahead for a boundary (see
-// _first_boundary_after in deploy/kiosk-agent), so an override older than that
-// plus a day of zone slack must be over even when the browser cannot see the
-// screen's own zone.
-const UNKNOWN_ZONE_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
+// The screen's system zone can sit up to 14 hours away from the admin
+// browser's. Its own boundary estimate is therefore only a rough lower bound:
+// keep the override until that estimate plus this slack has passed, when it
+// must be over on the screen too.
+const UNKNOWN_ZONE_SLACK_MS = 14 * 60 * 60 * 1000;
 
 /**
  * The active `{ power, setAt, expiry, hasSchedule }` override, or null when
@@ -169,8 +169,9 @@ const UNKNOWN_ZONE_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
  * (it stays until changed); `timeZone` only affects the display estimate.
  *
  * When the screen uses its system zone the browser cannot know that zone, so
- * its own boundary estimate must never end the override: only the agent, on its
- * own clock, can. `hasSchedule` says whether a schedule will end it eventually.
+ * its own estimate only ends the override after a zone's worth of slack; until
+ * then the row says "until the next scheduled change" rather than a time.
+ * `hasSchedule` says whether a schedule will end it eventually.
  */
 export function activePowerOverride(
   override,
@@ -183,7 +184,13 @@ export function activePowerOverride(
   if (!Number.isFinite(setAt)) return null;
   const hasSchedule = hasScheduleBoundary({ enabled, schedule });
   if (!timeZone) {
-    if (now.getTime() - setAt >= UNKNOWN_ZONE_MAX_AGE_MS) return null;
+    const estimate = firstScheduleBoundaryAfter({
+      enabled,
+      schedule,
+      moment: new Date(setAt),
+      timeZone: null,
+    });
+    if (estimate && now.getTime() >= estimate.getTime() + UNKNOWN_ZONE_SLACK_MS) return null;
     return { power, setAt: override.setAt, expiry: null, hasSchedule };
   }
   const expiry = firstScheduleBoundaryAfter({

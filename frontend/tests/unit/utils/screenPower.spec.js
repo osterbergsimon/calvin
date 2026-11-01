@@ -210,9 +210,17 @@ describe("activePowerOverride with an unknown screen zone", () => {
     });
   });
 
-  it("still ends once the agent's whole weekly search window is long gone", () => {
-    const longAfter = at("2026-11-20T00:00:00Z");
-    expect(activePowerOverride({ power: "on", setAt }, { ...options, now: longAfter })).toBeNull();
+  it("ends 14 hours after the browser's own boundary", () => {
+    withBrowserZone("Europe/Athens", () => {
+      // The browser's 06:00 boundary is 04:00Z; after 14 h of zone slack the
+      // override must be over on the screen too.
+      expect(
+        activePowerOverride({ power: "on", setAt }, { ...options, now: at("2026-11-02T17:59:59Z") })
+      ).not.toBeNull();
+      expect(
+        activePowerOverride({ power: "on", setAt }, { ...options, now: at("2026-11-02T18:00:00Z") })
+      ).toBeNull();
+    });
   });
 
   it("says the choice lasts until changed when no schedule can end it", () => {
