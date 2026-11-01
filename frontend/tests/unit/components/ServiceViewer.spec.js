@@ -6,21 +6,26 @@ import ServiceViewer from "@/components/service/ServiceViewer.vue";
 import { useConfigStore } from "@/stores/config";
 
 const schemaData = ref(null);
+const schemaDataCalls = [];
 
 vi.mock("@/composables/useSchemaData", () => ({
-  useSchemaData: () => ({ data: schemaData }),
+  useSchemaData: (...args) => {
+    schemaDataCalls.push(args);
+    return { data: schemaData };
+  },
 }));
 
 describe("ServiceViewer", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     schemaData.value = null;
+    schemaDataCalls.length = 0;
     useConfigStore().showUI = true;
   });
 
-  const mountViewer = service =>
+  const mountViewer = (service, extraProps = {}) =>
     mount(ServiceViewer, {
-      props: { service },
+      props: { service, ...extraProps },
       global: {
         stubs: {
           SchemaRenderer: {
@@ -133,5 +138,18 @@ describe("ServiceViewer", () => {
       },
     });
     expect(w.findComponent({ name: "SchemaRenderer" }).props("linkAction")).toBe("embed");
+  });
+
+  // CLV-115: the plugin's data fetches light its own region's frame.
+  it("passes its region to the data fetch so the loading light uses that frame", () => {
+    mountViewer({ id: "weather", display_schema: { kind: "status" } }, { regionId: "r1" });
+    const [, , , options] = schemaDataCalls.at(-1);
+    expect(options.regionId.value).toBe("r1");
+  });
+
+  it("without a region the data fetch lights the app frame", () => {
+    mountViewer({ id: "weather", display_schema: { kind: "status" } });
+    const [, , , options] = schemaDataCalls.at(-1);
+    expect(options.regionId.value).toBe(null);
   });
 });

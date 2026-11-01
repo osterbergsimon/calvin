@@ -53,6 +53,8 @@ const props = defineProps({
     default: false,
   },
   linkAction: { type: String, default: null },
+  // Region this viewer fills; its data fetches light that region's frame.
+  regionId: { type: String, default: null },
 });
 
 const schemaKind = computed(() => props.service.display_schema?.kind || null);
@@ -60,7 +62,8 @@ const displaySchema = computed(() => props.service.display_schema || {});
 const schemaQuery = useSchemaData(
   computed(() => props.service.id),
   displaySchema,
-  computed(() => Boolean(schemaKind.value))
+  computed(() => Boolean(schemaKind.value)),
+  { regionId: computed(() => props.regionId) }
 );
 const schemaData = computed(() => schemaQuery.data.value);
 const panelTitle = computed(() => {

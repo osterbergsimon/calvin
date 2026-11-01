@@ -50,6 +50,7 @@
           :header-visible="!isFullscreen"
           :focused="focused"
           :link-action="linkAction"
+          :region-id="regionId"
         >
           <template #actions>
             <ServiceRegionViewOptions
