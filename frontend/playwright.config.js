@@ -38,7 +38,20 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
       // The phone suite is a real 390x844 touch viewport and the accessibility
       // suite drives its own viewports/themes; both run as their own projects.
-      testIgnore: ["**/phone/**", "**/a11y/**"],
+      testIgnore: ["**/phone/**", "**/a11y/**", "**/osk/**"],
+    },
+    {
+      // CLV-114: the on-screen keyboard driven by touch taps. WebKit is the
+      // engine of cog (the default kiosk browser) and GNOME Web; the same spec
+      // runs in Chromium so neither engine regresses. Specs set the viewport.
+      name: "osk-webkit",
+      testDir: "./tests/e2e/osk",
+      use: { ...devices["Desktop Safari"], hasTouch: true },
+    },
+    {
+      name: "osk-chromium",
+      testDir: "./tests/e2e/osk",
+      use: { ...devices["Desktop Chrome"], hasTouch: true },
     },
     {
       // CLV-65: axe audits at phone and kiosk sizes, light and dark. The specs

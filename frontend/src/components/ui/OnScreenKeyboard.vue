@@ -7,6 +7,7 @@
       class="osk-open"
       aria-label="Show on-screen keyboard"
       @pointerdown.prevent
+      @mousedown.prevent
       @click="osk.showKeyboard()"
     >
       <svg class="osk-open__ic" aria-hidden="true" viewBox="0 0 24 24">
@@ -16,6 +17,10 @@
       </svg>
       <span>Keyboard</span>
     </button>
+    <!-- Both pointerdown and mousedown are prevented so a tap never takes focus
+         from the field (CLV-114). WebKit still sends the compatibility mousedown
+         of a touch tap after a prevented pointerdown, and its default action
+         focuses the key button: the field blurs and the keyboard hides. -->
     <div
       v-if="!failed"
       ref="panel"
@@ -30,6 +35,7 @@
       :aria-hidden="!osk.visible.value"
       :inert="!osk.visible.value"
       @pointerdown.prevent
+      @mousedown.prevent
     >
       <div v-if="osk.pickerOpen.value" class="osk-picker" role="group" aria-label="Keyboard layout">
         <div class="osk-picker__head">Keyboard layout</div>

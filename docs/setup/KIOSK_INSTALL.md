@@ -292,8 +292,10 @@ Every board follows the same rule: a fresh install selects cog. An existing
 kiosk keeps the stack recorded in `/etc/default/calvin-kiosk` — the default does
 not silently migrate an X11 kiosk — and you switch it with an explicit
 `--display-stack` (see [Switch an existing kiosk](#switch-an-existing-kiosk)).
-FULL (all-in-one) installs (`scripts/setup.sh`, which also runs the server) are
-unchanged and keep X11 + Chromium.
+FULL (all-in-one) installs (`scripts/setup.sh`, which also runs the server)
+follow the same rule: a fresh install selects cog, `--display-stack` wins, and a
+re-run keeps the recorded stack (an all-in-one Pi from before the setting
+existed stays X11). Switch one with `sudo bash setup.sh --display-stack <stack>`.
 
 ### Choose Wayland on a fresh install (opt-in, experimental)
 
@@ -453,8 +455,8 @@ switch, pass it (`--display-stack x11` to go back to Chromium, `cog` or
 - **Remote update:** a bundle update installs the Wayland unit and labwc config but
   never switches the stack or enables the other compositor. Switching is always an
   explicit installer run.
-- FULL installs (`scripts/setup.sh`) and the backend display services are unchanged in
-  phase 1; they follow in phase 2/3.
+- FULL installs (`scripts/setup.sh`) take the same `--display-stack` values and the
+  same default (cog); the backend display services are unchanged.
 
 ### Known limitations of cog
 
