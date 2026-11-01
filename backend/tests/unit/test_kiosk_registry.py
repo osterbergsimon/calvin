@@ -645,6 +645,7 @@ async def _set_control_globals() -> None:
 @pytest.mark.unit
 async def test_global_controls_are_copied_to_screens_without_their_own_value(test_db):
     from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
 
     await kr.record_kiosk("kitchen")
     await kr.set_overrides("hallway", {"showUI": True, "orientation": "portrait"})
@@ -652,6 +653,7 @@ async def test_global_controls_are_copied_to_screens_without_their_own_value(tes
 
     await kr.migrate_global_screen_controls()
 
+    assert await config_service.get_value("screenControlsMigrated") is True
     assert await kr.get_overrides("kitchen") == {
         "showUI": False,
         "clockBarShowInKiosk": True,
@@ -696,6 +698,8 @@ async def test_global_controls_are_kept_until_a_screen_exists(test_db):
     assert await config_service.get_value("show_ui") is False
     assert await config_service.get_value("clock_bar_show_in_kiosk") is True
     assert await config_service.get_value("tap_anywhere_reveal") is True
+    # Nothing existed to migrate yet, so a later first screen still gets it.
+    assert await config_service.get_value("screenControlsMigrated") is None
 
 
 @pytest.mark.asyncio
@@ -732,6 +736,46 @@ async def test_screen_created_by_set_overrides_gets_the_global_controls(test_db)
         "clockBarShowInKiosk": True,
         "tapAnywhereReveal": True,
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_screen_registering_after_the_migration_uses_the_global_fallback(test_db):
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk("kitchen")
+    await _set_control_globals()
+    await kr.migrate_global_screen_controls()
+
+    await kr.record_kiosk("hallway", hostname="hallway-pi")
+
+    assert await kr.get_overrides("hallway") == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_reset_screen_stays_on_the_fallback_after_further_migration_runs(test_db):
+    """The migration is one-time: a reset screen is not filled in again."""
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk("kitchen")
+    await _set_control_globals()
+    await kr.migrate_global_screen_controls()
+    assert await kr.get_overrides("kitchen") == {
+        "showUI": False,
+        "clockBarShowInKiosk": True,
+        "tapAnywhereReveal": True,
+    }
+
+    # "Reset to default" drops this screen's controls; startup runs again.
+    await kr.set_overrides("kitchen", {"orientation": "portrait"})
+    await kr.migrate_global_screen_controls()
+
+    assert await kr.get_overrides("kitchen") == {"orientation": "portrait"}
+
+    # A later registration uses the global fallback too.
+    await kr.record_kiosk("hallway")
+    assert await kr.get_overrides("hallway") == {}
 
 
 @pytest.mark.asyncio
