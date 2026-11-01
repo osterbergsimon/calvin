@@ -1061,6 +1061,39 @@ describe("path addressing", () => {
       ]);
     });
 
+    it("addSubRegionAtPath grows a split up to MAX_TOP_REGIONS and refuses past the cap", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      while (getNodeAtPath(l, [0]).split.regions.length < MAX_TOP_REGIONS) {
+        const before = getNodeAtPath(l, [0]).split.regions.length;
+        l = addSubRegionAtPath(l, [0]);
+        expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(before + 1);
+      }
+      expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
+
+      const overflow = addSubRegionAtPath(l, [0]);
+      expect(overflow).toBe(l);
+      expect(getNodeAtPath(overflow, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
+    });
+
+    it("removeRegionAtPath on one of 3+ top-level siblings rebalances to 100", () => {
+      const three = addTopRegion(createDashboardLayoutFromPreset("split_two"));
+      expect(three.regions).toHaveLength(3);
+
+      const out = removeRegionAtPath(three, [1]);
+      expect(out.regions).toHaveLength(2);
+      expect(out.regions.map(r => r.id)).toEqual([three.regions[0].id, three.regions[2].id]);
+      expect(out.regions.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
+    it("removeRegionAtPath on one of 3+ nested siblings rebalances to 100", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      l = addSubRegionAtPath(l, [0]); // a,b,c
+      const out = removeRegionAtPath(l, [0, 1]);
+      const subs = getNodeAtPath(out, [0]).split.regions;
+      expect(subs.map(r => r.id)).toEqual(["region-1-a", "region-1-c"]);
+      expect(subs.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
     it("removeRegionAtPath keeps a min of one top-level region", () => {
       const single = createDashboardLayoutFromPreset("single");
       expect(removeRegionAtPath(single, [0])).toBe(single);

@@ -1,5 +1,7 @@
 # Recursive Region Nesting Implementation Plan
 
+> Superseded: the flat helpers named here were removed in CLV-112; use the *AtPath helpers.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Let a dashboard region split recursively into sub-cells (soft cap 3 levels), rendered and drag-resizable both in the editor modal and on the live kiosk.
