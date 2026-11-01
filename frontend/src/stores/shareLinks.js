@@ -33,7 +33,8 @@ export const useShareLinksStore = defineStore("shareLinks", () => {
   async function createLink(input) {
     const link = await shareApi.createLink(input);
     links.value = [link, ...links.value.filter(l => l.id !== link.id)];
-    if (!folders.value.includes(link.folder)) folders.value = [...folders.value, link.folder].sort();
+    if (!folders.value.includes(link.folder))
+      folders.value = [...folders.value, link.folder].sort();
     return link;
   }
 
