@@ -36,8 +36,15 @@
           <span class="ap-group-count">{{ group.actions.length }}</span>
         </button>
         <!-- Static header for the recommended / primary tiers -->
-        <h4 v-else class="ap-group-title">
-          <span v-if="group.tier === 'recommended'" class="ap-star">★</span>
+        <h4 v-else class="ap-group-title heading-group">
+          <svg
+            v-if="group.tier === 'recommended'"
+            class="ap-star"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path :d="mdiStar" fill="currentColor" />
+          </svg>
           {{ group.label }}
         </h4>
 
@@ -62,6 +69,7 @@
 
 <script setup>
 import { ref, computed } from "vue";
+import { mdiStar } from "@mdi/js";
 import TextField from "@/components/ui/TextField.vue";
 import { ACTION_GROUPS } from "@/utils/keyboardActionsCatalog";
 
@@ -139,15 +147,15 @@ const visibleGroups = computed(() => {
   padding-bottom: var(--gap-3);
 }
 .ap-group-title {
-  font-size: var(--text-label);
-  font-weight: var(--weight-strong);
-  color: var(--ink);
   margin: var(--gap-4) 0 var(--gap-1);
   display: flex;
   align-items: center;
   gap: var(--gap-1);
 }
 .ap-star {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
   color: var(--warn-text);
 }
 .ap-group-toggle {

@@ -25,7 +25,7 @@
         @submit.prevent="retry"
       >
         <Card>
-          <h1 class="auth-card__title">Can't reach Calvin</h1>
+          <h1 class="auth-card__title heading-title">Can't reach Calvin</h1>
           <p class="auth-card__lead">
             Settings can't check whether you're signed in. Check that the server is running and this
             device is on the same network.
@@ -58,7 +58,7 @@
             </svg>
           </div>
 
-          <h1 v-if="!oskCollapsed" class="auth-card__title">{{ title }}</h1>
+          <h1 v-if="!oskCollapsed" class="auth-card__title heading-title">{{ title }}</h1>
 
           <InlineNote v-if="notice" class="auth-card__notice" tone="warn" role="status">
             {{ notice }}
@@ -582,11 +582,7 @@ async function submitLogin() {
 }
 .auth-card__title {
   margin: 0 0 var(--gap-1);
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
   line-height: 1.3;
-  color: var(--ink);
 }
 .auth-card__lead {
   margin: 0 0 var(--gap-4);

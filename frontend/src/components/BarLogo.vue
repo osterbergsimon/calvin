@@ -18,7 +18,7 @@ defineProps({
 .bar-logo {
   font-family: var(--font-display);
   font-size: var(--fs-base);
-  font-weight: 700;
+  font-weight: var(--weight-title);
   letter-spacing: 0.08em;
   color: var(--ink);
   user-select: none;

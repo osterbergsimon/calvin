@@ -92,7 +92,7 @@ defineExpose({ focus, select });
   margin-bottom: 6px;
   font-family: var(--font-ui);
   font-size: var(--fs-md);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink);
 }
 .password-field__box {

@@ -6,7 +6,7 @@
  */
 
 export const roleLint = {
-  allowlist: ["components/settings/shared/DisplayScheduleGrid.vue"],
+  allowlist: [],
   baseline: [
     "components/settings/categories/DefaultScreenSettings.vue",
     "components/settings/categories/ScreensSettings.vue",
@@ -20,7 +20,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: ["components/settings/shared/DisplayScheduleGrid.vue"],
+  allowlist: [],
   baseline: [
     "components/settings/categories/ScreensSettings.vue",
     "components/settings/shared/AddKioskPanel.vue",
