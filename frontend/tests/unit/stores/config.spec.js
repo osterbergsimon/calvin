@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigStore } from "@/stores/config";
+import { useNotificationsStore } from "@/stores/notifications";
 import api from "@/services/api";
 
 vi.mock("@/services/api", () => ({
@@ -615,5 +616,131 @@ describe("Config Store kiosk viewport reporting (CLV-36)", () => {
 
     await vi.advanceTimersByTimeAsync(1);
     expect(api.get).toHaveBeenCalledTimes(2);
+  });
+});
+
+// calvin-hi6w — the hide-controls settings belong to the screen you change them on.
+describe("config store — per-screen control visibility", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    localStorage.clear();
+    sessionStorage.clear();
+    vi.clearAllMocks();
+    api.post.mockResolvedValue({ data: {} });
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    vi.useRealTimers();
+  });
+
+  it("hides this browser's controls without writing the global default", async () => {
+    const store = useConfigStore();
+    store.showUI = true;
+
+    await store.toggleUI();
+
+    expect(store.shouldShowUI).toBe(false);
+    expect(localStorage.getItem("calvin-screen-showUI")).toBe("false");
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("shows this browser's controls again from its own stored choice", async () => {
+    localStorage.setItem("calvin-screen-showUI", "false");
+    const store = useConfigStore();
+    store.showUI = true;
+
+    expect(store.shouldShowUI).toBe(false);
+
+    await store.toggleUI();
+
+    expect(store.shouldShowUI).toBe(true);
+    expect(localStorage.getItem("calvin-screen-showUI")).toBe("true");
+    expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the global value while this browser has no choice", () => {
+    const store = useConfigStore();
+    store.showUI = false;
+    store.clockBarShowInKiosk = true;
+    store.tapAnywhereReveal = true;
+
+    expect(store.effectiveShowUI).toBe(false);
+    expect(store.effectiveClockBarShowInKiosk).toBe(true);
+    expect(store.effectiveTapAnywhereReveal).toBe(true);
+  });
+
+  it("lets this browser's own clock-bar and tap choices win over the global ones", () => {
+    localStorage.setItem("calvin-screen-clockBarShowInKiosk", "false");
+    localStorage.setItem("calvin-screen-tapAnywhereReveal", "false");
+    const store = useConfigStore();
+    store.clockBarShowInKiosk = true;
+    store.tapAnywhereReveal = true;
+
+    expect(store.effectiveClockBarShowInKiosk).toBe(false);
+    expect(store.effectiveTapAnywhereReveal).toBe(false);
+  });
+
+  it("writes the hide choice into this kiosk's overrides, not the global config", async () => {
+    sessionStorage.setItem("calvin_kiosk_id", "kitchen-3f9a2c");
+    api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+    api.put.mockResolvedValue({ data: {} });
+    const store = useConfigStore();
+    store.showUI = true;
+
+    await store.toggleUI();
+
+    expect(api.get).toHaveBeenCalledWith("/kiosks/kitchen-3f9a2c/overrides");
+    expect(api.put).toHaveBeenCalledWith("/kiosks/kitchen-3f9a2c/overrides", {
+      overrides: { orientation: "portrait", showUI: false },
+    });
+    expect(api.post).not.toHaveBeenCalled();
+    expect(store.showUI).toBe(false);
+    expect(localStorage.getItem("calvin-screen-showUI")).toBeNull();
+  });
+
+  it("keeps the stored value and warns when a kiosk save fails", async () => {
+    sessionStorage.setItem("calvin_kiosk_id", "kitchen-3f9a2c");
+    api.get.mockResolvedValue({ data: { overrides: {} } });
+    api.put.mockRejectedValue(new Error("offline"));
+    const notifications = useNotificationsStore();
+    const notify = vi.spyOn(notifications, "notify");
+    const store = useConfigStore();
+    store.showUI = true;
+
+    await store.toggleUI();
+
+    expect(store.showUI).toBe(true);
+    expect(store.shouldShowUI).toBe(true);
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBeNull();
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: "error", message: expect.stringContaining("unchanged") })
+    );
+  });
+
+  it("restores the hidden controls after the temporary reveal's 60 s", () => {
+    vi.useFakeTimers();
+    const store = useConfigStore();
+    store.showUI = false;
+
+    store.showUITemporarily(60);
+    expect(store.shouldShowUI).toBe(true);
+
+    vi.advanceTimersByTime(60000);
+    expect(store.shouldShowUI).toBe(false);
+  });
+
+  it("toggling while a temporary reveal is up hides it at once", async () => {
+    vi.useFakeTimers();
+    const store = useConfigStore();
+    store.showUI = false;
+    store.showUITemporarily(60);
+    expect(store.shouldShowUI).toBe(true);
+
+    await store.toggleUI();
+
+    expect(store.shouldShowUI).toBe(false);
+    expect(localStorage.getItem("calvin-screen-showUI")).toBe("false");
   });
 });

@@ -35,6 +35,15 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
     await expectPhoneLayout(page, `kiosk ${category} category`);
   }
 
+  // On a kiosk Hide controls writes that screen's overrides, not the global
+  // config (calvin-hi6w).
+  await selectCategory(page, "Dashboard");
+  const configPosts = () => api.requests.filter(r => r === "POST /api/config").length;
+  const postsBeforeHiding = configPosts();
+  await page.getByLabel("Hide controls").click();
+  await expect.poll(() => api.requests).toContain(`PUT /api/kiosks/${KIOSK_ID}/overrides`);
+  expect(configPosts()).toBe(postsBeforeHiding);
+
   // A touch kiosk offers the same settings on a phone.
   await selectCategory(page, "Content");
   await page.getByRole("button", { name: "Continue setup on your phone" }).click();

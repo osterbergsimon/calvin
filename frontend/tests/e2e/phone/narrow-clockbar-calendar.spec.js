@@ -85,6 +85,7 @@ test.describe("CLV-110 narrow clock bar and calendar header", () => {
     // Every control is visible, inside the region, and not covering the title.
     const controls = header.locator(".calendar-header__controls button");
     expect(await controls.count()).toBeGreaterThan(0);
+    const controlBoxes = [];
     for (const control of await controls.all()) {
       const name =
         (await control.getAttribute("aria-label")) || (await control.textContent()) || "control";
@@ -98,6 +99,24 @@ test.describe("CLV-110 narrow clock bar and calendar header", () => {
         regionBox.y + regionBox.height + 0.5
       );
       expect(overlaps(box, labelBox), `${name} covers the month title`).toBe(false);
+      controlBoxes.push(box);
+    }
+
+    // A narrow region may wrap the rail, but the rows must line up: every row
+    // shares the same centre (calvin-8nad review 3).
+    const rows = new Map();
+    for (const box of controlBoxes) {
+      const key = Math.round(box.y);
+      const row = rows.get(key) || { left: box.x, right: box.x + box.width };
+      row.left = Math.min(row.left, box.x);
+      row.right = Math.max(row.right, box.x + box.width);
+      rows.set(key, row);
+    }
+    const centres = [...rows.values()].map(row => (row.left + row.right) / 2);
+    for (const centre of centres) {
+      expect(Math.abs(centre - centres[0]), "wrapped control rows are not centred").toBeLessThan(
+        1.5
+      );
     }
 
     expect(api.hostActions).toEqual([]);
