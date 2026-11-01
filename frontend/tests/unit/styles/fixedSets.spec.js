@@ -4,16 +4,20 @@
  * Four value families are a short closed set, with no allowlist:
  * - z-index: one of the layer roles (`--z-raised|sticky|dialog|popover|osk|toast`);
  * - font-weight: one of the weight roles (400 / 500 / 600 via `--weight-*`);
- * - transitions: `--dur-fast` (120ms) or `--dur` (200ms); animations derive
- *   from `--dur` too, never a literal time;
+ * - transitions: `--dur-fast` (120ms) or `--dur` (200ms), plus the one
+ *   spec-backed `--dur-loading-fade` (450ms, docs/design/2026-11-01-loading-light.md
+ *   §2); animations derive from `--dur` too, never a literal time;
  * - width breakpoints: the shared custom media (`--bp-phone` 600px,
  *   `--bp-wide` 1024px), defined once in src/styles/breakpoints.js.
  * The global reduced-motion rule in base.css is the one place a literal time
  * may appear.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
 import {
   CSS_FILES,
+  SRC,
   VUE_FILES,
   fixedSetViolations,
   fixedSetViolationsIn,
@@ -62,6 +66,21 @@ describe("fixed sets: z-index, weight, duration, breakpoints", () => {
             ".b { animation: spin calc(var(--dur) * 5) linear infinite; }"
         )
       ).toEqual([]);
+    });
+
+    it("accepts the one spec-backed slow token, the loading-light fade", () => {
+      expect(kinds(".a { transition: opacity var(--dur-loading-fade) ease; }")).toEqual([]);
+      expect(kinds(".a { transition-duration: var(--dur-loading-fade); }")).toEqual([]);
+      expect(kinds(".a { transition: opacity var(--dur-slow) ease; }")).toEqual(["duration"]);
+    });
+
+    it("keeps the indicators on the spec's 450ms fade", () => {
+      const theme = readFileSync(join(SRC, "styles/theme.css"), "utf-8");
+      expect(theme).toMatch(/--dur-loading-fade:\s*calc\(var\(--dur\) \* 2\.25\)/);
+      for (const file of ["CometIndicator.vue", "PulseIndicator.vue"]) {
+        const source = readFileSync(join(SRC, "components/indicators", file), "utf-8");
+        expect(source, file).toContain("transition: opacity var(--dur-loading-fade) ease;");
+      }
     });
 
     it("leaves the reduced-motion override alone", () => {

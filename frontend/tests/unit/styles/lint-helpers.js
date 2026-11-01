@@ -110,7 +110,9 @@ export const CSS_FILES = readdirSync(join(SRC, "styles"))
 
 const Z_ROLE = /^(auto|var\(--z-(raised|sticky|dialog|popover|osk|toast)\))$/;
 const WEIGHT_ROLE = /^(inherit|var\(--weight-(body|strong|title)\))$/;
-const DUR_ROLE = /^var\(--dur(-fast)?\)$/;
+// `--dur-loading-fade` is the loading light's spec-backed 450ms fade
+// (docs/design/2026-11-01-loading-light.md §2), the one slow transition.
+const DUR_ROLE = /^var\(--dur(-fast|-loading-fade)?\)$/;
 const TIME = /(^|[\s,(])\d*\.?\d+m?s\b/;
 const WIDTH_FEATURE = /^(min-|max-)?(device-)?width\s*:/;
 

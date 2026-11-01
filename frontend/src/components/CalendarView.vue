@@ -6,21 +6,6 @@
     tabindex="0"
     @keydown="handleKeydown"
   >
-    <!-- Fullscreen close button (only in fullscreen mode) -->
-    <div v-if="isFullscreen" class="fullscreen-close-overlay">
-      <IconButton
-        class="btn-close-fullscreen"
-        size="lg"
-        shape="circle"
-        data-action="exit-fullscreen"
-        title="Close Fullscreen (ESC)"
-        label="Exit fullscreen"
-        @click.stop="handleCloseFullscreen"
-      >
-        ×
-      </IconButton>
-    </div>
-
     <DashboardPanel
       title="Calendar"
       :show-title="false"
@@ -235,6 +220,23 @@
         </div>
       </div>
     </DashboardPanel>
+    <!-- Fullscreen close button (only in fullscreen mode). After the panel and on
+         --z-sticky, so it paints over the header (also --z-sticky) whether or
+         not the panel makes a stacking context of its own. -->
+    <div v-if="isFullscreen" class="fullscreen-close-overlay">
+      <IconButton
+        class="btn-close-fullscreen"
+        size="lg"
+        shape="circle"
+        data-action="exit-fullscreen"
+        title="Close Fullscreen (ESC)"
+        label="Exit fullscreen"
+        @click.stop="handleCloseFullscreen"
+      >
+        ×
+      </IconButton>
+    </div>
+
     <!-- Event Detail Panel -->
     <!-- Scrim first: both sit on --z-dialog, so the panel after it paints on top. -->
     <DialogScrim v-if="calendarStore.selectedEvent" @dismiss="closeEventDetail" />
@@ -1484,7 +1486,7 @@ onActivated(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: var(--z-raised);
+  z-index: var(--z-sticky);
   pointer-events: none;
 }
 

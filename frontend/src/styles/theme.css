@@ -182,6 +182,9 @@
   /* Motion roles */
   --dur-fast: 120ms;
   --dur: 200ms;
+  /* The loading light's fade in/out: 450ms by spec
+     (docs/design/2026-11-01-loading-light.md §2). The only slower transition. */
+  --dur-loading-fade: calc(var(--dur) * 2.25);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* Layer roles */
