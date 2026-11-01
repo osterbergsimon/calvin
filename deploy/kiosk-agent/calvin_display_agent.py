@@ -75,8 +75,47 @@ def _should_be_on(now_t, on_t, off_t):
     return on_t <= now_t < off_t
 
 
+def _parse_until(value, now):
+    """Parse an override's ISO ``until``; None when it is absent or unreadable."""
+    if not value:
+        return None
+    try:
+        until = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if until.tzinfo is None and now.tzinfo is not None:
+        until = until.replace(tzinfo=now.tzinfo)
+    elif until.tzinfo is not None and now.tzinfo is None:
+        until = until.replace(tzinfo=None)
+    return until
+
+
+def screen_power_override(cfg, now):
+    """True/False from an active "Screen now" override, or None when inactive.
+
+    An override is active while its ``until`` is in the future, or forever when
+    ``until`` is null (no schedule to take over). An expired override is ignored,
+    so the schedule rules again on the next poll.
+    """
+    override = cfg_get(cfg, "screen_now", "screenNow")
+    if not isinstance(override, dict):
+        return None
+    power = str(override.get("power") or "").lower()
+    if power not in ("on", "off"):
+        return None
+    until_value = override.get("until")
+    if until_value:
+        until = _parse_until(until_value, now)
+        if until is None or until <= now:
+            return None
+    return power == "on"
+
+
 def desired_on(cfg, now):
     """Return True if the display should be ON at `now` (a datetime)."""
+    override = screen_power_override(cfg, now)
+    if override is not None:
+        return override
     if not cfg_get(
         cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
     ):
@@ -94,14 +133,29 @@ def desired_on(cfg, now):
 
 
 def seconds_to_next_boundary(cfg, now):
-    """Seconds until the next on/off transition, or None if no boundaries exist."""
+    """Seconds until the next on/off transition, or None if no boundaries exist.
+
+    An active "Screen now" override ends at its ``until``, which is the next
+    transition even when the schedule's own boundary is later.
+    """
+    override_until = None
+    override = cfg_get(cfg, "screen_now", "screenNow")
+    if isinstance(override, dict) and override.get("until"):
+        override_until = _parse_until(override.get("until"), now)
+        if override_until is not None and override_until <= now:
+            override_until = None
+
     if not cfg_get(
         cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
     ):
-        return None
+        if override_until is None:
+            return None
+        return max(1, int((override_until - now).total_seconds()))
     schedule = cfg_get(cfg, "display_schedule", "displaySchedule", default=[]) or []
     by_day = {d.get("day"): d for d in schedule if d.get("enabled", False)}
     candidates = []
+    if override_until is not None:
+        candidates.append(override_until)
     for offset in range(0, 9):  # today + 8 days covers any weekly gap
         d = (now + timedelta(days=offset)).date()
         entry = by_day.get(d.weekday())
@@ -118,6 +172,7 @@ def seconds_to_next_boundary(cfg, now):
     if not candidates:
         return None
     return int((min(candidates) - now).total_seconds())
+
 
 
 def apply_on(on, env=None):
