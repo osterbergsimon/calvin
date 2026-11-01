@@ -90,10 +90,14 @@ const mountEditor = async (kiosks = []) => {
 const resizeModal = async (w, width, height) => {
   const observer = [...observers]
     .reverse()
-    .find(candidate => candidate.elements.some(node => node.matches?.(".sre-root")));
-  if (!observer) throw new Error("no ResizeObserver watching .sre-root");
+    .find(candidate => candidate.elements.some(node => node.matches?.(".dialog-overlay")));
+  if (!observer) throw new Error("no ResizeObserver watching .dialog-overlay");
   observer.callback([
-    { target: observer.elements[0], contentRect: { width, height, top: 0, left: 0 } },
+    {
+      target: observer.elements[0],
+      borderBoxSize: [{ inlineSize: width, blockSize: height }],
+      contentRect: { width, height, top: 0, left: 0 },
+    },
   ]);
   await w.vm.$nextTick();
 };
