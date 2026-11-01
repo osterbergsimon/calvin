@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
@@ -72,25 +72,61 @@ describe("ColourField", () => {
     expect(w.find('input[type="radio"][value="#123456"]').exists()).toBe(false);
   });
 
-  it("never offers a raw hex box; the custom picker is the native colour input", async () => {
+  it("never opens the browser's own colour dialog (it can't be styled)", async () => {
     const w = mountField();
+    expect(w.find('input[type="color"]').exists()).toBe(false);
+    // No hex box until someone asks for a custom colour.
     expect(w.find('input[type="text"]').exists()).toBe(false);
-    const native = w.find('input[type="color"]');
-    expect(native.exists()).toBe(true);
-    expect(native.attributes("aria-label")).toBe("Custom colour picker");
-
-    const click = vi.spyOn(native.element, "click");
-    const custom = w.findAll("button").find(button => button.text() === "Custom…");
-    await custom.trigger("click");
-    expect(click).toHaveBeenCalled();
   });
 
-  it("emits a normalised hex when the native picker changes", async () => {
+  const openCustom = async w => {
+    const custom = w.findAll("button").find(button => button.text() === "Custom…");
+    await custom.trigger("click");
+    await nextTick();
+  };
+
+  it("Custom… opens Calvin's own panel: more colours and a colour code", async () => {
     const w = mountField();
-    const native = w.find('input[type="color"]');
-    native.element.value = "#abcdef";
-    await native.trigger("input");
-    expect(w.emitted("update:modelValue")).toEqual([["#abcdef"]]);
+    await openCustom(w);
+    const custom = w.findAll("button").find(button => button.text() === "Custom…");
+    expect(custom.attributes("aria-expanded")).toBe("true");
+    const more = w.find('[role="radiogroup"][aria-label="More colours"]');
+    expect(more.exists()).toBe(true);
+    expect(more.findAll('input[type="radio"]')).toHaveLength(24);
+    expect(w.find('input[type="text"]').exists()).toBe(true);
+    expect(w.text()).toContain("Colour code");
+  });
+
+  it("emits the hex of a more-colours choice", async () => {
+    const w = mountField();
+    await openCustom(w);
+    const first = w.find('[aria-label="More colours"] input[type="radio"]');
+    await first.trigger("change");
+    expect(w.emitted("update:modelValue")[0][0]).toMatch(/^#[0-9a-f]{6}$/);
+  });
+
+  it("names a more-colours choice instead of 'Custom colour'", () => {
+    const w = mountField({ modelValue: "#0d47a1" });
+    expect(w.find(".colour-field__chosen").text()).toBe("Dark blue");
+  });
+
+  it("applies a typed colour code, normalised", async () => {
+    const w = mountField();
+    await openCustom(w);
+    const code = w.find('input[type="text"]');
+    await code.setValue("#ABC");
+    await code.trigger("keydown", { key: "Enter" });
+    expect(w.emitted("update:modelValue")).toEqual([["#aabbcc"]]);
+  });
+
+  it("rejects a bad colour code with a note and emits nothing", async () => {
+    const w = mountField();
+    await openCustom(w);
+    const code = w.find('input[type="text"]');
+    await code.setValue("blue-ish");
+    await code.trigger("keydown", { key: "Enter" });
+    expect(w.emitted("update:modelValue")).toBeUndefined();
+    expect(w.text()).toContain("Use a colour code like #4caf50.");
   });
 
   it("compact renders a trigger that shows the chosen swatch and name", () => {

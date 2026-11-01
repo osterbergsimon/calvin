@@ -39,7 +39,47 @@
               <span class="colour-field__sr">{{ swatch.name }}</span>
             </label>
           </div>
-          <Button size="sm" @click="openNativePicker">Custom…</Button>
+          <Button size="sm" :aria-expanded="customOpen ? 'true' : 'false'" @click="toggleCustom">
+            Custom…
+          </Button>
+          <div v-if="customOpen" class="colour-field__custom">
+            <div
+              class="colour-field__swatches colour-field__swatches--grid"
+              role="radiogroup"
+              aria-label="More colours"
+            >
+              <label
+                v-for="swatch in moreColours"
+                :key="swatch.hex"
+                class="colour-field__swatch"
+                :class="{ 'colour-field__swatch--selected': isSelected(swatch) }"
+              >
+                <input
+                  class="colour-field__radio"
+                  type="radio"
+                  :name="`${groupName}-more`"
+                  :value="swatch.hex"
+                  :checked="isSelected(swatch)"
+                  @change="choose(swatch)"
+                />
+                <span
+                  class="colour-field__dot colour-field__dot--choice"
+                  :style="{ background: swatch.hex }"
+                  aria-hidden="true"
+                />
+                <span class="colour-field__sr">{{ swatch.name }}</span>
+              </label>
+            </div>
+            <TextField
+              v-model="code"
+              label="Colour code"
+              placeholder="#4caf50"
+              :maxlength="7"
+              :error="codeError"
+              @keydown.enter.prevent="applyCode"
+              @blur="applyCode"
+            />
+          </div>
         </div>
       </Popover>
     </template>
@@ -78,19 +118,49 @@
         <span>{{ chosenName }}</span>
       </div>
       <div>
-        <Button size="sm" @click="openNativePicker">Custom…</Button>
+        <Button size="sm" :aria-expanded="customOpen ? 'true' : 'false'" @click="toggleCustom">
+          Custom…
+        </Button>
+      </div>
+      <div v-if="customOpen" class="colour-field__custom">
+        <div
+          class="colour-field__swatches colour-field__swatches--grid"
+          role="radiogroup"
+          aria-label="More colours"
+        >
+          <label
+            v-for="swatch in moreColours"
+            :key="swatch.hex"
+            class="colour-field__swatch"
+            :class="{ 'colour-field__swatch--selected': isSelected(swatch) }"
+          >
+            <input
+              class="colour-field__radio"
+              type="radio"
+              :name="`${groupName}-more`"
+              :value="swatch.hex"
+              :checked="isSelected(swatch)"
+              @change="choose(swatch)"
+            />
+            <span
+              class="colour-field__dot colour-field__dot--choice"
+              :style="{ background: swatch.hex }"
+              aria-hidden="true"
+            />
+            <span class="colour-field__sr">{{ swatch.name }}</span>
+          </label>
+        </div>
+        <TextField
+          v-model="code"
+          label="Colour code"
+          placeholder="#4caf50"
+          :maxlength="7"
+          :error="codeError"
+          @keydown.enter.prevent="applyCode"
+          @blur="applyCode"
+        />
       </div>
     </template>
-
-    <input
-      ref="nativeInput"
-      class="colour-field__native"
-      type="color"
-      :value="inputValue"
-      tabindex="-1"
-      aria-label="Custom colour picker"
-      @input="onNativeInput"
-    />
 
     <p v-if="hint" class="colour-field__hint">{{ hint }}</p>
   </div>
@@ -100,11 +170,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import Button from "./Button.vue";
 import Popover from "./Popover.vue";
-import { cssColourToHex, eventSwatches } from "@/utils/themePalettes";
+import TextField from "./TextField.vue";
+import { MORE_COLOURS, cssColourToHex, eventSwatches } from "@/utils/themePalettes";
 
 // The one colour control (docs/design/frontend-doctrine.md §3): the current
 // theme's --event-1…8 swatches first as a native radio group, then "Custom…"
-// opening the native picker. It shows the chosen swatch and its name; a raw
+// opening Calvin's own panel (more colours + a colour code). It never opens the
+// browser's colour dialog: that is browser chrome and can't be styled. It shows the chosen swatch and its name; a raw
 // hex box is never the default. `compact` swaps the inline group for a trigger
 // that opens the same group in a Popover (a list row has no room for eight).
 let colourSeq = 0;
@@ -123,7 +195,10 @@ const emit = defineEmits(["update:modelValue"]);
 const labelId = `colour-field-label-${++colourSeq}`;
 const groupName = `colour-field-${colourSeq}`;
 const rootEl = ref(null);
-const nativeInput = ref(null);
+const customOpen = ref(false);
+const code = ref("");
+const codeError = ref("");
+const moreColours = MORE_COLOURS;
 const open = ref(false);
 const revision = ref(0);
 
@@ -152,13 +227,17 @@ const selectedSwatch = computed(
       swatch => normalisedValue.value && swatch.hex === normalisedValue.value
     ) || null
 );
-const chosenName = computed(() => selectedSwatch.value?.name || "Custom colour");
+const chosenName = computed(
+  () =>
+    selectedSwatch.value?.name ||
+    MORE_COLOURS.find(swatch => swatch.hex === normalisedValue.value)?.name ||
+    "Custom colour"
+);
 const chosenBackground = computed(() =>
   selectedSwatch.value
     ? swatchBackground(selectedSwatch.value)
     : safeColour(props.modelValue) || "var(--bg-2)"
 );
-const inputValue = computed(() => normalisedValue.value || "#863427");
 
 const swatchBackground = swatch =>
   swatch.token ? `var(${swatch.token})` : safeColour(swatch.hex) || "var(--bg-2)";
@@ -176,13 +255,25 @@ function choose(swatch) {
   if (props.compact) open.value = false;
 }
 
-function openNativePicker() {
-  nativeInput.value?.click();
+function toggleCustom() {
+  customOpen.value = !customOpen.value;
+  codeError.value = "";
+  code.value = customOpen.value && !selectedSwatch.value ? normalisedValue.value : "";
 }
 
-function onNativeInput(event) {
-  const hex = cssColourToHex(event.target.value);
-  if (!hex) return;
+// #rgb or #rrggbb, with or without the #, case-insensitive.
+function applyCode() {
+  const raw = code.value.trim();
+  if (!raw) return;
+  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(raw);
+  if (!match) {
+    codeError.value = "Use a colour code like #4caf50.";
+    return;
+  }
+  const digits = match[1].toLowerCase();
+  const hex = `#${digits.length === 3 ? [...digits].map(d => d + d).join("") : digits}`;
+  codeError.value = "";
+  if (hex === normalisedValue.value) return;
   emit("update:modelValue", hex);
   if (props.compact) nextTick(() => (open.value = false));
 }
@@ -292,12 +383,23 @@ onBeforeUnmount(() => observer?.disconnect());
   white-space: nowrap;
 }
 
-.colour-field__native {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.colour-field__custom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+}
+
+/* Light, mid and deep rows of the same eight hues: keep the columns aligned
+   (four per row on a phone, so each shade takes two rows). */
+.colour-field__swatches--grid {
+  display: grid;
+  grid-template-columns: repeat(8, var(--touch-target));
+}
+
+@media (--bp-phone) {
+  .colour-field__swatches--grid {
+    grid-template-columns: repeat(4, var(--touch-target));
+  }
 }
 
 .colour-field__trigger {
