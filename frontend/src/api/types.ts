@@ -536,6 +536,104 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/guest/{token}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Guest Info
+     * @description What the guest page shows: the link's name and the upload limits.
+     */
+    get: operations["guest_info_api_guest__token__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/guest/{token}/manifest.webmanifest": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Guest Manifest
+     * @description Per-link PWA manifest: installable, and an Android share target.
+     */
+    get: operations["guest_manifest_api_guest__token__manifest_webmanifest_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/guest/{token}/uploads": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Guest Uploads
+     * @description Photos sent from this phone through this link, newest first.
+     */
+    get: operations["guest_uploads_api_guest__token__uploads_get"];
+    put?: never;
+    /** Guest Upload */
+    post: operations["guest_upload_api_guest__token__uploads_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/guest/{token}/uploads/{image_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Guest Remove Upload
+     * @description Remove one of this phone's own uploads (file and record).
+     */
+    delete: operations["guest_remove_upload_api_guest__token__uploads__image_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/guest/{token}/uploads/{image_id}/thumbnail": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Guest Thumbnail */
+    get: operations["guest_thumbnail_api_guest__token__uploads__image_id__thumbnail_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/health": {
     parameters: {
       query?: never;
@@ -1760,6 +1858,68 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/share/folders": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Share Folders
+     * @description Existing Local photos subfolders, to pick a link's folder from.
+     */
+    get: operations["list_share_folders_api_share_folders_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/links": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Share Links
+     * @description Every link, newest first, with its guest URL path (admin read).
+     */
+    get: operations["list_share_links_api_share_links_get"];
+    put?: never;
+    /** Create Share Link */
+    post: operations["create_share_link_api_share_links_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/share/links/{link_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Revoke Share Link
+     * @description Revoke at once; optionally delete the photos guests sent through it.
+     */
+    delete: operations["revoke_share_link_api_share_links__link_id__delete"];
+    options?: never;
+    head?: never;
+    /** Rename Share Link */
+    patch: operations["rename_share_link_api_share_links__link_id__patch"];
+    trace?: never;
+  };
   "/api/system/display/power/off": {
     parameters: {
       query?: never;
@@ -2059,6 +2219,11 @@ export interface components {
        * @default 7
        */
       retention: number;
+    };
+    /** Body_guest_upload_api_guest__token__uploads_post */
+    Body_guest_upload_api_guest__token__uploads_post: {
+      /** Photos */
+      photos: string[];
     };
     /** Body_inspect_plugin_api_plugins_inspect_post */
     Body_inspect_plugin_api_plugins_inspect_post: {
@@ -2369,6 +2534,15 @@ export interface components {
        */
       scope: "read" | "admin" | "host";
     };
+    /** CreateLinkBody */
+    CreateLinkBody: {
+      /** Expires In Days */
+      expires_in_days?: number | null;
+      /** Folder */
+      folder: string;
+      /** Name */
+      name: string;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -2533,6 +2707,11 @@ export interface components {
       plugin_id: string;
       /** Success */
       success: boolean;
+    };
+    /** RenameLinkBody */
+    RenameLinkBody: {
+      /** Name */
+      name: string;
     };
     /** SealedModeBody */
     SealedModeBody: {
@@ -3401,6 +3580,196 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  guest_info_api_guest__token__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  guest_manifest_api_guest__token__manifest_webmanifest_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  guest_uploads_api_guest__token__uploads_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  guest_upload_api_guest__token__uploads_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_guest_upload_api_guest__token__uploads_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  guest_remove_upload_api_guest__token__uploads__image_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+        image_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  guest_thumbnail_api_guest__token__uploads__image_id__thumbnail_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        token: string;
+        image_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };
@@ -5197,6 +5566,145 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["SealedModeBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_share_folders_api_share_folders_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  list_share_links_api_share_links_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  create_share_link_api_share_links_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateLinkBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  revoke_share_link_api_share_links__link_id__delete: {
+    parameters: {
+      query?: {
+        remove_photos?: boolean;
+      };
+      header?: never;
+      path: {
+        link_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  rename_share_link_api_share_links__link_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        link_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RenameLinkBody"];
       };
     };
     responses: {

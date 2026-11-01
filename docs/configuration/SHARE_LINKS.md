@@ -104,11 +104,10 @@ from the internet (a reverse proxy, a tunnel or port forwarding) and set
 
 ## For developers
 
-- Store: [`app/security/share_links.py`](../../backend/app/security/share_links.py)
-- Routes: [`app/api/routes/share.py`](../../backend/app/api/routes/share.py);
-  the guest routes are listed in `GUEST_ROUTES` in
-  [`route_policy.py`](../../backend/app/security/route_policy.py), which
-  resolves the token before any handler runs.
-- Photo checks: [`app/services/guest_image.py`](../../backend/app/services/guest_image.py)
-- Guest page: [`frontend/src/views/GuestShare.vue`](../../frontend/src/views/GuestShare.vue);
-  admin list: `ShareLinksSection.vue` in Settings › Content.
+- Store: `backend/app/security/share_links.py`
+- Routes: `backend/app/api/routes/share.py`; the guest routes are listed in
+  `GUEST_ROUTES` in `backend/app/security/route_policy.py`, which resolves the
+  token before any handler runs.
+- Photo checks: `backend/app/services/guest_image.py`
+- Guest page: `frontend/src/views/GuestShare.vue`; admin list:
+  `ShareLinksSection.vue` in Settings › Content.
