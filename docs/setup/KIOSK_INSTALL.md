@@ -292,8 +292,10 @@ Every board follows the same rule: a fresh install selects cog. An existing
 kiosk keeps the stack recorded in `/etc/default/calvin-kiosk` — the default does
 not silently migrate an X11 kiosk — and you switch it with an explicit
 `--display-stack` (see [Switch an existing kiosk](#switch-an-existing-kiosk)).
-FULL (all-in-one) installs (`scripts/setup.sh`, which also runs the server) are
-unchanged and keep X11 + Chromium.
+FULL (all-in-one) installs (`scripts/setup.sh`, which also runs the server)
+follow the same rule: a fresh install selects cog, `--display-stack` wins, and a
+re-run keeps the recorded stack (an all-in-one Pi from before the setting
+existed stays X11). Switch one with `sudo bash setup.sh --display-stack <stack>`.
 
 ### Choose Wayland on a fresh install (opt-in, experimental)
 
@@ -361,9 +363,14 @@ cog --platform=drm \
   The `renderer=gles` part is required: cog's default `modeset` renderer cannot
   rotate.
 - **Screen power** (display schedule) works: cog is the only DRM client, so the
-  agent's root helper stops `calvin-cog.service`, writes `4` to
-  `/sys/class/graphics/fb0/blank` (DPMS off), and on wake writes `0` and starts
-  the unit again (the dashboard is back in ~5 s). Starting is idempotent, and a
+  agent's root helper stops `calvin-cog.service`, waits up to 5 s for its
+  `MainPID` to disappear (the kernel restores the console mode when the last DRM
+  client closes, which would otherwise turn DPMS back on), clears tty1, then
+  writes `0` and `4` to `/sys/class/graphics/fb0/blank` (DPMS off), verifies the
+  connected connectors report `dpms=Off` and retries the `0`/`4` pair once
+  before failing, so the agent retries on its next poll. On wake it clears tty1,
+  writes `0` and starts the unit again (the dashboard is back in ~5 s).
+  Starting is idempotent, and a
   kiosk that boots inside its off window recovers at the next on boundary: the
   agent retries a panel command that failed (for example while the unit was
   still transitioning) on its next poll instead of waiting for the next schedule
@@ -448,8 +455,8 @@ switch, pass it (`--display-stack x11` to go back to Chromium, `cog` or
 - **Remote update:** a bundle update installs the Wayland unit and labwc config but
   never switches the stack or enables the other compositor. Switching is always an
   explicit installer run.
-- FULL installs (`scripts/setup.sh`) and the backend display services are unchanged in
-  phase 1; they follow in phase 2/3.
+- FULL installs (`scripts/setup.sh`) take the same `--display-stack` values and the
+  same default (cog); the backend display services are unchanged.
 
 ### Known limitations of cog
 

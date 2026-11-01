@@ -25,8 +25,9 @@ This shared approach reduces code duplication and makes the scripts more maintai
 - Clones/configures Git repository
 - Creates runtime data directories under `/var/lib/calvin`
 - Installs `/etc/calvin/docker-compose.yml` and `/etc/calvin/.env` (compose auto-loads the latter)
-- Writes the kiosk session env `/etc/default/calvin-kiosk-display` (DISPLAY/XAUTHORITY plus the board's Chromium flags — `--disable-gpu` on Pi 3-class boards, see [Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu))
-- Configures `calvin-app.service`, `calvin-x.service`, and `calvin-kiosk.service`
+- Picks the kiosk display stack like `setup-kiosk.sh` does: cog by default, `--display-stack x11|wayland|cog` to choose, and a re-run keeps the stack recorded in `/etc/default/calvin-kiosk` (an older X11 install stays X11). See [Display stack](KIOSK_INSTALL.md#display-stack-cog-default-everywhere-wayland-opt-in)
+- Writes the kiosk session env `/etc/default/calvin-kiosk-display` (on X11/Wayland: the session variables plus the board's Chromium flags — `--disable-gpu` on Pi 3-class boards, see [Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu))
+- Installs `calvin-app.service` plus every display unit (`calvin-cog.service`, `calvin-x.service`, `calvin-wayland.service`, `calvin-kiosk.service`) and enables exactly one display owner: `calvin-cog.service` on cog, otherwise the compositor plus `calvin-kiosk.service` (Chromium)
 - Sets up display and kiosk mode
 - Configures auto-start on boot
 
@@ -356,13 +357,14 @@ For repository-based usage (most common), the scripts work correctly as they're 
 1. **Check service status:**
    ```bash
    sudo systemctl status calvin-app
-   sudo systemctl status calvin-kiosk
+   sudo systemctl status calvin-cog     # cog (default)
+   sudo systemctl status calvin-kiosk   # X11/Wayland (Chromium)
    ```
 
 2. **Check logs:**
    ```bash
    sudo journalctl -u calvin-app -n 50
-   sudo journalctl -u calvin-kiosk -n 50
+   sudo journalctl -u calvin-cog -n 50     # or calvin-kiosk on X11/Wayland
    ```
 
 3. **Verify permissions:**

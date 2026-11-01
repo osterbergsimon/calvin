@@ -1,8 +1,13 @@
 [Unit]
 Description=Calvin Dashboard Kiosk
-After=network.target calvin-app.service calvin-x.service
+# The compositor is whichever display stack setup.sh enabled (calvin-x.service
+# on X11, calvin-wayland.service on Wayland; on cog this unit is disabled). It is
+# deliberately not in Wants=: calvin-x conflicts with calvin-wayland, so pulling
+# it in here would tear down a Wayland session. graphical.target pulls in the
+# enabled compositor; After= orders us behind it.
+After=network.target calvin-app.service calvin-x.service calvin-wayland.service
 Requires=calvin-app.service
-Wants=graphical.target calvin-x.service
+Wants=graphical.target
 
 [Service]
 Type=simple
@@ -23,7 +28,7 @@ Environment="XAUTHORITY=/home/calvin/.Xauthority"
 # 240s health wait — generous enough for first boot on a Pi 3B+ when
 # the runtime image still has to be pulled from GHCR.
 ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -s "http://localhost:${CALVIN_PORT:-8000}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin app not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
-ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "X server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1 || { [ -n "$${WAYLAND_DISPLAY:-}" ] && [ -S "$${XDG_RUNTIME_DIR:-/run/user/1000}/$${WAYLAND_DISPLAY}" ]; }; do if [ $elapsed -ge $timeout ]; then echo "display server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
 ExecStartPre=/bin/sleep 2
 ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
 ExecStartPre=/bin/sleep 1

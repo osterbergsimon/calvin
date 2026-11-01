@@ -1,0 +1,55 @@
+name: On-screen keyboard E2E
+
+# CLV-114: the on-screen keyboard driven by touch taps, in WebKit (the engine
+# of cog, the default kiosk browser, and of GNOME Web) and in Chromium.
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/e2e-osk.yml"
+
+concurrency:
+  group: osk-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  osk-e2e:
+    name: On-screen keyboard E2E (WebKit + Chromium, touch)
+    # Pin the runner: Playwright 1.57 has no support for ubuntu-26.04 yet.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: ./frontend
+        run: npx playwright install --with-deps webkit chromium
+
+      # The backend is mocked with route interception (installApiMock); no
+      # backend is started and host-acting routes are always intercepted.
+      - name: Run on-screen keyboard E2E
+        working-directory: ./frontend
+        run: npx playwright test --project=osk-webkit --project=osk-chromium
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-osk-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 7
