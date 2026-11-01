@@ -8,9 +8,9 @@
         <span v-if="statusDot" class="setting-row__dot" aria-hidden="true"></span>
         {{ label }}<slot name="label-extra" />
       </div>
-      <slot name="description">
-        <p v-if="description" class="setting-row__desc">{{ description }}</p>
-      </slot>
+      <div v-if="description || $slots.description" class="setting-row__desc">
+        <slot name="description">{{ description }}</slot>
+      </div>
     </div>
     <div class="setting-row__control"><slot /></div>
   </div>
@@ -32,7 +32,11 @@ defineProps({
 <style scoped>
 .setting-row {
   display: flex;
-  flex-wrap: wrap;
+  /* Side by side at every width a control up to half the row fits: a long
+     description wraps in the left column instead of pushing the control below
+     it (docs/design/2026-11-01-screen-schedule.md §4). `stacked` is the opt-in
+     for wide controls — chip groups, tables, sliders with a preview. */
+  flex-wrap: nowrap;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
@@ -45,6 +49,7 @@ defineProps({
   border-top: 1px solid var(--line-soft);
 }
 .setting-row__info {
+  flex: 1 1 auto;
   min-width: 0;
 }
 .setting-row__label {
@@ -67,6 +72,12 @@ defineProps({
   font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
+}
+/* Slot content (a ScopeLine, an InlineNote) sits on the same description line
+   without the browser's paragraph margins. */
+.setting-row__desc :slotted(*) {
+  display: block;
+  margin: 0;
 }
 .setting-row__control {
   /* A control with intrinsic width (a row of chips, a stepper) must be allowed
@@ -96,5 +107,12 @@ defineProps({
    dialog rows with a toggle keep the same label-left / toggle-right layout. */
 .setting-row--flush .setting-row__info {
   flex: 1 1 0;
+}
+
+/* A phone stacks the control under the label, as every other row does. */
+@media (--bp-phone) {
+  .setting-row {
+    flex-wrap: wrap;
+  }
 }
 </style>

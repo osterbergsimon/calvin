@@ -56,6 +56,7 @@ describe("settings registry", () => {
       "dashboard-ui",
       "dashboard-kiosk",
       "dashboard-kiosk-focus",
+      "screen-behaviour",
       "clock-bar-appearance",
       "clock-bar-items",
       "content-calendars",
@@ -171,6 +172,22 @@ describe("settings registry", () => {
       section: "device-keyboard",
       path: "Screens / Default · Touch & keyboard",
     });
+  });
+
+  it("points the moved behaviour rows at Screens while the old words still find them", () => {
+    expect(getSettingDestinationById("screen-behaviour")).toMatchObject({
+      category: "screens",
+      section: "device-behaviour",
+      path: "Screens / Default · Behaviour",
+    });
+    for (const word of ["photo frame", "loading light", "layout"]) {
+      expect(filterSettingsDestinations(word).map(item => item.id)).toContain("screen-behaviour");
+    }
+    // The old label words still find the renamed rows (§4 copy).
+    expect(filterSettingsDestinations("show it").map(item => item.id)).toContain("device-keyboard");
+    expect(filterSettingsDestinations("daily schedule").map(item => item.id)).toContain(
+      "device-power"
+    );
   });
 
   it("resolves Add a web page to Content / Web pages & apps", () => {

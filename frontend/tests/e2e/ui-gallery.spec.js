@@ -81,9 +81,11 @@ for (const viewport of VIEWPORTS) {
         // Hidden here until CI-rendered baselines that include it are adopted;
         // the a11y gallery audit and ProgressBar.spec.js still cover it.
         // Follow-up calvin-4qdt: generate the baselines in CI, then delete
-        // this addStyleTag.
+        // this addStyleTag. FieldTable (screen schedule) waits on the same
+        // follow-up; its own unit spec covers the block meanwhile.
         await page.addStyleTag({
-          content: '[data-test="gallery-progress-bar"] { display: none !important; }',
+          content:
+            '[data-test="gallery-progress-bar"], [data-test="gallery-field-table"] { display: none !important; }',
         });
         await expect(page).toHaveScreenshot(`ui-gallery-${viewport.name}-${theme}.png`, {
           fullPage: true,

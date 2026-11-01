@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
 
-const stubs = { ClockBarFontSizePicker: true, ClockBarItemsTab: true };
+const stubs = { ClockBarSizePicker: true, ClockBarPreview: true, ClockBarItemsTab: true };
 
 const baseConfig = {
   clockShowDate: true,
@@ -52,5 +52,29 @@ describe("ClockBarSections", () => {
     expect(labels.join(" ")).not.toContain("Show plugin info");
     expect(wrapper.text()).not.toContain("Show plugin info");
     expect(wrapper.text()).not.toContain("plugin readouts");
+  });
+
+  it("writes a size preset through to the stored clock bar keys", async () => {
+    const wrapper = mount(ClockBarSections, { props: { config: baseConfig }, global: { stubs } });
+    const [horizontal, vertical] = wrapper.findAllComponents({ name: "ClockBarSizePicker" });
+
+    horizontal.vm.$emit("update", { time: 24, date: 18, padding: 12, plugin: 20 });
+    vertical.vm.$emit("update", { time: 28 });
+
+    const patches = wrapper.emitted("update:config").map(call => call[0]);
+    expect(patches).toContainEqual({
+      clockBarFontSize: 24,
+      clockBarDateFontSize: 18,
+      clockBarPadding: 12,
+      clockBarPluginItemSize: 20,
+    });
+    expect(patches).toContainEqual({ clockBarVerticalFontSize: 28 });
+  });
+
+  it("keeps one live preview under the layout section", () => {
+    const wrapper = mount(ClockBarSections, { props: { config: baseConfig }, global: { stubs } });
+    expect(
+      wrapper.find("#section-clock-bar-layout").findComponent({ name: "ClockBarPreview" }).exists()
+    ).toBe(true);
   });
 });
