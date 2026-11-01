@@ -1199,8 +1199,10 @@ LABWC_RC_EOF
 # The cog unit reads its rotation from this file (EnvironmentFile=); the display
 # agent's root helper rewrites it when the Kiosks setting changes. Optional for
 # the unit (default 0), but seeding it makes the first boot explicit.
+# CALVIN_KIOSK_COG_ENV_FILE overrides the path; otherwise it follows
+# CALVIN_DEFAULT_DIR like the other setup-owned /etc/default files.
 calvin_cog_rotation_file() {
-    printf '%s\n' "${CALVIN_KIOSK_COG_ENV_FILE:-/etc/default/calvin-kiosk-cog}"
+    printf '%s\n' "${CALVIN_KIOSK_COG_ENV_FILE:-${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-kiosk-cog}"
 }
 
 configure_cog_rotation() {
