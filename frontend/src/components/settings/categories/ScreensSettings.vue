@@ -100,7 +100,7 @@
               v-for="k in kiosks"
               :key="k.id"
               class="screen-card"
-              :name="nameFor(k)"
+              :name="screenLabel(k)"
               :selected="k.id === selectedId"
               data-test="screen-card"
               role="button"
@@ -113,7 +113,7 @@
                 <PageThumbnail
                   :page="startPage(k)"
                   :orientation="orientationFor(k)"
-                  :aria-label="`${nameFor(k)} start page`"
+                  :aria-label="`${screenLabel(k)} start page`"
                 />
               </template>
               <template #meta>
@@ -143,7 +143,7 @@
                   tone="warn"
                   data-test="kiosk-pending-badge"
                   role="img"
-                  :aria-label="`${nameFor(k)}: offline, display settings waiting`"
+                  :aria-label="`${screenLabel(k)}: offline, display settings waiting`"
                   title="Offline. It will apply the new display settings when it's back."
                   :icon="mdiAlert"
                 />
@@ -185,7 +185,7 @@
 
     <template v-else-if="selectedKiosk">
       <KioskStatusHeader
-        :kiosk-id="nameFor(selectedKiosk)"
+        :kiosk-id="screenLabel(selectedKiosk)"
         :online="isOnline(selectedKiosk)"
         :last-seen-label="relativeTime(selectedKiosk.lastSeen)"
         :applied-version="selectedKiosk.lastAppliedVersion ?? null"
@@ -537,6 +537,7 @@ import {
 } from "@/utils/kioskSoftware";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { getKioskId } from "@/utils/kioskId";
+import { screenLabel, screenLabelFallback } from "@/utils/screenLabel";
 import {
   changedSettingCount,
   formatSettingList,
@@ -688,12 +689,6 @@ function startPage(k) {
 }
 
 // --- per-screen facts used by the cards and the detail page --------------
-function nameFor(k) {
-  return k?.overrides?.displayName || k?.hostname || k?.id || "";
-}
-function nameFallback(k) {
-  return k?.hostname || k?.id || "";
-}
 function orientationFor(k) {
   return (k ? k.overrides?.orientation : null) ?? props.config.orientation ?? "landscape";
 }
@@ -751,7 +746,7 @@ const defaultSummary = computed(() => {
 // --- list / detail -------------------------------------------------------
 const selectedKiosk = computed(() => kiosks.value.find(k => k.id === selectedId.value) || null);
 const selectedChangedCount = computed(() => changedSettingCount(overrides.value));
-const selectedName = computed(() => (selectedKiosk.value ? nameFor(selectedKiosk.value) : ""));
+const selectedName = computed(() => (selectedKiosk.value ? screenLabel(selectedKiosk.value) : ""));
 const footerCopy = computed(() => {
   const count = selectedChangedCount.value;
   return `${count} ${count === 1 ? "setting differs" : "settings differ"} from the default.`;
@@ -805,7 +800,7 @@ const nameValue = computed(() => overrides.value.displayName || "");
 const nameDraft = ref("");
 watch(nameValue, value => (nameDraft.value = value), { immediate: true });
 const namePlaceholder = computed(() =>
-  selectedKiosk.value ? nameFallback(selectedKiosk.value) : ""
+  selectedKiosk.value ? screenLabelFallback(selectedKiosk.value) : ""
 );
 function showsPage(pageId) {
   return effAvailable.value.includes(pageId);
@@ -1183,7 +1178,7 @@ async function updateAll() {
         severity: "error",
         eyebrow: "Screens",
         // The name on the card, never the internal id (CLV-63).
-        message: `Couldn't start the update on ${nameFor(targets[index])}.`,
+        message: `Couldn't start the update on ${screenLabel(targets[index])}.`,
       });
     }
   });
