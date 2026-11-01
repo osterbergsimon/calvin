@@ -300,6 +300,10 @@ async def migrate_global_room_name() -> None:
     if not global_name:
         return
 
+    # Narrow race: two first registrations within milliseconds can both read
+    # the global name here and both copy it before either deletes the key.
+    # Harmless: each writes the same name onto unnamed screens only, and the
+    # second key delete is a no-op.
     rows = await KioskDB.objects.all()
     if not rows:
         logger.info("Kept the global room name until a screen registers")
@@ -308,6 +312,9 @@ async def migrate_global_room_name() -> None:
     for row in rows:
         if _has_screen_name(row.overrides):
             continue
+        # Narrow race: a set_overrides landing between the read above and the
+        # write below is lost, as this writes back the stale overrides snapshot.
+        # The window is one row update during a one-off migration.
         overrides = dict(row.overrides or {})
         overrides["displayName"] = global_name
         row.overrides = overrides
