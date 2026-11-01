@@ -55,7 +55,7 @@ defineEmits(["select-screen"]);
   height: 9px;
   border-radius: 50%;
   background: var(--ink-3);
-  transition: background 0.2s;
+  transition: background var(--dur);
 }
 .screen-dot.is-active .screen-dot__pip {
   background: var(--focus);

@@ -31,10 +31,10 @@ const stateClass = computed(() => {
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
   transition:
-    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow 0.35s,
-    opacity 0.35s,
-    filter 0.35s;
+    transform var(--dur) cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow var(--dur),
+    opacity var(--dur),
+    filter var(--dur);
 }
 .focus-panel.is-focused {
   background:

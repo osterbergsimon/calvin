@@ -71,7 +71,7 @@ const toggle = () => {
   border-radius: var(--radius-sm);
   margin-bottom: 1.5rem;
   overflow: hidden;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
 }
 
 .settings-section:hover {
@@ -89,7 +89,7 @@ const toggle = () => {
   user-select: none;
   background: var(--bg-1);
   border: 0;
-  transition: background 0.2s ease;
+  transition: background var(--dur) ease;
 }
 
 .section-header:hover {
@@ -114,7 +114,7 @@ const toggle = () => {
 .toggle-icon {
   font-size: var(--fs-control);
   color: var(--ink-2);
-  transition: transform 0.2s ease;
+  transition: transform var(--dur) ease;
 }
 
 .section-content {

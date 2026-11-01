@@ -8,6 +8,8 @@
 // the first time they are seen and read back from there afterwards. A new
 // ?kiosk= in the URL always wins over the stored value.
 
+import { KIOSK_ROOT_CLASS } from "../styles/breakpoints.js";
+
 const KIOSK_ID_KEY = "calvin_kiosk_id";
 const KIOSK_HOST_KEY = "calvin_kiosk_host";
 
@@ -47,9 +49,16 @@ function captured(param, key) {
 }
 
 // Call once at boot (main.js) so the identity is stored before any route change.
+// A kiosk also gets the KIOSK_ROOT_CLASS on <html>: the breakpoints read it so
+// the short 800x480 wall panel is never classed as a landscape phone.
 export function captureKioskIdentity() {
-  captured("kiosk", KIOSK_ID_KEY);
+  const id = captured("kiosk", KIOSK_ID_KEY);
   captured("khost", KIOSK_HOST_KEY);
+  try {
+    document.documentElement.classList.toggle(KIOSK_ROOT_CLASS, Boolean(id));
+  } catch {
+    // No DOM (SSR/tests without jsdom): nothing to mark.
+  }
 }
 
 export function getKioskId() {

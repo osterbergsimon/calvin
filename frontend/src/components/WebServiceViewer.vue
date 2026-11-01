@@ -327,7 +327,7 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
+  z-index: var(--z-dialog);
 }
 
 .viewer-content {
@@ -360,7 +360,8 @@ onUnmounted(() => {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: 100;
+  /* Above everything the viewer draws, the embed fallback (--z-raised) included. */
+  z-index: var(--z-sticky);
   pointer-events: none;
 }
 
@@ -369,7 +370,7 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px var(--shadow);
   /* IconButton's transition covers background/border-color/color only, so
      animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
-  transition: transform 0.2s;
+  transition: transform var(--dur);
 }
 
 .btn-close-fullscreen:hover {

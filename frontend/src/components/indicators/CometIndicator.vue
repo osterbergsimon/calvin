@@ -63,13 +63,7 @@ const beadStyle = index => {
   pointer-events: none;
   z-index: var(--z-raised);
   opacity: 0;
-  transition: opacity calc(var(--dur) * 2.25) ease; /* 450ms */
-}
-
-/* The app frame sits above the dashboard content (dashboard-main is a sticky
-   layer), so the light rides on top of the panels' edges. */
-.loading-indicator--app {
-  z-index: calc(var(--z-sticky) + 1);
+  transition: opacity var(--dur-loading-fade) ease;
 }
 
 .loading-indicator.is-active {

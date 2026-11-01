@@ -78,6 +78,7 @@
 </template>
 
 <script setup>
+import { isPhone as isPhoneViewport } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";
 import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
@@ -129,12 +130,14 @@ watch(next, () => {
 
 // Phone-width rows stack (C2); a wide embedded editor keeps the side-by-side form.
 const width = ref(typeof window === "undefined" ? 1024 : window.innerWidth);
+const height = ref(typeof window === "undefined" ? 768 : window.innerHeight);
 const onResize = () => {
   width.value = window.innerWidth;
+  height.value = window.innerHeight;
 };
 onMounted(() => window.addEventListener("resize", onResize));
 onUnmounted(() => window.removeEventListener("resize", onResize));
-const isPhone = computed(() => width.value < 480);
+const isPhone = computed(() => isPhoneViewport(width.value, height.value));
 
 async function signOut() {
   signingOut.value = true;

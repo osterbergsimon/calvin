@@ -32,6 +32,18 @@ describe("kiosk identity survives navigation (F1)", () => {
     expect(getKioskId()).toBe("hall");
   });
 
+  it("marks <html> as a kiosk at boot, and only for a kiosk", () => {
+    sessionStorage.clear();
+    document.documentElement.classList.remove("calvin-kiosk");
+    setLocation("");
+    captureKioskIdentity();
+    expect(document.documentElement.classList.contains("calvin-kiosk")).toBe(false);
+    setLocation("?kiosk=hall");
+    captureKioskIdentity();
+    expect(document.documentElement.classList.contains("calvin-kiosk")).toBe(true);
+    document.documentElement.classList.remove("calvin-kiosk");
+  });
+
   it("a new ?kiosk= in the URL replaces the stored id", () => {
     setLocation("?kiosk=old");
     getKioskId();

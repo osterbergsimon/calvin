@@ -109,8 +109,8 @@ defineExpose({ focus, select });
   /* 1rem, not --fs-control: iOS zooms on inputs under 16px. */
   font: 1rem var(--font-ui);
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    border-color var(--dur),
+    box-shadow var(--dur);
 }
 .password-field__input:hover:not(:disabled) {
   border-color: var(--focus-edge);
@@ -137,7 +137,7 @@ defineExpose({ focus, select });
   background: transparent;
   color: var(--ink-2);
   border-radius: var(--radius-xs);
-  font: 500 var(--fs-control) var(--font-ui);
+  font: var(--weight-strong) var(--fs-control) var(--font-ui);
   cursor: pointer;
 }
 .password-field__toggle:focus-visible {

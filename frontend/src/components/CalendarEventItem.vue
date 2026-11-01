@@ -107,7 +107,7 @@ const handleFocus = () => {
   overflow: hidden;
   overflow-x: clip; /* Prevent horizontal overflow from long event names */
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--dur);
   border: 2px solid transparent;
   outline: none;
   position: relative;
@@ -130,7 +130,7 @@ const handleFocus = () => {
   border-bottom-right-radius: 0;
   /* Reduce negative margin to prevent grid expansion */
   margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
-  z-index: 1;
+  z-index: var(--z-raised);
   border-right: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margin doesn't cause cell expansion */
   position: relative;
@@ -143,7 +143,7 @@ const handleFocus = () => {
   border-bottom-left-radius: 0;
   /* Reduce negative margin to prevent grid expansion */
   margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
-  z-index: 1;
+  z-index: var(--z-raised);
   border-left: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margin doesn't cause cell expansion */
   position: relative;
@@ -154,7 +154,7 @@ const handleFocus = () => {
   /* Reduce negative margins to prevent grid expansion */
   margin-left: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
   margin-right: calc(-1 * clamp(0.02rem, 0.1vw, 0.05rem));
-  z-index: 1;
+  z-index: var(--z-raised);
   border-left: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   border-right: 1px dashed color-mix(in srgb, var(--on-event, var(--on-event-ink)) 30%, transparent);
   /* Ensure negative margins don't cause cell expansion */
@@ -210,7 +210,7 @@ const handleFocus = () => {
   outline-offset: -2px;
   border-color: var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 2px var(--focus);
-  z-index: 10;
+  z-index: var(--z-sticky);
   position: relative;
 }
 
@@ -219,14 +219,14 @@ const handleFocus = () => {
   outline-offset: -2px;
   border-color: var(--on-event, var(--on-event-ink));
   box-shadow: 0 0 0 2px var(--focus);
-  z-index: 10;
+  z-index: var(--z-sticky);
   position: relative;
 }
 
 .event-item.event-start.focused,
 .event-item.event-end.focused,
 .event-item.event-middle.focused {
-  z-index: 11;
+  z-index: var(--z-sticky);
 }
 
 .event-item.selected {
@@ -235,7 +235,7 @@ const handleFocus = () => {
 }
 
 /* Responsive styles for smaller screens and portrait mode */
-@media (max-width: 768px), (orientation: portrait) {
+@media (--bp-phone), (orientation: portrait) {
   .event-item {
     font-size: clamp(var(--fs-3xs), 1.5vw, var(--fs-2xs));
     padding: clamp(0.1rem, 0.5vw, 0.25rem) clamp(0.2rem, 0.75vw, 0.5rem);
@@ -261,7 +261,7 @@ const handleFocus = () => {
 }
 
 /* Extra small screens - more aggressive scaling */
-@media (max-width: 480px) {
+@media (--bp-phone) {
   .event-item {
     font-size: clamp(var(--fs-3xs), 1.8vw, var(--fs-micro));
     padding: clamp(0.05rem, 0.5vw, 0.15rem) clamp(0.15rem, 0.75vw, 0.35rem);

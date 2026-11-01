@@ -49,9 +49,9 @@ defineProps({
   border: 1px solid transparent;
   cursor: pointer;
   transition:
-    background 0.2s,
-    border-color 0.2s,
-    color 0.2s;
+    background var(--dur),
+    border-color var(--dur),
+    color var(--dur);
 }
 .icon-btn:focus-visible {
   outline: 2px solid var(--focus);

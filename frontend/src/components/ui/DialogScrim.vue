@@ -13,9 +13,9 @@ defineEmits(["dismiss"]);
 .dialog-scrim {
   position: fixed;
   inset: 0;
-  /* One step under the dialog layer, so a panel rendered before the scrim
-     still paints above it (CalendarView's event panel). */
-  z-index: calc(var(--z-dialog) - 1);
+  /* On the dialog layer; every caller renders the scrim before its panel, so
+     the panel (same layer, later in the DOM) paints above it. */
+  z-index: var(--z-dialog);
   background: color-mix(in srgb, var(--bg-0) 72%, transparent);
   animation: scrim-in var(--dur) var(--ease);
 }

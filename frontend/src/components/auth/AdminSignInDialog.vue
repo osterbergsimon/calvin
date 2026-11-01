@@ -85,6 +85,7 @@
 </template>
 
 <script setup>
+import { isPhone } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";
@@ -139,13 +140,17 @@ watch(password, () => {
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 const width = ref(typeof window === "undefined" ? 1024 : window.innerWidth);
+const height = ref(typeof window === "undefined" ? 768 : window.innerHeight);
 const onResize = () => {
   width.value = window.innerWidth;
+  height.value = window.innerHeight;
 };
 onMounted(() => window.addEventListener("resize", onResize));
 onUnmounted(() => window.removeEventListener("resize", onResize));
 
-const showPhoneCard = computed(() => isTouch.value && width.value >= 720 && !osk.visible.value);
+const showPhoneCard = computed(
+  () => isTouch.value && !isPhone(width.value, height.value) && !osk.visible.value
+);
 
 watch(
   () => auth.dialog.open,
