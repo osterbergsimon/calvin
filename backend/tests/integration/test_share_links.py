@@ -473,7 +473,7 @@ def test_location_quotes_the_token(guest):
 def test_oversized_request_is_refused_before_upload(admin, guest, monkeypatch, image_dir):
     from app.security import guest_gate
 
-    monkeypatch.setattr(guest_gate, "MAX_GUEST_REQUEST_BYTES", 1000)
+    monkeypatch.setattr(guest_gate, "MAX_GUEST_API_REQUEST_BYTES", 1000)
     _, token = _make_link(admin)
     response = _upload(guest, token, ("a.jpg", _photo(size=(400, 400))))
     assert response.status_code == 413
@@ -605,3 +605,152 @@ def test_guest_page_html_links_the_links_manifest():
     assert 'name="apple-mobile-web-app-title"' in html
     # Anything that isn't token-shaped is never written into the page.
     assert share_page_html(index, '"><script>') == index
+
+
+# -- security r2: quota atomicity and image id reuse -----------------------
+
+
+def _big_photo() -> bytes:
+    """A noise PNG over Starlette's 1 MB spool limit, so reading it yields."""
+    import os as _os
+
+    img = Image.frombytes("RGB", (800, 800), _os.urandom(800 * 800 * 3))
+    buffer = BytesIO()
+    img.save(buffer, "PNG")
+    assert len(buffer.getvalue()) > 1024 * 1024
+    return buffer.getvalue()
+
+
+def test_concurrent_uploads_cannot_pass_the_photo_quota(admin, app, image_dir):
+    """Six parallel requests against max_photos=3 store exactly three photos."""
+    import httpx
+
+    _, token = _make_link(admin, max_photos=3)
+    photo = _big_photo()
+
+    async def run():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+
+            async def one(i):
+                files = [("photos", (f"p{i}.png", photo, "image/png"))]
+                return await client.post(f"/api/guest/{token}/uploads", files=files)
+
+            return await asyncio.gather(*(one(i) for i in range(6)))
+
+    responses = asyncio.run(run())
+    stored = sorted(p.name for p in (image_dir / "Guests").iterdir() if p.suffix != "")
+    assert len(stored) == 3, stored
+    assert sum(len(r.json().get("uploaded", [])) for r in responses if r.status_code == 200) == 3
+    from app.security.share_links import get_share_link_store
+
+    (link,) = get_share_link_store().list()
+    assert link["uploadCount"] == 3
+
+
+def test_concurrent_uploads_cannot_pass_the_rate_limit(admin, app, image_dir, monkeypatch):
+    import httpx
+
+    from app.api.routes import share
+    from app.services import plugin_image_service
+
+    monkeypatch.setattr(share.guest_upload_limiter, "max_events", 2)
+    real_upload = plugin_image_service.upload_to_local_folder
+
+    async def slow_upload(*args, **kwargs):
+        await asyncio.sleep(0.05)  # a slow SD card: the write yields
+        return await real_upload(*args, **kwargs)
+
+    monkeypatch.setattr(plugin_image_service, "upload_to_local_folder", slow_upload)
+    _, token = _make_link(admin)
+    photo = _big_photo()
+
+    async def run():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+
+            async def one(i):
+                files = [("photos", (f"p{i}.png", photo, "image/png"))]
+                return await client.post(f"/api/guest/{token}/uploads", files=files)
+
+            await asyncio.gather(*(one(i) for i in range(5)))
+
+    asyncio.run(run())
+    assert len([p for p in (image_dir / "Guests").iterdir() if p.suffix != ""]) == 2
+
+
+def _delete_in_manage_images(app, image_id):
+    """The owner removes a photo in Manage images (the record stays with the link)."""
+    plugin = plugin_manager.get_plugin("local-images")
+    assert asyncio.run(plugin.delete_image(image_id))
+
+
+def test_reused_image_id_cannot_be_deleted_by_the_earlier_guest(admin, app, image_dir):
+    _, token = _make_link(admin)
+    phone_a, phone_b = TestClient(app), TestClient(app)
+    phone_a.get(f"/api/guest/{token}")
+    phone_b.get(f"/api/guest/{token}")
+    (a,) = _upload(phone_a, token, ("x.jpg", _photo())).json()["uploaded"]
+    _delete_in_manage_images(app, a["imageId"])
+    (b,) = _upload(phone_b, token, ("x.jpg", _photo())).json()["uploaded"]
+    assert b["imageId"] == a["imageId"]  # same path, same md5 id
+
+    assert phone_a.get(f"/api/guest/{token}/uploads").json()["uploads"] == []
+    assert phone_a.get(f"/api/guest/{token}/uploads/{a['imageId']}/thumbnail").status_code == 404
+    assert phone_a.delete(f"/api/guest/{token}/uploads/{a['imageId']}").status_code == 404
+    assert (image_dir / "Guests" / "x.jpg").exists()
+    assert [u["imageId"] for u in phone_b.get(f"/api/guest/{token}/uploads").json()["uploads"]] == [
+        b["imageId"]
+    ]
+
+
+def test_reused_image_id_across_links_survives_revoke_with_remove(admin, guest, image_dir):
+    link_a, token_a = _make_link(admin, "A", "Guests")
+    _, token_b = _make_link(admin, "B", "Guests")
+    (a,) = _upload(guest, token_a, ("x.jpg", _photo())).json()["uploaded"]
+    _delete_in_manage_images(None, a["imageId"])
+    (b,) = _upload(guest, token_b, ("x.jpg", _photo())).json()["uploaded"]
+    assert b["imageId"] == a["imageId"]
+
+    response = admin.delete(f"/api/share/links/{link_a['id']}?remove_photos=true")
+    assert response.status_code == 204
+    assert (image_dir / "Guests" / "x.jpg").exists()
+
+
+def test_revoke_with_remove_spares_a_file_that_replaced_the_upload(admin, guest, image_dir):
+    """A file at the upload's path that the upload did not create is left alone."""
+    import os
+    import time
+
+    from tests.test_utils import create_test_image_file
+
+    link, token = _make_link(admin)
+    _upload(guest, token, ("x.jpg", _photo()))
+    path = image_dir / "Guests" / "x.jpg"
+    path.unlink()
+    create_test_image_file(path)  # the owner's own photo, same name
+    later = time.time() + 5
+    os.utime(path, (later, later))
+
+    response = admin.delete(f"/api/share/links/{link['id']}?remove_photos=true")
+    assert response.status_code == 204
+    assert path.exists()
+
+
+def test_guest_cannot_delete_a_file_that_replaced_their_upload(admin, guest, image_dir):
+    import os
+    import time
+
+    from tests.test_utils import create_test_image_file
+
+    _, token = _make_link(admin)
+    guest.get(f"/api/guest/{token}")
+    (a,) = _upload(guest, token, ("x.jpg", _photo())).json()["uploaded"]
+    path = image_dir / "Guests" / "x.jpg"
+    path.unlink()
+    create_test_image_file(path)
+    later = time.time() + 5
+    os.utime(path, (later, later))
+
+    assert guest.delete(f"/api/guest/{token}/uploads/{a['imageId']}").status_code == 404
+    assert path.exists()

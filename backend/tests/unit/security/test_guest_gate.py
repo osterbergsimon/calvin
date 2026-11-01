@@ -153,3 +153,42 @@ def test_other_paths_pass_untouched():
 )
 def test_client_ip(peer, forwarded, trusted, expected):
     assert client_ip(peer, forwarded, trusted) == expected
+
+
+# -- body caps (security r2) -------------------------------------------------
+
+
+def test_guest_api_cap_is_one_photo_plus_margin():
+    from app.services.guest_image import MAX_GUEST_UPLOAD_BYTES
+
+    # The page sends one photo per request: the API cap is far below the
+    # share target's, but still fits the largest photo and its form framing.
+    assert MAX_GUEST_UPLOAD_BYTES < guest_gate.MAX_GUEST_API_REQUEST_BYTES
+    assert guest_gate.MAX_GUEST_API_REQUEST_BYTES <= MAX_GUEST_UPLOAD_BYTES + 2 * 2**20
+    assert guest_gate.MAX_GUEST_API_REQUEST_BYTES < guest_gate.MAX_GUEST_REQUEST_BYTES
+
+
+def test_guest_api_over_its_cap_is_refused_without_reading_the_body(token):
+    headers = {"content-length": str(guest_gate.MAX_GUEST_API_REQUEST_BYTES + 1)}
+    status, _, reached = _call(_scope(f"/api/guest/{token}/uploads", headers=headers))
+    assert status == 413
+    assert reached == []
+
+
+def test_guest_api_within_its_cap_reaches_the_app(token):
+    headers = {"content-length": str(guest_gate.MAX_GUEST_API_REQUEST_BYTES)}
+    status, _, reached = _call(_scope(f"/api/guest/{token}/uploads", headers=headers))
+    assert status is None
+    assert len(reached) == 1
+
+
+def test_share_target_keeps_the_large_cap(token):
+    # Android shares every selected photo in one request.
+    headers = {"content-length": str(guest_gate.MAX_GUEST_API_REQUEST_BYTES + 1)}
+    status, _, reached = _call(_scope(f"/share/{token}/receive", headers=headers))
+    assert status is None
+    assert len(reached) == 1
+    headers = {"content-length": str(guest_gate.MAX_GUEST_REQUEST_BYTES + 1)}
+    status, _, reached = _call(_scope(f"/share/{token}/receive", headers=headers))
+    assert status == 303
+    assert reached == []
