@@ -66,7 +66,11 @@ def install_security(app: FastAPI) -> None:
     if not any(isinstance(f, ShareTokenRedactor) for f in access_log.filters):
         access_log.addFilter(ShareTokenRedactor())
     from app.api.routes.auth import router as auth_router
+    from app.security.guest_gate import GuestGateMiddleware
     from app.security.host_origin import HostOriginMiddleware
 
+    # Added first, so it runs inside the Host/Origin check (the last added
+    # middleware is the outermost one).
+    app.add_middleware(GuestGateMiddleware)
     app.add_middleware(HostOriginMiddleware)
     app.include_router(auth_router, prefix="/api", tags=["auth"])

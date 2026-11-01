@@ -77,9 +77,7 @@ def test_filename_is_reduced_to_a_safe_stem():
 def _gif(frames: int = 3, size=(8, 8), trailer: bytes = b"") -> bytes:
     images = [Image.new("RGB", size, (i * 80 % 256, 0, 0)) for i in range(frames)]
     buffer = BytesIO()
-    images[0].save(
-        buffer, "GIF", save_all=True, append_images=images[1:], duration=120, loop=0
-    )
+    images[0].save(buffer, "GIF", save_all=True, append_images=images[1:], duration=120, loop=0)
     return buffer.getvalue() + trailer
 
 

@@ -94,3 +94,24 @@ def public_base_url(request: Request) -> str:
         forwarded_host=request.headers.get("x-forwarded-host"),
         trusted_proxies=settings.trusted_proxies,
     )
+
+
+def client_ip(client_host: str | None, forwarded_for: str | None, trusted_proxies: str) -> str:
+    """The caller's IP for rate limits: the peer, or behind a trusted proxy the forwarded one.
+
+    ``X-Forwarded-For`` is only read when the peer is in ``CALVIN_TRUSTED_PROXIES``.
+    Hops are read right to left, skipping trusted proxies, so the first untrusted
+    hop is the client the nearest proxy saw; a hop that is not an IP is never used.
+    """
+    peer = client_host or "unknown"
+    if not forwarded_for or not _is_trusted_proxy(client_host, trusted_proxies):
+        return peer
+    hops = [hop.strip() for hop in forwarded_for.split(",") if hop.strip()]
+    for hop in reversed(hops):
+        try:
+            ipaddress.ip_address(hop)
+        except ValueError:
+            return peer
+        if not _is_trusted_proxy(hop, trusted_proxies) or "*" in _entries(trusted_proxies):
+            return hop
+    return hops[0] if hops else peer
