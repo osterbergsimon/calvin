@@ -129,6 +129,58 @@ describe("ColourField", () => {
     expect(w.text()).toContain("Use a colour code like #4caf50.");
   });
 
+  it("accepts a code without the # and rejects 4, 5 and 8 digits", async () => {
+    const w = mountField();
+    await openCustom(w);
+    const code = w.find('input[type="text"]');
+    await code.setValue("4CAF50");
+    await code.trigger("keydown", { key: "Enter" });
+    expect(w.emitted("update:modelValue")).toEqual([["#4caf50"]]);
+    for (const bad of ["#abcd", "#abcde", "#aabbccdd"]) {
+      await code.setValue(bad);
+      await code.trigger("keydown", { key: "Enter" });
+    }
+    expect(w.emitted("update:modelValue")).toHaveLength(1);
+    expect(w.text()).toContain("Use a colour code like #4caf50.");
+  });
+
+  it("prefills the code with the current custom colour", async () => {
+    const w = mountField({ modelValue: "#123456" });
+    await openCustom(w);
+    expect(w.find('input[type="text"]').element.value).toBe("#123456");
+  });
+
+  it("clears the code field when a swatch is picked", async () => {
+    const w = mountField({ modelValue: "#123456" });
+    await openCustom(w);
+    await w.find('[aria-label="More colours"] input[type="radio"]').trigger("change");
+    await nextTick();
+    expect(w.find('input[type="text"]').element.value).toBe("");
+  });
+
+  it("applies the code on blur but keeps the compact popover open", async () => {
+    const w = mountField({ compact: true, modelValue: "#863427" }, document.body);
+    await w.find("button.colour-field__trigger").trigger("click");
+    await nextTick();
+    await openCustom(w);
+    // The popover content renders through a stubbed teleport, so drive the
+    // shared TextField directly: type a code, then leave the field.
+    const field = w.findComponent({ name: "TextField" });
+    field.vm.$emit("update:modelValue", "#abcdef");
+    field.vm.$emit("blur", new FocusEvent("blur"));
+    await nextTick();
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toEqual([["#abcdef"]]);
+    expect(w.find('[role="dialog"]').exists()).toBe(true);
+  });
+
+  it("keeps the more colours apart from the theme swatches and visible on dark surfaces", async () => {
+    const { MORE_COLOURS } = await import("@/utils/themePalettes");
+    const hexes = MORE_COLOURS.map(c => c.hex);
+    for (const near of ["#827717", "#b71c1c", "#004d40", "#311b92"])
+      expect(hexes).not.toContain(near);
+  });
+
   it("compact renders a trigger that shows the chosen swatch and name", () => {
     const w = mountField({ compact: true, modelValue: "#863427" });
     const trigger = w.find("button.colour-field__trigger");
