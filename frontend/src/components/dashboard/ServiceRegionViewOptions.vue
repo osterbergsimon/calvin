@@ -40,6 +40,7 @@
 import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
+import { useProgressStore } from "@/stores/progress";
 import RegionViewOptions from "./RegionViewOptions.vue";
 import Button from "@/components/ui/Button.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
@@ -53,10 +54,17 @@ const props = defineProps({
 
 const configStore = useConfigStore();
 const webServicesStore = useWebServicesStore();
+const progressStore = useProgressStore();
 const refreshNow = () => {
-  webServicesStore.refreshCurrentService().catch(err => {
-    console.error("Failed to refresh service:", err);
-  });
+  progressStore
+    .track(
+      `plugin:refresh:${props.regionId || "fullscreen"}`,
+      () => webServicesStore.refreshCurrentService(),
+      { regionId: props.regionId || null }
+    )
+    .catch(err => {
+      console.error("Failed to refresh service:", err);
+    });
 };
 
 // "default" means inherit the plugin hint (persisted as absent).

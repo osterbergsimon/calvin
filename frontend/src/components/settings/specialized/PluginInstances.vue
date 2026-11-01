@@ -1,7 +1,7 @@
 <template>
   <div class="pi-wrap">
     <div class="pi-header">
-      <h4 class="pi-title">
+      <h4 class="pi-title heading-group">
         {{ instanceLabelPlural }}
         <Tag v-if="instances.length > 0" class="pi-count" count>{{ instances.length }}</Tag>
       </h4>
@@ -150,11 +150,6 @@ const handleOrderChange = newOrder => emit("order-change", newOrder);
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-label);
-  font-weight: var(--weight-strong);
-  color: var(--ink);
 }
 
 .pi-list {

@@ -7,14 +7,12 @@
 
 export const roleLint = {
   allowlist: [
-    "components/PerimeterProgress.vue",
     "components/StatusRail.vue",
     "components/settings/categories/ThisBrowserSettings.vue",
     "components/settings/shared/CollapsibleSection.vue",
     "components/settings/shared/DefaultEditNote.vue",
     "components/settings/shared/DefaultOnlyNote.vue",
     "components/settings/shared/TabNavigation.vue",
-    "components/settings/shell/CategoryRail.vue",
     "components/settings/shell/CollapsibleSettingsSection.vue",
     "components/settings/shell/ScopeChip.vue",
     "components/settings/shell/SettingRow.vue",
@@ -55,10 +53,7 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/settings/shared/TabNavigation.vue",
-    "components/settings/tabs/layout/keyboard/KeyBindingTile.vue",
-  ],
+  allowlist: ["components/settings/shared/TabNavigation.vue"],
   baseline: [
     "components/settings/shared/ConfirmModal.vue",
     "components/settings/shared/TabNavigation.vue",

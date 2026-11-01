@@ -326,7 +326,8 @@ describe("ApiKeysSection", () => {
         await get("api-key-copy").trigger("click");
         await flushPromises();
         expect(writeText).toHaveBeenCalledWith(SECRET);
-        expect(get("api-key-copy").text()).toContain("✓ Copied");
+        expect(get("api-key-copy").text()).toContain("Copied");
+        expect(get("api-key-copy").find(".btn__icon").exists()).toBe(true);
         expect(get("api-key-live").text()).toBe("Key copied.");
         expect(get("api-key-live").attributes("aria-live")).toBe("polite");
         vi.advanceTimersByTime(2000);
@@ -341,7 +342,8 @@ describe("ApiKeysSection", () => {
         await get("api-key-copy").trigger("click");
         await flushPromises();
         expect(document.execCommand).toHaveBeenCalledWith("copy");
-        expect(get("api-key-copy").text()).toContain("✓ Copied");
+        expect(get("api-key-copy").text()).toContain("Copied");
+        expect(get("api-key-copy").find(".btn__icon").exists()).toBe(true);
       });
 
       it("shows Select and copy plus the Ctrl+C hint when both fail", async () => {

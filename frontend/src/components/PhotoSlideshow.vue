@@ -9,7 +9,9 @@
       label="Exit fullscreen"
       @click="handleAction('photos_exit_fullscreen')"
     >
-      ✕
+      <svg class="fs-close__glyph" viewBox="0 0 24 24" aria-hidden="true">
+        <path :d="mdiClose" fill="currentColor" />
+      </svg>
     </IconButton>
     <DashboardPanel
       title="Photos"
@@ -97,7 +99,9 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { mdiClose } from "@mdi/js";
 import { useImagesStore } from "../stores/images";
+import { useProgressStore } from "../stores/progress";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
@@ -147,6 +151,14 @@ const props = defineProps({
 });
 
 const imagesStore = useImagesStore();
+const progressStore = useProgressStore();
+
+// Fetching the photo-source list lights this region's frame (the app frame in
+// fullscreen). Rotation from cache and prefetching never do (CLV-115).
+const trackPhotoFetch = work =>
+  progressStore.track(`photos:${props.regionId || "fullscreen"}`, work, {
+    regionId: props.regionId || null,
+  });
 
 // Only a real "nothing configured" is setup-empty (CLV-20); an offline error
 // is its own state and must not trigger the setup prompt.
@@ -274,10 +286,12 @@ onMounted(async () => {
 
   // Fetch images and current image
   try {
-    await imagesStore.fetchImages(props.sourceIds);
-    if (sourceImages.value.length > 0 && !currentImage.value) {
-      await imagesStore.fetchCurrentImage(props.sourceIds);
-    }
+    await trackPhotoFetch(async () => {
+      await imagesStore.fetchImages(props.sourceIds);
+      if (sourceImages.value.length > 0 && !currentImage.value) {
+        await imagesStore.fetchCurrentImage(props.sourceIds);
+      }
+    });
   } catch (error) {
     console.error("Failed to load images:", error);
   }
@@ -328,7 +342,7 @@ watch(
 
 watch(sourceKey, async () => {
   stopAutoRotation();
-  await imagesStore.fetchImages(props.sourceIds);
+  await trackPhotoFetch(() => imagesStore.fetchImages(props.sourceIds));
   if (props.autoRotate) startAutoRotation();
 });
 </script>
@@ -354,6 +368,11 @@ watch(sourceKey, async () => {
   top: var(--gap-4);
   right: var(--gap-4);
   z-index: var(--z-raised);
+}
+
+.fs-close__glyph {
+  width: 1em;
+  height: 1em;
 }
 
 .photo-slideshow.fullscreen {

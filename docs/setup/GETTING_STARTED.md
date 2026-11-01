@@ -148,10 +148,17 @@ sudo reboot
 ```
 
 The script installs Docker, the kiosk dependencies, the published runtime
-image for that release, and three systemd units. The dashboard comes up at
+image for that release, and the systemd units. The dashboard comes up at
 `http://localhost:8000` after reboot.
 
-On Pi 3-class boards (Pi 3/3B+, Zero 2 W, CM3) the kiosk runs Chromium without
+The kiosk browser is **cog** (WPE WebKit) by default, the same as on a kiosk Pi.
+Add `--display-stack x11` for X11 + Chromium instead
+(`... | sudo GIT_BRANCH=v0.1.0 bash -s -- --display-stack x11`). A re-run keeps
+the stack the Pi already has; an older all-in-one Pi stays on X11 until you
+re-run setup with `--display-stack cog`. See
+[Display stack](KIOSK_INSTALL.md#display-stack-cog-default-everywhere-wayland-opt-in).
+
+When the kiosk runs Chromium (X11 or Wayland), on Pi 3-class boards (Pi 3/3B+, Zero 2 W, CM3) the kiosk runs Chromium without
 its GPU path, because that path crashes the dashboard renderer on their VC4
 graphics; Pi 4/5 keep it. The flags live in
 `/etc/default/calvin-kiosk-display`; see
@@ -252,7 +259,8 @@ newgrp docker
 ```bash
 sudo systemctl status calvin-app
 sudo journalctl -u calvin-app -n 50
-sudo systemctl status calvin-kiosk        # Mode A
+sudo systemctl status calvin-cog          # Mode A, cog (default)
+sudo systemctl status calvin-kiosk        # Mode A, X11/Wayland (Chromium)
 sudo systemctl status calvin-kiosk-remote # Mode B
 ```
 

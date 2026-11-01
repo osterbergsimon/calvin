@@ -5,12 +5,19 @@
  * (`/api/plugins/{serviceId}/data`) and the polling interval declared in the
  * schema. Renderers consume the returned reactive `data` and don't need to
  * know how it was fetched.
+ *
+ * Every fetch, first load and poll refetch alike, drives the loading light
+ * (CLV-115): on `regionId`'s frame when the data belongs to a region, else on
+ * the app frame (clock-bar and status items).
  */
 import { useQuery } from "@tanstack/vue-query";
-import { computed, unref } from "vue";
+import { computed, getCurrentScope, onScopeDispose, unref, watch } from "vue";
 import api, { isServiceWorkerReplay } from "@/services/api";
+import { useProgressStore } from "@/stores/progress";
 
-export function useSchemaData(serviceId, schema, enabled = true) {
+let lightSeq = 0;
+
+export function useSchemaData(serviceId, schema, enabled = true, { regionId = null } = {}) {
   const id = computed(() => unref(serviceId));
   const isEnabled = computed(() => Boolean(unref(enabled)));
   const refetchInterval = computed(() => {
@@ -41,5 +48,35 @@ export function useSchemaData(serviceId, schema, enabled = true) {
     retry: 1,
   });
 
+  trackFetching(query, id, regionId);
+
   return query;
+}
+
+// One light source per caller, so two tiles sharing a query key each hold
+// their own and one finishing never cuts the other's light short.
+function trackFetching(query, id, regionId) {
+  if (!query?.isFetching) return;
+  const progress = useProgressStore();
+  lightSeq += 1;
+  const seq = lightSeq;
+  let sourceId = null;
+
+  const stop = () => {
+    if (sourceId) progress.end(sourceId);
+    sourceId = null;
+  };
+
+  watch(
+    () => Boolean(unref(query.isFetching)),
+    fetching => {
+      if (!fetching) return stop();
+      if (sourceId) return;
+      sourceId = `plugin-data:${id.value}#${seq}`;
+      progress.begin(sourceId, { regionId: unref(regionId) || null });
+    },
+    { immediate: true, flush: "sync" }
+  );
+
+  if (getCurrentScope()) onScopeDispose(stop);
 }
