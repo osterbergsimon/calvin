@@ -261,6 +261,43 @@
         </div>
       </section>
 
+      <section class="ui-gallery__section" data-test="gallery-field-table">
+        <h2 class="ui-gallery__heading">FieldTable</h2>
+        <p class="ui-gallery__note">
+          A compact “same fields per row” editor: one header row, then a label and its controls per
+          row. Rows are the touch target tall, the cells sit --gap-inline apart, and under 360px
+          the label stacks above its controls. The screen schedule is its first user.
+        </p>
+
+        <SettingsSection id="gallery-field-table-schedule" title="Schedule">
+          <FieldTable :columns="fieldTableColumns" :rows="fieldTableRows">
+            <template #default="{ row }">
+              <TextField
+                type="time"
+                step="900"
+                hide-label
+                :label="`${row.label} on`"
+                :model-value="row.onTime"
+                @update:model-value="value => (row.onTime = value)"
+              />
+              <TextField
+                type="time"
+                step="900"
+                hide-label
+                :label="`${row.label} off`"
+                :model-value="row.offTime"
+                @update:model-value="value => (row.offTime = value)"
+              />
+              <ToggleSwitch
+                :model-value="row.enabled"
+                :aria-label="`Screen on, ${row.label}`"
+                @update:model-value="value => (row.enabled = value)"
+              />
+            </template>
+          </FieldTable>
+        </SettingsSection>
+      </section>
+
       <section class="ui-gallery__section" data-test="gallery-setting-group">
         <h2 class="ui-gallery__heading">SettingGroup</h2>
         <p class="ui-gallery__note">
@@ -417,6 +454,7 @@ import Button from "../components/ui/Button.vue";
 import Card from "../components/ui/Card.vue";
 import ColourField from "../components/ui/ColourField.vue";
 import Dialog from "../components/ui/Dialog.vue";
+import FieldTable from "../components/ui/FieldTable.vue";
 import IconButton from "../components/ui/IconButton.vue";
 import InlineNote from "../components/ui/InlineNote.vue";
 import ListRow from "../components/ui/ListRow.vue";
@@ -469,6 +507,16 @@ const dialogText = ref("");
 const fullDialogOpen = ref(false);
 const fullDialogText = ref("");
 const scopeOverridden = ref(true);
+const fieldTableColumns = [
+  { label: "" },
+  { label: "On", width: "7rem" },
+  { label: "Off", width: "7rem" },
+  { label: "" },
+];
+const fieldTableRows = ref([
+  { key: "mon-fri", label: "Mon–Fri", onTime: "06:00", offTime: "22:00", enabled: true },
+  { key: "sat-sun", label: "Sat–Sun", onTime: "08:00", offTime: "23:00", enabled: false },
+]);
 
 const galleryTab = ref("home");
 const galleryTabs = [

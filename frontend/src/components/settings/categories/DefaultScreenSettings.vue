@@ -121,12 +121,12 @@
         @dismiss="dismissNote"
       />
       <template v-if="config.displayScheduleEnabled">
-        <SettingRow label="Daily schedule" description="On and off times for each day of the week.">
-          <DisplayScheduleGrid
-            :model-value="config.displaySchedule || []"
-            @update:model-value="v => emitChange({ displaySchedule: v })"
-          />
-        </SettingRow>
+        <DisplayScheduleGrid
+          :model-value="config.displaySchedule || []"
+          :week-start="config.weekStartDay ?? 1"
+          :time-format="config.timeFormat || '24h'"
+          @update:model-value="v => emitChange({ displaySchedule: v })"
+        />
         <DefaultEditNote
           :note="editNote"
           setting="displaySchedule"

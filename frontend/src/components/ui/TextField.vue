@@ -46,13 +46,16 @@
 </template>
 
 <script setup>
-import { computed, ref, useSlots } from "vue";
+import { computed, ref, useId, useSlots } from "vue";
 import InlineNote from "./InlineNote.vue";
 
 // The one text input (docs/design/frontend-doctrine.md §3), built from
 // PasswordField's shell: same label, 48px box, error line and aria wiring.
 // Secrets stay in PasswordField, numbers in NumberStepper.
-let fieldSeq = 0;
+// `useId` is per instance: a module counter inside <script setup> restarts for
+// every instance, which gave every field the same id (and every label the
+// first field's name).
+const instanceId = useId();
 
 const props = defineProps({
   modelValue: { type: String, default: "" },
@@ -86,7 +89,7 @@ const props = defineProps({
 defineEmits(["update:modelValue", "blur", "focus"]);
 
 const slots = useSlots();
-const fallbackId = `text-field-${++fieldSeq}`;
+const fallbackId = `text-field-${instanceId}`;
 const fieldId = computed(() => props.inputId || fallbackId);
 const errorId = computed(() => `${fieldId.value}-error`);
 const hintId = computed(() => `${fieldId.value}-hint`);
