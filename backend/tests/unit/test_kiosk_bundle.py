@@ -221,3 +221,44 @@ def test_ensure_signing_key_creates_key(tmp_path, monkeypatch):
     monkeypatch.setattr(kiosk_bundle.settings, "kiosk_signing_key_path", keyfile)
     assert kiosk_bundle.ensure_signing_key() == keyfile
     assert len(keyfile.read_text().strip()) == 64
+
+
+def test_bundle_version_cached_while_files_unchanged(tmp_path, monkeypatch):
+    """The 60 s kiosk poll must not re-hash an unchanged bundle (calvin-stnq)."""
+    _seed(tmp_path)
+    v1 = kiosk_bundle.bundle_version(tmp_path)
+    calls = []
+    real = kiosk_bundle._sha256
+    monkeypatch.setattr(kiosk_bundle, "_sha256", lambda p: calls.append(p) or real(p))
+    assert kiosk_bundle.bundle_version(tmp_path) == v1
+    assert kiosk_bundle.bundle_version(tmp_path) == v1
+    assert calls == []
+
+
+def test_bundle_version_cache_invalidated_on_change(tmp_path):
+    _seed(tmp_path)
+    v1 = kiosk_bundle.bundle_version(tmp_path)
+    target = tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path
+    target.write_text("CHANGED, and longer than before\n")
+    v2 = kiosk_bundle.bundle_version(tmp_path)
+    assert v2 != v1
+    assert v2 == kiosk_bundle._version_from(
+        [
+            {"name": bf.name, "sha256": kiosk_bundle._sha256(tmp_path / bf.repo_path)}
+            for bf in kiosk_bundle.BUNDLE_FILES
+        ]
+    )
+
+
+def test_bundle_version_cache_invalidated_on_same_size_edit(tmp_path):
+    """A same-size edit is caught by the mtime part of the key."""
+    import os
+
+    _seed(tmp_path)
+    target = tmp_path / kiosk_bundle.BUNDLE_FILES[0].repo_path
+    v1 = kiosk_bundle.bundle_version(tmp_path)
+    original = target.read_text()
+    target.write_text(original.upper())  # same length, different bytes
+    st = target.stat()
+    os.utime(target, ns=(st.st_atime_ns, st.st_mtime_ns + 1_000_000_000))
+    assert kiosk_bundle.bundle_version(tmp_path) != v1
