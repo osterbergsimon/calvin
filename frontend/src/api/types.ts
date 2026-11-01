@@ -4385,6 +4385,7 @@ export interface operations {
         kagent?: string | null;
         kstat?: string | null;
         kmsg?: string | null;
+        kstack?: string | null;
         vw?: number | null;
         vh?: number | null;
       };

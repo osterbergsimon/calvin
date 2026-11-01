@@ -69,6 +69,20 @@ def public_overrides(overrides: dict | None) -> dict:
     return ov
 
 
+# The display stacks the kiosk agent can run (deploy/kiosk-agent/calvin_display_agent.py).
+# The agent reports one on its config poll so the Screens list can say what a
+# kiosk actually runs; an older agent sends nothing and reads as unknown.
+DISPLAY_STACKS: tuple[str, ...] = ("x11", "wayland", "cog")
+
+
+def _normalized_display_stack(stack: str | None) -> str | None:
+    """Only a known stack name from the agent is stored; anything else is ignored."""
+    if not isinstance(stack, str):
+        return None
+    value = stack.strip().lower()
+    return value if value in DISPLAY_STACKS else None
+
+
 def _normalized_viewport(viewport: dict | None) -> dict | None:
     """Accept only a sane ``{w, h}`` pair of positive ints. Anything else is None."""
     if not isinstance(viewport, dict):
@@ -90,6 +104,7 @@ async def record_kiosk(
     agent_message: str | None = None,
     available_version: str | None = None,
     viewport: dict | None = None,
+    display_stack: str | None = None,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
     if not kiosk_id:
@@ -103,6 +118,7 @@ async def record_kiosk(
     if agent_message is not None and len(agent_message) > 255:
         agent_message = agent_message[:255]
     viewport = _normalized_viewport(viewport)
+    display_stack = _normalized_display_stack(display_stack)
 
     now = utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
@@ -116,6 +132,7 @@ async def record_kiosk(
                 agent_update_status=agent_status,
                 agent_update_message=agent_message,
                 viewport=viewport,
+                display_stack=display_stack,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             await _adopt_global_settings()
@@ -146,6 +163,9 @@ async def record_kiosk(
         changed = True
     if viewport is not None and existing.viewport != viewport:
         existing.viewport = viewport
+        changed = True
+    if display_stack is not None and existing.display_stack != display_stack:
+        existing.display_stack = display_stack
         changed = True
     # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
     # (target) version — clearing on any reported version would cancel a just-issued
@@ -202,6 +222,7 @@ async def list_kiosks() -> list[dict]:
             "agentUpdateRequested": agent_update_requested(row.overrides),
             "overrides": public_overrides(row.overrides),
             "viewport": _normalized_viewport(row.viewport),
+            "displayStack": row.display_stack,
         }
         for row in rows
     ]

@@ -136,6 +136,7 @@ async def get_kiosk_config(
     kagent: str | None = None,
     kstat: str | None = None,
     kmsg: str | None = None,
+    kstack: str | None = None,
     vw: int | None = None,
     vh: int | None = None,
 ):
@@ -163,6 +164,7 @@ async def get_kiosk_config(
             agent_message=kmsg,
             available_version=available,
             viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
+            display_stack=kstack,
         )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
