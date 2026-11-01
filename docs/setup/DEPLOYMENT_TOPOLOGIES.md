@@ -163,8 +163,8 @@ schedule from `${CALVIN_BACKEND_URL}/api/config` and powers the panel with
 `vcgencmd`/`xset`. It computes on/off boundaries locally and wakes exactly at
 the next one, and re-reads the config every `CALVIN_DISPLAY_REFRESH_SECONDS`
 (default 60, set in `/etc/default/calvin-kiosk` to override), so a schedule
-edit reaches the panel within about a minute. Set the schedule in the UI as usual; the kiosk
-follows it. Logs: `journalctl -u calvin-display-agent.service`.
+edit reaches the panel within about a minute. Set the schedule in the UI as
+usual; the kiosk follows it. Logs: `journalctl -u calvin-display-agent.service`.
 
 ### Screen rotation on a Mode-B kiosk
 
