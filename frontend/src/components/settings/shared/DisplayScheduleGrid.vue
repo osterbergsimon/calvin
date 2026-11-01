@@ -28,7 +28,6 @@
         <template #default="{ row }">
           <template v-if="rowValue(row).enabled">
             <TextField
-              class="display-schedule__time"
               type="time"
               step="900"
               hide-label
@@ -37,7 +36,6 @@
               @update:model-value="value => setRow(row, { onTime: value })"
             />
             <TextField
-              class="display-schedule__time"
               type="time"
               step="900"
               hide-label
@@ -119,8 +117,9 @@ const summary = computed(() =>
 
 const columns = [
   { label: "" },
-  { label: "On", width: "7rem" },
-  { label: "Off", width: "7rem" },
+  // Fields shrink before the phone width does: the row must fit 390px.
+  { label: "On", width: "minmax(0, 7rem)" },
+  { label: "Off", width: "minmax(0, 7rem)" },
   { label: "" },
 ];
 

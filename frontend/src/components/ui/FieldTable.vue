@@ -102,8 +102,10 @@ const tableStyle = computed(() => {
   grid-column: 1 / -1;
 }
 
-/* Under 360px a table cannot hold a label and two time fields: stack. */
-@container (max-width: 359px) {
+/* When the table's own column is too narrow for a label and two time fields
+   (a 360px viewport leaves ~300px inside the panel), stack. The query is on
+   the table, so a narrow two-pane detail stacks even on a wide screen. */
+@container (max-width: 300px) {
   .field-table__head {
     display: none;
   }
