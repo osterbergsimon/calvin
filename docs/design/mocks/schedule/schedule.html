@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Screen schedule</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#1b242b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } h1 { font-family:var(--font-display); margin:0 0 20px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); display:grid; grid-template-columns:1fr 1fr; gap:24px; padding:24px; }
+.eyebrow { font-family:var(--font-data); font-size:.72rem; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-3); margin:0 0 8px; }
+.panel { background:var(--bg-1); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+.row { display:flex; align-items:center; gap:16px; padding:12px 20px; min-height:56px; }
+.row + .row, .row + .group, .group + .row { border-top:1px solid var(--line-soft); }
+.txt { flex:1; } .txt b { font-weight:500; display:block; } .txt span { font-size:.85rem; color:var(--ink-2); }
+.tog { display:inline-block; vertical-align:middle; width:44px; height:24px; border-radius:12px; background:var(--focus); position:relative; flex:none; } .tog::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); }
+.btn { height:36px; padding:0 14px; border:1px solid var(--line); border-radius:8px; display:inline-flex; align-items:center; font-size:.85rem; font-weight:500; background:var(--bg-2); }
+.group { padding:14px 20px 16px; }
+.seg { display:inline-flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:.85rem; margin-bottom:14px; }
+.seg span { padding:8px 14px; border-left:1px solid var(--line); } .seg span:first-child { border-left:0; } .seg .on { background:var(--focus); color:var(--focus-ink); font-weight:600; }
+table { border-collapse:collapse; width:100%; } th { text-align:left; font-size:.78rem; font-weight:500; color:var(--ink-2); padding:0 0 6px; }
+td { padding:4px 0; } td:last-child { text-align:right; } td.d { width:4.5rem; font-weight:500; }
+.t { width:7rem; height:40px; border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; padding:0 10px; font-family:var(--font-data); font-size:.9rem; }
+.chk { font-size:.8rem; color:var(--ink-2); display:flex; gap:6px; align-items:center; justify-content:flex-end; } .chk i { width:16px; height:16px; border:1.5px solid var(--line); border-radius:4px; display:inline-block; } .chk i.y { background:var(--focus); border-color:var(--focus); }
+.offall { color:var(--ink-3); font-size:.88rem; }
+.foot { display:flex; justify-content:flex-end; margin-top:10px; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>Screen on/off schedule</h1>
+  <figure>
+    <div class="frame">
+      <div>
+        <p class="eyebrow">Default · Power · collapsed</p>
+        <div class="panel">
+          <div class="row"><div class="txt"><b>Screen on/off schedule</b><span>Turns the screen off and on at set times.</span></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Schedule</b><span>On 06:00 · off 22:00, every day</span></div><span class="btn">Change</span></div>
+          <div class="row"><div class="txt"><b>Turn off when idle</b></div><span class="btn">15 min ▾</span></div>
+        </div>
+        <p class="eyebrow" style="margin-top:24px">Default · Power · editing, weekdays and weekends</p>
+        <div class="panel">
+          <div class="row"><div class="txt"><b>Screen on/off schedule</b></div><div class="tog"></div></div>
+          <div class="row"><div class="txt"><b>Schedule</b><span>Weekdays 06:00–22:00 · weekends 08:00–23:00</span></div></div>
+          <div class="group">
+            <div class="seg"><span>Every day</span><span class="on">Weekdays and weekends</span><span>Each day</span></div>
+            <table><tr><th></th><th>On</th><th>Off</th><th></th></tr>
+              <tr><td class="d">Mon–Fri</td><td><div class="t">06:00</div></td><td><div class="t">22:00</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Sat–Sun</td><td><div class="t">08:00</div></td><td><div class="t">23:00</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+            </table>
+            <div class="foot"><span class="btn">Done</span></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="eyebrow">Each day</p>
+        <div class="panel">
+          <div class="row"><div class="txt"><b>Schedule</b><span>Different each day · off on Sundays</span></div></div>
+          <div class="group">
+            <div class="seg"><span>Every day</span><span>Weekdays and weekends</span><span class="on">Each day</span></div>
+            <table><tr><th></th><th>On</th><th>Off</th><th></th></tr>
+              <tr><td class="d">Mon</td><td><div class="t">06:00</div></td><td><div class="t">22:00</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Tue</td><td><div class="t">06:00</div></td><td><div class="t">22:00</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Wed</td><td><div class="t">06:00</div></td><td><div class="t">22:00</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Thu</td><td><div class="t">06:00</div></td><td><div class="t">22:00</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Fri</td><td><div class="t">06:00</div></td><td><div class="t">23:30</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Sat</td><td><div class="t">08:00</div></td><td><div class="t">23:30</div></td><td><span class="tog" style="margin-left:auto"></span></td></tr>
+              <tr><td class="d">Sun</td><td colspan="2" class="offall">Off all day</td><td><span class="tog" style="margin-left:auto;background:#dde3e8"></span></td></tr>
+            </table>
+            <div class="foot"><span class="btn">Done</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>W1 · Compact schedule.</b> Collapsed it's one row with a summary and <b>Change</b> (today it's seven always-open cards, about 1,680px tall). Editing opens a full-width table: one row for Every day, two for Weekdays and weekends, seven for Each day. Column headers appear once, and each day has its own on/off toggle (shared ToggleSwitch).</figcaption>
+  </figure>
+</main>
+</body>
+</html>
