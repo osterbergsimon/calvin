@@ -13,9 +13,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import { ref } from "vue";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { mdiChevronLeft, mdiChevronRight } from "@mdi/js";
+import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ path: "/" }),
@@ -61,7 +59,7 @@ function setViewportWidth(width) {
   });
 }
 
-function mountHeader(view = VIEW) {
+function mountHeader(view = VIEW, { touchControlSize } = {}) {
   setActivePinia(createPinia());
   const cal = useCalendarStore();
   cal.fetchSources = vi.fn().mockResolvedValue({ sources: [] });
@@ -71,6 +69,7 @@ function mountHeader(view = VIEW) {
   cal.loading = false;
   const cfg = useConfigStore();
   cfg.updateRegionView = vi.fn().mockResolvedValue();
+  if (touchControlSize) cfg.touchControlSize = touchControlSize;
   // Move off the current period so the conditional "Today" jump renders too.
   cal.setCurrentDate(new Date(2027, 0, 15));
 
@@ -132,6 +131,10 @@ describe("CalendarView header view selector", () => {
     expect(w.findComponent(SelectPill).exists()).toBe(true);
     expect(w.findComponent(SegmentedControl).exists()).toBe(false);
     expect(w.find(".calendar-header__view-switch").text()).toContain("Month");
+    // The pill keeps the same accessible name (including rolling) as segments.
+    expect(w.find(".calendar-header__view-switch .pill").attributes("aria-label")).toContain(
+      "Calendar view, currently Month"
+    );
   });
 
   it("selects a view from the narrow SelectPill", async () => {
@@ -160,35 +163,48 @@ describe("CalendarView header control set", () => {
     expect(next.text()).toBe("");
   });
 
-  it("puts every control on the control height", () => {
+  it("puts every control on the shared region control rail", () => {
     const { w } = mountHeader();
     const today = w.find(".calendar-header__today");
     const prev = w.find('.calendar-header__controls [aria-label="Previous"]');
     const next = w.find('.calendar-header__controls [aria-label="Next"]');
     const fullscreen = w.find(".calendar-header__fullscreen");
 
-    expect(today.classes()).toContain("btn--md");
+    expect(w.find(".region-header-controls").exists()).toBe(true);
+    expect(today.classes()).toContain("btn--custom");
     for (const control of [prev, next, fullscreen]) {
-      expect(control.classes()).toContain("icon-btn--lg");
+      expect(control.classes()).toContain("icon-btn--custom");
     }
   });
 
-  it("has no size=custom control left in the header", () => {
+  it("uses mdi fullscreen and close icons, not text glyphs", () => {
     const { w } = mountHeader();
-    expect(w.find(".calendar-header__controls .icon-btn--custom").exists()).toBe(false);
+    expect(w.find(".calendar-header__fullscreen path").attributes("d")).toBe(mdiFullscreen);
+
+    const fullscreenView = mount(CalendarView, {
+      props: { sourceIds: [], regionId: "r1", view: VIEW, focused: true, isFullscreen: true },
+      global: { stubs: { ...stubs, teleport: true } },
+    });
+    expect(
+      fullscreenView
+        .find('.fullscreen-close-overlay [data-action="exit-fullscreen"] path')
+        .attributes("d")
+    ).toBe(mdiClose);
+    fullscreenView.unmount();
   });
 
-  it("pins the view selector to the header's control height and radius", () => {
-    const source = readFileSync(
-      resolve(__dirname, "../../../src/components/CalendarView.vue"),
-      "utf8"
-    );
-    const rule = source.slice(source.indexOf(".calendar-header__view-switch {"));
-    const body = rule.slice(rule.indexOf("{") + 1, rule.indexOf("}"));
+  it("follows Dashboard size: xsmall and xlarge give different control rails", () => {
+    const { w: small } = mountHeader(VIEW, { touchControlSize: "xsmall" });
+    const { w: large } = mountHeader(VIEW, { touchControlSize: "xlarge" });
+    const rail = w =>
+      w.find(".region-header-controls").element.style.getPropertyValue("--region-rail-h");
+    const glyph = w =>
+      w.find(".region-header-controls").element.style.getPropertyValue("--region-glyph-fs");
 
-    expect(body).toContain("--seg-height: var(--control-height)");
-    expect(body).toContain("--seg-radius: var(--radius-control)");
-    expect(body).toContain("--pill-radius: var(--radius-control)");
+    expect(rail(small)).toBe("22px");
+    expect(rail(large)).toBe("40px");
+    expect(glyph(small)).toBe("0.8rem");
+    expect(glyph(large)).toBe("1.25rem");
   });
 
   it("keeps the previous/next actions working", async () => {
