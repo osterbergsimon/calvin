@@ -12,6 +12,8 @@ import { useConfigStore } from "./stores/config";
 import { useTypeTheme } from "./composables/useTypeTheme";
 import { useUiScale } from "./composables/useUiScale";
 import { captureKioskIdentity } from "./utils/kioskId";
+import { reloadWithLight } from "./utils/reloadWithLight";
+import { useProgressStore } from "./stores/progress";
 import {
   markControllerReload,
   shouldReloadOnControllerChange,
@@ -76,7 +78,8 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     }
 
     markControllerReload();
-    window.location.reload();
+    // The app loading light shows until the new build is up (CLV-115).
+    reloadWithLight({ progress: useProgressStore(pinia) });
   });
 
   window.addEventListener("load", () => {

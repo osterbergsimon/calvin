@@ -19,9 +19,9 @@
         active screen's layout direction (row vs column).
       -->
       <div class="dashboard-stage">
-        <!-- Ambient loading comet: orbits the framed content area, riding a
-             clock bar's seam where one exists. See calvin-dt7. -->
-        <PerimeterProgress />
+        <!-- App-frame loading light: the whole perimeter, riding a clock bar's
+             seam where one exists. Region loads light their own frame. CLV-115. -->
+        <LoadingLight />
 
         <ClockBarVertical
           v-if="showVerticalBarLeft"
@@ -180,7 +180,7 @@ import SetupWelcomeCard from "../components/dashboard/SetupWelcomeCard.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
-import PerimeterProgress from "../components/PerimeterProgress.vue";
+import LoadingLight from "../components/LoadingLight.vue";
 import Button from "../components/ui/Button.vue";
 
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
@@ -189,8 +189,7 @@ const CalendarView = defineAsyncComponent(() => import("../components/CalendarVi
 import { regionChromeVars } from "@/styles/regionChromeScale";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
-import { useCalendarStore } from "../stores/calendar";
-import { useProgressStore } from "../stores/progress";
+import { useFirstLoadLight } from "../composables/useFirstLoadLight";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { useHotCornerReveal } from "../composables/useHotCornerReveal";
@@ -216,21 +215,11 @@ const configStore = useConfigStore();
 // taps pass straight through. See calvin-arv.
 useHotCornerReveal(configStore);
 const modeStore = useModeStore();
-const calendarStore = useCalendarStore();
-const progressStore = useProgressStore();
 const route = useRoute();
 
-// Bridge background work into the perimeter comet. Keyed by source so a future
-// per-region indicator can subscribe to its own id (see calvin-dt7); for now the
-// calendar's background refresh is the single global source.
-watch(
-  () => calendarStore.backgroundRefreshing,
-  refreshing => {
-    if (refreshing) progressStore.begin("calendar");
-    else progressStore.end("calendar");
-  },
-  { immediate: true }
-);
+// First load after a page load lights the app frame until the dashboard has
+// content. Region and plugin fetches report themselves (CLV-115).
+const firstLoadLight = useFirstLoadLight();
 const { focusRegion } = useKeyboardActions();
 
 let configPollInterval = null;
@@ -583,6 +572,7 @@ watch(
 
 onMounted(async () => {
   await configStore.fetchConfig();
+  firstLoadLight.contentReady();
   startConfigPolling();
   settleSetupPrompt();
 });

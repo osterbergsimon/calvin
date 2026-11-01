@@ -5,7 +5,6 @@ import {
   DEFAULT_CALENDAR_VIEW,
   MAX_TOP_REGIONS,
   MAX_SPLIT_DEPTH,
-  addSubRegion,
   addSubRegionAtPath,
   addTopRegion,
   applyDragSizesById,
@@ -36,23 +35,15 @@ import {
   normalizeDashboardScreens,
   normalizeScreenClockBar,
   removeRegionAtPath,
-  removeSubRegion,
-  removeTopRegion,
   resizeAdjacentRegions,
   resizePairAtPath,
-  resizeSubRegion,
-  resizeSubRegionPair,
   resolveClockBarForScreen,
   setLayoutDirection,
   setRegionContentAtPath,
   setRegionView,
-  setSplitDirection,
   setSplitDirectionAtPath,
-  setSubRegionContent,
   splitRegionAtPath,
-  splitTopRegion,
   unsplitRegionAtPath,
-  unsplitTopRegion,
   updateNodeAtPath,
 } from "@/utils/layout";
 
@@ -240,7 +231,7 @@ describe("Layout Utilities", () => {
     });
   });
 
-  describe("top-level regions: add and remove", () => {
+  describe("top-level regions: add", () => {
     const baseLayout = () => createDashboardLayoutFromPreset("split_two");
 
     it("adds a new top region and rebalances sizes to 100", () => {
@@ -261,90 +252,6 @@ describe("Layout Utilities", () => {
       const overflow = addTopRegion(layout);
       expect(overflow.regions).toHaveLength(MAX_TOP_REGIONS);
     });
-
-    it("removes a region and renormalizes", () => {
-      const layout = removeTopRegion(addTopRegion(baseLayout()), 1);
-
-      expect(layout.regions).toHaveLength(2);
-      expect(layout.regions.reduce((sum, r) => sum + r.size, 0)).toBe(100);
-    });
-
-    it("collapses to a single region without going below 1", () => {
-      const layout = removeTopRegion(baseLayout(), 0);
-      expect(layout.regions).toHaveLength(1);
-
-      const tooFar = removeTopRegion(layout, 0);
-      expect(tooFar.regions).toHaveLength(1);
-    });
-  });
-
-  describe("splits and sub-regions", () => {
-    const splitLayout = () => splitTopRegion(createDashboardLayoutFromPreset("single"), 0);
-
-    it("splitTopRegion creates two sub-regions inheriting parent kind", () => {
-      const layout = splitLayout();
-      expect(layout.regions[0].split.regions).toHaveLength(2);
-      expect(layout.regions[0].split.regions[0].kind).toBe("calendar");
-      expect(layout.regions[0].split.regions[1].kind).not.toBe("calendar");
-    });
-
-    it("unsplitTopRegion adopts the first sub-region's content", () => {
-      const layout = setSubRegionContent(splitLayout(), 0, 0, {
-        kind: "service",
-        serviceId: "weather",
-      });
-      const collapsed = unsplitTopRegion(layout, 0);
-      expect(collapsed.regions[0].split).toBeNull();
-      expect(collapsed.regions[0]).toMatchObject({
-        kind: "service",
-        serviceId: "weather",
-      });
-    });
-
-    it("addSubRegion grows up to MAX_TOP_REGIONS sub-regions", () => {
-      let layout = splitLayout();
-      while (layout.regions[0].split.regions.length < MAX_TOP_REGIONS) {
-        layout = addSubRegion(layout, 0);
-      }
-      expect(layout.regions[0].split.regions).toHaveLength(MAX_TOP_REGIONS);
-      expect(layout.regions[0].split.regions.reduce((sum, sub) => sum + sub.size, 0)).toBe(100);
-
-      const overflow = addSubRegion(layout, 0);
-      expect(overflow.regions[0].split.regions).toHaveLength(MAX_TOP_REGIONS);
-    });
-
-    it("removeSubRegion collapses the split when only one sub would remain", () => {
-      const layout = removeSubRegion(splitLayout(), 0, 1);
-      expect(layout.regions[0].split).toBeNull();
-      expect(layout.regions[0].kind).toBe("calendar");
-    });
-
-    it("removeSubRegion keeps the split when 2+ subs remain", () => {
-      const three = addSubRegion(splitLayout(), 0);
-      const layout = removeSubRegion(three, 0, 2);
-      expect(layout.regions[0].split.regions).toHaveLength(2);
-      expect(layout.regions[0].split.regions.reduce((sum, sub) => sum + sub.size, 0)).toBe(100);
-    });
-
-    it("resizeSubRegion handles end-of-list and middle indices", () => {
-      const three = addSubRegion(splitLayout(), 0);
-      const middle = resizeSubRegion(three, 0, 1, 50);
-      expect(middle.regions[0].split.regions[1].size).toBe(50);
-
-      const last = resizeSubRegion(three, 0, 2, 50);
-      expect(last.regions[0].split.regions[2].size).toBe(50);
-      expect(last.regions[0].split.regions.reduce((sum, sub) => sum + sub.size, 0)).toBe(100);
-    });
-
-    it("resizeSubRegionPair adjusts adjacent subs preserving total", () => {
-      const three = addSubRegion(splitLayout(), 0);
-      const pairTotal =
-        three.regions[0].split.regions[0].size + three.regions[0].split.regions[1].size;
-      const target = Math.min(pairTotal - 10, 50);
-      const adjusted = resizeSubRegionPair(three, 0, 0, target);
-      expect(adjusted.regions[0].split.regions[0].size).toBe(target);
-      expect(adjusted.regions[0].split.regions.reduce((sum, sub) => sum + sub.size, 0)).toBe(100);
-    });
   });
 
   describe("layout direction helpers", () => {
@@ -360,24 +267,17 @@ describe("Layout Utilities", () => {
     });
 
     it("getSplitDirection defaults to perpendicular to the parent", () => {
-      const layout = splitTopRegion(createDashboardLayoutFromPreset("single"), 0);
+      const layout = splitRegionAtPath(createDashboardLayoutFromPreset("single"), [0]);
       expect(getSplitDirection(layout.regions[0].split, "row")).toBe("column");
       expect(getSplitDirection(layout.regions[0].split, "column")).toBe("row");
-    });
-
-    it("setSplitDirection persists an explicit sub direction", () => {
-      const layout = setSplitDirection(
-        splitTopRegion(createDashboardLayoutFromPreset("single"), 0),
-        0,
-        "row"
-      );
-      expect(getSplitDirection(layout.regions[0].split, "row")).toBe("row");
     });
   });
 
   describe("getLeafRegions and active region resolution", () => {
     it("flattens splits into leaves with parent ids", () => {
-      const layout = splitTopRegion(addTopRegion(createDashboardLayoutFromPreset("single")), 0);
+      const layout = splitRegionAtPath(addTopRegion(createDashboardLayoutFromPreset("single")), [
+        0,
+      ]);
       const leaves = getLeafRegions(layout);
       expect(leaves.map(leaf => leaf.id)).toEqual(["region-1-a", "region-1-b", "region-2"]);
       expect(leaves[0].parentId).toBe("region-1");
@@ -385,7 +285,7 @@ describe("Layout Utilities", () => {
     });
 
     it("normalizeDashboardScreens accepts a sub-region id as the active leaf", () => {
-      const layout = splitTopRegion(createDashboardLayoutFromPreset("single"), 0);
+      const layout = splitRegionAtPath(createDashboardLayoutFromPreset("single"), [0]);
       const screens = normalizeDashboardScreens({
         activeScreenId: "screen-home",
         screens: [
@@ -401,7 +301,9 @@ describe("Layout Utilities", () => {
     });
 
     it("cycling regions walks across split leaves", () => {
-      const layout = splitTopRegion(addTopRegion(createDashboardLayoutFromPreset("single")), 0);
+      const layout = splitRegionAtPath(addTopRegion(createDashboardLayoutFromPreset("single")), [
+        0,
+      ]);
       const screens = normalizeDashboardScreens({
         activeScreenId: "screen-home",
         screens: [
@@ -1157,6 +1059,39 @@ describe("path addressing", () => {
         "region-1-b-a",
         "region-1-b-b",
       ]);
+    });
+
+    it("addSubRegionAtPath grows a split up to MAX_TOP_REGIONS and refuses past the cap", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      while (getNodeAtPath(l, [0]).split.regions.length < MAX_TOP_REGIONS) {
+        const before = getNodeAtPath(l, [0]).split.regions.length;
+        l = addSubRegionAtPath(l, [0]);
+        expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(before + 1);
+      }
+      expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
+
+      const overflow = addSubRegionAtPath(l, [0]);
+      expect(overflow).toBe(l);
+      expect(getNodeAtPath(overflow, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
+    });
+
+    it("removeRegionAtPath on one of 3+ top-level siblings rebalances to 100", () => {
+      const three = addTopRegion(createDashboardLayoutFromPreset("split_two"));
+      expect(three.regions).toHaveLength(3);
+
+      const out = removeRegionAtPath(three, [1]);
+      expect(out.regions).toHaveLength(2);
+      expect(out.regions.map(r => r.id)).toEqual([three.regions[0].id, three.regions[2].id]);
+      expect(out.regions.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
+    it("removeRegionAtPath on one of 3+ nested siblings rebalances to 100", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      l = addSubRegionAtPath(l, [0]); // a,b,c
+      const out = removeRegionAtPath(l, [0, 1]);
+      const subs = getNodeAtPath(out, [0]).split.regions;
+      expect(subs.map(r => r.id)).toEqual(["region-1-a", "region-1-c"]);
+      expect(subs.reduce((sum, r) => sum + r.size, 0)).toBe(100);
     });
 
     it("removeRegionAtPath keeps a min of one top-level region", () => {

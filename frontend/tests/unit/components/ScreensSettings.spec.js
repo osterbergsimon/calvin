@@ -12,6 +12,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
+import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 
 const AVAILABLE = "e4f5a6b7c8d9e0f1";
@@ -252,6 +253,34 @@ describe("ScreensSettings — screen list", () => {
     expect(cards[1].text()).toContain("nohost");
   });
 
+  it("titles cards and the screen header Name, then hostname, then id (CLV-103)", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({
+          id: "calvin401-aaaaaa",
+          hostname: "calvin401",
+          overrides: { displayName: "Kitchen" },
+        }),
+        kiosk({ id: "calvin400-16d03d", hostname: "calvin400" }),
+        kiosk({ id: "calvin402-bbbbbb", hostname: "" }),
+      ],
+    });
+    await flushPromises();
+    const titles = wrapper
+      .findAll("[data-test='screen-card']")
+      .map(card => card.findComponent(ListRow).props("name"));
+    expect(titles).toEqual(["Kitchen", "calvin400", "calvin402-bbbbbb"]);
+
+    const expected = ["Kitchen", "calvin400", "calvin402-bbbbbb"];
+    for (const [index, label] of expected.entries()) {
+      await wrapper.findAll("[data-test='screen-card']")[index].trigger("click");
+      await flushPromises();
+      expect(wrapper.findComponent(KioskStatusHeader).props("kioskId")).toBe(label);
+      await wrapper.find("[data-test='screens-back']").trigger("click");
+      await flushPromises();
+    }
+  });
+
   it("draws each card's start page thumbnail in that screen's orientation", async () => {
     const { wrapper } = mountScreens({
       kiosks: [
@@ -437,7 +466,7 @@ describe("ScreensSettings — Pages", () => {
       "utf-8"
     );
     expect(source).toMatch(/\.screen-page__show\)[\s\S]*?gap: var\(--gap-tight\)/);
-    expect(source).toMatch(/\.screen-page__show input\)[\s\S]*?accent-color: var\(--focus\)/);
+    expect(source).toMatch(/\.screen-page__start input\)[\s\S]*?accent-color: var\(--focus\)/);
   });
 
   it("lists every page with Show and Start here, marking the effective start page", async () => {
@@ -458,7 +487,8 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
-    await row.find('input[type="checkbox"]').setValue(false);
+    expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    await row.find('[role="switch"]').trigger("click");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -472,7 +502,8 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
-    await row.find('input[type="checkbox"]').setValue(true);
+    expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("false");
+    await row.find('[role="switch"]').trigger("click");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
   });
@@ -483,7 +514,8 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[0];
-    await row.find('input[type="checkbox"]').setValue(false);
+    expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    await row.find('[role="switch"]').trigger("click");
 
     expect(store.saveOverrides).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("Pick at least one page.");
@@ -960,7 +992,8 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     await rows[1].find('input[type="radio"]').setValue(true);
     expect(wrapper.emitted("update:config")).toContainEqual([{ defaultScreenId: "photos" }]);
 
-    await rows[1].find('input[type="checkbox"]').setValue(false);
+    expect(rows[1].find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    await rows[1].find('[role="switch"]').trigger("click");
     expect(wrapper.emitted("update:config")).toContainEqual([{ availableScreens: ["home"] }]);
   });
 

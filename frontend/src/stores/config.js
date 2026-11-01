@@ -85,6 +85,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarShowLogo = ref(true);
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
+  const loadingLight = ref("comet"); // Loading light style: 'comet' | 'pulse' | 'off' (CLV-115)
   const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
   const tapAnywhereReveal = ref(false); // When UI is hidden, whether tapping content re-shows it (default: hot corner only)
   const hotCornerPosition = ref("bottom-left"); // Reveal hot corner: 'bottom-left'|'bottom-right'|'top-left'|'top-right'
@@ -178,6 +179,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarShowLogo,
     focusLightMode,
     focusLightDimOthers,
+    loadingLight,
     regionsLocked,
     tapAnywhereReveal,
     hotCornerPosition,
@@ -652,6 +654,7 @@ export const useConfigStore = defineStore("config", () => {
     pluginCatalogRepo,
     focusLightMode,
     focusLightDimOthers,
+    loadingLight,
     regionsLocked,
     tapAnywhereReveal,
     hotCornerPosition,

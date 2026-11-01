@@ -26,11 +26,10 @@
         </template>
         <template #actions>
           <label class="screen-page__show">
-            <input
-              type="checkbox"
-              :checked="showsPage(page.id)"
+            <ToggleSwitch
+              :model-value="showsPage(page.id)"
               :aria-label="`Show ${page.name} to browsers and new screens`"
-              @change="e => togglePage(page.id, e.target.checked)"
+              @update:model-value="value => togglePage(page.id, value)"
             />
             <span>Show</span>
           </label>
@@ -300,6 +299,7 @@ import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { screensOverriding } from "@/utils/screenOverrides";
+import { screenLabel } from "@/utils/screenLabel";
 import {
   OSK_LAYOUT_CHANGE_EVENT,
   clearStoredOskLayout,
@@ -338,9 +338,7 @@ function dismissNote() {
   editNote.value = null;
 }
 function showNote(key) {
-  const names = screensOverriding(store.kiosks, key).map(
-    k => k?.overrides?.displayName || k?.hostname || k?.id || ""
-  );
+  const names = screensOverriding(store.kiosks, key).map(screenLabel);
   if (names.length === 0) {
     editNote.value = null;
     clearNoteTimer();

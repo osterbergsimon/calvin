@@ -133,15 +133,17 @@ describe("SetupWelcomeCard (CLV-20)", () => {
     expect(useModeStore().currentMode).toBe(useModeStore().MODES.SETTINGS);
   });
 
-  it("shows ✓ Added for a kind configured while the card is open", async () => {
+  it("shows a checked Added tag for a kind configured while the card is open", async () => {
     openWelcome();
     const { wrapper } = await mountCard();
-    expect(wrapper.text()).not.toContain("✓ Added");
+    expect(wrapper.find('[data-test="setup-welcome-done"]').exists()).toBe(false);
 
     prompt.clear("cal");
     await flushPromises();
 
-    expect(wrapper.findAll('[data-test="setup-welcome-done"]')[0].text()).toContain("✓ Added");
+    const done = wrapper.findAll('[data-test="setup-welcome-done"]')[0];
+    expect(done.text()).toContain("Added");
+    expect(done.find(".tag__icon").exists()).toBe(true);
     expect(wrapper.find('[data-test="setup-welcome-announce"]').text()).toBe("Calendars added.");
     // The other gaps keep the card open.
     expect(wrapper.find('[data-test="setup-welcome"]').exists()).toBe(true);

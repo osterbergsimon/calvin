@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:webkit": "playwright test --project=webkit",
     "test:e2e:phone": "playwright test --project=phone",
     "test:e2e:a11y": "playwright test --project=a11y",
     "test:e2e:ui": "playwright test --ui",
@@ -62,5 +63,14 @@
     "vite": "8.3.4",
     "vitest": "^5.0.5",
     "vue-tsc": "^3.3.14"
+  },
+  "overrides": {
+    "minimatch": "^11.0.3",
+    "@redocly/openapi-core": {
+      "minimatch": "^5.1.9"
+    },
+    "js-beautify": {
+      "glob": "^14.0.3"
+    }
   }
 }

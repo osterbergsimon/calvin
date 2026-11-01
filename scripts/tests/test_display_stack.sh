@@ -185,6 +185,15 @@ assert_eq "0" "$(read_env_value "$CALVIN_KIOSK_COG_ENV_FILE" CALVIN_COG_ROTATION
     "cog rotation file was not seeded with 0"
 assert_mode "$CALVIN_KIOSK_COG_ENV_FILE" 644
 
+# Path resolution: the explicit override wins, then CALVIN_DEFAULT_DIR, and a
+# real install (neither set) writes /etc/default/calvin-kiosk-cog.
+assert_eq "/etc/default/calvin-kiosk-cog" \
+    "$(unset CALVIN_KIOSK_COG_ENV_FILE CALVIN_DEFAULT_DIR; calvin_cog_rotation_file)" \
+    "real install cog rotation path"
+assert_eq "$tmp/d/calvin-kiosk-cog" \
+    "$(unset CALVIN_KIOSK_COG_ENV_FILE; CALVIN_DEFAULT_DIR="$tmp/d" calvin_cog_rotation_file)" \
+    "cog rotation path ignores CALVIN_DEFAULT_DIR"
+
 # A persisted rotation (the agent's live setting) survives a setup re-run.
 printf 'CALVIN_COG_ROTATION=2\n' > "$CALVIN_KIOSK_COG_ENV_FILE"
 apply_display_stack cog calvin >/dev/null
@@ -208,7 +217,7 @@ CALVIN_KIOSK_HOSTNAME=kitchen
 CALVIN_DISPLAY_ROTATION=left
 CALVIN_DISPLAY_STACK=x11
 EOF
-# setup-kiosk.sh's own helpers (install_kiosk_config, requested_display_stack).
+# setup-kiosk.sh's own helper install_kiosk_config; requested_display_stack lives in setup-common.sh.
 # shellcheck source=../setup-kiosk.sh
 . "$REPO/scripts/setup-kiosk.sh" --source-only
 BACKEND_URL="http://tower.local:8000"

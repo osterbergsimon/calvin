@@ -106,29 +106,8 @@ install_kiosk_config() {
     fi
 }
 
-# Which stack to install: --display-stack wins, then the environment, then the
-# value already in /etc/default/calvin-kiosk, then auto (cog on every board).
-# install_kiosk_config records the resolved value, so a re-run with no flag keeps
-# the stack an existing kiosk already has. An older kiosk whose config predates
-# CALVIN_DISPLAY_STACK is X11 and stays X11 (no silent migration).
-requested_display_stack() {
-    if [ -n "${DISPLAY_STACK_ARG}" ]; then
-        resolve_display_stack "${DISPLAY_STACK_ARG}"
-        return
-    fi
-    if [ -n "${CALVIN_DISPLAY_STACK:-}" ]; then
-        resolve_display_stack "${CALVIN_DISPLAY_STACK}"
-        return
-    fi
-    local env_file existing
-    env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
-    if [ -f "${env_file}" ]; then
-        existing="$(read_env_value "$env_file" CALVIN_DISPLAY_STACK)"
-        resolve_display_stack "${existing:-x11}"
-        return
-    fi
-    resolve_display_stack auto
-}
+# Which stack to install: requested_display_stack (setup-common.sh), shared with
+# the all-in-one setup.sh.
 
 usage() {
     cat <<EOF
@@ -336,11 +315,8 @@ main() {
     bootstrap_kiosk "${BACKEND_URL}"
     install_sudoers_fragment calvin-kiosk-update \
         "${CALVIN_USER} ALL=(root) NOPASSWD: /bin/systemctl start --no-block calvin-kiosk-update.service"
-    # The cog stack's panel power/rotation needs root (DRM master, /sys fb blank,
-    # unit restart). The agent may run only this validated helper, only for its
-    # three verbs. Harmless on X11/Wayland; kept so a stack switch needs no reinstall.
-    install_sudoers_fragment calvin-kiosk-cog \
-        "${CALVIN_USER} ALL=(root) NOPASSWD: /usr/local/bin/calvin-cog-panel.sh on, /usr/local/bin/calvin-cog-panel.sh off, /usr/local/bin/calvin-cog-panel.sh rotate *"
+    # Root helper for cog panel power/rotation (setup-common.sh).
+    install_cog_panel_sudoers "${CALVIN_USER}"
 
     configure_display "${CALVIN_USER}"
     # Chromium is managed by calvin-kiosk-remote.service; openbox

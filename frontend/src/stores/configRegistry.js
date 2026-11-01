@@ -245,6 +245,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    name: "loadingLight",
+    keys: ["loadingLight", "loading_light"],
+    defaultValue: "comet",
+  },
+  {
     name: "regionsLocked",
     keys: ["regionsLocked", "regions_locked"],
     defaultValue: true,
