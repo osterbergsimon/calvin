@@ -57,7 +57,8 @@ from under the finger, so it never gets focus (CLV-114).
 - a tap outside both the keyboard and its field (calvin-q9m7): hides and blurs the field. WebKit leaves a
   focused input focused when a non-focusable element is tapped, so no `focusout` arrives there; the tap is
   not prevented, so a real control under the finger still receives its click. A `<label>` of the focused
-  field counts as that field, and a drag or scroll is not a tap;
+  field counts as that field, a drag or scroll is not a tap, and the tap's origin is kept long enough for
+  its delayed compatibility click (cog/WPE adds a tap delay) before a drag can discard it;
 - focus moving to a non-target element or to nothing (wait one `requestAnimationFrame` before deciding, so
   focus jumping between two fields doesn't flicker);
 - route change;
