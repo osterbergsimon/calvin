@@ -291,6 +291,26 @@ describe("progress store: loading-light engine (CLV-115)", () => {
       expect(store.visibleFrames).toEqual(["r2"]);
     });
 
+    it("lights a waiting region when the app light hides before the handback settles", () => {
+      store.begin("statusbar");
+      vi.advanceTimersByTime(2000); // app light up since 400
+      // Queued before end(), so it runs ahead of the app light's 300 ms hide
+      // timer; the handback timer it schedules then runs after the hide.
+      setTimeout(() => store.begin("photos:r2", { regionId: "r2" }), 300);
+      store.end("statusbar");
+      vi.advanceTimersByTime(350); // begin, hide and handback have all run
+      expect(store.active).toBe(true);
+      expect(store.visibleFrames).toEqual([]);
+      // The light was already dark, so the region waits a fresh 400 ms delay
+      // and then lights; it never stays dark for the rest of its work.
+      vi.advanceTimersByTime(400);
+      expect(store.visibleFrames).toEqual(["r2"]);
+      for (let t = 0; t < 3000; t += 50) {
+        vi.advanceTimersByTime(50);
+        expect(store.visibleFrames).toEqual(["r2"]);
+      }
+    });
+
     it("an app source arriving while a region light shows takes it over at once", () => {
       store.begin("calendar:r1", { regionId: "r1" });
       vi.advanceTimersByTime(600);
