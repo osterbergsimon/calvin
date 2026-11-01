@@ -52,6 +52,13 @@ const CARETLESS_TYPES = new Set(["number", "email"]);
 const NUMERIC_INPUTMODES = new Set(["numeric", "decimal"]);
 const MAX_HEIGHT = 300;
 const HEIGHT_RATIO = 0.45;
+// A tap outside the keyboard hides it; give the browser's compatibility mouse
+// events (and the real control's click) time to finish first.
+const OUTSIDE_HIDE_DELAY_MS = 120;
+const TAP_SLOP_PX = 10;
+// A Hide tap can leave a click on the Keyboard button that appears in its
+// place; ignore the button for this long after a Hide.
+const HIDE_OPEN_GUARD_MS = 400;
 const SHIFT_LOCK_WINDOW_MS = 400;
 const SHIFT_UPPER = { ß: "ẞ" };
 const CASE_CHARS = "abcdefghijklmnopqrstuvwxyzåäöæøéèüñßáàâêëíïóôúçõœã";
@@ -287,6 +294,10 @@ export function useOnScreenKeyboard() {
   // under the finger, so the tap's click can land on another element; the
   // gesture that opened it must never be read as a tap outside.
   let gestureTarget = null;
+  let touchGesture = false;
+  let touchStart = null;
+  let outsideHideTimer = null;
+  let hiddenAt = 0;
 
   const mode = () => screenSetting.value.value || "auto";
 
@@ -518,6 +529,7 @@ export function useOnScreenKeyboard() {
     // button may bring the keyboard back for that field.
     if (!force && el === dismissedTarget.value) return;
 
+    cancelOutsideHide();
     dismissedTarget.value = null;
     target.value = el;
     focusedTarget.value = el;
@@ -539,7 +551,7 @@ export function useOnScreenKeyboard() {
   const showKeyboard = () => {
     // Hiding moves the panel away and the Keyboard button can appear in its
     // place; the trailing click of the Hide tap must not press that button.
-    if (gestureTarget?.closest?.(".osk")) return;
+    if (Date.now() - hiddenAt < HIDE_OPEN_GUARD_MS) return;
     const el =
       focusedTarget.value ||
       (typeof document !== "undefined" && isTargetElement(document.activeElement)
@@ -550,7 +562,15 @@ export function useOnScreenKeyboard() {
     showFor(el, { force: true });
   };
 
+  const cancelOutsideHide = () => {
+    if (outsideHideTimer !== null) {
+      clearTimeout(outsideHideTimer);
+      outsideHideTimer = null;
+    }
+  };
+
   const hide = () => {
+    cancelOutsideHide();
     if (hideFrame !== null) {
       cancelRaf(hideFrame);
       hideFrame = null;
@@ -570,6 +590,7 @@ export function useOnScreenKeyboard() {
    * the way back; a fresh tap on the field clears the dismissal too.
    */
   const dismiss = () => {
+    hiddenAt = Date.now();
     dismissedTarget.value = target.value;
     hide();
   };
@@ -584,6 +605,12 @@ export function useOnScreenKeyboard() {
    */
   const onDocumentClick = event => {
     const startedOn = gestureTarget;
+    // Reset after the click has reached the target and the Keyboard button, so
+    // both can still see which gesture it belongs to.
+    queueMicrotask(() => {
+      gestureTarget = null;
+      touchGesture = false;
+    });
     if (!visible.value) return;
     const el = isElement(event.target);
     if (!el || isKeyboardUi(el)) return;
@@ -599,11 +626,68 @@ export function useOnScreenKeyboard() {
     if (current && document.activeElement === current) current.blur();
   };
 
+  const scheduleOutsideHide = () => {
+    cancelOutsideHide();
+    outsideHideTimer = setTimeout(() => {
+      outsideHideTimer = null;
+      if (!visible.value) return;
+      const el = target.value;
+      hide();
+      if (el && document.activeElement === el) el.blur();
+    }, OUTSIDE_HIDE_DELAY_MS);
+  };
+
   // Any fresh gesture on a field clears a Hide-key dismissal. The trailing
   // events of the Hide tap are compatibility mouse events, never pointerdown.
   const onPointerDown = event => {
-    gestureTarget = isElement(event.target);
+    cancelOutsideHide();
+    // A touch tap's compatibility mouse events must not overwrite the element
+    // the touch started on; a real mouse pointer is a new gesture.
+    if (event.pointerType === "mouse" || !touchGesture) {
+      gestureTarget = isElement(event.target);
+    }
     if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
+  };
+
+  // WebKit does not always send a click for a tap on non-focusable content, so
+  // a tap outside is also recognised from its touch events. The touch start
+  // element is used because showing/hiding the keyboard can move the page
+  // before the compatibility mouse events arrive.
+  const onTouchStart = event => {
+    cancelOutsideHide();
+    touchGesture = true;
+    gestureTarget = isElement(event.target);
+    const touch = event.touches?.[0];
+    touchStart = touch
+      ? { x: touch.clientX, y: touch.clientY, el: gestureTarget }
+      : { el: gestureTarget };
+    if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
+  };
+
+  const onTouchEnd = event => {
+    const start = touchStart;
+    touchStart = null;
+    if (!start || !visible.value) return;
+    const touch = event.changedTouches?.[0];
+    if (
+      touch &&
+      Number.isFinite(start.x) &&
+      (Math.abs(touch.clientX - start.x) > TAP_SLOP_PX ||
+        Math.abs(touch.clientY - start.y) > TAP_SLOP_PX)
+    ) {
+      return; // A scroll or drag, not a tap.
+    }
+    const el = start.el;
+    if (!el || isKeyboardUi(el)) return;
+    const current = target.value;
+    if (current && (el === current || current.contains?.(el))) return;
+    if (isTargetElement(el)) return;
+    scheduleOutsideHide();
+  };
+
+  const onTouchCancel = () => {
+    touchStart = null;
+    cancelOutsideHide();
   };
 
   const scheduleHideCheck = () => {
@@ -764,6 +848,9 @@ export function useOnScreenKeyboard() {
     document.addEventListener("click", onClick, true);
     document.addEventListener("click", onDocumentClick, true);
     document.addEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("touchstart", onTouchStart, { capture: true, passive: true });
+    document.addEventListener("touchend", onTouchEnd, { capture: true, passive: true });
+    document.addEventListener("touchcancel", onTouchCancel, { capture: true, passive: true });
     document.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onResize);
     if (route) {
@@ -786,12 +873,19 @@ export function useOnScreenKeyboard() {
     document.removeEventListener("click", onClick, true);
     document.removeEventListener("click", onDocumentClick, true);
     document.removeEventListener("pointerdown", onPointerDown, true);
+    document.removeEventListener("touchstart", onTouchStart, true);
+    document.removeEventListener("touchend", onTouchEnd, true);
+    document.removeEventListener("touchcancel", onTouchCancel, true);
     document.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("resize", onResize);
     if (hideFrame !== null) {
       cancelRaf(hideFrame);
       hideFrame = null;
     }
+    cancelOutsideHide();
+    touchStart = null;
+    touchGesture = false;
+    gestureTarget = null;
     stopRouteWatch?.();
     stopRouteWatch = null;
     visible.value = false;
