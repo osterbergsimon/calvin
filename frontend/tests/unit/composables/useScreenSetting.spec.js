@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from "pinia";
 import api from "@/services/api";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useConfigStore } from "@/stores/config";
+import { useNotificationsStore } from "@/stores/notifications";
 
 vi.mock("@/services/api", () => ({
   default: {
@@ -78,6 +79,28 @@ describe("useScreenSetting", () => {
     setItem.mockRestore();
   });
 
+  it("round-trips a boolean choice without reading 'false' as true", async () => {
+    const config = useConfigStore();
+    config.showUI = true;
+    const setting = useScreenSetting("showUI");
+
+    expect(setting.value.value).toBe(true);
+    await setting.set(false);
+
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBe("false");
+    expect(setting.value.value).toBe(false);
+  });
+
+  it("reads a stored boolean false after a reload", () => {
+    window.localStorage.setItem("calvin-screen-showUI", "false");
+    const config = useConfigStore();
+    config.showUI = true;
+
+    const setting = useScreenSetting("showUI");
+
+    expect(setting.value.value).toBe(false);
+  });
+
   it("merges a kiosk choice into that kiosk's whole overrides object", async () => {
     window.sessionStorage.setItem(KIOSK_KEY, "hallway");
     api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
@@ -95,5 +118,24 @@ describe("useScreenSetting", () => {
     });
     expect(setting.value.value).toBe("on");
     expect(window.localStorage.getItem("calvin-osk-mode")).toBeNull();
+  });
+
+  it("keeps the kiosk's stored value and warns when the save fails", async () => {
+    window.sessionStorage.setItem(KIOSK_KEY, "hallway");
+    api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+    api.put.mockRejectedValue(new Error("offline"));
+    const config = useConfigStore();
+    config.onScreenKeyboard = "auto";
+    const notifications = useNotificationsStore();
+    const notify = vi.spyOn(notifications, "notify");
+    const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+    await setting.set("on");
+
+    expect(setting.value.value).toBe("auto");
+    expect(config.onScreenKeyboard).toBe("auto");
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: "error", message: expect.stringContaining("unchanged") })
+    );
   });
 });
