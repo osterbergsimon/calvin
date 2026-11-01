@@ -31,6 +31,8 @@ export function screenSettingRef(storageKey) {
   return stored;
 }
 
+// Booleans use the literal "true"/"false" (a stored "false" must not come back
+// truthy); arrays keep their list shape as JSON (photo-frame sources).
 export function encodeScreenValue(value) {
   if (typeof value === "boolean") return value ? "true" : "false";
   if (Array.isArray(value)) return JSON.stringify(value);
