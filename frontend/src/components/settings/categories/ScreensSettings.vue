@@ -933,7 +933,7 @@ const untilCopy = computed(() => {
 function setScreenNow(power) {
   const next = {
     ...overrides.value,
-    screenNow: buildPowerOverride({ power, now: now() }),
+    screenNow: buildPowerOverride({ power, now: new Date() }),
   };
   persist(next, powerMsg, "Saved. This screen changes at its next check-in (~30s).", OFFLINE_COPY);
 }
