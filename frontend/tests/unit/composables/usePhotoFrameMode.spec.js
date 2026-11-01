@@ -296,6 +296,29 @@ describe("usePhotoFrameMode", () => {
       expect(nextTap.defaultPrevented).toBe(false);
     });
 
+    it("keeps the touch window open for the later compat mouse/click tasks", async () => {
+      await enterAndListen();
+      const down = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(down);
+      const end = new Event("touchend", { cancelable: true, bubbles: true });
+      window.dispatchEvent(end);
+      expect(end.defaultPrevented).toBe(true);
+
+      // WPE WebKit dispatches the compat mouse events in later tasks.
+      await vi.advanceTimersByTimeAsync(0);
+      const compat = ["mousedown", "mouseup", "click"].map(
+        type => new Event(type, { cancelable: true, bubbles: true })
+      );
+      for (const event of compat) window.dispatchEvent(event);
+
+      for (const event of compat) expect(event.defaultPrevented).toBe(true);
+
+      // The click ended the window; the next real tap is not eaten.
+      const nextTap = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(nextTap);
+      expect(nextTap.defaultPrevented).toBe(false);
+    });
+
     it("lets modifier-only keys and browser chords through", async () => {
       await enterAndListen();
       const shift = new KeyboardEvent("keydown", { key: "Shift", cancelable: true });

@@ -311,16 +311,21 @@ export function usePhotoFrameMode() {
     disarmWakeListeners();
   };
 
-  const openSuppressionWindow = () => {
+  const armSuppressionTimer = () => {
     suppressUntil = Date.now() + WAKE_SUPPRESS_MS;
     if (suppressTimer) clearTimeout(suppressTimer);
     suppressTimer = setTimeout(clearSuppression, WAKE_SUPPRESS_MS);
+  };
+
+  const openSuppressionWindow = () => {
+    armSuppressionTimer();
     armWakeListeners();
   };
 
-  // The release ends the gesture, but the browser may still dispatch its click
-  // right after pointerup/touchend. Clear on the next task so that trailing
-  // click is swallowed and a later tap is not.
+  // A mouse/pen release ends the gesture now; only a click that belongs to it
+  // may still arrive in the same task. Touch is different: WPE WebKit fires
+  // compat mousedown/mouseup/click in later tasks, so keep the window until
+  // that click arrives (or the 400 ms fallback ends after the release).
   const clearSuppressionSoon = () => {
     if (suppressTimer) clearTimeout(suppressTimer);
     suppressTimer = setTimeout(clearSuppression, 0);
@@ -328,12 +333,20 @@ export function usePhotoFrameMode() {
 
   // While the frame is up (or its wake gesture is finishing): swallow every
   // event of that gesture, so nothing acts on the slideshow or the dashboard
-  // underneath. The release ends the window immediately; the timer is only a
-  // fallback for a gesture that never releases (e.g. a long press).
+  // underneath.
   const handleWakeEvent = event => {
     if (suppressionOpen() && SUPPRESSED_EVENTS.has(event.type)) {
       swallow(event);
-      if (RELEASE_EVENTS.has(event.type)) clearSuppressionSoon();
+      if (event.type === "click") {
+        // The gesture's trailing click has arrived: the window is done.
+        clearSuppression();
+      } else if (RELEASE_EVENTS.has(event.type)) {
+        const touchRelease =
+          event.type === "touchend" ||
+          (event.type === "pointerup" && event.pointerType === "touch");
+        if (touchRelease) armSuppressionTimer();
+        else clearSuppressionSoon();
+      }
       return;
     }
     if (!isPhotoFrameActive.value) {
