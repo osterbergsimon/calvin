@@ -4,7 +4,8 @@
     :class="[`loading-indicator--${frameKind}`, { 'is-active': active }]"
     aria-hidden="true"
   >
-    <span class="pulse__ring" />
+    <!-- The one deliberate exception to the reduced-motion rule (CLV-65 motion e2e). -->
+    <span class="pulse__ring" data-reduced-motion-exempt />
   </div>
 </template>
 
