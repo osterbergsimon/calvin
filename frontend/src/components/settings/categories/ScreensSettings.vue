@@ -370,16 +370,17 @@
             @update:model-value="setScheduleEnabled"
           />
         </SettingRow>
-        <SettingRow v-if="effScheduleEnabled" label="Daily schedule">
-          <template #description>
-            <ScopeLine
-              :overridden="scheduleOverridden"
-              reset-test="reset-daily-schedule"
-              @reset="resetDailySchedule"
-            />
-          </template>
-          <DisplayScheduleGrid :model-value="effSchedule || []" @update:model-value="setSchedule" />
-        </SettingRow>
+        <DisplayScheduleGrid
+          v-if="effScheduleEnabled"
+          :model-value="effSchedule || []"
+          :week-start="config.weekStartDay ?? 1"
+          :time-format="config.timeFormat || '24h'"
+          show-scope
+          :overridden="scheduleOverridden"
+          reset-test="reset-daily-schedule"
+          @update:model-value="setSchedule"
+          @reset="resetDailySchedule"
+        />
         <SettingRow label="Turn off when idle">
           <template #description>
             <ScopeLine

@@ -8,9 +8,9 @@
         <span v-if="statusDot" class="setting-row__dot" aria-hidden="true"></span>
         {{ label }}<slot name="label-extra" />
       </div>
-      <slot name="description">
-        <p v-if="description" class="setting-row__desc">{{ description }}</p>
-      </slot>
+      <div v-if="description || $slots.description" class="setting-row__desc">
+        <slot name="description">{{ description }}</slot>
+      </div>
     </div>
     <div class="setting-row__control"><slot /></div>
   </div>
@@ -67,6 +67,12 @@ defineProps({
   font-size: var(--fs-sm);
   line-height: 1.4;
   color: var(--ink-2);
+}
+/* Slot content (a ScopeLine, an InlineNote) sits on the same description line
+   without the browser's paragraph margins. */
+.setting-row__desc :slotted(*) {
+  display: block;
+  margin: 0;
 }
 .setting-row__control {
   /* A control with intrinsic width (a row of chips, a stepper) must be allowed
