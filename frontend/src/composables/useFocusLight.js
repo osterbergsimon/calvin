@@ -1,5 +1,5 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useConfigStore } from "../stores/config";
+import { DEFAULT_MODE_INDICATOR_TIMEOUT, useConfigStore } from "../stores/config";
 
 /**
  * The dashboard's focus light (calvin-3xz9).
@@ -11,7 +11,6 @@ import { useConfigStore } from "../stores/config";
  * (`modeIndicatorTimeout`, the "Hide label after" value; 0 keeps it up).
  */
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "touchstart"];
-const DEFAULT_IDLE_SECONDS = 5;
 
 export function useFocusLight(configStore = useConfigStore()) {
   const active = ref(false);
@@ -19,7 +18,7 @@ export function useFocusLight(configStore = useConfigStore()) {
 
   const idleSeconds = () => {
     const value = Number(configStore.modeIndicatorTimeout);
-    return Number.isFinite(value) ? value : DEFAULT_IDLE_SECONDS;
+    return Number.isFinite(value) ? value : DEFAULT_MODE_INDICATOR_TIMEOUT;
   };
 
   const clearIdleTimer = () => {

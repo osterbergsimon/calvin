@@ -369,6 +369,8 @@ import { useRoute } from "vue-router";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { LAYOUT_STORAGE_KEY, normalizeLayoutMode } from "@/utils/layoutMode";
 import { useScreenSetting } from "@/composables/useScreenSetting";
+import { useConfigStore } from "@/stores/config";
+import { getKioskId } from "@/utils/kioskId";
 import { usePlugins } from "@/composables/usePlugins";
 import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
@@ -487,8 +489,13 @@ const layoutMode = computed(() => normalizeLayoutMode(layoutSetting.value.value)
 // value as the Default. The frame's sources use the same picker as a photo
 // region: an empty list means every source.
 const PHOTO_FRAME_MINUTES = [1, 2, 5, 10, 15, 30];
+const configStore = useConfigStore();
+// Existing per-screen rows keep following the Settings form value on a kiosk;
+// the new photo-frame rows want the kiosk's merged config instead (an override
+// may already differ from the global form value).
+const screenServerValue = (key, fallback) => () => (getKioskId() ? configStore[key] : fallback());
 const photoFrameSetting = useScreenSetting("photoFrameEnabled", {
-  serverValue: () => props.config.photoFrameEnabled,
+  serverValue: screenServerValue("photoFrameEnabled", () => props.config.photoFrameEnabled),
   serialize: JSON.stringify,
   parse: JSON.parse,
 });
@@ -496,7 +503,7 @@ const photoFrameEnabled = computed(
   () => photoFrameSetting.value.value === true || photoFrameSetting.value.value === "true"
 );
 const photoFrameTimeoutSetting = useScreenSetting("photoFrameTimeout", {
-  serverValue: () => props.config.photoFrameTimeout,
+  serverValue: screenServerValue("photoFrameTimeout", () => props.config.photoFrameTimeout),
   serialize: JSON.stringify,
   parse: JSON.parse,
 });
@@ -521,7 +528,7 @@ const photoFrameTimeoutOptions = computed(() => {
   return options;
 });
 const photoFrameSourceSetting = useScreenSetting("photoFrameSourceIds", {
-  serverValue: () => props.config.photoFrameSourceIds,
+  serverValue: screenServerValue("photoFrameSourceIds", () => props.config.photoFrameSourceIds),
   serialize: JSON.stringify,
   parse: JSON.parse,
 });
