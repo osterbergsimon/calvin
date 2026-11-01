@@ -67,7 +67,6 @@ export const sampleConfig = {
   imageDisplayMode: "smart",
   randomizeImages: false,
   showUI: true,
-  displayName: "Kitchen",
   modeIndicatorTimeout: 5,
   focusLightMode: "interaction",
   focusLightDimOthers: true,
