@@ -112,6 +112,66 @@ def test_desired_on_merged_payload_honours_screen_override():
     assert agent.seconds_to_next_boundary(cfg, now) is None
 
 
+# desired_on — "Screen now" overrides the schedule until its next boundary
+def test_desired_on_override_off_wins_during_on_window():
+    cfg = _cfg(screen_now={"power": "off", "until": None})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is False
+
+
+def test_desired_on_override_on_wins_during_off_window():
+    cfg = _cfg(screen_now={"power": "on", "until": None})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is True
+
+
+def test_desired_on_override_until_in_the_future_is_honoured():
+    cfg = _cfg(screen_now={"power": "off", "until": "2026-07-11T22:00:00"})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is False
+
+
+def test_desired_on_expired_override_is_ignored():
+    """After the schedule's next boundary the schedule rules again."""
+    cfg = _cfg(screen_now={"power": "on", "until": "2026-07-11T06:00:00"})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is False
+
+
+def test_desired_on_override_at_its_boundary_is_expired():
+    cfg = _cfg(screen_now={"power": "on", "until": "2026-07-11T22:00:00"})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 22, 0)) is False
+
+
+def test_desired_on_override_survives_without_a_schedule():
+    """No schedule: the manual choice stays until it is changed."""
+    cfg = _cfg(display_schedule_enabled=False, screen_now={"power": "off", "until": None})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is False
+
+
+def test_desired_on_camelcase_override_key():
+    cfg = _cfg(screenNow={"power": "off", "until": None})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is False
+
+
+def test_desired_on_malformed_override_is_ignored():
+    cfg = _cfg(screen_now={"power": "sideways", "until": None})
+    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is True
+
+
+def test_desired_on_override_with_aware_until():
+    from datetime import timezone
+
+    until = datetime(2026, 7, 11, 19, 0, tzinfo=timezone.utc)
+    cfg = _cfg(screen_now={"power": "off", "until": until.isoformat()})
+    before = datetime(2026, 7, 11, 18, 0, tzinfo=timezone.utc)
+    after = datetime(2026, 7, 11, 19, 30, tzinfo=timezone.utc)
+    assert agent.desired_on(cfg, before) is False
+    assert agent.desired_on(cfg, after) is True  # 21:30 local: schedule says on
+
+
+def test_next_boundary_uses_an_active_override_until():
+    """Wake up at the override's expiry, not only at the schedule's boundary."""
+    cfg = _cfg(screen_now={"power": "on", "until": "2026-07-11T12:00:00"})
+    assert agent.seconds_to_next_boundary(cfg, datetime(2026, 7, 11, 9, 0)) == 3 * 3600
+
+
 # desired_on — day not enabled ⇒ ON
 def test_desired_on_day_disabled():
     cfg = _cfg(display_schedule=_sched(enabled=False))
