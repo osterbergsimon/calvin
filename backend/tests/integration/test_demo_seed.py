@@ -193,7 +193,10 @@ async def test_seed_is_idempotent(demo_env):
         SCREEN_CALENDAR_ID,
         SCREEN_PHOTO_ID,
     ]
-    assert await config_service.get_value("displayName") == DEMO_ROOM_NAME
+    # The room name is per screen now (CLV-111): the seed never writes one.
+    assert await config_service.get_value("displayName") is None
+    assert "room_name" not in first["pages"]
+    assert "displayName" not in manifest["config"]
     assert calendar_ics_path(data_dir).is_file()
 
 
@@ -216,7 +219,7 @@ async def test_seed_replaces_the_untouched_default_page(demo_env, factory):
         SCREEN_CALENDAR_ID,
         SCREEN_PHOTO_ID,
     ]
-    assert await config_service.get_value("displayName") == DEMO_ROOM_NAME
+    assert await config_service.get_value("displayName") is None
 
     await clear_demo(data_dir=data_dir, image_dir=image_dir)
     assert await config_service.get_value("dashboard_screens") is None
@@ -314,7 +317,7 @@ async def test_clear_removes_only_demo_items(demo_env):
     assert not calendar_ics_path(data_dir).exists()
 
 
-async def test_clear_undoes_pages_and_room_name_when_it_created_them(demo_env):
+async def test_clear_undoes_pages_when_it_created_them(demo_env):
     from app.services.config_service import config_service
 
     data_dir, image_dir = demo_env
@@ -328,6 +331,26 @@ async def test_clear_undoes_pages_and_room_name_when_it_created_them(demo_env):
     assert await config_service.get_value("displayName") is None
     assert not calendar_ics_path(data_dir).exists()
     assert read_manifest(data_dir) is None
+
+
+async def test_clear_still_undoes_a_room_name_seeded_by_an_older_release(demo_env):
+    """Older seeds wrote the retired global room name; clear must still undo it."""
+    import json
+
+    from app.demo.seed import manifest_path
+    from app.services.config_service import config_service
+
+    data_dir, image_dir = demo_env
+    await _seed(data_dir, image_dir)
+    manifest = read_manifest(data_dir)
+    manifest["config"]["displayName"] = {"previous": None}
+    manifest_path(data_dir).write_text(json.dumps(manifest), encoding="utf-8")
+    await config_service.set_value("displayName", DEMO_ROOM_NAME)
+
+    result = await clear_demo(data_dir=data_dir, image_dir=image_dir)
+
+    assert result["room_name"] is True
+    assert await config_service.get_value("displayName") is None
 
 
 async def test_clear_keeps_a_page_the_user_added_while_demo_pages_existed(demo_env):
