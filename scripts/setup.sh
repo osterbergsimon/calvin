@@ -3,7 +3,9 @@
 #
 # Installs the kiosk dependencies plus Docker, then runs Calvin through
 # docker compose. Use --mode prod for the published runtime image or
-# --mode dev for the hot-reload compose stack.
+# --mode dev for the hot-reload compose stack. The kiosk on this Pi uses the
+# same display stack selection as a remote kiosk (resolve_display_stack in
+# setup-common.sh): cog by default, --display-stack x11|wayland|cog to choose.
 
 set -euo pipefail
 
@@ -113,17 +115,26 @@ CALVIN_SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
 CALVIN_KIOSK_ENV_FILE="${CALVIN_KIOSK_ENV_FILE:-${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-kiosk}"
 SETUP_MODE=""
 REFRESH_ONLY=0
+# --display-stack <x11|wayland|cog>; empty means "environment, then the stack
+# recorded in /etc/default/calvin-kiosk, then auto" (requested_display_stack).
+DISPLAY_STACK_ARG=""
+DISPLAY_STACK=""
 
 usage() {
     cat <<USAGE
-Usage: setup.sh [--mode prod|dev] [--refresh]
+Usage: setup.sh [--mode prod|dev] [--display-stack auto|x11|wayland|cog] [--refresh]
 
   --mode prod|dev  prod (default) runs the published image; dev runs the
                    hot-reload compose stack from the checkout.
+  --display-stack  The kiosk on this Pi: auto (default on a fresh install; cog,
+                   WPE WebKit on DRM/KMS), x11 (Chromium on X11), wayland
+                   (Chromium on labwc) or cog. A re-run without it keeps the
+                   stack the host already has; re-run setup with another value
+                   to switch (X11 + Chromium stay installed for rollback).
   --refresh        Only re-install the host files from the checkout (compose
                    file, systemd units, helper scripts, sudoers, X/openbox
                    config, display agent). No apt, Docker or git. update-calvin.sh
-                   runs this on every update.
+                   runs this on every update; it keeps the recorded stack.
 
 Environment overrides:
   GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_DATA_DIR, CALVIN_IMAGE_TAG
@@ -146,6 +157,14 @@ parse_args() {
                 ;;
             --refresh)
                 REFRESH_ONLY=1
+                shift
+                ;;
+            --display-stack)
+                DISPLAY_STACK_ARG="${2:-}"
+                shift 2
+                ;;
+            --display-stack=*)
+                DISPLAY_STACK_ARG="${1#*=}"
                 shift
                 ;;
             --source-only)
@@ -362,15 +381,18 @@ install_display_agent() {
     install -m 0644 "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-display-agent.service" "${CALVIN_SYSTEMD_DIR}/calvin-display-agent.service"
     [ -f "${CALVIN_KIOSK_ENV_FILE}" ] || install -m 0644 /dev/null "${CALVIN_KIOSK_ENV_FILE}"
     upsert_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_BACKEND_URL "http://localhost:${port}"
+    # Setup-owned, like on a remote kiosk: the agent and the next re-run read it.
+    upsert_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_DISPLAY_STACK "${DISPLAY_STACK}"
     systemctl enable calvin-display-agent.service >/dev/null 2>&1 || log_warn "Could not enable calvin-display-agent.service"
 }
 
-# Session env for the FULL kiosk (calvin-x.service + calvin-kiosk.service).
-# calvin-kiosk.service reads it like calvin-kiosk-remote.service does, so the
-# board-dependent Chromium flags from setup-common.sh apply here too: VC4-class
-# boards (Pi 3/3B+, Zero 2 W, CM3) crash Chromium's renderer ("Aw, Snap! error
-# 11") unless --disable-gpu is passed. Refresh only owns this file; the operator
-# settings live in calvin-kiosk.
+# Session env + stack files for the FULL kiosk, the same configure_display_stack
+# a remote kiosk runs (cog: no session, rotation file; x11/wayland: the
+# Chromium env). calvin-kiosk.service reads the env like
+# calvin-kiosk-remote.service does, so the board-dependent Chromium flags from
+# setup-common.sh apply here too: VC4-class boards (Pi 3/3B+, Zero 2 W, CM3)
+# crash Chromium's renderer ("Aw, Snap! error 11") unless --disable-gpu is
+# passed. Refresh only owns this file; the operator settings live in calvin-kiosk.
 configure_kiosk_display_session() {
     log "Configuring the kiosk display session..."
     local before after env_file
@@ -383,9 +405,7 @@ configure_kiosk_display_session() {
     if [ -z "$(read_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_CHROMIUM_GPU)" ]; then
         upsert_env_value "${CALVIN_KIOSK_ENV_FILE}" CALVIN_CHROMIUM_GPU "auto"
     fi
-    # Mode A is X11-only (calvin-x.service), so no --ozone-platform flag; the GPU
-    # flag still follows the board and CALVIN_CHROMIUM_GPU.
-    configure_display_session x11 "${CALVIN_USER}" || return 1
+    configure_display_stack "${DISPLAY_STACK:-x11}" "${CALVIN_USER}" || return 1
 
     # A recomputed flag only takes effect when Chromium restarts, so an update
     # fixes a running Pi 3 now instead of at the next reboot. try-restart leaves
@@ -395,6 +415,15 @@ configure_kiosk_display_session() {
         log "Chromium flags changed; restarting calvin-kiosk.service"
         systemctl try-restart calvin-kiosk.service || log_warn "Could not restart calvin-kiosk.service"
     fi
+}
+
+# The cog stack's root panel helper (screen on/off, rotation) and its sudoers
+# rule: a remote kiosk gets the helper from the kiosk bundle, the FULL install
+# from the checkout. Installed on every stack so a switch needs no reinstall.
+install_cog_panel_helper() {
+    mkdir -p "${CALVIN_BIN_DIR}"
+    install -m 0755 "${CALVIN_SOURCE_DIR}/deploy/kiosk-agent/calvin-cog-panel.sh" "${CALVIN_BIN_DIR}/calvin-cog-panel.sh"
+    install_cog_panel_sudoers "${CALVIN_USER}"
 }
 
 install_helper_scripts() {
@@ -425,16 +454,23 @@ systemd_available() {
     [ -d /run/systemd/system ] && systemctl list-unit-files >/dev/null 2>&1
 }
 
+# Every display unit is installed (the kiosk bundle's calvin-cog/calvin-wayland
+# units, unchanged) and exactly one display owner is enabled, by the same
+# enable_display_stack_units a remote kiosk uses; here the Chromium unit is
+# calvin-kiosk.service. The cog drop-in makes cog wait for the local backend.
 install_runtime_services() {
     log "Installing systemd services..."
-    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-app.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-x.service" "${CALVIN_DIR}"
-    install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-kiosk.service" "${CALVIN_DIR}"
+    local unit
+    for unit in calvin-app calvin-x calvin-wayland calvin-cog calvin-kiosk; do
+        install_systemd_service "${CALVIN_SOURCE_DIR}/deploy/systemd/${unit}.service" "${CALVIN_DIR}"
+    done
+    mkdir -p "${CALVIN_SYSTEMD_DIR}/calvin-cog.service.d"
+    install -m 0644 "${CALVIN_SOURCE_DIR}/deploy/systemd/calvin-cog.service.d/calvin-full.conf" \
+        "${CALVIN_SYSTEMD_DIR}/calvin-cog.service.d/calvin-full.conf"
 
     if systemd_available; then
         enable_systemd_service "calvin-app.service"
-        enable_systemd_service "calvin-x.service"
-        enable_systemd_service "calvin-kiosk.service"
+        enable_display_stack_units "${DISPLAY_STACK:-x11}" calvin-kiosk.service
     else
         log_warn "systemd is not running; installed service files but skipped enable"
     fi
@@ -459,6 +495,11 @@ resolve_source_dir() {
 # Everything setup puts on the host outside the Docker volume. Run on every
 # setup and, via --refresh, on every update.
 refresh_host_files() {
+    # Before anything writes /etc/default/calvin-kiosk: a fresh host resolves auto.
+    if [ -z "${DISPLAY_STACK}" ]; then
+        DISPLAY_STACK="$(requested_display_stack)" || exit 1
+    fi
+    log "Display stack: ${DISPLAY_STACK}"
     resolve_source_dir
     install_compose_config "${SETUP_MODE}"
     local port
@@ -470,6 +511,7 @@ refresh_host_files() {
     configure_display "${CALVIN_USER}"
     configure_openbox_autostart "${CALVIN_USER}" "http://localhost:${port}" "false"
     install_display_agent "${port}"
+    install_cog_panel_helper
     configure_kiosk_display_session
     install_runtime_services
     systemctl daemon-reload >/dev/null 2>&1 || log_warn "systemctl daemon-reload failed"
@@ -479,9 +521,18 @@ start_runtime_services() {
     log "Starting Calvin runtime services..."
     if systemd_available; then
         start_systemd_service "calvin-app.service"
-        start_systemd_service "calvin-x.service"
-        sleep 3
-        start_systemd_service "calvin-kiosk.service"
+        if [ "${DISPLAY_STACK}" = "cog" ]; then
+            # cog IS the browser on this stack: Chromium is not started at all.
+            start_systemd_service "calvin-cog.service"
+        else
+            if [ "${DISPLAY_STACK}" = "wayland" ]; then
+                start_systemd_service "calvin-wayland.service"
+            else
+                start_systemd_service "calvin-x.service"
+            fi
+            sleep 3
+            start_systemd_service "calvin-kiosk.service"
+        fi
         systemctl restart calvin-display-agent.service || log_warn "Could not start calvin-display-agent.service"
     else
         log_warn "systemd is not running; starting Docker Compose stack directly"
@@ -503,11 +554,27 @@ verify_compose_runtime() {
     log "Setup verification complete"
 }
 
+# Kiosk + system packages. The X11/Chromium set is always installed (rollback is
+# a re-run, not a reimage); the stack adds its own (cog, labwc...).
+install_full_packages() {
+    local stack="$1"
+    log "Installing kiosk and system dependencies..."
+    install_system_packages git cron "${CALVIN_KIOSK_PACKAGES[@]}"
+    local -a extra=()
+    mapfile -t extra < <(display_stack_packages "${stack}")
+    if [ "${#extra[@]}" -gt 0 ]; then
+        log "Installing ${stack} display packages: ${extra[*]}"
+        install_system_packages "${extra[@]}"
+    fi
+}
+
 main() {
     parse_args "$@"
     require_fixed_calvin_user
     check_root
     mkdir -p "$(dirname "${LOG_FILE}")"
+    # Resolve before touching packages: everything below depends on the stack.
+    DISPLAY_STACK="$(requested_display_stack)" || exit 1
 
     if [ "${REFRESH_ONLY}" = 1 ]; then
         log "Refreshing Calvin host files from ${CALVIN_DIR} (mode ${SETUP_MODE})..."
@@ -524,6 +591,7 @@ main() {
     log "Calvin Raspberry Pi Setup"
     log "=========================================="
     log "Mode: ${SETUP_MODE}"
+    log "Display stack: ${DISPLAY_STACK}"
     log "Repository: ${GIT_REPO}"
     log "Branch: ${GIT_BRANCH}"
     log "Target Directory: ${CALVIN_DIR}"
@@ -534,8 +602,7 @@ main() {
     ensure_user_exists "${CALVIN_USER}"
     update_system_packages
 
-    log "Installing kiosk and system dependencies..."
-    install_system_packages git cron "${CALVIN_KIOSK_PACKAGES[@]}"
+    install_full_packages "${DISPLAY_STACK}"
 
     install_docker_runtime
     configure_unattended_upgrades
@@ -558,13 +625,20 @@ main() {
     log "Environment file: ${CALVIN_ETC_DIR}/.env"
     log "Data directory: ${CALVIN_DATA_DIR}"
     log ""
-    log "IMPORTANT: Reboot to start X and the dashboard:"
+    log "IMPORTANT: Reboot to start the kiosk and the dashboard:"
     log "  sudo reboot"
     log ""
     log "After reboot:"
     log "  - Docker Compose starts Calvin via calvin-app.service"
-    log "  - Kiosk mode starts via calvin-kiosk.service"
+    if [ "${DISPLAY_STACK}" = "cog" ]; then
+        log "  - The kiosk (cog) starts via calvin-cog.service"
+    else
+        log "  - Kiosk mode (Chromium, ${DISPLAY_STACK}) starts via calvin-kiosk.service"
+    fi
     log "  - Dashboard is available at http://localhost:${port}"
+    log ""
+    log "To switch the kiosk's display stack later (X11 + Chromium stay installed):"
+    log "  sudo bash setup.sh --display-stack x11"
     log ""
     log "To update Calvin in the future:"
     log "  sudo update-calvin.sh"
