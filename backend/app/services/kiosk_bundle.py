@@ -207,7 +207,28 @@ def _version_from(files: list[dict]) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
+# Every kiosk asks for the bundle version on each config poll (once a minute).
+# Hashing the files each time is blocking I/O on the event loop, so the version
+# is memoised per root and keyed on each file's (path, mtime_ns, size): a stat
+# is cheap, and any edit to a file changes its key and forces a re-hash.
+_VERSION_CACHE: dict[Path, tuple[tuple[tuple[str, int, int], ...], str]] = {}
+
+
+def _stat_key(r: Path) -> tuple[tuple[str, int, int], ...]:
+    key = []
+    for bf in BUNDLE_FILES:
+        st = (r / bf.repo_path).stat()
+        key.append((bf.repo_path, st.st_mtime_ns, st.st_size))
+    return tuple(key)
+
+
 def bundle_version(root: Path | None = None) -> str:
     r = _root(root)
+    key = _stat_key(r)
+    cached = _VERSION_CACHE.get(r)
+    if cached is not None and cached[0] == key:
+        return cached[1]
     files = [{"name": bf.name, "sha256": _sha256(r / bf.repo_path)} for bf in BUNDLE_FILES]
-    return _version_from(files)
+    version = _version_from(files)
+    _VERSION_CACHE[r] = (key, version)
+    return version

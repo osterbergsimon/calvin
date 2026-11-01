@@ -625,3 +625,65 @@ async def test_global_room_name_migration_handles_the_snake_case_key(test_db):
 
     assert await kr.get_overrides("kitchen") == {"displayName": "Lounge"}
     assert await config_service.get_value("display_name") is None
+
+
+async def _count_kiosk_updates(monkeypatch) -> list:
+    calls: list = []
+    real_update = KioskDB.update
+
+    async def counting_update(self, *args, **kwargs):
+        calls.append(self.id)
+        return await real_update(self, *args, **kwargs)
+
+    monkeypatch.setattr(KioskDB, "update", counting_update)
+    return calls
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_skips_write_when_unchanged_and_recent(test_db, monkeypatch):
+    """A 60 s poll with nothing new must not rewrite a fresh last_seen (calvin-stnq)."""
+    await kiosk_registry.record_kiosk("k-skip", hostname="pi", agent_version="v1")
+    first_seen = (await KioskDB.objects.get(id="k-skip")).last_seen
+    calls = await _count_kiosk_updates(monkeypatch)
+
+    await kiosk_registry.record_kiosk("k-skip", hostname="pi", agent_version="v1")
+
+    assert calls == []
+    assert (await KioskDB.objects.get(id="k-skip")).last_seen == first_seen
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_writes_when_last_seen_is_old(test_db, monkeypatch):
+    await kiosk_registry.record_kiosk("k-old", hostname="pi")
+    row = await KioskDB.objects.get(id="k-old")
+    row.last_seen = datetime.now(UTC) - timedelta(
+        seconds=kiosk_registry.LAST_SEEN_WRITE_INTERVAL_S + 1
+    )
+    await row.update()
+    stale = (await KioskDB.objects.get(id="k-old")).last_seen
+    calls = await _count_kiosk_updates(monkeypatch)
+
+    await kiosk_registry.record_kiosk("k-old", hostname="pi")
+
+    assert calls == ["k-old"]
+    assert (await KioskDB.objects.get(id="k-old")).last_seen > stale
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_writes_when_a_field_changes(test_db, monkeypatch):
+    await kiosk_registry.record_kiosk("k-chg", hostname="pi", agent_version="v1")
+    calls = await _count_kiosk_updates(monkeypatch)
+
+    await kiosk_registry.record_kiosk("k-chg", hostname="pi", agent_version="v2")
+
+    assert calls == ["k-chg"]
+    assert (await KioskDB.objects.get(id="k-chg")).agent_version == "v2"
+
+
+def test_last_seen_skip_keeps_screen_online_between_polls():
+    """Skipped writes plus one 60 s poll gap stay inside the UI's 120 s online window."""
+    poll_s, online_window_s = 60, 120
+    assert kiosk_registry.LAST_SEEN_WRITE_INTERVAL_S + poll_s < online_window_s

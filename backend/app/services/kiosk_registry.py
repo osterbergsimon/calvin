@@ -39,6 +39,12 @@ DEVICE_PHYSICAL_KEYS: tuple[str, ...] = (
 # fallthrough works regardless of the underlying driver.
 _INTEGRITY_ERRORS = (sqlite3.IntegrityError, SAIntegrityError)
 
+# A kiosk polls its config once a minute. When a poll reports nothing new and the
+# stored last_seen is younger than this, the row is not rewritten. The Screens list
+# shows a kiosk online while last_seen is under 120 s old, so a skipped write plus
+# one poll gap (30 + 60 s) still reads as online.
+LAST_SEEN_WRITE_INTERVAL_S = 30
+
 _UPDATE_FLAG_KEY = (
     "_agentUpdateRequested"  # stored in overrides; host-internal, not a device setting
 )
@@ -121,17 +127,22 @@ async def record_kiosk(
                 # Extremely unlikely (row vanished again); nothing safe to do.
                 return
 
-    existing.last_seen = now
-    if hostname:
+    changed = False
+    if hostname and existing.hostname != hostname:
         existing.hostname = hostname
-    if agent_version is not None:
+        changed = True
+    if agent_version is not None and existing.agent_version != agent_version:
         existing.agent_version = agent_version
-    if agent_status is not None:
+        changed = True
+    if agent_status is not None and existing.agent_update_status != agent_status:
         existing.agent_update_status = agent_status
-    if agent_message is not None:
+        changed = True
+    if agent_message is not None and existing.agent_update_message != agent_message:
         existing.agent_update_message = agent_message
-    if viewport is not None:
+        changed = True
+    if viewport is not None and existing.viewport != viewport:
         existing.viewport = viewport
+        changed = True
     # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
     # (target) version — clearing on any reported version would cancel a just-issued
     # request before the agent ever sees it.
@@ -144,6 +155,14 @@ async def record_kiosk(
         ov = dict(existing.overrides)
         if ov.pop(_UPDATE_FLAG_KEY, None) is not None:
             existing.overrides = ov
+            changed = True
+    if (
+        not changed
+        and existing.last_seen is not None
+        and (now - as_utc(existing.last_seen)).total_seconds() < LAST_SEEN_WRITE_INTERVAL_S
+    ):
+        return
+    existing.last_seen = now
     await existing.update()
 
 
