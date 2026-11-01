@@ -265,8 +265,8 @@
         <h2 class="ui-gallery__heading">FieldTable</h2>
         <p class="ui-gallery__note">
           A compact “same fields per row” editor: one header row, then a label and its controls per
-          row. Rows are the touch target tall, the cells sit --gap-inline apart, and under 360px
-          the label stacks above its controls. The screen schedule is its first user.
+          row. Rows are the touch target tall, the cells sit --gap-inline apart, and under 360px the
+          label stacks above its controls. The screen schedule is its first user.
         </p>
 
         <SettingsSection id="gallery-field-table-schedule" title="Schedule">

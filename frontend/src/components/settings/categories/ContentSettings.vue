@@ -29,6 +29,7 @@
       <SettingRow
         label="Weekend days"
         description="Days highlighted as the weekend on the calendar."
+        stacked
       >
         <ChipMultiSelect
           :model-value="config.weekendDays"

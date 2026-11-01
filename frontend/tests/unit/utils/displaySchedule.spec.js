@@ -11,12 +11,11 @@ import {
 const week = (on, off, enabled = true) =>
   SCHEDULE_DAYS.map((_, day) => ({ day, enabled, onTime: on, offTime: off }));
 
-const byDay = (...entries) =>
-  entries.map(([day, enabled, onTime, offTime]) => ({ day, enabled, onTime, offTime }));
-
 describe("displaySchedule", () => {
   it("normalizes a partial array to the seven Python weekday entries", () => {
-    const schedule = normalizeSchedule([{ day: 2, enabled: false, onTime: "08:00", offTime: "23:00" }]);
+    const schedule = normalizeSchedule([
+      { day: 2, enabled: false, onTime: "08:00", offTime: "23:00" },
+    ]);
     expect(schedule).toHaveLength(7);
     expect(schedule.map(day => day.day)).toEqual([0, 1, 2, 3, 4, 5, 6]);
     expect(schedule[2]).toMatchObject({ enabled: false, onTime: "08:00", offTime: "23:00" });
@@ -51,9 +50,9 @@ describe("displaySchedule", () => {
     const schedule = week("06:00", "22:00");
     schedule[3] = { day: 3, enabled: false, onTime: "09:00", offTime: "23:30" };
     const next = applyScheduleMode(schedule, "every-day");
-    expect(next.every(day => day.enabled && day.onTime === "06:00" && day.offTime === "22:00")).toBe(
-      true
-    );
+    expect(
+      next.every(day => day.enabled && day.onTime === "06:00" && day.offTime === "22:00")
+    ).toBe(true);
     expect(next.map(day => day.day)).toEqual([0, 1, 2, 3, 4, 5, 6]);
   });
 
@@ -116,9 +115,7 @@ describe("displaySchedule", () => {
       schedule[5].offTime = "23:00";
       schedule[6].onTime = "08:00";
       schedule[6].offTime = "23:00";
-      expect(formatScheduleSummary(schedule)).toBe(
-        "Weekdays 06:00–22:00 · weekends 08:00–23:00"
-      );
+      expect(formatScheduleSummary(schedule)).toBe("Weekdays 06:00–22:00 · weekends 08:00–23:00");
     });
 
     it("says the schedule is different each day, and names days that are off", () => {

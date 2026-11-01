@@ -39,9 +39,7 @@ describe("FieldTable", () => {
   it("puts the header and the row cells on one shared grid", () => {
     const wrapper = mountTable();
     const style = wrapper.find("[data-test='field-table']").attributes("style");
-    expect(style).toContain(
-      "--field-table-columns: 4.5rem 7rem 7rem minmax(0, 1fr)"
-    );
+    expect(style).toContain("--field-table-columns: 4.5rem 7rem 7rem minmax(0, 1fr)");
   });
 
   it("lets the row take a wider label column", () => {

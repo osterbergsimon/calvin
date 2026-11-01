@@ -25,9 +25,7 @@ describe("DisplayScheduleGrid", () => {
       schedule[day].onTime = "08:00";
       schedule[day].offTime = "23:00";
     }
-    expect(summary(mountGrid(schedule))).toBe(
-      "Weekdays 06:00–22:00 · weekends 08:00–23:00"
-    );
+    expect(summary(mountGrid(schedule))).toBe("Weekdays 06:00–22:00 · weekends 08:00–23:00");
   });
 
   it("names an off day when every day differs", () => {
@@ -44,9 +42,7 @@ describe("DisplayScheduleGrid", () => {
   });
 
   it("summarises an overnight schedule", () => {
-    expect(summary(mountGrid(week("22:00", "06:00")))).toBe(
-      "On 22:00 · off 06:00 the next day"
-    );
+    expect(summary(mountGrid(week("22:00", "06:00")))).toBe("On 22:00 · off 06:00 the next day");
   });
 
   it("expands a full-width editor with one header row and Done collapses it", async () => {
@@ -105,9 +101,9 @@ describe("DisplayScheduleGrid", () => {
     await wrapper.vm.$nextTick();
 
     const emitted = wrapper.emitted("update:modelValue").at(-1)[0];
-    expect(emitted.every(day => day.enabled && day.onTime === "06:00" && day.offTime === "22:00")).toBe(
-      true
-    );
+    expect(
+      emitted.every(day => day.enabled && day.onTime === "06:00" && day.offTime === "22:00")
+    ).toBe(true);
   });
 
   it("writes a grouped row to every day in its group", async () => {
@@ -181,7 +177,9 @@ describe("DisplayScheduleGrid", () => {
     await wrapper.find('[data-test="schedule-change"]').trigger("click");
     wrapper.findComponent({ name: "SegmentedControl" }).vm.$emit("update:modelValue", "each-day");
     await wrapper.vm.$nextTick();
-    expect(wrapper.findComponent({ name: "SegmentedControl" }).props("modelValue")).toBe("each-day");
+    expect(wrapper.findComponent({ name: "SegmentedControl" }).props("modelValue")).toBe(
+      "each-day"
+    );
 
     await wrapper.find('[data-test="schedule-change"]').trigger("click");
     await wrapper.find('[data-test="schedule-change"]').trigger("click");

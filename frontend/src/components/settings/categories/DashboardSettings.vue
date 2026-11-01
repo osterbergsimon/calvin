@@ -90,9 +90,7 @@
       >
         <template #label-extra><ScopeChip /></template>
         <template #description>
-          <p class="setting-row__desc">
-            Hides the ⋯ menu and region headers for a calm wall display.
-          </p>
+          <span>Hides the ⋯ menu and region headers for a calm wall display.</span>
           <ScopeLine
             :overridden="showUISetting.overridden.value"
             reset-test="reset-hide-controls"
@@ -126,7 +124,7 @@
       >
         <template #label-extra><ScopeChip /></template>
         <template #description>
-          <p class="setting-row__desc">A tap on calendar or photos brings controls back.</p>
+          <span>A tap on calendar or photos brings controls back.</span>
           <ScopeLine
             :overridden="tapAnywhereSetting.overridden.value"
             reset-test="reset-tap-anywhere-reveal"
@@ -220,107 +218,6 @@
         />
       </SettingRow>
       <SettingRow
-        label="Photo frame"
-        description="After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back."
-      >
-        <template #description>
-          <p class="setting-row__desc">
-            After a while with no touches or key presses, photos go full screen. Any touch brings
-            the dashboard back.
-          </p>
-          <ScopeLine
-            :overridden="photoFrameSetting.overridden.value"
-            reset-test="reset-photo-frame"
-            @reset="photoFrameSetting.reset()"
-          />
-        </template>
-        <SegmentedControl
-          :model-value="photoFrameEnabled"
-          :options="[
-            { value: false, label: 'Off' },
-            { value: true, label: 'On' },
-          ]"
-          aria-label="Photo frame"
-          @update:model-value="photoFrameSetting.set($event)"
-        />
-      </SettingRow>
-      <SettingRow v-if="photoFrameEnabled" label="Start after">
-        <template #description>
-          <ScopeLine
-            :overridden="photoFrameTimeoutSetting.overridden.value"
-            reset-test="reset-photo-frame-timeout"
-            @reset="photoFrameTimeoutSetting.reset()"
-          />
-        </template>
-        <SelectPill
-          :model-value="photoFrameTimeout"
-          :options="photoFrameTimeoutOptions"
-          aria-label="Start the photo frame after"
-          @update:model-value="photoFrameTimeoutSetting.set($event)"
-        />
-      </SettingRow>
-      <SettingRow
-        v-if="photoFrameEnabled"
-        label="Photos from"
-        description="All sources, or the photo sources this screen's frame uses."
-      >
-        <template #description>
-          <p class="setting-row__desc">
-            All sources, or the photo sources this screen's frame uses.
-          </p>
-          <ScopeLine
-            :overridden="photoFrameSourceSetting.overridden.value"
-            reset-test="reset-photo-frame-sources"
-            @reset="photoFrameSourceSetting.reset()"
-          />
-        </template>
-        <PhotoSourcePicker
-          :model-value="photoFrameSourceIds"
-          :options="photoSources"
-          @update:model-value="photoFrameSourceSetting.set($event)"
-        />
-      </SettingRow>
-      <SettingRow label="Loading light">
-        <template #description>
-          <p class="setting-row__desc">What Calvin shows while it's fetching something.</p>
-          <p v-if="prefersReducedMotion" class="setting-row__desc">
-            This device prefers less motion, so it pulses.
-          </p>
-          <ScopeLine
-            :overridden="loadingLightSetting.overridden.value"
-            reset-test="reset-loading-light"
-            @reset="loadingLightSetting.reset()"
-          />
-        </template>
-        <SegmentedControl
-          :model-value="loadingLight"
-          :options="LOADING_LIGHT_OPTIONS"
-          aria-label="Loading light"
-          @update:model-value="v => loadingLightSetting.set(v)"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Layout"
-        description="Auto follows the screen size. Force the desktop or phone layout on this screen."
-      >
-        <template #description>
-          <p class="setting-row__desc">
-            Auto follows the screen size. Force the desktop or phone layout on this screen.
-          </p>
-          <ScopeLine
-            :overridden="layoutSetting.overridden.value"
-            reset-test="reset-layout-mode"
-            @reset="layoutSetting.reset()"
-          />
-        </template>
-        <SegmentedControl
-          :model-value="layoutMode"
-          :options="LAYOUT_OPTIONS"
-          aria-label="Layout"
-          @update:model-value="v => layoutSetting.set(v)"
-        />
-      </SettingRow>
-      <SettingRow
         label="Dashboard size"
         description="Size of labels and touch buttons on the dashboard."
       >
@@ -388,18 +285,14 @@ import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import PhotoSourcePicker from "@/components/settings/shared/PhotoSourcePicker.vue";
 import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useConfigStore } from "@/stores/config";
 import { normalizeDashboardScreens } from "@/utils/layout";
-import { LAYOUT_STORAGE_KEY, normalizeLayoutMode } from "@/utils/layoutMode";
 import { useScreenSetting } from "@/composables/useScreenSetting";
-import { getKioskId } from "@/utils/kioskId";
-import { usePlugins } from "@/composables/usePlugins";
 import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
 import { useRegionEditorRequest } from "@/composables/useRegionEditorRequest";
@@ -504,99 +397,6 @@ const tapAnywhereSetting = useScreenSetting("tapAnywhereReveal", {
   serverValue: () => props.config.tapAnywhereReveal,
 });
 const tapAnywhereReveal = computed(() => Boolean(tapAnywhereSetting.value.value));
-
-// --- Loading light: per screen, like the rows above (CLV-115) --------------
-// A wall panel and a laptop may want different lights; the Default value is
-// what a screen without its own choice uses. Reduced motion forces the pulse
-// on the dashboard, so say so here instead of silently ignoring Comet.
-const LOADING_LIGHT_OPTIONS = [
-  { value: "comet", label: "Comet" },
-  { value: "pulse", label: "Pulse" },
-  { value: "off", label: "Off" },
-];
-const loadingLightSetting = useScreenSetting("loadingLight", {
-  serverValue: () => props.config.loadingLight,
-});
-const loadingLight = computed(() => {
-  const value = loadingLightSetting.value.value;
-  return LOADING_LIGHT_OPTIONS.some(option => option.value === value) ? value : "comet";
-});
-
-// --- Layout: per screen, browser, or kiosk (calvin-tnkg) --------------------
-// A small or portrait kiosk may want the desktop layout. On a kiosk the choice
-// is that screen's override; any other browser remembers it locally. Auto is
-// today's viewport rule.
-const LAYOUT_OPTIONS = [
-  { value: "auto", label: "Auto" },
-  { value: "desktop", label: "Desktop" },
-  { value: "phone", label: "Phone" },
-];
-const layoutSetting = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
-const layoutMode = computed(() => normalizeLayoutMode(layoutSetting.value.value));
-
-// --- Photo frame: per screen (calvin-3xz9) ---------------------------------
-// Off/On, the idle wait and the sources all follow this screen's own choice
-// (a kiosk's override, or this browser's localStorage) with the old global
-// value as the Default. The frame's sources use the same picker as a photo
-// region: an empty list means every source.
-const PHOTO_FRAME_MINUTES = [1, 2, 5, 10, 15, 30];
-// Existing per-screen rows keep following the Settings form value on a kiosk;
-// the new photo-frame rows want the kiosk's merged config instead (an override
-// may already differ from the global form value).
-const screenServerValue = (key, fallback) => () => (getKioskId() ? configStore[key] : fallback());
-const photoFrameSetting = useScreenSetting("photoFrameEnabled", {
-  serverValue: screenServerValue("photoFrameEnabled", () => props.config.photoFrameEnabled),
-});
-const photoFrameEnabled = computed(
-  () => photoFrameSetting.value.value === true || photoFrameSetting.value.value === "true"
-);
-const photoFrameTimeoutSetting = useScreenSetting("photoFrameTimeout", {
-  serverValue: screenServerValue("photoFrameTimeout", () => props.config.photoFrameTimeout),
-});
-const photoFrameTimeout = computed(() => {
-  const seconds = Number(photoFrameTimeoutSetting.value.value);
-  return Number.isFinite(seconds) && seconds > 0 ? seconds : 300;
-});
-const minutesLabel = seconds => {
-  if (seconds % 60 !== 0) return `${seconds} s`;
-  return `${seconds / 60} min`;
-};
-const photoFrameTimeoutOptions = computed(() => {
-  const options = PHOTO_FRAME_MINUTES.map(minutes => ({
-    value: minutes * 60,
-    label: `${minutes} min`,
-  }));
-  const current = photoFrameTimeout.value;
-  if (!options.some(option => option.value === current)) {
-    options.push({ value: current, label: minutesLabel(current) });
-    options.sort((a, b) => a.value - b.value);
-  }
-  return options;
-});
-const photoFrameSourceSetting = useScreenSetting("photoFrameSourceIds", {
-  serverValue: screenServerValue("photoFrameSourceIds", () => props.config.photoFrameSourceIds),
-});
-const photoFrameSourceIds = computed(() =>
-  Array.isArray(photoFrameSourceSetting.value.value) ? photoFrameSourceSetting.value.value : []
-);
-
-// The photo-region picker's source list: enabled image-plugin instances.
-const { plugins, pluginInstances, loadPlugins } = usePlugins();
-const photoSources = computed(() =>
-  plugins.value
-    .filter(plugin => plugin.type === "image" && plugin.enabled)
-    .flatMap(plugin => pluginInstances.value[plugin.id] || [])
-    .filter(instance => instance.enabled !== false)
-    .map(instance => ({ id: instance.id, name: instance.name }))
-);
-onMounted(() => {
-  if (plugins.value.length === 0) loadPlugins();
-});
-
-const prefersReducedMotion =
-  typeof window !== "undefined" &&
-  typeof window.matchMedia === "function" &&
-  Boolean(window.matchMedia("(prefers-reduced-motion: reduce)")?.matches);
 
 // --- Dark from: two whole-hour pickers, one row ----------------------------
 const hourToTime = (hour, fallback) => {
