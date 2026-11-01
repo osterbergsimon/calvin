@@ -80,12 +80,9 @@ export function useScreenSetting(
   const stored = localRef(storageKey, parse);
   if (scope === "browser") stored.value = parseStored(storageKey, parse);
 
-  const serverValue = computed(() => {
-    // A kiosk always reads its own merged config (override or global), never
-    // the Settings form's global value: the screen's value is the server's.
-    if (scope === "kiosk") return configStore[key] ?? null;
-    return readServerValue ? readServerValue() : (configStore[key] ?? null);
-  });
+  const serverValue = computed(() =>
+    readServerValue ? readServerValue() : (configStore[key] ?? null)
+  );
 
   const value = computed(() => {
     if (scope === "kiosk") return serverValue.value;

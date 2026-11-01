@@ -21,6 +21,10 @@ import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
 // and served (flagged stale) even after that when the backend is unreachable.
 const CONFIG_CACHE_TTL = 24 * 60 * 60 * 1000;
 
+// Shared with useFocusLight, so its idle fade uses the same default as the
+// input-feedback label rather than duplicating the number.
+export const DEFAULT_MODE_INDICATOR_TIMEOUT = 5;
+
 // Only one store instance reports a viewport in the app; rebinding replaces the
 // previous listener instead of stacking another one.
 let viewportResizeHandler = null;
@@ -45,7 +49,7 @@ export const useConfigStore = defineStore("config", () => {
   const showUI = ref(true); // Show headers and UI controls (can be hidden for kiosk mode)
   const showUITemporary = ref(false); // Temporary UI override (doesn't persist)
   const temporaryUITimer = ref(null); // Timer for temporary UI override
-  const modeIndicatorTimeout = ref(5); // Mode change notification auto-hide timeout in seconds (0 = never hide, default 5)
+  const modeIndicatorTimeout = ref(DEFAULT_MODE_INDICATOR_TIMEOUT); // seconds (0 = never hide)
   const photoRotationInterval = ref(30); // Photo rotation interval in seconds (default 30)
   const calendarRefreshInterval = ref(15); // Calendar refresh interval in minutes (default 15)
   const timeFormat = ref("24h"); // Time format: '12h' or '24h' (default: '24h')

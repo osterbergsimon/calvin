@@ -78,16 +78,18 @@ describe("useScreenSetting", () => {
     setItem.mockRestore();
   });
 
-  it("a kiosk reads its merged config, not the Settings form's global value", () => {
+  it("a kiosk row still follows the serverValue option it was given", () => {
     window.sessionStorage.setItem(KIOSK_KEY, "hallway");
     const config = useConfigStore();
-    config.photoFrameEnabled = true; // merged config from /kiosks/hallway/config
-    const setting = useScreenSetting("photoFrameEnabled", {
-      serverValue: () => false, // global GET /api/config value
+    // The merged config has the override, but an existing #256 row reads the
+    // Settings form value it passed in (its historical behaviour).
+    config.onScreenKeyboard = "on";
+    const setting = useScreenSetting("onScreenKeyboard", {
+      serverValue: () => "off",
     });
 
     expect(setting.scope).toBe("kiosk");
-    expect(setting.value.value).toBe(true);
+    expect(setting.value.value).toBe("off");
   });
 
   it("merges a kiosk choice into that kiosk's whole overrides object", async () => {

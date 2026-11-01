@@ -260,18 +260,75 @@ describe("usePhotoFrameMode", () => {
       expect(photoFrame.isPhotoFrameActive.value).toBe(false);
     });
 
-    it("swallows the tap and its trailing click", async () => {
+    it("swallows the whole tap gesture, not just its first event", async () => {
       const photoFrame = await enterAndListen();
-      const down = new MouseEvent("pointerdown", { cancelable: true, bubbles: true });
+      const gesture = ["pointerdown", "touchstart", "mousedown", "click"].map(
+        type => new Event(type, { cancelable: true, bubbles: true })
+      );
+
+      for (const event of gesture) window.dispatchEvent(event);
+
+      for (const event of gesture) expect(event.defaultPrevented).toBe(true);
+      expect(mockModeStore.exitFullscreen).toHaveBeenCalledTimes(1);
+      expect(photoFrame.isPhotoFrameActive.value).toBe(false);
+    });
+
+    it("ends the wake window on release so the next real tap is not eaten", async () => {
+      await enterAndListen();
+      const down = new Event("pointerdown", { cancelable: true, bubbles: true });
       window.dispatchEvent(down);
       expect(down.defaultPrevented).toBe(true);
 
-      const click = new MouseEvent("click", { cancelable: true, bubbles: true });
+      // No click (a drag/long-press): the release closes the window.
+      const up = new Event("pointerup", { cancelable: true, bubbles: true });
+      window.dispatchEvent(up);
+      expect(up.defaultPrevented).toBe(true);
+      // The trailing click of this gesture is still swallowed ...
+      const click = new Event("click", { cancelable: true, bubbles: true });
       window.dispatchEvent(click);
-
       expect(click.defaultPrevented).toBe(true);
+
+      // ... and the window closes right after it.
+      await vi.advanceTimersByTimeAsync(0);
+
+      const nextTap = new Event("pointerdown", { cancelable: true, bubbles: true });
+      window.dispatchEvent(nextTap);
+      expect(nextTap.defaultPrevented).toBe(false);
+    });
+
+    it("lets modifier-only keys and browser chords through", async () => {
+      await enterAndListen();
+      const shift = new KeyboardEvent("keydown", { key: "Shift", cancelable: true });
+      window.dispatchEvent(shift);
+      expect(shift.defaultPrevented).toBe(false);
       expect(mockModeStore.exitFullscreen).toHaveBeenCalledTimes(1);
-      expect(photoFrame.isPhotoFrameActive.value).toBe(false);
+
+      // Re-enter for the browser chord.
+      await enterAndListen();
+      const reload = new KeyboardEvent("keydown", { key: "r", ctrlKey: true, cancelable: true });
+      window.dispatchEvent(reload);
+      expect(reload.defaultPrevented).toBe(false);
+    });
+
+    it("registers non-passive wake listeners only while the frame is up", async () => {
+      enable();
+      const add = vi.spyOn(window, "addEventListener");
+      const remove = vi.spyOn(window, "removeEventListener");
+      const photoFrame = usePhotoFrameMode();
+      photoFrame.setupEventListeners();
+
+      const pointerdownOptions = () =>
+        add.mock.calls.filter(([type]) => type === "pointerdown").map(([, , options]) => options);
+      expect(pointerdownOptions()).toEqual([{ capture: true, passive: true }]);
+
+      await photoFrame.enterPhotoFrameMode();
+      expect(pointerdownOptions()).toContainEqual({ capture: true, passive: false });
+
+      const key = new KeyboardEvent("keydown", { key: "ArrowRight", cancelable: true });
+      window.dispatchEvent(key);
+      expect(
+        remove.mock.calls.some(([type, , options]) => type === "pointerdown" && options?.capture)
+      ).toBe(true);
     });
   });
 

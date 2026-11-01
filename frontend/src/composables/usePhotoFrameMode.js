@@ -16,12 +16,25 @@ import { useRouter } from "vue-router";
 let photoFrameInstance = null;
 let globalInitialized = false; // Track initialization at module level
 
-// The wake event itself must not reach the slideshow or the dashboard under it
-// (a tap on a photo, Escape, an arrow key). The trailing click of a tap is
-// swallowed for the same short window the hot-corner reveal uses.
-const CLICK_SUPPRESS_MS = 700;
+// One tap fires pointerdown, touchstart, mousedown, click (and pointerup). The
+// whole gesture must be swallowed, not just its first event, or the later ones
+// reach the dashboard that just appeared. The window is short and ends on the
+// gesture's release, so the next real tap is never eaten.
+const WAKE_SUPPRESS_MS = 400;
 const WAKE_EVENTS = new Set(["pointerdown", "mousedown", "touchstart", "keydown"]);
-const ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "touchstart", "pointerdown", "click"];
+const RELEASE_EVENTS = new Set(["pointerup", "mouseup", "touchend"]);
+const SUPPRESSED_EVENTS = new Set([...WAKE_EVENTS, ...RELEASE_EVENTS, "click"]);
+const ACTIVITY_EVENTS = [
+  "mousedown",
+  "mousemove",
+  "keydown",
+  "touchstart",
+  "pointerdown",
+  "click",
+  "pointerup",
+  "mouseup",
+  "touchend",
+];
 
 // Helper function to log only in development mode
 const devLog = (...args) => {
@@ -181,6 +194,10 @@ export function usePhotoFrameMode() {
 
     // A screen whose chosen sources have no photos stays on the dashboard
     // instead of opening an empty fullscreen slideshow (calvin-3xz9).
+    // The store keys its lists by source set, so loading the frame's sources
+    // does not replace what a dashboard photo region with other sources shows.
+    // A failure/empty result leaves no retry timer: the next input re-arms the
+    // idle wait, so the wall simply stays on the dashboard until then.
     const sourceIds = photoFrameSourceIds.value;
     const token = ++enterToken;
     try {
@@ -208,6 +225,7 @@ export function usePhotoFrameMode() {
     // (an empty list means all sources).
     modeStore.enterFullscreen(modeStore.MODES.PHOTOS, { sourceIds });
     isPhotoFrameActive.value = true;
+    armWakeListeners();
     router.push("/");
     return true;
   };
@@ -221,6 +239,9 @@ export function usePhotoFrameMode() {
     // Exit fullscreen - return to dashboard
     modeStore.exitFullscreen();
     isPhotoFrameActive.value = false;
+    // A pointer wake keeps the listeners for its short suppression window;
+    // every other exit drops them right away.
+    if (!suppressionOpen()) disarmWakeListeners();
     router.push("/");
 
     // Restore saved side view mode
@@ -247,34 +268,105 @@ export function usePhotoFrameMode() {
     }, 500); // Throttle to max once per 500ms
   };
 
-  let suppressClicksUntil = 0;
+  let suppressUntil = 0;
+  let suppressTimer = null;
+  let wakeListenersSetup = false;
+
+  const suppressionOpen = () => suppressUntil > 0 && Date.now() < suppressUntil;
 
   const swallow = event => {
     event.preventDefault?.();
     event.stopImmediatePropagation?.();
   };
 
-  // One capture-phase handler: while the frame is up, the first touch/key wakes
-  // it and is swallowed, so it does not also act on the slideshow or the
-  // dashboard that appears underneath.
-  const handleWindowEvent = event => {
-    // The tap that woke the frame still produces a click after the frame has
-    // closed; swallow that one too so it cannot press a dashboard control.
-    if (event.type === "click" && Date.now() < suppressClicksUntil) {
-      suppressClicksUntil = 0;
+  // Modifier-only keys and browser chords wake the frame but must still reach
+  // the browser (Shift alone, Ctrl+R, Alt+Tab, F5/F11/F12).
+  const letKeyThrough = event => {
+    const key = event.key || "";
+    if (["Shift", "Control", "Alt", "Meta", "CapsLock", "OS", "AltGraph"].includes(key)) {
+      return true;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) return true;
+    return ["F5", "F11", "F12"].includes(key);
+  };
+
+  const disarmWakeListeners = () => {
+    if (!wakeListenersSetup) return;
+    SUPPRESSED_EVENTS.forEach(event => {
+      window.removeEventListener(event, handleWakeEvent, { capture: true });
+    });
+    wakeListenersSetup = false;
+  };
+
+  const armWakeListeners = () => {
+    if (wakeListenersSetup) return;
+    // Non-passive only while the frame is up (or a wake gesture is finishing),
+    // never for the whole session.
+    SUPPRESSED_EVENTS.forEach(event => {
+      window.addEventListener(event, handleWakeEvent, { capture: true, passive: false });
+    });
+    wakeListenersSetup = true;
+  };
+
+  const clearSuppression = () => {
+    suppressUntil = 0;
+    if (suppressTimer) {
+      clearTimeout(suppressTimer);
+      suppressTimer = null;
+    }
+    disarmWakeListeners();
+  };
+
+  const openSuppressionWindow = () => {
+    suppressUntil = Date.now() + WAKE_SUPPRESS_MS;
+    if (suppressTimer) clearTimeout(suppressTimer);
+    suppressTimer = setTimeout(clearSuppression, WAKE_SUPPRESS_MS);
+    armWakeListeners();
+  };
+
+  // The release ends the gesture, but the browser may still dispatch its click
+  // right after pointerup/touchend. Clear on the next task so that trailing
+  // click is swallowed and a later tap is not.
+  const clearSuppressionSoon = () => {
+    if (suppressTimer) clearTimeout(suppressTimer);
+    suppressTimer = setTimeout(clearSuppression, 0);
+  };
+
+  // While the frame is up (or its wake gesture is finishing): swallow every
+  // event of that gesture, so nothing acts on the slideshow or the dashboard
+  // underneath. The release ends the window immediately; the timer is only a
+  // fallback for a gesture that never releases (e.g. a long press).
+  const handleWakeEvent = event => {
+    if (suppressionOpen() && SUPPRESSED_EVENTS.has(event.type)) {
       swallow(event);
+      if (RELEASE_EVENTS.has(event.type)) clearSuppressionSoon();
       return;
     }
-    if (isPhotoFrameActive.value) {
-      if (WAKE_EVENTS.has(event.type)) {
-        swallow(event);
-        if (event.type !== "keydown") {
-          suppressClicksUntil = Date.now() + CLICK_SUPPRESS_MS;
-        }
-        exitPhotoFrameMode();
-        return;
-      }
+    if (!isPhotoFrameActive.value) {
+      disarmWakeListeners();
+      return;
     }
+    if (!WAKE_EVENTS.has(event.type)) return;
+
+    const isKey = event.type === "keydown";
+    const passThrough = isKey && letKeyThrough(event);
+    if (!passThrough) swallow(event);
+    if (isKey) {
+      // A key wake has no trailing tap/click to suppress.
+      exitPhotoFrameMode();
+      disarmWakeListeners();
+    } else {
+      openSuppressionWindow();
+      exitPhotoFrameMode();
+    }
+  };
+
+  // Passive, always-on activity tracking. It steps aside for the wake gesture,
+  // whose non-passive listener owns those events.
+  const handleActivityEvent = event => {
+    if (isPhotoFrameActive.value && WAKE_EVENTS.has(event.type)) return;
+    if (suppressionOpen() && SUPPRESSED_EVENTS.has(event.type)) return;
+    if (RELEASE_EVENTS.has(event.type)) return;
     handleActivity();
   };
 
@@ -287,10 +379,8 @@ export function usePhotoFrameMode() {
       return;
     }
 
-    // Capture phase so the wake event can be swallowed before the slideshow or
-    // dashboard sees it.
     ACTIVITY_EVENTS.forEach(event => {
-      window.addEventListener(event, handleWindowEvent, { capture: true, passive: false });
+      window.addEventListener(event, handleActivityEvent, { capture: true, passive: true });
     });
 
     listenersSetup = true;
@@ -298,10 +388,14 @@ export function usePhotoFrameMode() {
   };
 
   const removeEventListeners = () => {
+    // Wake listeners can be armed without the activity set being installed
+    // (a test/entry that never called setupEventListeners), so always clear
+    // them; otherwise a stale instance keeps swallowing the next gesture.
+    clearSuppression();
     if (!listenersSetup) return;
 
     ACTIVITY_EVENTS.forEach(event => {
-      window.removeEventListener(event, handleWindowEvent, { capture: true });
+      window.removeEventListener(event, handleActivityEvent, { capture: true });
     });
 
     listenersSetup = false;

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import DashboardSettings from "@/components/settings/categories/DashboardSettings.vue";
+import { useConfigStore } from "@/stores/config";
 
 const baseConfig = () => ({
   orientation: "landscape",
@@ -333,6 +334,29 @@ describe("DashboardSettings photo frame", () => {
     expect(JSON.parse(localStorage.getItem("calvin-screen-photoFrameSourceIds"))).toEqual([
       "image-1",
     ]);
+  });
+
+  it("reads the kiosk's merged photo frame but leaves the #256 rows on serverValue", () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "hallway");
+    const store = useConfigStore();
+    // The kiosk's merged config has the photo-frame override ...
+    store.photoFrameEnabled = true;
+    // ... while the Settings form still holds the global value.
+    const w = mount(DashboardSettings, {
+      props: { config: { ...baseConfig(), photoFrameEnabled: false, uiSize: "large" } },
+      global: { stubs },
+    });
+    expect(
+      row(w, "Photo frame").findComponent({ name: "SegmentedControl" }).props("modelValue")
+    ).toBe(true);
+
+    // The existing #256 row keeps following the serverValue it passes in.
+    store.uiSize = "compact";
+    const size = w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Settings text size");
+    expect(size.props("modelValue")).toBe("large");
+    window.sessionStorage.clear();
   });
 
   it("falls back to the old global value until this screen chooses", () => {
