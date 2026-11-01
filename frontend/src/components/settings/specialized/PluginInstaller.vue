@@ -2,7 +2,7 @@
   <div class="plugin-installer">
     <!-- From the Calvin catalog (§3.3): listed on open, nothing to type. -->
     <section class="catalog" aria-label="Install from the Calvin catalog">
-      <h3 class="catalog-title">Install from the Calvin catalog</h3>
+      <h3 class="catalog-title heading-group">Install from the Calvin catalog</h3>
 
       <TextField
         v-model="searchQuery"
@@ -790,14 +790,6 @@ watch(searchQuery, () => {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
-}
-
-.catalog-title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-label);
-  font-weight: var(--weight-strong);
-  color: var(--ink);
 }
 
 .catalog-list {

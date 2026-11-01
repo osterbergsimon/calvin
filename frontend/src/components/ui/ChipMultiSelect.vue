@@ -48,7 +48,7 @@ const toggle = v => {
 .chip {
   font-family: var(--font-ui);
   font-size: var(--fs-control);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   color: var(--ink-2);
   background: var(--bg-2);
   border: 1px solid var(--line);

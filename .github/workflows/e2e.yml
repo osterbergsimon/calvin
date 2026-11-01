@@ -3,6 +3,8 @@ name: Desktop E2E
 # CLV-73: the default (desktop chromium) Playwright project never ran in CI, so
 # stale selectors after the Settings redesign sat red on develop unnoticed.
 # This job runs it on every frontend PR alongside the phone and a11y projects.
+# CLV-105: cog (WPE WebKit) is the default kiosk browser, so the same desktop
+# specs also run on WebKit; only Chromium-only visual snapshots are skipped.
 on:
   pull_request:
     paths:
@@ -36,16 +38,16 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
-      - name: Install Playwright browser
+      - name: Install Playwright browsers
         working-directory: ./frontend
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps webkit chromium
 
       # The default project runs without a backend: tests that need data answer
       # every /api request with page.route, and the rest tolerate an absent
       # server. Host-acting routes are always intercepted, never sent.
       - name: Run desktop E2E
         working-directory: ./frontend
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --project=webkit
 
       - name: Upload Playwright report
         if: failure()

@@ -1,3 +1,12 @@
+import {
+  mdiCogOutline,
+  mdiLockOutline,
+  mdiMonitor,
+  mdiPackageVariantClosed,
+  mdiPowerPlugOutline,
+  mdiViewDashboardOutline,
+} from "@mdi/js";
+
 export const SETTINGS_CATEGORY_STORAGE_KEY = "settings_active_category";
 
 export const defaultSettingsCategoryId = "content";
@@ -6,32 +15,32 @@ export const settingsCategories = [
   {
     id: "content",
     label: "Content",
-    icon: "📦",
+    icon: mdiPackageVariantClosed,
     subtitle: "Calendars · photos · web pages",
   },
   {
     id: "dashboard",
     label: "Dashboard",
-    icon: "📐",
+    icon: mdiViewDashboardOutline,
     subtitle: "Pages · clock bar · theme",
   },
   {
     id: "screens",
     label: "Screens",
-    icon: "📺",
+    icon: mdiMonitor,
     subtitle: "Pages · rotation · power · touch",
   },
-  { id: "plugins", label: "Plugins", icon: "🔌", subtitle: "Install · manage" },
+  { id: "plugins", label: "Plugins", icon: mdiPowerPlugOutline, subtitle: "Install · manage" },
   {
     id: "maintenance",
     label: "System",
-    icon: "⚙️",
+    icon: mdiCogOutline,
     subtitle: "Updates · backup · diagnostics",
   },
   {
     id: "security",
     label: "Security",
-    icon: "🔒",
+    icon: mdiLockOutline,
     subtitle: "Admin password · API keys · allowed sites",
   },
 ];

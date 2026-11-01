@@ -154,7 +154,7 @@ const handleAction = _action => {
   font-size: var(--fs-md);
   cursor: pointer;
   transition: all 0.2s ease;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
 }
 
 .btn-primary:hover:not(:disabled) {

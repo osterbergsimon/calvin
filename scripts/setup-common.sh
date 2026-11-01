@@ -973,6 +973,41 @@ resolve_display_stack() {
     esac
 }
 
+# Which stack an installer run should apply, shared by setup-kiosk.sh (remote
+# kiosk) and setup.sh (all-in-one): --display-stack (DISPLAY_STACK_ARG) wins,
+# then the environment, then the value already recorded in
+# /etc/default/calvin-kiosk, then auto (cog on every board). The installers
+# record the resolved value, so a re-run with no flag keeps the stack an existing
+# install already has. An install that predates CALVIN_DISPLAY_STACK is X11 and
+# stays X11 (no silent migration): its kiosk config has no stack recorded, or
+# (an all-in-one install from before the display agent) there is no kiosk config
+# yet but the all-in-one Chromium unit is installed.
+requested_display_stack() {
+    if [ -n "${DISPLAY_STACK_ARG:-}" ]; then
+        resolve_display_stack "${DISPLAY_STACK_ARG}"
+        return
+    fi
+    if [ -n "${CALVIN_DISPLAY_STACK:-}" ]; then
+        resolve_display_stack "${CALVIN_DISPLAY_STACK}"
+        return
+    fi
+    local env_file existing
+    env_file="${CALVIN_KIOSK_ENV_FILE:-/etc/default/calvin-kiosk}"
+    if [ -f "${env_file}" ]; then
+        existing="$(read_env_value "$env_file" CALVIN_DISPLAY_STACK)"
+        resolve_display_stack "${existing:-x11}"
+        return
+    fi
+    # calvin-kiosk.service is the all-in-one Chromium unit: setup-kiosk.sh never
+    # installs it, so on a remote kiosk this only matches a Pi that used to be
+    # an all-in-one install (which is X11 as well).
+    if [ -f "${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}/calvin-kiosk.service" ]; then
+        resolve_display_stack x11
+        return
+    fi
+    resolve_display_stack auto
+}
+
 # Extra packages a stack needs; X11's CALVIN_KIOSK_PACKAGES are always installed.
 display_stack_packages() {
     case "${1:-x11}" in
@@ -1167,8 +1202,10 @@ LABWC_RC_EOF
 # The cog unit reads its rotation from this file (EnvironmentFile=); the display
 # agent's root helper rewrites it when the Kiosks setting changes. Optional for
 # the unit (default 0), but seeding it makes the first boot explicit.
+# CALVIN_KIOSK_COG_ENV_FILE overrides the path; otherwise it follows
+# CALVIN_DEFAULT_DIR like the other setup-owned /etc/default files.
 calvin_cog_rotation_file() {
-    printf '%s\n' "${CALVIN_KIOSK_COG_ENV_FILE:-/etc/default/calvin-kiosk-cog}"
+    printf '%s\n' "${CALVIN_KIOSK_COG_ENV_FILE:-${CALVIN_DEFAULT_DIR:-/etc/default}/calvin-kiosk-cog}"
 }
 
 configure_cog_rotation() {
@@ -1214,9 +1251,12 @@ warn_unvalidated_display_os() {
 # so switching stacks is one re-run of the installer in either direction. On the
 # cog stack Chromium (calvin-kiosk-remote.service) must stay off: there is no X
 # or Wayland session for it, and it would fight cog for the panel.
+# $2 is the Chromium unit: calvin-kiosk-remote.service on a remote kiosk (the
+# default), calvin-kiosk.service on the all-in-one install.
 enable_display_stack_units() {
     local stack="$1"
-    local want drop kiosk="calvin-kiosk-remote.service"
+    local kiosk="${2:-calvin-kiosk-remote.service}"
+    local want drop
     case "${stack}" in
         wayland)
             want="calvin-wayland.service"
@@ -1253,14 +1293,22 @@ enable_display_stack_units() {
     log "Reboot to start ${want}"
 }
 
-# Apply the stack everywhere setup owns it: session env, compositor autostart,
-# and which display unit is enabled. Safe to run repeatedly in either direction
-# (switching a kiosk X11 <-> Wayland <-> cog in place).
-apply_display_stack() {
+# The cog stack's panel power/rotation needs root (DRM master, /sys fb blank,
+# unit restart). The agent may run only this validated helper, only for its
+# three verbs. Harmless on X11/Wayland; kept so a stack switch needs no reinstall.
+install_cog_panel_sudoers() {
+    local user="${1:-$DEFAULT_CALVIN_USER}"
+    install_sudoers_fragment calvin-kiosk-cog \
+        "${user} ALL=(root) NOPASSWD: /usr/local/bin/calvin-cog-panel.sh on, /usr/local/bin/calvin-cog-panel.sh off, /usr/local/bin/calvin-cog-panel.sh rotate *"
+}
+
+# The files the stack owns, without touching units: session env, compositor
+# autostart, cog rotation. Safe to run repeatedly in either direction.
+configure_display_stack() {
     local stack="$1"
     local user="${2:-$DEFAULT_CALVIN_USER}"
 
-    configure_display_session "${stack}" "${user}"
+    configure_display_session "${stack}" "${user}" || return 1
     case "${stack}" in
         wayland)
             warn_unvalidated_display_os "${stack}"
@@ -1271,7 +1319,18 @@ apply_display_stack() {
             configure_cog_rotation
             ;;
     esac
-    enable_display_stack_units "${stack}"
+}
+
+# Apply the stack everywhere setup owns it: the files above plus which display
+# unit is enabled. Safe to run repeatedly in either direction (switching a kiosk
+# X11 <-> Wayland <-> cog in place). $3 is the Chromium unit (see
+# enable_display_stack_units).
+apply_display_stack() {
+    local stack="$1"
+    local user="${2:-$DEFAULT_CALVIN_USER}"
+
+    configure_display_stack "${stack}" "${user}"
+    enable_display_stack_units "${stack}" "${3:-}"
 }
 
 # Verification functions

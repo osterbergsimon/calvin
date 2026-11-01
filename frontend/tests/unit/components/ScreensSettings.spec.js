@@ -437,7 +437,7 @@ describe("ScreensSettings — Pages", () => {
       "utf-8"
     );
     expect(source).toMatch(/\.screen-page__show\)[\s\S]*?gap: var\(--gap-tight\)/);
-    expect(source).toMatch(/\.screen-page__show input\)[\s\S]*?accent-color: var\(--focus\)/);
+    expect(source).toMatch(/\.screen-page__start input\)[\s\S]*?accent-color: var\(--focus\)/);
   });
 
   it("lists every page with Show and Start here, marking the effective start page", async () => {
@@ -458,7 +458,8 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
-    await row.find('input[type="checkbox"]').setValue(false);
+    expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    await row.find('[role="switch"]').trigger("click");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -472,7 +473,8 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
-    await row.find('input[type="checkbox"]').setValue(true);
+    expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("false");
+    await row.find('[role="switch"]').trigger("click");
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
   });
@@ -483,7 +485,8 @@ describe("ScreensSettings — Pages", () => {
     await selectFirst(wrapper);
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[0];
-    await row.find('input[type="checkbox"]').setValue(false);
+    expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    await row.find('[role="switch"]').trigger("click");
 
     expect(store.saveOverrides).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("Pick at least one page.");
@@ -960,7 +963,8 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     await rows[1].find('input[type="radio"]').setValue(true);
     expect(wrapper.emitted("update:config")).toContainEqual([{ defaultScreenId: "photos" }]);
 
-    await rows[1].find('input[type="checkbox"]').setValue(false);
+    expect(rows[1].find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    await rows[1].find('[role="switch"]').trigger("click");
     expect(wrapper.emitted("update:config")).toContainEqual([{ availableScreens: ["home"] }]);
   });
 
