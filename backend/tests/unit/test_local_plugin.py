@@ -302,15 +302,17 @@ class TestFolders:
         assert image["folder"] == "Guests"
         assert image["id"] in {img["id"] for img in await local_plugin.get_images()}
 
-    async def test_scan_includes_folders_but_not_thumbnails_or_hidden(
-        self, local_plugin, temp_image_dir
-    ):
+    async def test_scan_includes_share_folders_only(self, local_plugin, temp_image_dir):
         from tests.test_utils import create_test_image_file
 
         create_test_image_file(temp_image_dir / "root.jpg")
-        (temp_image_dir / "Party").mkdir()
+        local_plugin.mark_share_folder("Party")
         create_test_image_file(temp_image_dir / "Party" / "p.jpg")
+        # An owner's own subfolder is not part of the library, as before.
+        (temp_image_dir / "Archive").mkdir()
+        create_test_image_file(temp_image_dir / "Archive" / "old.jpg")
         (temp_image_dir / ".trash").mkdir()
+        (temp_image_dir / ".trash" / ".calvin-share").touch()
         create_test_image_file(temp_image_dir / ".trash" / "gone.jpg")
 
         images = await local_plugin.scan_images()
@@ -322,12 +324,18 @@ class TestFolders:
         # Thumbnails (written to thumbnails/) never show up as photos.
         assert all("thumbnails" not in img["path"] for img in images)
 
-    async def test_list_folders(self, local_plugin, temp_image_dir):
-        (temp_image_dir / "Party").mkdir()
-        (temp_image_dir / "Guests").mkdir()
+    async def test_list_folders_lists_share_folders(self, local_plugin, temp_image_dir):
+        local_plugin.mark_share_folder("Party")
+        local_plugin.mark_share_folder("Guests")
+        (temp_image_dir / "Archive").mkdir()
         (temp_image_dir / ".hidden").mkdir()
 
         assert local_plugin.list_folders() == ["Guests", "Party"]
+
+    async def test_mark_share_folder_refuses_bad_names(self, local_plugin, temp_image_dir):
+        with pytest.raises(ValueError):
+            local_plugin.mark_share_folder("../x")
+        assert not (temp_image_dir.parent / "x").exists()
 
     @pytest.mark.parametrize("folder", ["../x", "a/b", ".hidden", "thumbnails", ""])
     async def test_bad_folder_is_refused(self, local_plugin, temp_image_dir, folder):

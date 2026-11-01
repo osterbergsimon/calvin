@@ -167,8 +167,10 @@ def test_create_validates(admin):
     )
 
 
-def test_folders_lists_local_photos_subfolders(admin, image_dir):
-    (image_dir / "Party").mkdir()
+def test_folders_lists_share_folders_only(admin, image_dir):
+    (image_dir / "Archive").mkdir()
+    _make_link(admin, folder="Party")
+    assert (image_dir / "Party").is_dir()
     assert admin.get("/api/share/folders").json() == {"folders": ["Party"]}
 
 
@@ -243,7 +245,8 @@ def test_many_files_in_one_request_and_partial_failure(admin, guest, image_dir):
     body = response.json()
     assert len(body["uploaded"]) == 2
     assert [f["filename"] for f in body["failed"]] == ["evil.jpg"]
-    assert sorted(p.name for p in (image_dir / "Guests").iterdir()) == ["a.jpg", "b.png"]
+    photos = sorted(p.name for p in (image_dir / "Guests").iterdir() if p.suffix)
+    assert photos == ["a.jpg", "b.png"]
 
 
 def test_only_bad_files_is_400(admin, guest):
