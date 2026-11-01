@@ -27,6 +27,7 @@ import { collapseSettingsSection, expandSettingsSection } from "@/utils/settings
 import { filterSettingsDestinations } from "@/components/settings/settingsRegistry";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";
+import { RELOAD_SOURCE_ID, useProgressStore } from "@/stores/progress";
 
 const stubs = { UpdatesTab: true, BackupSettings: true, UpdateSourceRows: true };
 const baseConfig = { consoleLogEnabled: true, consoleLogLevel: "info", configPollInterval: 30 };
@@ -434,5 +435,26 @@ describe("MaintenanceSettings — This server's screen", () => {
     });
     expect(w.text()).toContain("Turn off");
     expect(w.text()).toContain("Turn on");
+  });
+
+  it("Reload starts the app loading light before reloading the page (CLV-115)", async () => {
+    const reload = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...original, reload },
+    });
+    try {
+      const wrapper = mount(MaintenanceSettings, {
+        props: { config: baseConfig, gitRepoUrl: "", gitBranch: "main" },
+        global: { stubs },
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="reload-ui"] button').trigger("click");
+      expect(useProgressStore().isActive(RELOAD_SOURCE_ID)).toBe(true);
+      expect(reload).toHaveBeenCalledTimes(1);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: original });
+    }
   });
 });

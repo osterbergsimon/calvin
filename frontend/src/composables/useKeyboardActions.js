@@ -4,6 +4,7 @@ import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
 import { useConfigStore } from "../stores/config";
+import { useProgressStore } from "../stores/progress";
 import { useRouter } from "vue-router";
 import { logInfo, logError, logWarn, logDebug } from "../utils/logger";
 import {
@@ -39,6 +40,7 @@ export function useKeyboardActions() {
   const calendarStore = useCalendarStore();
   const imagesStore = useImagesStore();
   const webServicesStore = useWebServicesStore();
+  const progressStore = useProgressStore();
   const configStore = useConfigStore();
   const router = useRouter();
 
@@ -887,9 +889,12 @@ export function useKeyboardActions() {
       case "calendar_refresh":
         if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Refresh calendar events
-          calendarStore.refreshEvents().catch(err => {
-            logError("[Keyboard]", "Failed to refresh calendar:", err);
-          });
+          // Refetches every calendar, not one region's: the app light.
+          progressStore
+            .track("calendar:refresh:keyboard", () => calendarStore.refreshEvents())
+            .catch(err => {
+              logError("[Keyboard]", "Failed to refresh calendar:", err);
+            });
           logInfo("[Keyboard]", "Refreshing calendar events");
         }
         break;
@@ -899,9 +904,11 @@ export function useKeyboardActions() {
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
           activeRegionKindIs("service")
         ) {
-          webServicesStore.refreshCurrentService().catch(err => {
-            logError("[Keyboard]", "Failed to refresh service:", err);
-          });
+          progressStore
+            .track("plugin:refresh:keyboard", () => webServicesStore.refreshCurrentService())
+            .catch(err => {
+              logError("[Keyboard]", "Failed to refresh service:", err);
+            });
           logInfo("[Keyboard]", "Refreshing web service data");
         }
         break;

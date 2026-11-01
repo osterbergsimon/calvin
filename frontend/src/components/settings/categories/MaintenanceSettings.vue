@@ -124,6 +124,7 @@
 </template>
 
 <script setup>
+import { reloadWithLight } from "@/utils/reloadWithLight";
 import { computed, onMounted, reactive } from "vue";
 import { useSystem } from "@/composables";
 import { useConnectionStore } from "@/stores/connection";
@@ -232,7 +233,8 @@ const onConfirm = async () => {
     console.error("System action failed:", e);
   }
 };
+// The app loading light covers the wait until the new page is up (CLV-115).
 const reloadUi = () => {
-  window.location.reload();
+  reloadWithLight();
 };
 </script>
