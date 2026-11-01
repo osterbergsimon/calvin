@@ -936,14 +936,16 @@ configure_openbox_autostart() {
     log "Openbox autostart configured"
 }
 
-# Display stack selection (cog is the default on Pi 3-class boards)
+# Display stack selection (cog is the default on every board)
 # ---------------------------------------------------------------------------
 # CALVIN_DISPLAY_STACK (environment, then /etc/default/calvin-kiosk) or the
-# installer's --display-stack flag picks the stack. `auto` means cog on the
-# Pi 3-class boards (VC4: Pi 3, 3B, 3B+, 3A+, Zero 2 W, CM3) and X11 everywhere
-# else; Wayland stays opt-in. An explicit x11|wayland|cog always wins, and the
-# installer records the resolved value, so a re-run keeps the stack an existing
-# kiosk already has. See docs/research/2026-10-29-kiosk-cog.md.
+# installer's --display-stack flag picks the stack. `auto` means cog on every
+# board (owner decision 2026-10-31; cog/WPE WebKit ran the boot, rotation,
+# screen-off/on and a 60 min soak on a Pi 3B+ and a Pi 400). X11 + Chromium
+# stays available as the fallback for sites WPE cannot show, and Wayland stays
+# opt-in/experimental. An explicit x11|wayland|cog always wins over `auto`, and
+# the installer records the resolved value, so a re-run keeps the stack an
+# existing kiosk already has. See docs/research/2026-10-29-kiosk-cog.md.
 
 # Session env file shared by calvin-kiosk-remote.service and
 # calvin-display-agent.service, so one file selects the stack for both instead of
@@ -953,8 +955,8 @@ calvin_display_env_file() {
 }
 
 # Echo the stack to use: x11, wayland or cog. $1 is the explicit --display-stack
-# value (empty when not given); otherwise the environment, then `auto`, which is
-# cog on the Pi 3 class (same VC4 detection as --disable-gpu) and x11 elsewhere.
+# value (empty when not given); otherwise the environment, then `auto`, which
+# now means cog everywhere. Only an explicit value selects X11/Wayland.
 resolve_display_stack() {
     local requested="${1:-${CALVIN_DISPLAY_STACK:-auto}}"
     case "${requested}" in
@@ -962,11 +964,7 @@ resolve_display_stack() {
             printf '%s\n' "${requested}"
             ;;
         auto|"")
-            if board_is_vc4_class "$(calvin_board_model)"; then
-                printf 'cog\n'
-            else
-                printf 'x11\n'
-            fi
+            printf 'cog\n'
             ;;
         *)
             echo "Invalid display stack: ${requested} (expected auto, x11, wayland or cog)" >&2
