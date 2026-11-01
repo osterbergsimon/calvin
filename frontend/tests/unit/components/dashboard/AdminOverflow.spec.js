@@ -75,7 +75,8 @@ describe("AdminOverflow", () => {
     expect(panel()).toBeNull();
     expect(spy).not.toHaveBeenCalled();
     const text = document.body.textContent;
-    expect(text).toContain("every screen");
+    expect(text).toContain("on this screen");
+    expect(text).not.toContain("every screen");
     expect(text).toContain("press and hold the top right corner");
     w.unmount();
   });

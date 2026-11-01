@@ -5,6 +5,7 @@ import json
 import re
 import sqlite3
 from datetime import datetime
+from typing import Any
 
 from loguru import logger
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
@@ -117,7 +118,7 @@ async def record_kiosk(
                 viewport=viewport,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
-            await _adopt_global_room_name()
+            await _adopt_global_settings()
             return
         except _INTEGRITY_ERRORS:
             # Lost a create race: another request inserted this id between our
@@ -292,6 +293,27 @@ async def get_overrides(kiosk_id: str) -> dict | None:
 
 _GLOBAL_NAME_KEYS = ("displayName", "display_name")
 
+# The three controls that used to be household-wide now have a per-screen value
+# (calvin-hi6w). Each entry is (canonical key written per screen, both global
+# spellings read). The canonical keys are the ones the Settings UI writes.
+_SCREEN_CONTROL_KEYS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("showUI", ("show_ui", "showUI")),
+    ("clockBarShowInKiosk", ("clock_bar_show_in_kiosk", "clockBarShowInKiosk")),
+    ("tapAnywhereReveal", ("tap_anywhere_reveal", "tapAnywhereReveal")),
+)
+
+# Marks the one-time copy as done, like displaySettingsMigrated (CLV-49). Kept
+# in the config so it survives a restart; a restore from an older backup (no
+# marker) migrates that backup's screens, while a post-migration backup keeps
+# the marker and a screen reset to Default stays on the global fallback.
+_SCREEN_CONTROLS_MIGRATED_KEY = "screenControlsMigrated"
+
+
+def _has_own_control(overrides: dict | None, spellings: tuple[str, ...]) -> bool:
+    """True when a screen already carries a value, in either spelling."""
+    ov = overrides or {}
+    return any(spelling in ov and ov[spelling] is not None for spelling in spellings)
+
 
 def _has_screen_name(overrides: dict | None) -> bool:
     value = (overrides or {}).get("displayName")
@@ -308,7 +330,7 @@ async def migrate_global_room_name() -> None:
     deleted, which makes a second run a no-op. With no screens registered yet
     there is nothing to copy it to, so the old key is kept; it runs again at
     startup and whenever a new screen row is created (see
-    :func:`_adopt_global_room_name`), so the first screen to register after an
+    :func:`_adopt_global_settings`), so the first screen to register after an
     upgrade still gets the name.
     """
     from app.services.config_service import config_service
@@ -350,16 +372,78 @@ async def migrate_global_room_name() -> None:
     logger.info("Retired the global room name")
 
 
-async def _adopt_global_room_name() -> None:
-    """Run the room-name migration after a new screen row is created.
+@retry_on_db_locked()
+async def migrate_global_screen_controls() -> None:
+    """Copy the global show-UI controls onto every screen without one (calvin-hi6w).
+
+    Hiding the controls, keeping the clock bar while hidden and tap-to-reveal
+    used to be household settings. They are per-screen now: a screen's own
+    value wins, while the global stays as the fallback for a screen that has
+    none. This one-time migration takes the current global value and writes it
+    onto each screen that has no value of its own, so an existing wall keeps
+    behaving as it did. With no screens registered there is nothing to copy it
+    to, so the globals stay and the first run with a screen does the copy (see
+    :func:`_adopt_global_settings`).
+
+    One-time: after that copy the done marker is stored, so a screen reset to
+    Default, a screen registering later or a restore of a post-migration backup
+    all use the global fallback instead of being filled in again. A value
+    already stored in either spelling counts as the screen's own.
+    """
+    from app.services.config_service import config_service
+
+    if await config_service.get_value(_SCREEN_CONTROLS_MIGRATED_KEY) is True:
+        return
+
+    globals_: dict[str, Any] = {}
+    for canonical, spellings in _SCREEN_CONTROL_KEYS:
+        for spelling in spellings:
+            value = await config_service.get_value(spelling)
+            if value is not None:
+                globals_[canonical] = value
+                break
+    if not globals_:
+        return
+
+    rows = await KioskDB.objects.all()
+    if not rows:
+        logger.info("Kept the global screen controls until a screen registers")
+        return
+
+    for row in rows:
+        overrides = dict(row.overrides or {})
+        changed = False
+        for canonical, spellings in _SCREEN_CONTROL_KEYS:
+            if canonical not in globals_ or _has_own_control(overrides, spellings):
+                continue
+            overrides[canonical] = globals_[canonical]
+            changed = True
+        if not changed:
+            continue
+        row.overrides = overrides
+        # Write only this column so a concurrent record_kiosk heartbeat
+        # (last_seen, agent_*) is not overwritten by this stale snapshot.
+        await row.update(_columns=["overrides"])
+        logger.info(f"Copied the global screen controls onto screen {row.id!r}")
+
+    await config_service.set_value(_SCREEN_CONTROLS_MIGRATED_KEY, True)
+    logger.info("Retired the one-time per-screen control migration")
+
+
+async def _adopt_global_settings() -> None:
+    """Run the global-to-per-screen migrations after a screen row is created.
 
     Best effort: a failure is logged and never fails the registration; the
-    global key stays, so the next new screen or restart retries it.
+    global keys stay, so the next new screen or restart retries them.
     """
     try:
         await migrate_global_room_name()
     except Exception as exc:  # noqa: BLE001 - registration must not fail on this
         logger.warning(f"Could not copy the global room name to a new screen: {exc}")
+    try:
+        await migrate_global_screen_controls()
+    except Exception as exc:  # noqa: BLE001 - registration must not fail on this
+        logger.warning(f"Could not copy the global screen controls to a new screen: {exc}")
 
 
 @retry_on_db_locked()
@@ -373,7 +457,7 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     if existing is None:
         try:
             await KioskDB.objects.create(id=kiosk_id, last_seen=now, overrides=overrides)
-            await _adopt_global_room_name()
+            await _adopt_global_settings()
             return
         except _INTEGRITY_ERRORS:
             # Lost a create race: another request inserted this id between our
