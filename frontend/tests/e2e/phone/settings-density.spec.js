@@ -27,12 +27,13 @@ const WEEK = [0, 1, 2, 3, 4, 5, 6].map(day => ({
 }));
 
 async function openSettings(page, category = null) {
-  await installApiMock(page, {
+  const api = await installApiMock(page, {
     config: { displayScheduleEnabled: true, displaySchedule: WEEK },
   });
   await gotoSettings(page);
   await expectSettingsReady(page);
   if (category) await selectCategory(page, category);
+  return api;
 }
 
 /** Rows with a toggle / segmented control / select in their control column. */
@@ -124,3 +125,51 @@ for (const [name, viewport] of [
     });
   });
 }
+
+test.describe("schedule editor at 390", () => {
+  test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
+
+  test("Each day fits the phone and keeps every toggle tappable", async ({ page }) => {
+    const api = await openSettings(page, "Screens");
+    await page.locator("[data-test='screen-default-card']").click();
+    await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+
+    await page.locator("[data-test='schedule-change']").click();
+    await page
+      .getByRole("radiogroup", { name: "How it repeats" })
+      .getByRole("radio", { name: "Each day" })
+      .click();
+    await expect(page.locator(".field-table__row")).toHaveCount(7);
+
+    // No horizontal scroll: the settings panel and the table both have to fit
+    // 390px (the table stacks its rows when its column is too narrow).
+    const overflow = await page.$$eval(
+      "html, .settings-content, [data-test='field-table']",
+      elements =>
+        elements.map(el => ({
+          tag: el.getAttribute("data-test") || el.tagName.toLowerCase(),
+          by: el.scrollWidth - el.clientWidth,
+        }))
+    );
+    for (const element of overflow) {
+      expect(element.by, `${element.tag} scrolls sideways`).toBeLessThanOrEqual(0);
+    }
+
+    // Every row keeps a real toggle track (nothing squeezed to zero width).
+    const tracks = await page.$$eval(".field-table__row [role='switch']", switches =>
+      switches.map(track => {
+        const box = track.getBoundingClientRect();
+        return { width: box.width, height: box.height };
+      })
+    );
+    expect(tracks).toHaveLength(7);
+    for (const track of tracks) {
+      expect(track.width).toBeGreaterThan(0);
+      expect(track.height).toBeGreaterThan(0);
+    }
+
+    // This spec only runs against the mocked harness: no host route fired.
+    expect(api.hostActions).toEqual([]);
+    expect(api.unmatched).toEqual([]);
+  });
+});

@@ -15,15 +15,15 @@
       </Button>
     </SettingRow>
 
-    <SettingGroup v-if="editing" title="How it repeats">
-      <div class="display-schedule__mode">
+    <SettingGroup v-if="editing" title="Schedule">
+      <SettingRow label="How it repeats">
         <SegmentedControl
           :model-value="mode"
           :options="SCHEDULE_MODES"
           aria-label="How it repeats"
           @update:model-value="setMode"
         />
-      </div>
+      </SettingRow>
       <FieldTable :columns="columns" :rows="rows">
         <template #default="{ row }">
           <template v-if="rowValue(row).enabled">
@@ -117,10 +117,11 @@ const summary = computed(() =>
 
 const columns = [
   { label: "" },
-  // Fields shrink before the phone width does: the row must fit 390px.
+  // Fields shrink before the phone width does: the row must fit 390px. The
+  // toggle keeps its own track so the time fields cannot squeeze it to zero.
   { label: "On", width: "minmax(0, 7rem)" },
   { label: "Off", width: "minmax(0, 7rem)" },
-  { label: "" },
+  { label: "", width: "var(--toggle-w)" },
 ];
 
 const rows = computed(() => scheduleRows(local.value, mode.value, props.weekStart));
@@ -157,11 +158,3 @@ function toggleEditing() {
   if (!editing.value) mode.value = inferScheduleMode(local.value);
 }
 </script>
-
-<style scoped>
-/* Layout only: the table and the segment control share the panel's inset. */
-.display-schedule__mode {
-  display: flex;
-  padding: 0 var(--panel-pad-x) var(--gap-2);
-}
-</style>
