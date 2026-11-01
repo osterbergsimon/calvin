@@ -66,6 +66,29 @@ input[type="number"]::-webkit-inner-spin-button {
   background: transparent;
 }
 
+/* Heading roles (docs/design/frontend-doctrine.md §2 and §4.5). A heading has
+   one of three looks: the section eyebrow (owned by SettingsSection), a title
+   or a group label. A component puts the class on its heading and keeps only
+   layout (margin, flex, truncation, colour for an error) in its own style.
+   - .heading-title: panel, dialog and inspector titles (--text-title).
+   - .heading-group: a sub-heading inside a panel, the same look as the
+     SettingGroup label (--text-label, sentence case). */
+.heading-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
+  color: var(--ink);
+}
+
+.heading-group {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

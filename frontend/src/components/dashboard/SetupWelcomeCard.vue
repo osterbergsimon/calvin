@@ -14,7 +14,13 @@
       aria-labelledby="setup-welcome-title"
     >
       <div class="setup-welcome__main">
-        <h2 id="setup-welcome-title" class="setup-welcome__title">Let's set up Calvin</h2>
+        <h2
+          id="setup-welcome-title"
+          class="setup-welcome__title"
+          :class="compact ? 'heading-group' : 'heading-title'"
+        >
+          Let's set up Calvin
+        </h2>
         <p v-if="!compact" class="setup-welcome__lead" data-test="setup-welcome-lead">
           {{ lead }}
         </p>
@@ -27,7 +33,9 @@
             data-test="setup-welcome-row"
           >
             <template v-if="item.added || showActions" #actions>
-              <Tag v-if="item.added" tone="ok" data-test="setup-welcome-done">✓ Added</Tag>
+              <Tag v-if="item.added" tone="ok" :icon="mdiCheck" data-test="setup-welcome-done">
+                Added
+              </Tag>
               <Button
                 v-else
                 :variant="isPhoneWidth && index === 0 ? 'primary' : 'secondary'"
@@ -82,6 +90,7 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { mdiCheck } from "@mdi/js";
 import { useRouter } from "vue-router";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
@@ -243,12 +252,6 @@ function dismiss() {
 }
 .setup-welcome__title {
   margin: 0 0 var(--gap-1);
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
-}
-.setup-welcome--compact .setup-welcome__title {
-  font-size: var(--text-label);
 }
 .setup-welcome__lead {
   margin: 0 0 var(--gap-3);
