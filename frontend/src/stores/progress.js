@@ -15,7 +15,8 @@ import { logError } from "../utils/logger";
  * light, and any app source takes the light over from a region, so there is
  * only ever one light at a time. A light that is already showing moves to the
  * new frame at once (no second light, no dark gap); only a light that never
- * showed waits out the 400 ms delay.
+ * showed waits out the 400 ms delay. Handing the app light back to a region
+ * waits for the change to settle, so it never moves after all work has ended.
  */
 
 export const PROGRESS_TIMING = Object.freeze({
@@ -201,11 +202,39 @@ export const useProgressStore = defineStore("progress", () => {
     timers.hideTimer = setTimeout(() => hide(frame), delay);
   };
 
+  // App → region handback waits for the change to settle (one macrotask):
+  // when sources end one after another in the same tick, the scope passes
+  // through a lone region on its way to "nothing loading", and moving the
+  // light there would make it jump from the perimeter to a region after all
+  // work has finished. Until then the app light simply stays where it is.
+  let handbackTimer = null;
+  const cancelHandback = () => {
+    if (handbackTimer) clearTimeout(handbackTimer);
+    handbackTimer = null;
+  };
+  const settleHandback = () => {
+    handbackTimer = null;
+    const target = wantedFrame.value;
+    if (!target || target === APP_FRAME) return;
+    if (visible.value.has(APP_FRAME) && !visible.value.has(target)) moveLight(APP_FRAME, target);
+  };
+
   // Sync flush: the delay starts at the exact moment the work begins.
   watch(
     wantedFrame,
     frame => {
+      cancelHandback();
       const others = Array.from(frameTimers.keys()).filter(known => known !== frame);
+      if (
+        frame &&
+        frame !== APP_FRAME &&
+        !visible.value.has(frame) &&
+        visible.value.has(APP_FRAME)
+      ) {
+        handbackTimer = setTimeout(settleHandback, 0);
+        for (const known of others) if (known !== APP_FRAME) release(known);
+        return;
+      }
       if (frame && !visible.value.has(frame)) {
         const lit = others.find(known => visible.value.has(known));
         if (lit) {

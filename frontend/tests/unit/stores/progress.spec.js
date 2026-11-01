@@ -241,6 +241,10 @@ describe("progress store: loading-light engine (CLV-115)", () => {
       store.begin("photos:r2", { regionId: "r2" });
       stepAndCheck(3000);
       store.end("photos:r2");
+      // The light stays on the app until the change settles (same tick), then
+      // moves to r1 in one step.
+      expect(store.visibleFrames).toEqual([APP_FRAME]);
+      vi.advanceTimersByTime(0);
       expect(store.visibleFrames).toEqual(["r1"]);
       stepAndCheck(3000);
       expect(store.visibleFrames).toEqual(["r1"]);
@@ -253,12 +257,38 @@ describe("progress store: loading-light engine (CLV-115)", () => {
       vi.advanceTimersByTime(100); // 500
       store.end("calendar:r1");
       store.end("photos:r2");
-      // Shown at 400 → held until 1200, not 500 + 800. (Ending r1 first hands
-      // the light to r2 for a moment; it is still the same single light.)
+      // Shown at 400 → held until 1200, not 500 + 800.
       vi.advanceTimersByTime(699);
       expect(store.visibleFrames.length).toBe(1);
       vi.advanceTimersByTime(1);
       expect(store.visibleFrames).toEqual([]);
+    });
+
+    it("does not hand back to a region whose work ended in the same tick", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      store.begin("photos:r2", { regionId: "r2" });
+      vi.advanceTimersByTime(1000); // app light up since 400
+      store.end("calendar:r1"); // r2 alone for a moment...
+      store.end("photos:r2"); // ...then nothing is loading
+      // The light stays on the app frame until it hides; it never jumps to r2
+      // after all work has finished.
+      for (let t = 0; t < 1000; t += 50) {
+        expect(store.visibleFrames).not.toContain("r2");
+        expect(store.visibleFrames.length).toBeLessThanOrEqual(1);
+        vi.advanceTimersByTime(50);
+      }
+      expect(store.visibleFrames).toEqual([]);
+    });
+
+    it("hands back to a region that is still loading once the change settles", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      store.begin("photos:r2", { regionId: "r2" });
+      vi.advanceTimersByTime(1000);
+      store.end("calendar:r1");
+      store.end("photos:r2");
+      store.begin("photos:r2", { regionId: "r2" }); // a refetch in the same tick
+      vi.advanceTimersByTime(0);
+      expect(store.visibleFrames).toEqual(["r2"]);
     });
 
     it("an app source arriving while a region light shows takes it over at once", () => {
@@ -268,6 +298,7 @@ describe("progress store: loading-light engine (CLV-115)", () => {
       expect(store.visibleFrames).toEqual([APP_FRAME]);
       stepAndCheck(1000);
       store.end("statusbar");
+      vi.advanceTimersByTime(0);
       expect(store.visibleFrames).toEqual(["r1"]);
       stepAndCheck(1000);
     });
