@@ -10,6 +10,7 @@ import { setActivePinia, createPinia } from "pinia";
 import OnScreenKeyboard from "@/components/ui/OnScreenKeyboard.vue";
 import { isTrustedKeyInTarget } from "@/composables/useOnScreenKeyboard";
 import { useConfigStore } from "@/stores/config";
+import { KIOSK_ROOT_CLASS } from "@/styles/breakpoints.js";
 
 let wrapper;
 let config;
@@ -312,6 +313,48 @@ describe("OnScreenKeyboard", () => {
       await nextTick();
 
       expect(isShown()).toBe(false);
+    });
+
+    it("never shows in auto mode on a landscape phone (667x375 touch)", async () => {
+      config.onScreenKeyboard = "auto";
+      setTouchPoints(5);
+      setWidth(667);
+      setHeight(375);
+      mountOsk();
+      const input = addInput();
+
+      await focus(input);
+
+      expect(isShown()).toBe(false);
+    });
+
+    it("never shows in auto mode on a 640x360 landscape Android", async () => {
+      config.onScreenKeyboard = "auto";
+      setTouchPoints(5);
+      setWidth(640);
+      setHeight(360);
+      mountOsk();
+
+      await focus(addInput());
+
+      expect(isShown()).toBe(false);
+    });
+
+    it("still shows in auto mode on the 800x480 touch kiosk", async () => {
+      document.documentElement.classList.add(KIOSK_ROOT_CLASS);
+      try {
+        config.onScreenKeyboard = "auto";
+        setTouchPoints(5);
+        setWidth(800);
+        setHeight(480);
+        mountOsk();
+
+        await focus(addInput());
+
+        expect(isShown()).toBe(true);
+      } finally {
+        document.documentElement.classList.remove(KIOSK_ROOT_CLASS);
+      }
     });
 
     it("never shows when the setting is off", async () => {
