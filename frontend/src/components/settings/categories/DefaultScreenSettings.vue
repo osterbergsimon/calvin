@@ -36,7 +36,7 @@
             :aria-pressed="startPageId === page.id ? 'true' : 'false'"
             :icon="startPageId === page.id ? mdiCheck : undefined"
             :disabled="!showsPage(page.id)"
-            :aria-label="`Start on ${page.name}`"
+            :aria-label="`Start here: ${page.name}`"
             @click="setDefaultPage(page.id)"
           >
             Start here
