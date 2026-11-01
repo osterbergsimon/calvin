@@ -144,6 +144,11 @@ export const settingsDestinations = [
       "key press",
       "keyboard feedback",
       "notifications",
+      "loading light",
+      "loading",
+      "comet",
+      "pulse",
+      "spinner",
     ],
   },
   {

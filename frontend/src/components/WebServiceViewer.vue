@@ -26,10 +26,8 @@
         :dim="dim"
       >
         <template #actions> </template>
-        <div v-if="emptyState.loading" :class="emptyState.className">
-          <div class="spinner" />
-          <p>{{ emptyState.message }}</p>
-        </div>
+        <!-- Nothing to show yet: the region's loading light speaks (CLV-115) -->
+        <div v-if="emptyState.loading" :class="emptyState.className" />
         <EmptyState
           v-else
           :class="emptyState.className"
@@ -52,6 +50,7 @@
           :header-visible="!isFullscreen"
           :focused="focused"
           :link-action="linkAction"
+          :region-id="regionId"
         >
           <template #actions>
             <ServiceRegionViewOptions
@@ -107,6 +106,7 @@
 import { computed, onMounted, onUnmounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
+import { useProgressStore } from "../stores/progress";
 import DashboardPanel from "./DashboardPanel.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
@@ -170,8 +170,10 @@ const serviceSubtitle = computed(() =>
     : ""
 );
 const emptyState = computed(() => {
-  if (loading.value) {
-    return { className: "loading-state", loading: true, message: "Loading service..." };
+  // Still fetching with nothing to show: a quiet panel while the region's
+  // loading light speaks. A service already in hand keeps showing (CLV-115).
+  if (loading.value && !currentService.value) {
+    return { className: "loading-state", loading: true };
   }
   if (services.value.length === 0) {
     return {
@@ -288,8 +290,15 @@ const handleKeydown = event => {
   }
 };
 
+const progressStore = useProgressStore();
+
 onMounted(async () => {
-  await webServicesStore.fetchServices();
+  // Plugin data fetches light this region's frame (the app frame in fullscreen).
+  await progressStore.track(
+    `plugin:services:${props.regionId || "fullscreen"}`,
+    () => webServicesStore.fetchServices(),
+    { regionId: props.regionId || null }
+  );
   // Add keyboard listener for Escape key
   window.addEventListener("keydown", handleKeydown);
 });
@@ -339,24 +348,6 @@ onUnmounted(() => {
   height: 100%;
   color: var(--ink-3);
   gap: 1rem;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--line);
-  border-top: 4px solid var(--focus);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
 }
 
 .service-container {

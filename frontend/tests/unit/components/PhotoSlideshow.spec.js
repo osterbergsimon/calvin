@@ -4,11 +4,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import PhotoSlideshow from "@/components/PhotoSlideshow.vue";
 import { useImagesStore } from "@/stores/images";
 import { useConfigStore } from "@/stores/config";
+import { useProgressStore } from "@/stores/progress";
 
 describe("PhotoSlideshow", () => {
   let imagesStore;
@@ -330,7 +331,8 @@ describe("PhotoSlideshow", () => {
       await vi.waitFor(() => {
         expect(imagesStore.fetchImages).toHaveBeenCalled();
       });
-      await wrapper.vm.$nextTick(); // Wait for startAutoRotation to be called
+      // Let the mounted hook's fetch chain settle so startAutoRotation runs.
+      await flushPromises();
 
       // Fast-forward past rotation interval
       vi.advanceTimersByTime(5000);
@@ -440,6 +442,44 @@ describe("PhotoSlideshow", () => {
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
+    });
+  });
+
+  // CLV-115: loading the photo source lights the region; rotation does not.
+  describe("loading light", () => {
+    it("fetching the photo source lights this region's frame", async () => {
+      let resolve;
+      imagesStore.fetchImages = vi.fn(() => new Promise(r => (resolve = r)));
+      const progress = useProgressStore();
+      createWrapper({ regionId: "photos-1" });
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(progress.isFrameVisible("photos-1")).toBe(true);
+      expect(progress.appVisible).toBe(false);
+
+      resolve();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(progress.isFrameVisible("photos-1")).toBe(false);
+    });
+
+    it("rotating and prefetching from cache never begin a source", async () => {
+      const image1 = createImage({ id: "1" });
+      const image2 = createImage({ id: "2" });
+      imagesStore.currentImage = image1;
+      imagesStore.fetchImages = vi.fn().mockImplementation(async () => {
+        imagesStore.images = [image1, image2];
+      });
+      const progress = useProgressStore();
+      createWrapper({ regionId: "photos-1", autoRotate: true, rotationInterval: 5000 });
+      await flushPromises();
+
+      const begin = vi.spyOn(progress, "begin");
+      const track = vi.spyOn(progress, "track");
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(imagesStore.nextImage).toHaveBeenCalled();
+      expect(begin).not.toHaveBeenCalled();
+      expect(track).not.toHaveBeenCalled();
     });
   });
 });

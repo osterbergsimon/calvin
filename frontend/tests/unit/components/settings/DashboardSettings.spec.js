@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import DashboardSettings from "@/components/settings/categories/DashboardSettings.vue";
@@ -249,5 +249,85 @@ describe("DashboardSettings per-screen settings (§2)", () => {
       .findAllComponents({ name: "SegmentedControl" })
       .find(c => c.props("ariaLabel") === "Settings text size");
     expect(size.props("modelValue")).toBe("compact");
+  });
+});
+
+// CLV-115: Dashboard › Focus & remote › Loading light, per screen.
+describe("DashboardSettings loading light", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+  });
+
+  const loadingRow = w =>
+    w
+      .findAll("#section-kiosk-touch-focus .setting-row")
+      .find(row => row.text().includes("Loading light"));
+  const loadingControl = w =>
+    w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(
+        c =>
+          c.props("ariaLabel") === "Loading light" || c.attributes("aria-label") === "Loading light"
+      );
+
+  it("offers Comet · Pulse · Off under Focus & remote, Comet by default", () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    const row = loadingRow(w);
+    expect(row).toBeTruthy();
+    expect(row.text()).toContain("What Calvin shows while it's fetching something.");
+    const control = loadingControl(w);
+    expect(control.props("options").map(o => o.label)).toEqual(["Comet", "Pulse", "Off"]);
+    expect(control.props("modelValue")).toBe("comet");
+    expect(row.text()).toContain("Same as Default");
+  });
+
+  it("shows the Default value until this screen picks its own", () => {
+    const w = mount(DashboardSettings, {
+      props: { config: { ...baseConfig(), loadingLight: "off" } },
+      global: { stubs },
+    });
+    expect(loadingControl(w).props("modelValue")).toBe("off");
+  });
+
+  it("a choice applies to this screen only, then resets to the Default", async () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    loadingControl(w).vm.$emit("update:modelValue", "pulse");
+    await flushPromises();
+
+    expect(localStorage.getItem("calvin-screen-loadingLight")).toBe("pulse");
+    expect((w.emitted("update:config") || []).some(c => "loadingLight" in c[0])).toBe(false);
+    expect(loadingControl(w).props("modelValue")).toBe("pulse");
+    expect(loadingRow(w).text()).toContain("Changed here");
+
+    await w.find('[data-test="reset-loading-light"]').trigger("click");
+    await flushPromises();
+    expect(localStorage.getItem("calvin-screen-loadingLight")).toBeNull();
+    expect(loadingControl(w).props("modelValue")).toBe("comet");
+    expect(loadingRow(w).text()).toContain("Same as Default");
+  });
+
+  it("explains the pulse when the device prefers less motion", () => {
+    window.matchMedia = vi.fn(query => ({
+      matches: /prefers-reduced-motion:\s*reduce/.test(query),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    }));
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    expect(loadingRow(w).text()).toContain("This device prefers less motion, so it pulses.");
+  });
+
+  it("does not mention reduced motion otherwise", () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    expect(loadingRow(w).text()).not.toContain("prefers less motion");
   });
 });

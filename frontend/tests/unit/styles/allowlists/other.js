@@ -7,7 +7,6 @@
 
 export const roleLint = {
   allowlist: [
-    "components/PerimeterProgress.vue",
     "components/StatusRail.vue",
     "components/settings/categories/ThisBrowserSettings.vue",
     "components/settings/shared/CollapsibleSection.vue",

@@ -1,5 +1,9 @@
 <template>
-  <div class="dashboard-region" @click="emit('focus-region', region.id)">
+  <div
+    class="dashboard-region"
+    :class="{ 'dashboard-region--leaf': !region.split }"
+    @click="emit('focus-region', region.id)"
+  >
     <template v-if="region.split">
       <div
         ref="splitContainerEl"
@@ -47,6 +51,7 @@
         :region-id="region.id"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
+        @vue:mounted="onContentMounted"
       />
       <PhotoSlideshow
         v-else-if="region.kind === 'photos'"
@@ -58,6 +63,7 @@
         :fit="region.view?.fit"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
+        @vue:mounted="onContentMounted"
       />
       <WebServiceViewer
         v-else-if="region.kind === 'service'"
@@ -67,14 +73,23 @@
         :view="region.view"
         :focused="isFocused(region.id)"
         :dim="isDim(region.id)"
+        @vue:mounted="onContentMounted"
       />
+      <!-- This region's own loading light, on its focus-glow path (CLV-115) -->
+      <LoadingLight :region-id="region.id" />
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, inject, ref } from "vue";
+import { computed, defineAsyncComponent, inject, onBeforeUnmount, ref } from "vue";
 import { getSplitDirection } from "@/utils/layout";
+import LoadingLight from "./LoadingLight.vue";
+import {
+  expectFirstLoadRegion,
+  firstLoadRegionMounted,
+  forgetFirstLoadRegion,
+} from "@/composables/useFirstLoadLight";
 
 const props = defineProps({
   region: {
@@ -126,6 +141,21 @@ const subtreeContainsActive = node => {
   return node.split.regions.some(subtreeContainsActive);
 };
 
+// First-load light (CLV-115): a leaf with content to load is waited for until
+// its lazily loaded component has mounted and begun its fetch. The async
+// wrapper hands the vnode:mounted hook to the loaded component, so it fires
+// once that chunk has arrived and mounted, not when the empty wrapper does.
+const CONTENT_KINDS = ["calendar", "photos", "service"];
+const reportsFirstLoad = !props.region.split && CONTENT_KINDS.includes(props.region.kind);
+const reportedId = props.region.id;
+if (reportsFirstLoad) expectFirstLoadRegion(reportedId);
+const onContentMounted = () => {
+  if (reportsFirstLoad) firstLoadRegionMounted(reportedId);
+};
+onBeforeUnmount(() => {
+  if (reportsFirstLoad) forgetFirstLoadRegion(reportedId);
+});
+
 const CalendarView = defineAsyncComponent(() => import("./CalendarView.vue"));
 const PhotoSlideshow = defineAsyncComponent(() => import("./PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("./WebServiceViewer.vue"));
@@ -171,6 +201,12 @@ const subResizeHandles = computed(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* A leaf region is the containing block of its loading light, so the light
+   traces the same box as the panel's focus glow. */
+.dashboard-region--leaf {
+  position: relative;
 }
 
 /* Split container: fills the region and flows children in the split direction.
