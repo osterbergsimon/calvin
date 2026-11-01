@@ -93,23 +93,43 @@ const mountEditor = async (props = {}) => {
   return w;
 };
 
-const resize = async (w, selector, width, height) => {
-  // The teleport stub can replace its children on re-render, so match the
-  // observer by the element's selector rather than node identity.
-  const observer = [...observers]
+const observerFor = selector =>
+  [...observers]
     .reverse()
     .find(candidate => candidate.elements.some(node => node.matches?.(selector)));
-  if (!observer) throw new Error(`no ResizeObserver watching ${selector}`);
+
+const report = async (w, observer, width, height) => {
+  // ResizeObserver reports the border box, which is the only measurement that
+  // does not include the observed element's own padding.
   observer.callback([
     {
       target: observer.elements[0],
+      borderBoxSize: [{ inlineSize: width, blockSize: height }],
       contentRect: { width, height, top: 0, left: 0, right: width, bottom: height },
     },
   ]);
   await w.vm.$nextTick();
 };
 
+const resize = async (w, selector, width, height) => {
+  // The teleport stub can replace its children on re-render, so match the
+  // observer by the element's selector rather than node identity.
+  const observer = observerFor(selector);
+  if (!observer) throw new Error(`no ResizeObserver watching ${selector}`);
+  await report(w, observer, width, height);
+};
+
+// A box the editor used to observe before the layout measured the space it is
+// given instead. No observer watches it now, so driving it is a no-op.
+const tryResize = async (w, selector, width, height) => {
+  const observer = observerFor(selector);
+  if (!observer) return false;
+  await report(w, observer, width, height);
+  return true;
+};
+
 const classes = w => w.find(".sre-root").classes();
+const sizeClassOf = w => classes(w).find(name => name.startsWith("size-"));
 
 const deviceBox = w => {
   const style = w.find(".sre-device").element.style;
@@ -118,35 +138,92 @@ const deviceBox = w => {
 
 /* --- §1 size classes ------------------------------------------------------ */
 describe("ScreenRegionEditor size classes", () => {
-  it("derives Wide / Compact / Phone from the measured modal", async () => {
+  it("derives Wide / Compact / Phone from the available space", async () => {
     const w = await mountEditor();
     expect(classes(w)).toContain("size-wide");
 
-    await resize(w, ".sre-root", 1280, 720);
+    await resize(w, ".dialog-overlay", 1280, 720);
     expect(classes(w)).toContain("size-wide");
 
-    await resize(w, ".sre-root", 800, 480);
+    await resize(w, ".dialog-overlay", 800, 480);
     expect(classes(w)).toContain("size-compact");
 
-    await resize(w, ".sre-root", 390, 844);
+    await resize(w, ".dialog-overlay", 390, 844);
     expect(classes(w)).toContain("size-phone");
+  });
+
+  it.each([
+    { name: "1920x1080 at dpr 1", width: 1920, height: 1080 },
+    { name: "1536x864 at dpr 1.25", width: 1536, height: 864 },
+    { name: "1280x720 at dpr 1.5", width: 1280, height: 720 },
+  ])("settles Wide at the fullscreen touchscreen size $name", async ({ width, height }) => {
+    const w = await mountEditor();
+    await resize(w, ".dialog-overlay", width, height);
+    expect(sizeClassOf(w)).toBe("size-wide");
+  });
+
+  it("does not flip when the sheet's own box changes under a stable space", async () => {
+    // The wide sheet's content box is smaller than the space it is given
+    // (gutter + header): at a 720px window it measures ~1008x627, while the
+    // compact bleed layout fills the window at ~1280x663. A class decided from
+    // that box flipped on every observer tick: the reported flicker.
+    const w = await mountEditor();
+    const seen = [];
+    for (let i = 0; i < 8; i += 1) {
+      await tryResize(w, ".sre-root", ...(i % 2 ? [1008, 627] : [1280, 663]));
+      seen.push(sizeClassOf(w));
+    }
+    expect(seen).toEqual(Array(8).fill("size-wide"));
+  });
+
+  it("ignores the sheet's own box once the space is measured", async () => {
+    const w = await mountEditor();
+    await resize(w, ".dialog-overlay", 1280, 720);
+    expect(sizeClassOf(w)).toBe("size-wide");
+
+    await tryResize(w, ".sre-root", 1008, 627);
+    expect(sizeClassOf(w)).toBe("size-wide");
+  });
+
+  it("holds its class inside a deadband around each Wide threshold", async () => {
+    const w = await mountEditor();
+    await resize(w, ".dialog-overlay", 1280, 720);
+    expect(sizeClassOf(w)).toBe("size-wide");
+
+    // Just under the height threshold: still Wide until it is clearly short.
+    await resize(w, ".dialog-overlay", 1280, 630);
+    expect(sizeClassOf(w)).toBe("size-wide");
+    await resize(w, ".dialog-overlay", 1280, 600);
+    expect(sizeClassOf(w)).toBe("size-compact");
+
+    // Just over the height threshold is not yet enough to go back to Wide.
+    await resize(w, ".dialog-overlay", 1280, 655);
+    expect(sizeClassOf(w)).toBe("size-compact");
+    await resize(w, ".dialog-overlay", 1280, 680);
+    expect(sizeClassOf(w)).toBe("size-wide");
+
+    // The same deadband applies to the width threshold.
+    await resize(w, ".dialog-overlay", 1030, 720);
+    expect(sizeClassOf(w)).toBe("size-wide");
+    await resize(w, ".dialog-overlay", 990, 720);
+    expect(sizeClassOf(w)).toBe("size-compact");
   });
 
   it("puts exactly 600px on the phone side, like every other phone check", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 600, 800);
+    await resize(w, ".dialog-overlay", 600, 800);
     expect(classes(w)).toContain("size-phone");
-    await resize(w, ".sre-root", 601, 800);
+    await resize(w, ".dialog-overlay", 601, 800);
     expect(classes(w)).toContain("size-compact");
   });
 
   it("moves a kiosk from Wide to Compact when the OSK shrinks the modal", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 1280, 720);
+    await resize(w, ".dialog-overlay", 1280, 720);
     expect(classes(w)).toContain("size-wide");
 
     // The on-screen keyboard eats the bottom of the screen.
-    await resize(w, ".sre-root", 1280, 430);
+    await resize(w, ".dialog-overlay", 1280, 430);
     expect(classes(w)).toContain("size-compact");
   });
 
@@ -157,7 +234,7 @@ describe("ScreenRegionEditor size classes", () => {
 
   it("moves the orientation badge under the device in Compact", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 800, 480);
+    await resize(w, ".dialog-overlay", 800, 480);
     const caption = w.find('[data-test="orientation-caption"]');
     expect(caption.exists()).toBe(true);
     // Any browser owns its orientation through the toggle, so the caption
@@ -175,7 +252,7 @@ describe("ScreenRegionEditor device fit", () => {
     { name: "wide", modal: [1280, 720], stage: [1280, 700] },
   ])("keeps the aspect ratio and stays in the stage at $name", async ({ modal, stage }) => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", ...modal);
+    await resize(w, ".dialog-overlay", ...modal);
     await resize(w, ".sre-stage", ...stage);
 
     const { width, height } = deviceBox(w);
@@ -186,7 +263,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("stops shrinking at 200px on the long side", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 300, 844);
+    await resize(w, ".dialog-overlay", 300, 844);
     await resize(w, ".sre-stage", 300, 160);
     const { width, height } = deviceBox(w);
     expect(Math.max(width, height)).toBeGreaterThanOrEqual(200);
@@ -194,7 +271,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("shrinks region labels and drops the icon and size badge under 320px", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 390, 844);
+    await resize(w, ".dialog-overlay", 390, 844);
     await resize(w, ".sre-stage", 300, 600);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
     expect(w.findAll(".sre-region-name").length).toBeGreaterThan(0);
@@ -204,7 +281,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("keeps the region icon and size badge when the device has room", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 1280, 720);
+    await resize(w, ".dialog-overlay", 1280, 720);
     await resize(w, ".sre-stage", 1280, 700);
     expect(w.find(".sre-device").classes()).not.toContain("is-narrow");
     expect(w.findAll(".sre-region-icon").length).toBeGreaterThan(0);
@@ -213,7 +290,7 @@ describe("ScreenRegionEditor device fit", () => {
 
   it("hides the icon and % badge when the open phone sheet leaves a narrow device", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 390, 844);
+    await resize(w, ".dialog-overlay", 390, 844);
     // The stage left above an open 65% inspector sheet.
     await resize(w, ".sre-stage", 390, 204);
     expect(w.find(".sre-device").classes()).toContain("is-narrow");
@@ -226,7 +303,7 @@ describe("ScreenRegionEditor device fit", () => {
 describe("ScreenRegionEditor phone inspector sheet", () => {
   const phone = async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 390, 844);
+    await resize(w, ".dialog-overlay", 390, 844);
     return w;
   };
 
@@ -328,7 +405,7 @@ describe("ScreenRegionEditor touch behaviour", () => {
 
   it("is not draggable in Compact either", async () => {
     const w = await mountEditor();
-    await resize(w, ".sre-root", 800, 480);
+    await resize(w, ".dialog-overlay", 800, 480);
     expect(w.find(".sre-clockbar").attributes("draggable")).toBe("false");
     expect(w.find(".sre-clock-grip").exists()).toBe(false);
   });
@@ -358,7 +435,7 @@ describe("ScreenRegionEditor touch behaviour", () => {
   it("names the clock bar in the phone peek", async () => {
     setMedia({ coarse: true });
     const w = await mountEditor();
-    await resize(w, ".sre-root", 390, 844);
+    await resize(w, ".dialog-overlay", 390, 844);
     await w.find(".sre-clockbar").trigger("click");
     expect(w.find('[data-test="sheet-selection"]').text()).toBe("Clock bar");
     expect(w.find(".sre-rail").classes()).toContain("is-open");
