@@ -16,6 +16,7 @@ phone.
 import math
 import re
 import secrets
+import shutil
 import time
 from collections import deque
 from datetime import UTC, datetime, timedelta
@@ -28,7 +29,10 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from app.security.admin_auth import guest_token_limiter
+from app.security.guest_gate import share_page
 from app.security.share_links import (
+    DEFAULT_MAX_BYTES,
+    DEFAULT_MAX_PHOTOS,
     MAX_NAME_LEN,
     DuplicateLinkName,
     InvalidFolder,
@@ -47,6 +51,11 @@ DEVICE_COOKIE = "calvin_guest"
 DEVICE_COOKIE_MAX_AGE = 34560000  # 400 days, the browser cap
 MAX_FILES_PER_REQUEST = 50
 MAX_EXPIRY_DAYS = 365
+MAX_LINK_PHOTOS = 100_000
+MAX_LINK_MB = 1024 * 1024  # 1 TB: "no practical limit"
+# Guests never take the last of the disk: Calvin, its database and the
+# owner's own uploads need room too.
+MIN_FREE_BYTES = 512 * 1024 * 1024
 ACCEPT = ["image/*", ".jpg", ".jpeg", ".png", ".webp", ".gif"]
 
 
@@ -122,6 +131,20 @@ def _device(request: Request) -> tuple[str, bool]:
     return secrets.token_urlsafe(24), True
 
 
+def _disk_full() -> HTTPException:
+    return HTTPException(
+        status_code=507,
+        detail={"code": "disk_full", "message": "Calvin is out of space for photos."},
+    )
+
+
+def _free_bytes(directory: Path) -> int:
+    try:
+        return shutil.disk_usage(directory).free
+    except OSError:
+        return 0
+
+
 def _set_device(response: Response, device: str) -> None:
     response.set_cookie(
         DEVICE_COOKIE,
@@ -156,7 +179,10 @@ async def _save_files(
     plugin = _local_photos()
     if plugin is None:
         raise _local_photos_off()
-    ip = request.client.host if request.client else "unknown"
+    # The trusted client IP the guest gate resolved (forwarded, behind a proxy).
+    ip = getattr(request.state, "guest_ip", None) or (
+        request.client.host if request.client else "unknown"
+    )
     limit_key = f"{link['id']}:{ip}"
     wait = guest_upload_limiter.check(limit_key)
     if wait:
@@ -164,7 +190,7 @@ async def _save_files(
             status_code=429,
             detail={
                 "code": "rate_limited",
-                "message": f"That's a lot of photos at once. Try again in {wait} seconds.",
+                "message": f"Too many photos at once. Try again in {wait} seconds.",
                 "retry_after": wait,
             },
             headers={"Retry-After": str(wait)},
@@ -177,18 +203,35 @@ async def _save_files(
                 "message": f"Send at most {MAX_FILES_PER_REQUEST} photos at a time.",
             },
         )
+    plugin.image_dir.mkdir(parents=True, exist_ok=True)
+    if _free_bytes(plugin.image_dir) < MIN_FREE_BYTES:
+        raise _disk_full()
 
     store = get_share_link_store()
     token = str(request.path_params["token"])
+    photo_count = int(link.get("uploadCount", 0))
+    byte_count = int(link.get("uploadBytes", 0))
+    max_photos = int(link.get("maxPhotos", DEFAULT_MAX_PHOTOS))
+    max_bytes = int(link.get("maxBytes", DEFAULT_MAX_BYTES))
+    full = f"This link has reached its limit of {max_photos} photos."
     uploaded: list[dict[str, Any]] = []
     failed: list[dict[str, str]] = []
     for file in files:
         filename = file.filename or "photo"
+        if photo_count >= max_photos:
+            failed.append({"filename": filename, "message": full})
+            continue
         data = await file.read(MAX_GUEST_UPLOAD_BYTES + 1)
         try:
             prepared, name = prepare_guest_image(data, filename)
         except HTTPException as exc:
             failed.append({"filename": filename, "message": str(exc.detail)})
+            continue
+        if byte_count + len(prepared) > max_bytes:
+            failed.append({"filename": filename, "message": "This link has run out of space."})
+            continue
+        if _free_bytes(plugin.image_dir) - len(prepared) < MIN_FREE_BYTES:
+            failed.append({"filename": filename, "message": "Calvin is out of space for photos."})
             continue
         if guest_upload_limiter.check(limit_key):
             failed.append({"filename": filename, "message": "Too many photos. Try again later."})
@@ -198,8 +241,10 @@ async def _save_files(
             failed.append({"filename": filename, "message": "Couldn't save this photo."})
             continue
         guest_upload_limiter.record(limit_key)
+        photo_count += 1
+        byte_count += len(prepared)
         relative = Path(image["path"]).relative_to(plugin.image_dir).as_posix()
-        store.record_upload(link["id"], relative, image["id"], device)
+        store.record_upload(link["id"], relative, image["id"], device, size=len(prepared))
         uploaded.append(
             _upload_view(
                 token,
@@ -238,6 +283,8 @@ class CreateLinkBody(BaseModel):
     name: str = Field(min_length=1, max_length=MAX_NAME_LEN)
     folder: str = Field(min_length=1)
     expires_in_days: int | None = Field(default=None, ge=1, le=MAX_EXPIRY_DAYS)
+    max_photos: int = Field(default=DEFAULT_MAX_PHOTOS, ge=1, le=MAX_LINK_PHOTOS)
+    max_mb: int = Field(default=DEFAULT_MAX_BYTES // 2**20, ge=1, le=MAX_LINK_MB)
 
 
 class RenameLinkBody(BaseModel):
@@ -280,7 +327,13 @@ async def create_share_link(body: CreateLinkBody):
     if body.expires_in_days is not None:
         expires_at = (datetime.now(UTC) + timedelta(days=body.expires_in_days)).timestamp()
     try:
-        link, _token = get_share_link_store().create(name, body.folder, expires_at=expires_at)
+        link, _token = get_share_link_store().create(
+            name,
+            body.folder,
+            expires_at=expires_at,
+            max_photos=body.max_photos,
+            max_bytes=body.max_mb * 2**20,
+        )
     except DuplicateLinkName:
         raise _duplicate(name) from None
     except InvalidFolder:
@@ -471,7 +524,7 @@ async def share_target(
     except HTTPException as exc:
         code = exc.detail.get("code") if isinstance(exc.detail, dict) else "upload_failed"
         query = f"error={code}"
-    redirect = RedirectResponse(f"/share/{token}/?{query}", status_code=303)
+    redirect = RedirectResponse(share_page(token, query), status_code=303)
     if new:
         _set_device(redirect, device)
     return redirect

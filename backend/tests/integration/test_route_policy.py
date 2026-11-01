@@ -131,3 +131,14 @@ def test_host_routes_match_the_routes_that_call_require_host_control():
         for method in route.methods
     }
     assert guarded == set(HOST_ROUTES)
+
+
+def test_the_app_gates_guest_bodies_before_routing():
+    """Share tokens are checked in ASGI middleware, before a form is parsed (calvin-mwqo)."""
+    from app.security.guest_gate import GuestGateMiddleware
+    from app.security.host_origin import HostOriginMiddleware
+
+    classes = [middleware.cls for middleware in main_app.user_middleware]
+    assert GuestGateMiddleware in classes
+    # Host/Origin stays outermost: it is added after the gate.
+    assert classes.index(HostOriginMiddleware) < classes.index(GuestGateMiddleware)

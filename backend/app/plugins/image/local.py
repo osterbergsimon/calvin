@@ -14,7 +14,6 @@ from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ImagePlugin
 from app.utils.photo_folders import RESERVED_FOLDERS, InvalidFolder, normalize_folder
 
-
 # A share-link folder holds this hidden file; only such subfolders are scanned.
 SHARE_FOLDER_MARKER = ".calvin-share"
 

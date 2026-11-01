@@ -97,7 +97,7 @@ def prepare_guest_image(data: bytes, filename: str) -> tuple[bytes, str]:
 def _reencode_animated_gif(img: Image.Image) -> bytes:
     """Decode every frame, scale it to MAX_ANIMATED_EDGE and write a fresh GIF."""
     try:
-        frame_count = int(img.n_frames)
+        frame_count = int(getattr(img, "n_frames", 1))
     except Exception:
         raise _refuse("This file isn't a photo Calvin can show.") from None
     if frame_count > MAX_GIF_FRAMES:

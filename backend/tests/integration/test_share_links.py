@@ -6,6 +6,7 @@ host-acting route exists on this app.
 """
 
 import asyncio
+import json
 import logging
 import re
 from io import BytesIO
@@ -396,6 +397,143 @@ def test_token_guessing_is_rate_limited(guest):
     for _ in range(5):
         assert guest.get("/api/guest/nope.nope").status_code == 404
     assert guest.get("/api/guest/nope.nope").status_code == 429
+
+
+def test_failed_guesses_never_block_a_valid_token(admin, guest):
+    _, token = _make_link(admin)
+    for _ in range(6):
+        guest.get("/api/guest/nope.nope")
+    assert guest.get("/api/guest/nope.nope").status_code == 429
+    # Same IP, real link: still works, uploads included.
+    assert guest.get(f"/api/guest/{token}").status_code == 200
+    assert _upload(guest, token, ("a.jpg", _photo())).status_code == 200
+
+
+def test_valid_requests_do_not_count_as_failures(admin, guest):
+    _, token = _make_link(admin)
+    for _ in range(10):
+        assert guest.get(f"/api/guest/{token}").status_code == 200
+    for _ in range(4):
+        assert guest.get("/api/guest/nope.nope").status_code == 404
+
+
+def test_behind_a_trusted_proxy_guesses_count_per_forwarded_ip(guest, monkeypatch):
+    monkeypatch.setattr(settings, "trusted_proxies", "*")
+    stranger = {"X-Forwarded-For": "203.0.113.7"}
+    for _ in range(6):
+        guest.get("/api/guest/nope.nope", headers=stranger)
+    assert guest.get("/api/guest/nope.nope", headers=stranger).status_code == 429
+    # Another guest behind the same proxy is not locked out by the stranger.
+    other = {"X-Forwarded-For": "198.51.100.9"}
+    assert guest.get("/api/guest/nope.nope", headers=other).status_code == 404
+
+
+def test_forwarded_for_is_ignored_without_a_trusted_proxy(guest):
+    for index in range(6):
+        guest.get("/api/guest/nope.nope", headers={"X-Forwarded-For": f"203.0.113.{index}"})
+    response = guest.get("/api/guest/nope.nope", headers={"X-Forwarded-For": "198.51.100.9"})
+    assert response.status_code == 429
+
+
+def test_cross_site_share_target_post_is_refused(admin, guest, image_dir):
+    _, token = _make_link(admin)
+    response = guest.post(
+        f"/share/{token}/receive",
+        files=[("photos", ("a.jpg", _photo(), "image/jpeg"))],
+        headers={"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+
+
+@pytest.mark.parametrize("site", ["same-origin", "none"])
+def test_share_target_allows_same_origin_and_direct(admin, guest, image_dir, site):
+    _, token = _make_link(admin)
+    response = guest.post(
+        f"/share/{token}/receive",
+        files=[("photos", ("a.jpg", _photo(), "image/jpeg"))],
+        headers={"Sec-Fetch-Site": site},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("?added=1&failed=0")
+
+
+def test_location_quotes_the_token(guest):
+    response = guest.post(
+        "/share/a%20b%22c/receive",
+        files=[("photos", ("a.jpg", _photo(), "image/jpeg"))],
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/share/a%20b%22c/?error=invalid"
+
+
+def test_oversized_request_is_refused_before_upload(admin, guest, monkeypatch, image_dir):
+    from app.security import guest_gate
+
+    monkeypatch.setattr(guest_gate, "MAX_GUEST_REQUEST_BYTES", 1000)
+    _, token = _make_link(admin)
+    response = _upload(guest, token, ("a.jpg", _photo(size=(400, 400))))
+    assert response.status_code == 413
+    assert response.json()["detail"]["code"] == "too_large"
+    assert not (image_dir / "Guests" / "a.jpg").exists()
+
+
+def test_link_photo_quota(admin, guest, image_dir):
+    _, token = _make_link(admin, max_photos=2)
+    response = _upload(guest, token, ("a.jpg", _photo()), ("b.jpg", _photo()), ("c.jpg", _photo()))
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["uploaded"]) == 2
+    (failed,) = body["failed"]
+    assert failed["filename"] == "c.jpg"
+    assert "limit" in failed["message"]
+    response = _upload(guest, token, ("d.jpg", _photo()))
+    assert response.status_code == 400
+    # Removing a photo frees its place.
+    first = guest.get(f"/api/guest/{token}/uploads").json()["uploads"][0]
+    guest.delete(f"/api/guest/{token}/uploads/{first['imageId']}")
+    assert _upload(guest, token, ("e.jpg", _photo())).status_code == 200
+
+
+def test_link_byte_quota(admin, guest, image_dir):
+    from app.services.guest_image import prepare_guest_image
+
+    photo = _photo()
+    stored_size = len(prepare_guest_image(photo, "a.jpg")[0])
+    _, token = _make_link(admin, max_mb=1)
+    import app.security.share_links as share_links
+
+    store = share_links.get_share_link_store()
+    data = json.loads(store.path.read_text())
+    # Room for one stored photo, not two.
+    data["links"][0]["max_bytes"] = int(stored_size * 1.5)
+    store.path.write_text(json.dumps(data))
+    body = _upload(guest, token, ("a.jpg", photo), ("b.jpg", photo)).json()
+    assert len(body["uploaded"]) == 1
+    assert [f["filename"] for f in body["failed"]] == ["b.jpg"]
+
+
+def test_link_quota_defaults_and_validation(admin):
+    link, _ = _make_link(admin)
+    assert link["maxPhotos"] == 500
+    assert link["maxBytes"] == 2 * 1024**3
+    for bad in ({"max_photos": 0}, {"max_photos": 100001}, {"max_mb": 0}):
+        response = admin.post("/api/share/links", json={"name": "x", "folder": "y", **bad})
+        assert response.status_code == 422, bad
+
+
+def test_uploads_are_refused_when_disk_is_low(admin, guest, monkeypatch, image_dir):
+    from app.api.routes import share
+
+    _, token = _make_link(admin)
+    monkeypatch.setattr(share, "MIN_FREE_BYTES", 10**18)
+    response = _upload(guest, token, ("a.jpg", _photo()))
+    assert response.status_code == 507
+    assert response.json()["detail"]["code"] == "disk_full"
+    assert not (image_dir / "Guests" / "a.jpg").exists()
 
 
 def test_uploads_are_rate_limited(admin, guest, monkeypatch):

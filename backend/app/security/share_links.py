@@ -40,6 +40,9 @@ __all__ = [
 ]
 
 MAX_NAME_LEN = 40
+# Per-link quota (owner-configurable): one leaked link can't fill the SD card.
+DEFAULT_MAX_PHOTOS = 500
+DEFAULT_MAX_BYTES = 2 * 1024**3
 LAST_USED_INTERVAL = 60  # seconds between last_used_at writes from page loads
 _KEY_BYTES = 32
 _FILE_VERSION = 1
@@ -61,6 +64,7 @@ def _public(entry: dict[str, Any], now: float) -> dict[str, Any]:
     """The shape the admin API returns: never the hash, never the uploads' devices."""
     last_used = entry.get("last_used_at")
     expires = entry.get("expires_at")
+    uploads = entry.get("uploads", [])
     return {
         "id": entry["id"],
         "name": entry["name"],
@@ -69,7 +73,10 @@ def _public(entry: dict[str, Any], now: float) -> dict[str, Any]:
         "lastUsedAt": _iso(last_used) if last_used is not None else None,
         "expiresAt": _iso(expires) if expires is not None else None,
         "expired": expires is not None and now >= expires,
-        "uploadCount": len(entry.get("uploads", [])),
+        "uploadCount": len(uploads),
+        "uploadBytes": sum(int(upload.get("size", 0)) for upload in uploads),
+        "maxPhotos": int(entry.get("max_photos", DEFAULT_MAX_PHOTOS)),
+        "maxBytes": int(entry.get("max_bytes", DEFAULT_MAX_BYTES)),
     }
 
 
@@ -194,6 +201,8 @@ class ShareLinkStore:
         folder: str,
         expires_at: float | None = None,
         now: float | None = None,
+        max_photos: int = DEFAULT_MAX_PHOTOS,
+        max_bytes: int = DEFAULT_MAX_BYTES,
     ) -> tuple[dict[str, Any], str]:
         """Mint a link. Returns ``(public record, token)``."""
         created = time.time() if now is None else now
@@ -214,6 +223,8 @@ class ShareLinkStore:
                 "created_at": created,
                 "expires_at": expires_at,
                 "last_used_at": None,
+                "max_photos": max_photos,
+                "max_bytes": max_bytes,
                 "uploads": [],
             }
             links.append(entry)
@@ -256,6 +267,7 @@ class ShareLinkStore:
         image_id: str,
         device: str,
         now: float | None = None,
+        size: int = 0,
     ) -> None:
         current = time.time() if now is None else now
         with self._lock:
@@ -268,6 +280,7 @@ class ShareLinkStore:
                             "image_id": image_id,
                             "device": _hash(device),
                             "uploaded_at": current,
+                            "size": size,
                         }
                     )
                     entry["last_used_at"] = current

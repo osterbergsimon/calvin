@@ -983,6 +983,20 @@
             "title": "Folder",
             "type": "string"
           },
+          "max_mb": {
+            "default": 2048,
+            "maximum": 1048576.0,
+            "minimum": 1.0,
+            "title": "Max Mb",
+            "type": "integer"
+          },
+          "max_photos": {
+            "default": 500,
+            "maximum": 100000.0,
+            "minimum": 1.0,
+            "title": "Max Photos",
+            "type": "integer"
+          },
           "name": {
             "maxLength": 40,
             "minLength": 1,

@@ -8,12 +8,7 @@ so a newly added write route is protected without anyone remembering to.
 from fastapi import HTTPException, Request
 from loguru import logger
 
-from app.security.admin_auth import (
-    COOKIE_NAME,
-    api_key_limiter,
-    get_admin_store,
-    guest_token_limiter,
-)
+from app.security.admin_auth import COOKIE_NAME, api_key_limiter, get_admin_store
 from app.security.api_keys import SCOPE_RANK, get_api_key_store
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -187,38 +182,29 @@ def _insufficient_scope(needed: str) -> HTTPException:
 
 
 def _authenticate_guest(request: Request, route_id: tuple[str, str]) -> None:
-    """Resolve the path's share token to its link, or refuse (429 / 404 / 303)."""
-    from app.security.share_links import get_share_link_store
+    """Resolve the path's share token to its link, or refuse (429 / 404 / 303).
 
-    token = str(request.path_params.get("token", ""))
-    ip = request.client.host if request.client else "unknown"
-    wait = guest_token_limiter.check(ip)
-    link = None if wait else get_share_link_store().authenticate(token)
-    if link is not None:
-        request.state.share_link = link
+    :class:`~app.security.guest_gate.GuestGateMiddleware` normally did this
+    already, before the body was read; this is the same check for an app
+    without the middleware.
+    """
+    from app.security.guest_gate import GuestRefusal, guest_ip, resolve_guest, share_page
+
+    if getattr(request.state, "share_link", None) is not None:
         return
-    if route_id == SHARE_TARGET_ROUTE:
-        raise HTTPException(status_code=303, headers={"Location": f"/share/{token}/?error=invalid"})
-    if wait:
+    token = str(request.path_params.get("token", ""))
+    ip = guest_ip(request.scope)
+    try:
+        request.state.share_link = resolve_guest(token, ip)
+        request.state.guest_ip = ip
+    except GuestRefusal as refusal:
+        if route_id == SHARE_TARGET_ROUTE:
+            raise HTTPException(
+                status_code=303, headers={"Location": share_page(token, "error=invalid")}
+            ) from None
         raise HTTPException(
-            status_code=429,
-            detail={
-                "code": "rate_limited",
-                "message": f"Too many attempts. Try again in {wait} seconds.",
-                "retry_after": wait,
-            },
-            headers={"Retry-After": str(wait)},
-        )
-    guest_token_limiter.record_failure(ip)
-    # Never the token itself: tokens are not logged.
-    logger.warning("Unknown, revoked or expired share link from {}", ip)
-    raise HTTPException(
-        status_code=404,
-        detail={
-            "code": "share_link_invalid",
-            "message": "This link doesn't work any more. Ask for a new one.",
-        },
-    )
+            status_code=refusal.status, detail=refusal.detail, headers=refusal.headers or None
+        ) from None
 
 
 async def enforce_route_policy(request: Request) -> None:
