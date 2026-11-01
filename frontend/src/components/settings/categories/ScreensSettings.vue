@@ -395,6 +395,30 @@
             @update:model-value="setIdle"
           />
         </SettingRow>
+        <SettingRow label="Screen now">
+          <template #description>
+            <InlineNote data-test="screen-now-state">
+              {{ desiredOnNow ? "On now" : "Off now" }}
+            </InlineNote>
+            <InlineNote v-if="activeOverride" data-test="screen-now-until">
+              {{ untilCopy }}
+            </InlineNote>
+          </template>
+          <Button data-test="screen-now-on" :disabled="desiredOnNow" @click="setScreenNow('on')">
+            Turn on now
+          </Button>
+          <Button data-test="screen-now-off" :disabled="!desiredOnNow" @click="setScreenNow('off')">
+            Turn off now
+          </Button>
+          <Button
+            v-if="activeOverride"
+            variant="link"
+            data-test="screen-now-follow"
+            @click="followSchedule"
+          >
+            Follow schedule
+          </Button>
+        </SettingRow>
         <InlineNote
           v-if="powerMsg"
           class="screens-saved"
@@ -541,6 +565,13 @@ import {
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { getKioskId } from "@/utils/kioskId";
 import { screenLabel, screenLabelFallback } from "@/utils/screenLabel";
+import {
+  activePowerOverride,
+  buildPowerOverride,
+  effectiveTimeZone,
+  formatUntil,
+  scheduleDesiredOn,
+} from "@/utils/screenPower";
 import {
   changedSettingCount,
   formatSettingList,
@@ -863,6 +894,53 @@ const effScheduleEnabled = computed(() =>
 const effSchedule = computed(() =>
   scheduleOverridden.value ? overrides.value.displaySchedule : props.config.displaySchedule
 );
+
+// "Screen now" (calvin-ydzz): a manual choice that holds only until the
+// schedule's next on/off boundary. The row reads the same effective schedule
+// the agent will, so its "until" matches what the screen does.
+const powerTimeZone = computed(() => effectiveTimeZone(props.config));
+const activeOverride = computed(() => activePowerOverride(overrides.value.screenNow, new Date()));
+const desiredOnNow = computed(() => {
+  if (activeOverride.value) return activeOverride.value.power === "on";
+  return scheduleDesiredOn({
+    enabled: effScheduleEnabled.value,
+    schedule: effSchedule.value,
+    now: new Date(),
+    timeZone: powerTimeZone.value,
+  });
+});
+const untilCopy = computed(() => {
+  const override = activeOverride.value;
+  if (!override) return "";
+  const state = override.power === "on" ? "On" : "Off";
+  return override.until
+    ? `${state} until ${formatUntil(override.until, powerTimeZone.value)}`
+    : `${state} until you change it`;
+});
+
+function setScreenNow(power) {
+  const next = {
+    ...overrides.value,
+    screenNow: buildPowerOverride({
+      power,
+      enabled: effScheduleEnabled.value,
+      schedule: effSchedule.value,
+      timeZone: powerTimeZone.value,
+    }),
+  };
+  persist(next, powerMsg, "Saved. This screen changes at its next check-in (~30s).", OFFLINE_COPY);
+}
+
+function followSchedule() {
+  const next = { ...overrides.value };
+  delete next.screenNow;
+  persist(
+    next,
+    powerMsg,
+    "Saved. This screen follows the schedule again at its next check-in (~30s).",
+    OFFLINE_COPY
+  );
+}
 
 const idleOverridden = computed(
   () => "displayTimeoutEnabled" in overrides.value || "displayTimeout" in overrides.value

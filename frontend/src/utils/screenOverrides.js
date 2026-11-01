@@ -40,11 +40,16 @@ export const SCREEN_SETTING_LABELS = {
   defaultScreenId: "Start page",
 };
 
+// Keys that are not durable settings, so they never make a screen "differ from
+// Default": its own name, and the transient "Screen now" manual power choice
+// (it expires at the schedule's next boundary and is not copied anywhere).
+const NON_SETTING_KEYS = new Set(["displayName", "screenNow"]);
+
 // Keys that make a screen's *settings* differ from Default. The name does not
 // count: every screen can be called something without deviating from Default.
 // The idle row writes two keys (enabled + seconds) but is one setting.
 export const changedSettingKeys = overrides => {
-  const keys = Object.keys(overrides || {}).filter(key => key !== "displayName");
+  const keys = Object.keys(overrides || {}).filter(key => !NON_SETTING_KEYS.has(key));
   const idleKey =
     "displayTimeoutEnabled" in (overrides || {}) || "displayTimeout" in (overrides || {});
   const settings = keys.filter(key => key !== "displayTimeoutEnabled" && key !== "displayTimeout");

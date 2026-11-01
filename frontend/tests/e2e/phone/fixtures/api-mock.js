@@ -359,6 +359,9 @@ export async function installApiMock(page, options = {}) {
     config: { ...sampleConfig, ...(options.config || {}) },
     instances: JSON.parse(JSON.stringify(sampleInstances)),
     hostActions: [],
+    // Per-kiosk override layer written by Settings (stateful so a second
+    // selection reads back what the first save wrote).
+    overridesByKiosk: {},
     // Flip to true to simulate a server that stopped answering every route.
     down: false,
     requests: [],
@@ -533,9 +536,15 @@ export async function installApiMock(page, options = {}) {
 
     if (path === "/api/kiosks") return json(route, { kiosks: sampleKiosks });
     if (path === "/api/kiosks/agent/manifest") return json(route, { version: "1.6.0" });
-    if (/^\/api\/kiosks\/[^/]+\/overrides$/.test(path)) {
-      if (method === "PUT") return json(route, request.postDataJSON() || {});
-      return json(route, { overrides: {} });
+    const kioskOverrides = path.match(/^\/api\/kiosks\/([^/]+)\/overrides$/);
+    if (kioskOverrides) {
+      const id = decodeURIComponent(kioskOverrides[1]);
+      if (method === "PUT") {
+        const body = request.postDataJSON() || {};
+        state.overridesByKiosk[id] = body.overrides || {};
+        return json(route, { id, overrides: state.overridesByKiosk[id] });
+      }
+      return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
       return json(route, { deviceConfigVersion: "3" });
