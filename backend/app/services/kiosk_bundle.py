@@ -209,16 +209,17 @@ def _version_from(files: list[dict]) -> str:
 
 # Every kiosk asks for the bundle version on each config poll (once a minute).
 # Hashing the files each time is blocking I/O on the event loop, so the version
-# is memoised per root and keyed on each file's (path, mtime_ns, size): a stat
-# is cheap, and any edit to a file changes its key and forces a re-hash.
-_VERSION_CACHE: dict[Path, tuple[tuple[tuple[str, int, int], ...], str]] = {}
+# is memoised per root and keyed on each file's (path, inode, mtime_ns, size): a
+# stat is cheap, and any edit to a file changes its key and forces a re-hash. The
+# inode catches an atomic replace (temp file renamed over) that keeps mtime and size.
+_VERSION_CACHE: dict[Path, tuple[tuple[tuple[str, int, int, int], ...], str]] = {}
 
 
-def _stat_key(r: Path) -> tuple[tuple[str, int, int], ...]:
+def _stat_key(r: Path) -> tuple[tuple[str, int, int, int], ...]:
     key = []
     for bf in BUNDLE_FILES:
         st = (r / bf.repo_path).stat()
-        key.append((bf.repo_path, st.st_mtime_ns, st.st_size))
+        key.append((bf.repo_path, st.st_ino, st.st_mtime_ns, st.st_size))
     return tuple(key)
 
 
