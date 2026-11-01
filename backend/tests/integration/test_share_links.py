@@ -679,8 +679,8 @@ def test_concurrent_uploads_cannot_pass_the_rate_limit(admin, app, image_dir, mo
     assert len([p for p in (image_dir / "Guests").iterdir() if p.suffix != ""]) == 2
 
 
-def _delete_in_manage_images(app, image_id):
-    """The owner removes a photo in Manage images (the record stays with the link)."""
+def _delete_photo(app, image_id):
+    """The owner removes a photo in the Local photos browser (the link record stays)."""
     plugin = plugin_manager.get_plugin("local-images")
     assert asyncio.run(plugin.delete_image(image_id))
 
@@ -691,7 +691,7 @@ def test_reused_image_id_cannot_be_deleted_by_the_earlier_guest(admin, app, imag
     phone_a.get(f"/api/guest/{token}")
     phone_b.get(f"/api/guest/{token}")
     (a,) = _upload(phone_a, token, ("x.jpg", _photo())).json()["uploaded"]
-    _delete_in_manage_images(app, a["imageId"])
+    _delete_photo(app, a["imageId"])
     (b,) = _upload(phone_b, token, ("x.jpg", _photo())).json()["uploaded"]
     assert b["imageId"] == a["imageId"]  # same path, same md5 id
 
@@ -708,7 +708,7 @@ def test_reused_image_id_across_links_survives_revoke_with_remove(admin, guest, 
     link_a, token_a = _make_link(admin, "A", "Guests")
     _, token_b = _make_link(admin, "B", "Guests")
     (a,) = _upload(guest, token_a, ("x.jpg", _photo())).json()["uploaded"]
-    _delete_in_manage_images(None, a["imageId"])
+    _delete_photo(None, a["imageId"])
     (b,) = _upload(guest, token_b, ("x.jpg", _photo())).json()["uploaded"]
     assert b["imageId"] == a["imageId"]
 

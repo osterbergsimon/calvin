@@ -47,7 +47,7 @@ too, at most 200 frames and 1280 px on the longest side.
 **There is no moderation.** A guest's photo goes on the display as soon as it
 arrives; nobody approves it first. Give links only to people you trust with
 your screen, and remove a photo you don't want from Settings › Content ›
-Photos › Manage images (or revoke the link with its photos).
+Photos › Local photos › Manage photos (or revoke the link with its photos).
 
 ## Install it on Android (share from the gallery)
 

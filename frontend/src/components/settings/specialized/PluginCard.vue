@@ -118,15 +118,11 @@
 
       <PluginSections
         v-if="plugin.ui_sections && plugin.ui_sections.length > 0"
-        :plugin-id="plugin.id"
-        :plugin-instances="instances"
         :sections="plugin.ui_sections"
-        :images="images"
         :uploading="uploading"
         :upload-error="uploadError"
         :upload-success="uploadSuccess"
         @upload="$emit('upload', $event)"
-        @delete-image="$emit('delete-image', $event)"
       />
     </Card>
   </div>
@@ -186,10 +182,6 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  images: {
-    type: Array,
-    default: () => [],
-  },
   uploading: {
     type: Boolean,
     default: false,
@@ -227,7 +219,6 @@ const emit = defineEmits([
   "open-appearance",
   "update",
   "upload",
-  "delete-image",
 ]);
 
 const kindLabel = computed(() => pluginKindLabel(props.plugin));
