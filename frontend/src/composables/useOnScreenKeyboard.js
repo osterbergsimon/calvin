@@ -199,6 +199,9 @@ export function useOnScreenKeyboard() {
   // The OSK target that has focus even when the keyboard is hidden. The
   // "⌨ Keyboard" button needs it while `target` is cleared.
   const focusedTarget = ref(null);
+  // A field dismissed with the Hide key. It stays dismissed through the rest
+  // of that tap and later focus churn; a fresh tap on a field clears it.
+  const dismissedTarget = ref(null);
   const layout = ref("default");
   // The letter layout to return to from the symbols/accents layers.
   const baseLayout = ref("default");
@@ -280,6 +283,10 @@ export function useOnScreenKeyboard() {
   let lastShiftTap = 0;
   let hideFrame = null;
   let started = false;
+  // The element the current tap started on. Showing the keyboard moves the page
+  // under the finger, so the tap's click can land on another element; the
+  // gesture that opened it must never be read as a tap outside.
+  let gestureTarget = null;
 
   const mode = () => screenSetting.value.value || "auto";
 
@@ -507,7 +514,11 @@ export function useOnScreenKeyboard() {
   const showFor = (el, { force = false } = {}) => {
     if (!isTargetElement(el)) return;
     if (!force && !canShowFor(el)) return;
+    // The Hide key records the dismissal: only a fresh tap or the Keyboard
+    // button may bring the keyboard back for that field.
+    if (!force && el === dismissedTarget.value) return;
 
+    dismissedTarget.value = null;
     target.value = el;
     focusedTarget.value = el;
     baseLayout.value = layoutForTarget(el);
@@ -526,6 +537,9 @@ export function useOnScreenKeyboard() {
    * it also forgets the learned keyboard, so focusing a field shows it again.
    */
   const showKeyboard = () => {
+    // Hiding moves the panel away and the Keyboard button can appear in its
+    // place; the trailing click of the Hide tap must not press that button.
+    if (gestureTarget?.closest?.(".osk")) return;
     const el =
       focusedTarget.value ||
       (typeof document !== "undefined" && isTargetElement(document.activeElement)
@@ -546,6 +560,50 @@ export function useOnScreenKeyboard() {
     pickerOpen.value = false;
     resetShift();
     syncHeight();
+  };
+
+  /**
+   * The Hide key. Unlike a plain hide it remembers that the field was
+   * dismissed, so the rest of the same tap (touchend, then WebKit's
+   * compatibility mouse events) and later focus churn cannot reopen the
+   * keyboard for it. Focus stays in the field so the ⌨ Keyboard button remains
+   * the way back; a fresh tap on the field clears the dismissal too.
+   */
+  const dismiss = () => {
+    dismissedTarget.value = target.value;
+    hide();
+  };
+
+  const isKeyboardUi = el => !!el?.closest?.(".osk, .osk-open");
+
+  /**
+   * WebKit leaves a focused input focused when a non-focusable element is
+   * tapped, so no focusout arrives and the keyboard would stay up. A tap
+   * outside both the keyboard and its field hides it and drops focus. The tap
+   * is not prevented: a real control under the finger still gets its click.
+   */
+  const onDocumentClick = event => {
+    const startedOn = gestureTarget;
+    if (!visible.value) return;
+    const el = isElement(event.target);
+    if (!el || isKeyboardUi(el)) return;
+    const current = target.value;
+    if (current && (el === current || current.contains?.(el))) return;
+    // The gesture began on the keyboard or on an OSK field (which may have
+    // moved under the finger once the keyboard appeared).
+    if (isKeyboardUi(startedOn) || isTargetElement(startedOn)) return;
+    if (current && (startedOn === current || current.contains?.(startedOn))) return;
+    // Another OSK field takes over through focusin (and its click reopens).
+    if (isTargetElement(el)) return;
+    hide();
+    if (current && document.activeElement === current) current.blur();
+  };
+
+  // Any fresh gesture on a field clears a Hide-key dismissal. The trailing
+  // events of the Hide tap are compatibility mouse events, never pointerdown.
+  const onPointerDown = event => {
+    gestureTarget = isElement(event.target);
+    if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
   };
 
   const scheduleHideCheck = () => {
@@ -609,7 +667,7 @@ export function useOnScreenKeyboard() {
         pressEnter();
         return;
       case "{hide}":
-        hide();
+        dismiss();
         return;
       case "{numbers}":
         resetShift();
@@ -637,6 +695,8 @@ export function useOnScreenKeyboard() {
   const onFocusIn = event => {
     const el = event.target;
     if (isTargetElement(el)) {
+      // Focus returning from the tail of the Hide tap is not a request to type.
+      if (el === dismissedTarget.value) return;
       focusedTarget.value = el;
       if (canShowFor(el)) showFor(el);
       else if (visible.value) hide();
@@ -702,6 +762,8 @@ export function useOnScreenKeyboard() {
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);
     document.addEventListener("click", onClick, true);
+    document.addEventListener("click", onDocumentClick, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onResize);
     if (route) {
@@ -709,6 +771,7 @@ export function useOnScreenKeyboard() {
         () => route.fullPath,
         () => {
           focusedTarget.value = null;
+          dismissedTarget.value = null;
           hide();
         }
       );
@@ -721,6 +784,8 @@ export function useOnScreenKeyboard() {
     document.removeEventListener("focusin", onFocusIn);
     document.removeEventListener("focusout", onFocusOut);
     document.removeEventListener("click", onClick, true);
+    document.removeEventListener("click", onDocumentClick, true);
+    document.removeEventListener("pointerdown", onPointerDown, true);
     document.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("resize", onResize);
     if (hideFrame !== null) {
@@ -732,6 +797,7 @@ export function useOnScreenKeyboard() {
     visible.value = false;
     target.value = null;
     focusedTarget.value = null;
+    dismissedTarget.value = null;
     height.value = 0;
     sharedVisible.value = false;
     sharedHeight.value = 0;
