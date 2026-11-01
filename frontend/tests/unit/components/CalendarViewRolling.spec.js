@@ -49,6 +49,15 @@ describe("CalendarView per-region view", () => {
     expect(title).not.toMatch(/day:/i);
   });
 
+  it("formats a same-month week range as month day - day, year", async () => {
+    useConfigStore().weekStartDay = 1; // Monday
+    useCalendarStore().setCurrentDate(new Date(2026, 4, 4)); // Monday 4 May 2026
+    const w = mountCalendar({ mode: "week", rolling: false, weeks: 4, days: 7 }, { focused: true });
+    await w.vm.$nextTick();
+
+    expect(w.find(".calendar-header__label").text()).toBe("May 4 - 10, 2026");
+  });
+
   it("renders weeks*7 day cells for month-rolling", async () => {
     const w = mountCalendar({ mode: "month", rolling: true, weeks: 3, days: 7 });
     await w.vm.$nextTick();
