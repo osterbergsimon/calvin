@@ -1075,6 +1075,43 @@ describe("path addressing", () => {
       expect(getNodeAtPath(overflow, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
     });
 
+    it("addSubRegionAtPath keeps sub-region sizes summing to 100 for every count (calvin-20gu)", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      const sumOf = layout =>
+        getNodeAtPath(layout, [0]).split.regions.reduce((sum, r) => sum + r.size, 0);
+      expect(sumOf(l)).toBe(100);
+      while (getNodeAtPath(l, [0]).split.regions.length < MAX_TOP_REGIONS) {
+        l = addSubRegionAtPath(l, [0]);
+        const count = getNodeAtPath(l, [0]).split.regions.length;
+        expect({ count, sum: sumOf(l) }).toEqual({ count, sum: 100 });
+      }
+    });
+
+    it("normalizes drifted sub-region sizes from a saved layout on read (calvin-20gu)", () => {
+      const saved = {
+        preset: "split_two",
+        regions: [
+          {
+            id: "region-1",
+            kind: "photos",
+            size: 50,
+            split: {
+              direction: "row",
+              regions: [
+                { id: "region-1-a", kind: "photos", size: 34 },
+                { id: "region-1-b", kind: "photos", size: 34 },
+                { id: "region-1-c", kind: "photos", size: 33 },
+              ],
+            },
+          },
+          { id: "region-2", kind: "photos", size: 50 },
+        ],
+      };
+      const subs = normalizeDashboardLayout(saved).regions[0].split.regions;
+      expect(subs).toHaveLength(3);
+      expect(subs.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
     it("removeRegionAtPath on one of 3+ top-level siblings rebalances to 100", () => {
       const three = addTopRegion(createDashboardLayoutFromPreset("split_two"));
       expect(three.regions).toHaveLength(3);

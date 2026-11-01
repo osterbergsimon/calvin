@@ -541,7 +541,10 @@ export function addSubRegionAtPath(layout, path) {
       instanceIds: [],
       size: newSize,
     };
-    return { ...target, split: { ...target.split, regions: [...scaled, newSub] } };
+    return {
+      ...target,
+      split: { ...target.split, regions: normalizeRegionPercentages([...scaled, newSub]) },
+    };
   });
 }
 
