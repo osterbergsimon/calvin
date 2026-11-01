@@ -42,6 +42,23 @@
         "title": "BackupSchedule",
         "type": "object"
       },
+      "Body_guest_upload_api_guest__token__uploads_post": {
+        "properties": {
+          "photos": {
+            "items": {
+              "format": "binary",
+              "type": "string"
+            },
+            "title": "Photos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "photos"
+        ],
+        "title": "Body_guest_upload_api_guest__token__uploads_post",
+        "type": "object"
+      },
       "Body_inspect_plugin_api_plugins_inspect_post": {
         "properties": {
           "file": {
@@ -946,6 +963,40 @@
         "title": "CreateKeyBody",
         "type": "object"
       },
+      "CreateLinkBody": {
+        "properties": {
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "maximum": 365.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days"
+          },
+          "folder": {
+            "minLength": 1,
+            "title": "Folder",
+            "type": "string"
+          },
+          "name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "folder"
+        ],
+        "title": "CreateLinkBody",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1308,6 +1359,21 @@
           "plugin_id"
         ],
         "title": "PluginTypeConfigUpdateResponse",
+        "type": "object"
+      },
+      "RenameLinkBody": {
+        "properties": {
+          "name": {
+            "maxLength": 40,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "RenameLinkBody",
         "type": "object"
       },
       "SealedModeBody": {
@@ -2487,6 +2553,271 @@
         "summary": "Demo Calendar",
         "tags": [
           "demo"
+        ]
+      }
+    },
+    "/api/guest/{token}": {
+      "get": {
+        "description": "What the guest page shows: the link's name and the upload limits.",
+        "operationId": "guest_info_api_guest__token__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guest Info",
+        "tags": [
+          "share"
+        ]
+      }
+    },
+    "/api/guest/{token}/manifest.webmanifest": {
+      "get": {
+        "description": "Per-link PWA manifest: installable, and an Android share target.",
+        "operationId": "guest_manifest_api_guest__token__manifest_webmanifest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guest Manifest",
+        "tags": [
+          "share"
+        ]
+      }
+    },
+    "/api/guest/{token}/uploads": {
+      "get": {
+        "description": "Photos sent from this phone through this link, newest first.",
+        "operationId": "guest_uploads_api_guest__token__uploads_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guest Uploads",
+        "tags": [
+          "share"
+        ]
+      },
+      "post": {
+        "operationId": "guest_upload_api_guest__token__uploads_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_guest_upload_api_guest__token__uploads_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guest Upload",
+        "tags": [
+          "share"
+        ]
+      }
+    },
+    "/api/guest/{token}/uploads/{image_id}": {
+      "delete": {
+        "description": "Remove one of this phone's own uploads (file and record).",
+        "operationId": "guest_remove_upload_api_guest__token__uploads__image_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guest Remove Upload",
+        "tags": [
+          "share"
+        ]
+      }
+    },
+    "/api/guest/{token}/uploads/{image_id}/thumbnail": {
+      "get": {
+        "operationId": "guest_thumbnail_api_guest__token__uploads__image_id__thumbnail_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Guest Thumbnail",
+        "tags": [
+          "share"
         ]
       }
     },
@@ -5013,6 +5344,177 @@
         "summary": "Put Sealed Mode Setting",
         "tags": [
           "security"
+        ]
+      }
+    },
+    "/api/share/folders": {
+      "get": {
+        "description": "Existing Local photos subfolders, to pick a link's folder from.",
+        "operationId": "list_share_folders_api_share_folders_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Share Folders",
+        "tags": [
+          "share"
+        ]
+      }
+    },
+    "/api/share/links": {
+      "get": {
+        "description": "Every link, newest first, with its guest URL path (admin read).",
+        "operationId": "list_share_links_api_share_links_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Share Links",
+        "tags": [
+          "share"
+        ]
+      },
+      "post": {
+        "operationId": "create_share_link_api_share_links_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLinkBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Share Link",
+        "tags": [
+          "share"
+        ]
+      }
+    },
+    "/api/share/links/{link_id}": {
+      "delete": {
+        "description": "Revoke at once; optionally delete the photos guests sent through it.",
+        "operationId": "revoke_share_link_api_share_links__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "remove_photos",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Remove Photos",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Share Link",
+        "tags": [
+          "share"
+        ]
+      },
+      "patch": {
+        "operationId": "rename_share_link_api_share_links__link_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameLinkBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Share Link",
+        "tags": [
+          "share"
         ]
       }
     },

@@ -134,6 +134,7 @@ from app.api.routes import (  # noqa: E402
     kiosks,
     plugins,
     security,
+    share,
     system,
 )
 from app.mcp_server.gateway import mcp_gateway  # noqa: E402
@@ -666,6 +667,8 @@ app.include_router(system.router, prefix="/api/system", tags=["system"])
 app.include_router(security.router, prefix="/api", tags=["security"])
 app.include_router(backup.router, prefix="/api", tags=["backup"])
 app.include_router(demo.router, prefix="/api", tags=["demo"])
+app.include_router(share.router, prefix="/api", tags=["share"])
+app.include_router(share.share_target_router)
 
 # MCP server (CLV-33). Not a FastAPI route, so the gateway authenticates itself:
 # every request needs a bearer API key. Both spellings avoid a redirect on POST.
@@ -747,6 +750,26 @@ if frontend_dist.exists():
     @app.api_route("/sw.js", methods=["GET", "HEAD"], include_in_schema=False)
     async def serve_service_worker():
         return await serve_frontend_public_file("sw.js")
+
+    # The guest page of a share link (calvin-mwqo) links its own PWA manifest,
+    # so "Add to Home screen" installs this link and Android's Share menu offers
+    # it. The page itself is the SPA; a dead token is explained there.
+    @app.get("/share/{token}", include_in_schema=False)
+    @app.get("/share/{token}/", include_in_schema=False)
+    async def serve_share_page(token: str):
+        from fastapi import HTTPException
+        from fastapi.responses import HTMLResponse
+
+        index_path = frontend_dist / "index.html"
+        if not index_path.exists():
+            raise HTTPException(status_code=404, detail="Not found")
+        return HTMLResponse(
+            share.share_page_html(index_path.read_text(encoding="utf-8"), token),
+            headers={
+                "Cache-Control": "no-store",
+                "Referrer-Policy": "no-referrer",
+            },
+        )
 
     # Serve index.html for root path
     @app.get("/", operation_id="root__get", summary="Root")
