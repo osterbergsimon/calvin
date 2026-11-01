@@ -36,7 +36,11 @@
               </span>
             </div>
           </div>
-          <span v-if="selectedThemeId === theme.id" class="theme-selected-badge"> ✓ </span>
+          <span v-if="selectedThemeId === theme.id" class="theme-selected-badge">
+            <svg class="theme-selected-badge__glyph" viewBox="0 0 24 24" aria-hidden="true">
+              <path :d="mdiCheck" fill="currentColor" />
+            </svg>
+          </span>
         </div>
         <div class="theme-selection-info">
           <strong>{{ theme.name }}</strong>
@@ -58,6 +62,7 @@
 </template>
 
 <script setup>
+import { mdiCheck } from "@mdi/js";
 import Tag from "@/components/ui/Tag.vue";
 import { themePalette } from "@/utils/themePalettes";
 
@@ -250,7 +255,7 @@ const hasHueWarning = theme =>
   height: 1rem;
   border-radius: var(--radius-xs);
   font-size: var(--fs-3xs);
-  font-weight: 600;
+  font-weight: var(--weight-title);
 }
 
 .mini-tag {
@@ -261,7 +266,7 @@ const hasHueWarning = theme =>
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   font-size: var(--fs-3xs);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
 }
 
 .theme-selected-badge {
@@ -277,8 +282,13 @@ const hasHueWarning = theme =>
   align-items: center;
   justify-content: center;
   font-size: var(--fs-control);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   box-shadow: 0 2px 4px var(--shadow);
+}
+
+.theme-selected-badge__glyph {
+  width: 1em;
+  height: 1em;
 }
 
 .theme-selection-info {

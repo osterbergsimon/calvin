@@ -14,7 +14,6 @@ export const roleLint = {
     "components/EventDetailPanel.vue",
     "components/WebServiceViewer.vue",
     "components/service/IframeViewer.vue",
-    "components/settings/shared/ClockBarFontSizePicker.vue",
     "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
   ],
   baseline: [

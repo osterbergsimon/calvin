@@ -145,9 +145,8 @@
                   role="img"
                   :aria-label="`${nameFor(k)}: offline, display settings waiting`"
                   title="Offline. It will apply the new display settings when it's back."
-                >
-                  ⚠
-                </Tag>
+                  :icon="mdiAlert"
+                />
               </template>
             </ListRow>
 
@@ -251,11 +250,10 @@
           </template>
           <template #actions>
             <label class="screen-page__show">
-              <input
-                type="checkbox"
-                :checked="showsPage(page.id)"
+              <ToggleSwitch
+                :model-value="showsPage(page.id)"
                 :aria-label="`Show ${page.name} on this screen`"
-                @change="e => togglePage(page.id, e.target.checked)"
+                @update:model-value="value => togglePage(page.id, value)"
               />
               <span>Show</span>
             </label>
@@ -526,6 +524,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { mdiAlert } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
 import {

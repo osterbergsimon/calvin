@@ -188,7 +188,7 @@ onUnmounted(() => {
 .annunciator__eyebrow {
   font-family: var(--font-data);
   font-size: var(--fs-micro);
-  font-weight: 600;
+  font-weight: var(--weight-title);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--sev);
