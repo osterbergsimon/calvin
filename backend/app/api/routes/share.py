@@ -291,6 +291,10 @@ async def create_share_link(body: CreateLinkBody):
                 "message": "Use letters, numbers, spaces, - or _ for the folder name.",
             },
         ) from None
+    plugin = _local_photos()
+    if plugin is not None:
+        # Make the folder part of the library now; the first upload would too.
+        plugin.mark_share_folder(link["folder"])
     logger.info("Share link created: {} ({}) -> {}", link["id"], link["name"], link["folder"])
     return {"link": _with_path(link)}
 

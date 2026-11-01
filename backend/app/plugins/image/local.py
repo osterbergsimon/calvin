@@ -15,6 +15,10 @@ from app.plugins.protocols import ImagePlugin
 from app.utils.photo_folders import RESERVED_FOLDERS, InvalidFolder, normalize_folder
 
 
+# A share-link folder holds this hidden file; only such subfolders are scanned.
+SHARE_FOLDER_MARKER = ".calvin-share"
+
+
 def _default_image_dir() -> Path:
     """Resolve the image directory: IMAGE_DIR env var, else settings.image_dir.
 
@@ -251,7 +255,12 @@ class LocalImagePlugin(ImagePlugin):
         return images
 
     def _folder_dirs(self) -> list[Path]:
-        """One-level subfolders that hold photos (not thumbnails/, not hidden)."""
+        """Share-link folders: one-level subfolders that carry the share marker.
+
+        Any other subfolder (an owner's archive, backups) stays out of the
+        library, exactly as before share links existed. The marker stays when a
+        link is revoked, so photos kept after a revoke stay on show.
+        """
         if not self.image_dir.exists():
             return []
         return sorted(
@@ -260,7 +269,15 @@ class LocalImagePlugin(ImagePlugin):
             if child.is_dir()
             and not child.name.startswith(".")
             and child.name.casefold() not in RESERVED_FOLDERS
+            and (child / SHARE_FOLDER_MARKER).is_file()
         )
+
+    def mark_share_folder(self, folder: str) -> Path:
+        """Create ``folder`` if needed and make it part of the library (share links)."""
+        target = self.image_dir / normalize_folder(folder)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / SHARE_FOLDER_MARKER).touch(exist_ok=True)
+        return target
 
     def _candidate_files(self) -> list[Path]:
         """Entries of the image dir, then of each photo subfolder (calvin-mwqo)."""
@@ -270,7 +287,7 @@ class LocalImagePlugin(ImagePlugin):
         return entries
 
     def list_folders(self) -> list[str]:
-        """Names of the photo subfolders, sorted."""
+        """Names of the share-link folders, sorted."""
         return [folder.name for folder in self._folder_dirs()]
 
     def _safe_upload_path(self, filename: str, target_dir: Path | None = None) -> Path:
@@ -313,8 +330,7 @@ class LocalImagePlugin(ImagePlugin):
             self.image_dir.mkdir(parents=True, exist_ok=True)
             target_dir = self.image_dir
             if folder is not None:
-                target_dir = self.image_dir / normalize_folder(folder)
-                target_dir.mkdir(exist_ok=True)
+                target_dir = self.mark_share_folder(folder)
             file_path = self._safe_upload_path(filename, target_dir)
             with open(file_path, "xb") as f:
                 f.write(file_data)
