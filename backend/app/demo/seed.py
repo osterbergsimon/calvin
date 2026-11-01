@@ -1,7 +1,9 @@
 """Seed and clear realistic sample content for demos (CLV-67).
 
 ``python -m app.demo seed`` adds a sample calendar, twelve bundled CC0 photos,
-two dashboard pages and a room name, all clearly marked as demo content.
+and two dashboard pages, all clearly marked as demo content. It seeds no room
+name: that is a registered screen's own Name (CLV-111), and the demo creates no
+screen.
 ``clear`` removes exactly what the seed created and leaves everything the user
 made untouched.
 
@@ -42,6 +44,7 @@ PHOTO_ASSETS_DIR = Path(__file__).resolve().parent / "assets" / "photos"
 SCREEN_CALENDAR_ID = "demo-screen-calendar"
 SCREEN_PHOTO_ID = "demo-screen-photo-frame"
 DEMO_SCREEN_IDS = (SCREEN_CALENDAR_ID, SCREEN_PHOTO_ID)
+# Older seeds wrote this as the retired global room name; clear still undoes it.
 DEMO_ROOM_NAME = "Demo Room"
 
 # The shipped single Home page (backend defaults in main._initialize_default_config
@@ -144,7 +147,7 @@ def _merge(existing: list[str], new: list[str]) -> list[str]:
     return list(dict.fromkeys([*existing, *new]))
 
 
-# ── pages / room ────────────────────────────────────────────────────────────
+# ── pages ────────────────────────────────────────────────────────────────
 def _demo_screens() -> list[dict[str, Any]]:
     return [
         {
@@ -308,19 +311,7 @@ async def _seed_pages(manifest: dict[str, Any]) -> dict[str, Any]:
     )
     manifest["screens"] = _merge(manifest["screens"], [s["id"] for s in demo_screens])
 
-    room = await config_service.get_value("displayName")
-    room_created = False
-    if not room:
-        if "displayName" not in manifest["config"]:
-            manifest["config"]["displayName"] = {"previous": room}
-        await config_service.set_value("displayName", DEMO_ROOM_NAME)
-        room_created = True
-
-    return {
-        "created": True,
-        "screens": [s["id"] for s in demo_screens],
-        "room_name": DEMO_ROOM_NAME if room_created else None,
-    }
+    return {"created": True, "screens": [s["id"] for s in demo_screens]}
 
 
 # ── photos ──────────────────────────────────────────────────────────────────
@@ -487,6 +478,7 @@ async def clear_demo(*, data_dir: Path, image_dir: Path) -> dict[str, Any]:
                 else:
                     await config_service.delete_value("dashboard_screens")
 
+    # Only a manifest from an older release records the global room name.
     room_entry = (manifest.get("config") or {}).get("displayName")
     if room_entry is not None:
         current = await config_service.get_value("displayName")

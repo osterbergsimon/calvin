@@ -108,6 +108,7 @@ async def record_kiosk(
                 viewport=viewport,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
+            await _adopt_global_room_name()
             return
         except _INTEGRITY_ERRORS:
             # Lost a create race: another request inserted this id between our
@@ -270,14 +271,23 @@ async def get_overrides(kiosk_id: str) -> dict | None:
 _GLOBAL_NAME_KEYS = ("displayName", "display_name")
 
 
+def _has_screen_name(overrides: dict | None) -> bool:
+    value = (overrides or {}).get("displayName")
+    return isinstance(value, str) and bool(value.strip())
+
+
 @retry_on_db_locked()
 async def migrate_global_room_name() -> None:
-    """Move the retired global room name onto the one screen that can own it (CLV-84).
+    """Copy the retired global room name onto every unnamed screen (CLV-84, CLV-111).
 
     The room name is per-screen now: a screen's own ``displayName`` override.
-    A value left in the global config is moved to the only screen without a name
-    when there is exactly one such screen; otherwise it is dropped. Deleting the
-    global keys makes a second run a no-op.
+    A value left in the global config is copied to each screen that has no name
+    of its own; screens that already have one keep it. The global keys are then
+    deleted, which makes a second run a no-op. With no screens registered yet
+    there is nothing to copy it to, so the old key is kept; it runs again at
+    startup and whenever a new screen row is created (see
+    :func:`_adopt_global_room_name`), so the first screen to register after an
+    upgrade still gets the name.
     """
     from app.services.config_service import config_service
 
@@ -291,23 +301,36 @@ async def migrate_global_room_name() -> None:
         return
 
     rows = await KioskDB.objects.all()
-    unnamed = [row for row in rows if not (row.overrides or {}).get("displayName")]
-    if len(unnamed) == 1:
-        target = unnamed[0]
-        overrides = dict(target.overrides or {})
+    if not rows:
+        logger.info("Kept the global room name until a screen registers")
+        return
+
+    for row in rows:
+        if _has_screen_name(row.overrides):
+            continue
+        overrides = dict(row.overrides or {})
         overrides["displayName"] = global_name
-        target.overrides = overrides
-        await target.update()
-        logger.info(f"Moved the global room name onto screen {target.id!r}")
-    else:
-        logger.warning(
-            f"Dropped the global room name {global_name!r}: {len(unnamed)} unnamed screens; "
-            "set it per screen in Settings › Screens"
-        )
+        row.overrides = overrides
+        # Write only this column so a concurrent record_kiosk heartbeat
+        # (last_seen, agent_*) is not overwritten by this stale snapshot.
+        await row.update(_columns=["overrides"])
+        logger.info(f"Copied the global room name onto screen {row.id!r}")
 
     for key in _GLOBAL_NAME_KEYS:
         await config_service.delete_value(key)
-    logger.info("Retired the global room name (CLV-84)")
+    logger.info("Retired the global room name")
+
+
+async def _adopt_global_room_name() -> None:
+    """Run the room-name migration after a new screen row is created.
+
+    Best effort: a failure is logged and never fails the registration; the
+    global key stays, so the next new screen or restart retries it.
+    """
+    try:
+        await migrate_global_room_name()
+    except Exception as exc:  # noqa: BLE001 - registration must not fail on this
+        logger.warning(f"Could not copy the global room name to a new screen: {exc}")
 
 
 @retry_on_db_locked()
@@ -321,6 +344,7 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
     if existing is None:
         try:
             await KioskDB.objects.create(id=kiosk_id, last_seen=now, overrides=overrides)
+            await _adopt_global_room_name()
             return
         except _INTEGRITY_ERRORS:
             # Lost a create race: another request inserted this id between our

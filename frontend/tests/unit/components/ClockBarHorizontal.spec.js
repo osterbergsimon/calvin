@@ -225,11 +225,9 @@ describe("ClockBarHorizontal", () => {
 
   it("shows nothing in an unnamed screen's clock bar", async () => {
     window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
-    // Even a stale global name never reaches the bar: only the screen's own
-    // Name override does (CLV-84).
+    // Only the screen's own Name override reaches the bar (CLV-84).
     const store = useConfigStore();
     store.showUI = true;
-    store.displayName = "Global lounge";
     const kiosks = useKiosksStore();
     kiosks.kiosks = [{ id: "kitchen", hostname: "kitchen-pi", overrides: {} }];
     kiosks.loadKiosks = vi.fn(async () => {});
@@ -244,7 +242,6 @@ describe("ClockBarHorizontal", () => {
   it("shows no room in a browser that is not a set-up screen", async () => {
     const store = useConfigStore();
     store.showUI = true;
-    store.displayName = "Lounge";
     const wrapper = mount(ClockBarHorizontal, {
       props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
       global: { stubs: { BarActionCluster: true } },

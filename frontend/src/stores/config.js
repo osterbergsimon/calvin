@@ -83,7 +83,6 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarVerticalPluginItemSize = ref(16);
   const clockBarShowPluginItems = ref(true);
   const clockBarShowLogo = ref(true);
-  const displayName = ref("");
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
   const loadingLight = ref("comet"); // Loading light style: 'comet' | 'pulse' | 'off' (CLV-115)
@@ -178,7 +177,6 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
-    displayName,
     focusLightMode,
     focusLightDimOthers,
     loadingLight,
@@ -575,9 +573,6 @@ export const useConfigStore = defineStore("config", () => {
     imageDisplayMode.value = mode;
   };
 
-  const setDisplayName = name => {
-    displayName.value = name;
-  };
   const setFocusLightMode = mode => {
     focusLightMode.value = mode;
   };
@@ -657,7 +652,6 @@ export const useConfigStore = defineStore("config", () => {
     devMode,
     pluginRepositoryUrl,
     pluginCatalogRepo,
-    displayName,
     focusLightMode,
     focusLightDimOthers,
     loadingLight,
@@ -709,7 +703,6 @@ export const useConfigStore = defineStore("config", () => {
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,
-    setDisplayName,
     setFocusLightMode,
     setFocusLightDimOthers,
     setTouchControls,
