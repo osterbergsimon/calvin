@@ -26,14 +26,16 @@ describe("CalendarView per-region view", () => {
     useConfigStore().showUI = true;
   });
 
-  it("derives the view-switch label from the view prop, not global config", () => {
+  it("derives the selected view-switch segment from the view prop, not global config", () => {
     const w = mountCalendar({ mode: "week", rolling: false, weeks: 4, days: 7 }, { focused: true });
-    expect(w.find(".calendar-header__view-label").text()).toBe("Week");
+    expect(w.find(".calendar-header__view-switch .seg__btn.on").text()).toBe("Week");
   });
 
-  it("labels a rolling base view with a rolling suffix", () => {
+  it("names a rolling base view with a rolling suffix", () => {
     const w = mountCalendar({ mode: "month", rolling: true, weeks: 4, days: 7 }, { focused: true });
-    expect(w.find(".calendar-header__view-label").text()).toBe("Month · Rolling");
+    expect(w.find(".calendar-header__view-switch").attributes("aria-label")).toContain(
+      "Month · Rolling"
+    );
   });
 
   it("renders weeks*7 day cells for month-rolling", async () => {
@@ -80,14 +82,17 @@ describe("CalendarView per-region view", () => {
     expect(headers[0]).toContain(String(new Date().getDate()));
   });
 
-  it("view-switch button cycles the region's base mode via updateRegionView", async () => {
+  it("view-switch segment sets the region's base mode via updateRegionView", async () => {
     const cfg = useConfigStore();
     cfg.updateRegionView = vi.fn().mockResolvedValue();
     const w = mountCalendar(
       { mode: "month", rolling: false, weeks: 4, days: 7 },
       { focused: true }
     );
-    await w.find(".calendar-header__view-switch").trigger("click");
+    const week = w
+      .findAll(".calendar-header__view-switch .seg__btn")
+      .find(b => b.text() === "Week");
+    await week.trigger("click");
     expect(cfg.updateRegionView).toHaveBeenCalledWith("r1", { mode: "week" });
   });
 
