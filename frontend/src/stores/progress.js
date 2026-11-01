@@ -13,7 +13,9 @@ import { logError } from "../utils/logger";
  * region's frame; without a regionId it belongs to the app frame (the whole
  * dashboard perimeter). Two or more regions loading at once promote to one app
  * light, and any app source takes the light over from a region, so there is
- * only ever one light at a time.
+ * only ever one light at a time. A light that is already showing moves to the
+ * new frame at once (no second light, no dark gap); only a light that never
+ * showed waits out the 400 ms delay.
  */
 
 export const PROGRESS_TIMING = Object.freeze({
@@ -48,7 +50,7 @@ export const useProgressStore = defineStore("progress", () => {
   const capTimers = new Map();
   // Frames whose light is currently showing (APP_FRAME or a region id).
   const visible = ref(new Set());
-  // frame → { showTimer, hideTimer, shownAt }. Not reactive.
+  // frame → timing state (see timersFor). Not reactive.
   const frameTimers = new Map();
   let trackSeq = 0;
 
@@ -119,13 +121,22 @@ export const useProgressStore = defineStore("progress", () => {
   });
 
   // ── Timing: a small state machine per frame ──────────────────────────────
+  // frame → { showTimer, showDueAt, hideTimer, shownAt }
   const timersFor = frame => {
     let timers = frameTimers.get(frame);
     if (!timers) {
-      timers = { showTimer: null, hideTimer: null, shownAt: 0 };
+      timers = { showTimer: null, showDueAt: 0, hideTimer: null, shownAt: 0 };
       frameTimers.set(frame, timers);
     }
     return timers;
+  };
+
+  const clearFrame = frame => {
+    const timers = frameTimers.get(frame);
+    if (!timers) return;
+    if (timers.showTimer) clearTimeout(timers.showTimer);
+    if (timers.hideTimer) clearTimeout(timers.hideTimer);
+    frameTimers.delete(frame);
   };
 
   const show = frame => {
@@ -136,13 +147,31 @@ export const useProgressStore = defineStore("progress", () => {
   };
 
   const hide = frame => {
-    const timers = timersFor(frame);
-    timers.hideTimer = null;
+    clearFrame(frame);
     visible.value.delete(frame);
-    frameTimers.delete(frame);
   };
 
-  const want = frame => {
+  /**
+   * Move a light that is already showing to another frame in one step: the new
+   * frame lights now, keeps the original `shownAt` (so the 800 ms minimum
+   * counts from when the light first appeared) and the old frame goes dark in
+   * the same mutation. No second light, no dark gap, no fresh 400 ms delay.
+   */
+  const moveLight = (from, to) => {
+    const { shownAt } = timersFor(from);
+    clearFrame(from);
+    clearFrame(to);
+    timersFor(to).shownAt = shownAt;
+    const next = new Set(visible.value);
+    next.delete(from);
+    next.add(to);
+    visible.value = next;
+  };
+
+  // `dueAt`: when the show delay that began with the work runs out. A frame
+  // taking over from one that never showed inherits that deadline, so the
+  // 400 ms counts from the first begin, not from the promotion.
+  const want = (frame, dueAt = Date.now() + PROGRESS_TIMING.showDelayMs) => {
     const timers = timersFor(frame);
     if (timers.hideTimer) {
       // Back-to-back work inside the linger window: keep the same light.
@@ -150,7 +179,8 @@ export const useProgressStore = defineStore("progress", () => {
       timers.hideTimer = null;
     }
     if (visible.value.has(frame) || timers.showTimer) return;
-    timers.showTimer = setTimeout(() => show(frame), PROGRESS_TIMING.showDelayMs);
+    timers.showDueAt = dueAt;
+    timers.showTimer = setTimeout(() => show(frame), Math.max(0, dueAt - Date.now()));
   };
 
   const release = frame => {
@@ -175,10 +205,22 @@ export const useProgressStore = defineStore("progress", () => {
   watch(
     wantedFrame,
     frame => {
-      for (const known of Array.from(frameTimers.keys())) {
-        if (known !== frame) release(known);
+      const others = Array.from(frameTimers.keys()).filter(known => known !== frame);
+      if (frame && !visible.value.has(frame)) {
+        const lit = others.find(known => visible.value.has(known));
+        if (lit) {
+          moveLight(lit, frame);
+        } else {
+          const pending = others
+            .map(known => frameTimers.get(known))
+            .filter(timers => timers.showTimer)
+            .map(timers => timers.showDueAt);
+          want(frame, pending.length ? Math.min(...pending) : undefined);
+        }
+      } else if (frame) {
+        want(frame);
       }
-      if (frame) want(frame);
+      for (const known of others) release(known);
     },
     { flush: "sync", immediate: true }
   );

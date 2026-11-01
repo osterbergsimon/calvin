@@ -203,6 +203,86 @@ describe("progress store: loading-light engine (CLV-115)", () => {
     });
   });
 
+  describe("handoff between frames (one light, no gap)", () => {
+    // Step through time 50 ms at a time and check the invariants at every step:
+    // never two lights, and never dark while work is active and a light was up.
+    const stepAndCheck = (ms, { expectLit = true } = {}) => {
+      for (let t = 0; t < ms; t += 50) {
+        vi.advanceTimersByTime(50);
+        expect(store.visibleFrames.length).toBeLessThanOrEqual(1);
+        if (expectLit && store.active) expect(store.visibleFrames.length).toBe(1);
+      }
+    };
+
+    it("moves a showing region light to the app at once when a second region begins", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      vi.advanceTimersByTime(400);
+      expect(store.visibleFrames).toEqual(["r1"]);
+      vi.advanceTimersByTime(100); // 500 ms
+      store.begin("photos:r2", { regionId: "r2" });
+      expect(store.visibleFrames).toEqual([APP_FRAME]);
+      stepAndCheck(2000);
+      expect(store.visibleFrames).toEqual([APP_FRAME]);
+    });
+
+    it("moves a long-showing region light to the app with no dark gap", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      vi.advanceTimersByTime(400);
+      stepAndCheck(5000);
+      store.begin("photos:r2", { regionId: "r2" });
+      expect(store.visibleFrames).toEqual([APP_FRAME]);
+      stepAndCheck(1000);
+    });
+
+    it("hands the app light back to the region at once, with no dark gap", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      vi.advanceTimersByTime(400);
+      stepAndCheck(1000);
+      store.begin("photos:r2", { regionId: "r2" });
+      stepAndCheck(3000);
+      store.end("photos:r2");
+      expect(store.visibleFrames).toEqual(["r1"]);
+      stepAndCheck(3000);
+      expect(store.visibleFrames).toEqual(["r1"]);
+    });
+
+    it("keeps the minimum from when the light first showed, across a move", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      vi.advanceTimersByTime(400); // shown at 400
+      store.begin("photos:r2", { regionId: "r2" }); // moved to app at 400
+      vi.advanceTimersByTime(100); // 500
+      store.end("calendar:r1");
+      store.end("photos:r2");
+      // Shown at 400 → held until 1200, not 500 + 800. (Ending r1 first hands
+      // the light to r2 for a moment; it is still the same single light.)
+      vi.advanceTimersByTime(699);
+      expect(store.visibleFrames.length).toBe(1);
+      vi.advanceTimersByTime(1);
+      expect(store.visibleFrames).toEqual([]);
+    });
+
+    it("an app source arriving while a region light shows takes it over at once", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      vi.advanceTimersByTime(600);
+      store.begin("statusbar");
+      expect(store.visibleFrames).toEqual([APP_FRAME]);
+      stepAndCheck(1000);
+      store.end("statusbar");
+      expect(store.visibleFrames).toEqual(["r1"]);
+      stepAndCheck(1000);
+    });
+
+    it("a frame that never showed still waits out the 400 ms from the first begin", () => {
+      store.begin("calendar:r1", { regionId: "r1" });
+      vi.advanceTimersByTime(200);
+      store.begin("photos:r2", { regionId: "r2" });
+      vi.advanceTimersByTime(199); // 399 ms since work began
+      expect(store.visibleFrames).toEqual([]);
+      vi.advanceTimersByTime(1);
+      expect(store.visibleFrames).toEqual([APP_FRAME]);
+    });
+  });
+
   describe("track()", () => {
     it("ends the source when the work resolves", async () => {
       let resolve;
