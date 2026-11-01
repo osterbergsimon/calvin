@@ -41,9 +41,7 @@ describe("guest path", () => {
 
   it("lets the guest page itself route normally (first load, query clean-up)", async () => {
     const load = vi.fn();
-    const router = routerWith(
-      createGuestGuard({ currentPath: () => "/share/abc.TOKEN/", load })
-    );
+    const router = routerWith(createGuestGuard({ currentPath: () => "/share/abc.TOKEN/", load }));
 
     await router.push("/share/abc.TOKEN/?added=1");
     await router.replace("/share/abc.TOKEN/");
@@ -54,9 +52,7 @@ describe("guest path", () => {
 
   it("turns leaving the guest page for the dashboard into a full page load", async () => {
     const load = vi.fn();
-    const router = routerWith(
-      createGuestGuard({ currentPath: () => "/share/abc.TOKEN/", load })
-    );
+    const router = routerWith(createGuestGuard({ currentPath: () => "/share/abc.TOKEN/", load }));
     await router.push("/share/abc.TOKEN/");
 
     await router.push("/");

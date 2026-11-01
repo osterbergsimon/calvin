@@ -2,9 +2,7 @@
   <SettingGroup title="Share links" data-test="share-links">
     <SettingRow label="Guest photos">
       <template #description>
-        <InlineNote
-          >Let guests add photos to one folder in Local photos from their phone.</InlineNote
-        >
+        <InlineNote>{{ DESCRIPTION }}</InlineNote>
         <InlineNote aria-live="polite" data-test="share-links-live">{{ liveMessage }}</InlineNote>
       </template>
       <Button
@@ -199,6 +197,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 // The URL (and so the QR code) can be shown again at any time; revoking is
 // immediate and can also remove the photos guests sent with the link.
 
+const DESCRIPTION = "Let guests add photos to one folder in Local photos from their phone.";
 const DEFAULT_FOLDER = "Guests";
 const expiryOptions = [
   { value: 0, label: "Until revoked" },
