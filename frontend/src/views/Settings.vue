@@ -73,6 +73,7 @@
               :git-repo-url="localConfig && localConfig.gitRepoUrl"
               :git-branch="(localConfig && localConfig.gitBranch) || 'develop'"
               :version="version"
+              :revision="revision"
               :frontend-version="frontendVersion"
               @update:config="handleConfigUpdate"
               @update:git-repo-url="handleGitRepoUrlUpdate"
@@ -436,6 +437,7 @@ const handleGitBranchUpdate = async branch => {
 
 // ── Version info (for DeviceCategory) ────────────────────────────────────────
 const version = ref(null);
+const revision = ref(null);
 const frontendVersion = ref(null);
 
 const getFrontendVersionFromMeta = () => {
@@ -453,6 +455,7 @@ onMounted(async () => {
   await Promise.all([loadConfig(), auth.fetchStatus()]);
   frontendVersion.value = getFrontendVersionFromMeta();
   version.value = localConfig.value?.version ?? null;
+  revision.value = localConfig.value?.revision ?? null;
 
   if (MIGRATED_CATEGORIES.has(activeCategory.value)) {
     await nextTick();
