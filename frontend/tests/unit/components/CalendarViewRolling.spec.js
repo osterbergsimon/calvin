@@ -38,6 +38,17 @@ describe("CalendarView per-region view", () => {
     );
   });
 
+  it("week view labels the date range without a debug-style suffix", async () => {
+    useConfigStore().weekStartDay = 0;
+    useCalendarStore().setCurrentDate(new Date(2026, 10, 1)); // Sunday 1 Nov 2026
+    const w = mountCalendar({ mode: "week", rolling: false, weeks: 4, days: 7 }, { focused: true });
+    await w.vm.$nextTick();
+
+    const title = w.find(".calendar-header__label").text();
+    expect(title).toBe("November 1 - 7, 2026");
+    expect(title).not.toMatch(/day:/i);
+  });
+
   it("renders weeks*7 day cells for month-rolling", async () => {
     const w = mountCalendar({ mode: "month", rolling: true, weeks: 3, days: 7 });
     await w.vm.$nextTick();
