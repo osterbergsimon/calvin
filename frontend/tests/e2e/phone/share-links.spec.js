@@ -11,86 +11,9 @@ import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
 import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import { GUEST, JPEG, TOKEN, installGuestMock } from "./fixtures/guest-mock.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
-
-const TOKEN = "abc123.SAMPLETOKEN";
-const GUEST = `/api/guest/${TOKEN}`;
-// A 1x1 JPEG, enough for the file picker and the multipart body.
-const JPEG = Buffer.from(
-  "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
-  "base64"
-);
-
-/** Mock the guest routes of one link. Returns the recorded state. */
-async function installGuestMock(page, { valid = true } = {}) {
-  const state = { uploads: [], posts: 0, deleted: [], shareTarget: null };
-  const thumb = id => ({
-    imageId: id,
-    uploadedAt: "2026-11-01T10:00:00Z",
-    thumbnail: `${GUEST}/uploads/${id}/thumbnail`,
-  });
-  await page.route("**/api/guest/**", async route => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    const method = request.method();
-    const reply = (body, status = 200) =>
-      route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-    if (!valid) return reply({ detail: { code: "share_link_invalid" } }, 404);
-    if (path === GUEST) return reply({ name: "Grandma", available: true, maxBytes: 26214400 });
-    if (path === `${GUEST}/manifest.webmanifest`) {
-      return route.fulfill({
-        status: 200,
-        contentType: "application/manifest+json",
-        body: JSON.stringify({
-          name: "Add photos to Calvin",
-          start_url: `/share/${TOKEN}/`,
-          scope: `/share/${TOKEN}/`,
-          display: "standalone",
-          icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }],
-          share_target: {
-            action: `/share/${TOKEN}/receive`,
-            method: "POST",
-            enctype: "multipart/form-data",
-            params: { files: [{ name: "photos", accept: ["image/*"] }] },
-          },
-        }),
-      });
-    }
-    if (path === `${GUEST}/uploads` && method === "GET") return reply({ uploads: state.uploads });
-    if (path === `${GUEST}/uploads` && method === "POST") {
-      state.posts += 1;
-      const added = thumb(`photo${state.posts}`);
-      state.uploads = [added, ...state.uploads];
-      return reply({ uploaded: [added], failed: [] });
-    }
-    const thumbMatch = path.match(/\/uploads\/([^/]+)\/thumbnail$/);
-    if (thumbMatch) return route.fulfill({ status: 200, contentType: "image/jpeg", body: JPEG });
-    const removeMatch = path.match(/\/uploads\/([^/]+)$/);
-    if (removeMatch && method === "DELETE") {
-      state.deleted.push(removeMatch[1]);
-      state.uploads = state.uploads.filter(u => u.imageId !== removeMatch[1]);
-      return route.fulfill({ status: 204, body: "" });
-    }
-    return reply({}, 404);
-  });
-  // Android's Share › Calvin photos: a multipart POST navigation to the
-  // manifest's share_target action, answered with a redirect to the page.
-  await page.route(`**/share/${TOKEN}/receive`, async route => {
-    const request = route.request();
-    state.shareTarget = {
-      method: request.method(),
-      contentType: request.headers()["content-type"] || "",
-      body: request.postDataBuffer()?.toString("latin1") || "",
-    };
-    state.uploads = [thumb("shared1"), ...state.uploads];
-    return route.fulfill({
-      status: 303,
-      headers: { location: `/share/${TOKEN}/?added=1&failed=0` },
-    });
-  });
-  return state;
-}
 
 test.describe("phone: share links", () => {
   test("owner creates a link, re-shows its QR code and revokes it", async ({
@@ -122,8 +45,8 @@ test.describe("phone: share links", () => {
       "/share/link1.SAMPLETOKEN/"
     );
 
-    await page.locator('[data-test="share-link-revoke"]').click();
-    await page.locator('[data-test="share-link-revoke-confirm"]').click();
+    await page.getByRole("button", { name: "Revoke Grandma" }).click();
+    await page.locator('[data-test="confirm-accept"]').click();
     await expect(page.locator('[data-test="share-link-row"]')).toHaveCount(0);
     expect(api.shareLinks).toEqual([]);
     expect(api.requests).toContain("DELETE /api/share/links/link1");
@@ -221,10 +144,44 @@ test.describe("phone: share links", () => {
   test("a revoked link explains itself", async ({ page }) => {
     await installGuestMock(page, { valid: false });
     await page.goto(`/share/${TOKEN}/`);
+    await expect(page.locator('[data-test="guest-invalid"]')).toBeVisible();
     await expect(page.locator('[data-test="guest-invalid"]')).toContainText(
       "This link doesn't work any more"
     );
     await expect(page.locator('[data-test="guest-add"]')).toHaveCount(0);
     await expectPhoneLayout(page, "revoked share link");
+  });
+});
+
+test.describe("phone: share links that ran out", () => {
+  test("an expired link explains itself when opened", async ({ page }) => {
+    await installGuestMock(page, { valid: false });
+    // What the share target redirect sends a dead link back to.
+    await page.goto(`/share/${TOKEN}/?error=invalid`);
+    await expect(page.locator('[data-test="guest-invalid"]')).toBeVisible();
+    await expect(page.locator('[data-test="guest-invalid"]')).toContainText(
+      "Ask the person who sent it for a new one."
+    );
+    await expect(page.locator('[data-test="guest-add"]')).toHaveCount(0);
+  });
+
+  test("a link that expires while the page is open stops taking photos", async ({
+    page,
+    consoleErrors,
+  }) => {
+    const guest = await installGuestMock(page, { expireOnUpload: true });
+    await page.goto(`/share/${TOKEN}/`);
+    const chooser = page.waitForEvent("filechooser");
+    await page.locator('[data-test="guest-add"]').click();
+    await (await chooser).setFiles([{ name: "one.jpg", mimeType: "image/jpeg", buffer: JPEG }]);
+
+    await expect(page.locator('[data-test="guest-invalid"]')).toBeVisible();
+    await expect(page.locator('[data-test="guest-invalid"]')).toContainText(
+      "This link doesn't work any more"
+    );
+    await expect(page.locator('[data-test="guest-add"]')).toHaveCount(0);
+    expect(guest.posts).toBe(0);
+    await expectPhoneLayout(page, "expired share link");
+    expect(consoleErrors.filter(line => !line.includes("404"))).toEqual([]);
   });
 });
