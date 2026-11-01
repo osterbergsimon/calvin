@@ -816,6 +816,41 @@ def test_config_url_appends_update_message():
     assert "kmsg=device%20python%20%3C%203.9" in url
 
 
+def test_config_url_appends_display_stack():
+    url = agent._config_url("http://s:8000", "k1", "pi", kstack="cog")
+    assert "kstack=cog" in url
+
+
+def test_fetch_config_reports_the_display_stack(monkeypatch, tmp_path):
+    """The agent tells the backend which display stack it runs (calvin-2ibz)."""
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "k1")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setenv("CALVIN_DISPLAY_STACK", "cog")
+    monkeypatch.setattr(agent, "running_version", lambda: "v9")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(url, timeout=None):
+        seen["url"] = url
+        return FakeResponse()
+
+    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
+
+    agent.fetch_config("http://s:8000")
+
+    assert "kstack=cog" in seen["url"]
+
+
 def test_update_report_reads_updater_state(tmp_path):
     (tmp_path / "agent-update-state.json").write_text(
         '{"status": "error", "phase": "python-too-old", '
