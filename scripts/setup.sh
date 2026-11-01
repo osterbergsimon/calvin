@@ -133,8 +133,10 @@ Usage: setup.sh [--mode prod|dev] [--display-stack auto|x11|wayland|cog] [--refr
                    to switch (X11 + Chromium stay installed for rollback).
   --refresh        Only re-install the host files from the checkout (compose
                    file, systemd units, helper scripts, sudoers, X/openbox
-                   config, display agent). No apt, Docker or git. update-calvin.sh
-                   runs this on every update; it keeps the recorded stack.
+                   config, display agent). No Docker or git, and no apt unless
+                   the stack needs a missing package (cog, labwc): that is
+                   installed before any unit changes. update-calvin.sh runs
+                   this on every update; it keeps the recorded stack.
 
 Environment overrides:
   GIT_REPO, GIT_BRANCH, CALVIN_DIR, CALVIN_DATA_DIR, CALVIN_IMAGE_TAG
@@ -148,7 +150,12 @@ parse_args() {
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --mode)
-                SETUP_MODE="${2:-}"
+                if [ "$#" -lt 2 ]; then
+                    echo "--mode needs a value" >&2
+                    usage >&2
+                    exit 1
+                fi
+                SETUP_MODE="$2"
                 shift 2
                 ;;
             --mode=*)
@@ -160,7 +167,12 @@ parse_args() {
                 shift
                 ;;
             --display-stack)
-                DISPLAY_STACK_ARG="${2:-}"
+                if [ "$#" -lt 2 ]; then
+                    echo "--display-stack needs a value" >&2
+                    usage >&2
+                    exit 1
+                fi
+                DISPLAY_STACK_ARG="$2"
                 shift 2
                 ;;
             --display-stack=*)
@@ -523,6 +535,10 @@ start_runtime_services() {
         start_systemd_service "calvin-app.service"
         if [ "${DISPLAY_STACK}" = "cog" ]; then
             # cog IS the browser on this stack: Chromium is not started at all.
+            # On a switch from X11, calvin-cog's Conflicts= stops calvin-x, but
+            # calvin-kiosk (Restart=always, no BindsTo on the compositor) would
+            # keep retrying its display wait until the reboot: stop it first.
+            systemctl stop calvin-kiosk.service >/dev/null 2>&1 || true
             start_systemd_service "calvin-cog.service"
         else
             if [ "${DISPLAY_STACK}" = "wayland" ]; then
@@ -568,6 +584,37 @@ install_full_packages() {
     fi
 }
 
+# The command a stack's own packages provide (none for x11: its set is always
+# installed).
+display_stack_command() {
+    case "${1:-x11}" in
+        cog) printf 'cog\n' ;;
+        wayland) printf 'labwc\n' ;;
+        *) return 0 ;;
+    esac
+}
+
+# --refresh skips apt, so a refresh that switches the host to a stack whose
+# packages are missing (e.g. `--refresh --display-stack cog` on an X11 host)
+# would enable a display unit with nothing to run: a black screen after the
+# reboot. Install the stack's packages first; if that still leaves the command
+# missing, stop here, before any unit is touched.
+ensure_display_stack_packages() {
+    local stack="$1" cmd
+    cmd="$(display_stack_command "${stack}")"
+    if [ -z "${cmd}" ] || command -v "${cmd}" >/dev/null 2>&1; then
+        return 0
+    fi
+    local -a pkgs=()
+    mapfile -t pkgs < <(display_stack_packages "${stack}")
+    log "Display stack ${stack} needs ${cmd}, which is not installed; installing ${pkgs[*]}..."
+    apt_get update -qq || log_warn "Could not update the package list"
+    install_system_packages "${pkgs[@]}"
+    if ! command -v "${cmd}" >/dev/null 2>&1; then
+        error_exit "Display stack ${stack} needs ${cmd}, which is still missing; no display unit was changed. Run a full setup: sudo bash setup.sh --display-stack ${stack}" 1
+    fi
+}
+
 main() {
     parse_args "$@"
     require_fixed_calvin_user
@@ -579,6 +626,7 @@ main() {
     if [ "${REFRESH_ONLY}" = 1 ]; then
         log "Refreshing Calvin host files from ${CALVIN_DIR} (mode ${SETUP_MODE})..."
         verify_directory "${CALVIN_DIR}"
+        ensure_display_stack_packages "${DISPLAY_STACK}"
         refresh_host_files
         if systemd_available; then
             systemctl try-restart calvin-display-agent.service || true

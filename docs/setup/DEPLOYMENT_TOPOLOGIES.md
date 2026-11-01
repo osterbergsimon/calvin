@@ -43,12 +43,15 @@ The kiosk browser follows the same display-stack rule as a kiosk Pi (see
   migrated silently. Re-run setup with `--display-stack cog` to move it.
 - X11 + Chromium stay installed on every stack, so switching back is one
   re-run of setup with `--display-stack x11`, not a reimage.
+- `setup.sh --refresh` skips apt, except when the stack it applies needs a
+  package that is missing (`cog`, or `labwc` on Wayland): it installs that
+  first, and stops before changing any display unit if the install fails.
 
-The screen on/off schedule needs `vcgencmd`/`xset` (or, on cog, the panel helper) on the host, which the
-container does not have, so setup also installs the same
-`calvin-display-agent.service` the kiosk Pis use, pointed at
-`http://localhost:$CALVIN_PORT` (it reads the global config; it does not show up
-under Settings → Screens). Rotation and output settings go in
+The screen on/off schedule needs `vcgencmd`/`xset` (or, on cog, the panel
+helper) on the host, which the container does not have, so setup also installs
+the same `calvin-display-agent.service` the kiosk Pis use, pointed at
+`http://localhost:$CALVIN_PORT` (it reads the global config; it does not show
+up under Settings → Screens). Rotation and output settings go in
 `/etc/default/calvin-kiosk` exactly as on a kiosk Pi.
 
 ## Mode B — Remote backend + kiosk Pi

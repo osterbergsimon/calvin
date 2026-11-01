@@ -998,6 +998,9 @@ requested_display_stack() {
         resolve_display_stack "${existing:-x11}"
         return
     fi
+    # calvin-kiosk.service is the all-in-one Chromium unit: setup-kiosk.sh never
+    # installs it, so on a remote kiosk this only matches a Pi that used to be
+    # an all-in-one install (which is X11 as well).
     if [ -f "${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}/calvin-kiosk.service" ]; then
         resolve_display_stack x11
         return
