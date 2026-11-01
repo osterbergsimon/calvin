@@ -18,12 +18,13 @@ import { migrateDisplaySettings } from "../utils/displaySettingsMigration";
 import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
 import {
   decodeScreenValue,
-  encodeScreenValue,
   readScreenStorage,
   screenSettingRef,
   screenStorageKey,
+  writeScreenSetting,
 } from "../utils/screenSetting";
 import { useKiosksStore } from "./kiosks";
+import { useNotificationsStore } from "./notifications";
 
 // The config is what a kiosk boots from, so its offline copy is kept for a day
 // and served (flagged stale) even after that when the backend is unreachable.
@@ -219,6 +220,7 @@ export const useConfigStore = defineStore("config", () => {
   // shared with useScreenSetting, so the Settings rows and the dashboard ⋯
   // menu always write the same value.
   const kioskScope = Boolean(getKioskId());
+  const notifications = useNotificationsStore();
   const showUIScreenStorage = screenStorageKey("showUI");
   const clockBarInKioskScreenStorage = screenStorageKey("clockBarShowInKiosk");
   const tapAnywhereScreenStorage = screenStorageKey("tapAnywhereReveal");
@@ -232,35 +234,18 @@ export const useConfigStore = defineStore("config", () => {
     tapAnywhereScreenRaw.value = readScreenStorage(tapAnywhereScreenStorage);
   }
 
-  const decodeScreenChoice = (raw, fallback) => decodeScreenValue(raw, fallback);
   const effectiveShowUI = computed(() => {
     if (kioskScope) return showUI.value;
-    return decodeScreenChoice(showUIScreenRaw.value, true) ?? showUI.value;
+    return decodeScreenValue(showUIScreenRaw.value, true) ?? showUI.value;
   });
   const effectiveClockBarShowInKiosk = computed(() => {
     if (kioskScope) return clockBarShowInKiosk.value;
-    return decodeScreenChoice(clockBarInKioskScreenRaw.value, false) ?? clockBarShowInKiosk.value;
+    return decodeScreenValue(clockBarInKioskScreenRaw.value, false) ?? clockBarShowInKiosk.value;
   });
   const effectiveTapAnywhereReveal = computed(() => {
     if (kioskScope) return tapAnywhereReveal.value;
-    return decodeScreenChoice(tapAnywhereScreenRaw.value, false) ?? tapAnywhereReveal.value;
+    return decodeScreenValue(tapAnywhereScreenRaw.value, false) ?? tapAnywhereReveal.value;
   });
-
-  const writeScreenControl = async (key, storageKey, raw, next) => {
-    if (kioskScope) {
-      const kiosksStore = useKiosksStore();
-      const overrides = (await kiosksStore.fetchOverrides(getKioskId())) || {};
-      await kiosksStore.saveOverrides(getKioskId(), { ...overrides, [key]: next });
-      configRefs[key].value = next;
-      return;
-    }
-    raw.value = encodeScreenValue(next);
-    try {
-      window.localStorage.setItem(storageKey, raw.value);
-    } catch {
-      // Storage blocked: the choice lasts for this page load.
-    }
-  };
 
   const setOrientation = newOrientation => {
     orientation.value = newOrientation;
@@ -436,9 +421,25 @@ export const useConfigStore = defineStore("config", () => {
     // This screen's own choice: a kiosk override, or this browser's storage.
     // The global value stays the default for screens that have no choice.
     try {
-      await writeScreenControl("showUI", showUIScreenStorage, showUIScreenRaw, newValue);
+      await writeScreenSetting({
+        kioskId: kioskScope ? getKioskId() : null,
+        key: "showUI",
+        storageKey: showUIScreenStorage,
+        next: newValue,
+        raw: showUIScreenRaw,
+        kiosksStore: useKiosksStore(),
+        applyServerValue: value => {
+          showUI.value = value;
+        },
+      });
     } catch (err) {
+      // The stored value still decides what is on screen.
       logError("[ConfigStore]", "Failed to save UI visibility:", err);
+      notifications.notify({
+        severity: "error",
+        message:
+          "Couldn't save the controls setting for this screen. The stored value is unchanged.",
+      });
     }
   };
 

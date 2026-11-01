@@ -35,6 +35,36 @@ export function encodeScreenValue(value) {
   return typeof value === "boolean" ? (value ? "true" : "false") : String(value);
 }
 
+/**
+ * Persist one screen's choice. A kiosk writes the value into its overrides;
+ * any other browser keeps it in the shared localStorage ref. The kiosk value is
+ * applied to `applyServerValue` only after the save succeeds, so a failed save
+ * leaves the UI matching what the server still has. Throws on that failure.
+ */
+export async function writeScreenSetting({
+  kioskId,
+  key,
+  storageKey,
+  next,
+  raw,
+  kiosksStore,
+  applyServerValue,
+}) {
+  if (kioskId) {
+    const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
+    await kiosksStore.saveOverrides(kioskId, { ...overrides, [key]: next });
+    applyServerValue?.(next);
+    return;
+  }
+
+  raw.value = encodeScreenValue(next);
+  try {
+    window.localStorage.setItem(storageKey, raw.value);
+  } catch {
+    // Storage blocked: the choice lasts for this page load.
+  }
+}
+
 // Decode a stored string using the server/default value's type. A string
 // setting keeps the raw text; a boolean never comes back as the truthy string
 // "false". null means "no choice of this screen's own".
