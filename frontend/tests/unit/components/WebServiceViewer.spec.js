@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
+import { mdiChevronLeft, mdiChevronRight, mdiFullscreen } from "@mdi/js";
 import WebServiceViewer from "@/components/WebServiceViewer.vue";
 import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
@@ -212,6 +213,30 @@ describe("WebServiceViewer control consolidation", () => {
   it("still shows the Enter Fullscreen control with a pointer present", () => {
     const w = mount2({ isFullscreen: false, serviceId: "b", focused: true });
     expect(w.find('[title="Enter Fullscreen"]').exists()).toBe(true);
+  });
+
+  it("follows Dashboard size for the header controls", () => {
+    const cfg = useConfigStore();
+    cfg.touchControlSize = "xsmall";
+    const small = mount2({ isFullscreen: true, focused: true });
+    cfg.touchControlSize = "xlarge";
+    const large = mount2({ isFullscreen: true, focused: true });
+    const rail = w =>
+      w.find(".region-header-controls").element.style.getPropertyValue("--region-rail-h");
+
+    expect(rail(small)).toBe("22px");
+    expect(rail(large)).toBe("40px");
+  });
+
+  it("uses mdi chevrons for service navigation, not text glyphs", () => {
+    const w = mount2({ isFullscreen: true, focused: true });
+    const paths = w.findAll(".region-header-controls .icon-btn path").map(p => p.attributes("d"));
+    expect(paths).toEqual([mdiChevronLeft, mdiChevronRight]);
+  });
+
+  it("uses the mdi fullscreen icon on a focused region", () => {
+    const w = mount2({ isFullscreen: false, serviceId: "b", focused: true });
+    expect(w.find(".region-header-controls .icon-btn path").attributes("d")).toBe(mdiFullscreen);
   });
 });
 

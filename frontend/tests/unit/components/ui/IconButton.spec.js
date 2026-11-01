@@ -52,6 +52,16 @@ describe("IconButton", () => {
     expect(w.find("[data-test='glyph']").exists()).toBe(true);
   });
 
+  it("draws an @mdi/js icon at the button's type size", () => {
+    const w = mount(IconButton, {
+      props: { label: "Next", icon: "M0 0h24v24H0z" },
+    });
+    const glyph = w.find("svg.icon-btn__glyph");
+    expect(glyph.exists()).toBe(true);
+    expect(glyph.find("path").attributes("d")).toBe("M0 0h24v24H0z");
+    expect(w.text()).toBe("");
+  });
+
   it("accepts the custom size escape-hatch (consumer drives --icon-size/--icon-font)", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const w = mount(IconButton, { props: { label: "Next", size: "custom" } });

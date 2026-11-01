@@ -11,7 +11,7 @@
       >
         <!-- Sliders/"tune" glyph: reads as "adjust what I'm looking at", distinct
              from a settings gear (which lives in the Settings screen). -->
-        <svg class="tune-glyph" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+        <svg class="tune-glyph" viewBox="0 0 24 24" aria-hidden="true">
           <line x1="4" y1="7" x2="20" y2="7" />
           <line x1="4" y1="12" x2="20" y2="12" />
           <line x1="4" y1="17" x2="20" y2="17" />
@@ -64,6 +64,9 @@ defineExpose({ open });
    component's scope, so these scoped selectors reach it. The glyph inherits
    the button's `color`, so IconButton's active state (--focus) lights it up. */
 .tune-glyph {
+  /* 1em tracks IconButton size="custom" (--icon-font), i.e. the region glyph. */
+  width: 1em;
+  height: 1em;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;

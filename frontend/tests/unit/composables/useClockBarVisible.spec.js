@@ -1,6 +1,6 @@
 /** useClockBarVisible (CLV-48): decides when the floating pill takes over. */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import { createMemoryHistory, createRouter } from "vue-router";
@@ -37,6 +37,11 @@ const mountProbe = async (path, configure) => {
 };
 
 describe("useClockBarVisible", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
   it("is true on the dashboard when the clock bar is showing", async () => {
     const wrapper = await mountProbe("/", () => {});
     expect(wrapper.text()).toBe("bar");
@@ -55,6 +60,16 @@ describe("useClockBarVisible", () => {
       configStore.showUI = false;
       configStore.clockBarShowInKiosk = true;
     });
+    expect(wrapper.text()).toBe("bar");
+  });
+
+  it("uses this browser's per-screen keep-clock-bar choice", async () => {
+    window.localStorage.setItem("calvin-screen-clockBarShowInKiosk", "true");
+    const wrapper = await mountProbe("/", configStore => {
+      configStore.showUI = false;
+      configStore.clockBarShowInKiosk = false;
+    });
+
     expect(wrapper.text()).toBe("bar");
   });
 
