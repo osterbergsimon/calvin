@@ -278,7 +278,7 @@ onUnmounted(() => {
   padding: 0 1rem; /* 16px */
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--pill-radius, var(--radius-lg));
   font-family: var(--font-ui);
   font-size: var(--fs-control-lg);
   color: var(--ink);
@@ -319,7 +319,7 @@ onUnmounted(() => {
   padding: 0 0.75rem; /* 12px */
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--pill-radius, var(--radius-lg));
   font-family: var(--font-ui);
   font-size: var(--fs-control-lg);
   color: var(--ink);
