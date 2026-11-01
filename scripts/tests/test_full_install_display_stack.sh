@@ -137,7 +137,14 @@ rm -f "$SYSTEMCTL_LOG"
 start_runtime_services >/dev/null
 assert_contains "$SYSTEMCTL_LOG" '^start calvin-cog\.service$' "cog not started"
 assert_not_contains "$SYSTEMCTL_LOG" '^start calvin-(x|kiosk)\.service$' "X11/Chromium started on cog"
-pass "FULL cog install starts cog, not X11/Chromium"
+# Switching a running X11 host: calvin-cog's Conflicts= stops calvin-x, but the
+# FULL Chromium unit (Restart=always) would keep retrying its display wait until
+# the reboot. It must be stopped before cog takes the panel.
+assert_contains "$SYSTEMCTL_LOG" '^stop calvin-kiosk\.service$' "FULL Chromium not stopped on cog"
+stop_line="$(grep -n '^stop calvin-kiosk\.service$' "$SYSTEMCTL_LOG" | head -1 | cut -d: -f1)"
+start_line="$(grep -n '^start calvin-cog\.service$' "$SYSTEMCTL_LOG" | head -1 | cut -d: -f1)"
+[ "$stop_line" -lt "$start_line" ] || fail "calvin-kiosk.service is stopped after cog starts"
+pass "FULL cog install starts cog, not X11/Chromium, and stops FULL Chromium first"
 
 # A refresh (what update-calvin.sh runs) keeps cog without being told.
 rm -f "$SYSTEMCTL_LOG"; DISPLAY_STACK=""
@@ -181,5 +188,49 @@ assert_not_contains "$unit" '^Wants=.*calvin-x\.service' "calvin-kiosk.service p
 assert_contains "$unit" '^After=.*calvin-wayland\.service' "calvin-kiosk.service does not order after labwc"
 assert_contains "$unit" 'WAYLAND_DISPLAY' "calvin-kiosk.service cannot wait for a Wayland session"
 pass "explicit wayland on FULL enables labwc + Chromium"
+
+# --- 6. --refresh never switches units to a stack whose packages are missing --
+# --refresh skips apt, so `--refresh --display-stack cog` on an X11 host would
+# enable calvin-cog with no /usr/bin/cog: a black screen after the reboot. The
+# refresh installs the stack's packages first, or stops before any unit changes.
+reset_host
+installed=()
+# shellcheck disable=SC2317  # called by ensure_display_stack_packages
+install_system_packages() { installed+=("$@"); make_stub "$B" cog "exit 0"; }
+rm -f "$B/cog"
+ensure_display_stack_packages cog >/dev/null
+printf '%s\n' "${installed[@]}" | grep -qx cog || fail "refresh to cog did not install the missing cog"
+command -v cog >/dev/null || fail "cog still missing after the refresh installed it"
+installed=()
+ensure_display_stack_packages cog >/dev/null
+assert_eq "0" "${#installed[@]}" "refresh reinstalled cog although it is present"
+ensure_display_stack_packages x11 >/dev/null
+assert_eq "0" "${#installed[@]}" "refresh to x11 touched apt"
+pass "refresh installs cog when the stack needs it and it is missing"
+
+# If the install does not produce cog, refuse before touching any unit.
+rm -f "$B/cog" "$SYSTEMCTL_LOG"
+# shellcheck disable=SC2317  # called by ensure_display_stack_packages
+install_system_packages() { :; }
+if (ensure_display_stack_packages cog) >"$tmp/refuse.log" 2>&1; then
+    fail "refresh to cog went on although cog is still missing"
+fi
+assert_contains "$tmp/refuse.log" 'cog' "the refusal does not name the missing cog"
+[ ! -s "$SYSTEMCTL_LOG" ] || fail "a refused refresh touched systemd units"
+# main's refresh path checks the packages before it re-installs any unit.
+refresh_body="$(sed -n '/REFRESH_ONLY}" = 1 ]/,/return 0/p' "$HERE/../setup.sh")"
+printf '%s\n' "$refresh_body" | grep -n 'ensure_display_stack_packages\|refresh_host_files' \
+    | head -1 | grep -q ensure_display_stack_packages \
+    || fail "setup.sh --refresh re-installs units before checking the stack's packages"
+pass "refresh refuses a stack whose packages are missing, before any unit changes"
+
+# --- 7. A flag with no value fails with a message, not a silent `shift 2` ---------
+for flag in --display-stack --mode; do
+    if (parse_args "$flag") >"$tmp/args.log" 2>&1; then
+        fail "$flag with no value was accepted"
+    fi
+    assert_contains "$tmp/args.log" "$flag needs a value" "$flag with no value exits without a message"
+done
+pass "--display-stack/--mode with no value fail with a message"
 
 echo "PASS"
