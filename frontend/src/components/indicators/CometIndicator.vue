@@ -17,8 +17,9 @@ import { computed } from "vue";
  * on a region frame it follows the panel's focus-glow path, on top of the glow
  * when the region is focused. Decorative only.
  *
- * The beads always animate; the container's opacity gates visibility on
- * `active`, so revealing the comet is a cheap fade with no layout churn.
+ * The container's opacity gates visibility on `active`, so revealing the
+ * comet is a cheap fade with no layout churn. The orbit is paused while idle
+ * (no animation work at opacity 0) and resumes from where it stopped.
  */
 
 const props = defineProps({
@@ -96,6 +97,12 @@ const beadStyle = index => {
   offset-distance: 0%;
   transform: scale(var(--bead-scale, 1));
   animation: comet-orbit var(--orbit-duration) linear infinite;
+  /* Idle: no animation work while nothing loads (a kiosk idles for weeks). */
+  animation-play-state: paused;
+}
+
+.loading-indicator.is-active .comet__bead {
+  animation-play-state: running;
 }
 
 /* A region frame follows the panel radius, like its focus glow. */
