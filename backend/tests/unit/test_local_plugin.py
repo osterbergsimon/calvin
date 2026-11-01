@@ -43,10 +43,7 @@ class TestLocalImagePlugin:
         assert metadata.name == "Local Images"
         assert metadata.supports_multiple_instances is False
         assert metadata.fixed_instance_id == "local-images"
-        assert {section["type"] for section in metadata.ui_sections} == {
-            "upload",
-            "manage_images",
-        }
+        assert {section["type"] for section in metadata.ui_sections} == {"upload"}
 
     def test_registers_as_image_plugin(self):
         """The loader derives the image family from the class."""
@@ -300,6 +297,8 @@ class TestFolders:
         assert image is not None
         assert (temp_image_dir / "Guests" / "a.jpg").is_file()
         assert image["folder"] == "Guests"
+        # The browser shows when each photo was last written.
+        assert image["modified"].endswith("+00:00")
         assert image["id"] in {img["id"] for img in await local_plugin.get_images()}
 
     async def test_scan_includes_share_folders_only(self, local_plugin, temp_image_dir):
