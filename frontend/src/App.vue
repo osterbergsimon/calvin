@@ -4,6 +4,7 @@
     <RouterView />
     <ConnectionStatus v-if="!clockBarVisible" floating />
     <StatusRail />
+    <ReloadLight />
     <OnScreenKeyboard />
     <AdminSignInDialog />
   </div>
@@ -14,6 +15,7 @@ import { onMounted, onUnmounted } from "vue";
 import { RouterView } from "vue-router";
 import KeyboardHandler from "./components/KeyboardHandler.vue";
 import StatusRail from "./components/StatusRail.vue";
+import ReloadLight from "./components/ReloadLight.vue";
 import OnScreenKeyboard from "./components/ui/OnScreenKeyboard.vue";
 import AdminSignInDialog from "./components/auth/AdminSignInDialog.vue";
 import ConnectionStatus from "./components/ConnectionStatus.vue";

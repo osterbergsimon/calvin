@@ -53,6 +53,7 @@
 import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
 import { useCalendarStore } from "@/stores/calendar";
+import { useProgressStore } from "@/stores/progress";
 import RegionViewOptions from "./RegionViewOptions.vue";
 import Button from "@/components/ui/Button.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
@@ -65,10 +66,19 @@ const props = defineProps({
 
 const configStore = useConfigStore();
 const calendarStore = useCalendarStore();
+const progressStore = useProgressStore();
 const refreshNow = () => {
-  calendarStore.refreshEvents().catch(err => {
-    console.error("Failed to refresh calendar:", err);
-  });
+  progressStore
+    .track(
+      `calendar:refresh:${props.regionId || "fullscreen"}`,
+      () => calendarStore.refreshEvents(),
+      {
+        regionId: props.regionId || null,
+      }
+    )
+    .catch(err => {
+      console.error("Failed to refresh calendar:", err);
+    });
 };
 
 const rolling = computed(() => props.view?.rolling === true);

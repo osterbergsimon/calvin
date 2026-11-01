@@ -16,6 +16,7 @@
 <script setup>
 import { computed, onMounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
+import { useProgressStore } from "../stores/progress";
 import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
@@ -43,6 +44,7 @@ const sizeStyle = computed(() =>
 );
 
 const webServicesStore = useWebServicesStore();
+const progressStore = useProgressStore();
 
 function asBoolean(value) {
   if (typeof value === "string") {
@@ -63,7 +65,8 @@ const schemaServices = computed(() =>
 
 onMounted(() => {
   if (webServicesStore.services.length === 0) {
-    webServicesStore.fetchServices();
+    // Clock-bar and status plugins belong to no region: the app frame (CLV-115).
+    progressStore.track("plugin:statusbar", () => webServicesStore.fetchServices());
   }
 });
 </script>
