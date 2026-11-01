@@ -72,6 +72,7 @@ GUEST_ROUTES = frozenset(
         ("GET", "/api/guest/{token}"),
         ("GET", "/api/guest/{token}/manifest.webmanifest"),
         ("GET", "/api/guest/{token}/uploads"),
+        ("POST", "/api/guest/{token}/claim"),
         ("POST", "/api/guest/{token}/uploads"),
         ("DELETE", "/api/guest/{token}/uploads/{image_id}"),
         ("GET", "/api/guest/{token}/uploads/{image_id}/thumbnail"),

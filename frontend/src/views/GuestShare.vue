@@ -87,10 +87,14 @@
         <InlineNote v-else-if="showIosTip" data-test="guest-ios-tip">
           Tip: tap Share › Add to Home Screen to keep this handy.
         </InlineNote>
+        <!-- Firefox for Android can't install the page or join the Share menu. -->
+        <InlineNote v-else-if="showFirefoxTip" data-test="guest-firefox-tip">
+          To add Calvin to the Share menu, open this link in Chrome.
+        </InlineNote>
       </section>
 
-      <Card v-if="uploads.length" title="Your photos" data-test="guest-recent">
-        <InlineNote>Only you can see and remove these from this phone.</InlineNote>
+      <Card v-if="uploads.length" :title="recentTitle" data-test="guest-recent">
+        <InlineNote>{{ recentNote }}</InlineNote>
         <ul class="guest__grid">
           <li
             v-for="(item, index) in uploads"
@@ -138,6 +142,7 @@ import InlineNote from "@/components/ui/InlineNote.vue";
 import ProgressBar from "@/components/ui/ProgressBar.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import {
+  claimGuestUploads,
   getGuest,
   listGuestUploads,
   removeGuestUpload,
@@ -147,7 +152,8 @@ import { logError } from "@/utils/logger";
 
 // The guest page of a share link (calvin-mwqo): phone-first, outside the
 // dashboard and Settings shell. The token in the URL is the only credential
-// and only lets this page add photos to one folder and remove its own.
+// and only lets this page add photos to one folder and remove its own (or,
+// when the link shows guests all its photos, any photo added with the link).
 
 const route = useRoute();
 const router = useRouter();
@@ -156,6 +162,9 @@ const token = computed(() => String(route.params.token || ""));
 const state = ref("loading"); // loading | ready | invalid | error
 const linkName = ref("");
 const available = ref(true);
+const seeAll = ref(false);
+// One-time claim id from a share that arrived without this phone's cookie.
+let pendingClaim = "";
 const uploads = ref([]);
 const busy = ref(false);
 const total = ref(0);
@@ -177,6 +186,15 @@ const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent || "");
 const isStandalone = () =>
   window.matchMedia?.("(display-mode: standalone)")?.matches || navigator.standalone === true;
 const showIosTip = computed(() => state.value === "ready" && isIos() && !isStandalone());
+const isAndroidFirefox = () =>
+  /android/i.test(navigator.userAgent || "") && /firefox\//i.test(navigator.userAgent || "");
+const showFirefoxTip = computed(() => state.value === "ready" && isAndroidFirefox());
+const recentTitle = computed(() => (seeAll.value ? "Photos added with this link" : "Your photos"));
+const recentNote = computed(() =>
+  seeAll.value
+    ? "Everyone with this link can see and remove these."
+    : "Only you can see and remove these from this phone."
+);
 
 const photos = count => `${count} photo${count === 1 ? "" : "s"}`;
 const messageOf = err =>
@@ -204,7 +222,8 @@ const applyColourScheme = () => {
 };
 
 function readShareResult() {
-  const { added, failed, error } = route.query;
+  const { added, failed, error, claim } = route.query;
+  if (typeof claim === "string" && claim) pendingClaim = claim;
   if (error === "share_link_invalid" || error === "invalid") return "invalid";
   if (error === "too_large") errors.value = ["Too many photos at once. Share fewer at a time."];
   else if (error) errors.value = ["Those photos couldn't be added. Try Add photos instead."];
@@ -218,7 +237,7 @@ function readShareResult() {
       .filter(Boolean)
       .join(" ");
   }
-  if (added !== undefined || failed !== undefined || error) {
+  if (added !== undefined || failed !== undefined || error || claim !== undefined) {
     router.replace({ query: {} });
   }
   return null;
@@ -230,11 +249,25 @@ async function load() {
     const info = await getGuest(token.value);
     linkName.value = info?.name || "";
     available.value = info?.available !== false;
+    seeAll.value = info?.seeAll === true;
+    await claimShare();
     uploads.value = await listGuestUploads(token.value);
     state.value = "ready";
   } catch (err) {
     state.value = err?.response?.status === 404 ? "invalid" : "error";
     if (state.value === "error") logError("[GuestShare]", "load failed", err?.response?.status);
+  }
+}
+
+/** Claim the share's photos for this phone; a failed claim must not block the page. */
+async function claimShare() {
+  const claim = pendingClaim;
+  if (!claim) return;
+  pendingClaim = "";
+  try {
+    await claimGuestUploads(token.value, claim);
+  } catch (err) {
+    logError("[GuestShare]", "claim failed", err?.response?.status);
   }
 }
 
