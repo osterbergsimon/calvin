@@ -54,6 +54,14 @@ describe("RegionViewOptions", () => {
     w.unmount();
   });
 
+  it("uses the standard control height for its trigger", () => {
+    const w = mountShell();
+    const trigger = w.find(".region-view-options__trigger");
+    expect(trigger.classes()).toContain("icon-btn--lg");
+    expect(trigger.classes()).not.toContain("icon-btn--custom");
+    w.unmount();
+  });
+
   it("uses the label prop for the accessible name", () => {
     const w = mountShell({ label: "Calendar view options" });
     expect(w.find(".region-view-options__trigger").attributes("aria-label")).toBe(
