@@ -1085,6 +1085,19 @@ async def test_photo_frame_migration_respects_a_snake_case_screen_choice(test_db
 
 @pytest.mark.asyncio
 @pytest.mark.unit
+async def test_photo_frame_migration_marks_done_without_a_global_value(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await kr.migrate_global_photo_frame()
+
+    assert await config_service.get_value(kr.PHOTO_FRAME_MIGRATED_KEY) is True
+    assert await kr.get_overrides("kitchen") == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
 async def test_global_photo_frame_stays_the_fallback_after_the_marker(test_db):
     from app.services import kiosk_registry as kr
     from app.services.config_service import config_service

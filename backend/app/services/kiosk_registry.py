@@ -490,6 +490,14 @@ async def migrate_global_photo_frame() -> None:
                 globals_[canonical] = value
                 break
     if not globals_:
+        # Nothing to copy, but this run still completes the one-time migration.
+        # A startup unit test may call this before the config table exists; the
+        # next real startup will set it.
+        try:
+            await config_service.set_value(PHOTO_FRAME_MIGRATED_KEY, True)
+            logger.info("No global photo frame to copy; marked the migration done")
+        except Exception as exc:  # noqa: BLE001 - no config table yet
+            logger.warning(f"Could not mark the photo-frame migration done: {exc}")
         return
 
     rows = await KioskDB.objects.all()

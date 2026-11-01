@@ -140,8 +140,15 @@ def _doc(zip_bytes):
 
 def _normalized(doc):
     data = doc["data"]
+    # One-time migration markers are bookkeeping, not user settings: the
+    # restored install may have completed a migration the backup predates.
+    migration_markers = {"photoFrameMigrated"}
     return {
-        "config": sorted((c["key"], c["value"], c["value_type"]) for c in data["config"]),
+        "config": sorted(
+            (c["key"], c["value"], c["value_type"])
+            for c in data["config"]
+            if c["key"] not in migration_markers
+        ),
         "keyboard": sorted((k["key_code"], k["action"]) for k in data["keyboard_mappings"]),
         "types": sorted(
             (t["type_id"], t["enabled"], json.dumps(t["common_config_schema"], sort_keys=True))
