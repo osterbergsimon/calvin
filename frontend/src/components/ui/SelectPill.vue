@@ -269,20 +269,36 @@ onUnmounted(() => {
 <style scoped>
 .pill-wrap {
   position: relative;
+  display: inline-flex;
+  min-width: 0;
+  /* No inline line box: the wrapper then matches the pill's rail height instead
+     of sitting ~1.6px taller and floating above its sibling controls. */
+  line-height: 0;
 }
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 0.75rem; /* 12px */
-  height: var(--control-height);
+  min-width: 0;
+  height: var(--pill-height, var(--control-height));
   padding: 0 1rem; /* 16px */
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--pill-radius, var(--radius-lg));
   font-family: var(--font-ui);
-  font-size: var(--fs-control-lg);
+  font-size: var(--pill-font, var(--fs-control-lg));
+  /* The wrapper drops the line box; the trigger restores one inside its fixed
+     height so its label is centred normally. */
+  line-height: 1;
   color: var(--ink);
   cursor: pointer;
+  max-width: 100%;
+}
+.pill__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pill:focus-visible {
   outline: 2px solid var(--focus);
@@ -319,7 +335,7 @@ onUnmounted(() => {
   padding: 0 0.75rem; /* 12px */
   background: var(--bg-2);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--pill-radius, var(--radius-lg));
   font-family: var(--font-ui);
   font-size: var(--fs-control-lg);
   color: var(--ink);

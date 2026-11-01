@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import SelectPill from "@/components/ui/SelectPill.vue";
+
+const STYLE = readFileSync(
+  resolve(__dirname, "../../../../src/components/ui/SelectPill.vue"),
+  "utf8"
+).match(/<style[^>]*>([\s\S]*?)<\/style>/)[1];
 
 const OPTS = [
   { value: "backlit", label: "Backlit" },
@@ -18,6 +25,15 @@ describe("SelectPill", () => {
     const w = mountPill({ modelValue: "backlit", options: OPTS });
     expect(w.find(".pill__label").text()).toBe("Backlit");
     expect(w.find('[role="listbox"]').exists()).toBe(false);
+  });
+
+  it("sits on the control rail without an inline line box", () => {
+    // The wrapper is a flex item in the region header rail: a block/inline
+    // line box made it ~1.6px taller than the rail at small sizes and the pill
+    // floated above its neighbours (calvin-8nad review 4).
+    expect(STYLE).toMatch(/\.pill-wrap\s*\{[^}]*display:\s*inline-flex/s);
+    expect(STYLE).toMatch(/\.pill-wrap\s*\{[^}]*line-height:\s*0/s);
+    expect(STYLE).toMatch(/\.pill\s*\{[^}]*line-height:\s*1/s);
   });
 
   it("puts its id on the trigger button, not the wrapper", () => {

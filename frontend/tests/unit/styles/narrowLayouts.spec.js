@@ -99,18 +99,25 @@ describe("calendar header in a narrow region", () => {
     expect(label).toMatch(/text-overflow:\s*ellipsis/);
   });
 
-  it("wraps the controls and right-aligns them when they move to their own row", () => {
+  it("keeps the controls right-aligned and lets the selector shrink", () => {
     const controls = rule(css, ".calendar-header__controls");
-    expect(controls).toMatch(/flex-wrap:\s*wrap/);
     expect(controls).toMatch(/margin-left:\s*auto/);
+    // Shrinkable up to the region width, so a long pill ellipsizes instead of
+    // overlapping its neighbour.
+    expect(controls).toMatch(/flex:\s*0\s+1\s+auto/);
+    expect(controls).toMatch(/max-width:\s*100%/);
+    expect(rule(css, ".calendar-header__view-switch")).toMatch(/min-width:\s*0/);
   });
 
-  it("lets the controls shrink onto their own row instead of overflowing it", () => {
-    const controls = rule(css, ".calendar-header__controls");
-    // A max-content row that refuses to shrink is what pushed the last button
-    // past the region edge, where the panel's overflow:hidden hid it.
-    expect(controls).not.toMatch(/flex-shrink:\s*0/);
-    expect(controls).toMatch(/flex:\s*0\s+1\s+auto/);
+  it("uses the shared header rail: aligned wraps, coarse-pointer touch minimum", () => {
+    const shared = styleOf("components/dashboard/RegionHeaderControls.vue");
+    const rail = rule(shared, ".region-header-controls");
+    expect(rail).toMatch(/flex-wrap:\s*wrap/);
+    expect(rail).toMatch(/justify-content:\s*center/);
+    const coarse = mediaBlock(shared, "(any-pointer: coarse)");
+    expect(coarse).toContain(
+      "max(var(--region-rail-h, var(--control-height)), var(--touch-target))"
+    );
   });
 
   describe("at 390px", () => {

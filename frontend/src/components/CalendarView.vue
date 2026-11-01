@@ -15,47 +15,63 @@
     >
       <div class="calendar-content">
         <!-- Always-visible header: month/year label, navigation + view switch -->
-        <div class="calendar-header">
+        <div ref="headerEl" class="calendar-header">
           <div class="calendar-header__label">{{ currentMonthYear }}</div>
-          <div v-if="focused && hasPointer" class="calendar-header__controls">
+          <RegionHeaderControls v-if="focused && hasPointer" class="calendar-header__controls">
             <Button
               v-if="!isCurrentPeriod"
               class="calendar-header__today"
               variant="primary"
-              size="sm"
+              size="custom"
               title="Jump to today"
               aria-label="Jump to today"
               @click="goToToday"
             >
               Today
             </Button>
-            <IconButton size="custom" label="Previous" title="Previous" @click="previousMonth">
-              ‹
-            </IconButton>
-            <Button
+            <IconButton
+              size="custom"
+              :icon="mdiChevronLeft"
+              label="Previous"
+              title="Previous"
+              @click="previousMonth"
+            />
+            <!-- The view is picked directly. A narrow region cannot fit three
+                 segments, so it gets the same choice in a SelectPill. -->
+            <SegmentedControl
+              v-if="!isNarrowHeader"
               class="calendar-header__view-switch"
-              variant="secondary"
-              size="sm"
-              :title="`Switch view (currently ${viewModeLabel})`"
-              :aria-label="`Switch calendar view, currently ${viewModeLabel}`"
-              @click="cycleView"
-            >
-              <span class="calendar-header__view-label">{{ viewModeLabel }}</span>
-              <span class="calendar-header__view-caret" aria-hidden="true">▸</span>
-            </Button>
-            <IconButton size="custom" label="Next" title="Next" @click="nextMonth"> › </IconButton>
+              :model-value="viewMode"
+              :options="viewOptions"
+              :aria-label="viewSwitchLabel"
+              @update:model-value="setViewMode"
+            />
+            <SelectPill
+              v-else
+              class="calendar-header__view-switch"
+              :model-value="viewMode"
+              :options="viewOptions"
+              :aria-label="viewSwitchLabel"
+              @update:model-value="setViewMode"
+            />
+            <IconButton
+              size="custom"
+              :icon="mdiChevronRight"
+              label="Next"
+              title="Next"
+              @click="nextMonth"
+            />
             <CalendarViewOptions v-if="view" :region-id="regionId" :view="view" />
             <IconButton
               v-if="!isFullscreen"
               size="custom"
               class="calendar-header__fullscreen"
+              :icon="mdiFullscreen"
               label="Fullscreen calendar"
               title="Fullscreen"
               @click="enterFullscreen"
-            >
-              ⤢
-            </IconButton>
-          </div>
+            />
+          </RegionHeaderControls>
         </div>
 
         <!-- First run: no calendar sources yet → say so and link to the fix (F4) -->
@@ -229,12 +245,11 @@
         size="lg"
         shape="circle"
         data-action="exit-fullscreen"
+        :icon="mdiClose"
         title="Close Fullscreen (ESC)"
         label="Exit fullscreen"
         @click.stop="handleCloseFullscreen"
-      >
-        ×
-      </IconButton>
+      />
     </div>
 
     <!-- Event Detail Panel -->
@@ -266,9 +281,14 @@ import { addMonths } from "@/utils/dateMath";
 import DashboardPanel from "./DashboardPanel.vue";
 import Button from "./ui/Button.vue";
 import IconButton from "./ui/IconButton.vue";
+import SegmentedControl from "./ui/SegmentedControl.vue";
+import SelectPill from "./ui/SelectPill.vue";
 import EmptyState from "./ui/EmptyState.vue";
 import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
+import RegionHeaderControls from "./dashboard/RegionHeaderControls.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
+import { isPhoneWidth } from "@/styles/breakpoints.js";
+import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
 
 const props = defineProps({
   focused: {
@@ -397,11 +417,23 @@ const rollingColumnStyle = computed(() =>
   isAgenda.value ? { "--rolling-cols": `repeat(${rollingDays.value}, minmax(0, 1fr))` } : null
 );
 
+// The one view list: the header selector and the keyboard/cycle path share it.
+const VIEW_OPTIONS = [
+  { value: "month", label: "Month" },
+  { value: "week", label: "Week" },
+  { value: "day", label: "Day" },
+];
+const viewOptions = VIEW_OPTIONS;
+
 const viewModeLabel = computed(() => {
   const labels = { month: "Month", week: "Week", day: "Day" };
   const base = labels[viewMode.value] || "Month";
   return rolling.value && viewMode.value !== "day" ? `${base} · Rolling` : base;
 });
+
+// The selector's accessible name carries the rolling modifier, which the
+// segment labels themselves do not show.
+const viewSwitchLabel = computed(() => `Calendar view, currently ${viewModeLabel.value}`);
 
 const calendarStore = useCalendarStore();
 const progressStore = useProgressStore();
@@ -416,13 +448,12 @@ const fetchSources = () => trackLoad("sources", () => calendarStore.fetchSources
 const modeStore = useModeStore();
 const route = useRoute();
 
-// Cycle this region's base view (month → week → day) and persist it to the
-// region. Rolling stays out of the cycle — it's a separate windowing toggle.
-const cycleView = () => {
-  const order = ["month", "week", "day"];
-  const next = order[(order.indexOf(viewMode.value) + 1) % order.length];
-  configStore.updateRegionView(props.regionId, { mode: next }).catch(err => {
-    console.error("Failed to cycle calendar view mode:", err);
+// Pick this region's base view and persist it to the region. Rolling stays out
+// of it — that is a separate windowing toggle.
+const setViewMode = mode => {
+  if (mode === viewMode.value || !VIEW_OPTIONS.some(option => option.value === mode)) return;
+  configStore.updateRegionView(props.regionId, { mode }).catch(err => {
+    console.error("Failed to update calendar view mode:", err);
   });
 };
 
@@ -511,6 +542,15 @@ const handleVisibilityChange = () => {
 
 // Load calendar sources on mount
 onMounted(async () => {
+  measureHeaderWidth();
+  if (typeof ResizeObserver !== "undefined") {
+    headerObserver = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect?.width;
+      if (width > 0) headerWidth.value = width;
+    });
+    if (headerEl.value) headerObserver.observe(headerEl.value);
+  }
+
   await fetchSources();
   sourcesChecked.value = true;
 
@@ -532,6 +572,8 @@ onUnmounted(() => {
   }
   densityObserver?.disconnect();
   densityObserver = null;
+  headerObserver?.disconnect();
+  headerObserver = null;
   document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 
@@ -554,6 +596,17 @@ const setupEmpty = computed(() => noSources.value && !calendarStore.error && !ca
 const selectedEvent = computed(() => calendarStore.selectedEvent);
 
 const calendarView = ref(null);
+// The header decides between segments and a pill from its OWN width, not the
+// viewport: a dashboard region can be narrow on a wide desktop screen. Until
+// the first measure lands, the viewport width is the best available guess.
+const headerEl = ref(null);
+const headerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
+let headerObserver = null;
+const isNarrowHeader = computed(() => isPhoneWidth(headerWidth.value));
+const measureHeaderWidth = () => {
+  const width = headerEl.value?.clientWidth ?? 0;
+  if (width > 0) headerWidth.value = width;
+};
 const focusedDayIndex = ref(null);
 const focusedEventIndex = ref(null);
 const eventRefs = ref({});
@@ -594,7 +647,13 @@ const formatDateRange = (startDate, endDate) => {
     startDate.getMonth() === endDate.getMonth() &&
     startDate.getFullYear() === endDate.getFullYear()
   ) {
-    return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
+    // Ask for the day and year separately: an Intl pattern with day+year but no
+    // month renders as "2026 (day: 7)" under some ICU builds, which read like
+    // debug text in the header.
+    const start = startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    const endDay = endDate.toLocaleDateString("en-US", { day: "numeric" });
+    const endYear = endDate.toLocaleDateString("en-US", { year: "numeric" });
+    return `${start} - ${endDay}, ${endYear}`;
   }
   const start = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const end = endDate.toLocaleDateString("en-US", {
@@ -1458,27 +1517,20 @@ onActivated(() => {
   min-width: 0;
 }
 
+/* Shared rail geometry (height, gap, type) comes from RegionHeaderControls;
+   only this header's placement and the shrinkable pill stay local. */
 .calendar-header__controls {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  /* If the controls themselves are wider than the region, wrap them rather
-     than letting the right edge clip. `margin-left: auto` keeps them right-
-     aligned when they move to their own row. */
-  flex-wrap: wrap;
-  justify-content: flex-end;
   margin-left: auto;
   min-width: 0;
-  /* Do not hold the row at its max-content width: that is what pushed the last
-     button past the region edge. Let the controls shrink onto their own row so
-     their buttons wrap inside it instead of disappearing (CLV-91). */
+  max-width: 100%;
+  /* Wrap under the label as a whole, then let the view selector shrink (and
+     ellipsize) if a row is still narrower than the controls themselves. */
   flex: 0 1 auto;
 }
 
-/* The view-switch's chrome comes from ui/Button; only its caret stays local. */
-.calendar-header__view-caret {
-  font-size: var(--text-caption);
-  color: var(--ink-2);
+.calendar-header__view-switch {
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 /* Fullscreen close button — mirrors the photos/web-service overlay. */
@@ -1507,14 +1559,6 @@ onActivated(() => {
   inset: 0;
   z-index: var(--z-raised);
   background: color-mix(in srgb, var(--bg-1) 88%, transparent);
-}
-
-/* Touch screens: header controls get a full 44px target (F8). The chrome scale
-   sizes them to the label (28px at "medium"), which is too small for a finger. */
-@media (any-pointer: coarse) {
-  .calendar-header__controls {
-    --icon-size: max(var(--region-rail-h, 1.75rem), var(--touch-target, 2.75rem));
-  }
 }
 
 /* The calendar owns its own surface + spacing, so drop the panel body's default
