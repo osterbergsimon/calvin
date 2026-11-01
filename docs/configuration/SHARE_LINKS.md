@@ -17,14 +17,18 @@ on, and you can turn it off at any time.
    - **Photo limit**: how many photos the link takes in total (default 500).
      Each link also stops at 2 GB of photos; the API takes `max_mb` to change
      that.
+   - **Guests see all photos** (on by default): everyone using the link sees
+     every photo added with it and can remove any of them. Turn it off so each
+     guest sees and removes only the photos sent from their own phone.
 4. Tap **Create**. A QR code and the link's address appear.
 
 Scan the QR code with the guest's phone, or send them the address. You can
 show the QR code again at any time with **Show QR**, and **Rename** a link
 without changing its address.
 
-The list shows each link's folder, when it was created and last used, and how
-many photos came in through it.
+The list shows each link's folder, when it was created and last used, whether
+guests see all photos, and how many photos came in through it. The switch on
+each link changes **Guests see all photos** at any time.
 
 Only folders made for share links are part of Local photos: Calvin marks them
 with a hidden `.calvin-share` file. Other subfolders you keep in the photos
@@ -35,9 +39,18 @@ folder of your own as a link's folder only if you want its photos on show.
 
 A page with one big **Add photos** button. It opens the phone's photo picker
 (several photos at once is fine), shows progress while sending, and then
-the photos sent from that phone as thumbnails. The guest can remove their own
-photos, and only those: another phone using the same link can't see or remove
-them.
+thumbnails of the photos added with the link. With **Guests see all photos**
+on, that is every photo anyone added with the link, and the guest can remove
+any of them. With it off, it is only the photos sent from that phone, and
+another phone using the same link can't see or remove them.
+
+A phone is recognised by a cookie in its browser, so two browsers on one phone
+(Firefox and Chrome) count as two phones, and clearing the browser's site data
+or opening the link at another address (`calvin.local` instead of the IP
+address) starts afresh. The installed app shares the cookie of the browser it
+was installed from. Photos shared from the gallery stay with the phone even
+when Android sends the share without the cookie: the page that opens after
+the share claims them.
 
 Calvin scales each photo down for display (longest side 2560 px), turns it
 upright and removes the GPS location from its EXIF data. Only JPEG, PNG, WebP
@@ -58,6 +71,9 @@ Photos › Manage images (or revoke the link with its photos).
    **Calvin photos**. The photos are sent and the page confirms how many were
    added.
 
+Firefox for Android can't install the page or add it to the Share menu; the
+page says so and asks the guest to open the link in Chrome.
+
 ## iPhone and iPad
 
 Open the link in Safari and tap **Share › Add to Home Screen**. The icon opens
@@ -76,6 +92,11 @@ this link** (only that link's photos go; anything else in the folder stays).
 - The link's address **is** the key. Anyone who has it can add photos to that
   folder (nothing else) until it is revoked or runs out. Give each person their
   own link, and revoke a link you no longer need.
+- With **Guests see all photos** on (the default), **anyone holding the link
+  can see and remove every photo added with it**, from any phone. It still
+  reaches only that link's photos: not other photos in the folder, nor
+  another link's. Turn it off for a link given to people who shouldn't remove
+  each other's photos.
 - Calvin stores only a hash of each link's secret in `share-links.json` next to
   `admin-auth.json` in the data directory. `share-links.key` sits in the same
   directory and lets Calvin show the address again, so **anyone who can read
