@@ -532,9 +532,16 @@ async function submitLogin() {
   overflow: auto;
   background: var(--bg-0);
 }
-.auth-lock--osk-up {
-  align-items: center;
-  padding-bottom: calc(var(--gap-5) + var(--osk-height, 0px));
+/* On-screen keyboard up: reserve its height so the centred card sits above it.
+   Two classes so the later --short and phone padding rules can't reset it
+   (CLV-114: a 600px panel in a browser window is "short" and lost the room).
+   The lock screen is zoomed by the Settings UI size (.settings-lock-scale)
+   while --osk-height is in screen pixels, hence the division. */
+.auth-lock.auth-lock--osk-up {
+  padding-bottom: calc(var(--gap-5) + var(--osk-height, 0px) / var(--ui-scale, 1));
+}
+.auth-lock.auth-lock--short.auth-lock--osk-up {
+  padding-bottom: calc(var(--gap-3) + var(--osk-height, 0px) / var(--ui-scale, 1));
 }
 .auth-lock__checking {
   margin: auto;
