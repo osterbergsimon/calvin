@@ -269,7 +269,11 @@ onUnmounted(() => {
 <style scoped>
 .pill-wrap {
   position: relative;
+  display: inline-flex;
   min-width: 0;
+  /* No inline line box: the wrapper then matches the pill's rail height instead
+     of sitting ~1.6px taller and floating above its sibling controls. */
+  line-height: 0;
 }
 .pill {
   display: inline-flex;
@@ -283,6 +287,9 @@ onUnmounted(() => {
   border-radius: var(--pill-radius, var(--radius-lg));
   font-family: var(--font-ui);
   font-size: var(--pill-font, var(--fs-control-lg));
+  /* The wrapper drops the line box; the trigger restores one inside its fixed
+     height so its label is centred normally. */
+  line-height: 1;
   color: var(--ink);
   cursor: pointer;
   max-width: 100%;

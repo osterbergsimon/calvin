@@ -38,7 +38,6 @@
           />
           <IconButton
             size="custom"
-            variant="primary"
             :icon="mdiFullscreen"
             data-action="expand"
             label="Fullscreen photos"
