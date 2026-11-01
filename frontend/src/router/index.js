@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { recoverFromChunkLoadError } from "./chunkRecovery";
+import { createGuestGuard } from "../utils/guestPath";
 
 // Lazy load routes for better code splitting
 const Dashboard = () => import("../views/Dashboard.vue");
@@ -28,6 +29,9 @@ const router = createRouter({
     },
   ],
 });
+
+// The guest page and the dashboard never share a page load (calvin-mwqo).
+router.beforeEach(createGuestGuard());
 
 // A stale client (a page left open across a deploy) cannot load a route's
 // hashed chunk, and Vue Router would abort the navigation silently — clicking
