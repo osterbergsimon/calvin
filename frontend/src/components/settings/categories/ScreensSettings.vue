@@ -262,7 +262,7 @@
               :aria-pressed="effDefault === page.id ? 'true' : 'false'"
               :icon="effDefault === page.id ? mdiCheck : undefined"
               :disabled="!showsPage(page.id)"
-              :aria-label="`Start on ${page.name}`"
+              :aria-label="`Start here: ${page.name}`"
               @click="setDefault(page.id)"
             >
               Start here

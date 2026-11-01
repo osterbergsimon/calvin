@@ -475,6 +475,9 @@ describe("ScreensSettings — Pages", () => {
     const startButtons = rows.map(row => row.find("button[aria-pressed]"));
     expect(startButtons[0].attributes("aria-pressed")).toBe("false");
     expect(startButtons[1].attributes("aria-pressed")).toBe("true");
+    // The visible "Start here" stays part of the accessible name (axe).
+    expect(startButtons[0].text()).toBe("Start here");
+    expect(startButtons[0].attributes("aria-label")).toBe("Start here: Home");
   });
 
   it("unchecking Show saves an availableScreens allowlist", async () => {
