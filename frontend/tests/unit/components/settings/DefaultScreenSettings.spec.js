@@ -22,7 +22,6 @@ const baseConfig = {
   rebootComboKey1: "KEY_1",
   rebootComboKey2: "KEY_7",
   rebootComboDuration: 10000,
-  displayName: "",
   availableScreens: null,
   defaultScreenId: null,
   dashboardScreens: {

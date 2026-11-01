@@ -7,17 +7,14 @@ describe("config store — Cycle B focus-light keys", () => {
 
   it("defaults preserve a sensible resting state", () => {
     const store = useConfigStore();
-    expect(store.displayName).toBe("");
     expect(store.focusLightMode).toBe("interaction");
     expect(store.focusLightDimOthers).toBe(true);
   });
 
   it("setters update state", () => {
     const store = useConfigStore();
-    store.setDisplayName("Vardagsrummet");
     store.setFocusLightMode("always");
     store.setFocusLightDimOthers(false);
-    expect(store.displayName).toBe("Vardagsrummet");
     expect(store.focusLightMode).toBe("always");
     expect(store.focusLightDimOthers).toBe(false);
   });
@@ -25,12 +22,17 @@ describe("config store — Cycle B focus-light keys", () => {
   it("applyConfigPayload via updateConfig syncs the keys from a backend payload", async () => {
     const store = useConfigStore();
     await store.updateConfig({
-      displayName: "Köket",
       focusLightMode: "off",
       focusLightDimOthers: false,
     });
-    expect(store.displayName).toBe("Köket");
     expect(store.focusLightMode).toBe("off");
     expect(store.focusLightDimOthers).toBe(false);
+  });
+
+  it("has no global room name: a screen's Name is its own override (CLV-111)", async () => {
+    const store = useConfigStore();
+    await store.updateConfig({ displayName: "Köket" });
+    expect(store.displayName).toBeUndefined();
+    expect(store.setDisplayName).toBeUndefined();
   });
 });

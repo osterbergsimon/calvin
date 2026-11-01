@@ -120,7 +120,6 @@ describe("useConfigForm", () => {
 
     it("maps the Dashboard and Screens rows the settings categories need", async () => {
       const mockConfig = {
-        displayName: "Kitchen",
         focusLightMode: "always",
         focusLightDimOthers: false,
         touchControls: "on",
@@ -138,6 +137,15 @@ describe("useConfigForm", () => {
       await form.loadConfig();
 
       expect(form.localConfig.value).toMatchObject(mockConfig);
+    });
+
+    it("drops a leftover global room name so a full save cannot write it back (CLV-111)", async () => {
+      configApi.getConfig.mockResolvedValue({ displayName: "Lounge", display_name: "Lounge" });
+
+      const form = useConfigForm();
+      await form.loadConfig();
+
+      expect(form.localConfig.value).not.toHaveProperty("displayName");
     });
 
     it("should handle errors when loading config", async () => {
