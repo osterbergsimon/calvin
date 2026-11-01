@@ -45,3 +45,18 @@ export function kiosksBlocked(kiosks, availableVersion) {
 export function shortVersion(version) {
   return version == null ? "" : String(version).slice(0, 7);
 }
+
+/** The display stacks the kiosk agent can report (calvin-2ibz). */
+export const DISPLAY_STACKS = ["x11", "wayland", "cog"];
+
+/** What the screen runs, or "unknown" when an older agent sends no stack. */
+export function displayStackLabel(kiosk) {
+  const stack = kiosk?.displayStack;
+  return DISPLAY_STACKS.includes(stack) ? stack : "unknown";
+}
+
+/** "cog · agent 1ed916a" — the stack beside the agent version. Empty without an agent. */
+export function displayStackReadout(kiosk) {
+  if (kiosk?.agentVersion == null) return "";
+  return `${displayStackLabel(kiosk)} · agent ${shortVersion(kiosk.agentVersion)}`;
+}

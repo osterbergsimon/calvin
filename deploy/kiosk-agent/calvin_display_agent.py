@@ -241,7 +241,7 @@ def update_report(state_dir=STATE_DIR):
     return status, (str(message)[:255] if message else None)
 
 
-def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None):
+def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None, kstack=None):
     """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
     base = backend_url.rstrip("/")
     if kiosk_id:
@@ -254,6 +254,8 @@ def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None)
             params["kstat"] = kstat
         if kmsg:
             params["kmsg"] = kmsg
+        if kstack:
+            params["kstack"] = kstack
         q = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
         return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
     return base + "/api/config"
@@ -265,7 +267,13 @@ def fetch_config(backend_url, kstat=None, kmsg=None):
     if kstat is None:
         kstat, kmsg = update_report()
     url = _config_url(
-        backend_url, kiosk_id, host, kagent=running_version(), kstat=kstat, kmsg=kmsg
+        backend_url,
+        kiosk_id,
+        host,
+        kagent=running_version(),
+        kstat=kstat,
+        kmsg=kmsg,
+        kstack=display_stack(),
     )
     with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
         cfg = json.load(r)

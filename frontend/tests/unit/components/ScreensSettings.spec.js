@@ -56,6 +56,7 @@ const kiosk = (over = {}) => ({
   agentUpdateRequested: false,
   overrides: {},
   viewport: null,
+  displayStack: null,
   ...over,
 });
 
@@ -841,7 +842,7 @@ describe("ScreensSettings — software (CLV-19)", () => {
     });
     await flushPromises();
     expect(wrapper.find("[data-test='kiosk-version-line']").text()).toBe(
-      "Kiosk software a1b2c3d · e4f5a6b available"
+      "unknown · Kiosk software a1b2c3d · e4f5a6b available"
     );
   });
 
@@ -893,6 +894,64 @@ describe("ScreensSettings — software (CLV-19)", () => {
     expect(empty.text()).toContain("no kiosk software to update");
     // The note gets the normal row padding instead of sitting on the border.
     expect(empty.classes()).toContain("setting-row");
+  });
+});
+
+describe("ScreensSettings — display stack (calvin-2ibz)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows the stack beside the agent version on the card", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD, displayStack: "cog" })],
+      availableVersion: AVAILABLE,
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='kiosk-version-line']").text()).toBe(
+      "cog · Kiosk software a1b2c3d · e4f5a6b available"
+    );
+  });
+
+  it("says unknown when an older agent does not report its stack", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD, displayStack: null })],
+      availableVersion: AVAILABLE,
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='kiosk-version-line']").text()).toBe(
+      "unknown · Kiosk software a1b2c3d · e4f5a6b available"
+    );
+  });
+
+  it("shows the stack and agent version in the screen's header", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD, displayStack: "wayland" })],
+      availableVersion: AVAILABLE,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    const tag = wrapper.find("[data-test='kiosk-display-stack']");
+    expect(tag.text()).toBe("wayland · agent a1b2c3d");
+  });
+
+  it("keeps the header readout to unknown for an older agent", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ agentVersion: OLD, displayStack: null })],
+      availableVersion: AVAILABLE,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='kiosk-display-stack']").text()).toBe(
+      "unknown · agent a1b2c3d"
+    );
+  });
+
+  it("shows no stack readout for a browser-only screen", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ agentVersion: null, displayStack: null })],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    expect(wrapper.find("[data-test='kiosk-display-stack']").exists()).toBe(false);
   });
 });
 

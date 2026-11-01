@@ -59,6 +59,7 @@ async def test_list_kiosks_shape(test_db):
         "agentUpdateRequested",
         "overrides",
         "viewport",
+        "displayStack",
     }
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
 
@@ -382,6 +383,37 @@ async def test_record_kiosk_stores_agent_report(test_db):
     assert row["agentVersion"] == "v1"
     assert row["agentUpdateStatus"] == "ok"
     assert row["agentUpdateMessage"] is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_stores_and_lists_display_stack(test_db):
+    """The agent reports x11/wayland/cog; the Screens list shows what a kiosk runs (2ibz)."""
+    from app.services import kiosk_registry as kr
+
+    await kr.record_kiosk("k-stack", agent_version="v1", display_stack="cog")
+    rows = await kr.list_kiosks()
+    row = next(r for r in rows if r["id"] == "k-stack")
+    assert row["displayStack"] == "cog"
+    assert (await KioskDB.objects.get(id="k-stack")).display_stack == "cog"
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+@pytest.mark.parametrize("bad", ["windows", "", "  ", "x11;rm", "COG!"])
+async def test_record_kiosk_ignores_an_unknown_display_stack(test_db, bad):
+    """Only x11, wayland and cog are stored; anything else leaves the column empty."""
+    await kiosk_registry.record_kiosk("k-bad-stack", display_stack=bad)
+    assert (await KioskDB.objects.get(id="k-bad-stack")).display_stack is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_record_kiosk_keeps_the_stack_when_a_poll_omits_it(test_db):
+    """An older agent (or a browser poll) sends no kstack and must not clear it."""
+    await kiosk_registry.record_kiosk("k-keep-stack", display_stack="wayland")
+    await kiosk_registry.record_kiosk("k-keep-stack", hostname="pi")
+    assert (await KioskDB.objects.get(id="k-keep-stack")).display_stack == "wayland"
 
 
 @pytest.mark.asyncio
@@ -899,11 +931,15 @@ async def _count_kiosk_updates(monkeypatch) -> list:
 @pytest.mark.unit
 async def test_record_kiosk_skips_write_when_unchanged_and_recent(test_db, monkeypatch):
     """A 60 s poll with nothing new must not rewrite a fresh last_seen (calvin-stnq)."""
-    await kiosk_registry.record_kiosk("k-skip", hostname="pi", agent_version="v1")
+    await kiosk_registry.record_kiosk(
+        "k-skip", hostname="pi", agent_version="v1", display_stack="cog"
+    )
     first_seen = (await KioskDB.objects.get(id="k-skip")).last_seen
     calls = await _count_kiosk_updates(monkeypatch)
 
-    await kiosk_registry.record_kiosk("k-skip", hostname="pi", agent_version="v1")
+    await kiosk_registry.record_kiosk(
+        "k-skip", hostname="pi", agent_version="v1", display_stack="cog"
+    )
 
     assert calls == []
     assert (await KioskDB.objects.get(id="k-skip")).last_seen == first_seen
@@ -953,6 +989,11 @@ _CHANGED_FIELD_CASES = {
         {"agent_version": "v1", "viewport": {"w": 800, "h": 480}},
         {"agent_version": "v1", "viewport": {"w": 1024, "h": 600}},
         lambda row: row.viewport == {"w": 1024, "h": 600},
+    ),
+    "display_stack": (
+        {"agent_version": "v1", "display_stack": "cog"},
+        {"agent_version": "v1", "display_stack": "wayland"},
+        lambda row: row.display_stack == "wayland",
     ),
     "update_flag_auto_clear": (
         {"agent_version": "v1"},
