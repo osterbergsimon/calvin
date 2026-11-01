@@ -395,6 +395,30 @@
             @update:model-value="setIdle"
           />
         </SettingRow>
+        <SettingRow label="Screen now">
+          <template #description>
+            <InlineNote data-test="screen-now-state">
+              {{ desiredOnNow ? "On now" : "Off now" }}
+            </InlineNote>
+            <InlineNote v-if="activeOverride" data-test="screen-now-until">
+              {{ untilCopy }}
+            </InlineNote>
+          </template>
+          <Button data-test="screen-now-on" :disabled="desiredOnNow" @click="setScreenNow('on')">
+            Turn on now
+          </Button>
+          <Button data-test="screen-now-off" :disabled="!desiredOnNow" @click="setScreenNow('off')">
+            Turn off now
+          </Button>
+          <Button
+            v-if="activeOverride"
+            variant="link"
+            data-test="screen-now-follow"
+            @click="followSchedule"
+          >
+            Follow schedule
+          </Button>
+        </SettingRow>
         <InlineNote
           v-if="powerMsg"
           class="screens-saved"
@@ -541,6 +565,13 @@ import {
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { getKioskId } from "@/utils/kioskId";
 import { screenLabel, screenLabelFallback } from "@/utils/screenLabel";
+import {
+  activePowerOverride,
+  buildPowerOverride,
+  effectiveTimeZone,
+  formatUntil,
+  scheduleDesiredOn,
+} from "@/utils/screenPower";
 import {
   changedSettingCount,
   formatSettingList,
@@ -863,6 +894,60 @@ const effScheduleEnabled = computed(() =>
 const effSchedule = computed(() =>
   scheduleOverridden.value ? overrides.value.displaySchedule : props.config.displaySchedule
 );
+
+// "Screen now" (calvin-ydzz): a manual choice that holds only until the first
+// schedule boundary after it was set. The agent owns that decision from the
+// stored UTC `setAt`; the row re-reads the clock so an expired override stops
+// claiming the screen without needing another config change.
+const powerTimeZone = computed(() => effectiveTimeZone(props.config));
+const nowTick = ref(Date.now());
+const now = () => new Date(nowTick.value);
+let nowTimer = null;
+const activeOverride = computed(() =>
+  activePowerOverride(overrides.value.screenNow, {
+    enabled: effScheduleEnabled.value,
+    schedule: effSchedule.value,
+    now: now(),
+    timeZone: powerTimeZone.value,
+  })
+);
+const desiredOnNow = computed(() => {
+  if (activeOverride.value) return activeOverride.value.power === "on";
+  return scheduleDesiredOn({
+    enabled: effScheduleEnabled.value,
+    schedule: effSchedule.value,
+    now: now(),
+    timeZone: powerTimeZone.value,
+  });
+});
+const untilCopy = computed(() => {
+  const override = activeOverride.value;
+  if (!override) return "";
+  const state = override.power === "on" ? "On" : "Off";
+  if (!override.expiry) return `${state} until you change it`;
+  // The browser cannot know the Pi's zone when the screen uses the system one.
+  if (!powerTimeZone.value) return `${state} until the next scheduled change`;
+  return `${state} until ${formatUntil(override.expiry, powerTimeZone.value)}`;
+});
+
+function setScreenNow(power) {
+  const next = {
+    ...overrides.value,
+    screenNow: buildPowerOverride({ power, now: new Date() }),
+  };
+  persist(next, powerMsg, "Saved. This screen changes at its next check-in (~30s).", OFFLINE_COPY);
+}
+
+function followSchedule() {
+  const next = { ...overrides.value };
+  delete next.screenNow;
+  persist(
+    next,
+    powerMsg,
+    "Saved. This screen follows the schedule again at its next check-in (~30s).",
+    OFFLINE_COPY
+  );
+}
 
 const idleOverridden = computed(
   () => "displayTimeoutEnabled" in overrides.value || "displayTimeout" in overrides.value
@@ -1217,6 +1302,9 @@ async function refreshDesiredVersion(id) {
 }
 
 onMounted(async () => {
+  nowTimer = window.setInterval(() => {
+    nowTick.value = Date.now();
+  }, 30000);
   refreshBrowserCount();
   await store.loadKiosks();
   if (kiosks.value.length === 0) addOpen.value = true;
@@ -1233,6 +1321,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (nowTimer !== null) window.clearInterval(nowTimer);
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
     narrowMql.removeEventListener("change", onNarrowChange);

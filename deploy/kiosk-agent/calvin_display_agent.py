@@ -20,7 +20,7 @@ import threading
 import time as time_module
 import urllib.parse
 import urllib.request
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 
 try:
     from zoneinfo import ZoneInfo
@@ -75,8 +75,108 @@ def _should_be_on(now_t, on_t, off_t):
     return on_t <= now_t < off_t
 
 
+def _parse_instant(value):
+    """Parse a UTC ISO instant from an override; None when absent or unreadable.
+
+    The UI writes ``toISOString()`` (always ``...Z``). A legacy/naive value is
+    read as UTC, never as local wall time, so the Pi's offset cannot shift it.
+    """
+    if not value:
+        return None
+    try:
+        instant = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return instant if instant.tzinfo is not None else instant.replace(tzinfo=timezone.utc)
+
+
+def _as_aware(moment):
+    """An aware datetime for `moment`; a naive one is the local wall clock."""
+    return moment if moment.tzinfo is not None else moment.astimezone()
+
+
+def _first_boundary_after(cfg, moment):
+    """The first scheduled on/off transition strictly after `moment`, or None.
+
+    `moment` must be aware; boundaries are built in its timezone, which is the
+    screen's timezone (``now_in(cfg)``). No schedule, a disabled schedule or a
+    schedule with no enabled days has no boundary.
+    """
+    if not cfg_get(
+        cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
+    ):
+        return None
+    schedule = cfg_get(cfg, "display_schedule", "displaySchedule", default=[]) or []
+    by_day = {d.get("day"): d for d in schedule if d.get("enabled", False)}
+    candidates = []
+    for offset in range(0, 9):  # today + 8 days covers any weekly gap
+        d = (moment + timedelta(days=offset)).date()
+        entry = by_day.get(d.weekday())
+        if not entry:
+            continue
+        for key in ("onTime", "offTime"):
+            try:
+                hh, mm = map(int, str(entry.get(key)).split(":"))
+            except (ValueError, AttributeError):
+                continue
+            dt = datetime(d.year, d.month, d.day, hh, mm, tzinfo=moment.tzinfo)
+            if dt > moment:
+                candidates.append(dt)
+    if not candidates:
+        return None
+    return min(candidates)
+
+
+def _screen_now(cfg):
+    override = cfg_get(cfg, "screen_now", "screenNow")
+    return override if isinstance(override, dict) else None
+
+
+def override_expiry(cfg, now):
+    """When the active "Screen now" override ends, or None when it never does.
+
+    The UI stores only ``{power, setAt}``. The agent owns the clock: the override
+    ends at the first schedule boundary after ``setAt``, computed from its own
+    ``now_in(cfg)`` timezone, so the browser's clock or zone never matters.
+    """
+    override = _screen_now(cfg)
+    if override is None:
+        return None
+    set_at = _parse_instant(override.get("setAt"))
+    if set_at is None:
+        return None
+    aware_now = _as_aware(now)
+    return _first_boundary_after(cfg, set_at.astimezone(aware_now.tzinfo))
+
+
+def screen_power_override(cfg, now):
+    """True/False from an active "Screen now" override, or None when inactive.
+
+    An override is active until the first scheduled boundary after ``setAt``.
+    With no schedule it stays until changed. An expired override is ignored, so
+    the schedule rules again on the next poll.
+    """
+    override = _screen_now(cfg)
+    if override is None:
+        return None
+    power = str(override.get("power") or "").lower()
+    if power not in ("on", "off"):
+        return None
+    set_at = _parse_instant(override.get("setAt"))
+    if set_at is None:
+        return None
+    aware_now = _as_aware(now)
+    expiry = _first_boundary_after(cfg, set_at.astimezone(aware_now.tzinfo))
+    if expiry is not None and aware_now >= expiry:
+        return None
+    return power == "on"
+
+
 def desired_on(cfg, now):
     """Return True if the display should be ON at `now` (a datetime)."""
+    override = screen_power_override(cfg, now)
+    if override is not None:
+        return override
     if not cfg_get(
         cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
     ):
@@ -94,30 +194,16 @@ def desired_on(cfg, now):
 
 
 def seconds_to_next_boundary(cfg, now):
-    """Seconds until the next on/off transition, or None if no boundaries exist."""
-    if not cfg_get(
-        cfg, "display_schedule_enabled", "displayScheduleEnabled", default=False
-    ):
+    """Seconds until the next on/off transition, or None if no boundaries exist.
+
+    This is also the remaining life of an active override: the override ends at
+    the first boundary after its ``setAt``, which is the next boundary after
+    ``now`` while it is still active.
+    """
+    boundary = _first_boundary_after(cfg, _as_aware(now))
+    if boundary is None:
         return None
-    schedule = cfg_get(cfg, "display_schedule", "displaySchedule", default=[]) or []
-    by_day = {d.get("day"): d for d in schedule if d.get("enabled", False)}
-    candidates = []
-    for offset in range(0, 9):  # today + 8 days covers any weekly gap
-        d = (now + timedelta(days=offset)).date()
-        entry = by_day.get(d.weekday())
-        if not entry:
-            continue
-        for key in ("onTime", "offTime"):
-            try:
-                hh, mm = map(int, str(entry.get(key)).split(":"))
-            except (ValueError, AttributeError):
-                continue
-            dt = datetime(d.year, d.month, d.day, hh, mm, tzinfo=now.tzinfo)
-            if dt > now:
-                candidates.append(dt)
-    if not candidates:
-        return None
-    return int((min(candidates) - now).total_seconds())
+    return int((boundary - _as_aware(now)).total_seconds())
 
 
 def apply_on(on, env=None):
@@ -288,7 +374,9 @@ def now_in(cfg):
             return datetime.now(ZoneInfo(tzname))
         except Exception:
             pass
-    return datetime.now()
+    # The fallback is still aware: a naive "now" plus a UTC setAt is exactly
+    # how a browser/Pi clock mismatch used to shift an expiry.
+    return datetime.now().astimezone()
 
 
 def run(
