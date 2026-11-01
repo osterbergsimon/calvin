@@ -149,10 +149,28 @@ export function scheduleDesiredOn({ enabled, schedule, now = new Date(), timeZon
     : minutes >= on.minutes && minutes < off.minutes;
 }
 
+/** Whether any enabled day has a boundary the agent could act on. */
+function hasScheduleBoundary({ enabled, schedule }) {
+  if (!enabled || !Array.isArray(schedule)) return false;
+  return schedule.some(
+    day => day && day.enabled && (parseClock(day.onTime) || parseClock(day.offTime))
+  );
+}
+
+// The kiosk agent searches at most eight days ahead for a boundary (see
+// _first_boundary_after in deploy/kiosk-agent), so an override older than that
+// plus a day of zone slack must be over even when the browser cannot see the
+// screen's own zone.
+const UNKNOWN_ZONE_MAX_AGE_MS = 10 * 24 * 60 * 60 * 1000;
+
 /**
- * The active `{ power, setAt, expiry }` override, or null when absent, expired
- * or invalid. `expiry` is null when no schedule can take over (it stays until
- * changed); `timeZone` only affects the display estimate.
+ * The active `{ power, setAt, expiry, hasSchedule }` override, or null when
+ * absent, expired or invalid. `expiry` is null when no schedule can take over
+ * (it stays until changed); `timeZone` only affects the display estimate.
+ *
+ * When the screen uses its system zone the browser cannot know that zone, so
+ * its own boundary estimate must never end the override: only the agent, on its
+ * own clock, can. `hasSchedule` says whether a schedule will end it eventually.
  */
 export function activePowerOverride(
   override,
@@ -163,6 +181,11 @@ export function activePowerOverride(
   if (power !== "on" && power !== "off") return null;
   const setAt = Date.parse(override.setAt);
   if (!Number.isFinite(setAt)) return null;
+  const hasSchedule = hasScheduleBoundary({ enabled, schedule });
+  if (!timeZone) {
+    if (now.getTime() - setAt >= UNKNOWN_ZONE_MAX_AGE_MS) return null;
+    return { power, setAt: override.setAt, expiry: null, hasSchedule };
+  }
   const expiry = firstScheduleBoundaryAfter({
     enabled,
     schedule,
@@ -170,7 +193,7 @@ export function activePowerOverride(
     timeZone,
   });
   if (expiry && now.getTime() >= expiry.getTime()) return null;
-  return { power, setAt: override.setAt, expiry };
+  return { power, setAt: override.setAt, expiry, hasSchedule };
 }
 
 /** "22:00" for a boundary, in the screen's timezone. */
