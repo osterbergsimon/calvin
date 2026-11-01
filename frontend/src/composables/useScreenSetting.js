@@ -1,13 +1,15 @@
 import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
+import { useNotificationsStore } from "../stores/notifications";
 import { getKioskId } from "../utils/kioskId";
+import { logError } from "../utils/logger";
 import {
   decodeScreenValue,
-  encodeScreenValue,
   readScreenStorage,
   screenSettingRef,
   screenStorageKey,
+  writeScreenSetting,
 } from "../utils/screenSetting";
 
 /**
@@ -35,6 +37,7 @@ export function useScreenSetting(
 ) {
   const configStore = useConfigStore();
   const kiosksStore = useKiosksStore();
+  const notifications = useNotificationsStore();
   const kioskId = getKioskId();
   const scope = kioskId ? "kiosk" : "browser";
 
@@ -58,21 +61,26 @@ export function useScreenSetting(
   const overridden = computed(() => scope === "browser" && stored.value !== null);
 
   const set = async next => {
-    if (scope === "kiosk") {
-      const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
-      const merged = { ...overrides, [key]: next };
-      await kiosksStore.saveOverrides(kioskId, merged);
-      // The override replaces the whole object; keep this page in step without
-      // waiting for the next merged-config poll.
-      configStore[key] = next;
-      return;
-    }
-
-    stored.value = encodeScreenValue(next);
     try {
-      window.localStorage.setItem(storageKey, stored.value);
-    } catch {
-      // Storage blocked: the choice lasts for this page load.
+      await writeScreenSetting({
+        kioskId,
+        key,
+        storageKey,
+        next,
+        raw: stored,
+        kiosksStore,
+        // The override replaces the whole object; keep this page in step
+        // without waiting for the next merged-config poll.
+        applyServerValue: value => {
+          configStore[key] = value;
+        },
+      });
+    } catch (err) {
+      logError("[useScreenSetting]", `Failed to save ${key}:`, err);
+      notifications.notify({
+        severity: "error",
+        message: "Couldn't save this screen's setting. The stored value is unchanged.",
+      });
     }
   };
 

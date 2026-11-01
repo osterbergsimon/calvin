@@ -3,6 +3,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigStore } from "@/stores/config";
+import { useNotificationsStore } from "@/stores/notifications";
 import api from "@/services/api";
 
 vi.mock("@/services/api", () => ({
@@ -697,6 +698,25 @@ describe("config store — per-screen control visibility", () => {
     expect(api.post).not.toHaveBeenCalled();
     expect(store.showUI).toBe(false);
     expect(localStorage.getItem("calvin-screen-showUI")).toBeNull();
+  });
+
+  it("keeps the stored value and warns when a kiosk save fails", async () => {
+    sessionStorage.setItem("calvin_kiosk_id", "kitchen-3f9a2c");
+    api.get.mockResolvedValue({ data: { overrides: {} } });
+    api.put.mockRejectedValue(new Error("offline"));
+    const notifications = useNotificationsStore();
+    const notify = vi.spyOn(notifications, "notify");
+    const store = useConfigStore();
+    store.showUI = true;
+
+    await store.toggleUI();
+
+    expect(store.showUI).toBe(true);
+    expect(store.shouldShowUI).toBe(true);
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBeNull();
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: "error", message: expect.stringContaining("unchanged") })
+    );
   });
 
   it("restores the hidden controls after the temporary reveal's 60 s", () => {
