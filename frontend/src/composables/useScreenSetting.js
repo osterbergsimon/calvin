@@ -1,7 +1,16 @@
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
+import { useNotificationsStore } from "../stores/notifications";
 import { getKioskId } from "../utils/kioskId";
+import { logError } from "../utils/logger";
+import {
+  decodeScreenValue,
+  readScreenStorage,
+  screenSettingRef,
+  screenStorageKey,
+  writeScreenSetting,
+} from "../utils/screenSetting";
 
 /**
  * One setting, scoped to the screen you are changing it on.
@@ -14,71 +23,28 @@ import { getKioskId } from "../utils/kioskId";
  * Returns { value, set, scope } for the settings audit's "This screen" rows.
  */
 
-// localStorage keys are per setting; sharing one ref per key keeps every
-// caller (Settings row, keyboard composable, ...) in sync in the same page.
-const localRefs = new Map();
-
-const readStorage = storageKey => {
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    return raw === null || raw === "" ? null : raw;
-  } catch {
-    return null;
-  }
-};
-
-const parseStored = (storageKey, parse) => {
-  const raw = readStorage(storageKey);
-  if (raw === null) return null;
-  try {
-    return parse(raw);
-  } catch {
-    return null;
-  }
-};
-
-const localRef = (storageKey, parse) => {
-  let stored = localRefs.get(storageKey);
-  if (!stored) {
-    stored = ref(parseStored(storageKey, parse));
-    localRefs.set(storageKey, stored);
-  }
-  return stored;
-};
-
 /**
  * @param {string} key config key, e.g. "onScreenKeyboard"
- * @param {{
- *   storageKey?: string,
- *   serverValue?: () => any,
- *   serialize?: (value: any) => string,
- *   parse?: (raw: string) => any
- * }} options
+ * @param {{ storageKey?: string, serverValue?: () => any }} options
  *   storageKey: localStorage key for browser scope
  *   serverValue: where the seed comes from when this screen has no choice of
  *   its own (defaults to the config store; pass the Settings form's own value
  *   when the row must reflect what Settings loaded)
- *   serialize/parse: localStorage encoding for non-string choices (booleans,
- *   lists). Defaults keep the historical plain string form.
  */
 export function useScreenSetting(
   key,
-  {
-    storageKey = `calvin-screen-${key}`,
-    serverValue: readServerValue,
-    serialize = value => String(value),
-    parse = raw => raw,
-  } = {}
+  { storageKey = screenStorageKey(key), serverValue: readServerValue } = {}
 ) {
   const configStore = useConfigStore();
   const kiosksStore = useKiosksStore();
+  const notifications = useNotificationsStore();
   const kioskId = getKioskId();
   const scope = kioskId ? "kiosk" : "browser";
 
   // Re-read on creation so a fresh caller sees the current value even if a
   // previous instance left the shared ref behind (tests, remounts).
-  const stored = localRef(storageKey, parse);
-  if (scope === "browser") stored.value = parseStored(storageKey, parse);
+  const stored = screenSettingRef(storageKey);
+  if (scope === "browser") stored.value = readScreenStorage(storageKey);
 
   const serverValue = computed(() =>
     readServerValue ? readServerValue() : (configStore[key] ?? null)
@@ -86,7 +52,7 @@ export function useScreenSetting(
 
   const value = computed(() => {
     if (scope === "kiosk") return serverValue.value;
-    return stored.value ?? serverValue.value;
+    return decodeScreenValue(stored.value, serverValue.value) ?? serverValue.value;
   });
 
   // A browser choice of its own, as opposed to falling back to the server
@@ -95,21 +61,26 @@ export function useScreenSetting(
   const overridden = computed(() => scope === "browser" && stored.value !== null);
 
   const set = async next => {
-    if (scope === "kiosk") {
-      const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
-      const merged = { ...overrides, [key]: next };
-      await kiosksStore.saveOverrides(kioskId, merged);
-      // The override replaces the whole object; keep this page in step without
-      // waiting for the next merged-config poll.
-      configStore[key] = next;
-      return;
-    }
-
-    stored.value = next;
     try {
-      window.localStorage.setItem(storageKey, serialize(next));
-    } catch {
-      // Storage blocked: the choice lasts for this page load.
+      await writeScreenSetting({
+        kioskId,
+        key,
+        storageKey,
+        next,
+        raw: stored,
+        kiosksStore,
+        // The override replaces the whole object; keep this page in step
+        // without waiting for the next merged-config poll.
+        applyServerValue: value => {
+          configStore[key] = value;
+        },
+      });
+    } catch (err) {
+      logError("[useScreenSetting]", `Failed to save ${key}:`, err);
+      notifications.notify({
+        severity: "error",
+        message: "Couldn't save this screen's setting. The stored value is unchanged.",
+      });
     }
   };
 

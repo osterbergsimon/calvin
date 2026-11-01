@@ -82,22 +82,16 @@ export function usePhotoFrameMode() {
   const modeStore = useModeStore();
   const router = useRouter();
 
-  // Per-screen settings. `serialize`/`parse` keep booleans, numbers and lists
-  // intact in localStorage (the default string form would turn `false` truthy).
+  // Per-screen settings. The shared screenSetting helpers keep booleans,
+  // numbers and lists intact in localStorage (`false` never comes back truthy).
   const enabledSetting = useScreenSetting("photoFrameEnabled", {
     serverValue: () => configStore.photoFrameEnabled,
-    serialize: JSON.stringify,
-    parse: JSON.parse,
   });
   const timeoutSetting = useScreenSetting("photoFrameTimeout", {
     serverValue: () => configStore.photoFrameTimeout,
-    serialize: JSON.stringify,
-    parse: JSON.parse,
   });
   const sourceIdsSetting = useScreenSetting("photoFrameSourceIds", {
     serverValue: () => configStore.photoFrameSourceIds,
-    serialize: JSON.stringify,
-    parse: JSON.parse,
   });
 
   const photoFrameEnabled = computed(() => asBool(enabledSetting.value.value));

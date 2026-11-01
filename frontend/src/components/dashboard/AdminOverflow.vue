@@ -21,7 +21,7 @@
       </template>
       <Menu :items="menuItems" label="More controls" @select="onSelect" @close="open = false" />
     </Popover>
-    <!-- F7: hiding is global (every screen) and the way back is a hidden
+    <!-- F7: hiding applies to this screen only, and the way back is a hidden
          long-press, so say both before doing it. -->
     <Teleport to="body">
       <ConfirmModal
@@ -92,9 +92,9 @@ const hideMessage = computed(() => {
   const corner = normalizeHotCornerPosition(configStore.hotCornerPosition).replace("-", " ");
   const seconds = Math.max(0.1, Number(configStore.hotCornerLongPressMs) / 1000 || 0.5);
   return (
-    "This hides the clock-bar buttons and menus on every screen showing this dashboard, " +
-    `not only this one. To bring them back, press and hold the ${corner} corner of the ` +
-    `screen for ${seconds} s.`
+    "This hides the clock-bar buttons and menus on this screen. Other screens keep their " +
+    `own controls. To bring them back, press and hold the ${corner} corner of this screen ` +
+    `for ${seconds} s.`
   );
 });
 const onHideUi = () => {

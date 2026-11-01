@@ -23,7 +23,7 @@ export function useClockBarVisible() {
   return computed(() => {
     if (!route || route.name !== "dashboard") return false;
 
-    const barVisible = configStore.shouldShowUI || configStore.clockBarShowInKiosk;
+    const barVisible = configStore.shouldShowUI || configStore.effectiveClockBarShowInKiosk;
     if (!barVisible) return false;
 
     const screen = getActiveDashboardScreen(configStore.effectiveDashboardScreens);
