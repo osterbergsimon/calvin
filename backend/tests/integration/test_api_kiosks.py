@@ -72,6 +72,26 @@ def test_config_fetch_records_viewport(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_config_fetch_records_display_stack(test_client: TestClient):
+    """The agent reports its display stack on the config poll; GET /kiosks returns it."""
+    resp = test_client.get("/api/kiosks/hall-stack/config?kstack=cog")
+    assert resp.status_code == 200
+    listed = test_client.get("/api/kiosks").json()["kiosks"]
+    kiosk = next(k for k in listed if k["id"] == "hall-stack")
+    assert kiosk["displayStack"] == "cog"
+
+
+@pytest.mark.integration
+def test_config_fetch_ignores_an_unknown_display_stack(test_client: TestClient):
+    """A bad kstack must not fail the poll or store junk."""
+    resp = test_client.get("/api/kiosks/hall-bad-stack/config?kstack=windows")
+    assert resp.status_code == 200
+    listed = test_client.get("/api/kiosks").json()["kiosks"]
+    kiosk = next(k for k in listed if k["id"] == "hall-bad-stack")
+    assert kiosk["displayStack"] is None
+
+
+@pytest.mark.integration
 def test_list_kiosks_includes_overrides_without_agent_keys(test_client: TestClient):
     """GET /kiosks carries each kiosk's overrides, with host-internal keys stripped."""
     test_client.put(

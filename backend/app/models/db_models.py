@@ -177,3 +177,6 @@ class KioskDB(ormar.Model):
     viewport: dict | None = ormar.JSON(
         nullable=True
     )  # screen's reported CSS viewport {w, h}, used by the layout editor preview (CLV-36)
+    display_stack: str | None = ormar.String(
+        max_length=16, nullable=True
+    )  # x11 | wayland | cog, reported by the display agent (calvin-2ibz)
