@@ -215,8 +215,15 @@ export const useProgressStore = defineStore("progress", () => {
   const settleHandback = () => {
     handbackTimer = null;
     const target = wantedFrame.value;
-    if (!target || target === APP_FRAME) return;
-    if (visible.value.has(APP_FRAME) && !visible.value.has(target)) moveLight(APP_FRAME, target);
+    if (!target || target === APP_FRAME || visible.value.has(target)) return;
+    if (visible.value.has(APP_FRAME)) {
+      moveLight(APP_FRAME, target);
+    } else {
+      // The app light's hide timer ran before this settled: the light is
+      // already dark, so the region waits out a fresh show delay instead of
+      // running with no light at all.
+      want(target);
+    }
   };
 
   // Sync flush: the delay starts at the exact moment the work begins.
