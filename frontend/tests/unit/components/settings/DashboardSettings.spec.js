@@ -17,7 +17,6 @@ const baseConfig = () => ({
   clockBarShowInKiosk: false,
   touchControls: "auto",
   touchControlSize: "medium",
-  displayName: "",
 });
 
 const stubs = {

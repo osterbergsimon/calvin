@@ -92,7 +92,6 @@ export function useConfigForm(initialConfig = {}) {
         randomizeImages: response.randomizeImages ?? response.randomize_images ?? false,
         // UI
         showUI: response.showUI ?? response.show_ui ?? true,
-        displayName: response.displayName ?? response.display_name ?? "",
         modeIndicatorTimeout: response.modeIndicatorTimeout ?? response.mode_indicator_timeout ?? 5,
         focusLightMode: response.focusLightMode ?? response.focus_light_mode ?? "interaction",
         focusLightDimOthers:

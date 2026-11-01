@@ -83,7 +83,6 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarVerticalPluginItemSize = ref(16);
   const clockBarShowPluginItems = ref(true);
   const clockBarShowLogo = ref(true);
-  const displayName = ref("");
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
   const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
@@ -177,7 +176,6 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
-    displayName,
     focusLightMode,
     focusLightDimOthers,
     regionsLocked,
@@ -573,9 +571,6 @@ export const useConfigStore = defineStore("config", () => {
     imageDisplayMode.value = mode;
   };
 
-  const setDisplayName = name => {
-    displayName.value = name;
-  };
   const setFocusLightMode = mode => {
     focusLightMode.value = mode;
   };
@@ -655,7 +650,6 @@ export const useConfigStore = defineStore("config", () => {
     devMode,
     pluginRepositoryUrl,
     pluginCatalogRepo,
-    displayName,
     focusLightMode,
     focusLightDimOthers,
     regionsLocked,
@@ -706,7 +700,6 @@ export const useConfigStore = defineStore("config", () => {
     setThemeMode,
     setDarkModeTime,
     setImageDisplayMode,
-    setDisplayName,
     setFocusLightMode,
     setFocusLightDimOthers,
     setTouchControls,

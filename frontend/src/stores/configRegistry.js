@@ -235,11 +235,6 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
-    name: "displayName",
-    keys: ["displayName", "display_name"],
-    defaultValue: "",
-  },
-  {
     name: "focusLightMode",
     keys: ["focusLightMode", "focus_light_mode"],
     defaultValue: "interaction",
