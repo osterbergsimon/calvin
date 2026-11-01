@@ -125,6 +125,19 @@
         </div>
       </section>
 
+      <section class="ui-gallery__section" data-test="gallery-progress-bar">
+        <h2 class="ui-gallery__heading">ProgressBar</h2>
+        <p class="ui-gallery__note">
+          Progress of a long task, such as a guest's upload. The fill is the action colour; the "3
+          of 8" text sits beside it and is the only thing announced.
+        </p>
+
+        <div class="ui-gallery__stack">
+          <span class="ui-gallery__text">Sending 3 of 8</span>
+          <ProgressBar :value="40" label="Upload progress" value-text="Sending 3 of 8" />
+        </div>
+      </section>
+
       <section class="ui-gallery__section" data-test="gallery-list-row">
         <h2 class="ui-gallery__heading">ListRow</h2>
         <p class="ui-gallery__note">
@@ -409,6 +422,7 @@ import InlineNote from "../components/ui/InlineNote.vue";
 import ListRow from "../components/ui/ListRow.vue";
 import Menu from "../components/ui/Menu.vue";
 import Popover from "../components/ui/Popover.vue";
+import ProgressBar from "../components/ui/ProgressBar.vue";
 import ScopeLine from "../components/ui/ScopeLine.vue";
 import SegmentedControl from "../components/ui/SegmentedControl.vue";
 import SettingGroup from "../components/ui/SettingGroup.vue";
