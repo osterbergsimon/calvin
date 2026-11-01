@@ -3,8 +3,8 @@
     uv run python -m app.demo seed [--data-dir DIR] [--calendar-url URL] [--json]
     uv run python -m app.demo clear [--data-dir DIR] [--json]
 
-``seed`` adds a sample calendar, twelve bundled CC0 photos, two dashboard
-pages and a room name. ``clear`` removes exactly those and nothing the user
+``seed`` adds a sample calendar, twelve bundled CC0 photos and two dashboard
+pages. ``clear`` removes exactly those and nothing the user
 created. Both operate on the configured data directory (``CALVIN_DATA_DIR``
 or ``backend/data``).
 
@@ -26,7 +26,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m app.demo")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    seed = sub.add_parser("seed", help="add the sample calendar, photos, pages and room name")
+    seed = sub.add_parser("seed", help="add the sample calendar, photos and pages")
     seed.add_argument(
         "--data-dir",
         type=Path,
@@ -109,8 +109,6 @@ async def _run(args: argparse.Namespace) -> int:
         print(f"  photos:   {result['photos']['count']} CC0 sample photos")
         if result["pages"].get("created"):
             print(f"  pages:    {', '.join(result['pages']['screens'])}")
-            if result["pages"].get("room_name"):
-                print(f"  room:     {result['pages']['room_name']}")
         else:
             print(f"  pages:    left alone ({result['pages'].get('reason')})")
         print("Restart Calvin (or start it) so the backend loads the sample calendar.")
