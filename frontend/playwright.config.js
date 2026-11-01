@@ -54,6 +54,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], hasTouch: true },
     },
     {
+      // CLV-105: cog (WPE WebKit) is the default kiosk browser, so the desktop
+      // specs also run on WebKit. Plain `webkit` keeps the Linux user agent
+      // that WPE reports, unlike devices["Desktop Safari"] (macOS UA).
+      name: "webkit",
+      use: { browserName: "webkit", viewport: { width: 1280, height: 720 } },
+      // Scope out phone/a11y like chromium, and the visual snapshot gallery:
+      // its baselines are Chromium-only on purpose (no WebKit baselines).
+      testIgnore: ["**/phone/**", "**/a11y/**", "**/ui-gallery.spec.js"],
+    },
+    {
       // CLV-65: axe audits at phone and kiosk sizes, light and dark. The specs
       // set viewport/colorScheme themselves per describe block.
       name: "a11y",
