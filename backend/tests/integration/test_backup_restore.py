@@ -579,3 +579,42 @@ def test_damaged_zip_is_rejected_without_leaking_temp_dirs(test_client, tmp_path
         zf.writestr("backup.json", json.dumps(_doc(_export(test_client))))
         zf.writestr("signing-key", b"\xff\xfe")
     assert _restore(test_client, bad_key.getvalue()).status_code == 400
+
+
+def test_restore_moves_global_room_name_onto_unnamed_screens(test_client):
+    """calvin-al91: a backup from before CLV-111 still has the global room name.
+
+    The restore runs the room-name migration itself, so unnamed screens get the
+    name and the global key is cleared without a restart or a new screen.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    seed = {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [{"key": "displayName", "value": "Lounge", "value_type": "string"}],
+            "kiosks": [
+                {"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}},
+                {
+                    "id": "office-4d5e6f",
+                    "hostname": "office",
+                    "overrides": {"displayName": "Office", "orientation": "portrait"},
+                },
+            ],
+        },
+    }
+    r = test_client.post(
+        "/api/backup/restore",
+        files={"file": ("seed.json", json.dumps(seed).encode(), "application/json")},
+        data={"mode": "merge"},
+    )
+    assert r.status_code == 200, r.text
+
+    assert _run(kr.get_overrides("kitchen-1a2b3c")) == {"displayName": "Lounge"}
+    assert _run(kr.get_overrides("office-4d5e6f")) == {
+        "displayName": "Office",
+        "orientation": "portrait",
+    }
+    assert _run(config_service.get_value("displayName")) is None
