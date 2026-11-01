@@ -21,7 +21,9 @@ const CASES = [
   { name: "1280x800 landscape", viewport: { width: 1280, height: 800 } },
   { name: "800x1280 portrait", viewport: { width: 800, height: 1280 } },
   { name: "1024x600 7-inch panel", viewport: { width: 1024, height: 600 } },
-  { name: "800x480 Pi display", viewport: { width: 800, height: 480 } },
+  // The Pi panel is a registered kiosk (?kiosk=): short and landscape, but not
+  // a phone, so the keyboard still opens by itself (CLV-98).
+  { name: "800x480 Pi display", viewport: { width: 800, height: 480 }, kiosk: true },
   // The lock screen is zoomed by the Settings UI size (CLV-9 §6).
   { name: "1024x600 compact UI", viewport: { width: 1024, height: 600 }, uiSize: "compact" },
   {
@@ -62,7 +64,7 @@ for (const c of CASES) {
         }, c.uiSize);
       }
 
-      await page.goto("/settings");
+      await page.goto(c.kiosk ? "/settings?kiosk=pi-panel" : "/settings");
       const field = page.locator("#auth-signin-password");
       await expect(field).toBeVisible();
 

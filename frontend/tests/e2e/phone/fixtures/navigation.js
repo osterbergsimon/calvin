@@ -6,6 +6,11 @@ import { expect } from "@playwright/test";
 
 export const PHONE = { width: 390, height: 844 };
 export const KIOSK = { width: 800, height: 480 };
+/**
+ * A wall kiosk opens Calvin with its identity (?kiosk=<id>). Without it an
+ * 800x480 window is a short landscape screen, i.e. a phone turned sideways.
+ */
+export const KIOSK_ID = "pi-panel";
 
 /** Open the dashboard with mocked data already in place. */
 export async function gotoDashboard(page) {
@@ -15,8 +20,8 @@ export async function gotoDashboard(page) {
 }
 
 /** Open Settings directly (the address a phone opens from the QR card). */
-export async function gotoSettings(page, category) {
-  await page.goto("/settings");
+export async function gotoSettings(page, category, { kiosk = null } = {}) {
+  await page.goto(kiosk ? `/settings?kiosk=${encodeURIComponent(kiosk)}` : "/settings");
   await expect(page.locator(".settings-page")).toBeVisible();
   await page.waitForLoadState("networkidle");
   if (category) await selectCategory(page, category);

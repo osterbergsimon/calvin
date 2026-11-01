@@ -9,7 +9,13 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { KIOSK, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  KIOSK,
+  KIOSK_ID,
+  gotoSettings,
+  expectSettingsReady,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: KIOSK, hasTouch: true, isMobile: false });
 
@@ -18,8 +24,10 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
   consoleErrors,
 }) => {
   const api = await installApiMock(page);
-  await gotoSettings(page);
+  await gotoSettings(page, null, { kiosk: KIOSK_ID });
   await expectSettingsReady(page);
+  // The kiosk identity marks <html>; that is what keeps 800x480 off the phone layout.
+  await expect(page.locator("html")).toHaveClass(/calvin-kiosk/);
   await expectPhoneLayout(page, "Settings at 800x480");
 
   for (const category of ["Content", "Dashboard", "Screens", "Plugins", "System", "Security"]) {
