@@ -128,14 +128,21 @@ test.describe("phone: Screens", () => {
     await page.locator('[data-test="screen-card"]').first().click();
     await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
 
-    await page.locator('[data-test="screen-now-off"]').click();
-    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe("off");
+    // Either choice can be the one that is available, depending on the wall
+    // clock the CI runs at. Pick the enabled one so the test is time-agnostic.
+    const offButton = page.locator('[data-test="screen-now-off"]');
+    const onButton = page.locator('[data-test="screen-now-on"]');
+    const turningOff = await offButton.isEnabled();
+    await (turningOff ? offButton : onButton).click();
+    const power = turningOff ? "off" : "on";
+    const state = turningOff ? "Off now" : "On now";
+    await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe(power);
     // The choice carries the UTC instant; the agent computes the boundary.
     expect(api.overridesByKiosk.hallway.screenNow.setAt).toBeTruthy();
     expect(Number.isNaN(Date.parse(api.overridesByKiosk.hallway.screenNow.setAt))).toBe(false);
-    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText("Off now");
+    await expect(page.locator('[data-test="screen-now-state"]')).toHaveText(state);
     await expect(page.locator('[data-test="screen-now-until"]')).toHaveText(
-      /^Off until \d{2}:\d{2}$/
+      /^(On|Off) until \d{2}:\d{2}$/
     );
 
     await page.getByRole("button", { name: "Follow schedule" }).click();
