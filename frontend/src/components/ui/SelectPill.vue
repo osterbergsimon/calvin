@@ -1,6 +1,7 @@
 <template>
   <div class="pill-wrap" ref="rootEl">
     <button
+      :id="id"
       type="button"
       class="pill"
       :aria-label="ariaLabel ? `${ariaLabel}: ${currentLabel}` : undefined"
@@ -80,6 +81,8 @@ let _counter = 0;
 const listboxId = `selectpill-lb-${++_counter}-${Math.random().toString(36).slice(2, 7)}`;
 
 const props = defineProps({
+  // Lands on the trigger button, so a <label for> outside the pill targets it.
+  id: { type: String, default: undefined },
   modelValue: { type: [String, Number], default: null },
   options: { type: Array, required: true },
   swatch: { type: String, default: null },
