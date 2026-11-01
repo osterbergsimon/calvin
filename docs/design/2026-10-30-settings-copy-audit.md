@@ -122,7 +122,7 @@ Clock bar:
 | Power schedule | **Screen on/off schedule** | Turns the screen off and on at set times. |
 | Timezone | (same) | Used by the schedule. **Server's timezone** (option renamed from "System default"). |
 | Screen timeout + Timeout | one row **Turn off when idle** with SelectPill **Never · 5 min · 15 min · 30 min · 1 hour · 2 hours** | — |
-| Manual control | **Screen now** with buttons **Turn off · Turn on** | — |
+| Manual control | **Screen now** with buttons **Turn on now · Turn off now** and **Follow schedule** while overridden | — |
 | section Keyboard | **On-screen keyboard** | |
 | On-screen keyboard | **Show it** | When you tap a text field. Auto shows it on touchscreens. |
 | | options **Auto · Always · Never** | |

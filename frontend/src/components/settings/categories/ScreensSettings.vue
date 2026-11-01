@@ -895,17 +895,28 @@ const effSchedule = computed(() =>
   scheduleOverridden.value ? overrides.value.displaySchedule : props.config.displaySchedule
 );
 
-// "Screen now" (calvin-ydzz): a manual choice that holds only until the
-// schedule's next on/off boundary. The row reads the same effective schedule
-// the agent will, so its "until" matches what the screen does.
+// "Screen now" (calvin-ydzz): a manual choice that holds only until the first
+// schedule boundary after it was set. The agent owns that decision from the
+// stored UTC `setAt`; the row re-reads the clock so an expired override stops
+// claiming the screen without needing another config change.
 const powerTimeZone = computed(() => effectiveTimeZone(props.config));
-const activeOverride = computed(() => activePowerOverride(overrides.value.screenNow, new Date()));
+const nowTick = ref(Date.now());
+const now = () => new Date(nowTick.value);
+let nowTimer = null;
+const activeOverride = computed(() =>
+  activePowerOverride(overrides.value.screenNow, {
+    enabled: effScheduleEnabled.value,
+    schedule: effSchedule.value,
+    now: now(),
+    timeZone: powerTimeZone.value,
+  })
+);
 const desiredOnNow = computed(() => {
   if (activeOverride.value) return activeOverride.value.power === "on";
   return scheduleDesiredOn({
     enabled: effScheduleEnabled.value,
     schedule: effSchedule.value,
-    now: new Date(),
+    now: now(),
     timeZone: powerTimeZone.value,
   });
 });
@@ -913,20 +924,16 @@ const untilCopy = computed(() => {
   const override = activeOverride.value;
   if (!override) return "";
   const state = override.power === "on" ? "On" : "Off";
-  return override.until
-    ? `${state} until ${formatUntil(override.until, powerTimeZone.value)}`
-    : `${state} until you change it`;
+  if (!override.expiry) return `${state} until you change it`;
+  // The browser cannot know the Pi's zone when the screen uses the system one.
+  if (!powerTimeZone.value) return `${state} until the next scheduled change`;
+  return `${state} until ${formatUntil(override.expiry, powerTimeZone.value)}`;
 });
 
 function setScreenNow(power) {
   const next = {
     ...overrides.value,
-    screenNow: buildPowerOverride({
-      power,
-      enabled: effScheduleEnabled.value,
-      schedule: effSchedule.value,
-      timeZone: powerTimeZone.value,
-    }),
+    screenNow: buildPowerOverride({ power, now: now() }),
   };
   persist(next, powerMsg, "Saved. This screen changes at its next check-in (~30s).", OFFLINE_COPY);
 }
@@ -1295,6 +1302,9 @@ async function refreshDesiredVersion(id) {
 }
 
 onMounted(async () => {
+  nowTimer = window.setInterval(() => {
+    nowTick.value = Date.now();
+  }, 30000);
   refreshBrowserCount();
   await store.loadKiosks();
   if (kiosks.value.length === 0) addOpen.value = true;
@@ -1311,6 +1321,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  if (nowTimer !== null) window.clearInterval(nowTimer);
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
     narrowMql.removeEventListener("change", onNarrowChange);

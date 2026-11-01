@@ -130,8 +130,9 @@ test.describe("phone: Screens", () => {
 
     await page.locator('[data-test="screen-now-off"]').click();
     await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe("off");
-    // The schedule's next boundary is saved with the choice, in the screen's zone.
-    expect(api.overridesByKiosk.hallway.screenNow.until).toBeTruthy();
+    // The choice carries the UTC instant; the agent computes the boundary.
+    expect(api.overridesByKiosk.hallway.screenNow.setAt).toBeTruthy();
+    expect(Number.isNaN(Date.parse(api.overridesByKiosk.hallway.screenNow.setAt))).toBe(false);
     await expect(page.locator('[data-test="screen-now-state"]')).toHaveText("Off now");
     await expect(page.locator('[data-test="screen-now-until"]')).toHaveText(
       /^Off until \d{2}:\d{2}$/
