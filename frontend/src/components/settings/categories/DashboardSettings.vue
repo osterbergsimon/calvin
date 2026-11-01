@@ -191,6 +191,25 @@
           @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
         />
       </SettingRow>
+      <SettingRow label="Loading light">
+        <template #description>
+          <p class="setting-row__desc">What Calvin shows while it's fetching something.</p>
+          <p v-if="prefersReducedMotion" class="setting-row__desc">
+            This device prefers less motion, so it pulses.
+          </p>
+          <ScopeLine
+            :overridden="loadingLightSetting.overridden.value"
+            reset-test="reset-loading-light"
+            @reset="loadingLightSetting.reset()"
+          />
+        </template>
+        <SegmentedControl
+          :model-value="loadingLight"
+          :options="LOADING_LIGHT_OPTIONS"
+          aria-label="Loading light"
+          @update:model-value="v => loadingLightSetting.set(v)"
+        />
+      </SettingRow>
       <SettingRow
         label="Dashboard size"
         description="Size of labels and touch buttons on the dashboard."
@@ -248,6 +267,7 @@
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ScopeChip from "@/components/settings/shell/ScopeChip.vue";
+import ScopeLine from "@/components/ui/ScopeLine.vue";
 import Button from "@/components/ui/Button.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import TextField from "@/components/ui/TextField.vue";
@@ -346,6 +366,27 @@ const setUiSize = async value => {
   // Apply immediately, without waiting for the config store to round-trip.
   applyUiScale(value);
 };
+
+// --- Loading light: per screen, like the rows above (CLV-115) --------------
+// A wall panel and a laptop may want different lights; the Default value is
+// what a screen without its own choice uses. Reduced motion forces the pulse
+// on the dashboard, so say so here instead of silently ignoring Comet.
+const LOADING_LIGHT_OPTIONS = [
+  { value: "comet", label: "Comet" },
+  { value: "pulse", label: "Pulse" },
+  { value: "off", label: "Off" },
+];
+const loadingLightSetting = useScreenSetting("loadingLight", {
+  serverValue: () => props.config.loadingLight,
+});
+const loadingLight = computed(() => {
+  const value = loadingLightSetting.value.value;
+  return LOADING_LIGHT_OPTIONS.some(option => option.value === value) ? value : "comet";
+});
+const prefersReducedMotion =
+  typeof window !== "undefined" &&
+  typeof window.matchMedia === "function" &&
+  Boolean(window.matchMedia("(prefers-reduced-motion: reduce)")?.matches);
 
 // --- Dark from: two whole-hour pickers, one row ----------------------------
 const hourToTime = (hour, fallback) => {
