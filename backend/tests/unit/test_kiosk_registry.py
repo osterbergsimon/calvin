@@ -1,7 +1,10 @@
 """Unit tests for the kiosk registry service."""
 
+import importlib.util
+import re
 import sqlite3
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -671,19 +674,88 @@ async def test_record_kiosk_writes_when_last_seen_is_old(test_db, monkeypatch):
     assert (await KioskDB.objects.get(id="k-old")).last_seen > stale
 
 
+def _update_flag_cleared(row) -> bool:
+    return not kiosk_registry.agent_update_requested(row.overrides)
+
+
+# (first poll, second poll, check on the stored row). Each second poll changes
+# exactly one stored field, so it must be written although last_seen is fresh.
+_CHANGED_FIELD_CASES = {
+    "agent_version": (
+        {"agent_version": "v1"},
+        {"agent_version": "v2"},
+        lambda row: row.agent_version == "v2",
+    ),
+    "agent_status": (
+        {"agent_version": "v1", "agent_status": "ok"},
+        {"agent_version": "v1", "agent_status": "error"},
+        lambda row: row.agent_update_status == "error",
+    ),
+    "agent_message": (
+        {"agent_version": "v1", "agent_message": "fine"},
+        {"agent_version": "v1", "agent_message": "disk full"},
+        lambda row: row.agent_update_message == "disk full",
+    ),
+    "viewport": (
+        {"agent_version": "v1", "viewport": {"w": 800, "h": 480}},
+        {"agent_version": "v1", "viewport": {"w": 1024, "h": 600}},
+        lambda row: row.viewport == {"w": 1024, "h": 600},
+    ),
+    "update_flag_auto_clear": (
+        {"agent_version": "v1"},
+        {"agent_version": "v1", "available_version": "v1"},
+        _update_flag_cleared,
+    ),
+}
+
+
 @pytest.mark.asyncio
 @pytest.mark.unit
-async def test_record_kiosk_writes_when_a_field_changes(test_db, monkeypatch):
-    await kiosk_registry.record_kiosk("k-chg", hostname="pi", agent_version="v1")
+@pytest.mark.parametrize("case", list(_CHANGED_FIELD_CASES))
+async def test_record_kiosk_writes_when_a_field_changes(test_db, monkeypatch, case):
+    first, second, check = _CHANGED_FIELD_CASES[case]
+    await kiosk_registry.record_kiosk("k-chg", hostname="pi", **first)
+    if case == "update_flag_auto_clear":
+        assert await kiosk_registry.request_agent_update("k-chg") is True
     calls = await _count_kiosk_updates(monkeypatch)
 
-    await kiosk_registry.record_kiosk("k-chg", hostname="pi", agent_version="v2")
+    await kiosk_registry.record_kiosk("k-chg", hostname="pi", **second)
 
     assert calls == ["k-chg"]
-    assert (await KioskDB.objects.get(id="k-chg")).agent_version == "v2"
+    assert check(await KioskDB.objects.get(id="k-chg"))
+
+
+_AGENT_PATH = (
+    Path(__file__).resolve().parents[3] / "deploy" / "kiosk-agent" / "calvin_display_agent.py"
+)
+_SCREENS_SETTINGS_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "frontend"
+    / "src"
+    / "components"
+    / "settings"
+    / "categories"
+    / "ScreensSettings.vue"
+)
+
+
+def _agent_poll_seconds() -> int:
+    spec = importlib.util.spec_from_file_location("_calvin_display_agent", _AGENT_PATH)
+    assert spec and spec.loader
+    agent = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(agent)
+    return agent.DEFAULT_REFRESH_SECONDS
+
+
+def _ui_online_window_seconds() -> float:
+    match = re.search(
+        r"^const ONLINE_WINDOW_MS = ([\d_]+);", _SCREENS_SETTINGS_PATH.read_text(), re.MULTILINE
+    )
+    assert match, "could not find ONLINE_WINDOW_MS in ScreensSettings.vue"
+    return int(match.group(1)) / 1000
 
 
 def test_last_seen_skip_keeps_screen_online_between_polls():
-    """Skipped writes plus one 60 s poll gap stay inside the UI's 120 s online window."""
-    poll_s, online_window_s = 60, 120
+    """Skipped writes plus one poll gap stay inside the UI's online window."""
+    poll_s, online_window_s = _agent_poll_seconds(), _ui_online_window_seconds()
     assert kiosk_registry.LAST_SEEN_WRITE_INTERVAL_S + poll_s < online_window_s

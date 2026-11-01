@@ -581,16 +581,8 @@ def test_damaged_zip_is_rejected_without_leaking_temp_dirs(test_client, tmp_path
     assert _restore(test_client, bad_key.getvalue()).status_code == 400
 
 
-def test_restore_moves_global_room_name_onto_unnamed_screens(test_client):
-    """calvin-al91: a backup from before CLV-111 still has the global room name.
-
-    The restore runs the room-name migration itself, so unnamed screens get the
-    name and the global key is cleared without a restart or a new screen.
-    """
-    from app.services import kiosk_registry as kr
-    from app.services.config_service import config_service
-
-    seed = {
+def _room_name_seed() -> dict:
+    return {
         "format": "calvin-backup",
         "format_version": 1,
         "data": {
@@ -605,11 +597,27 @@ def test_restore_moves_global_room_name_onto_unnamed_screens(test_client):
             ],
         },
     }
-    r = test_client.post(
+
+
+def _restore_room_name_seed(test_client, mode: str):
+    return test_client.post(
         "/api/backup/restore",
-        files={"file": ("seed.json", json.dumps(seed).encode(), "application/json")},
-        data={"mode": "merge"},
+        files={"file": ("seed.json", json.dumps(_room_name_seed()).encode(), "application/json")},
+        data={"mode": mode},
     )
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_moves_global_room_name_onto_unnamed_screens(test_client, mode):
+    """calvin-al91: a backup from before CLV-111 still has the global room name.
+
+    The restore runs the room-name migration itself, so unnamed screens get the
+    name and the global key is cleared without a restart or a new screen.
+    """
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    r = _restore_room_name_seed(test_client, mode)
     assert r.status_code == 200, r.text
 
     assert _run(kr.get_overrides("kitchen-1a2b3c")) == {"displayName": "Lounge"}
@@ -618,3 +626,22 @@ def test_restore_moves_global_room_name_onto_unnamed_screens(test_client):
         "orientation": "portrait",
     }
     assert _run(config_service.get_value("displayName")) is None
+
+
+def test_restore_succeeds_with_a_warning_when_room_name_migration_fails(test_client, monkeypatch):
+    """The migration is best effort: the restore is already applied when it runs."""
+    from app.services import kiosk_registry as kr
+
+    async def boom() -> None:
+        raise RuntimeError("database is locked")
+
+    monkeypatch.setattr(kr, "migrate_global_room_name", boom)
+    r = _restore_room_name_seed(test_client, "merge")
+
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["applied"] is True
+    assert (
+        "The backup's room name could not be copied to the screens; "
+        "it will be retried at the next restart."
+    ) in body["warnings"]
