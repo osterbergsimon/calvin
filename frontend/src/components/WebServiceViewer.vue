@@ -52,15 +52,15 @@
           :region-id="regionId"
         >
           <template #actions>
-            <RegionHeaderControls v-if="hasPointer && (focused || isFullscreen)">
+            <RegionHeaderControls v-if="hasPointer && (showControls || isFullscreen)">
               <ServiceRegionViewOptions
-                v-if="focused && hasPointer && isLinkCapable"
+                v-if="showControls && hasPointer && isLinkCapable"
                 :region-id="regionId"
                 :view="view"
               />
               <IconButton
                 v-if="
-                  (focused || isFullscreen) &&
+                  (showControls || isFullscreen) &&
                   hasPointer &&
                   canNavigateServices &&
                   services.length > 1
@@ -73,7 +73,7 @@
               />
               <IconButton
                 v-if="
-                  (focused || isFullscreen) &&
+                  (showControls || isFullscreen) &&
                   hasPointer &&
                   canNavigateServices &&
                   services.length > 1
@@ -85,7 +85,7 @@
                 @click="nextService"
               />
               <IconButton
-                v-if="focused && hasPointer && !isFullscreen"
+                v-if="showControls && hasPointer && !isFullscreen"
                 size="custom"
                 :icon="mdiFullscreen"
                 label="Enter Fullscreen"
@@ -120,6 +120,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Service actions follow hide/show controls, not the focus light.
+  // null = fall back to `focused` (standalone use and older callers).
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
   dim: {
     type: Boolean,
     default: false,
@@ -142,6 +148,7 @@ const props = defineProps({
   },
 });
 
+const showControls = computed(() => props.controlsVisible ?? props.focused);
 const { hasPointer } = useTouchCapability();
 
 const webServicesStore = useWebServicesStore();

@@ -73,6 +73,16 @@ export const CONFIG_FIELD_DEFINITIONS = [
     keys: ["photoFrameTimeout", "photo_frame_timeout"],
     defaultValue: 300,
   },
+  {
+    // Per-screen photo frame sources (calvin-3xz9). Empty means all sources.
+    name: "photoFrameSourceIds",
+    keys: ["photoFrameSourceIds", "photo_frame_source_ids"],
+    defaultValue: [],
+    parse: value =>
+      Array.isArray(value)
+        ? value.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())
+        : [],
+  },
   { name: "showUI", keys: ["showUI", "show_ui"], defaultValue: true },
   {
     name: "modeIndicatorTimeout",

@@ -1012,3 +1012,205 @@ def test_last_seen_skip_keeps_screen_online_between_polls():
     """Skipped writes plus one poll gap stay inside the UI's online window."""
     poll_s, online_window_s = _agent_poll_seconds(), _ui_online_window_seconds()
     assert kiosk_registry.LAST_SEEN_WRITE_INTERVAL_S + poll_s < online_window_s
+
+
+# --- calvin-3xz9: the global photo frame becomes a per-screen setting --------
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_photo_frame_moves_to_screens_without_their_own(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await kr.set_overrides("hallway", {"photoFrameEnabled": False, "photoFrameTimeout": 600})
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 300)
+
+    await kr.migrate_global_photo_frame()
+
+    # A screen with no choice of its own inherits the old global value ...
+    assert await kr.get_overrides("kitchen") == {
+        "photoFrameEnabled": True,
+        "photoFrameTimeout": 300,
+    }
+    # ... and one that already chose keeps it.
+    assert await kr.get_overrides("hallway") == {
+        "photoFrameEnabled": False,
+        "photoFrameTimeout": 600,
+    }
+    # The global stays as the fallback for a browser that is not a known screen.
+    assert await config_service.get_value("photo_frame_enabled") is True
+    assert await config_service.get_value("photo_frame_timeout") == 300
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_photo_frame_migration_reads_snake_case_globals(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 120)
+
+    await kr.migrate_global_photo_frame()
+
+    assert await kr.get_overrides("kitchen") == {
+        "photoFrameEnabled": True,
+        "photoFrameTimeout": 120,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_photo_frame_migration_respects_a_snake_case_screen_choice(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.set_overrides("hallway", {"photo_frame_enabled": False})
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 300)
+
+    await kr.migrate_global_photo_frame()
+
+    # The screen's own (snake_case) choice wins and is not duplicated; the
+    # setting it has not chosen is copied.
+    assert await kr.get_overrides("hallway") == {
+        "photo_frame_enabled": False,
+        "photoFrameTimeout": 300,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_photo_frame_migration_marks_done_without_a_global_value(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await kr.migrate_global_photo_frame()
+
+    assert await config_service.get_value(kr.PHOTO_FRAME_MIGRATED_KEY) is True
+    assert await kr.get_overrides("kitchen") == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_global_photo_frame_stays_the_fallback_after_the_marker(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 900)
+
+    await kr.migrate_global_photo_frame()
+
+    # Nothing to copy it to yet: the marker is set, and the globals stay as
+    # the fallback for every screen that registers later.
+    assert await config_service.get_value(kr.PHOTO_FRAME_MIGRATED_KEY) is True
+    assert await config_service.get_value("photo_frame_enabled") is True
+    assert await config_service.get_value("photo_frame_timeout") == 900
+
+    await kr.record_kiosk("kitchen")
+
+    # No copy on registration: the screen reads the global fallback instead.
+    assert await kr.get_overrides("kitchen") == {}
+    assert await config_service.get_value("photo_frame_enabled") is True
+    assert await config_service.get_value("photo_frame_timeout") == 900
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_screen_created_after_the_marker_keeps_using_the_global_fallback(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 300)
+    await kr.migrate_global_photo_frame()
+
+    await kr.set_overrides("kitchen", {"orientation": "portrait"})
+
+    assert await kr.get_overrides("kitchen") == {"orientation": "portrait"}
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_photo_frame_migration_is_idempotent_and_keeps_screen_choices(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 300)
+
+    await kr.migrate_global_photo_frame()
+    await kr.migrate_global_photo_frame()
+
+    assert await kr.get_overrides("kitchen") == {
+        "photoFrameEnabled": True,
+        "photoFrameTimeout": 300,
+    }
+
+    # A later global change never overwrites a screen that already has a value.
+    await config_service.set_value("photo_frame_enabled", False)
+    await config_service.set_value("photo_frame_timeout", 60)
+    await kr.migrate_global_photo_frame()
+
+    assert await kr.get_overrides("kitchen") == {
+        "photoFrameEnabled": True,
+        "photoFrameTimeout": 300,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_reset_photo_frame_override_stays_absent_after_a_rerun(test_db):
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen")
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 300)
+    await kr.migrate_global_photo_frame()
+
+    # "Reset to default" deletes the screen's own values.
+    await kr.set_overrides("kitchen", {})
+    await kr.migrate_global_photo_frame()
+
+    # The one-time marker means the old global is not put back.
+    assert await kr.get_overrides("kitchen") == {}
+    assert await config_service.get_value("photo_frame_enabled") is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.unit
+async def test_photo_frame_migration_writes_only_the_overrides_column(test_db, monkeypatch):
+    from app.models.db_models import KioskDB
+    from app.services import kiosk_registry as kr
+    from app.services.config_service import config_service
+
+    await kr.record_kiosk("kitchen", agent_version="1.0")
+    await config_service.set_value("photo_frame_enabled", True)
+    await config_service.set_value("photo_frame_timeout", 300)
+
+    # The migration reads a snapshot; a heartbeat lands before it writes back.
+    stale_rows = await KioskDB.objects.all()
+    await kr.record_kiosk("kitchen", agent_version="2.0")
+
+    class _StaleObjects:
+        async def all(self):
+            return stale_rows
+
+    class _StaleKioskDB:
+        objects = _StaleObjects()
+
+    monkeypatch.setattr(kr, "KioskDB", _StaleKioskDB)
+    await kr.migrate_global_photo_frame()
+    monkeypatch.undo()
+
+    row = await KioskDB.objects.get(id="kitchen")
+    assert row.overrides == {"photoFrameEnabled": True, "photoFrameTimeout": 300}
+    assert row.agent_version == "2.0"

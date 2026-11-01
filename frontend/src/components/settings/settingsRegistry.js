@@ -149,6 +149,11 @@ export const settingsDestinations = [
       "comet",
       "pulse",
       "spinner",
+      "photo frame",
+      "photo-frame",
+      "photo slideshow",
+      "start after",
+      "photos from",
     ],
   },
   {

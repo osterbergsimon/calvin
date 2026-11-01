@@ -79,6 +79,20 @@ describe("useScreenSetting", () => {
     setItem.mockRestore();
   });
 
+  it("a kiosk row still follows the serverValue option it was given", () => {
+    window.sessionStorage.setItem(KIOSK_KEY, "hallway");
+    const config = useConfigStore();
+    // The merged config has the override, but an existing #256 row reads the
+    // Settings form value it passed in (its historical behaviour).
+    config.onScreenKeyboard = "on";
+    const setting = useScreenSetting("onScreenKeyboard", {
+      serverValue: () => "off",
+    });
+
+    expect(setting.scope).toBe("kiosk");
+    expect(setting.value.value).toBe("off");
+  });
+
   it("round-trips a boolean choice without reading 'false' as true", async () => {
     const config = useConfigStore();
     config.showUI = true;
@@ -99,6 +113,19 @@ describe("useScreenSetting", () => {
     const setting = useScreenSetting("showUI");
 
     expect(setting.value.value).toBe(false);
+  });
+
+  it("round-trips an array choice (photo-frame sources)", async () => {
+    const config = useConfigStore();
+    config.photoFrameSourceIds = [];
+    const setting = useScreenSetting("photoFrameSourceIds");
+
+    await setting.set(["src-a", "src-b"]);
+
+    expect(window.localStorage.getItem("calvin-screen-photoFrameSourceIds")).toBe(
+      '["src-a","src-b"]'
+    );
+    expect(setting.value.value).toEqual(["src-a", "src-b"]);
   });
 
   it("merges a kiosk choice into that kiosk's whole overrides object", async () => {
