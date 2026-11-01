@@ -118,6 +118,103 @@ describe("PluginFieldRenderer label and hint", () => {
     expect(wrapper.emitted("update")).toEqual([["2"]]);
   });
 
+  it("shows the label of a numeric option for the saved string value", () => {
+    const wrapper = mountField(
+      "zoom",
+      {
+        type: "integer",
+        label: "Zoom",
+        ui: { component: "select", options: [{ value: 2, label: "Two" }] },
+      },
+      "2"
+    );
+
+    expect(wrapper.find(".pill__label").text()).toBe("Two");
+  });
+
+  it("shows the label of a numeric option for a numeric schema default", () => {
+    const wrapper = mountField(
+      "zoom",
+      {
+        type: "integer",
+        label: "Zoom",
+        ui: { component: "select", options: [{ value: 2, label: "Two" }] },
+      },
+      2
+    );
+
+    expect(wrapper.find(".pill__label").text()).toBe("Two");
+  });
+
+  it("shows the label of a boolean option for the saved string value", () => {
+    const wrapper = mountField(
+      "compact",
+      {
+        type: "boolean",
+        label: "Compact",
+        ui: {
+          component: "select",
+          options: [
+            { value: true, label: "Yes" },
+            { value: false, label: "No" },
+          ],
+        },
+      },
+      "false"
+    );
+
+    expect(wrapper.find(".pill__label").text()).toBe("No");
+  });
+
+  it("passes null to the pill when the select has no value", () => {
+    const wrapper = mountField(
+      "units",
+      { type: "string", label: "Units", ui: { component: "select", options: [{ value: "a" }] } },
+      ""
+    );
+
+    expect(wrapper.findComponent(SelectPill).props("modelValue")).toBe(null);
+  });
+
+  it("shows the label of a scanned numeric option for the saved string value", async () => {
+    const wrapper = mountField(
+      "channel",
+      { type: "integer", label: "Channel", ui: { component: "select-scan" } },
+      "3"
+    );
+
+    wrapper.vm.scannedOptions = [{ value: 3, label: "Three" }];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".pill__label").text()).toBe("Three");
+    expect(wrapper.findComponent(SelectPill).props("options")).toEqual([
+      { value: "3", label: "Three" },
+    ]);
+  });
+
+  it("points the field label at the select pill trigger", () => {
+    const wrapper = mountField(
+      "units",
+      { type: "string", label: "Units", ui: { component: "select", options: [{ value: "a" }] } },
+      "a"
+    );
+
+    const forId = wrapper.find("label").attributes("for");
+    expect(forId).toBeTruthy();
+    expect(wrapper.find(`button#${forId}`).exists()).toBe(true);
+  });
+
+  it("points the field label at the scan select pill trigger", () => {
+    const wrapper = mountField(
+      "device",
+      { type: "string", label: "Device", ui: { component: "select-scan" } },
+      "aa:bb"
+    );
+
+    const forId = wrapper.find("label").attributes("for");
+    expect(wrapper.find(`button#${forId}`).classes()).toContain("pill");
+  });
+
   it("renders a scan select as a SelectPill that keeps the saved value", () => {
     const wrapper = mountField(
       "device",

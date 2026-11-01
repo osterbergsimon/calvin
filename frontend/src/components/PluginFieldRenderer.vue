@@ -53,7 +53,8 @@
     <!-- Select: the shared pill, never a native select -->
     <SelectPill
       v-else-if="ui && ui.component === 'select'"
-      :model-value="fieldValue"
+      :id="fieldId"
+      :model-value="selectValue"
       :options="selectOptions"
       :aria-label="label"
       @update:model-value="emitSelected"
@@ -64,7 +65,8 @@
       <div class="scan-select-row">
         <SelectPill
           class="scan-select-pill"
-          :model-value="fieldValue"
+          :id="fieldId"
+          :model-value="selectValue"
           :options="scanSelectOptions"
           :display-label="fieldValue ? '' : scanPlaceholder"
           :aria-label="label"
@@ -207,15 +209,26 @@ const scannedOptions = ref([]);
 const scanning = ref(false);
 const scanError = ref(null);
 
-const toOption = option => ({ value: option.value, label: option.label || String(option.value) });
+// SelectPill matches the selection with ===, and the stored value is a string
+// (see emitSelected), so option values are compared as strings too. A native
+// select coerced both sides the same way.
+const toOption = option => ({
+  value: String(option.value),
+  label: option.label || String(option.value),
+});
+
+const selectValue = computed(() => {
+  const value = fieldValue.value;
+  return value === null || value === undefined || value === "" ? null : String(value);
+});
 
 const selectOptions = computed(() => (ui.value?.options || []).map(toOption));
 
 // The saved value stays pickable before (or without) a scan finding it.
 const scanSelectOptions = computed(() => {
   const scanned = scannedOptions.value.map(toOption);
-  const saved = fieldValue.value;
-  if (saved && !scanned.some(option => option.value === saved)) {
+  const saved = selectValue.value;
+  if (saved !== null && !scanned.some(option => option.value === saved)) {
     return [{ value: saved, label: String(saved) }, ...scanned];
   }
   return scanned;
