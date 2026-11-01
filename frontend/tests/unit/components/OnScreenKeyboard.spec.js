@@ -138,6 +138,51 @@ describe("OnScreenKeyboard", () => {
       expect(vmValue("target")).toBe(input);
     });
 
+    // CLV-114: on touch the browser focuses the field with the mouse events it
+    // sends after touchend, hit-tested at that moment. Opening on pointerdown
+    // re-laid out the lock screen first, so the tap focused whatever slid
+    // under the finger and the field never got focus.
+    it("does not open on pointerdown of an unfocused field, only once it has focus", async () => {
+      mountOsk();
+      const input = addInput();
+
+      input.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(false);
+
+      await focus(input);
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("reopens on a tap of the already-focused field, once the tap has finished", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+      expect(document.activeElement).toBe(input);
+
+      input.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(false);
+
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("does not open on a click of a field that is not focused", async () => {
+      mountOsk();
+      const input = addInput();
+
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(isShown()).toBe(false);
+    });
+
     it("ignores time inputs, readonly inputs and data-osk=off areas", async () => {
       mountOsk();
       const time = addInput({ type: "time" });
