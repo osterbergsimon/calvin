@@ -50,10 +50,14 @@ from under the finger, so it never gets focus (CLV-114).
 **Hide:**
 - the Hide key (calvin-q9m7): it records the dismissal for that field, so the rest of the same tap
   (`touchend`, then WebKit's compatibility mouse events) and later focus churn cannot reopen it. A fresh tap
-  on the field, or the ⌨ Keyboard button, clears the dismissal;
+  on the field, a refocus after the field has actually lost focus (Tab or programmatic focus), or the
+  ⌨ Keyboard button clears the dismissal. Hiding moves the button under the finger, so the click that ends
+  the Hide tap must not press it; that guard is the **gesture that hid** (a press is a new gesture), not a
+  time window, so the button works again immediately;
 - a tap outside both the keyboard and its field (calvin-q9m7): hides and blurs the field. WebKit leaves a
   focused input focused when a non-focusable element is tapped, so no `focusout` arrives there; the tap is
-  not prevented, so a real control under the finger still receives its click;
+  not prevented, so a real control under the finger still receives its click. A `<label>` of the focused
+  field counts as that field, and a drag or scroll is not a tap;
 - focus moving to a non-target element or to nothing (wait one `requestAnimationFrame` before deciding, so
   focus jumping between two fields doesn't flicker);
 - route change;
