@@ -68,6 +68,14 @@ cannot find it as its predecessor.
   first release PR proposes the next 0.x version from the commits since the
   repository began, so its changelog covers the project history up to that
   point.
+- The version shown in **Settings → System** comes from
+  `backend/app/__init__.py` (`__version__`). release-please bumps it through
+  the `extra-files` entry in
+  [`release-please-config.json`](https://github.com/osterbergsimon/calvin/blob/develop/release-please-config.json)
+  in the same release PR as the manifest, so do not edit it by hand. The
+  Docker build stamps the same release version (`CALVIN_VERSION`) and the
+  commit (`CALVIN_GIT_SHA`) into the image; a git checkout reads the revision
+  from git instead.
 - After `1.0.0`, normal semver applies: breaking → major, `feat` → minor.
 
 ## Images a release publishes

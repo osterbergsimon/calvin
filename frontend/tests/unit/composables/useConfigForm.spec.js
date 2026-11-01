@@ -105,6 +105,16 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value.showUI).toBe(false);
     });
 
+    it("maps the version and build revision from the API (calvin-hshq)", async () => {
+      configApi.getConfig.mockResolvedValue({ version: "0.1.0", revision: "8ea7088" });
+
+      const form = useConfigForm();
+      await form.loadConfig();
+
+      expect(form.localConfig.value.version).toBe("0.1.0");
+      expect(form.localConfig.value.revision).toBe("8ea7088");
+    });
+
     it("should use defaults when values are missing", async () => {
       const mockConfig = {};
 

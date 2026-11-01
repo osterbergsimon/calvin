@@ -8,7 +8,7 @@
     <SettingsSection id="device-hardware" title="Versions & status">
       <SettingRow label="Version">
         <span data-test="version-readout">
-          {{ version || "Not available" }}
+          {{ versionReadout }}
           <span v-if="screenVersion">(screen {{ screenVersion }})</span>
         </span>
       </SettingRow>
@@ -148,6 +148,7 @@ const props = defineProps({
   gitRepoUrl: { type: String, default: "" },
   gitBranch: { type: String, default: "develop" },
   version: { type: String, default: null },
+  revision: { type: String, default: null },
   frontendVersion: { type: String, default: null },
 });
 const emit = defineEmits(["update:config", "update:gitRepoUrl", "update:gitBranch"]);
@@ -162,11 +163,20 @@ const {
 } = useSystem();
 const connectionStore = useConnectionStore();
 
+// The server reports a release version plus the commit it was built from
+// ("0.1.0 (8ea7088)"). An image without a stamped revision still shows the
+// version rather than "Not available".
+const versionReadout = computed(() => {
+  if (props.version && props.revision) return `${props.version} (${props.revision})`;
+  return props.version || props.revision || "Not available";
+});
+
 // One version row: the server's version, plus the screen's own bundle only when
 // it differs (a stale cached frontend is worth seeing; a matching one is noise).
+// The screen's meta tag carries the same commit as the server's revision.
 const screenVersion = computed(() => {
   if (!props.frontendVersion) return null;
-  return props.frontendVersion === props.version ? null : props.frontendVersion;
+  return props.frontendVersion === props.revision ? null : props.frontendVersion;
 });
 
 const statusText = computed(() => (connectionStore.isBackendOnline ? "Online" : "Offline"));

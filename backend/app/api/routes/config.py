@@ -18,33 +18,15 @@ from app.services.display_orientation_service import display_orientation_service
 from app.utils.errors import internal_error
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
 from app.utils.host_control import host_control_enabled
+from app.version import get_revision, get_version
 
 router = APIRouter()
 
-
-def get_git_version() -> str | None:
-    """
-    Get the current git commit short hash.
-
-    Returns:
-        Short commit hash (7 characters) or None if git is not available
-    """
-    try:
-        # Get the project root (parent of backend directory)
-        project_root = Path(__file__).parent.parent.parent.parent
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-        return None
-    except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-        # Git not available or error occurred
-        return None
+# Built frontend location. In a checkout this is <repo>/frontend/dist; in the
+# runtime image the backend lives at /app and the dist at /frontend/dist, so
+# both resolve to <root>/frontend/dist.
+_PROJECT_ROOT = Path(__file__).parents[4]
+_FRONTEND_DIST = _PROJECT_ROOT / "frontend" / "dist"
 
 
 def get_frontend_version() -> str | None:
@@ -55,15 +37,12 @@ def get_frontend_version() -> str | None:
         Frontend version (git commit short hash) or None if not available
     """
     try:
-        # Get the project root (parent of backend directory)
-        project_root = Path(__file__).parent.parent.parent.parent
-        frontend_dist = project_root / "frontend" / "dist"
-        index_path = frontend_dist / "index.html"
+        index_path = _FRONTEND_DIST / "index.html"
 
         if not index_path.exists():
             # Try alternative path (in case backend is in a different location)
             # This handles cases where the project structure might be different
-            alt_path = project_root / "dist" / "index.html"
+            alt_path = _PROJECT_ROOT / "dist" / "index.html"
             if alt_path.exists():
                 index_path = alt_path
             else:
@@ -591,8 +570,11 @@ async def build_global_config() -> dict:
     elif "calendar_refresh_interval" in config and "calendarRefreshInterval" not in config:
         config["calendarRefreshInterval"] = config["calendar_refresh_interval"]
 
-    # Add backend version (git commit short hash)
-    config["version"] = await asyncio.to_thread(get_git_version)
+    # Release version (app.__version__) plus the build's source revision.
+    # get_revision checks CALVIN_GIT_SHA first and caches the git fallback, so
+    # a Docker image with no git still reports its commit.
+    config["version"] = get_version()
+    config["revision"] = await asyncio.to_thread(get_revision)
 
     # Add frontend version (from built HTML)
     config["frontendVersion"] = get_frontend_version()

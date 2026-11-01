@@ -96,19 +96,37 @@ describe("MaintenanceSettings", () => {
     );
   });
 
-  it("renders the backend and frontend versions in Versions & status", () => {
+  it("renders the semantic version with its build revision and the screen bundle", () => {
     const wrapper = mount(MaintenanceSettings, {
       props: {
         config: baseConfig,
         gitRepoUrl: "",
-        version: "1.2.3",
+        version: "0.1.0",
+        revision: "8ea7088",
         frontendVersion: "4.5.6",
       },
       global: { stubs },
     });
     const hardware = wrapper.find("#section-device-hardware").text();
-    expect(hardware).toContain("1.2.3");
+    expect(hardware).toContain("0.1.0 (8ea7088)");
     expect(hardware).toContain("4.5.6");
+  });
+
+  it("shows the image's version and revision on a production readout (calvin-hshq)", () => {
+    const wrapper = mount(MaintenanceSettings, {
+      props: {
+        config: baseConfig,
+        gitRepoUrl: "",
+        version: "0.1.0",
+        revision: "8ea7088",
+        frontendVersion: "8ea7088",
+      },
+      global: { stubs },
+    });
+    const readout = wrapper.find('[data-test="version-readout"]');
+    expect(readout.text()).toBe("0.1.0 (8ea7088)");
+    expect(readout.text()).not.toContain("screen");
+    expect(readout.text()).not.toContain("Not available");
   });
 
   it("calls restartBackend after confirming Restart Calvin server", async () => {
@@ -298,18 +316,28 @@ describe("System copy (§3.4) and the Advanced disclosure (§4)", () => {
 
   it("shows one Version row, and the screen's bundle only when it differs", async () => {
     const same = mount(MaintenanceSettings, {
-      props: { config: baseConfig, version: "1.2.3", frontendVersion: "1.2.3" },
+      props: {
+        config: baseConfig,
+        version: "1.2.3",
+        revision: "abc1234",
+        frontendVersion: "abc1234",
+      },
       global: { stubs },
     });
-    expect(row(same, "Version").text()).toContain("1.2.3");
+    expect(row(same, "Version").text()).toContain("1.2.3 (abc1234)");
     expect(row(same, "Version").text()).not.toContain("screen");
     expect(row(same, "Backend version")).toBeUndefined();
 
     const differ = mount(MaintenanceSettings, {
-      props: { config: baseConfig, version: "1.2.3", frontendVersion: "4.5.6" },
+      props: {
+        config: baseConfig,
+        version: "1.2.3",
+        revision: "abc1234",
+        frontendVersion: "4.5.6",
+      },
       global: { stubs },
     });
-    expect(row(differ, "Version").text()).toContain("1.2.3 (screen 4.5.6)");
+    expect(row(differ, "Version").text()).toContain("1.2.3 (abc1234) (screen 4.5.6)");
   });
 
   it("offers Reload this screen", () => {
