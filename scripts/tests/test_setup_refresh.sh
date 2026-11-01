@@ -55,6 +55,9 @@ assert_contains "$CALVIN_SUDOERS_DIR/calvin-restart" 'NOPASSWD: /usr/local/bin/r
 assert_contains "$CALVIN_DEFAULT_DIR/calvin-update" '^GIT_BRANCH=develop$'
 assert_contains "$CALVIN_KIOSK_ENV_FILE" '^CALVIN_BACKEND_URL=http://localhost:8123$'
 assert_contains "$tmp/home/calvin/.config/openbox/autostart" 'unclutter'
+# A fresh host resolves auto -> cog, so refresh seeds the cog rotation file. It
+# follows CALVIN_DEFAULT_DIR like the other /etc/default files (CI runs unprivileged).
+assert_contains "$CALVIN_DEFAULT_DIR/calvin-kiosk-cog" '^CALVIN_COG_ROTATION=0$'
 assert_contains "$tmp/calls.log" 'systemctl daemon-reload'
 assert_not_contains "$tmp/calls.log" '^(apt-get|git) ' "refresh touched apt or git"
 pass "refresh re-installs all host files, root-owned updater, no apt/git"
