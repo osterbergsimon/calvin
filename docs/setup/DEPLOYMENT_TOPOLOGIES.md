@@ -11,7 +11,7 @@ The Pi runs everything: backend, frontend, and the kiosk browser.
 ```
 ┌─────────────────────────── Raspberry Pi ───────────────────────────┐
 │                                                                    │
-│   Chromium (kiosk) ──> http://localhost:8000  ──> Calvin backend   │
+│   cog (kiosk)      ──> http://localhost:8000  ──> Calvin backend   │
 │                                                  │                 │
 │                                                  └── SQLite, data  │
 └────────────────────────────────────────────────────────────────────┘
@@ -29,7 +29,22 @@ sudo bash scripts/setup.sh --mode prod
 
 See [SETUP_LINUX.md](SETUP_LINUX.md) for the full walkthrough.
 
-The screen on/off schedule needs `vcgencmd`/`xset` on the host, which the
+The kiosk browser follows the same display-stack rule as a kiosk Pi (see
+[Display stack](KIOSK_INSTALL.md#display-stack-cog-default-everywhere-wayland-opt-in)):
+
+- A fresh install uses **cog** (WPE WebKit on DRM/KMS, `calvin-cog.service`),
+  on every board. It waits for the local backend before it opens the dashboard.
+- `--display-stack x11|wayland|cog` picks one explicitly:
+  `sudo bash scripts/setup.sh --mode prod --display-stack x11` gives the previous
+  X11 + Chromium kiosk (`calvin-x.service` + `calvin-kiosk.service`).
+- A re-run (or `update-calvin.sh`) keeps the stack recorded in
+  `/etc/default/calvin-kiosk` as `CALVIN_DISPLAY_STACK`. An all-in-one Pi
+  installed before this setting existed is X11 and stays X11; it is never
+  migrated silently. Re-run setup with `--display-stack cog` to move it.
+- X11 + Chromium stay installed on every stack, so switching back is one
+  re-run of setup with `--display-stack x11`, not a reimage.
+
+The screen on/off schedule needs `vcgencmd`/`xset` (or, on cog, the panel helper) on the host, which the
 container does not have, so setup also installs the same
 `calvin-display-agent.service` the kiosk Pis use, pointed at
 `http://localhost:$CALVIN_PORT` (it reads the global config; it does not show up
