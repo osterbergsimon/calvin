@@ -467,25 +467,39 @@ const regionsEl = ref(null);
 const dragState = ref(null);
 
 /* --- size class + touch capability --------------------------------------- */
-// The editor's layout follows the MODAL's own size, not a viewport media
-// query: a kiosk with the on-screen keyboard open has a full-size viewport but
-// only the space above the keyboard to draw in. ResizeObserver gives that
-// directly, so the OSK shrinking the modal re-evaluates the class too.
+// The editor's layout follows the SPACE IT IS GIVEN, not its own box. The two
+// layouts are different sizes (Wide keeps a gutter and a header, Compact/Phone
+// bleed to the edges), so a class decided from the modal's own measurements
+// resized the box that decided it and flipped forever: at a 1280x720 fullscreen
+// window the Wide content measures ~627px tall and Compact ~663px, either side
+// of the 640px threshold. The dialog's fixed overlay is the available space —
+// inset 0 with its bottom above the on-screen keyboard (--osk-height) — so the
+// OSK shrinking the space still re-evaluates the class, while none of the
+// editor's own layout can change the measurement.
 const modalEl = ref(null);
 const stageEl = ref(null);
-const modalSize = ref({ width: 0, height: 0 });
 const stageSize = ref({ width: 0, height: 0 });
 const WIDE_MIN_HEIGHT = 640;
+// A deadband around each Wide threshold: device-pixel rounding (a 1.25/1.5 dpr
+// screen) or a scrollbar appearing must not flip the layout twice at a boundary.
+const WIDE_HYSTERESIS = 24;
 
-const sizeClass = computed(() => {
-  const { width, height } = modalSize.value;
+const resolveSizeClass = ({ width, height }, current) => {
   // Unmeasured (first paint, or a test host without ResizeObserver): keep
   // today's layout until the observer reports.
   if (!width || !height) return "wide";
-  if (width >= WIDE_MIN_WIDTH && height >= WIDE_MIN_HEIGHT) return "wide";
-  if (!isPhoneWidth(width)) return "compact";
-  return "phone";
-});
+  const wide =
+    current === "wide"
+      ? width >= WIDE_MIN_WIDTH - WIDE_HYSTERESIS && height >= WIDE_MIN_HEIGHT - WIDE_HYSTERESIS
+      : width >= WIDE_MIN_WIDTH + WIDE_HYSTERESIS && height >= WIDE_MIN_HEIGHT + WIDE_HYSTERESIS;
+  if (wide) return "wide";
+  return isPhoneWidth(width) ? "phone" : "compact";
+};
+
+const sizeClass = ref("wide");
+const setAvailableSize = size => {
+  sizeClass.value = resolveSizeClass(size, sizeClass.value);
+};
 const isPhone = computed(() => sizeClass.value === "phone");
 
 const coarsePointer = ref(false);
@@ -509,26 +523,46 @@ const watchMedia = (query, target) => {
 watchMedia("(any-pointer: coarse)", coarsePointer);
 watchMedia("(prefers-reduced-motion: reduce)", reduceMotion);
 
-let modalObserver = null;
+// The overlay is the editor's available space; <html> is the fallback for a
+// host that renders the editor without the Dialog shell.
+const spaceElement = () =>
+  modalEl.value?.closest?.(".dialog-overlay") ||
+  (typeof document !== "undefined" ? document.documentElement : null);
+// Read the border box: contentRect would subtract the overlay's gutter, which
+// the bleed layout removes, so it would depend on the class again.
+const borderBoxOf = entry => {
+  const border = entry?.borderBoxSize;
+  const size = Array.isArray(border) ? border[0] : border;
+  if (size && (size.inlineSize || size.blockSize)) {
+    return { width: size.inlineSize, height: size.blockSize };
+  }
+  const rect = entry?.target?.getBoundingClientRect?.();
+  if (rect) return { width: rect.width, height: rect.height };
+  const content = entry?.contentRect;
+  return { width: content?.width ?? 0, height: content?.height ?? 0 };
+};
+
+let spaceObserver = null;
 let stageObserver = null;
 const stopObserving = () => {
-  modalObserver?.disconnect();
+  spaceObserver?.disconnect();
   stageObserver?.disconnect();
-  modalObserver = null;
+  spaceObserver = null;
   stageObserver = null;
 };
 const startObserving = () => {
   if (typeof ResizeObserver === "undefined") return;
   stopObserving();
-  modalObserver = new ResizeObserver(entries => {
-    const box = entries[0]?.contentRect;
-    if (box) modalSize.value = { width: box.width, height: box.height };
+  spaceObserver = new ResizeObserver(entries => {
+    const entry = entries[0];
+    if (entry) setAvailableSize(borderBoxOf(entry));
   });
   stageObserver = new ResizeObserver(entries => {
     const box = entries[0]?.contentRect;
     if (box) stageSize.value = { width: box.width, height: box.height };
   });
-  if (modalEl.value) modalObserver.observe(modalEl.value);
+  const space = spaceElement();
+  if (space) spaceObserver.observe(space);
   if (stageEl.value) stageObserver.observe(stageEl.value);
 };
 
@@ -1180,7 +1214,7 @@ watch(
       startObserving();
     } else {
       stopObserving();
-      modalSize.value = { width: 0, height: 0 };
+      sizeClass.value = "wide";
       stageSize.value = { width: 0, height: 0 };
       sheetOpen.value = false;
     }
