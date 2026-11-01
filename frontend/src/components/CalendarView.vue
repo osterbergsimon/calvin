@@ -17,7 +17,7 @@
         <!-- Always-visible header: month/year label, navigation + view switch -->
         <div class="calendar-header">
           <div class="calendar-header__label">{{ currentMonthYear }}</div>
-          <div v-if="focused && hasPointer" class="calendar-header__controls">
+          <div v-if="showControls && hasPointer" class="calendar-header__controls">
             <Button
               v-if="!isCurrentPeriod"
               class="calendar-header__today"
@@ -275,6 +275,12 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Header controls follow hide/show controls; the focus light follows input.
+  // null = fall back to `focused` (standalone use and older callers).
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
   dim: {
     type: Boolean,
     default: false,
@@ -302,6 +308,7 @@ const props = defineProps({
 
 const configStore = useConfigStore();
 const { hasPointer } = useTouchCapability();
+const showControls = computed(() => props.controlsVisible ?? props.focused);
 const sourceKey = computed(() =>
   [
     ...new Set(

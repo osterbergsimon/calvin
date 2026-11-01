@@ -84,6 +84,7 @@
                   :parent-direction="layoutDirection"
                   :active-region-id="activeScreen.activeRegionId"
                   :light-active="lightActive"
+                  :controls-visible="configStore.shouldShowUI"
                   :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
                   @focus-region="onFocusRegion"
                 />
