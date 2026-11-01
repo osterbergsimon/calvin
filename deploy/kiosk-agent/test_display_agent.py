@@ -258,11 +258,6 @@ def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):
     assert slept == [900]  # capped by refresh, not 7h
 
 
-def test_default_refresh_applies_schedule_edits_within_a_minute():
-    # calvin-g4gi: owners expect a schedule edit to take effect within ~60 s.
-    assert agent.DEFAULT_REFRESH_SECONDS <= 60
-
-
 def test_main_uses_default_refresh_unless_overridden(monkeypatch):
     seen = []
     monkeypatch.setenv("CALVIN_BACKEND_URL", "http://x")
@@ -286,6 +281,8 @@ def test_schedule_edit_mid_interval_applies_on_next_poll(monkeypatch):
     # 12:00, panel ON (06-22 window, next boundary 10 h away). The owner then
     # edits the schedule so 12:00 falls in the off window; the next poll, at
     # most DEFAULT_REFRESH_SECONDS (<= 60 s) later, blanks the panel.
+    # calvin-g4gi: owners expect a schedule edit to take effect within ~60 s.
+    assert agent.DEFAULT_REFRESH_SECONDS <= 60
     configs = [_cfg(), _cfg(display_schedule=_sched(on="13:00", off="22:00"))]
     moments = [datetime(2026, 7, 11, 12, 0), datetime(2026, 7, 11, 12, 1)]
     monkeypatch.setattr(agent, "now_in", lambda c: moments.pop(0))
