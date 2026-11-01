@@ -160,7 +160,8 @@ describe("OnScreenKeyboard", () => {
       mountOsk();
       const input = addInput();
       await focus(input);
-      await key("{hide}");
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await nextTick();
       expect(isShown()).toBe(false);
       expect(document.activeElement).toBe(input);
 
@@ -169,6 +170,83 @@ describe("OnScreenKeyboard", () => {
       expect(isShown()).toBe(false);
 
       input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    // calvin-q9m7: WebKit leaves a focused input focused when a non-focusable
+    // element is tapped, so "tap elsewhere" must hide the keyboard itself.
+    it("hides and blurs the field when a click lands outside the keyboard and the field", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      const outside = addContainer({ "data-test": "outside" });
+      outside.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+
+      expect(isShown()).toBe(false);
+      expect(document.activeElement).not.toBe(input);
+      expect(vmValue("target")).toBeNull();
+    });
+
+    it("does not steal the click from a real control outside the keyboard", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+
+      const button = document.createElement("button");
+      button.type = "button";
+      const clicked = vi.fn();
+      button.addEventListener("click", clicked);
+      document.body.appendChild(button);
+      nodes.push(button);
+
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+
+      expect(clicked).toHaveBeenCalledTimes(1);
+      expect(isShown()).toBe(false);
+    });
+
+    // calvin-q9m7: the Hide key blurs the field and records the dismissal, so
+    // the rest of the same tap and focus churn cannot reopen the keyboard.
+    it("keeps the keyboard hidden after the Hide key until a fresh tap on a field", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+      // Focus stays for the Keyboard button, but it is not a reason to reopen.
+      expect(document.activeElement).toBe(input);
+
+      // The click of the same tap lands on the still-focused field.
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+      expect(isShown()).toBe(false);
+
+      // A fresh tap (pointerdown, then the click) is the way back.
+      input.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+      input.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("reopens a dismissed field when asked directly (the Keyboard button)", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      input.focus();
+      await nextTick();
+      wrapper.vm.showKeyboard();
       await nextTick();
       expect(isShown()).toBe(true);
       expect(vmValue("target")).toBe(input);
