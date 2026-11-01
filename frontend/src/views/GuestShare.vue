@@ -5,31 +5,37 @@
       <h1 class="guest__title">{{ title }}</h1>
     </header>
 
-    <p v-if="state === 'loading'" class="guest__note" aria-live="polite">Opening…</p>
+    <InlineNote v-if="state === 'loading'" role="status">Opening…</InlineNote>
 
-    <section v-else-if="state === 'invalid'" class="guest__card" data-test="guest-invalid">
-      <h2 class="guest__heading">This link doesn't work any more</h2>
-      <p class="guest__note">
-        It was turned off or it ran out. Ask the person who sent it for a new one.
-      </p>
-    </section>
+    <!-- Revoked and expired both land here: the server doesn't say which. -->
+    <EmptyState
+      v-else-if="state === 'invalid'"
+      :icon="mdiLinkOff"
+      title="This link doesn't work any more"
+      help="Ask the person who sent it for a new one."
+      :phone-hint="false"
+      data-test="guest-invalid"
+    />
 
-    <section v-else-if="state === 'error'" class="guest__card" data-test="guest-error">
-      <h2 class="guest__heading">Calvin can't be reached</h2>
-      <p class="guest__note">Check that this phone is on the same Wi-Fi, then try again.</p>
-      <Button @click="load">Try again</Button>
-    </section>
+    <EmptyState
+      v-else-if="state === 'error'"
+      :icon="mdiWifiOff"
+      title="Calvin can't be reached"
+      help="Check that this phone is on the same Wi-Fi, then try again."
+      action-label="Try again"
+      :phone-hint="false"
+      data-test="guest-error"
+      @action="load"
+    />
 
     <template v-else>
-      <section class="guest__actions">
+      <section class="guest__actions" aria-label="Add photos">
         <input
           ref="fileInput"
-          class="guest__file"
           type="file"
           accept="image/*"
           multiple
-          tabindex="-1"
-          aria-hidden="true"
+          hidden
           data-test="guest-file-input"
           @change="onPicked"
         />
@@ -43,69 +49,67 @@
         >
           Add photos
         </Button>
-        <p v-if="!available" class="guest__note">
+        <InlineNote v-if="!available" tone="warn">
           Calvin can't take photos right now. Ask the owner to turn on Local photos.
-        </p>
+        </InlineNote>
 
-        <div v-if="busy" class="guest__progress" data-test="guest-progress" aria-live="polite">
-          <span>Sending {{ current }} of {{ total }}</span>
-          <div
-            class="guest__bar"
-            role="progressbar"
-            aria-label="Upload progress"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            :aria-valuenow="percent"
+        <div v-if="busy" class="guest__progress" data-test="guest-progress">
+          <InlineNote>{{ progressText }}</InlineNote>
+          <ProgressBar
+            :value="percent"
+            label="Upload progress"
+            :value-text="progressText"
             data-test="guest-progress-bar"
-          >
-            <span class="guest__bar-fill" :style="{ width: `${percent}%` }" />
-          </div>
+          />
         </div>
 
-        <p v-if="status" class="guest__status" role="status" data-test="guest-status">
-          {{ status }}
-        </p>
-        <ul v-if="errors.length" class="guest__errors" data-test="guest-errors">
-          <li v-for="(line, index) in errors" :key="index">{{ line }}</li>
-        </ul>
+        <!-- The one live region: the outcome, once, after the upload. -->
+        <div role="status" class="guest__live">
+          <InlineNote v-if="status" tone="ok" data-test="guest-status">{{ status }}</InlineNote>
+        </div>
+        <InlineNote
+          v-for="(line, index) in errors"
+          :key="index"
+          tone="err"
+          data-test="guest-errors"
+        >
+          {{ line }}
+        </InlineNote>
 
         <Button v-if="installPrompt" data-test="guest-install" @click="install">
           Install on this phone
         </Button>
-        <p v-if="installPrompt" class="guest__note">
+        <InlineNote v-if="installPrompt">
           Then share photos straight from your gallery: Share › Calvin photos.
-        </p>
-        <p v-else-if="showIosTip" class="guest__note" data-test="guest-ios-tip">
+        </InlineNote>
+        <InlineNote v-else-if="showIosTip" data-test="guest-ios-tip">
           Tip: tap Share › Add to Home Screen to keep this handy.
-        </p>
+        </InlineNote>
       </section>
 
-      <section v-if="uploads.length" class="guest__recent" aria-labelledby="guest-recent-title">
-        <h2 id="guest-recent-title" class="guest__heading">Your photos</h2>
-        <p class="guest__note">Only you can see and remove these from this phone.</p>
+      <Card v-if="uploads.length" title="Your photos" data-test="guest-recent">
+        <InlineNote>Only you can see and remove these from this phone.</InlineNote>
         <ul class="guest__grid">
           <li
-            v-for="item in uploads"
+            v-for="(item, index) in uploads"
             :key="item.imageId"
             class="guest__thumb"
             data-test="guest-thumb"
           >
-            <img :src="item.thumbnail" alt="A photo you added" loading="lazy" />
+            <!-- Decorative: the Remove button names the photo. -->
+            <img :src="item.thumbnail" alt="" loading="lazy" />
             <IconButton
               class="guest__remove"
-              label="Remove photo"
+              :label="`Remove photo ${index + 1} of ${uploads.length}`"
+              :icon="mdiTrashCanOutline"
               variant="danger"
               size="md"
               data-test="guest-remove"
               @click="removing = item"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
-                <path :d="mdiTrashCanOutline" fill="currentColor" />
-              </svg>
-            </IconButton>
+            />
           </li>
         </ul>
-      </section>
+      </Card>
     </template>
 
     <ConfirmModal
@@ -123,9 +127,13 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { mdiImagePlus, mdiTrashCanOutline } from "@mdi/js";
+import { mdiImagePlus, mdiLinkOff, mdiTrashCanOutline, mdiWifiOff } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import IconButton from "@/components/ui/IconButton.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ProgressBar from "@/components/ui/ProgressBar.vue";
 import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import {
   getGuest,
@@ -159,6 +167,7 @@ const installPrompt = ref(null);
 
 const title = computed(() => (linkName.value ? `Add photos for ${linkName.value}` : "Add photos"));
 const current = computed(() => Math.min(done.value + 1, total.value));
+const progressText = computed(() => `Sending ${current.value} of ${total.value}`);
 const percent = computed(() =>
   total.value ? Math.round(((done.value + fraction.value) / total.value) * 100) : 0
 );
@@ -195,12 +204,13 @@ const applyColourScheme = () => {
 function readShareResult() {
   const { added, failed, error } = route.query;
   if (error === "share_link_invalid" || error === "invalid") return "invalid";
-  if (error) errors.value = ["Those photos couldn't be added. Try Add photos instead."];
+  if (error === "too_large") errors.value = ["Too many photos at once. Share fewer at a time."];
+  else if (error) errors.value = ["Those photos couldn't be added. Try Add photos instead."];
   const addedCount = Number(added) || 0;
   const failedCount = Number(failed) || 0;
   if (added !== undefined || failed !== undefined) {
     status.value = [
-      addedCount ? `${photos(addedCount)} added. Thank you!` : "",
+      addedCount ? `${photos(addedCount)} added.` : "",
       failedCount ? `${failedCount} couldn't be added.` : "",
     ]
       .filter(Boolean)
@@ -258,7 +268,7 @@ async function onPicked(event) {
     done.value += 1;
   }
   busy.value = false;
-  if (added) status.value = `${photos(added)} added. Thank you!`;
+  if (added) status.value = `${photos(added)} added.`;
   else if (!errors.value.length) status.value = "";
 }
 
@@ -314,7 +324,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   min-height: 100vh;
   min-height: 100dvh;
-  max-width: 34rem;
+  max-width: var(--guest-max-w);
   margin: 0 auto;
   padding: var(--gap-group) var(--gap-group) var(--gap-section);
   display: flex;
@@ -337,72 +347,21 @@ onUnmounted(() => {
   font-weight: var(--weight-title);
   overflow-wrap: anywhere;
 }
-.guest__heading {
-  margin: 0;
-  font-size: var(--text-label);
-  font-weight: var(--weight-strong);
-}
-.guest__note {
-  margin: 0;
-  color: var(--ink-2);
-  font-size: var(--text-meta);
-}
-.guest__card,
 .guest__actions,
-.guest__recent {
+.guest__progress {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
 }
-.guest__card {
-  padding: var(--gap-group);
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-}
-.guest__file {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
 /* One big target for a thumb: the whole point of the page. */
 .guest__add {
   width: 100%;
-  min-height: 4.5rem;
+  min-height: var(--guest-add-h);
   font-size: var(--text-title);
-}
-.guest__progress {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-tight);
-  font-size: var(--text-meta);
-}
-.guest__bar {
-  height: 0.5rem;
-  overflow: hidden;
-  background: var(--bg-2);
-  border-radius: var(--radius-round);
-}
-.guest__bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--focus);
-}
-.guest__status {
-  margin: 0;
-  font-size: var(--text-body);
-}
-.guest__errors {
-  margin: 0;
-  padding-left: var(--gap-group);
-  color: var(--err);
-  font-size: var(--text-meta);
 }
 .guest__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(6.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--guest-thumb-min), 1fr));
   gap: var(--gap-inline);
   margin: 0;
   padding: 0;

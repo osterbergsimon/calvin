@@ -36,6 +36,19 @@ describe("ConfirmModal", () => {
     });
   });
 
+  describe("Body slot", () => {
+    it("renders extra body content under the message (e.g. a ToggleSwitch row)", () => {
+      const wrapper = mount(ConfirmModal, {
+        props: { show: true, message: "The link stops working." },
+        slots: { default: "<p data-test='extra'>Also remove the photos</p>" },
+      });
+      const text = wrapper.get("[role='dialog']").text();
+      expect(text).toContain("The link stops working.");
+      expect(wrapper.find("[data-test='extra']").exists()).toBe(true);
+      expect(text.indexOf("The link stops")).toBeLessThan(text.indexOf("Also remove"));
+    });
+  });
+
   describe("Content Display", () => {
     it("displays the default title", () => {
       const wrapper = mountConfirm({ show: true });

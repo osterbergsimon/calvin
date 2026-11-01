@@ -155,12 +155,54 @@ describe("GuestShare", () => {
     expect(find("guest-thumb").exists()).toBe(false);
   });
 
-  it("thanks the guest after sharing from the gallery", async () => {
+  it("says how many photos came in after sharing from the gallery", async () => {
     respond({ uploads: [upload("a")] });
     await mountPage("?added=3&failed=1");
-    expect(get("guest-status").text()).toContain("3 photos added");
-    expect(get("guest-status").text()).toContain("1 couldn't be added");
+    expect(get("guest-status").text()).toBe("3 photos added. 1 couldn't be added.");
+    expect(wrapper.text()).not.toContain("Thank you");
     // The query is dropped so a reload doesn't repeat the message.
     expect(router.currentRoute.value.query).toEqual({});
+  });
+
+  it("explains a share that was too large", async () => {
+    respond();
+    await mountPage("?error=too_large");
+    expect(get("guest-errors").text()).toContain("Too many photos at once");
+  });
+
+  it("uses the shared EmptyState for a dead link and Card for the photos", async () => {
+    respond({ info: Object.assign(new Error("404"), { response: { status: 404 } }) });
+    await mountPage();
+    expect(get("guest-invalid").classes()).toContain("empty-state");
+    wrapper.unmount();
+
+    respond({ uploads: [upload("a")] });
+    await mountPage();
+    expect(get("guest-recent").classes()).toContain("card");
+    expect(get("guest-recent").text()).toContain("Your photos");
+  });
+
+  it("names each Remove button instead of repeating the thumbnail's alt text", async () => {
+    respond({ uploads: [upload("a"), upload("b"), upload("c")] });
+    await mountPage();
+    const images = wrapper.findAll("[data-test='guest-thumb'] img");
+    expect(images.map(img => img.attributes("alt"))).toEqual(["", "", ""]);
+    const labels = wrapper
+      .findAll("[data-test='guest-remove']")
+      .map(b => b.attributes("aria-label"));
+    expect(labels).toEqual(["Remove photo 1 of 3", "Remove photo 2 of 3", "Remove photo 3 of 3"]);
+  });
+
+  it("announces once: the progress text is not a second live region", async () => {
+    respond();
+    await mountPage();
+    api.post.mockImplementationOnce(() => new Promise(() => {}));
+    await pick([photo("one.jpg")]);
+    await flushPromises();
+    const progress = get("guest-progress");
+    expect(progress.find("[aria-live]").exists()).toBe(false);
+    expect(progress.attributes("aria-live")).toBeUndefined();
+    expect(progress.find("[role='progressbar']").exists()).toBe(true);
+    expect(wrapper.findAll("[role='status'], [aria-live]")).toHaveLength(1);
   });
 });
