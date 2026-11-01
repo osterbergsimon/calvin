@@ -39,10 +39,13 @@ DEVICE_PHYSICAL_KEYS: tuple[str, ...] = (
 # fallthrough works regardless of the underlying driver.
 _INTEGRITY_ERRORS = (sqlite3.IntegrityError, SAIntegrityError)
 
-# A kiosk polls its config once a minute. When a poll reports nothing new and the
-# stored last_seen is younger than this, the row is not rewritten. The Screens list
+# Each kiosk's config is polled about once a minute, and more than one poller
+# (the device agent and the kiosk browser) reports the same kiosk id. When a poll
+# reports nothing new and the stored last_seen is younger than this, the row is
+# not rewritten, which de-duplicates those concurrent pollers. The Screens list
 # shows a kiosk online while last_seen is under 120 s old, so a skipped write plus
-# one poll gap (30 + 60 s) still reads as online.
+# one poll gap (30 + 60 s) still reads as online. If a poll is missed, last_seen
+# can be up to 150 s old (30 + 60 + 60 s) and the screen briefly reads offline.
 LAST_SEEN_WRITE_INTERVAL_S = 30
 
 _UPDATE_FLAG_KEY = (
@@ -319,7 +322,7 @@ async def migrate_global_room_name() -> None:
     if not global_name:
         return
 
-    # Narrow race: two first registrations within milliseconds can both read
+    # Narrow race: two concurrent runs (registration, restore) can both read
     # the global name here and both copy it before either deletes the key.
     # Harmless: each writes the same name onto unnamed screens only, and the
     # second key delete is a no-op.
