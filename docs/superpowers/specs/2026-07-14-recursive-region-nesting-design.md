@@ -1,5 +1,7 @@
 # Recursive region nesting (sub-cells within sub-cells)
 
+> Superseded: the flat helpers named here were removed in CLV-112; use the *AtPath helpers.
+
 - **Date:** 2026-07-14
 - **Status:** Design — awaiting review
 - **Branch:** `feature/regions-editor-redesign`
