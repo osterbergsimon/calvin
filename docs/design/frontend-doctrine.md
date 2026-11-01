@@ -66,9 +66,30 @@ Components stop referencing these (§7 migration).
 | | `--focus`, `--focus-ink`, `--focus-text`, `--focus-glow`, `--focus-edge` | existing | action and selection only (§5) |
 | | `--ok`, `--warn`, `--err` (+ the `--tag-*` mix rule) | existing | status only |
 | Elevation | `--elev-1` (raised: menus, popovers), `--elev-2` (dialogs, sheets) | `0 6px 18px -8px var(--shadow-hover)` / `0 18px 50px -16px var(--shadow-hover)` | nothing else casts shadows |
-| Motion | `--dur-fast` 120ms, `--dur` 200ms, `--ease` `cubic-bezier(.2,.7,.2,1)` | | all transitions; zero under `prefers-reduced-motion` |
+| Motion | `--dur-fast` 120ms, `--dur` 200ms, `--ease` `cubic-bezier(.2,.7,.2,1)`; `--dur-loading-fade` 450ms (`calc(var(--dur) * 2.25)`) | | all transitions; zero under `prefers-reduced-motion`. `--dur-loading-fade` is the loading light's fade only ([loading light](2026-11-01-loading-light.md) §2), the one slow transition |
 | Layers | `--z-raised` 10, `--z-sticky` 100, `--z-dialog` 1000, `--z-popover` 1050 (popovers teleport to body, so they must clear an open dialog), `--z-osk` 1100, `--z-toast` 1200 | | no other z-index values |
-| Breakpoints | `--bp-phone` (`max-width: 600px`), `--bp-wide` (`min-width: 1024px`) | `src/styles/breakpoints.js` | every width `@media` and every JS width check; nothing else |
+| Breakpoints | `--bp-phone` (`max-width: 600px`, or `max-height: 500px` in landscape on anything but a kiosk), `--bp-wide` (`min-width: 1024px`) | `src/styles/breakpoints.js` | every width `@media` in app CSS, and the viewport phone checks in JS (`isPhone()`); nothing else |
+
+Breakpoint rules:
+- **Phone** is a viewport `width <= 600` **or** a landscape viewport `height <= 500` (a phone turned sideways:
+  667x375, 640x360). A phone gets no automatic on-screen keyboard, no phone hand-off QR, and the compact
+  calendar, panel and lock-screen layouts.
+- **The kiosk is never a landscape phone.** The 800x480 wall panel is short and landscape too, so the height
+  clause is skipped on a kiosk. The signal is the kiosk identity (`?kiosk=<id>`, `src/utils/kioskId.js`): at boot
+  it puts `calvin-kiosk` on `<html>`. `isPhone()` reads that class, and the `customMedia` PostCSS plugin emits
+  the height clause of `(--bp-phone)` as a second block scoped to `:where(:root:not(.calvin-kiosk))`. A kiosk
+  started without an id gets the phone layout at 800x480.
+- Width still decides on a kiosk: a portrait Pi 7" (480x800) gets the phone layout, by design.
+- Since CLV-98 the 481-600 px band (and exactly 480) gets the phone variants that used to start at 480 or 768
+  (calendar extra-small scaling, OSK phone layout, PhoneSetupCard, lock-screen phone layout, AdminAccess stacked
+  rows, SetupWelcomeCard phone card), and 601-767 px landscape screens taller than 500 px lose the compact
+  calendar and panel scaling.
+- Pane and container sizes are not viewport breakpoints: the pages editor sizes itself from its own modal with
+  `isPhoneWidth()`. ScreensSettings' two-pane `(max-width: 900px)` matchMedia is the one JS query still outside
+  the set (tracked as a follow-up).
+- **Plugin and theme CSS is served as-is**, without PostCSS, so `(--bp-*)` never expands there. Plugins and
+  themes keep the literal `@media (max-width: 600px)`; the plugin tokens and `.calvin-plugin-*` classes are
+  otherwise unchanged.
 
 **Component tokens** are allowed when a component has geometry of its own. They're prefixed with the component
 name and built from roles, e.g. `--tag-*`, `--toggle-*`, `--tab-height`, `--osk-height`, `--touch-target`,
