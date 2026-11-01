@@ -243,6 +243,7 @@ def test_now_in_naive_when_no_tz():
 
 def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):
     # desired OFF at 23:00; next boundary 06:00 (7h) but refresh caps to 900s
+    # (an explicit CALVIN_DISPLAY_REFRESH_SECONDS override)
     cfg = _cfg()
     monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 23, 0))
     slept = []
