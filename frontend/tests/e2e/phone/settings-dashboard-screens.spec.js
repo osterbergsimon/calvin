@@ -43,7 +43,7 @@ test.describe("phone: Dashboard", () => {
       .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
       .toBe("false");
     // The household config is untouched by this screen's choice.
-    expect(api.state.config.showUI).toBe(true);
+    expect(api.config.showUI).toBe(true);
     await hideControls.click();
     await expect
       .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
