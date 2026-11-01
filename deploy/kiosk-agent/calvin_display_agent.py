@@ -162,7 +162,9 @@ def apply_on(on, env=None):
     return "+".join(methods) if methods else "none"
 
 
-DEFAULT_REFRESH_SECONDS = 900
+# Config poll interval. The GET is small and LAN-local; 60 s keeps a display
+# schedule edit from waiting up to a whole interval to reach the panel.
+DEFAULT_REFRESH_SECONDS = 60
 HTTP_TIMEOUT = 10
 BACKOFF_SECONDS = 60
 
