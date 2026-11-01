@@ -387,17 +387,48 @@ async def _migrate_room_name(out: _Outcome) -> None:
         )
 
 
-async def _migrate_photo_frame(out: _Outcome) -> None:
+async def _migrate_screen_controls(out: _Outcome) -> None:
+    """Copy a restored global show-UI setting onto the screens (calvin-hi6w).
+
+    A backup taken before the controls became per-screen only carries the
+    household-wide keys. A screen with an own value keeps it; the others adopt
+    the restored global one now instead of waiting for a restart or a new
+    registration. Runs after config and kiosks are restored. Best effort: the
+    restore has already been applied, so a failure is a warning and startup
+    retries it.
+    """
+    from app.services.kiosk_registry import migrate_global_screen_controls
+
+    try:
+        await migrate_global_screen_controls()
+    except Exception as exc:  # noqa: BLE001 - the restore itself succeeded
+        logger.warning(f"Could not copy the restored screen controls onto the screens: {exc}")
+        out.warnings.append(
+            "The backup's screen controls could not be copied to the screens; "
+            "it will be retried at the next restart."
+        )
+
+
+async def _migrate_photo_frame(out: _Outcome, doc: BackupDocument) -> None:
     """Move a restored global photo frame onto the screens (calvin-3xz9).
 
     A backup taken before the photo frame became per screen still carries the
-    global ``photo_frame_enabled``/``photo_frame_timeout``. Runs after config and
-    kiosks are restored. Best effort: the restore has already been applied, so a
-    failure is a warning, and startup retries it.
+    global ``photo_frame_enabled``/``photo_frame_timeout`` and no done marker.
+    Clear a marker left by the current install first, so a merge restore of
+    that old backup really runs the one-time copy; a post-migration backup
+    keeps its marker and is left alone. Runs after config and kiosks are
+    restored. Best effort: the restore has already been applied, so a failure
+    is a warning, and startup retries it.
     """
-    from app.services.kiosk_registry import migrate_global_photo_frame
+    from app.services.config_service import config_service
+    from app.services.kiosk_registry import (
+        PHOTO_FRAME_MIGRATED_KEY,
+        migrate_global_photo_frame,
+    )
 
     try:
+        if not any(row.key == PHOTO_FRAME_MIGRATED_KEY for row in doc.data.config):
+            await config_service.delete_value(PHOTO_FRAME_MIGRATED_KEY)
         await migrate_global_photo_frame()
     except Exception as exc:  # noqa: BLE001 - the restore itself succeeded
         logger.warning(f"Could not move the restored photo frame onto the screens: {exc}")
@@ -582,7 +613,8 @@ async def apply_restore(
         await _restore_plugin_types(doc, out)
         await _restore_kiosks(doc)
         await _migrate_room_name(out)
-        await _migrate_photo_frame(out)
+        await _migrate_screen_controls(out)
+        await _migrate_photo_frame(out, doc)
 
         if loaded.signing_key and restore_signing_key:
             _write_signing_key(loaded.signing_key)
