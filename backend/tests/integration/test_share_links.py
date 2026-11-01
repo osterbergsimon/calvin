@@ -453,7 +453,7 @@ def test_share_target_allows_same_origin_and_direct(admin, guest, image_dir, sit
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert response.headers["location"].endswith("?added=1&failed=0")
+    assert "?added=1&failed=0" in response.headers["location"]
 
 
 def test_location_quotes_the_token(guest):
@@ -833,9 +833,7 @@ def test_claim_is_scoped_to_its_link(admin, app, image_dir):
     _, token_b = _make_link(admin, "B", "B", guests_see_all=False)
     claim = _claim_of(_share(TestClient(app), token_a).headers["location"])
     phone = TestClient(app)
-    assert phone.post(f"/api/guest/{token_b}/claim", json={"claim": claim}).json() == {
-        "claimed": 0
-    }
+    assert phone.post(f"/api/guest/{token_b}/claim", json={"claim": claim}).json() == {"claimed": 0}
     assert phone.post("/api/guest/nope/claim", json={"claim": claim}).status_code == 404
     assert phone.post(f"/api/guest/{token_a}/claim", json={"claim": "x"}).status_code == 422
 
