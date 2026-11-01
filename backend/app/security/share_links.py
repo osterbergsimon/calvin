@@ -33,6 +33,7 @@ from app.utils.photo_folders import InvalidFolder, normalize_folder
 
 __all__ = [
     "DuplicateLinkName",
+    "PENDING_PREFIX",
     "InvalidFolder",
     "ShareLinkStore",
     "get_share_link_store",
@@ -44,6 +45,10 @@ MAX_NAME_LEN = 40
 DEFAULT_MAX_PHOTOS = 500
 DEFAULT_MAX_BYTES = 2 * 1024**3
 LAST_USED_INTERVAL = 60  # seconds between last_used_at writes from page loads
+# Uploads waiting for a guest page to claim them (calvin-p954) are recorded
+# under this prefix plus the claim id. A device cookie can't contain ":", so a
+# claim never matches a real device and a device id never works as a claim.
+PENDING_PREFIX = "pending:"
 _KEY_BYTES = 32
 _FILE_VERSION = 1
 
@@ -77,6 +82,8 @@ def _public(entry: dict[str, Any], now: float) -> dict[str, Any]:
         "uploadBytes": sum(int(upload.get("size", 0)) for upload in uploads),
         "maxPhotos": int(entry.get("max_photos", DEFAULT_MAX_PHOTOS)),
         "maxBytes": int(entry.get("max_bytes", DEFAULT_MAX_BYTES)),
+        # Links saved before the setting existed keep their own-device scope.
+        "guestsSeeAll": bool(entry.get("guests_see_all", False)),
     }
 
 
@@ -207,6 +214,7 @@ class ShareLinkStore:
         now: float | None = None,
         max_photos: int = DEFAULT_MAX_PHOTOS,
         max_bytes: int = DEFAULT_MAX_BYTES,
+        guests_see_all: bool = True,
     ) -> tuple[dict[str, Any], str]:
         """Mint a link. Returns ``(public record, token)``."""
         created = time.time() if now is None else now
@@ -229,6 +237,7 @@ class ShareLinkStore:
                 "last_used_at": None,
                 "max_photos": max_photos,
                 "max_bytes": max_bytes,
+                "guests_see_all": guests_see_all,
                 "uploads": [],
             }
             links.append(entry)
@@ -236,17 +245,26 @@ class ShareLinkStore:
         return _public(entry, created), token
 
     def rename(self, link_id: str, name: str) -> dict[str, Any] | None:
+        return self.update(link_id, name=name)
+
+    def update(
+        self, link_id: str, *, name: str | None = None, guests_see_all: bool | None = None
+    ) -> dict[str, Any] | None:
+        """Change a link's name and/or its "guests see all photos" setting."""
         with self._lock:
             links = self._load()
             target = next((entry for entry in links if entry["id"] == link_id), None)
             if target is None:
                 return None
-            if any(
-                entry["id"] != link_id and entry["name"].casefold() == name.casefold()
-                for entry in links
-            ):
-                raise DuplicateLinkName(name)
-            target["name"] = name
+            if name is not None:
+                if any(
+                    entry["id"] != link_id and entry["name"].casefold() == name.casefold()
+                    for entry in links
+                ):
+                    raise DuplicateLinkName(name)
+                target["name"] = name
+            if guests_see_all is not None:
+                target["guests_see_all"] = guests_see_all
             self._write(links)
         return _public(target, time.time())
 
@@ -301,30 +319,58 @@ class ShareLinkStore:
             target["last_used_at"] = current
             self._write(links)
 
-    def uploads_for(self, link_id: str, device: str) -> builtins.list[dict[str, Any]]:
-        """This device's uploads through this link, newest first."""
-        device_hash = _hash(device)
+    def uploads_for(self, link_id: str, device: str | None = None) -> builtins.list[dict[str, Any]]:
+        """This device's uploads through this link (every upload when ``device`` is
+        ``None``), newest first."""
+        device_hash = _hash(device) if device is not None else None
         for entry in self._load():
             if entry["id"] == link_id:
-                mine = [u for u in entry["uploads"] if u["device"] == device_hash]
+                mine = [
+                    u for u in entry["uploads"] if device_hash is None or u["device"] == device_hash
+                ]
                 mine.sort(key=lambda u: u["uploaded_at"], reverse=True)
                 return [_public_upload(upload) for upload in mine]
         return []
 
-    def remove_upload(self, link_id: str, image_id: str, device: str) -> dict[str, Any] | None:
-        """Forget one of this device's uploads; returns it so the caller deletes the file."""
-        device_hash = _hash(device)
+    def remove_upload(
+        self, link_id: str, image_id: str, device: str | None = None
+    ) -> dict[str, Any] | None:
+        """Forget one of this device's uploads (any of the link's when ``device`` is
+        ``None``); returns it so the caller deletes the file."""
+        device_hash = _hash(device) if device is not None else None
         with self._lock:
             links = self._load()
             for entry in links:
                 if entry["id"] != link_id:
                     continue
                 for upload in entry["uploads"]:
-                    if upload["image_id"] == image_id and upload["device"] == device_hash:
+                    if upload["image_id"] == image_id and (
+                        device_hash is None or upload["device"] == device_hash
+                    ):
                         entry["uploads"].remove(upload)
                         self._write(links)
                         return _public_upload(upload)
         return None
+
+    def claim_uploads(self, link_id: str, claim: str, device: str) -> int:
+        """Hand the uploads waiting under ``claim`` on this link to ``device``.
+
+        One time only: afterwards they belong to the device and the claim
+        matches nothing. Returns how many uploads were claimed.
+        """
+        pending = _hash(PENDING_PREFIX + claim)
+        with self._lock:
+            links = self._load()
+            target = next((entry for entry in links if entry["id"] == link_id), None)
+            if target is None:
+                return 0
+            claimed = [u for u in target["uploads"] if u["device"] == pending]
+            if not claimed:
+                return 0
+            for upload in claimed:
+                upload["device"] = _hash(device)
+            self._write(links)
+        return len(claimed)
 
     def touch(self, link_id: str, now: float | None = None) -> None:
         """Note a page load as use, at most once a minute per link."""
