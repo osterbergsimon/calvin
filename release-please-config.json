@@ -22,6 +22,12 @@
         { "type": "refactor", "section": "Refactoring", "hidden": true },
         { "type": "style", "section": "Styles", "hidden": true },
         { "type": "test", "section": "Tests", "hidden": true }
+      ],
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "backend/app/__init__.py"
+        }
       ]
     }
   }
