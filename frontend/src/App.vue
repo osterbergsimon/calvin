@@ -26,12 +26,16 @@ import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 import { useTheme } from "./composables/useTheme";
 // Keep the global UI scale in sync with config
 import { useUiScale } from "./composables/useUiScale";
+// Force this screen's desktop/phone layout, if it has one
+import { useLayoutOverride } from "./composables/useLayoutOverride";
 // Initialize connection store
 import { useConnectionStore } from "./stores/connection";
 
 usePhotoFrameMode();
 const theme = useTheme();
 const uiScale = useUiScale();
+// Applies the layout class before mount; keeps it in step with Settings.
+useLayoutOverride().syncWithConfig();
 const connectionStore = useConnectionStore();
 const clockBarVisible = useClockBarVisible();
 

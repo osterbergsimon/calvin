@@ -211,6 +211,27 @@
         />
       </SettingRow>
       <SettingRow
+        label="Layout"
+        description="Auto follows the screen size. Force the desktop or phone layout on this screen."
+      >
+        <template #description>
+          <p class="setting-row__desc">
+            Auto follows the screen size. Force the desktop or phone layout on this screen.
+          </p>
+          <ScopeLine
+            :overridden="layoutSetting.overridden.value"
+            reset-test="reset-layout-mode"
+            @reset="layoutSetting.reset()"
+          />
+        </template>
+        <SegmentedControl
+          :model-value="layoutMode"
+          :options="LAYOUT_OPTIONS"
+          aria-label="Layout"
+          @update:model-value="v => layoutSetting.set(v)"
+        />
+      </SettingRow>
+      <SettingRow
         label="Dashboard size"
         description="Size of labels and touch buttons on the dashboard."
       >
@@ -284,6 +305,7 @@ import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { normalizeDashboardScreens } from "@/utils/layout";
+import { LAYOUT_STORAGE_KEY, normalizeLayoutMode } from "@/utils/layoutMode";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
@@ -383,6 +405,18 @@ const loadingLight = computed(() => {
   const value = loadingLightSetting.value.value;
   return LOADING_LIGHT_OPTIONS.some(option => option.value === value) ? value : "comet";
 });
+
+// --- Layout: per screen, browser, or kiosk (calvin-tnkg) --------------------
+// A small or portrait kiosk may want the desktop layout. On a kiosk the choice
+// is that screen's override; any other browser remembers it locally. Auto is
+// today's viewport rule.
+const LAYOUT_OPTIONS = [
+  { value: "auto", label: "Auto" },
+  { value: "desktop", label: "Desktop" },
+  { value: "phone", label: "Phone" },
+];
+const layoutSetting = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
+const layoutMode = computed(() => normalizeLayoutMode(layoutSetting.value.value));
 const prefersReducedMotion =
   typeof window !== "undefined" &&
   typeof window.matchMedia === "function" &&

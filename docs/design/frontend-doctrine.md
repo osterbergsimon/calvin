@@ -80,6 +80,10 @@ Breakpoint rules:
   the height clause of `(--bp-phone)` as a second block scoped to `:where(:root:not(.calvin-kiosk))`. A kiosk
   started without an id gets the phone layout at 800x480.
 - Width still decides on a kiosk: a portrait Pi 7" (480x800) gets the phone layout, by design.
+- **A screen can force either layout.** Settings › Dashboard › Focus & remote › Layout (`src/utils/layoutMode.js`)
+  sets `calvin-layout-desktop` or `calvin-layout-phone` on `<html>` from the effective choice: a kiosk's screen
+  override, or this browser's own `localStorage` choice. `isPhone()`/`isPhoneWidth()` and the `customMedia`
+  expansion of `(--bp-phone)` both read that class; Auto (the default) leaves it off and keeps the viewport rule.
 - Since CLV-98 the 481-600 px band (and exactly 480) gets the phone variants that used to start at 480 or 768
   (calendar extra-small scaling, OSK phone layout, PhoneSetupCard, lock-screen phone layout, AdminAccess stacked
   rows, SetupWelcomeCard phone card), and 601-767 px landscape screens taller than 500 px lose the compact

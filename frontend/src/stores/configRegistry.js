@@ -1,5 +1,6 @@
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
+import { normalizeLayoutMode } from "../utils/layoutMode";
 
 export const createDefaultDisplaySchedule = () => [
   { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
@@ -248,6 +249,15 @@ export const CONFIG_FIELD_DEFINITIONS = [
     name: "loadingLight",
     keys: ["loadingLight", "loading_light"],
     defaultValue: "comet",
+  },
+  {
+    // Per-screen layout override (calvin-tnkg): a kiosk's override arrives
+    // here from its merged config; other browsers keep their own choice in
+    // localStorage. Auto is the viewport rule.
+    name: "layoutMode",
+    keys: ["layoutMode", "layout_mode"],
+    defaultValue: "auto",
+    parse: value => normalizeLayoutMode(value),
   },
   {
     name: "regionsLocked",
