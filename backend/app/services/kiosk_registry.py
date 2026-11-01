@@ -302,6 +302,12 @@ _SCREEN_CONTROL_KEYS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("tapAnywhereReveal", ("tap_anywhere_reveal", "tapAnywhereReveal")),
 )
 
+# Marks the one-time copy as done, like displaySettingsMigrated (CLV-49). Kept
+# in the config so it survives a restart; a restore from an older backup (no
+# marker) migrates that backup's screens, while a post-migration backup keeps
+# the marker and a screen reset to Default stays on the global fallback.
+_SCREEN_CONTROLS_MIGRATED_KEY = "screenControlsMigrated"
+
 
 def _has_own_control(overrides: dict | None, spellings: tuple[str, ...]) -> bool:
     """True when a screen already carries a value, in either spelling."""
@@ -376,14 +382,18 @@ async def migrate_global_screen_controls() -> None:
     none. This one-time migration takes the current global value and writes it
     onto each screen that has no value of its own, so an existing wall keeps
     behaving as it did. With no screens registered there is nothing to copy it
-    to, so the globals stay; it runs again at startup and whenever a new screen
-    registers (see :func:`_adopt_global_settings`).
+    to, so the globals stay and the first run with a screen does the copy (see
+    :func:`_adopt_global_settings`).
 
-    Idempotent: a second run finds every migrated screen with its own value and
-    writes nothing. A value already stored in either spelling counts as the
-    screen's own.
+    One-time: after that copy the done marker is stored, so a screen reset to
+    Default, a screen registering later or a restore of a post-migration backup
+    all use the global fallback instead of being filled in again. A value
+    already stored in either spelling counts as the screen's own.
     """
     from app.services.config_service import config_service
+
+    if await config_service.get_value(_SCREEN_CONTROLS_MIGRATED_KEY) is True:
+        return
 
     globals_: dict[str, Any] = {}
     for canonical, spellings in _SCREEN_CONTROL_KEYS:
@@ -415,6 +425,9 @@ async def migrate_global_screen_controls() -> None:
         # (last_seen, agent_*) is not overwritten by this stale snapshot.
         await row.update(_columns=["overrides"])
         logger.info(f"Copied the global screen controls onto screen {row.id!r}")
+
+    await config_service.set_value(_SCREEN_CONTROLS_MIGRATED_KEY, True)
+    logger.info("Retired the one-time per-screen control migration")
 
 
 async def _adopt_global_settings() -> None:

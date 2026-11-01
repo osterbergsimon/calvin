@@ -702,3 +702,45 @@ def test_restore_copies_global_controls_onto_screens(test_client, mode):
     }
     # Still the fallback for a screen that has no value of its own.
     assert _run(config_service.get_value("show_ui")) is False
+
+
+def _migrated_controls_seed() -> dict:
+    return {
+        "format": "calvin-backup",
+        "format_version": 1,
+        "data": {
+            "config": [
+                {"key": "show_ui", "value": "false", "value_type": "bool"},
+                {"key": "screenControlsMigrated", "value": "true", "value_type": "bool"},
+            ],
+            "kiosks": [
+                {"id": "kitchen-1a2b3c", "hostname": "kitchen", "overrides": {}},
+            ],
+        },
+    }
+
+
+@pytest.mark.parametrize("mode", ["merge", "replace"])
+def test_restore_does_not_refill_a_screen_reset_after_the_migration(test_client, mode):
+    """calvin-hi6w: the done marker makes the control migration one-time.
+
+    A backup taken after the migration carries the marker. Its screen has no
+    controls of its own, so the restored global value is the fallback; the
+    restore must not copy it back into an override.
+    """
+    from app.services import kiosk_registry as kr
+
+    r = test_client.post(
+        "/api/backup/restore",
+        files={
+            "file": (
+                "seed.json",
+                json.dumps(_migrated_controls_seed()).encode(),
+                "application/json",
+            )
+        },
+        data={"mode": mode},
+    )
+    assert r.status_code == 200, r.text
+
+    assert _run(kr.get_overrides("kitchen-1a2b3c")) == {}
