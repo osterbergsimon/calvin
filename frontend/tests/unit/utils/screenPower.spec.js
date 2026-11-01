@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   activePowerOverride,
+  buildPowerOverride,
+  firstScheduleBoundaryAfter,
   formatUntil,
   nextScheduleBoundary,
   scheduleDesiredOn,
@@ -74,6 +76,18 @@ describe("nextScheduleBoundary", () => {
   });
 });
 
+describe("firstScheduleBoundaryAfter", () => {
+  it("skips a boundary exactly equal to the set time", () => {
+    const boundary = firstScheduleBoundaryAfter({
+      enabled: true,
+      schedule: schedule(),
+      moment: at("2026-07-11T06:00:00+02:00"),
+      timeZone: TZ,
+    });
+    expect(boundary.toISOString()).toBe("2026-07-11T20:00:00.000Z"); // 22:00, not 06:00
+  });
+});
+
 describe("scheduleDesiredOn", () => {
   it("follows the daily window", () => {
     expect(
@@ -112,26 +126,65 @@ describe("scheduleDesiredOn", () => {
 
 describe("activePowerOverride", () => {
   const now = at("2026-07-11T09:00:00+02:00");
+  const options = { enabled: true, schedule: schedule(), now, timeZone: TZ };
 
-  it("honours an override until a future boundary", () => {
-    expect(activePowerOverride({ power: "off", until: "2026-07-11T20:00:00.000Z" }, now)).toEqual({
+  it("honours an override until the first boundary after setAt", () => {
+    expect(
+      activePowerOverride({ power: "off", setAt: "2026-07-11T07:00:00.000Z" }, options)
+    ).toEqual({
       power: "off",
-      until: "2026-07-11T20:00:00.000Z",
+      setAt: "2026-07-11T07:00:00.000Z",
+      expiry: at("2026-07-11T20:00:00.000Z"), // 22:00 local
     });
   });
 
-  it("honours an override with no until (no schedule to take over)", () => {
-    expect(activePowerOverride({ power: "on", until: null }, now)).toEqual({
+  it("expires exactly on the boundary", () => {
+    const override = { power: "off", setAt: "2026-07-11T07:00:00.000Z" };
+    expect(
+      activePowerOverride(override, { ...options, now: at("2026-07-11T21:59:59+02:00") })
+    ).not.toBeNull();
+    expect(
+      activePowerOverride(override, { ...options, now: at("2026-07-11T22:00:00+02:00") })
+    ).toBeNull();
+  });
+
+  it("stays until changed without a schedule", () => {
+    expect(
+      activePowerOverride(
+        { power: "on", setAt: "2026-07-11T07:00:00.000Z" },
+        { ...options, enabled: false }
+      )
+    ).toEqual({
       power: "on",
-      until: null,
+      setAt: "2026-07-11T07:00:00.000Z",
+      expiry: null,
     });
   });
 
   it("ignores an expired or malformed override", () => {
-    expect(activePowerOverride({ power: "on", until: "2026-07-11T06:00:00.000Z" }, now)).toBeNull();
-    expect(activePowerOverride({ power: "on", until: "not a date" }, now)).toBeNull();
-    expect(activePowerOverride({ power: "sideways", until: null }, now)).toBeNull();
-    expect(activePowerOverride(null, now)).toBeNull();
+    expect(
+      activePowerOverride(
+        { power: "on", setAt: "2026-07-11T06:00:00.000Z" },
+        { ...options, now: at("2026-07-11T23:00:00+02:00") }
+      )
+    ).toBeNull();
+    expect(activePowerOverride({ power: "on", setAt: "not a date" }, options)).toBeNull();
+    expect(
+      activePowerOverride({ power: "sideways", setAt: "2026-07-11T07:00:00Z" }, options)
+    ).toBeNull();
+    // The retired shape (until) is no longer an override.
+    expect(activePowerOverride({ power: "on", until: null }, options)).toBeNull();
+    expect(activePowerOverride(null, options)).toBeNull();
+  });
+});
+
+describe("buildPowerOverride", () => {
+  it("stores the choice and the UTC instant, not a browser-computed boundary", () => {
+    const now = at("2026-07-11T09:00:00+02:00");
+    expect(buildPowerOverride({ power: "off", now })).toEqual({
+      power: "off",
+      setAt: "2026-07-11T07:00:00.000Z",
+    });
   });
 });
 

@@ -40,8 +40,8 @@ The same component and sections as a screen page (#165), opened from the Default
   it calls `/system/display/power/*`, which drives the **server's** own display, so it is shown only when
   `/system/environment` reports `capabilities.reboot` (host control) and the deployment has a display. Each
   kiosk's own page instead gets a **Screen now** row (calvin-ydzz): **Turn on now · Turn off now** writes a
-  `screenNow` override for that kiosk, which the display agent honours only until the schedule's next on/off
-  boundary; **Follow schedule** removes it.
+  `screenNow` override for that kiosk as `{ power, setAt }`. The display agent ends it at the first schedule
+  boundary after `setAt`, computed in the screen's own timezone; **Follow schedule** removes it.
 
 ## 4. A screen page
 
@@ -92,8 +92,9 @@ Each uses **Same as Default** / **Changed here · Reset to default** like a scre
   pages alone.
 - Editing a Default key that screens override shows the note with their names; **Change them too** removes those
   overrides; no note when nobody overrides it.
-- **Screen now** is gone from the Default page; each kiosk page's **Screen now** writes a `screenNow` override with
-  the schedule's next boundary as `until`, and **Follow schedule** removes it. The server's own display control
-  appears in System only with host control; it calls `/system/display/power/*`.
+- **Screen now** is gone from the Default page; each kiosk page's **Screen now** writes a `screenNow` override
+  `{ power, setAt }`. The agent ends it at the first schedule boundary after `setAt` (its own clock and zone), and
+  **Follow schedule** removes it. The server's own display control appears in System only with host control; it
+  calls `/system/display/power/*`.
 - Old deep links to the All-screens destinations (`device-power`, `device-keyboard`, `layout`) open the Default page
   at that section.

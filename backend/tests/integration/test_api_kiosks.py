@@ -180,7 +180,7 @@ def test_screen_now_override_is_stored_and_returned_in_config(test_client: TestC
     The UI writes camelCase; the agent reads snake_case first, so the merged
     config must carry the same object under both spellings.
     """
-    screen_now = {"power": "off", "until": "2026-11-01T22:00:00+01:00"}
+    screen_now = {"power": "off", "setAt": "2026-11-01T20:00:00Z"}
     put = test_client.put(
         "/api/kiosks/hall-now/overrides",
         json={"overrides": {"screenNow": screen_now}},

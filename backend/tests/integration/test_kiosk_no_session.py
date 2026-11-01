@@ -49,6 +49,6 @@ def test_screen_now_override_needs_admin(test_client):
     """Turning a screen on/off now writes the admin-only overrides route."""
     response = test_client.put(
         "/api/kiosks/no-session-kiosk/overrides",
-        json={"overrides": {"screenNow": {"power": "off", "until": None}}},
+        json={"overrides": {"screenNow": {"power": "off", "setAt": "2026-11-01T20:00:00Z"}}},
     )
     assert response.status_code == 401

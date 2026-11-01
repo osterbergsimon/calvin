@@ -1,7 +1,8 @@
 import importlib.util
 import io
 import os
-from datetime import datetime, time
+import time as time_module
+from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -10,6 +11,13 @@ _MOD = os.path.join(os.path.dirname(__file__), "calvin_display_agent.py")
 _spec = importlib.util.spec_from_file_location("calvin_display_agent", _MOD)
 agent = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(agent)
+
+TZ_PLUS_2 = timezone(timedelta(hours=2))
+
+
+def _local(day=11, hour=9, minute=0):
+    """A 2026-07-11/12 datetime in a fixed UTC+2 zone (Stockholm in summer)."""
+    return datetime(2026, 7, day, hour, minute, tzinfo=TZ_PLUS_2)
 
 
 @pytest.fixture(autouse=True)
@@ -23,6 +31,22 @@ def _no_session_env(monkeypatch):
     for key in ("CALVIN_DISPLAY_STACK", "XDG_SESSION_TYPE", "WAYLAND_DISPLAY"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.delenv("XDG_RUNTIME_DIR", raising=False)
+
+
+@pytest.fixture
+def stockholm_local_time():
+    """Run a test with a known system zone for naive-datetime behaviour."""
+    previous = os.environ.get("TZ")
+    os.environ["TZ"] = "Europe/Stockholm"
+    time_module.tzset()
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop("TZ", None)
+        else:
+            os.environ["TZ"] = previous
+        time_module.tzset()
 
 
 def _sched(on="06:00", off="22:00", days=range(7), enabled=True):
@@ -114,62 +138,103 @@ def test_desired_on_merged_payload_honours_screen_override():
 
 # desired_on — "Screen now" overrides the schedule until its next boundary
 def test_desired_on_override_off_wins_during_on_window():
-    cfg = _cfg(screen_now={"power": "off", "until": None})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is False
+    cfg = _cfg(screen_now={"power": "off", "setAt": "2026-07-11T06:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=9)) is False
 
 
 def test_desired_on_override_on_wins_during_off_window():
-    cfg = _cfg(screen_now={"power": "on", "until": None})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is True
-
-
-def test_desired_on_override_until_in_the_future_is_honoured():
-    cfg = _cfg(screen_now={"power": "off", "until": "2026-07-11T22:00:00"})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is False
+    cfg = _cfg(screen_now={"power": "on", "setAt": "2026-07-11T21:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=23, minute=30)) is True
 
 
 def test_desired_on_expired_override_is_ignored():
-    """After the schedule's next boundary the schedule rules again."""
-    cfg = _cfg(screen_now={"power": "on", "until": "2026-07-11T06:00:00"})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is False
+    """After the first boundary after setAt the schedule rules again."""
+    cfg = _cfg(screen_now={"power": "on", "setAt": "2026-07-11T05:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=23)) is False
 
 
 def test_desired_on_override_at_its_boundary_is_expired():
-    cfg = _cfg(screen_now={"power": "on", "until": "2026-07-11T22:00:00"})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 22, 0)) is False
+    cfg = _cfg(screen_now={"power": "on", "setAt": "2026-07-11T05:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=21, minute=59)) is True
+    assert agent.desired_on(cfg, _local(hour=22)) is False
 
 
 def test_desired_on_override_survives_without_a_schedule():
     """No schedule: the manual choice stays until it is changed."""
-    cfg = _cfg(display_schedule_enabled=False, screen_now={"power": "off", "until": None})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 23, 0)) is False
+    cfg = _cfg(
+        display_schedule_enabled=False,
+        screen_now={"power": "off", "setAt": "2026-07-11T09:00:00Z"},
+    )
+    assert agent.desired_on(cfg, _local(hour=23)) is False
 
 
 def test_desired_on_camelcase_override_key():
-    cfg = _cfg(screenNow={"power": "off", "until": None})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is False
+    cfg = _cfg(screenNow={"power": "off", "setAt": "2026-07-11T07:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=9)) is False
 
 
 def test_desired_on_malformed_override_is_ignored():
-    cfg = _cfg(screen_now={"power": "sideways", "until": None})
-    assert agent.desired_on(cfg, datetime(2026, 7, 11, 9, 0)) is True
+    cfg = _cfg(screen_now={"power": "sideways", "setAt": "2026-07-11T07:00:00Z"})
+    assert agent.desired_on(cfg, _local(hour=9)) is True
 
 
-def test_desired_on_override_with_aware_until():
-    from datetime import timezone
-
-    until = datetime(2026, 7, 11, 19, 0, tzinfo=timezone.utc)
-    cfg = _cfg(screen_now={"power": "off", "until": until.isoformat()})
-    before = datetime(2026, 7, 11, 18, 0, tzinfo=timezone.utc)
-    after = datetime(2026, 7, 11, 19, 30, tzinfo=timezone.utc)
-    assert agent.desired_on(cfg, before) is False
-    assert agent.desired_on(cfg, after) is True  # 21:30 local: schedule says on
+def test_desired_on_override_without_setat_is_ignored():
+    cfg = _cfg(screen_now={"power": "off"})
+    assert agent.desired_on(cfg, _local(hour=9)) is True
 
 
-def test_next_boundary_uses_an_active_override_until():
-    """Wake up at the override's expiry, not only at the schedule's boundary."""
-    cfg = _cfg(screen_now={"power": "on", "until": "2026-07-11T12:00:00"})
-    assert agent.seconds_to_next_boundary(cfg, datetime(2026, 7, 11, 9, 0)) == 3 * 3600
+def test_desired_on_naive_setat_is_read_as_utc():
+    """Legacy/naive setAt must not be read as local wall time."""
+    cfg = _cfg(screen_now={"power": "on", "setAt": "2026-07-11T20:30:00"})
+    # 20:30Z is 22:30 local: the next boundary is 06:00, so the override holds.
+    # Read as 20:30 local it would already have expired at 22:00.
+    assert agent.desired_on(cfg, _local(hour=23)) is True
+
+
+def test_override_expiry_and_seconds_to_next_boundary_agree():
+    cfg = _cfg(screen_now={"power": "off", "setAt": "2026-07-11T06:00:00Z"})
+    now = _local(hour=9)
+    expiry = agent.override_expiry(cfg, now)
+    assert expiry == _local(hour=22)
+    assert int((expiry - now).total_seconds()) == agent.seconds_to_next_boundary(cfg, now)
+
+
+def test_next_boundary_excludes_now_exactly_on_a_boundary():
+    cfg = _cfg()  # 06:00-22:00
+    assert agent.seconds_to_next_boundary(cfg, _local(hour=6)) == 16 * 3600
+    assert agent.seconds_to_next_boundary(cfg, _local(hour=22)) == 8 * 3600
+
+
+def test_naive_now_matches_aware_now_for_a_utc_setat(stockholm_local_time):
+    """A naive `now` (the old now_in fallback) is local; setAt stays UTC."""
+    cfg = _cfg(screen_now={"power": "on", "setAt": "2026-07-11T20:30:00Z"})
+    naive = datetime(2026, 7, 11, 23, 0)  # 23:00 in Stockholm
+    aware = naive.astimezone()  # the same instant, aware in the system zone
+    assert agent.desired_on(cfg, naive) is True
+    assert agent.desired_on(cfg, aware) is True
+    assert agent.seconds_to_next_boundary(cfg, naive) == 7 * 3600
+    assert agent.seconds_to_next_boundary(cfg, aware) == 7 * 3600
+
+
+def test_reconcile_applies_then_expires_to_the_schedule():
+    """An override takes effect, then the schedule resumes at its boundary."""
+    cfg = _cfg(screen_now={"power": "on", "setAt": "2026-07-11T07:00:00Z"})
+    applied = []
+
+    last = agent.reconcile(
+        cfg, _local(hour=9), None, applier=lambda on: applied.append(on)
+    )
+    assert last is True and applied == [True]
+
+    last = agent.reconcile(
+        cfg, _local(hour=21), last, applier=lambda on: applied.append(on)
+    )
+    assert last is True and applied == [True]
+
+    last = agent.reconcile(
+        cfg, _local(hour=22), last, applier=lambda on: applied.append(on)
+    )
+    assert last is False and applied == [True, False]
 
 
 # desired_on — day not enabled ⇒ ON
@@ -296,9 +361,9 @@ def test_reconcile_retries_when_the_platform_apply_fails():
     assert agent.reconcile(cfg, at_on, False, applier=lambda on: None) is True
 
 
-def test_now_in_naive_when_no_tz():
+def test_now_in_is_aware_when_no_tz():
     n = agent.now_in({"timezone": None})
-    assert n.tzinfo is None
+    assert n.tzinfo is not None
 
 
 def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):

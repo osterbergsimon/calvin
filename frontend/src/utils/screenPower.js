@@ -1,15 +1,17 @@
 // "Screen now": a manual on/off choice that overrides a screen's own schedule
 // only until that schedule's next on/off boundary (calvin-ydzz).
 //
-// The Save writes the object to the kiosk's override layer as
-// `{ power: "on"|"off", until: <ISO boundary>|null }`. The display agent then
-// honours it while `until` is in the future (or null) and follows the schedule
-// again once it expires. The helpers here mirror the agent's decisions so the
-// row can say what the screen is doing now and when the schedule takes over.
+// The UI stores `{ power, setAt }` in the kiosk's override layer. `setAt` is a
+// UTC instant; the display agent owns the clock and ends the override at the
+// first schedule boundary after it, computed with its own `now_in(cfg)` zone.
+// Keeping the browser out of that decision means a phone and the Pi can never
+// disagree about when the schedule takes over. The helpers here only estimate
+// the boundary for the informational "Off until HH:MM" text, and mirror the
+// agent's schedule decision so the row can say what the screen is doing now.
 
 const formatterCache = new Map();
 
-/** "system" is the stored spelling of "the server's own zone". */
+/** The screen's configured zone, or null when it uses the system zone. */
 export function effectiveTimeZone(config) {
   const zone = config?.timezone;
   return zone && zone !== "system" ? zone : null;
@@ -96,15 +98,15 @@ function parseClock(value) {
 }
 
 /**
- * The next on/off boundary of a schedule after `now`, or null when the schedule
- * is off or has no enabled entries. Computed in the screen's timezone.
+ * The first on/off boundary strictly after `moment`, or null when the schedule
+ * is off or has no enabled entries. The agent uses the same rule and zone.
  */
-export function nextScheduleBoundary({ enabled, schedule, now = new Date(), timeZone = null }) {
+export function firstScheduleBoundaryAfter({ enabled, schedule, moment, timeZone = null }) {
   if (!enabled || !Array.isArray(schedule)) return null;
-  const today = zonedParts(now, timeZone);
+  const start = zonedParts(moment, timeZone);
   let best = null;
   for (let offset = 0; offset <= 8; offset += 1) {
-    const date = new Date(Date.UTC(today.year, today.month - 1, today.day + offset));
+    const date = new Date(Date.UTC(start.year, start.month - 1, start.day + offset));
     const weekday = (date.getUTCDay() + 6) % 7;
     const entry = schedule.find(day => day && Number(day.day) === weekday && day.enabled);
     if (!entry) continue;
@@ -119,10 +121,17 @@ export function nextScheduleBoundary({ enabled, schedule, now = new Date(), time
         clock.minute,
         timeZone
       );
-      if (candidate.getTime() > now.getTime() && (!best || candidate < best)) best = candidate;
+      if (candidate.getTime() > moment.getTime() && (!best || candidate < best)) {
+        best = candidate;
+      }
     }
   }
   return best;
+}
+
+/** The next boundary after `now` (kept for the schedule row's tests). */
+export function nextScheduleBoundary({ enabled, schedule, now = new Date(), timeZone = null }) {
+  return firstScheduleBoundaryAfter({ enabled, schedule, moment: now, timeZone });
 }
 
 /** Whether the effective schedule wants the screen on at `now` (agent parity). */
@@ -140,16 +149,28 @@ export function scheduleDesiredOn({ enabled, schedule, now = new Date(), timeZon
     : minutes >= on.minutes && minutes < off.minutes;
 }
 
-/** The active `{ power, until }` override, or null when absent/expired/invalid. */
-export function activePowerOverride(override, now = new Date()) {
+/**
+ * The active `{ power, setAt, expiry }` override, or null when absent, expired
+ * or invalid. `expiry` is null when no schedule can take over (it stays until
+ * changed); `timeZone` only affects the display estimate.
+ */
+export function activePowerOverride(
+  override,
+  { enabled, schedule, now = new Date(), timeZone = null } = {}
+) {
   if (!override || typeof override !== "object") return null;
   const power = String(override.power || "").toLowerCase();
   if (power !== "on" && power !== "off") return null;
-  const until = override.until ?? null;
-  if (!until) return { power, until: null };
-  const expiry = Date.parse(until);
-  if (!Number.isFinite(expiry) || expiry <= now.getTime()) return null;
-  return { power, until };
+  const setAt = Date.parse(override.setAt);
+  if (!Number.isFinite(setAt)) return null;
+  const expiry = firstScheduleBoundaryAfter({
+    enabled,
+    schedule,
+    moment: new Date(setAt),
+    timeZone,
+  });
+  if (expiry && now.getTime() >= expiry.getTime()) return null;
+  return { power, setAt: override.setAt, expiry };
 }
 
 /** "22:00" for a boundary, in the screen's timezone. */
@@ -160,17 +181,7 @@ export function formatUntil(until, timeZone = null) {
   return `${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`;
 }
 
-/**
- * The override object to save for a manual choice: `until` is the schedule's
- * next on/off boundary, or null when no schedule can take over.
- */
-export function buildPowerOverride({
-  power,
-  enabled,
-  schedule,
-  now = new Date(),
-  timeZone = null,
-}) {
-  const boundary = nextScheduleBoundary({ enabled, schedule, now, timeZone });
-  return { power, until: boundary ? boundary.toISOString() : null };
+/** The object to save for a manual choice: the choice plus the UTC instant. */
+export function buildPowerOverride({ power, now = new Date() }) {
+  return { power, setAt: now.toISOString() };
 }
