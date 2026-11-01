@@ -1,7 +1,7 @@
 <template>
   <div class="ins">
     <div v-if="!hideHeading" class="ins-mode">
-      <h3 class="ins-title">Region</h3>
+      <h3 class="ins-title heading-title">Region</h3>
       <span class="ins-sub">· in {{ screen.name }}</span>
     </div>
 
@@ -421,13 +421,6 @@ const photoFitModel = computed(() => props.region.view?.fit || "smart");
   gap: var(--gap-1);
   padding: var(--gap-4) var(--panel-pad-x) 0;
   margin-bottom: var(--gap-3);
-}
-.ins-title {
-  margin: 0;
-  font-family: var(--font-ui);
-  font-size: var(--text-title);
-  font-weight: var(--weight-title);
-  color: var(--ink);
 }
 .ins-sub {
   font-size: var(--text-meta);

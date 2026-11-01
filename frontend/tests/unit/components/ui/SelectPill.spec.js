@@ -20,6 +20,12 @@ describe("SelectPill", () => {
     expect(w.find('[role="listbox"]').exists()).toBe(false);
   });
 
+  it("puts its id on the trigger button, not the wrapper", () => {
+    const w = mountPill({ id: "units-field", modelValue: "paper", options: OPTS });
+    expect(w.find("button.pill").attributes("id")).toBe("units-field");
+    expect(w.find(".pill-wrap").attributes("id")).toBeUndefined();
+  });
+
   it("opens the listbox on trigger click", async () => {
     const w = mountPill({ modelValue: "backlit", options: OPTS });
     await w.find(".pill").trigger("click");

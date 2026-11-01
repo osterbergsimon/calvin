@@ -103,7 +103,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   padding: 0 0.45rem;
   font-family: var(--font-display);
   font-size: var(--fs-3xs);
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   line-height: 1;
   color: var(--ink);
   white-space: nowrap;
@@ -157,7 +157,7 @@ const handleFocus = () => emit("focus", props.ribbon);
 
 .ribbon-chevron {
   flex-shrink: 0;
-  font-weight: 700;
+  font-weight: var(--weight-title);
   /* A raw hue can be too light to read (yellow): pull it toward the theme ink,
      the same 55% mix the tone-text tokens use. */
   color: color-mix(in srgb, var(--ribbon-hue) 55%, var(--ink));

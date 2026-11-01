@@ -6,23 +6,22 @@
     <div class="kbt-key">{{ keyLabel }}</div>
     <div class="kbt-action">{{ action ? actionLabel(action) : "unassigned" }}</div>
     <div class="kbt-actions">
-      <button
-        class="kbt-btn"
-        data-role="edit"
-        :aria-label="`Change ${keyLabel}`"
-        @click="$emit('edit')"
-      >
-        ✎
-      </button>
-      <button
+      <IconButton size="md" data-role="edit" :label="`Change ${keyLabel}`" @click="$emit('edit')">
+        <svg class="kbt-glyph" viewBox="0 0 24 24" aria-hidden="true">
+          <path :d="mdiPencil" fill="currentColor" />
+        </svg>
+      </IconButton>
+      <IconButton
         v-if="action"
-        class="kbt-btn"
+        size="md"
         data-role="clear"
-        :aria-label="`Clear ${keyLabel}`"
+        :label="`Clear ${keyLabel}`"
         @click="$emit('clear')"
       >
-        ×
-      </button>
+        <svg class="kbt-glyph" viewBox="0 0 24 24" aria-hidden="true">
+          <path :d="mdiClose" fill="currentColor" />
+        </svg>
+      </IconButton>
     </div>
     <template v-if="conflict">
       <button
@@ -42,6 +41,8 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { mdiClose, mdiPencil } from "@mdi/js";
+import IconButton from "@/components/ui/IconButton.vue";
 import { actionLabel } from "@/utils/keyboardActionsCatalog";
 import { formatKeyLabel } from "@/utils/keyCode";
 import Tag from "@/components/ui/Tag.vue";
@@ -90,7 +91,7 @@ const conflictHint = computed(() => {
 }
 .kbt-key {
   font-family: var(--font-data);
-  font-weight: 700;
+  font-weight: var(--weight-title);
   font-size: var(--fs-lg);
   color: var(--ink);
 }
@@ -104,22 +105,9 @@ const conflictHint = computed(() => {
   display: flex;
   gap: 6px;
 }
-.kbt-btn {
-  background: var(--bg-1);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  color: var(--ink-2);
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
-  cursor: pointer;
-}
-.kbt-btn:hover {
-  border-color: var(--focus);
-  color: var(--ink);
-}
-.kbt-btn:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+.kbt-glyph {
+  width: 1em;
+  height: 1em;
 }
 /* Conflict badge — a tappable "!" that reveals the hint on touch;
    hover/focus reveal it for pointer & keyboard users (see below). */

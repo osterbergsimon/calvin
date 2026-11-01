@@ -9,7 +9,9 @@
       label="Exit fullscreen"
       @click="handleAction('photos_exit_fullscreen')"
     >
-      ✕
+      <svg class="fs-close__glyph" viewBox="0 0 24 24" aria-hidden="true">
+        <path :d="mdiClose" fill="currentColor" />
+      </svg>
     </IconButton>
     <DashboardPanel
       title="Photos"
@@ -97,6 +99,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { mdiClose } from "@mdi/js";
 import { useImagesStore } from "../stores/images";
 import { useProgressStore } from "../stores/progress";
 import DashboardPanel from "./DashboardPanel.vue";
@@ -365,6 +368,11 @@ watch(sourceKey, async () => {
   top: var(--gap-4);
   right: var(--gap-4);
   z-index: var(--z-raised);
+}
+
+.fs-close__glyph {
+  width: 1em;
+  height: 1em;
 }
 
 .photo-slideshow.fullscreen {
