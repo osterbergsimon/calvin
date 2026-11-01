@@ -6,13 +6,12 @@
         class="btn-close-fullscreen"
         size="lg"
         shape="circle"
+        :icon="mdiClose"
         data-action="exit-fullscreen"
         label="Exit fullscreen"
         title="Close Fullscreen (ESC)"
         @click.stop="handleCloseFullscreen"
-      >
-        ×
-      </IconButton>
+      />
     </div>
 
     <!-- Viewer Content -->
@@ -53,48 +52,47 @@
           :region-id="regionId"
         >
           <template #actions>
-            <ServiceRegionViewOptions
-              v-if="showControls && hasPointer && isLinkCapable"
-              :region-id="regionId"
-              :view="view"
-            />
-            <IconButton
-              v-if="
-                (showControls || isFullscreen) &&
-                hasPointer &&
-                canNavigateServices &&
-                services.length > 1
-              "
-              size="custom"
-              label="Previous Service"
-              title="Previous Service"
-              @click="previousService"
-            >
-              ‹
-            </IconButton>
-            <IconButton
-              v-if="
-                (showControls || isFullscreen) &&
-                hasPointer &&
-                canNavigateServices &&
-                services.length > 1
-              "
-              size="custom"
-              label="Next Service"
-              title="Next Service"
-              @click="nextService"
-            >
-              ›
-            </IconButton>
-            <IconButton
-              v-if="showControls && hasPointer && !isFullscreen"
-              size="custom"
-              label="Enter Fullscreen"
-              title="Enter Fullscreen"
-              @click.stop="handleToggleFullscreen"
-            >
-              ⤢
-            </IconButton>
+            <RegionHeaderControls v-if="hasPointer && (showControls || isFullscreen)">
+              <ServiceRegionViewOptions
+                v-if="showControls && hasPointer && isLinkCapable"
+                :region-id="regionId"
+                :view="view"
+              />
+              <IconButton
+                v-if="
+                  (showControls || isFullscreen) &&
+                  hasPointer &&
+                  canNavigateServices &&
+                  services.length > 1
+                "
+                size="custom"
+                :icon="mdiChevronLeft"
+                label="Previous Service"
+                title="Previous Service"
+                @click="previousService"
+              />
+              <IconButton
+                v-if="
+                  (showControls || isFullscreen) &&
+                  hasPointer &&
+                  canNavigateServices &&
+                  services.length > 1
+                "
+                size="custom"
+                :icon="mdiChevronRight"
+                label="Next Service"
+                title="Next Service"
+                @click="nextService"
+              />
+              <IconButton
+                v-if="showControls && hasPointer && !isFullscreen"
+                size="custom"
+                :icon="mdiFullscreen"
+                label="Enter Fullscreen"
+                title="Enter Fullscreen"
+                @click.stop="handleToggleFullscreen"
+              />
+            </RegionHeaderControls>
           </template>
         </ServiceViewer>
       </div>
@@ -104,6 +102,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from "vue";
+import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
 import { useProgressStore } from "../stores/progress";
@@ -112,6 +111,7 @@ import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
 import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
+import RegionHeaderControls from "./dashboard/RegionHeaderControls.vue";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { cardSizeVars } from "@/styles/cardSizeScale.js";
 

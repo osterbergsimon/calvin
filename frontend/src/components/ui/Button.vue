@@ -37,7 +37,9 @@ defineProps({
   size: {
     type: String,
     default: "md",
-    validator: value => ["md", "sm"].includes(value),
+    // "custom" is the region-chrome escape hatch: the consumer supplies
+    // --btn-height / --btn-font (like IconButton's custom size).
+    validator: value => ["md", "sm", "custom"].includes(value),
   },
   type: {
     type: String,
@@ -98,6 +100,12 @@ defineProps({
 .btn--sm {
   min-height: var(--touch-target);
   padding-inline: var(--gap-3);
+}
+
+.btn--custom {
+  min-height: var(--btn-height, var(--control-height));
+  padding-inline: var(--gap-3);
+  font-size: var(--btn-font, var(--text-body));
 }
 
 .btn:focus-visible {

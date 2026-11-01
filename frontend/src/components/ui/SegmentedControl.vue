@@ -52,23 +52,28 @@ const onKey = e => {
 </script>
 
 <style scoped>
+/* The track's geometry is overridable so a dense header can put it on the same
+   control height/radius as the buttons beside it. The defaults keep the
+   gallery's padded track, whose segments stay at the touch-target height. */
 .seg {
   display: inline-flex;
+  box-sizing: border-box;
+  height: var(--seg-height, auto);
   background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  padding: var(--space-3xs);
+  border-radius: var(--seg-radius, var(--radius-lg));
+  padding: var(--seg-padding, var(--space-3xs));
 }
 .seg__btn {
   font-family: var(--font-ui);
-  font-size: var(--fs-control);
+  font-size: var(--seg-font, var(--fs-control));
   font-weight: var(--weight-strong);
   color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-radius: var(--radius-sm);
-  padding: 0.625rem 1.125rem; /* 10px 18px */
-  min-height: var(--touch-target);
+  border-radius: var(--seg-btn-radius, var(--radius-sm));
+  padding: var(--seg-btn-padding, 0.625rem 1.125rem);
+  min-height: var(--seg-btn-min-height, var(--touch-target));
   cursor: pointer;
   display: flex;
   align-items: center;
