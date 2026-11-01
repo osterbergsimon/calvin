@@ -114,9 +114,10 @@ async def _dashboard_screens() -> dict:
 @scoped("read")
 async def get_status(ctx: Context) -> str:
     """Health, versions and deployment (native/docker, whether host control is on)."""
-    from app.api.routes.config import get_frontend_version, get_git_version
+    from app.api.routes.config import get_frontend_version
     from app.api.routes.health import _database_is_reachable
     from app.api.routes.system import get_environment
+    from app.version import get_revision, get_version
 
     env = await get_environment()
     database_ok = await _database_is_reachable()
@@ -124,7 +125,8 @@ async def get_status(ctx: Context) -> str:
         {
             "status": "healthy" if database_ok else "unhealthy",
             "database": "ok" if database_ok else "error",
-            "version": get_git_version(),
+            "version": get_version(),
+            "revision": get_revision(),
             "frontendVersion": get_frontend_version(),
             "deployment": env["deployment"],
             "hostControl": env["host_control"],

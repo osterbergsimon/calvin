@@ -89,6 +89,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # A tag build knows its release version (vX.Y.Z); develop/PR builds leave
+      # it empty so the image falls back to app.__version__. The revision is
+      # always the commit being built, because the runtime image has no git.
+      - name: Resolve build version
+        id: version
+        run: |
+          version=""
+          case "$GITHUB_REF" in
+            refs/tags/v*) version="${GITHUB_REF_NAME#v}" ;;
+          esac
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         if: env.PUBLISH == 'true'
         uses: docker/setup-qemu-action@v3
@@ -127,6 +140,8 @@ jobs:
           file: docker/Dockerfile
           build-args: |
             VITE_API_URL=/api
+            CALVIN_VERSION=${{ steps.version.outputs.value }}
+            CALVIN_GIT_SHA=${{ steps.version.outputs.sha }}
           # Multi-arch only when pushing: amd64 for Unraid / servers, arm64
           # and arm/v7 for all-in-one Pis. PR builds stay amd64-only.
           platforms: ${{ env.PUBLISH == 'true' && 'linux/amd64,linux/arm64,linux/arm/v7' || 'linux/amd64' }}
@@ -146,6 +161,8 @@ jobs:
           file: docker/Dockerfile
           build-args: |
             VITE_API_URL=/api
+            CALVIN_VERSION=${{ steps.version.outputs.value }}
+            CALVIN_GIT_SHA=${{ steps.version.outputs.sha }}
           # The image from the step above, amd64-only and loaded locally so the
           # check can run inside it. The GHA cache makes this a cache hit.
           platforms: linux/amd64
@@ -191,6 +208,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # A tag build knows its release version (vX.Y.Z); develop/PR builds leave
+      # it empty so the image falls back to app.__version__. The revision is
+      # always the commit being built, because the runtime image has no git.
+      - name: Resolve build version
+        id: version
+        run: |
+          version=""
+          case "$GITHUB_REF" in
+            refs/tags/v*) version="${GITHUB_REF_NAME#v}" ;;
+          esac
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -204,6 +234,8 @@ jobs:
           file: docker/Dockerfile
           build-args: |
             VITE_API_URL=/api
+            CALVIN_VERSION=${{ steps.version.outputs.value }}
+            CALVIN_GIT_SHA=${{ steps.version.outputs.sha }}
           platforms: linux/arm64,linux/arm/v7
           push: false
           # Shares the amd64 build's GHA cache for platform-independent

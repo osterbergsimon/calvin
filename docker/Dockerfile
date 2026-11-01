@@ -24,6 +24,11 @@ COPY frontend/ ./
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 
+# The build context excludes .git, so stamp the same revision the backend
+# reports into index.html's frontend-version meta tag (CLV-63, calvin-hshq).
+ARG CALVIN_GIT_SHA=
+ENV GIT_COMMIT_HASH=${CALVIN_GIT_SHA}
+
 RUN npm run build
 
 
@@ -97,7 +102,15 @@ COPY scripts/setup-kiosk.sh scripts/setup-common.sh /app/kiosk-bundle/scripts/
 # DATABASE_URL, IMAGE_DIR, PLUGIN_DIR, ... still override single paths.
 RUN mkdir -p /var/lib/calvin/db /var/lib/calvin/images /var/lib/calvin/plugins
 
+# The runtime image has no git: the API reads the version/revision from these
+# build args (stamped by .github/workflows/docker-build.yml), falling back to
+# app.__version__ when a develop build has no release version.
+ARG CALVIN_VERSION=
+ARG CALVIN_GIT_SHA=
+
 ENV CALVIN_DATA_DIR=/var/lib/calvin \
+    CALVIN_VERSION=${CALVIN_VERSION} \
+    CALVIN_GIT_SHA=${CALVIN_GIT_SHA} \
     KIOSK_BUNDLE_DIR=/app/kiosk-bundle \
     CALVIN_PORT=8000 \
     CALVIN_DEPLOYMENT=docker \

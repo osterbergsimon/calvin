@@ -18,6 +18,7 @@ from loguru import logger
 
 # Configure logging FIRST, before any other imports that might trigger database initialization
 # Import settings first to get log level
+from app import __version__
 from app.config import settings
 
 # Remove loguru's default handler and configure our own
@@ -791,7 +792,7 @@ if frontend_dist.exists():
                     "Expires": "0",
                 },
             )
-        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        return {"message": "Calvin Dashboard API", "version": __version__}
 
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
@@ -821,10 +822,10 @@ if frontend_dist.exists():
                     "Expires": "0",
                 },
             )
-        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        return {"message": "Calvin Dashboard API", "version": __version__}
 else:
     # Fallback if frontend dist doesn't exist (development mode)
     @app.get("/")
     async def root():
         """Root endpoint."""
-        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        return {"message": "Calvin Dashboard API", "version": __version__}

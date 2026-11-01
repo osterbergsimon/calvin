@@ -87,6 +87,26 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
 
 
 @pytest.mark.integration
+def test_get_config_reports_version_and_build_revision(test_client: TestClient, monkeypatch):
+    """Settings > System reads the release version plus the build revision
+    (calvin-hshq). On a checkout the revision comes from git; in an image it
+    comes from the build's CALVIN_GIT_SHA. The version is app.__version__."""
+    import app
+    from app import version as version_module
+
+    monkeypatch.delenv("CALVIN_VERSION", raising=False)
+    version_module.get_revision.cache_clear()
+
+    response = test_client.get("/api/config")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["version"] == app.__version__
+    assert data["revision"] is None or isinstance(data["revision"], str)
+    assert "frontendVersion" in data
+
+
+@pytest.mark.integration
 def test_update_config(test_client: TestClient):
     """Test updating configuration via API."""
     # Get current config

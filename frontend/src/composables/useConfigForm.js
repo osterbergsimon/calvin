@@ -203,6 +203,7 @@ export function useConfigForm(initialConfig = {}) {
         gitRepoUrl: response.gitRepoUrl ?? response.git_repo_url ?? null,
         gitBranch: response.gitBranch ?? response.git_branch ?? "develop",
         version: response.version ?? null,
+        revision: response.revision ?? null,
         frontendVersion: response.frontendVersion ?? response.frontend_version ?? null,
       };
     } catch (err) {

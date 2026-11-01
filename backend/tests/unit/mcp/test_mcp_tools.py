@@ -29,7 +29,8 @@ def run_json(coro_result: str):
 
 
 async def test_get_status(monkeypatch):
-    monkeypatch.setattr("app.api.routes.config.get_git_version", lambda: "abc123")
+    monkeypatch.setattr("app.version.get_version", lambda: "0.1.0")
+    monkeypatch.setattr("app.version.get_revision", lambda: "abc123")
     monkeypatch.setattr("app.api.routes.config.get_frontend_version", lambda: "fe1")
     monkeypatch.setattr(
         "app.api.routes.health._database_is_reachable", AsyncMock(return_value=True)
@@ -48,7 +49,8 @@ async def test_get_status(monkeypatch):
     assert data == {
         "status": "healthy",
         "database": "ok",
-        "version": "abc123",
+        "version": "0.1.0",
+        "revision": "abc123",
         "frontendVersion": "fe1",
         "deployment": "native",
         "hostControl": True,
@@ -57,7 +59,7 @@ async def test_get_status(monkeypatch):
 
 
 async def test_get_status_reports_unhealthy_database(monkeypatch):
-    monkeypatch.setattr("app.api.routes.config.get_git_version", lambda: None)
+    monkeypatch.setattr("app.version.get_revision", lambda: None)
     monkeypatch.setattr("app.api.routes.config.get_frontend_version", lambda: None)
     monkeypatch.setattr(
         "app.api.routes.health._database_is_reachable", AsyncMock(return_value=False)
