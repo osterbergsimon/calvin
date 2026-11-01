@@ -18,6 +18,24 @@ describe("KioskStatusHeader", () => {
     expect(w.text()).toContain("12s ago");
   });
 
+  it("shows the display stack beside the agent version", () => {
+    const w = mountHeader({
+      displayStack: "cog",
+      agentVersion: "1ed916a4b5c6",
+    });
+    expect(w.get("[data-test='kiosk-display-stack']").text()).toBe("cog · agent 1ed916a");
+  });
+
+  it("falls back to unknown for an agent that does not report a stack", () => {
+    const w = mountHeader({ displayStack: null, agentVersion: "1ed916a4b5c6" });
+    expect(w.get("[data-test='kiosk-display-stack']").text()).toBe("unknown · agent 1ed916a");
+  });
+
+  it("shows no stack readout without an agent", () => {
+    const w = mountHeader({ displayStack: null, agentVersion: null });
+    expect(w.find("[data-test='kiosk-display-stack']").exists()).toBe(false);
+  });
+
   it("shows Applied when applied matches desired", () => {
     const w = mountHeader({ appliedVersion: "9f2a", desiredVersion: "9f2a" });
     expect(w.get("[data-test='hardware-config-status']").text()).toContain("Applied");

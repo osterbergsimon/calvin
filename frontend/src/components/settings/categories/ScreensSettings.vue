@@ -190,6 +190,8 @@
         :last-seen-label="relativeTime(selectedKiosk.lastSeen)"
         :applied-version="selectedKiosk.lastAppliedVersion ?? null"
         :desired-version="desiredVersions[selectedId] ?? null"
+        :display-stack="selectedKiosk.displayStack ?? null"
+        :agent-version="selectedKiosk.agentVersion ?? null"
       />
 
       <SettingsSection id="screen-name" title="Name">
@@ -530,6 +532,7 @@ import { useNotificationsStore } from "@/stores/notifications";
 import {
   hasUpdateError,
   isUpdateBlocked,
+  displayStackLabel,
   isVersionBehind,
   kiosksBehind,
   kiosksBlocked,
@@ -1142,20 +1145,24 @@ function softwareTone(k) {
   return "neutral";
 }
 function softwareLine(k) {
-  const tone = softwareTone(k);
   if (k?.agentVersion == null) return "";
-  if (k.agentUpdateRequested) return `Updating to ${shortVersion(availableVersion.value)}…`;
+  // What the kiosk actually runs, beside the agent version (calvin-2ibz).
+  const lead = `${displayStackLabel(k)} · `;
+  const tone = softwareTone(k);
+  if (k.agentUpdateRequested) return `${lead}Updating to ${shortVersion(availableVersion.value)}…`;
   if (tone === "warn") {
-    return `Kiosk software ${shortVersion(k.agentVersion)} · update needs a newer OS`;
+    return `${lead}Kiosk software ${shortVersion(k.agentVersion)} · update needs a newer OS`;
   }
   if (tone === "err") {
-    return `Kiosk software ${shortVersion(k.agentVersion)} · last update failed, kept this version`;
+    return `${lead}Kiosk software ${shortVersion(k.agentVersion)} · last update failed, kept this version`;
   }
-  if (availableVersion.value == null) return `Kiosk software ${shortVersion(k.agentVersion)}`;
+  if (availableVersion.value == null) {
+    return `${lead}Kiosk software ${shortVersion(k.agentVersion)}`;
+  }
   if (!isVersionBehind(k, availableVersion.value)) {
-    return `Kiosk software ${shortVersion(k.agentVersion)} · up to date`;
+    return `${lead}Kiosk software ${shortVersion(k.agentVersion)} · up to date`;
   }
-  return `Kiosk software ${shortVersion(k.agentVersion)} · ${shortVersion(availableVersion.value)} available`;
+  return `${lead}Kiosk software ${shortVersion(k.agentVersion)} · ${shortVersion(availableVersion.value)} available`;
 }
 async function checkManifest() {
   manifestChecking.value = true;

@@ -44,6 +44,7 @@ const kiosk = (over = {}) => ({
   agentUpdateMessage: null,
   agentUpdateRequested: false,
   overrides: {},
+  displayStack: "cog",
   ...over,
 });
 
@@ -213,7 +214,7 @@ describe("ScreensSettings — screen card software line", () => {
     const { wrapper } = mountWith({ kiosks: [kiosk({ agentVersion: AVAILABLE })] });
     await flushPromises();
     expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe(
-      "Kiosk software e4f5a6b · up to date"
+      "cog · Kiosk software e4f5a6b · up to date"
     );
   });
 
@@ -221,14 +222,16 @@ describe("ScreensSettings — screen card software line", () => {
     const { wrapper } = mountWith({ kiosks: [kiosk()] });
     await flushPromises();
     expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe(
-      "Kiosk software a1b2c3d · e4f5a6b available"
+      "cog · Kiosk software a1b2c3d · e4f5a6b available"
     );
   });
 
   it("shows Updating to the available version while requested", async () => {
     const { wrapper } = mountWith({ kiosks: [kiosk({ agentUpdateRequested: true })] });
     await flushPromises();
-    expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe("Updating to e4f5a6b…");
+    expect(wrapper.find('[data-test="kiosk-version-line"]').text()).toBe(
+      "cog · Updating to e4f5a6b…"
+    );
   });
 
   it("marks a python-too-old failure as needing a newer OS", async () => {
@@ -242,7 +245,7 @@ describe("ScreensSettings — screen card software line", () => {
     });
     await flushPromises();
     const line = wrapper.find('[data-test="kiosk-version-line"]');
-    expect(line.text()).toBe("Kiosk software a1b2c3d · update needs a newer OS");
+    expect(line.text()).toBe("cog · Kiosk software a1b2c3d · update needs a newer OS");
     expect(line.classes()).toContain("inline-note--warn");
   });
 
@@ -257,7 +260,9 @@ describe("ScreensSettings — screen card software line", () => {
     });
     await flushPromises();
     const line = wrapper.find('[data-test="kiosk-version-line"]');
-    expect(line.text()).toBe("Kiosk software a1b2c3d · last update failed, kept this version");
+    expect(line.text()).toBe(
+      "cog · Kiosk software a1b2c3d · last update failed, kept this version"
+    );
     expect(line.classes()).toContain("inline-note--err");
   });
 
