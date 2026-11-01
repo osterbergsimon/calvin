@@ -56,6 +56,10 @@ const HEIGHT_RATIO = 0.45;
 // events (and the real control's click) time to finish first.
 const OUTSIDE_HIDE_DELAY_MS = 120;
 const TAP_SLOP_PX = 10;
+// A tap's compatibility click can arrive well after touchend on WebKit with a
+// tap delay (cog/WPE). Keep the gesture origin long enough for it; a new
+// gesture overwrites the origin at once.
+const GESTURE_RESET_DELAY_MS = 350;
 const SHIFT_LOCK_WINDOW_MS = 400;
 const SHIFT_UPPER = { ß: "ẞ" };
 const CASE_CHARS = "abcdefghijklmnopqrstuvwxyzåäöæøéèüñßáàâêëíïóôúçõœã";
@@ -304,7 +308,7 @@ export function useOnScreenKeyboard() {
   // Pointers that are down right now. Hiding on pointerdown can move the
   // Keyboard button under the finger, so the compatibility touchstart of the
   // same tap may land on the button: it continues the gesture that hid, not a
-  // new one.
+  // new one. stop() clears it, so a restart starts clean.
   const activePointers = new Set();
 
   const mode = () => screenSetting.value.value || "auto";
@@ -618,16 +622,23 @@ export function useOnScreenKeyboard() {
     }
   };
 
+  const resetGesture = () => {
+    cancelGestureReset();
+    gestureTarget = null;
+    touchGesture = false;
+  };
+
   // A drag or scroll never produces a click, so the gesture that started it
   // must not survive to judge a later click that has no pointerdown of its own.
-  // Wait a task so the compatibility click of a real tap still sees its origin.
+  // Wait long enough for the compatibility click of a real tap (WebKit adds a
+  // tap delay) before dropping the origin.
   const resetGestureSoon = () => {
     cancelGestureReset();
     gestureResetTimer = setTimeout(() => {
       gestureResetTimer = null;
       gestureTarget = null;
       touchGesture = false;
-    }, 0);
+    }, GESTURE_RESET_DELAY_MS);
   };
 
   /**
@@ -658,9 +669,9 @@ export function useOnScreenKeyboard() {
    */
   const onDocumentClick = event => {
     const startedOn = gestureTarget;
-    // Reset after the click has reached the target and the Keyboard button, so
-    // both can still see which gesture it belongs to.
-    resetGestureSoon();
+    // This click consumed the gesture; clear it before later handlers can see
+    // a stale origin. A delayed compatibility click arrives before this runs.
+    resetGesture();
     if (!visible.value) return;
     if (!isOutsideTap(isElement(event.target), startedOn)) return;
     const current = target.value;
@@ -689,7 +700,9 @@ export function useOnScreenKeyboard() {
     // the touch started on; a real mouse pointer is a new gesture.
     if (event.pointerType === "mouse" || !touchGesture) {
       cancelGestureReset();
-      if (isNewPointer) gestureSerial += 1;
+      // A mouse press is always a new gesture: its pointerup may have been
+      // lost outside the window, leaving a stale id in the set.
+      if (event.pointerType === "mouse" || isNewPointer) gestureSerial += 1;
       gestureTarget = isElement(event.target);
     }
     if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
@@ -749,6 +762,12 @@ export function useOnScreenKeyboard() {
     touchStart = null;
     cancelOutsideHide();
     resetGestureSoon();
+  };
+
+  // A pointer released outside the window never sends pointerup here; drop the
+  // stale ids so the next press counts as a new gesture.
+  const onWindowBlur = () => {
+    activePointers.clear();
   };
 
   const scheduleHideCheck = () => {
@@ -881,6 +900,9 @@ export function useOnScreenKeyboard() {
   };
 
   const onKeyDown = event => {
+    // A key activation of the ⌨ Keyboard button (Enter/Space) is a new intent
+    // even though no pointer gesture preceded it.
+    dismissedGesture = null;
     if (event.key === "Escape") {
       if (visible.value) hide();
       return;
@@ -922,6 +944,7 @@ export function useOnScreenKeyboard() {
     document.addEventListener("touchcancel", onTouchCancel, { capture: true, passive: true });
     document.addEventListener("keydown", onKeyDown);
     window.addEventListener("resize", onResize);
+    window.addEventListener("blur", onWindowBlur);
     if (route) {
       stopRouteWatch = watch(
         () => route.fullPath,
@@ -950,6 +973,7 @@ export function useOnScreenKeyboard() {
     document.removeEventListener("touchcancel", onTouchCancel, true);
     document.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("resize", onResize);
+    window.removeEventListener("blur", onWindowBlur);
     if (hideFrame !== null) {
       cancelRaf(hideFrame);
       hideFrame = null;

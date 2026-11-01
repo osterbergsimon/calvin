@@ -81,6 +81,17 @@ const touchTap = (element, from = { clientX: 10, clientY: 10 }, to = from) => {
 
 const waitForOutsideHide = () => new Promise(resolve => setTimeout(resolve, 160));
 
+// Longer than the gesture origin lives (350 ms). A compatibility click can
+// arrive after that on WebKit with a tap delay, so only drags/scrolls need it.
+const waitForGestureReset = () => new Promise(resolve => setTimeout(resolve, 380));
+
+const dispatchPointer = (element, type, { pointerType, pointerId }) => {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, "pointerType", { value: pointerType });
+  Object.defineProperty(event, "pointerId", { value: pointerId });
+  element.dispatchEvent(event);
+};
+
 const setNavigatorLanguage = tag =>
   Object.defineProperty(navigator, "language", { configurable: true, value: tag });
 
@@ -344,6 +355,84 @@ describe("OnScreenKeyboard", () => {
       expect(isShown()).toBe(false);
     });
 
+    it("keeps the keyboard when the compatibility click arrives late after a tap", async () => {
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      // WebKit's tap delay (cog/WPE) can hold the compatibility click back;
+      // by then the card has moved under the finger. The tap started on the
+      // field, so the late click must not count as an outside tap.
+      touchTap(input);
+      await new Promise(resolve => setTimeout(resolve, 60));
+
+      const moved = addContainer({ "data-test": "moved-under-finger" });
+      moved.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+
+      expect(isShown()).toBe(true);
+    });
+
+    it("counts a mouse press as a new gesture even if its pointer id is stale", async () => {
+      setTouchPoints(5);
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+
+      // A mouse released outside the window never sends pointerup.
+      dispatchPointer(document.body, "pointerdown", { pointerType: "mouse", pointerId: 1 });
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      // The next mouse press reuses the id but is still a new gesture, so the
+      // ⌨ Keyboard button opens at once.
+      dispatchPointer(document.body, "pointerdown", { pointerType: "mouse", pointerId: 1 });
+      const button = document.querySelector(".osk-open");
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("forgets stale pointers when the window loses focus", async () => {
+      setTouchPoints(5);
+      mountOsk();
+      const input = addInput();
+      await focus(input);
+
+      dispatchPointer(document.body, "pointerdown", { pointerType: "pen", pointerId: 5 });
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      window.dispatchEvent(new Event("blur"));
+      dispatchPointer(document.body, "pointerdown", { pointerType: "pen", pointerId: 5 });
+      const button = document.querySelector(".osk-open");
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(isShown()).toBe(true);
+      expect(vmValue("target")).toBe(input);
+    });
+
+    it("lets Enter or Space on the Keyboard button work after a pointer Hide", async () => {
+      setTouchPoints(5);
+      mountOsk();
+      await focus(addInput());
+      await key("{hide}");
+      expect(isShown()).toBe(false);
+
+      // A keyboard activation of the button has no pointer gesture to bump the
+      // serial; the keydown itself clears the dismissal guard.
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      const button = document.querySelector(".osk-open");
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await nextTick();
+
+      expect(isShown()).toBe(true);
+    });
+
     it("reopens a dismissed field after it actually loses focus and is refocused", async () => {
       mountOsk();
       const input = addInput();
@@ -367,7 +456,7 @@ describe("OnScreenKeyboard", () => {
 
       // A drag that starts on the field and ends elsewhere produces no click.
       touchTap(input, { clientX: 10, clientY: 10 }, { clientX: 10, clientY: 200 });
-      await waitForFrame();
+      await waitForGestureReset();
       expect(isShown()).toBe(true);
 
       const outside = addContainer({ "data-test": "after-drag" });
