@@ -1,0 +1,12 @@
+# Historic findings of the calvin-owner-identifier rule: personal hostnames that
+# were scrubbed from the tree but remain in public history (not rewritten).
+# Surfaced when a scan range spans old history (e.g. the develop -> main
+# promotion). New findings must still be fixed, not added here.
+342ccb878c46d03302fb21c075e0c0f6d3b49c8a:docs/research/2026-10-29-kiosk-cog.md:calvin-owner-identifier:432
+342ccb878c46d03302fb21c075e0c0f6d3b49c8a:docs/research/2026-10-29-kiosk-cog.md:calvin-owner-identifier:455
+342ccb878c46d03302fb21c075e0c0f6d3b49c8a:docs/research/2026-10-29-kiosk-cog.md:calvin-owner-identifier:480
+342ccb878c46d03302fb21c075e0c0f6d3b49c8a:docs/research/2026-10-29-kiosk-cog.md:calvin-owner-identifier:508
+34be362bcebcc589a3614c30dd713b26f4a1fda0:docs/superpowers/specs/2026-07-10-calvin-display-agent-design.md:calvin-owner-identifier:137
+7e2a935fa7cbc56550cf3d96333e5611898e2679:.beads/issues.jsonl:calvin-owner-identifier:16
+cedfeaf1f0ca2ee4f435bc2274ee8e0502e6770e:docs/superpowers/plans/2026-07-11-calvin-display-agent.md:calvin-owner-identifier:768
+cedfeaf1f0ca2ee4f435bc2274ee8e0502e6770e:docs/superpowers/plans/2026-07-11-calvin-display-agent.md:calvin-owner-identifier:785
