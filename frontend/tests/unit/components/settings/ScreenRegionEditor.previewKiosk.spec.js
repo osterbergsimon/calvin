@@ -62,6 +62,10 @@ const selectPreview = async (w, id) => {
 
 const badge = w => w.find('[data-test="orientation-badge"]').text();
 const device = w => w.find(".sre-device");
+const deviceBox = w => {
+  const style = device(w).element.style;
+  return { width: parseFloat(style.width), height: parseFloat(style.height) };
+};
 
 describe("ScreenRegionEditor preview on a screen", () => {
   beforeEach(() => sessionStorage.clear());
@@ -136,6 +140,42 @@ describe("ScreenRegionEditor preview on a screen", () => {
     expect(device(w).attributes("style")).toContain("width: 315px");
     expect(device(w).attributes("style")).toContain("height: 560px");
     expect(badge(w)).toBe("Portrait · 1080×1920");
+  });
+
+  it("previews a portrait kiosk as portrait when it reports a landscape viewport", async () => {
+    const { w } = await mountEditor({
+      kiosks: [
+        {
+          id: "hall",
+          hostname: "pi-hall",
+          overrides: { orientation: "portrait" },
+          viewport: { w: 1920, h: 1080 },
+        },
+      ],
+    });
+    await selectPreview(w, "hall");
+    const { width, height } = deviceBox(w);
+    expect(device(w).classes()).toContain("portrait");
+    expect(height).toBeGreaterThan(width);
+    expect(badge(w)).toBe("Portrait · 1920×1080");
+  });
+
+  it("previews a landscape kiosk as landscape when it reports a portrait viewport", async () => {
+    const { w } = await mountEditor({
+      kiosks: [
+        {
+          id: "hall",
+          hostname: "pi-hall",
+          overrides: { orientation: "landscape" },
+          viewport: { w: 1080, h: 1920 },
+        },
+      ],
+    });
+    await selectPreview(w, "hall");
+    const { width, height } = deviceBox(w);
+    expect(device(w).classes()).toContain("landscape");
+    expect(width).toBeGreaterThan(height);
+    expect(badge(w)).toBe("Landscape · 1080×1920");
   });
 
   it("falls back to 16:9 / 9:16 without a viewport report", async () => {
