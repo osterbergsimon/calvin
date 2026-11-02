@@ -869,6 +869,10 @@ export interface paths {
      * Get Image File
      * @description Get image file by ID from plugin service.
      *
+     *     With ``?w=``, serve a width-bucketed, disk-cached display variant (never
+     *     upscaled) so kiosks don't download full originals. Without it, the original
+     *     file is returned unchanged for downloads and the Local photos browser.
+     *
      *     For remote images, downloads and serves via the local cache (avoids rate limits,
      *     enables stale-on-error). For local images, serves the file directly.
      *
@@ -4096,7 +4100,10 @@ export interface operations {
   };
   get_image_file_api_images__image_id__get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Optional display width; rounded up to 640/960/1280/1920/2560. */
+        w?: number | null;
+      };
       header?: never;
       path: {
         image_id: string;

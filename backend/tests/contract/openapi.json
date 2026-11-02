@@ -3280,7 +3280,7 @@
         ]
       },
       "get": {
-        "description": "Get image file by ID from plugin service.\n\nFor remote images, downloads and serves via the local cache (avoids rate limits,\nenables stale-on-error). For local images, serves the file directly.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Image file response",
+        "description": "Get image file by ID from plugin service.\n\nWith ``?w=``, serve a width-bucketed, disk-cached display variant (never\nupscaled) so kiosks don't download full originals. Without it, the original\nfile is returned unchanged for downloads and the Local photos browser.\n\nFor remote images, downloads and serves via the local cache (avoids rate limits,\nenables stale-on-error). For local images, serves the file directly.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Image file response",
         "operationId": "get_image_file_api_images__image_id__get",
         "parameters": [
           {
@@ -3290,6 +3290,24 @@
             "schema": {
               "title": "Image Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Optional display width; rounded up to 640/960/1280/1920/2560.",
+            "in": "query",
+            "name": "w",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional display width; rounded up to 640/960/1280/1920/2560.",
+              "title": "W"
             }
           }
         ],
