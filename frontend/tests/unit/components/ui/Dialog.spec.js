@@ -164,7 +164,6 @@ describe("Dialog", () => {
       {
         title: "Pages & regions",
         size: "full",
-        scrimBlur: true,
         closeLabel: "Close editor",
       },
       { subtitle: "Design the pages your screens display" }
@@ -177,7 +176,8 @@ describe("Dialog", () => {
     expect(panel.classes()).not.toContain("dialog--bleed");
     expect(w.find(".dialog__subtitle").text()).toBe("Design the pages your screens display");
     expect(w.find("[aria-label='Close editor']").exists()).toBe(true);
-    expect(w.findComponent(DialogScrim).props("blur")).toBe(true);
+    // The scrim never blurs the dashboard behind a sheet (kiosk GPU).
+    expect(w.findComponent(DialogScrim).props("blur")).toBeUndefined();
     expect(STYLE).toContain(".dialog--full");
     expect(STYLE).toMatch(/height:\s*min\(820px, 100%\)/);
   });

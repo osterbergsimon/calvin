@@ -201,7 +201,8 @@ onUnmounted(() => {
   border-radius: var(--radius-sm);
   font-size: var(--fs-base);
   cursor: pointer;
-  transition: all var(--dur);
+  /* Hover feedback is a colour swap, not an animated filter (kiosk GPU). */
+  transition: background var(--dur);
 }
 
 .btn-open-new {
@@ -212,7 +213,7 @@ onUnmounted(() => {
 }
 
 .btn-open-new:hover {
-  filter: brightness(1.08);
+  background: color-mix(in srgb, var(--focus) 92%, var(--ink));
 }
 
 .btn-retry {
