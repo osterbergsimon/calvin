@@ -192,6 +192,20 @@ describe("DefaultScreenSettings", () => {
       ]);
     });
 
+    it("keeps both descriptions at the normal SettingRow size, not meta notes", () => {
+      const wrapper = mountSettings();
+      for (const label of ["Keyboard layout", "Also switch to"]) {
+        const row = wrapper
+          .findAllComponents({ name: "SettingRow" })
+          .find(candidate => candidate.props("label") === label);
+        const description = row.find(".setting-row__desc");
+        expect(description.exists(), `${label} has no description`).toBe(true);
+        expect(description.find(".inline-note").exists(), `${label} uses an InlineNote`).toBe(
+          false
+        );
+      }
+    });
+
     it("shows the browser's suggested layout, marked (suggested), while none is picked", () => {
       Object.defineProperty(navigator, "language", { configurable: true, value: "sv-SE" });
       const wrapper = mountSettings({ oskLayout: null });
