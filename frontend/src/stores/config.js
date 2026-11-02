@@ -14,6 +14,7 @@ import {
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
+import { useActiveRegionStore } from "./activeRegion";
 import { migrateDisplaySettings } from "../utils/displaySettingsMigration";
 import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
 import {
@@ -145,6 +146,9 @@ export const useConfigStore = defineStore("config", () => {
   // the persisted values (e.g. showUI true->false) and would otherwise look
   // like user-driven changes. See NotificationSystem's mode HUD (calvin-2ck).
   const hydrated = ref(false);
+  const activeRegionStore = useActiveRegionStore();
+
+  const syncActiveRegions = () => activeRegionStore.syncScreens(dashboardScreens.value?.screens);
 
   const configRefs = {
     orientation,
@@ -365,6 +369,7 @@ export const useConfigStore = defineStore("config", () => {
       const applied = applyFetched(response.data);
       if (applied) {
         await migrateDisplaySettingsOnce(response.data);
+        syncActiveRegions();
         setCachedData(cacheKey, response.data);
       }
       loadedFromServer = true;
@@ -376,7 +381,10 @@ export const useConfigStore = defineStore("config", () => {
         if (cached) {
           logInfo("[ConfigStore]", "Backend unreachable, using cached config");
           const applied = applyFetched(cached);
-          if (applied) await migrateDisplaySettingsOnce(cached);
+          if (applied) {
+            await migrateDisplaySettingsOnce(cached);
+            syncActiveRegions();
+          }
           stale.value = true;
           return cached;
         }
@@ -403,6 +411,7 @@ export const useConfigStore = defineStore("config", () => {
       applyConfigPayload(config, configRefs);
       const responseData = response.data || {};
       applyConfigPayload(responseData, configRefs);
+      syncActiveRegions();
       lastAppliedPayloadSignature = payloadSignature(responseData);
       return response.data;
     } catch (err) {
@@ -573,6 +582,7 @@ export const useConfigStore = defineStore("config", () => {
 
   const setDashboardScreens = screens => {
     dashboardScreens.value = normalizeDashboardScreens(screens);
+    syncActiveRegions();
   };
 
   const activateDashboardScreen = async screenId => {
