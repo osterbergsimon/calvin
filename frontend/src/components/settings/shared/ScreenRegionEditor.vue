@@ -455,7 +455,12 @@ import {
   addSubRegionAtPath,
 } from "@/utils/layout";
 import { effectiveAvailablePages } from "@/utils/availablePages";
-import { addPagePlan, pageDeletePlan, pageTogglePlan } from "@/utils/sharedPages";
+import {
+  addPagePlan,
+  pageDeletePlan,
+  pageTogglePlan,
+  removePageFromOverrides,
+} from "@/utils/sharedPages";
 import { joinNames } from "@/utils/screenOverrides";
 
 const props = defineProps({
@@ -639,14 +644,18 @@ const scopeLabel = computed(() =>
   scopeIsDefault.value ? "browsers & new screens" : previewScreenName.value
 );
 const pageList = computed(() => screens.value.screens);
+const catalogPageIds = computed(() => pageList.value.map(page => page.id));
 const defaultPageIds = computed(() =>
   effectiveAvailablePages(null, configValue.value, pageList.value)
 );
-const scopePageIds = computed(() =>
-  scopeIsDefault.value
+const scopePageIds = computed(() => {
+  const ids = scopeIsDefault.value
     ? defaultPageIds.value
-    : effectiveAvailablePages(previewOverrides.value, configValue.value, pageList.value)
-);
+    : effectiveAvailablePages(previewOverrides.value, configValue.value, pageList.value);
+  // Ignore ghost ids left by an older delete: only real catalog pages count
+  // when deciding whether this is the last page a target can hide.
+  return ids.filter(id => catalogPageIds.value.includes(id));
+});
 const hideLabel = computed(() => {
   if (!scopePageIds.value.includes(activeScreenId.value)) return "";
   if (scopePageIds.value.length < 2) return "";
@@ -1113,7 +1122,9 @@ const addPageFromScope = async screen => {
   }
   try {
     await applyConfigPatch(patch);
-  } catch {
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to save the new page:", err);
+    shownOnError.value = "Couldn't create the page. Try again.";
     return;
   }
   await saveScopePage(screen.id, pagesBefore);
@@ -1150,7 +1161,9 @@ const duplicateScreen = async () => {
   }
   try {
     await applyConfigPatch(patch);
-  } catch {
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to save the duplicated page:", err);
+    shownOnError.value = "Couldn't create the page. Try again.";
     return;
   }
   await saveScopePage(copy.id, pagesBefore);
@@ -1160,9 +1173,7 @@ const deleteConfirm = ref(null);
 const deletePage = async pageId => {
   const plan = pageDeletePlan({
     pageId,
-    pages: screens.value.screens,
     defaultList: configValue.value.availableScreens,
-    screens: kiosksStore.kiosks,
   });
   const next = JSON.parse(JSON.stringify(screens.value));
   const idx = next.screens.findIndex(screen => screen.id === pageId);
@@ -1185,16 +1196,23 @@ const deletePage = async pageId => {
   } catch {
     return;
   }
-  for (const screen of plan.screens) {
-    if (!screen.changed) continue;
+  const failures = [];
+  for (const kiosk of kiosksStore.kiosks) {
     try {
-      await kiosksStore.saveOverrides(screen.id, screen.overrides);
-      kiosksStore.setKioskOverrides(screen.id, screen.overrides);
+      // Read the layer from the server, not the cached list: an offline screen
+      // may have changed since this page was loaded.
+      const fresh = await kiosksStore.fetchOverrides(kiosk.id);
+      const cleaned = removePageFromOverrides(fresh, pageId);
+      if (!cleaned.changed) continue;
+      await kiosksStore.saveOverrides(kiosk.id, cleaned.overrides);
+      kiosksStore.setKioskOverrides(kiosk.id, cleaned.overrides);
     } catch (err) {
       logError("[ScreenRegionEditor]", "Failed to clean up a screen's page list:", err);
-      const kiosk = kiosksStore.kiosks.find(item => item.id === screen.id);
-      shownOnError.value = `Couldn't update ${screenLabel(kiosk)}. Try again.`;
+      failures.push(screenLabel(kiosk));
     }
+  }
+  if (failures.length) {
+    shownOnError.value = `Couldn't update ${joinNames(failures)}. Try again.`;
   }
 };
 
@@ -1224,10 +1242,33 @@ const requestDeleteActiveScreen = () => {
     : also;
   deleteConfirm.value = {
     pageId,
-    title: `Delete “${page.name}” everywhere?`,
+    title: `Delete "${page.name}" everywhere?`,
     message,
     alternativeText: hideLabel.value,
   };
+};
+
+// A screen that follows Default now hides the page too, so its own start page
+// must stop pointing at it. Re-read each layer first: the cached list can be
+// stale, and the override is replaced wholesale on save.
+const clearFollowingStartPage = async pageId => {
+  const failures = [];
+  for (const kiosk of kiosksStore.kiosks) {
+    try {
+      const fresh = await kiosksStore.fetchOverrides(kiosk.id);
+      const followsDefault = fresh.availableScreens == null;
+      if (!followsDefault || fresh.defaultScreenId !== pageId) continue;
+      const cleaned = removePageFromOverrides(fresh, pageId);
+      await kiosksStore.saveOverrides(kiosk.id, cleaned.overrides);
+      kiosksStore.setKioskOverrides(kiosk.id, cleaned.overrides);
+    } catch (err) {
+      logError("[ScreenRegionEditor]", "Failed to clear a screen's start page:", err);
+      failures.push(screenLabel(kiosk));
+    }
+  }
+  if (failures.length) {
+    shownOnError.value = `Couldn't update ${joinNames(failures)}. Try again.`;
+  }
 };
 
 const hideActivePage = async () => {
@@ -1253,7 +1294,9 @@ const hideActivePage = async () => {
       await applyConfigPatch(patch);
     } catch {
       /* the host shows the save error */
+      return;
     }
+    await clearFollowingStartPage(pageId);
     return;
   }
   try {
@@ -1299,7 +1342,9 @@ const toggleShownOn = async (targetId, checked) => {
       await applyConfigPatch(patch);
     } catch {
       /* the host shows the save error */
+      return;
     }
+    if (!checked) await clearFollowingStartPage(pageId);
     return;
   }
   const kiosk = kiosksStore.kiosks.find(item => item.id === targetId);
