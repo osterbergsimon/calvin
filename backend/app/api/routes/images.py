@@ -1,21 +1,48 @@
 """Image endpoints."""
 
-import logging
 from pathlib import Path
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse
+from loguru import logger
 
 from app.services import plugin_image_service
 from app.utils.errors import ErrorResponse
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter()
+
+SUPPORTED_UPLOAD_FORMATS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10MB
+
+
+def validate_upload(filename: str, size: int) -> None:
+    """Raise a 400 unless ``filename`` has a supported extension and ``size`` fits.
+
+    Shared by ``POST /images/upload`` and the MCP ``upload_photo`` tool so both
+    enforce the same limits.
+    """
+    if Path(filename).suffix.lower() not in SUPPORTED_UPLOAD_FORMATS:
+        raise ErrorResponse.validation_error(
+            "file",
+            f"Unsupported file format. Supported formats: {', '.join(SUPPORTED_UPLOAD_FORMATS)}",
+        )
+    if size > MAX_UPLOAD_BYTES:
+        raise ErrorResponse.validation_error(
+            "file", f"File too large. Maximum size is {MAX_UPLOAD_BYTES / (1024 * 1024):.0f}MB"
+        )
+
+
+def _parse_source_ids(source_ids: str | None) -> list[str] | None:
+    if not source_ids:
+        return None
+    parsed = [source_id.strip() for source_id in source_ids.split(",") if source_id.strip()]
+    return parsed or None
 
 
 @router.get("/images/list")
-async def list_images():
+async def list_images(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Get list of all images from all enabled image plugins.
 
@@ -33,14 +60,18 @@ async def list_images():
 
     # Use plugin service to aggregate images from all plugins
     logger.debug("Calling plugin_image_service.get_images()...")
-    images = await plugin_image_service.get_images(randomize=randomize)
+    images = await plugin_image_service.get_images(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     logger.debug(f"plugin_image_service.get_images() returned {len(images)} images")
 
     return {"images": images, "total": len(images)}
 
 
 @router.get("/images/current")
-async def get_current_image():
+async def get_current_image(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Get current image metadata from plugin service.
 
@@ -53,7 +84,9 @@ async def get_current_image():
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
-    image = await plugin_image_service.get_current_image(randomize=randomize)
+    image = await plugin_image_service.get_current_image(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     if not image:
         return {"image": None, "message": "No images available"}
 
@@ -208,11 +241,17 @@ async def get_image_thumbnail(image_id: str):
             },
         )
     except Exception as e:
-        raise ErrorResponse.internal_error("Failed to generate thumbnail", e)
+        raise ErrorResponse.internal_error(
+            "Could not generate the image thumbnail. Check the server logs for details.",
+            e,
+            code="thumbnail_failed",
+        )
 
 
 @router.post("/images/next")
-async def next_image():
+async def next_image(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Move to next image and return it from plugin service.
 
@@ -225,7 +264,9 @@ async def next_image():
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
-    image = await plugin_image_service.next_image(randomize=randomize)
+    image = await plugin_image_service.next_image(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     if not image:
         return {"image": None, "message": "No images available"}
 
@@ -233,7 +274,9 @@ async def next_image():
 
 
 @router.post("/images/previous")
-async def previous_image():
+async def previous_image(
+    source_ids: str | None = Query(None, description="Comma-separated source IDs"),
+):
     """
     Move to previous image and return it from plugin service.
 
@@ -246,7 +289,9 @@ async def previous_image():
     randomize_value = await config_service.get_value("randomize_images")
     randomize = randomize_value == "true" if randomize_value else False
 
-    image = await plugin_image_service.previous_image(randomize=randomize)
+    image = await plugin_image_service.previous_image(
+        randomize=randomize, source_ids=_parse_source_ids(source_ids)
+    )
     if not image:
         return {"image": None, "message": "No images available"}
 
@@ -292,27 +337,16 @@ async def upload_image(file: UploadFile = File(...)):
     Returns:
         Uploaded image metadata
     """
-    # Validate file extension
-    file_ext = Path(file.filename).suffix.lower()
-    supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
-    if file_ext not in supported_formats:
-        raise ErrorResponse.validation_error(
-            "file",
-            f"Unsupported file format. Supported formats: {', '.join(supported_formats)}",
-        )
-
-    # Validate file size (max 10MB)
-    max_size = 10 * 1024 * 1024  # 10MB
     file_content = await file.read()
-    if len(file_content) > max_size:
-        raise ErrorResponse.validation_error(
-            "file", f"File too large. Maximum size is {max_size / (1024 * 1024):.0f}MB"
-        )
+    validate_upload(file.filename, len(file_content))
 
     # Upload to plugin service (will try first plugin that supports upload)
     uploaded_image = await plugin_image_service.upload_image(file_content, file.filename)
     if not uploaded_image:
-        raise ErrorResponse.internal_error("Failed to upload image: No plugin supports upload")
+        raise ErrorResponse.internal_error(
+            "Could not upload the image: no image plugin supports uploads.",
+            code="image_upload_unsupported",
+        )
 
     return {
         "message": "Image uploaded successfully",

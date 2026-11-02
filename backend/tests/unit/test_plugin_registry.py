@@ -1,9 +1,13 @@
 """Tests for plugin registry."""
 
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.plugins.base import PluginType
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import BackendPlugin
 from app.plugins.registry import PluginRegistry
 
 
@@ -33,17 +37,14 @@ class TestPluginRegistry:
     ):
         """Test loading plugins from database."""
         # Mock plugin types
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-                "description": "A test plugin",
-                "version": "1.0.0",
-                "common_config_schema": {},
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+                description="A test plugin",
+                version="1.0.0",
+            )
         ]
 
         # Mock plugin instances - return None so no instances are created
@@ -97,14 +98,12 @@ class TestPluginRegistry:
         )
 
         # Mock plugin types
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+            )
         ]
 
         await plugin_registry_instance.load_plugins_from_db()
@@ -140,14 +139,12 @@ class TestPluginRegistry:
         mock_instance_manager.register = AsyncMock(return_value=None)
 
         # Mock plugin types
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+            )
         ]
 
         # Create plugin type in database first (use get_or_create to avoid UNIQUE constraint)
@@ -221,11 +218,11 @@ class TestPluginRegistry:
         mock_instance_manager.register = AsyncMock(return_value=None)
 
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "test_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "Test Plugin",
-            }
+            PluginMetadata(
+                type_id="test_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="Test Plugin",
+            )
         ]
 
         # Create plugin type in database (use get_or_create to avoid UNIQUE constraint)
@@ -350,17 +347,14 @@ class TestPluginRegistry:
         test_db,
     ):
         """Test loading new plugin types."""
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "new_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "New Plugin",
-                "description": "A new plugin",
-                "version": "1.0.0",
-                "common_config_schema": {},
-            }
+            PluginMetadata(
+                type_id="new_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="New Plugin",
+                description="A new plugin",
+                version="1.0.0",
+            )
         ]
 
         from app.plugins.registry.loader import load_plugin_types
@@ -374,6 +368,39 @@ class TestPluginRegistry:
         assert db_type is not None
         assert db_type.name == "New Plugin"
         assert db_type.enabled is False  # Default to disabled
+
+    @pytest.mark.asyncio
+    @patch("app.plugins.registry.loader.plugin_loader")
+    async def test_load_plugin_types_builtin_enabled_on_first_boot(
+        self,
+        mock_plugin_loader,
+        plugin_registry_instance,
+        test_db,
+    ):
+        """Built-in types (shipped in app.plugins) start enabled on a fresh DB (calvin-0y6)."""
+        from app.plugins.service.iframe import IframeServicePlugin as IframePlugin
+
+        mock_plugin_loader.get_plugin_types.return_value = [
+            IframePlugin.metadata.model_copy(
+                update={"plugin_class": IframePlugin, "plugin_type": PluginType.SERVICE}
+            )
+        ]
+
+        from app.models.db_models import PluginTypeDB
+        from app.plugins.registry.loader import load_plugin_types
+
+        await PluginTypeDB.objects.filter(type_id="iframe").delete()
+        await load_plugin_types()
+
+        db_type = await PluginTypeDB.objects.get(type_id="iframe")
+        assert db_type.enabled is True
+
+        # A user's later choice to disable it survives the next boot.
+        db_type.enabled = False
+        await db_type.update()
+        await load_plugin_types()
+        db_type = await PluginTypeDB.objects.get(type_id="iframe")
+        assert db_type.enabled is False
 
     @pytest.mark.asyncio
     @patch("app.plugins.registry.loader.plugin_loader")
@@ -400,17 +427,15 @@ class TestPluginRegistry:
             )
 
         # Mock updated plugin type
-        from app.plugins.base import PluginType
-
         mock_plugin_loader.get_plugin_types.return_value = [
-            {
-                "type_id": "existing_plugin",
-                "plugin_type": PluginType.SERVICE,
-                "name": "New Name",
-                "description": "Updated description",
-                "version": "2.0.0",
-                "common_config_schema": {"new_field": "value"},
-            }
+            PluginMetadata(
+                type_id="existing_plugin",
+                plugin_type=PluginType.SERVICE,
+                name="New Name",
+                description="Updated description",
+                version="2.0.0",
+                common_config_schema={"new_field": "value"},
+            )
         ]
 
         from app.plugins.registry.loader import load_plugin_types
@@ -425,3 +450,167 @@ class TestPluginRegistry:
         assert db_type.name == "New Name"
         assert db_type.description == "Updated description"
         assert db_type.version == "2.0.0"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestRegisterBackendPluginLifecycle:
+    """A newly created backend plugin must start like start_plugin() does (calvin-qq4l)."""
+
+    class DummyBackendPlugin(BackendPlugin):
+        metadata = PluginMetadata(type_id="test-backend", name="Test Backend")
+
+        def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+            super().__init__(plugin_id, name, enabled)
+            self.worker_started = False
+            self.initialize_calls = 0
+
+        async def initialize(self) -> None:
+            self.initialize_calls += 1
+
+        async def start_worker(self) -> None:
+            self.worker_started = True
+
+        async def get_schedule_config(self) -> dict[str, Any] | None:
+            return {"interval": 60, "enabled": True}
+
+    async def _register(
+        self,
+        plugin_registry_instance,
+        plugin,
+        plugin_id: str,
+        *,
+        enabled: bool = True,
+        scheduler_error: Exception | None = None,
+    ):
+        with (
+            patch("app.plugins.registry.manager.plugin_loader") as mock_loader,
+            patch("app.plugins.registry.manager.instance_manager") as mock_instance_manager,
+            patch("app.services.backend_scheduler.backend_plugin_scheduler") as mock_scheduler,
+        ):
+            mock_loader.create_plugin_instance.return_value = plugin
+            mock_instance_manager.register = AsyncMock(return_value=None)
+            mock_scheduler.register_plugin_tasks = AsyncMock(side_effect=scheduler_error)
+
+            await plugin_registry_instance.register_plugin(
+                plugin_id=plugin_id,
+                type_id="test-backend",
+                name="New Backend Instance",
+                config={},
+                enabled=enabled,
+            )
+
+        return mock_scheduler
+
+    async def test_register_backend_plugin_starts_worker_and_schedules_tasks(
+        self, plugin_registry_instance, test_db
+    ):
+        from app.models.db_models import PluginDB
+
+        plugin_id = "backend-new-instance"
+        await PluginDB.objects.delete(id=plugin_id)
+        plugin = self.DummyBackendPlugin(plugin_id=plugin_id, name="New Backend")
+
+        mock_scheduler = await self._register(plugin_registry_instance, plugin, plugin_id)
+
+        try:
+            assert plugin.worker_started is True
+            assert plugin.is_running() is True
+            mock_scheduler.register_plugin_tasks.assert_awaited_once_with(plugin)
+            stored = await PluginDB.objects.get(id=plugin_id)
+            assert stored.enabled is True
+        finally:
+            await PluginDB.objects.delete(id=plugin_id)
+
+    async def test_register_disabled_backend_plugin_does_not_start(
+        self, plugin_registry_instance, test_db
+    ):
+        from app.models.db_models import PluginDB
+
+        plugin_id = "backend-new-disabled"
+        await PluginDB.objects.delete(id=plugin_id)
+        plugin = self.DummyBackendPlugin(plugin_id=plugin_id, name="New Backend", enabled=False)
+
+        mock_scheduler = await self._register(
+            plugin_registry_instance, plugin, plugin_id, enabled=False
+        )
+
+        try:
+            assert plugin.worker_started is False
+            assert plugin.is_running() is False
+            mock_scheduler.register_plugin_tasks.assert_not_awaited()
+        finally:
+            await PluginDB.objects.delete(id=plugin_id)
+
+    async def test_register_backend_plugin_worker_error_keeps_going(
+        self, plugin_registry_instance, test_db
+    ):
+        """A worker/scheduler error must not stop registration (mirrors start_plugin)."""
+        from app.models.db_models import PluginDB
+
+        plugin_id = "backend-new-worker-error"
+        await PluginDB.objects.delete(id=plugin_id)
+        plugin = self.DummyBackendPlugin(plugin_id=plugin_id, name="New Backend")
+
+        async def failing_worker() -> None:
+            raise RuntimeError("worker boom")
+
+        plugin.start_worker = failing_worker  # type: ignore[method-assign]
+
+        mock_scheduler = await self._register(
+            plugin_registry_instance,
+            plugin,
+            plugin_id,
+            scheduler_error=RuntimeError("scheduler boom"),
+        )
+
+        try:
+            # The worker and scheduler failures were logged; the plugin still
+            # started and the row stays enabled instead of failing registration.
+            assert plugin.worker_started is False
+            assert plugin.is_running() is True
+            mock_scheduler.register_plugin_tasks.assert_awaited_once_with(plugin)
+            assert (await PluginDB.objects.get(id=plugin_id)).enabled is True
+        finally:
+            await PluginDB.objects.delete(id=plugin_id)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+class TestLoadPluginInstances:
+    """A plugin that exits during initialize() must not kill startup (audit R12)."""
+
+    async def test_sys_exit_in_initialize_marks_the_plugin_disabled(self, test_db, monkeypatch):
+        from app.models.db_models import PluginDB
+        from app.plugins.registry import loader as registry_loader
+
+        await PluginDB.objects.delete(id="exiting-instance")
+        db_plugin = await PluginDB.objects.create(
+            id="exiting-instance",
+            type_id="local",
+            plugin_type="image",
+            name="Exiting",
+            enabled=True,
+            config={},
+        )
+
+        plugin = MagicMock()
+        plugin.plugin_id = "exiting-instance"
+        plugin.enabled = True
+        plugin.configure = AsyncMock()
+        plugin.initialize = AsyncMock(side_effect=SystemExit(1))
+        plugin.start = MagicMock()
+        plugin.stop = MagicMock()
+
+        monkeypatch.setattr(
+            registry_loader.plugin_loader, "create_plugin_instance", lambda **_: plugin
+        )
+        monkeypatch.setattr(registry_loader.instance_manager, "get_plugin", lambda _id: None)
+        monkeypatch.setattr(registry_loader.instance_manager, "register", AsyncMock())
+
+        await registry_loader.load_plugin_instances()
+
+        plugin.stop.assert_called()
+        stored = await PluginDB.objects.get(id="exiting-instance")
+        assert stored.enabled is False
+        await db_plugin.delete()

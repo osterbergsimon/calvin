@@ -1,5 +1,6 @@
 """Plugin manager for registering and managing plugins."""
 
+import asyncio
 from typing import Any
 
 from loguru import logger
@@ -22,6 +23,22 @@ class PluginManager:
             PluginType.SERVICE: [],
             PluginType.BACKEND: [],
         }
+        # Serialises initialize()/start() for one instance. Concurrent dashboard
+        # polls of a boot-failed plugin must not race each other (calvin-olsx).
+        self._lifecycle_locks: dict[str, asyncio.Lock] = {}
+
+    def get_lifecycle_lock(self, plugin_id: str) -> asyncio.Lock:
+        """Return the per-instance lock guarding initialize()/start().
+
+        Keyed by instance id, so two instances never block each other and a
+        poll that waited on another poll's successful start can re-check
+        ``is_running()`` instead of initializing a second time.
+        """
+        lock = self._lifecycle_locks.get(plugin_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._lifecycle_locks[plugin_id] = lock
+        return lock
 
     async def register(self, plugin: BasePlugin) -> None:
         """
@@ -59,10 +76,9 @@ class PluginManager:
 
                     # Subscribe to events
                     event_system.subscribe(plugin.plugin_id, subscribed_events, event_handler)
-            except Exception as e:
-                logger.warning(
-                    f"Error subscribing backend plugin {plugin.plugin_id} to events: {e}",
-                    exc_info=True,
+            except Exception:
+                logger.opt(exception=True).warning(
+                    "Error subscribing backend plugin {} to events", plugin.plugin_id
                 )
 
     async def unregister(self, plugin_id: str) -> bool:
@@ -83,6 +99,7 @@ class PluginManager:
 
         plugin = self._plugins[plugin_id]
         del self._plugins[plugin_id]
+        self._lifecycle_locks.pop(plugin_id, None)
         if plugin.plugin_type in self._plugins_by_type:
             try:
                 self._plugins_by_type[plugin.plugin_type].remove(plugin)
@@ -101,10 +118,9 @@ class PluginManager:
                 else:
                     # Unsubscribe from all if no specific events
                     event_system.unsubscribe(plugin.plugin_id)
-            except Exception as e:
-                logger.warning(
-                    f"Error unsubscribing backend plugin {plugin_id} from events: {e}",
-                    exc_info=True,
+            except Exception:
+                logger.opt(exception=True).warning(
+                    "Error unsubscribing backend plugin {} from events", plugin_id
                 )
 
         return True
@@ -160,10 +176,9 @@ class PluginManager:
                         except NotImplementedError:
                             # Plugin doesn't implement start_worker, that's fine
                             pass
-                        except Exception as e:
-                            logger.warning(
-                                f"Error starting worker for backend plugin {plugin.plugin_id}: {e}",
-                                exc_info=True,
+                        except Exception:
+                            logger.opt(exception=True).warning(
+                                "Error starting worker for backend plugin {}", plugin.plugin_id
                             )
 
                     # Mark as running after successful initialization
@@ -173,13 +188,14 @@ class PluginManager:
                     if isinstance(plugin, BackendPlugin):
                         try:
                             await backend_plugin_scheduler.register_plugin_tasks(plugin)
-                        except Exception as e:
-                            logger.error(
-                                f"Error registering scheduled tasks for backend plugin "
-                                f"{plugin.plugin_id}: {e}",
-                                exc_info=True,
+                        except Exception:
+                            logger.exception(
+                                "Error registering scheduled tasks for backend plugin {}",
+                                plugin.plugin_id,
                             )
-                except Exception:
+                except (Exception, SystemExit):
+                    # SystemExit: a plugin calling sys.exit() in initialize()
+                    # must not kill the process (audit R12).
                     logger.exception("Error initializing plugin {}", plugin.plugin_id)
                     # Plugin failed to initialize, so it's not running
                     plugin.stop()
@@ -194,11 +210,10 @@ class PluginManager:
                 if isinstance(plugin, BackendPlugin):
                     try:
                         await backend_plugin_scheduler.unregister_plugin_tasks(plugin.plugin_id)
-                    except Exception as e:
-                        logger.warning(
-                            f"Error unregistering scheduled tasks for backend plugin "
-                            f"{plugin.plugin_id}: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.opt(exception=True).warning(
+                            "Error unregistering scheduled tasks for backend plugin {}",
+                            plugin.plugin_id,
                         )
 
                 # Stop plugin before cleanup
@@ -211,10 +226,9 @@ class PluginManager:
                     except NotImplementedError:
                         # Plugin doesn't implement stop_worker, that's fine
                         pass
-                    except Exception as e:
-                        logger.warning(
-                            f"Error stopping worker for backend plugin {plugin.plugin_id}: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.opt(exception=True).warning(
+                            "Error stopping worker for backend plugin {}", plugin.plugin_id
                         )
 
                 await plugin.cleanup()
@@ -248,10 +262,9 @@ class PluginManager:
                     except NotImplementedError:
                         # Plugin doesn't implement start_worker, that's fine
                         pass
-                    except Exception as e:
-                        logger.warning(
-                            f"Error starting worker for backend plugin {plugin_id}: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.opt(exception=True).warning(
+                            "Error starting worker for backend plugin {}", plugin_id
                         )
 
                 plugin.start()
@@ -260,11 +273,9 @@ class PluginManager:
                 if isinstance(plugin, BackendPlugin):
                     try:
                         await backend_plugin_scheduler.register_plugin_tasks(plugin)
-                    except Exception as e:
-                        logger.error(
-                            f"Error registering scheduled tasks for backend plugin "
-                            f"{plugin_id}: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.exception(
+                            "Error registering scheduled tasks for backend plugin {}", plugin_id
                         )
 
                     # Subscribe to events if not already subscribed
@@ -291,14 +302,13 @@ class PluginManager:
 
                                 # Subscribe to events
                                 event_system.subscribe(plugin_id, subscribed_events, event_handler)
-                    except Exception as e:
-                        logger.warning(
-                            f"Error subscribing backend plugin {plugin_id} to events: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.opt(exception=True).warning(
+                            "Error subscribing backend plugin {} to events", plugin_id
                         )
 
             return True
-        except Exception:
+        except (Exception, SystemExit):
             logger.exception("Error starting plugin {}", plugin_id)
             plugin.stop()
             return False
@@ -320,16 +330,18 @@ class PluginManager:
             return False
 
         try:
+            # Reaching here is a deliberate stop, even when the instance is
+            # already down (e.g. initialize() failed at boot): the data route
+            # must not retry it afterwards.
+            plugin.stopped_by_request = True
             if plugin.is_running():
                 # Unregister scheduled tasks if backend plugin
                 if isinstance(plugin, BackendPlugin):
                     try:
                         await backend_plugin_scheduler.unregister_plugin_tasks(plugin_id)
-                    except Exception as e:
-                        logger.warning(
-                            f"Error unregistering scheduled tasks for backend plugin "
-                            f"{plugin_id}: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.opt(exception=True).warning(
+                            "Error unregistering scheduled tasks for backend plugin {}", plugin_id
                         )
 
                 plugin.stop()
@@ -341,10 +353,9 @@ class PluginManager:
                     except NotImplementedError:
                         # Plugin doesn't implement stop_worker, that's fine
                         pass
-                    except Exception as e:
-                        logger.warning(
-                            f"Error stopping worker for backend plugin {plugin_id}: {e}",
-                            exc_info=True,
+                    except Exception:
+                        logger.opt(exception=True).warning(
+                            "Error stopping worker for backend plugin {}", plugin_id
                         )
 
                 await plugin.cleanup()

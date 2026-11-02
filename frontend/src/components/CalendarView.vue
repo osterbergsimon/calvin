@@ -1,137 +1,264 @@
 <template>
-  <div ref="calendarView" class="calendar-view" tabindex="0" @keydown="handleKeydown">
-    <div v-if="showHeader" class="calendar-header">
-      <h2>Calendar</h2>
-      <div class="calendar-controls">
-        <button class="btn-icon" @click="previousMonth" @keydown.enter="previousMonth">‹</button>
-        <div class="calendar-title-group">
-          <span class="current-month">{{ currentMonthYear }}</span>
-          <span class="view-mode-indicator">{{ viewModeLabel }}</span>
+  <div
+    ref="calendarView"
+    class="calendar-view"
+    :class="{ 'calendar-view--fullscreen': isFullscreen }"
+    tabindex="0"
+    @keydown="handleKeydown"
+  >
+    <DashboardPanel
+      title="Calendar"
+      :show-title="false"
+      :header-visible="!isFullscreen"
+      :focused="focused"
+      :dim="dim"
+    >
+      <div class="calendar-content">
+        <!-- Always-visible header: month/year label, navigation + view switch -->
+        <div ref="headerEl" class="calendar-header">
+          <div class="calendar-header__label">{{ currentMonthYear }}</div>
+          <RegionHeaderControls v-if="showControls && hasPointer" class="calendar-header__controls">
+            <Button
+              v-if="!isCurrentPeriod"
+              class="calendar-header__today"
+              variant="primary"
+              size="custom"
+              title="Jump to today"
+              aria-label="Jump to today"
+              @click="goToToday"
+            >
+              Today
+            </Button>
+            <IconButton
+              size="custom"
+              :icon="mdiChevronLeft"
+              label="Previous"
+              title="Previous"
+              @click="previousMonth"
+            />
+            <!-- The view is picked directly. A narrow region cannot fit three
+                 segments, so it gets the same choice in a SelectPill. -->
+            <SegmentedControl
+              v-if="!isNarrowHeader"
+              class="calendar-header__view-switch"
+              :model-value="viewMode"
+              :options="viewOptions"
+              :aria-label="viewSwitchLabel"
+              @update:model-value="setViewMode"
+            />
+            <SelectPill
+              v-else
+              class="calendar-header__view-switch"
+              :model-value="viewMode"
+              :options="viewOptions"
+              :aria-label="viewSwitchLabel"
+              @update:model-value="setViewMode"
+            />
+            <IconButton
+              size="custom"
+              :icon="mdiChevronRight"
+              label="Next"
+              title="Next"
+              @click="nextMonth"
+            />
+            <CalendarViewOptions v-if="view" :region-id="regionId" :view="view" />
+            <IconButton
+              v-if="!isFullscreen"
+              size="custom"
+              class="calendar-header__fullscreen"
+              :icon="mdiFullscreen"
+              label="Fullscreen calendar"
+              title="Fullscreen"
+              @click="enterFullscreen"
+            />
+          </RegionHeaderControls>
         </div>
-        <button class="btn-icon" @click="nextMonth" @keydown.enter="nextMonth">›</button>
-      </div>
-    </div>
-    <div v-else class="calendar-header-minimal">
-      <button
-        class="btn-icon-minimal"
-        title="Previous Month"
-        @click="previousMonth"
-        @keydown.enter="previousMonth"
-      >
-        ‹
-      </button>
-      <div class="calendar-title-group-minimal">
-        <span class="current-month-minimal">
-          {{ currentMonthYear }}
-        </span>
-        <span class="view-mode-indicator-minimal">
-          {{ viewModeLabel }}
-        </span>
-      </div>
-      <button
-        class="btn-icon-minimal"
-        title="Next Month"
-        @click="nextMonth"
-        @keydown.enter="nextMonth"
-      >
-        ›
-      </button>
-    </div>
-    <div class="calendar-content">
-      <!-- Loading indicator -->
-      <div v-if="loading" class="loading-overlay">
-        <div class="loading-spinner">
-          <div class="spinner" />
-          <div class="loading-text">Loading events...</div>
+
+        <!-- First run: no calendar sources yet → say so and link to the fix (F4) -->
+        <div v-if="noSources" class="calendar-empty-overlay">
+          <EmptyState
+            message="No calendars yet"
+            help="Add an iCal, Google or Proton calendar link in Settings › Content › Calendars."
+            action-label="Add a calendar"
+            setting-id="content-calendars"
+            :setup="setupEmpty"
+            :region-key="regionId || ''"
+            :phone-hint="setupEmpty ? null : false"
+          />
         </div>
-      </div>
-      <div
-        class="calendar-grid"
-        :class="{
-          'rolling-view': viewMode === 'rolling',
-          'week-view': viewMode === 'week',
-          'day-view': viewMode === 'day',
-          loading: loading,
-        }"
-      >
-        <!-- Day headers -->
-        <div class="calendar-weekdays">
-          <div
-            v-for="day in viewMode === 'day' ? [getCurrentWeekdayName()] : weekDays"
-            :key="day"
-            class="weekday"
-          >
-            {{ day }}
-          </div>
-        </div>
-        <!-- Calendar days -->
         <div
-          class="calendar-days"
+          class="calendar-grid"
           :class="{
-            'rolling-days': viewMode === 'rolling',
+            'agenda-view': isAgenda,
+            'day-view': viewMode === 'day',
+            'show-week-numbers': showWeekNumbers && !isAgenda && viewMode !== 'day',
           }"
         >
-          <div
-            v-for="(day, dayIndex) in calendarDays"
-            :key="day.date.toISOString()"
-            :class="[
-              'calendar-day',
-              {
-                'other-month': day.otherMonth,
-                today: day.isToday,
-                'week-start': isWeekStart(dayIndex),
-                weekend: isWeekend(day.date),
-                'red-day': showRedDays && isRedDay(day.date),
-              },
-            ]"
-          >
-            <div class="day-header">
-              <div class="day-number">
-                {{ day.date.getDate() }}
-              </div>
-              <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
-                {{ getWeekNumberForDay(dayIndex) }}
+          <!-- MONTH VIEW: the day-cell rows are uniform height (flex:1); each
+               week's spanning ribbons ride a compact strip that sits in the
+               seam between weeks, so events never shrink the day rows. -->
+          <template v-if="isMonthView">
+            <div class="calendar-weekdays month-weekdays">
+              <div v-if="showWeekNumbers" class="week-spine-head">wk</div>
+              <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
+                {{ header.label }}
               </div>
             </div>
-            <div class="day-events">
-              <!-- Visible events for this day (limited) -->
-              <CalendarEventItem
-                v-for="(event, eventIndex) in getVisibleEvents(day.events)"
-                :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
-                :ref="el => setEventRef(el, dayIndex, eventIndex)"
-                :event="event"
-                :day-index="dayIndex"
-                :event-index="eventIndex"
-                :day-date="day.date"
-                :is-focused="isFocused(dayIndex, eventIndex)"
-                :is-selected="isEventSelected(event, day.date)"
-                @click="selectEvent"
-                @focus="setFocusedEvent"
-              />
-              <!-- Overflow indicator -->
-              <div
-                v-if="getOverflowCount(day.events) > 0"
-                class="event-overflow-indicator"
-                :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
-              >
-                +{{ getOverflowCount(day.events) }} more
+            <div class="calendar-weeks">
+              <template v-for="wk in monthWeeks" :key="wk.weekIndex">
+                <!-- Ribbon strip: a compact band in the seam above this week -->
+                <div
+                  v-if="wk.laneCount > 0"
+                  class="mv-strip"
+                  :class="{ 'has-spine': showWeekNumbers }"
+                  :style="stripStyle(wk)"
+                >
+                  <CalendarRibbon
+                    v-for="seg in wk.ribbons"
+                    :key="seg.focusKey"
+                    :ref="el => setMonthRef(el, seg.focusKey)"
+                    :ribbon="seg"
+                    :date="seg.date"
+                    :is-focused="isMonthFocused(seg.focusKey)"
+                    :is-selected="isEventSelected(seg.event, seg.date)"
+                    @click="selectEvent"
+                    @focus="() => setMonthFocus(seg.focusKey)"
+                  />
+                </div>
+
+                <!-- Uniform-height day-cell row -->
+                <div class="week-days" :class="{ 'has-spine': showWeekNumbers }">
+                  <div
+                    v-if="showWeekNumbers"
+                    class="week-spine"
+                    :class="{ 'current-week': wk.isCurrent }"
+                    :aria-label="`Week ${wk.weekNumber}`"
+                  >
+                    <span class="week-spine-num">{{ wk.weekNumber }}</span>
+                  </div>
+                  <div
+                    v-for="day in wk.days"
+                    :key="day.date.toISOString()"
+                    class="calendar-day"
+                    :class="{
+                      'other-month': day.otherMonth,
+                      today: day.isToday,
+                      weekend: isWeekend(day.date),
+                      'red-day': showRedDays && isRedDay(day.date),
+                      'last-col': day.col === 6,
+                    }"
+                  >
+                    <div class="day-header">
+                      <div class="day-number">{{ day.date.getDate() }}</div>
+                    </div>
+                    <div class="mv-timed">
+                      <CalendarTimedEvent
+                        v-for="item in day.timed"
+                        :key="item.focusKey"
+                        :ref="el => setMonthRef(el, item.focusKey)"
+                        :event="item.ev"
+                        :date="day.date"
+                        :is-focused="isMonthFocused(item.focusKey)"
+                        :is-selected="isEventSelected(item.ev, day.date)"
+                        @click="selectEvent"
+                        @focus="() => setMonthFocus(item.focusKey)"
+                      />
+                      <div
+                        v-if="day.hiddenCount > 0"
+                        class="event-overflow-indicator"
+                        :title="`${day.hiddenCount} more event${day.hiddenCount > 1 ? 's' : ''}`"
+                      >
+                        +{{ day.hiddenCount }} more
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+
+          <!-- AGENDA (week strip) / DAY: unchanged per-day chip grid -->
+          <template v-else>
+            <div class="calendar-weekdays" :style="rollingColumnStyle">
+              <div v-for="header in weekdayHeaders" :key="header.key" class="weekday">
+                {{ header.label }}
               </div>
             </div>
-          </div>
+            <div class="calendar-days" :style="rollingColumnStyle">
+              <template v-for="(day, dayIndex) in calendarDays" :key="day.date.toISOString()">
+                <div
+                  :class="[
+                    'calendar-day',
+                    {
+                      'other-month': day.otherMonth,
+                      today: day.isToday,
+                      'week-start': isWeekStart(dayIndex),
+                      weekend: isWeekend(day.date),
+                      'red-day': showRedDays && isRedDay(day.date),
+                    },
+                  ]"
+                >
+                  <div class="day-header">
+                    <div class="day-number">
+                      {{ day.date.getDate() }}
+                    </div>
+                    <!-- Agenda/day layouts keep the inline week chip (no row to label) -->
+                    <div v-if="showWeekNumbers && isWeekStart(dayIndex)" class="week-number">
+                      {{ getWeekNumberForDay(dayIndex) }}
+                    </div>
+                  </div>
+                  <div class="day-events">
+                    <CalendarEventItem
+                      v-for="(event, eventIndex) in getVisibleEvents(day.events)"
+                      :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
+                      :ref="el => setEventRef(el, dayIndex, eventIndex)"
+                      :event="event"
+                      :day-index="dayIndex"
+                      :event-index="eventIndex"
+                      :day-date="day.date"
+                      :is-focused="isFocused(dayIndex, eventIndex)"
+                      :is-selected="isEventSelected(event, day.date)"
+                      @click="selectEvent"
+                      @focus="setFocusedEvent"
+                    />
+                    <div
+                      v-if="getOverflowCount(day.events) > 0"
+                      class="event-overflow-indicator"
+                      :title="`${getOverflowCount(day.events)} more event${getOverflowCount(day.events) > 1 ? 's' : ''}`"
+                    >
+                      +{{ getOverflowCount(day.events) }} more
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
+    </DashboardPanel>
+    <!-- Fullscreen close button (only in fullscreen mode). After the panel and on
+         --z-sticky, so it paints over the header (also --z-sticky) whether or
+         not the panel makes a stacking context of its own. -->
+    <div v-if="isFullscreen" class="fullscreen-close-overlay">
+      <IconButton
+        class="btn-close-fullscreen"
+        size="lg"
+        shape="circle"
+        data-action="exit-fullscreen"
+        :icon="mdiClose"
+        title="Close Fullscreen (ESC)"
+        label="Exit fullscreen"
+        @click.stop="handleCloseFullscreen"
+      />
     </div>
+
     <!-- Event Detail Panel -->
+    <!-- Scrim first: both sit on --z-dialog, so the panel after it paints on top. -->
+    <DialogScrim v-if="calendarStore.selectedEvent" @dismiss="closeEventDetail" />
     <EventDetailPanel
       v-if="calendarStore.selectedEvent"
       :event="calendarStore.selectedEvent"
       @close="closeEventDetail"
-    />
-    <!-- Backdrop for modal -->
-    <div
-      v-if="calendarStore.selectedEvent"
-      class="event-detail-backdrop"
-      @click="closeEventDetail"
     />
   </div>
 </template>
@@ -141,29 +268,242 @@ import { ref, computed, watch, onMounted, onUnmounted, onActivated, nextTick } f
 import { useRoute } from "vue-router";
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
+import { useModeStore } from "../stores/mode";
+import { useProgressStore } from "../stores/progress";
 import EventDetailPanel from "./EventDetailPanel.vue";
+import DialogScrim from "./ui/DialogScrim.vue";
 import CalendarEventItem from "./CalendarEventItem.vue";
+import CalendarRibbon from "./CalendarRibbon.vue";
+import CalendarTimedEvent from "./CalendarTimedEvent.vue";
+import { buildMonthWeeks } from "../composables/useMonthLayout";
+import { autoVisibleEventCount, DEFAULT_EVENT_ROW_HEIGHT } from "@/utils/calendarDensity";
+import { addMonths } from "@/utils/dateMath";
+import DashboardPanel from "./DashboardPanel.vue";
+import Button from "./ui/Button.vue";
+import IconButton from "./ui/IconButton.vue";
+import SegmentedControl from "./ui/SegmentedControl.vue";
+import SelectPill from "./ui/SelectPill.vue";
+import EmptyState from "./ui/EmptyState.vue";
+import CalendarViewOptions from "./dashboard/CalendarViewOptions.vue";
+import RegionHeaderControls from "./dashboard/RegionHeaderControls.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
+import { isPhoneWidth } from "@/styles/breakpoints.js";
+import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
+
+const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  // Header controls follow hide/show controls; the focus light follows input.
+  // null = fall back to `focused` (standalone use and older callers).
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
+  sourceIds: {
+    type: Array,
+    default: () => [],
+  },
+  isFullscreen: {
+    type: Boolean,
+    default: false,
+  },
+  // Per-region view config: { mode, rolling, weeks, days }. Owns the calendar's
+  // base granularity + rolling-window modifier (replaces the old global config).
+  view: {
+    type: Object,
+    default: null,
+  },
+  // Region id this calendar belongs to — target for view-mutating controls.
+  regionId: {
+    type: String,
+    default: null,
+  },
+});
 
 const configStore = useConfigStore();
-const showHeader = computed(() => configStore.shouldShowUI);
-const viewMode = computed(() => configStore.calendarViewMode);
-const showWeekNumbers = computed(() => configStore.showWeekNumbers);
+const { hasPointer } = useTouchCapability();
+const showControls = computed(() => props.controlsVisible ?? props.focused);
+const sourceKey = computed(() =>
+  [
+    ...new Set(
+      props.sourceIds.filter(id => typeof id === "string" && id.trim()).map(id => id.trim())
+    ),
+  ]
+    .sort()
+    .join(",")
+);
+// Base granularity + rolling modifier come from the region's `view` prop.
+const viewMode = computed(() => props.view?.mode ?? "month");
+const rolling = computed(() => props.view?.rolling === true);
+// Display settings belong to the region: no household default layer. Missing
+// weekNumbers means off; missing maxVisibleEvents means Auto (measured below).
+const showWeekNumbers = computed(() => props.view?.weekNumbers === true);
+const eventDensity = computed(() => {
+  const value = Number(props.view?.maxVisibleEvents);
+  return Number.isFinite(value) ? value : "auto";
+});
+
+// Auto: the visible row count follows the day cell's measured height and the
+// rendered chip's height (at least one row). A ResizeObserver watches a day
+// cell so the count follows the actual region shape, not a fixed guess.
+const measuredCellHeight = ref(0);
+const measuredRowHeight = ref(DEFAULT_EVENT_ROW_HEIGHT);
+let densityObserver = null;
+const autoVisibleCount = computed(() =>
+  autoVisibleEventCount(measuredCellHeight.value, measuredRowHeight.value)
+);
+const maxVisibleEvents = computed(() =>
+  eventDensity.value === "auto" ? autoVisibleCount.value : eventDensity.value
+);
 const weekStartDay = computed(() => configStore.weekStartDay ?? 1);
 const weekendDays = computed(() => configStore.weekendDays || [0, 6]);
 const showRedDays = computed(() => configStore.showRedDays || false);
+const rollingWeeks = computed(() => Math.min(12, Math.max(1, props.view?.weeks ?? 4)));
+const rollingDays = computed(() => Math.min(14, Math.max(1, props.view?.days ?? 7)));
+// Look-ahead weeks appended after a non-rolling month (0 = just the month).
+const extraWeeks = computed(() => Math.min(8, Math.max(0, props.view?.extraWeeks ?? 0)));
+// Rolling as a windowing modifier: the base view sets the unit + count, and
+// rolling only flips the anchor (period-start when off, today when on).
+//   month → `weeks` weeks (off: from the month's first week; on: from today's week)
+//   week  → `days` days    (off: from the current week's start; on: from today)
+//   day   → a single day (no count, no rolling)
+const isAgenda = computed(() => viewMode.value === "week");
+// Month is the only layout that uses the ribbon band; agenda/day keep chips.
+const isMonthView = computed(() => viewMode.value === "month");
 
-const viewModeLabel = computed(() => {
-  const labels = {
-    month: "Month",
-    week: "Week",
-    day: "Day",
-    rolling: "Rolling",
-  };
-  return labels[viewMode.value] || "Month";
+// First day cell of the rendered window (month + week views).
+const windowStart = computed(() => {
+  if (viewMode.value === "week") {
+    if (rolling.value) {
+      const d = new Date(currentDate.value);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return getWeekStart(currentDate.value);
+  }
+  const anchor = rolling.value
+    ? currentDate.value
+    : new Date(currentDate.value.getFullYear(), currentDate.value.getMonth(), 1);
+  return getWeekStart(anchor);
 });
 
+// Weeks needed to render the anchor month in full — leading days from the
+// previous month plus trailing days to complete the last week (4–6 weeks
+// depending on the month). Non-rolling month always shows all of these, so no
+// day is ever hidden by the count.
+const monthGridWeeks = computed(() => {
+  const y = currentDate.value.getFullYear();
+  const m = currentDate.value.getMonth();
+  const start = getWeekStart(new Date(y, m, 1));
+  const lastOfMonth = new Date(y, m + 1, 0);
+  const span = Math.round((lastOfMonth - start) / 86400000) + 1;
+  return Math.ceil(span / 7);
+});
+
+// Number of day cells in the window (day view is handled separately).
+//   week          → `days` cells
+//   rolling month → `weeks` cells (a pure N-week window from today's week)
+//   non-rolling month → the full month grid + `extraWeeks` look-ahead weeks
+const windowLength = computed(() => {
+  if (viewMode.value === "week") return rollingDays.value;
+  if (viewMode.value === "month" && !rolling.value) {
+    return (monthGridWeeks.value + extraWeeks.value) * 7;
+  }
+  return rollingWeeks.value * 7;
+});
+
+// The agenda strip lays out `days` columns in one row; the count is dynamic, so
+// feed it to the (!important) grid rule via a custom property.
+const rollingColumnStyle = computed(() =>
+  isAgenda.value ? { "--rolling-cols": `repeat(${rollingDays.value}, minmax(0, 1fr))` } : null
+);
+
+// The one view list: the header selector and the keyboard/cycle path share it.
+const VIEW_OPTIONS = [
+  { value: "month", label: "Month" },
+  { value: "week", label: "Week" },
+  { value: "day", label: "Day" },
+];
+const viewOptions = VIEW_OPTIONS;
+
+const viewModeLabel = computed(() => {
+  const labels = { month: "Month", week: "Week", day: "Day" };
+  const base = labels[viewMode.value] || "Month";
+  return rolling.value && viewMode.value !== "day" ? `${base} · Rolling` : base;
+});
+
+// The selector's accessible name carries the rolling modifier, which the
+// segment labels themselves do not show.
+const viewSwitchLabel = computed(() => `Calendar view, currently ${viewModeLabel.value}`);
+
 const calendarStore = useCalendarStore();
+const progressStore = useProgressStore();
+
+// Calendar fetches light this region's frame (the app frame in fullscreen, which
+// belongs to no region). The light replaces the old loading overlay (CLV-115).
+const trackLoad = (kind, work) =>
+  progressStore.track(`calendar:${kind}:${props.regionId || "fullscreen"}`, work, {
+    regionId: props.regionId || null,
+  });
+const fetchSources = () => trackLoad("sources", () => calendarStore.fetchSources());
+const modeStore = useModeStore();
 const route = useRoute();
+
+// Pick this region's base view and persist it to the region. Rolling stays out
+// of it — that is a separate windowing toggle.
+const setViewMode = mode => {
+  if (mode === viewMode.value || !VIEW_OPTIONS.some(option => option.value === mode)) return;
+  configStore.updateRegionView(props.regionId, { mode }).catch(err => {
+    console.error("Failed to update calendar view mode:", err);
+  });
+};
+
+// True when the visible window already contains today — used to hide the
+// "Today" jump button when it would be a no-op.
+const isCurrentPeriod = computed(() => {
+  const t = new Date(today.value);
+  t.setHours(0, 0, 0, 0);
+  const cd = currentDate.value;
+  if (viewMode.value === "day") {
+    return (
+      cd.getFullYear() === t.getFullYear() &&
+      cd.getMonth() === t.getMonth() &&
+      cd.getDate() === t.getDate()
+    );
+  }
+  // Month and week are both day-windows: today is "current" when it falls in
+  // the rendered [windowStart, windowStart + windowLength) span.
+  const start = new Date(windowStart.value);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(start.getDate() + windowLength.value - 1);
+  return t >= start && t <= end;
+});
+
+const goToToday = () => {
+  calendarStore.setCurrentDate(new Date());
+  focusedDayIndex.value = null;
+  focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
+};
+
+const handleCloseFullscreen = () => {
+  modeStore.exitFullscreen();
+};
+
+const enterFullscreen = () => {
+  // Carry the region's sources and view so the maximized calendar matches.
+  modeStore.enterFullscreen(modeStore.MODES.CALENDAR, {
+    sourceIds: props.sourceIds,
+    view: props.view,
+  });
+};
 
 // Reactive today date that updates periodically to refresh the calendar
 const today = ref(new Date());
@@ -181,15 +521,51 @@ const startCalendarAutoRefresh = () => {
   calendarAutoRefreshInterval = setInterval(() => loadEvents(true), ms);
 };
 
+// Refresh "today" and, on date rollover, advance currentDate if the user is
+// viewing the month that just ended. setInterval can fire late after the
+// browser/device has been asleep, so this is also called on visibilitychange.
+const refreshToday = () => {
+  const previousToday = today.value;
+  const newToday = new Date();
+  const dayChanged =
+    previousToday.getFullYear() !== newToday.getFullYear() ||
+    previousToday.getMonth() !== newToday.getMonth() ||
+    previousToday.getDate() !== newToday.getDate();
+  if (!dayChanged) return;
+  today.value = newToday;
+  const cd = currentDate.value;
+  const wasTrackingToday =
+    cd.getFullYear() === previousToday.getFullYear() && cd.getMonth() === previousToday.getMonth();
+  if (wasTrackingToday) {
+    calendarStore.setCurrentDate(newToday);
+  }
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "visible") {
+    refreshToday();
+  }
+};
+
 // Load calendar sources on mount
 onMounted(async () => {
-  await calendarStore.fetchSources();
+  measureHeaderWidth();
+  if (typeof ResizeObserver !== "undefined") {
+    headerObserver = new ResizeObserver(entries => {
+      const width = entries[0]?.contentRect?.width;
+      if (width > 0) headerWidth.value = width;
+    });
+    if (headerEl.value) headerObserver.observe(headerEl.value);
+  }
+
+  await fetchSources();
+  sourcesChecked.value = true;
 
   // Update today's date every minute to refresh the calendar
   // This ensures the "today" highlight updates automatically
-  todayRefreshInterval = setInterval(() => {
-    today.value = new Date();
-  }, 60000); // Update every minute
+  todayRefreshInterval = setInterval(refreshToday, 60000);
+
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 
   startCalendarAutoRefresh();
 });
@@ -201,6 +577,11 @@ onUnmounted(() => {
   if (calendarAutoRefreshInterval) {
     clearInterval(calendarAutoRefreshInterval);
   }
+  densityObserver?.disconnect();
+  densityObserver = null;
+  headerObserver?.disconnect();
+  headerObserver = null;
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
 });
 
 watch(calendarRefreshIntervalMinutes, () => {
@@ -208,11 +589,31 @@ watch(calendarRefreshIntervalMinutes, () => {
 });
 
 const currentDate = computed(() => calendarStore.currentDate);
-const events = computed(() => calendarStore.events);
+const events = computed(() => calendarStore.getEventsForSource(props.sourceIds));
 const loading = computed(() => calendarStore.loading);
+// Only claim "no calendars" once the sources request has answered, so the
+// overlay never flashes over a grid that is about to fill.
+const sourcesChecked = ref(false);
+const noSources = computed(
+  () => sourcesChecked.value && !loading.value && calendarStore.sources.length === 0
+);
+// Only a real "nothing configured" is setup-empty (CLV-20): an offline or
+// stale cache is its own state and must not trigger the setup prompt.
+const setupEmpty = computed(() => noSources.value && !calendarStore.error && !calendarStore.stale);
 const selectedEvent = computed(() => calendarStore.selectedEvent);
 
 const calendarView = ref(null);
+// The header decides between segments and a pill from its OWN width, not the
+// viewport: a dashboard region can be narrow on a wide desktop screen. Until
+// the first measure lands, the viewport width is the best available guess.
+const headerEl = ref(null);
+const headerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
+let headerObserver = null;
+const isNarrowHeader = computed(() => isPhoneWidth(headerWidth.value));
+const measureHeaderWidth = () => {
+  const width = headerEl.value?.clientWidth ?? 0;
+  if (width > 0) headerWidth.value = width;
+};
 const focusedDayIndex = ref(null);
 const focusedEventIndex = ref(null);
 const eventRefs = ref({});
@@ -230,32 +631,48 @@ const weekDays = computed(() => {
   return days;
 });
 
-const currentMonthYear = computed(() => {
-  if (viewMode.value === "week") {
-    // Show week range for week view
-    const startDate = getWeekStart(currentDate.value);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6);
+// Column headers for the grid. Fixed weekday names for month; a single weekday
+// for day view; per-day date labels ("Wed 2") for the week agenda strip, since
+// a variable day count breaks fixed weekday columns.
+const weekdayHeaders = computed(() => {
+  if (viewMode.value === "day") {
+    return [{ key: "day", label: getCurrentWeekdayName() }];
+  }
+  if (isAgenda.value) {
+    return calendarDays.value.map(d => ({
+      key: d.date.toISOString(),
+      label: `${weekDayNames[d.date.getDay()]} ${d.date.getDate()}`,
+    }));
+  }
+  return weekDays.value.map(name => ({ key: name, label: name }));
+});
 
-    // If same month, show: "Jan 1-7, 2024", otherwise "Dec 31 - Jan 6, 2024"
-    if (
-      startDate.getMonth() === endDate.getMonth() &&
-      startDate.getFullYear() === endDate.getFullYear()
-    ) {
-      return `${startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" })} - ${endDate.toLocaleDateString("en-US", { day: "numeric", year: "numeric" })}`;
-    } else {
-      const startMonth = startDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-      });
-      const endMonth = endDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      return `${startMonth} - ${endMonth}`;
-    }
-  } else if (viewMode.value === "day") {
+// Format an inclusive start–end date range: "Jan 1 - 7, 2024" when the range
+// stays inside one month, otherwise "Dec 31 - Jan 6, 2025".
+const formatDateRange = (startDate, endDate) => {
+  if (
+    startDate.getMonth() === endDate.getMonth() &&
+    startDate.getFullYear() === endDate.getFullYear()
+  ) {
+    // Ask for the day and year separately: an Intl pattern with day+year but no
+    // month renders as "2026 (day: 7)" under some ICU builds, which read like
+    // debug text in the header.
+    const start = startDate.toLocaleDateString("en-US", { month: "long", day: "numeric" });
+    const endDay = endDate.toLocaleDateString("en-US", { day: "numeric" });
+    const endYear = endDate.toLocaleDateString("en-US", { year: "numeric" });
+    return `${start} - ${endDay}, ${endYear}`;
+  }
+  const start = startDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const end = endDate.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  return `${start} - ${end}`;
+};
+
+const currentMonthYear = computed(() => {
+  if (viewMode.value === "day") {
     // Show full date for day view
     return currentDate.value.toLocaleDateString("en-US", {
       weekday: "long",
@@ -263,12 +680,19 @@ const currentMonthYear = computed(() => {
       day: "numeric",
       year: "numeric",
     });
-  } else {
-    return currentDate.value.toLocaleDateString("en-US", {
-      month: "long",
-      year: "numeric",
-    });
   }
+  // Non-rolling month is anchored to one calendar month, so name it plainly
+  // ("July 2026"); the leading/trailing padding days are dimmed rather than
+  // spelled out in the header.
+  if (viewMode.value === "month" && !rolling.value) {
+    return currentDate.value.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  // Rolling month and week are count-driven windows with no single "month";
+  // label them with the inclusive range they actually span.
+  const startDate = new Date(windowStart.value);
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + windowLength.value - 1);
+  return formatDateRange(startDate, endDate);
 });
 
 // Helper function to normalize a date to calendar date (year, month, day only)
@@ -414,8 +838,7 @@ const getVisibleEvents = events => {
   if (viewMode.value === "week" || viewMode.value === "day") {
     return events;
   }
-  const maxVisible = configStore.maxVisibleEvents || 4;
-  return events.slice(0, maxVisible);
+  return events.slice(0, maxVisibleEvents.value);
 };
 
 // Get count of overflow events
@@ -426,8 +849,7 @@ const getOverflowCount = events => {
   if (viewMode.value === "week" || viewMode.value === "day") {
     return 0;
   }
-  const maxVisible = configStore.maxVisibleEvents || 4;
-  return Math.max(0, events.length - maxVisible);
+  return Math.max(0, events.length - maxVisibleEvents.value);
 };
 
 // Event helper functions moved to useEventHelpers composable
@@ -469,127 +891,46 @@ const calendarDays = computed(() => {
   const todayDate = new Date(today.value);
   todayDate.setHours(0, 0, 0, 0);
 
-  if (viewMode.value === "week") {
-    // Week view: show 7 days starting from week start of current date
-    const days = [];
-    const startDate = getWeekStart(currentDate.value);
-    startDate.setHours(0, 0, 0, 0);
-
-    // Generate 7 days for the week
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-
-      days.push({
-        date,
-        otherMonth: false, // In week view, we show all days regardless of month
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
-      });
-    }
-
-    return days;
-  } else if (viewMode.value === "day") {
-    // Day view: show only the current day
-    const date = new Date(currentDate.value);
-    date.setHours(0, 0, 0, 0);
-    const dateOnly = new Date(date);
-    dateOnly.setHours(0, 0, 0, 0);
-
+  if (viewMode.value === "day") {
+    const dayDate = new Date(currentDate.value);
+    dayDate.setHours(0, 0, 0, 0);
     return [
       {
-        date,
+        date: dayDate,
         otherMonth: false,
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
+        isToday: dayDate.getTime() === todayDate.getTime(),
+        events: getEventsForDate(dayDate),
       },
     ];
-  } else if (viewMode.value === "rolling") {
-    // Rolling weeks view: show 4 weeks starting from today
-    const days = [];
-    const startDate = getWeekStart(todayDate);
-
-    // Generate 4 weeks (28 days)
-    for (let i = 0; i < 28; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-
-      days.push({
-        date,
-        otherMonth: date.getMonth() !== todayDate.getMonth(),
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
-      });
-    }
-
-    return days;
-  } else {
-    // Month view: show full month
-    const year = currentDate.value.getFullYear();
-    const month = currentDate.value.getMonth();
-
-    // First day of month
-    const firstDay = new Date(year, month, 1);
-    const firstDayOfWeek = firstDay.getDay();
-    const adjustedFirstDay = adjustDayOfWeek(firstDayOfWeek);
-
-    // Last day of month
-    const lastDay = new Date(year, month + 1, 0);
-    const lastDate = lastDay.getDate();
-
-    // Days array
-    const days = [];
-
-    // Previous month days
-    const prevMonthLastDay = new Date(year, month, 0).getDate();
-    for (let i = adjustedFirstDay - 1; i >= 0; i--) {
-      const date = new Date(year, month - 1, prevMonthLastDay - i);
-      days.push({
-        date,
-        otherMonth: true,
-        isToday: false,
-        events: getEventsForDate(date),
-      });
-    }
-
-    // Current month days
-    const todayDate = new Date(today.value);
-    todayDate.setHours(0, 0, 0, 0);
-
-    for (let day = 1; day <= lastDate; day++) {
-      const date = new Date(year, month, day);
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-
-      // Ensure current month days are never marked as otherMonth
-      const isCurrentMonth = date.getMonth() === month && date.getFullYear() === year;
-
-      days.push({
-        date,
-        otherMonth: !isCurrentMonth, // Explicitly check month/year
-        isToday: dateOnly.getTime() === todayDate.getTime(),
-        events: getEventsForDate(date),
-      });
-    }
-
-    // Next month days (fill to 6 weeks = 42 days)
-    const remainingDays = 42 - days.length;
-    for (let day = 1; day <= remainingDays; day++) {
-      const date = new Date(year, month + 1, day);
-      days.push({
-        date,
-        otherMonth: true,
-        isToday: false,
-        events: getEventsForDate(date),
-      });
-    }
-
-    return days;
   }
+
+  // Month and week are both windows of consecutive days beginning at
+  // windowStart (rolling only shifts the anchor). For a non-rolling month the
+  // window is anchored to one calendar month, so the leading/trailing padding
+  // days are flagged `otherMonth` and dimmed. Rolling month and week are pure
+  // windows — the window IS the view, so nothing is greyed.
+  const dimOutOfMonth = viewMode.value === "month" && !rolling.value;
+  const anchorMonth = currentDate.value.getMonth();
+  const anchorYear = currentDate.value.getFullYear();
+
+  const windowDays = [];
+  const windowFirst = new Date(windowStart.value);
+  windowFirst.setHours(0, 0, 0, 0);
+  for (let i = 0; i < windowLength.value; i++) {
+    const date = new Date(windowFirst);
+    date.setDate(windowFirst.getDate() + i);
+    const dateOnly = new Date(date);
+    dateOnly.setHours(0, 0, 0, 0);
+    const otherMonth =
+      dimOutOfMonth && (date.getMonth() !== anchorMonth || date.getFullYear() !== anchorYear);
+    windowDays.push({
+      date,
+      otherMonth,
+      isToday: dateOnly.getTime() === todayDate.getTime(),
+      events: getEventsForDate(date),
+    });
+  }
+  return windowDays;
 });
 
 // Helper function to check if a day is the start of a week
@@ -613,6 +954,115 @@ const getWeekNumberForDay = dayIndex => {
   const weekStart = getWeekStart(day.date);
   const weekNum = getWeekNumber(weekStart);
   return weekNum;
+};
+
+// --- Month ribbon-band layout -------------------------------------------------
+// Turn the flat day window into week rows: spanning events become lane-assigned
+// ribbons, timed events stay a per-day list. Decorate each week/segment with the
+// week number, current-week flag, a representative date, and a stable focus key.
+const monthWeeks = computed(() => {
+  const weeks = buildMonthWeeks(calendarDays.value, { maxTimed: maxVisibleEvents.value });
+  return weeks.map((wk, weekIndex) => ({
+    weekIndex,
+    laneCount: wk.laneCount,
+    weekNumber: getWeekNumber(getWeekStart(wk.days[0].date)),
+    isCurrent: wk.days.some(d => d.isToday),
+    ribbons: wk.ribbons.map(seg => ({
+      ...seg,
+      date: wk.days[seg.startCol].date,
+      focusKey: `m-${weekIndex}-r-${seg.event.id}`,
+    })),
+    days: wk.days.map((day, col) => ({
+      ...day,
+      col,
+      timed: day.timed.map((ev, ti) => ({
+        ev,
+        focusKey: `m-${weekIndex}-t-${col}-${ev.id}-${ti}`,
+      })),
+    })),
+  }));
+});
+
+// Watch one rendered day cell for the Auto row fit. The first `.mv-timed` cell
+// is representative: every row in the month grid shares the same height.
+const observeDensityCell = () => {
+  if (typeof ResizeObserver === "undefined") return;
+  const cell = calendarView.value?.querySelector?.(".calendar-weeks .mv-timed");
+  densityObserver?.disconnect();
+  densityObserver = null;
+  if (!cell) return;
+  densityObserver = new ResizeObserver(entries => {
+    const box = entries[0]?.contentRect;
+    if (!box || !(box.height > 0)) return;
+    measuredCellHeight.value = box.height;
+    const chip = cell.querySelector(".timed-event");
+    const rowHeight = chip?.offsetHeight || chip?.getBoundingClientRect?.().height || 0;
+    if (rowHeight > 0) measuredRowHeight.value = rowHeight;
+  });
+  densityObserver.observe(cell);
+};
+
+watch(
+  [isMonthView, monthWeeks, eventDensity],
+  async () => {
+    if (!isMonthView.value) {
+      densityObserver?.disconnect();
+      densityObserver = null;
+      return;
+    }
+    await nextTick();
+    observeDensityCell();
+  },
+  { flush: "post", immediate: true }
+);
+
+// The strip is a 7-column grid (day columns line up via a left pad for the
+// spine); ribbons place themselves by column span and ride one row per lane.
+const RIBBON_LANE_HEIGHT = "0.95rem";
+const stripStyle = wk => ({
+  gridTemplateRows: `repeat(${wk.laneCount}, ${RIBBON_LANE_HEIGHT})`,
+});
+
+// Focus model for month view. Ribbons and timed rows aren't per-(day,index)
+// like the agenda chips, so they get their own flat, ordered focus list keyed
+// by a stable string: ribbons first (top band), then each day's timed events.
+const focusedMonthKey = ref(null);
+const monthRefs = ref({});
+
+const setMonthRef = (el, key) => {
+  if (el) monthRefs.value[key] = el;
+};
+const isMonthFocused = key => focusedMonthKey.value === key;
+const setMonthFocus = key => {
+  focusedMonthKey.value = key;
+};
+
+const monthFocusables = computed(() => {
+  const list = [];
+  monthWeeks.value.forEach(wk => {
+    [...wk.ribbons]
+      .sort((a, b) => a.lane - b.lane || a.startCol - b.startCol)
+      .forEach(seg => list.push({ key: seg.focusKey, event: seg.event, date: seg.date }));
+    wk.days.forEach(day => {
+      day.timed.forEach(item => list.push({ key: item.focusKey, event: item.ev, date: day.date }));
+    });
+  });
+  return list;
+});
+
+const navigateMonth = direction => {
+  const list = monthFocusables.value;
+  if (!list.length) return;
+  const current = list.findIndex(f => f.key === focusedMonthKey.value);
+  let next;
+  if (direction === "next") next = current < list.length - 1 ? current + 1 : 0;
+  else if (direction === "prev") next = current > 0 ? current - 1 : list.length - 1;
+  else if (direction === "first") next = 0;
+  else next = list.length - 1;
+  if (current === -1 && (direction === "next" || direction === "prev")) next = 0;
+  const target = list[next];
+  focusedMonthKey.value = target.key;
+  nextTick(() => monthRefs.value[target.key]?.focus());
 };
 
 // Helper function to check if a date is a weekend day
@@ -703,7 +1153,7 @@ const focusEvent = (dayIndex, eventIndex) => {
 };
 
 const selectEvent = (event, dayDate) => {
-  calendarStore.selectEvent(event, dayDate);
+  calendarStore.selectEvent(event, dayDate, props.sourceIds);
 };
 
 const closeEventDetail = () => {
@@ -754,33 +1204,47 @@ const handleKeydown = event => {
     return;
   }
 
+  // In fullscreen, Escape returns to the dashboard
+  if (event.key === "Escape" && props.isFullscreen) {
+    handleCloseFullscreen();
+    event.preventDefault();
+    return;
+  }
+
+  // Month view drives a separate focus model (ribbons + timed rows); agenda and
+  // day views keep the per-(day,index) chip navigation.
+  const stepEvents = direction =>
+    isMonthView.value ? navigateMonth(direction) : navigateEvents(direction);
+
   switch (event.key) {
     case "ArrowRight":
-      navigateEvents("next");
+      stepEvents("next");
       event.preventDefault();
       break;
     case "ArrowLeft":
-      navigateEvents("prev");
+      stepEvents("prev");
       event.preventDefault();
       break;
     case "Home":
-      navigateEvents("first");
+      stepEvents("first");
       event.preventDefault();
       break;
     case "End":
-      navigateEvents("last");
+      stepEvents("last");
       event.preventDefault();
       break;
     case "Enter":
-      // Expand the focused event or all events for the focused day
-      if (focusedDayIndex.value !== null) {
+      if (isMonthView.value) {
+        // Open the focused ribbon or timed event
+        const focused = monthFocusables.value.find(f => f.key === focusedMonthKey.value);
+        if (focused) selectEvent(focused.event, focused.date);
+      } else if (focusedDayIndex.value !== null) {
+        // Expand the focused event or the first event for the focused day
         const day = calendarDays.value[focusedDayIndex.value];
         if (day && day.events.length > 0) {
           if (focusedEventIndex.value !== null && focusedEventIndex.value < day.events.length) {
-            // Expand the focused event
             selectEvent(day.events[focusedEventIndex.value], day.date);
           } else {
-            // Expand the first event of the day
             selectEvent(day.events[0], day.date);
           }
         }
@@ -797,45 +1261,55 @@ const handleKeydown = event => {
 // - Week view: moves by 1 week (7 days)
 // - Month/Rolling view: moves by 1 month
 const navigatePrevious = () => {
-  const newDate = new Date(currentDate.value);
+  let newDate = new Date(currentDate.value);
   if (viewMode.value === "day") {
     // Day view: move to previous day
     newDate.setDate(newDate.getDate() - 1);
   } else if (viewMode.value === "week") {
-    // Week view: move to the start of the previous week
+    // Week agenda strip: page back by the window's own length
+    newDate.setDate(newDate.getDate() - rollingDays.value);
+  } else if (rolling.value) {
+    // Rolling month: roll the multi-week window back by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() - 7);
     newDate.setTime(weekStart.getTime());
   } else {
-    // Month/Rolling view: move to previous month
-    newDate.setMonth(newDate.getMonth() - 1);
+    // Month view: move to previous month (clamped so a month-end date such as
+    // Mar 31 -> Feb 28/29 never rolls over into the wrong month)
+    newDate = addMonths(newDate, -1);
   }
   calendarStore.setCurrentDate(newDate);
   loadEvents();
   // Clear focus when view changes
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
 };
 
 const navigateNext = () => {
-  const newDate = new Date(currentDate.value);
+  let newDate = new Date(currentDate.value);
   if (viewMode.value === "day") {
     // Day view: move to next day
     newDate.setDate(newDate.getDate() + 1);
   } else if (viewMode.value === "week") {
-    // Week view: move to the start of the next week
+    // Week agenda strip: page forward by the window's own length
+    newDate.setDate(newDate.getDate() + rollingDays.value);
+  } else if (rolling.value) {
+    // Rolling month: roll the multi-week window forward by one week
     const weekStart = getWeekStart(currentDate.value);
     weekStart.setDate(weekStart.getDate() + 7);
     newDate.setTime(weekStart.getTime());
   } else {
-    // Month/Rolling view: move to next month
-    newDate.setMonth(newDate.getMonth() + 1);
+    // Month view: move to next month (clamped so Oct 31 -> Nov 30 instead of
+    // rolling over to Dec 1)
+    newDate = addMonths(newDate, 1);
   }
   calendarStore.setCurrentDate(newDate);
   loadEvents();
   // Clear focus when view changes
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
 };
 
 // Legacy function names for backward compatibility (used by header buttons)
@@ -845,43 +1319,30 @@ const nextMonth = navigateNext;
 const loadEvents = async (background = false) => {
   lastLoadedAt = Date.now();
   let startDate, endDate;
-  const year = currentDate.value.getFullYear();
-  const month = currentDate.value.getMonth();
 
-  if (viewMode.value === "week") {
-    // Week view: load the week plus buffer days for multi-day events
-    const weekStart = getWeekStart(currentDate.value);
-    startDate = new Date(weekStart);
-    startDate.setDate(startDate.getDate() - 7); // 7 days before week start
-    startDate.setHours(0, 0, 0, 0);
-
-    endDate = new Date(weekStart);
-    endDate.setDate(endDate.getDate() + 14); // 7 days after week end
-    endDate.setHours(23, 59, 59, 999);
-  } else if (viewMode.value === "day") {
-    // Day view: load the day plus buffer days for multi-day events
+  if (viewMode.value === "day") {
+    // Day view: load the day plus a buffer week on each side for multi-day events
     const day = new Date(currentDate.value);
     day.setHours(0, 0, 0, 0);
     startDate = new Date(day);
-    startDate.setDate(startDate.getDate() - 7); // 7 days before
+    startDate.setDate(startDate.getDate() - 7);
     startDate.setHours(0, 0, 0, 0);
 
     endDate = new Date(day);
-    endDate.setDate(endDate.getDate() + 7); // 7 days after
+    endDate.setDate(endDate.getDate() + 7);
     endDate.setHours(23, 59, 59, 999);
   } else {
-    // Month/rolling view: use month-based range
-    // Expand date range to include events that span across month boundaries
-    // Load previous month, current month, and next month for better caching
-    // This ensures we have data cached for adjacent months
-    const prevMonth = month === 0 ? 11 : month - 1;
-    const prevYear = month === 0 ? year - 1 : year;
-    startDate = new Date(prevYear, prevMonth, 1);
+    // Month and week are both day-windows: fetch [windowStart, +windowLength)
+    // plus a buffer week on each side so multi-day events that start/end just
+    // outside the window still render. This scales with any week/day count.
+    const first = new Date(windowStart.value);
+    first.setHours(0, 0, 0, 0);
+    startDate = new Date(first);
+    startDate.setDate(startDate.getDate() - 7);
     startDate.setHours(0, 0, 0, 0);
 
-    const nextMonth = month === 11 ? 0 : month + 1;
-    const nextYear = month === 11 ? year + 1 : year;
-    endDate = new Date(nextYear, nextMonth + 1, 0); // Last day of next month
+    endDate = new Date(first);
+    endDate.setDate(endDate.getDate() + windowLength.value + 6);
     endDate.setHours(23, 59, 59, 999);
   }
 
@@ -891,9 +1352,11 @@ const loadEvents = async (background = false) => {
     // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
     const refresh = false;
 
-    await calendarStore.fetchEvents(startDate, endDate, refresh, background);
+    await trackLoad("events", () =>
+      calendarStore.fetchEvents(startDate, endDate, refresh, background, props.sourceIds)
+    );
     console.log(
-      `Loaded ${calendarStore.events.length} events for ${year}-${month + 1} (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
+      `Loaded ${calendarStore.events.length} events (range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]})`
     );
   } catch (error) {
     console.error("Failed to load events:", error);
@@ -904,6 +1367,39 @@ watch(currentDate, () => {
   loadEvents();
 });
 
+watch(sourceKey, () => {
+  loadEvents();
+});
+
+// The visible date range differs per view mode (a month spans wider than the
+// ±7-day week/day window), so refetch when the mode changes and drop any stale
+// event focus.
+watch(viewMode, () => {
+  focusedDayIndex.value = null;
+  focusedEventIndex.value = null;
+  focusedMonthKey.value = null;
+  loadEvents();
+});
+
+// A larger window needs a wider fetch range than what's already loaded. Weeks
+// drive month view; days drive the week agenda strip.
+watch(rollingWeeks, () => {
+  if (viewMode.value === "month") loadEvents();
+});
+
+watch(rollingDays, () => {
+  if (viewMode.value === "week") loadEvents();
+});
+
+// Appending look-ahead weeks widens a non-rolling month's fetch range.
+watch(extraWeeks, () => {
+  if (viewMode.value === "month" && !rolling.value) loadEvents();
+});
+
+// Rolling on/off (and base mode) can flip the effective window; reload so the
+// fetched range matches what's rendered.
+watch(rolling, () => loadEvents());
+
 // Watch for route changes to reload events when navigating back to dashboard
 watch(
   () => route.path,
@@ -912,7 +1408,7 @@ watch(
     if (newPath === "/" && oldPath === "/settings") {
       loadEvents();
       // Also reload sources to ensure they're up to date
-      calendarStore.fetchSources();
+      fetchSources().catch(() => {});
     }
   },
   { immediate: false }
@@ -936,7 +1432,7 @@ onActivated(() => {
       loadEvents();
     }
     if (calendarStore.sources.length === 0) {
-      calendarStore.fetchSources();
+      fetchSources().catch(() => {});
     }
   }
 });
@@ -949,158 +1445,32 @@ onActivated(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--calendar-bg);
-  border-radius: 8px;
-  overflow: hidden;
+  background: var(--bg-1);
+  border-radius: var(--radius-control);
+  overflow: visible; /* let the focused panel glow bloom out */
   outline: none;
   min-height: 0;
   min-width: 0;
   box-sizing: border-box;
 }
 
-.calendar-view:focus {
-  outline: none;
+.calendar-view:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
 }
 
-.calendar-header {
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
+.calendar-view--fullscreen {
+  border-radius: 0;
 }
 
-.calendar-header-minimal {
-  padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.05);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  flex-shrink: 0;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.calendar-header-minimal:hover {
-  opacity: 1;
-}
-
-.btn-icon-minimal {
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  width: 28px;
-  height: 28px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-icon-minimal:hover {
-  background: rgba(0, 0, 0, 0.1);
-}
-
-.current-month-minimal {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  min-width: 120px;
-  text-align: center;
-}
-
-.calendar-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.calendar-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.calendar-title-group {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 150px;
-}
-
-.current-month {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  text-align: center;
-}
-
-.view-mode-indicator {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.8;
-}
-
-.calendar-title-group-minimal {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.125rem;
-  min-width: 120px;
-}
-
-.view-mode-indicator-minimal {
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: var(--accent-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-}
-
-.btn-icon {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-icon:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-icon:active {
-  background: var(--bg-tertiary);
-}
-
-.btn-icon:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+/* Keep the header controls clear of the fixed fullscreen close (×) button,
+   which floats at top/right: 1rem and is 48px wide. */
+.calendar-view--fullscreen .calendar-header {
+  padding-right: 4rem;
 }
 
 .calendar-content {
   flex: 1;
-  padding: 1rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1113,74 +1483,112 @@ onActivated(() => {
   transform: translateZ(0);
 }
 
-.calendar-view:has(.calendar-header-minimal) .calendar-content {
-  padding: 0.5rem;
+/* Always-visible calendar header: month/year label + nav + view switch.
+   Lives inside the content (not the panel chrome) so it stays visible even
+   when the dashboard UI chrome is hidden. */
+.calendar-header {
+  /* Stays above the first-run empty overlay so month navigation still works. */
+  position: relative;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  /* A narrow region cannot fit the title and every control on one row. Let the
+     controls wrap under the title instead of clipping at the right edge and
+     squeezing the month name away (CLV-91). */
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  /* The header grows to the height of its wrapped rows; never clip a row. */
+  height: auto;
+  overflow: visible;
+  /* Panel body is flush now, so the header carries its own inset — top + sides
+     line the month label up with the grid (0.5rem) instead of jamming it into
+     the corner; the bottom keeps the gap above the grid. */
+  padding: 0.5rem 0.5rem 0.4rem;
+  min-width: 0;
 }
 
-.loading-overlay {
+.calendar-header__label {
+  font-family: var(--font-display);
+  font-size: var(--region-label-fs, var(--text-title));
+  font-weight: var(--weight-title);
+  color: var(--ink);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* The title is the one thing that must never vanish: it keeps the first line
+     and truncates with an ellipsis when even it alone is too wide. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Shared rail geometry (height, gap, type) comes from RegionHeaderControls;
+   only this header's placement and the shrinkable pill stay local. */
+.calendar-header__controls {
+  margin-left: auto;
+  min-width: 0;
+  max-width: 100%;
+  /* Wrap under the label as a whole, then let the view selector shrink (and
+     ellipsize) if a row is still narrower than the controls themselves. */
+  flex: 0 1 auto;
+}
+
+.calendar-header__view-switch {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Fullscreen close button — mirrors the photos/web-service overlay. */
+.fullscreen-close-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--bg-primary);
-  opacity: 0.9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  backdrop-filter: blur(2px);
+  top: 1rem;
+  right: 1rem;
+  z-index: var(--z-sticky);
+  pointer-events: none;
 }
 
-.loading-spinner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
+.btn-close-fullscreen {
+  pointer-events: auto;
+  box-shadow: var(--elev-1);
+  /* IconButton's transition covers background/border-color/color only, so
+     animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
+  transition: transform var(--dur-fast) var(--ease);
 }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--border-color);
-  border-top: 4px solid var(--accent-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+.btn-close-fullscreen:hover {
+  transform: scale(1.1);
 }
 
-.loading-text {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  font-weight: 500;
+.calendar-empty-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-raised);
+  background: color-mix(in srgb, var(--bg-1) 88%, transparent);
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+/* The calendar owns its own surface + spacing, so drop the panel body's default
+   1rem inset — otherwise the grid is framed by a doubled 2rem border that eats
+   the day cells. The grid surface now fills the panel; a slim inner pad keeps the
+   day numbers off the edge. */
+:deep(.dashboard-panel__body) {
+  padding: 0;
 }
 
 .calendar-grid {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--calendar-bg);
-  border-radius: 8px;
-  padding: 1rem;
+  background: var(--bg-1);
+  border-radius: var(--radius-control);
+  padding: 0.5rem;
   min-height: 0;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
   contain: layout;
-}
-
-.calendar-grid.loading {
-  opacity: 0.5;
-  pointer-events: none;
 }
 
 /* Rolling view styles can be added here if needed */
@@ -1203,9 +1611,9 @@ onActivated(() => {
 
 .weekday {
   text-align: center;
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
+  font-weight: var(--weight-title);
+  font-size: var(--text-body);
+  color: var(--ink-2);
   padding: 0.5rem;
   min-width: 0;
   overflow: hidden;
@@ -1236,11 +1644,6 @@ onActivated(() => {
   isolation: isolate;
 }
 
-/* Week view: taller day cells */
-.calendar-grid.week-view .calendar-day {
-  min-height: 0;
-}
-
 /* Day view: single column, very tall */
 .calendar-grid.day-view .calendar-weekdays {
   grid-template-columns: minmax(0, 1fr) !important;
@@ -1254,9 +1657,21 @@ onActivated(() => {
   min-height: 0;
 }
 
+/* Week agenda: a strip of N day columns in a single row. The count is dynamic,
+   so it comes in via the --rolling-cols custom property (set inline). */
+.calendar-grid.agenda-view .calendar-weekdays,
+.calendar-grid.agenda-view .calendar-days {
+  grid-template-columns: var(--rolling-cols) !important;
+  grid-auto-rows: minmax(0, 1fr);
+}
+
+.calendar-grid.agenda-view .calendar-day {
+  min-height: 0;
+}
+
 .calendar-day {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
   padding: 0.5rem;
   min-height: 0;
   min-width: 0;
@@ -1264,8 +1679,8 @@ onActivated(() => {
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--calendar-bg) !important;
-  transition: background 0.2s;
+  background: var(--bg-1) !important;
+  transition: background var(--dur-fast) var(--ease);
   position: relative;
   overflow: hidden;
   overflow-x: clip; /* Better clipping for event overflow on RPI */
@@ -1277,7 +1692,7 @@ onActivated(() => {
 }
 
 .calendar-day:hover {
-  background: var(--bg-secondary) !important;
+  background: var(--bg-2) !important;
 }
 
 /* Reset any inherited backgrounds - but allow week-number to have its own background */
@@ -1285,47 +1700,49 @@ onActivated(() => {
   background: transparent !important;
 }
 
+/* Leading/trailing padding days of a non-rolling month. No grey block — they
+   belong to the adjacent month, so they just recede and let the current month
+   lift out of the grid. */
 .calendar-day.other-month {
-  opacity: 0.4;
-  background: var(--bg-tertiary) !important;
+  opacity: 0.38;
 }
 
 /* Force reset background for all calendar days (except other-month and today) */
 .calendar-day:not(.other-month):not(.today) {
-  background: var(--calendar-bg) !important;
+  background: var(--bg-1) !important;
 }
 
 .calendar-day.today {
-  border: 2px solid var(--accent-primary);
-  background: var(--calendar-today-bg) !important;
+  border: 2px solid var(--focus);
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1)) !important;
   opacity: 1 !important;
 }
 
 /* Ensure today's day doesn't have other-month styling */
 .calendar-day.today.other-month {
   opacity: 1 !important;
-  background: var(--calendar-today-bg) !important;
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1)) !important;
 }
 
 /* Ensure current month days don't have grey background */
 .calendar-day:not(.other-month) {
-  background: var(--calendar-bg) !important;
+  background: var(--bg-1) !important;
   opacity: 1 !important;
 }
 
 /* Weekend styling - very subtle background tint */
 .calendar-day.weekend:not(.other-month) {
-  background: rgba(0, 0, 0, 0.02) !important;
+  background: color-mix(in srgb, var(--ink) 2%, transparent) !important;
 }
 
 /* Red day (holiday) styling */
 .calendar-day.red-day:not(.other-month) {
-  background: rgba(220, 53, 69, 0.1) !important;
+  background: color-mix(in srgb, var(--err) 10%, transparent) !important;
 }
 
 .calendar-day.red-day:not(.other-month) .day-number {
-  color: #dc3545;
-  font-weight: 700;
+  color: var(--err-text);
+  font-weight: var(--weight-title);
 }
 
 /* Ensure day-events container doesn't affect day background */
@@ -1350,27 +1767,72 @@ onActivated(() => {
 }
 
 .day-number {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: var(--text-primary);
+  font-weight: var(--weight-title);
+  font-size: var(--text-body);
+  color: var(--ink);
   flex-shrink: 0;
   white-space: nowrap;
 }
 
 .week-number {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-  padding: 0.125rem 0.375rem;
-  border-radius: 3px;
+  font-family: var(--font-data);
+  font-size: var(--text-dense);
+  font-weight: var(--weight-title);
+  letter-spacing: 0.04em;
+  color: var(--focus-text);
+  background: color-mix(in srgb, var(--focus) 12%, transparent);
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-round);
+  line-height: 1.35;
+  white-space: nowrap;
+  align-self: flex-start;
+}
+
+/* Week-number spine: a ruler down the left edge of the month grid, one tick per
+   week row. The gutter column is added to both header + day grids by the
+   .show-week-numbers modifier (month layout only — agenda/day keep the chip). */
+.calendar-grid.show-week-numbers .calendar-weekdays,
+.calendar-grid.show-week-numbers .calendar-days {
+  grid-template-columns: minmax(1.15rem, auto) 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+}
+
+.week-spine-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  font-family: var(--font-data);
+  font-size: var(--text-dense);
+  font-weight: var(--weight-title);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  opacity: 0.6;
+  padding: 0.5rem 0;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.week-spine {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.week-spine-num {
+  font-family: var(--font-data);
+  font-size: var(--text-dense);
+  font-weight: var(--weight-title);
+  letter-spacing: 0.02em;
   line-height: 1.2;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.calendar-day.week-start .week-number {
-  color: var(--accent-primary);
-  background: var(--calendar-today-bg);
+.week-spine.current-week .week-spine-num {
+  color: var(--focus-text);
 }
 
 .day-events {
@@ -1390,39 +1852,138 @@ onActivated(() => {
 }
 
 .event-overflow-indicator {
-  font-size: 0.7rem;
+  font-size: var(--text-caption);
   padding: 0.15rem 0.35rem;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-  border-radius: 3px;
+  background: var(--bg-2);
+  color: var(--ink-2);
+  border-radius: var(--radius-control);
   text-align: center;
   cursor: default;
   margin-top: 0.1rem;
   opacity: 0.8;
-  font-weight: 500;
+  font-weight: var(--weight-strong);
   flex-shrink: 0;
 }
 
-.event-detail-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
+/* ===== Month view: ribbon strip above the day cells =======================
+   Each week is a grid: a spanning ribbon strip in the gutter above the day
+   cells (never overlaying them, so it can't collide with the today border),
+   then the day cells with their numbers and a light timed-event list. Bars
+   cross the hairline day dividers so a multi-day event reads as one span. */
+/* One fixed spine width shared by the header, strips, and day rows so every
+   column lines up regardless of the week number's digit count. */
+.calendar-grid.show-week-numbers .calendar-weeks,
+.calendar-grid.show-week-numbers .month-weekdays {
+  --spine-w: 1.6rem;
+}
+
+.month-weekdays {
+  gap: 0 !important;
+}
+.month-weekdays.calendar-weekdays {
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+}
+.calendar-grid.show-week-numbers .month-weekdays.calendar-weekdays {
+  grid-template-columns: var(--spine-w) 1fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+}
+
+.calendar-weeks {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Day-cell row: flex:1 so every week's day area is the same height — ribbon
+   strips never steal from it. */
+.week-days {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  flex: 1;
+  min-height: 0;
+  border-bottom: 1px solid var(--line);
+}
+.week-days.has-spine {
+  grid-template-columns: var(--spine-w) 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+}
+.week-days:last-child {
+  border-bottom: 0;
+}
+
+/* Day cell: a clean flex container (reuses .calendar-day so cell-count /
+   other-month / today tests keep working). */
+.calendar-weeks .calendar-day {
+  border: 0 !important;
+  border-right: 1px solid var(--line-soft) !important;
+  border-radius: 0;
+  padding: 0.2rem 0.3rem 0.3rem;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.calendar-weeks .calendar-day.last-col {
+  border-right: 0 !important;
+}
+.calendar-weeks .calendar-day.today {
+  border: 1px solid var(--focus) !important;
+  border-radius: var(--radius-control);
+}
+.calendar-weeks .calendar-day .day-header {
+  margin-bottom: 0;
+  min-height: 0;
+}
+.calendar-weeks .calendar-day .day-number {
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  color: var(--ink-2);
+}
+.calendar-weeks .calendar-day.today .day-number {
+  color: var(--focus-text);
+  font-weight: var(--weight-title);
+}
+
+.mv-timed {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  align-content: flex-start;
+}
+.mv-timed .event-overflow-indicator {
+  text-align: left;
+  background: transparent;
+  padding: 0.05rem 0.1rem;
+  font-family: var(--font-data);
+  font-size: var(--text-dense);
+  letter-spacing: 0.02em;
+}
+
+/* Ribbon strip: a compact band in the seam between weeks. flex:none so it takes
+   only its lanes' height; the day rows keep all the flexible space. The 7-column
+   grid is inset by the spine width so bars align to the day columns. */
+.mv-strip {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+  align-content: center;
+  row-gap: 2px;
+  padding: 0.2rem 0 0.1rem;
+  min-width: 0;
+}
+.mv-strip.has-spine {
+  padding-left: var(--spine-w);
 }
 
 /* Responsive styles for smaller screens and portrait mode */
 /* Use viewport units and scale everything proportionally */
-@media (max-width: 768px), (orientation: portrait) {
-  .calendar-content {
-    padding: clamp(0.25rem, 1vw, 0.75rem);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
+@media (--bp-phone), (orientation: portrait) {
   .calendar-grid {
     padding: clamp(0.25rem, 1vw, 0.75rem);
     width: 100%;
@@ -1453,28 +2014,12 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(0.6rem, 1.5vw, 0.9rem);
+    font-size: clamp(var(--text-dense), 1.5vw, var(--text-body));
     padding: clamp(0.15rem, 0.5vw, 0.5rem);
   }
 
   .day-number {
-    font-size: clamp(0.7rem, 2vw, 0.9rem);
-  }
-
-  .calendar-header {
-    padding: clamp(0.5rem, 1.5vw, 1rem);
-  }
-
-  .calendar-header h2 {
-    font-size: clamp(1rem, 3vw, 1.5rem);
-  }
-
-  .current-month {
-    font-size: clamp(0.85rem, 2.5vw, 1.1rem);
-  }
-
-  .view-mode-indicator {
-    font-size: clamp(0.6rem, 1.5vw, 0.75rem);
+    font-size: clamp(var(--text-caption), 2vw, var(--text-body));
   }
 
   .day-header {
@@ -1482,20 +2027,13 @@ onActivated(() => {
   }
 
   .week-number {
-    font-size: clamp(0.55rem, 1.5vw, 0.7rem);
+    font-size: clamp(var(--text-dense), 1.5vw, var(--text-caption));
     padding: clamp(0.05rem, 0.25vw, 0.125rem) clamp(0.2rem, 0.5vw, 0.375rem);
   }
 }
 
 /* Extra small screens - more aggressive scaling */
-@media (max-width: 480px) {
-  .calendar-content {
-    padding: clamp(0.15rem, 1vw, 0.5rem);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
+@media (--bp-phone) {
   .calendar-grid {
     padding: clamp(0.15rem, 1vw, 0.5rem);
     width: 100%;
@@ -1511,7 +2049,7 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(0.5rem, 2vw, 0.75rem);
+    font-size: clamp(var(--text-dense), 2vw, var(--text-caption));
     padding: clamp(0.1rem, 0.5vw, 0.25rem);
   }
 
@@ -1530,19 +2068,12 @@ onActivated(() => {
   }
 
   .day-number {
-    font-size: clamp(0.6rem, 2.5vw, 0.8rem);
+    font-size: clamp(var(--text-dense), 2.5vw, var(--text-meta));
   }
 }
 
 /* Portrait mode with limited height - ensure everything fits */
 @media (orientation: portrait) and (max-height: 800px) {
-  .calendar-content {
-    padding: clamp(0.15rem, 1vh, 0.5rem);
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   .calendar-grid {
     padding: clamp(0.15rem, 1vh, 0.5rem);
     width: 100%;
@@ -1573,24 +2104,17 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: clamp(0.5rem, 2vh, 0.75rem);
+    font-size: clamp(var(--text-dense), 2vh, var(--text-caption));
     padding: clamp(0.1rem, 0.5vh, 0.25rem);
   }
 
   .day-number {
-    font-size: clamp(0.6rem, 2.5vh, 0.8rem);
+    font-size: clamp(var(--text-dense), 2.5vh, var(--text-meta));
   }
 }
 
 /* Very small portrait screens - maximum compression */
 @media (orientation: portrait) and (max-height: 600px) {
-  .calendar-content {
-    padding: 0.15rem;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-
   .calendar-grid {
     padding: 0.15rem;
     width: 100%;
@@ -1607,7 +2131,7 @@ onActivated(() => {
   }
 
   .weekday {
-    font-size: 0.5rem;
+    font-size: var(--text-dense);
     padding: 0.1rem;
   }
 
@@ -1626,7 +2150,7 @@ onActivated(() => {
   }
 
   .day-number {
-    font-size: 0.6rem;
+    font-size: var(--text-dense);
   }
 
   .day-events {

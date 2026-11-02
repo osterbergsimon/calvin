@@ -11,11 +11,31 @@ from app.models.calendar import (
     CalendarSource,
     CalendarSourcesResponse,
 )
+from app.models.db_models import PluginDB
 from app.plugins.calendar.google import _normalize_google_calendar_url
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    drop_unchanged_secrets,
+    is_unchanged_secret,
+    redact_secrets,
+)
 from app.services import plugin_calendar_service
+from app.utils.db_retry import retry_on_db_locked
+from app.utils.errors import internal_error
 
 # Loguru automatically includes module/function info in logs
 router = APIRouter()
+
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _save_calendar_source(db_plugin: PluginDB) -> None:
+    """Persist a calendar source, retrying while SQLite holds a write lock (R11)."""
+    await db_plugin.save_with_timestamp()
+
+
+# Calendar source fields that are credentials (a private ICS URL is a bearer token).
+CALENDAR_SECRET_KEYS = ("ical_url", "api_key")
 
 
 def normalize_datetime(dt: datetime | None) -> datetime | None:
@@ -209,13 +229,12 @@ async def get_calendar_sources():
 
         # Filter out sources from disabled plugin types
         enabled_plugin_types = set()
-        # Get plugin types from pluggy hooks
         plugin_types = plugin_loader.get_plugin_types()
-        calendar_types = [t for t in plugin_types if t.get("plugin_type") == PluginType.CALENDAR]
+        calendar_types = [t for t in plugin_types if t.plugin_type == PluginType.CALENDAR]
 
         # Check enabled status from database
         for type_info in calendar_types:
-            type_id = type_info.get("type_id")
+            type_id = type_info.type_id
             db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
             enabled = db_type.enabled if db_type else True  # Default to enabled
             if enabled:
@@ -229,27 +248,33 @@ async def get_calendar_sources():
             if s.get("type") in enabled_plugin_types or s.get("type") in legacy_types
         ]
 
-        # Convert to CalendarSource models for response
-        source_models = [
-            CalendarSourceModel(
-                id=s["id"],
-                type=s["type"],
-                name=s["name"],
-                enabled=s["enabled"],
-                running=s.get("running", False),  # Include running state
-                ical_url=s.get("ical_url"),
-                api_key=s.get("api_key"),
-                color=s.get("color"),
-                show_time=s.get("show_time", True),
+        # Convert to CalendarSource models for response. Feed URLs and API keys
+        # are credentials: never returned, only flagged in has_value (audit S5).
+        source_models = []
+        for s in filtered_sources:
+            secrets, has_value = redact_secrets(
+                {k: s.get(k) for k in CALENDAR_SECRET_KEYS}, set(CALENDAR_SECRET_KEYS)
             )
-            for s in filtered_sources
-        ]
+            source_models.append(
+                CalendarSourceModel(
+                    id=s["id"],
+                    type=s["type"],
+                    name=s["name"],
+                    enabled=s["enabled"],
+                    running=s.get("running", False),  # Include running state
+                    **secrets,
+                    has_value=has_value,
+                    color=s.get("color"),
+                    show_time=s.get("show_time", True),
+                )
+            )
         return CalendarSourcesResponse(sources=source_models, total=len(source_models))
     except Exception as e:
-        import traceback
-
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error fetching calendar sources: {str(e)}")
+        raise internal_error(
+            "calendar_sources_failed",
+            "Could not load calendar sources. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/calendar/sources", response_model=CalendarSource)
@@ -354,27 +379,42 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
     # color, show_time, etc.).
     db_plugin = await PluginDB.objects.get_or_none(id=source_id)
     existing_url = (db_plugin.config or {}).get("ical_url") if db_plugin else None
-    url_changed = source.ical_url is not None and source.ical_url != existing_url
+    # The sources list never returns ical_url/api_key, so blank means unchanged.
+    url_changed = not is_unchanged_secret(source.ical_url) and source.ical_url != existing_url
     if url_changed:
         await validate_calendar_url(source.ical_url, source.type)
 
     if not db_plugin:
         raise HTTPException(status_code=404, detail="Calendar source not found")
 
+    # Never reuse a stored api_key for a different feed URL.
+    try:
+        check_secret_endpoint(
+            {"ical_url": source.ical_url, "api_key": source.api_key},
+            db_plugin.config or {},
+            set(CALENDAR_SECRET_KEYS),
+            {"ical_url"},
+        )
+    except SecretEndpointChangedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
     # Update database
     db_plugin.name = source.name
     db_plugin.enabled = source.enabled
     config = db_plugin.config or {}
     config.update(
-        {
-            "ical_url": source.ical_url,
-            "api_key": source.api_key,
-            "color": source.color,
-            "show_time": source.show_time,
-        }
+        drop_unchanged_secrets(
+            {
+                "ical_url": source.ical_url,
+                "api_key": source.api_key,
+                "color": source.color,
+                "show_time": source.show_time,
+            },
+            set(CALENDAR_SECRET_KEYS),
+        )
     )
     db_plugin.config = config
-    await db_plugin.save_with_timestamp()
+    await _save_calendar_source(db_plugin)
 
     # Handle instance creation/removal based on enabled status
     existing_plugin = plugin_manager.get_plugin(source_id)
@@ -416,9 +456,6 @@ async def update_calendar_source(source_id: str, source: CalendarSource):
                 # Then unregister it
                 await plugin_manager.unregister(source_id)
             except Exception:
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.exception("Error cleaning up disabled plugin {}", source_id)
 
     return source

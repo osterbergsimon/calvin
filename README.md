@@ -1,179 +1,201 @@
-# Calvin - Lightweight DAKBoard Alternative
+# Calvin — a self-hosted dashboard for your screens
 
-A lightweight, self-hosted home dashboard system for Raspberry Pi that displays calendars, photos, and external web services with keyboard navigation support. Perfect for creating a smart home information display.
+**Calvin is a home or business LAN dashboard for a wall screen.** Put calendars,
+photos and the web apps you check every day side by side, then drive that same
+dashboard from a Raspberry Pi kiosk, a spare tablet, or any browser on the
+network. One server holds the data; any number of screens show it. A plugin
+system adds calendar providers, photo sources and web services without touching
+the core.
+
+![Calvin's dashboard in light mode: a November calendar with multi-day events next to a photo frame](docs/images/tour/dashboard-light.webp)
+
+## A quick look
+
+**Light or dark, it is the same screen.** The shot above is light; the same
+layout in dark keeps the calendar and photo readable at night.
+
+![Calvin dashboard, dark theme](docs/images/tour/dashboard-dark.webp)
+
+**Portrait or landscape.** Turn the layout for a vertical screen, or stack the
+calendar above the photo frame on a tall display.
+
+![Calvin in portrait: calendar above a photo frame](docs/images/tour/dashboard-portrait.webp)
+
+**Settings from the couch.** Content and screens are managed from the same web
+UI, on a laptop or a phone.
+
+| Content                                                         | Screens                                                         |
+| --------------------------------------------------------------- | --------------------------------------------------------------- |
+| ![Settings › Content: calendars and photo sources](docs/images/tour/settings-content.webp) | ![Settings › Screens: the connected kiosks](docs/images/tour/settings-screens.webp) |
+
+**First run takes a minute.** A one-time setup code from the server log becomes
+the admin password; after that you can add a calendar from your phone and see it
+on the wall.
+
+| Set up from a phone                                            | Content on a phone                                            |
+| -------------------------------------------------------------- | ------------------------------------------------------------- |
+| ![First-run setup: the prefilled setup code and password fields](docs/images/tour/phone-setup.webp) | ![Content settings on a phone](docs/images/tour/phone-content.webp) |
+
+![The setup flow: choose a password with the setup code, add a calendar, and see it on the dashboard](docs/images/tour/setup-flow.gif)
+
+_Screenshots and the recording were made with the sample data from
+`make demo-seed`; see [frontend/scripts/capture-tour.mjs](frontend/scripts/capture-tour.mjs)
+to regenerate them._
+
+## Quick start
+
+Calvin runs on a Raspberry Pi 3B+ or newer, or any always-on Linux host, with
+Docker. The setup script installs the runtime and the kiosk browser for you.
+
+**Stable release** — replace `vX.Y.Z` with the newest tag from
+[Releases](https://github.com/osterbergsimon/calvin/releases):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/vX.Y.Z/scripts/setup.sh \
+  | sudo GIT_BRANCH=vX.Y.Z bash
+sudo reboot
+```
+
+The dashboard comes up at `http://<pi>:8000` after the reboot.
+
+**Testers** can track `develop` (the `:develop` image is rebuilt on every push).
+It is also the only installable ref until the first release is cut:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+sudo reboot
+```
+
+The full walkthrough — first sign-in, finding the setup code, and what to do
+next — is in [docs/setup/GETTING_STARTED.md](docs/setup/GETTING_STARTED.md).
+Setup-script details are in
+[docs/setup/SETUP_SCRIPTS.md](docs/setup/SETUP_SCRIPTS.md), and the three
+deployment shapes are compared in
+[docs/setup/DEPLOYMENT_TOPOLOGIES.md](docs/setup/DEPLOYMENT_TOPOLOGIES.md).
 
 ## ✨ Features
 
-- **📅 Calendar Integration**: Connect to Google Calendar and other calendar services
-- **🖼️ Photo Slideshow**: Automatic image rotation and display
-- **🌐 Web Services**: Embed external web services and content
-- **⌨️ Keyboard Navigation**: Support for compact 7-button keyboards and full keyboards
-- **🔌 Plugin System**: Extensible plugin architecture for custom functionality
-- **🔄 Hot Reload**: Development mode with automatic reloading
-- **📱 Responsive Design**: Works on various display sizes and orientations
-- **🐧 Cross-Platform**: Develop on Windows/Linux, deploy on Raspberry Pi
+- **📅 Calendar Integration** — Google Calendar, ICS/CalDAV sources, and plugins
+- **🖼️ Photo Slideshow** — Local folders, Immich, Unsplash, and more
+- **🌐 Web Services** — Embed dashboards, maps, home-automation UIs
+- **⌨️ Keyboard Navigation** — Compact 7-button keypads and full keyboards,
+  handled in the browser (no kernel input devices needed)
+- **🔌 Plugin System** — Calendar, image, service, and backend plugins
+- **📱 Kiosk Mode** — One server, many displays; per-kiosk content and rotation
+- **🐧 Cross-Platform** — Develop on Windows/Linux, deploy on Raspberry Pi
 
-## 🎯 Hardware Baseline
+## 🚀 Prerequisites
 
-- **Device**: Raspberry Pi 3B+ (primary target)
-- **Display**: Standard HDMI display (1080p)
-- **Keyboard**: 7-button compact keyboard (primary) with full keyboard support (secondary)
+Running Calvin (any topology below) needs:
 
-## 🚀 Quick Start
+- **Docker Engine + Compose v2** — on Raspberry Pi OS Bookworm/Trixie the setup
+  script installs both; it is the only runtime dependency for the server.
+- **Git** — to clone the repository.
+- A **Raspberry Pi 3B+ or newer** (or any always-on Linux host) for deployment.
 
-### Prerequisites
+For **native development** (tests, linters, formatting) you also need:
 
 - **Python 3.12+**
-- **Node.js 20+** (LTS recommended)
-- **UV** (Python package manager - installed automatically)
-- **Git**
+- **Node.js 20+**
+- **uv** (installed by the dev setup scripts if missing)
 
-### Windows Development Setup
+## 🧭 Deployment shapes
 
-**Quick Start (Develop Branch):**
+The full comparison, including security caveats, is in
+[docs/setup/DEPLOYMENT_TOPOLOGIES.md](docs/setup/DEPLOYMENT_TOPOLOGIES.md);
+the guided tour is
+[docs/setup/GETTING_STARTED.md](docs/setup/GETTING_STARTED.md).
 
-```powershell
-# 1. Clone repository
+### 1. All-in-one Pi (default)
+
+One Pi runs the backend, the frontend, and the kiosk browser. Simplest option,
+and the one to pick for a single display. Use the [quick start](#quick-start)
+above; details are in [docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md).
+
+### 2. Remote backend + kiosk Pi
+
+A home server runs the backend (SQLite, photos, plugins); one or more Pis run
+only Chromium pointed at the server URL. Use this to keep data off the SD card
+or to drive several displays from one backend.
+
+```bash
+# Server: same Docker image as Mode A
+docker compose -f docker/docker-compose.yml up -d
+
+# Pi (kiosk only)
+sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000
+sudo reboot
+```
+
+Or install the kiosk straight from the running server:
+`curl -fsSL http://homeserver.local:8000/api/kiosks/install.sh | sudo bash`.
+See [KIOSK_INSTALL.md](docs/setup/KIOSK_INSTALL.md) and
+[KIOSK_PROVISIONING.md](docs/setup/KIOSK_PROVISIONING.md).
+
+### 3. Unraid / home-server Docker
+
+Run the backend as a Docker container on Unraid (or any home server) and point
+kiosk Pis at it. Follow the template and volume layout in
+[docs/setup/UNRAID.md](docs/setup/UNRAID.md).
+
+## 🛠️ Development
+
+The dev workflow runs the whole stack in Docker: the backend with
+`uvicorn --reload` and the frontend with Vite HMR, both bind-mounting your
+checkout.
+
+```bash
 git clone https://github.com/osterbergsimon/calvin.git
 cd calvin
 
-# 2. Switch to develop branch
-git checkout develop
-
-# 3. Install Node.js from https://nodejs.org/ (LTS version)
-
-# 4. Run setup script
-.\setup-windows.ps1
-
-# 5. Start development servers
-.\make.ps1 dev
+make install   # one-time: creates docker/.env from docker/dev.env.example
+make dev       # starts the dev stack and streams logs
 ```
 
-**Using Make Commands:**
+- Frontend (HMR): <http://localhost:5173>
+- Backend / API docs: <http://localhost:8000> · <http://localhost:8000/docs>
 
-```powershell
-# Install dependencies
-.\make.ps1 install
+`make dev-down` stops the stack, `make doctor` checks Docker and ports, and
+`make clean` removes the stack and its dev data. Windows uses the same targets
+through `.\make.ps1`.
 
-# Start development servers
-.\make.ps1 dev
+Each checkout gets its own compose project, so several worktrees can run at
+once; give a second one different `CALVIN_PORT` / `CALVIN_FRONTEND_PORT`
+values in its `docker/.env`. The dev data lives in `docker/.calvin-dev-data/`,
+never in the host's `/var/lib/calvin`.
 
-# Run tests
-.\make.ps1 test
+VS Code users can open the folder and run **Dev Containers: Reopen in
+Container** to get the same stack with extensions pre-installed.
 
-# Format code
-.\make.ps1 format
+### Native toolchain (optional)
 
-# Lint code
-.\make.ps1 lint
-```
-
-**Note:** On Windows, keyboard input uses a mock handler. Full keyboard support works on Linux/Raspberry Pi.
-
-**Detailed Instructions:**
-- **Development (develop branch)**: See [docs/setup/QUICKSTART_DEVELOP.md](docs/setup/QUICKSTART_DEVELOP.md)
-- **General Windows setup**: See [docs/setup/QUICKSTART_WINDOWS.md](docs/setup/QUICKSTART_WINDOWS.md)
-- **Remote Settings Configuration**: See [docs/configuration/REMOTE_CONFIG.md](docs/configuration/REMOTE_CONFIG.md) - Configure frontend to connect to remote dashboard backend
-
-### Raspberry Pi Setup
-
-**Production Setup (One Command):**
+Tests, linting, formatting, and type checks run natively:
 
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-```
-
-**Development Setup (with hot reload):**
-
-```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
-```
-
-**Using curl:**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
-```
-
-**Using a Different Branch:**
-
-```bash
-# Production setup with develop branch
-export GIT_BRANCH=develop
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
-
-# Development setup with develop branch
-export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
-```
-
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop wget ...`), as inline assignments don't propagate through pipes to `sudo`.
-
-**Using a Fork or Different Repository:**
-
-```bash
-export GIT_REPO=https://github.com/yourusername/calvin.git
-export GIT_BRANCH=your-branch
-wget -O- ... | sudo -E bash
-```
-
-**What the Setup Scripts Do:**
-- Install all system dependencies (Python, Node.js, etc.)
-- Create `calvin` user if needed
-- Clone the Calvin repository (from the specified branch)
-- Install backend and frontend dependencies
-- Build frontend (production) or configure dev server (development)
-- Set up systemd services for auto-start
-- Configure display and kiosk mode
-- Enable hot reload for both backend and frontend (dev mode only)
-- Verify installation and provide next steps
-
-**For detailed information about the setup scripts, see [Setup Scripts Documentation](docs/setup/SETUP_SCRIPTS.md)**
-
-### Linux Development Setup
-
-**Quick Start:**
-
-```bash
-# Clone repository (if not already cloned)
-git clone https://github.com/osterbergsimon/calvin.git
-cd calvin
-
-# Install dependencies (Makefile auto-detects Linux and includes evdev)
-make install
-
-# Start development servers
-make dev
-```
-
-**Manual Setup:**
-
-```bash
-# Install dependencies (includes evdev for keyboard support)
 cd backend
-uv sync --extra linux --extra dev
+uv sync --extra dev
+uv run pytest
+
 cd ../frontend
 npm install
-
-# Start development servers (in separate terminals)
-# Terminal 1 - Backend:
-cd backend
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Terminal 2 - Frontend:
-cd frontend
-npm run dev
+npm test          # vitest run (one shot)
+npm run test:watch
 ```
 
-**Note:** 
-- On Linux, full keyboard support is available via `evdev` (automatically included with `make install`)
-- The Makefile automatically detects Linux and includes the `linux` extra for evdev support
-- For detailed setup instructions, see [docs/setup/SETUP_LINUX.md](docs/setup/SETUP_LINUX.md)
+`make test`, `make lint`, `make format`, and `make type-check` wrap these.
+Linux contributors have the same targets; NixOS users can `nix-shell` for a
+pinned toolchain.
 
-**Important:** The `scripts/setup.sh` and `scripts/setup-dev.sh` scripts are for **Raspberry Pi deployment** (require root, set up systemd services). For Linux development, use the Makefile or manual commands above.
+**Keyboard support** is browser-side: `KeyboardHandler.vue` listens for DOM
+`keydown` events; there is no backend hardware-keyboard (`evdev`) path, so no
+kernel headers or `--extra linux` install are needed.
+
+### README screenshots
+
+`npm run capture:tour` in `frontend/` boots a throwaway Calvin on free ports
+with `make demo-seed` data, drives it with Playwright, and writes the optimised
+assets under `docs/images/tour/`. It runs with `CALVIN_HOST_CONTROL=0` and
+intercepts every host-acting route.
 
 ## 📁 Project Structure
 
@@ -192,70 +214,54 @@ calvin/
 │       ├── components/  # Vue components
 │       ├── stores/      # Pinia stores
 │       └── services/    # API services
-├── config/           # Configuration files
-├── data/             # Data storage (images, database)
-├── rpi-image/        # Raspberry Pi image creation
-├── scripts/          # Utility scripts
+├── docker/           # Dockerfile + compose files (prod and dev)
+├── deploy/           # systemd units, kiosk agent, production env example
+├── scripts/          # Setup scripts and CI helpers
 └── docs/             # Documentation
 ```
 
+Runtime data (`CALVIN_DATA_DIR`: SQLite, images, plugins) lives outside the
+checkout — `/var/lib/calvin` in production, `docker/.calvin-dev-data/` in dev.
+
 ## 🔌 Plugin System
 
-Calvin features an extensible plugin system that allows you to add custom functionality:
+Plugins are self-contained directories with a `plugin.json`, a `plugin.py`,
+and optional pre-built frontend assets. They install live — no restart and no
+host-side rebuild.
 
-- **Service Plugins**: Add new backend services
-- **Calendar Plugins**: Integrate additional calendar sources
-- **Image Plugins**: Custom image processing and sources
-- **Frontend Components**: Add custom Vue components
-
-**Documentation:**
 - [Plugin Development Guide](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
-- [Plugin Installation Guide](docs/plugins/PLUGIN_INSTALLATION.md)
+- [Plugin Installation](docs/plugins/PLUGIN_INSTALLATION.md)
+- [Plugin Package Format](docs/plugins/PLUGIN_PACKAGE_FORMAT.md)
 
-## 🛠️ Development
-
-### Platform Support
-
-The backend automatically handles platform differences:
-
-- ✅ **Windows**: All features work except keyboard input (mock handler)
-- ✅ **Linux**: Full support including keyboard input via `evdev`
-- ✅ **Raspberry Pi**: Full support including keyboard input via `evdev`
-
-### Development Workflow
-
-- **Development/Testing**: Windows or Linux
-- **Production**: Linux (Raspberry Pi 3B+)
-
-### Technology Stack
-
-**Backend:**
-- Python 3.12+ with FastAPI
-- UV for package management
-- SQLite for data storage
-- APScheduler for scheduled tasks
-
-**Frontend:**
-- Vue 3 with Composition API
-- Vite for build tooling
-- Pinia for state management
+The reference plugins live in
+[osterbergsimon/calvin-plugins](https://github.com/osterbergsimon/calvin-plugins).
 
 ## 📚 Documentation
 
-Comprehensive documentation is available:
+- **Online documentation**: <https://osterbergsimon.github.io/calvin/>
+- **Releases**: <https://github.com/osterbergsimon/calvin/releases> · process in [docs/RELEASING.md](docs/RELEASING.md)
+- **Getting started**: [docs/setup/GETTING_STARTED.md](docs/setup/GETTING_STARTED.md)
+- **Deployment topologies**: [docs/setup/DEPLOYMENT_TOPOLOGIES.md](docs/setup/DEPLOYMENT_TOPOLOGIES.md)
+- **Documentation index**: [docs/index.md](docs/index.md)
+- **Locally**: `mkdocs serve` from the project root
 
-- **Online Documentation**: [Documentation Site](https://calvin.readthedocs.io/) (hosted on Read the Docs)
-- **Local Documentation**: Run `mkdocs serve` from the project root to view documentation locally
-- **Documentation Index**: See [docs/README.md](docs/README.md) for the documentation structure
+## 🤝 Contributing
 
-**Quick Links:**
-- [Quick Start - Development](docs/setup/QUICKSTART_DEVELOP.md)
-- [Quick Start - Windows](docs/setup/QUICKSTART_WINDOWS.md)
-- [Linux Setup Guide](docs/setup/SETUP_LINUX.md)
-- [Windows Setup Guide](docs/setup/SETUP_WINDOWS.md)
-- [Plugin Development Guide](docs/plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
-- [Plugin Installation](docs/plugins/PLUGIN_INSTALLATION.md)
+Calvin is an open project and contributions of every size are welcome.
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — development setup, the branch model
+  (branch from `develop`, pull requests into `develop`), conventional commit
+  messages, and the quality gates (`make lint`, `make type-check`, `make test`)
+- **[Code of Conduct](CODE_OF_CONDUCT.md)** — Contributor Covenant 2.1; this is
+  how we expect people to treat each other here
+- **[SECURITY.md](SECURITY.md)** — report a vulnerability privately through
+  GitHub; please never open a public issue for a security problem
+- **[Issue templates](.github/ISSUE_TEMPLATE/)** — bug reports ask for your
+  deployment, Pi model, and logs; feature requests are welcome too
+- **Plugin work** belongs in
+  [osterbergsimon/calvin-plugins](https://github.com/osterbergsimon/calvin-plugins),
+  not in this repository
 
 ## 📄 License
 
-GPLv3 - See [LICENSE](LICENSE) file for details.
+GPLv3 — see [LICENSE](LICENSE).

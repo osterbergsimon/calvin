@@ -1,0 +1,23 @@
+[Unit]
+Description=Calvin Kiosk Display-Power Agent (remote backend)
+After=network-online.target calvin-kiosk-remote.service calvin-x.service calvin-wayland.service calvin-cog.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+EnvironmentFile=/etc/default/calvin-kiosk
+# DISPLAY/XAUTHORITY (X11) or WAYLAND_DISPLAY/XDG_RUNTIME_DIR (Wayland), so the
+# agent's xrandr/xset or wlr-randr/wlopm calls reach the running session.
+EnvironmentFile=/etc/default/calvin-kiosk-display
+ExecStart=/usr/bin/python3 /usr/local/bin/calvin_display_agent.py
+RuntimeDirectory=calvin
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-display-agent
+
+[Install]
+WantedBy=multi-user.target

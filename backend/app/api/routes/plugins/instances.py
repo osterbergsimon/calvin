@@ -1,22 +1,41 @@
 """Plugin instance management endpoints."""
 
-import asyncio
-import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Body, HTTPException
+from loguru import logger
 from pydantic import BaseModel
 
-from app.api.routes.plugins.config import mask_sensitive_config
 from app.models.db_models import PluginDB, PluginTypeDB
-from app.plugins.hooks import plugin_manager as hook_manager
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.utils.instance_manager import apply_plugin_config_update
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    drop_unchanged_secrets,
+    endpoint_keys_for_type,
+    redact_secrets,
+    secret_keys_for_type,
+)
 from app.services.event_system import event_system
+from app.utils.db_retry import retry_on_db_locked
+from app.utils.errors import internal_error
 
-logger = logging.getLogger(__name__)
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _save_instance(db_plugin: PluginDB) -> None:
+    """Persist an instance row, retrying while SQLite holds a write lock (R11)."""
+    await db_plugin.save_with_timestamp()
+
+
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+async def _delete_instance(db_plugin: PluginDB) -> None:
+    """Delete an instance row, retrying while SQLite holds a write lock (R11)."""
+    await db_plugin.delete()
+
 
 router = APIRouter()
 
@@ -27,6 +46,8 @@ class PluginInstanceResponse(BaseModel):
     enabled: bool
     running: bool
     config: dict[str, Any]
+    # Secret keys -> whether a value is stored; their config values are always "".
+    has_value: dict[str, bool] = {}
     display_order: int
 
 
@@ -65,7 +86,20 @@ class PluginInstanceCreateRequest(BaseModel):
 
 
 def _serialize_instance_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Serialize config values to JSON-compatible primitives."""
+    """Serialize config values to JSON-compatible primitives.
+
+    Config values are bare scalars in the 1.0 contract; legacy rows may still
+    hold `{value}`/`{default}` wrapper dicts, which are unwrapped here so the
+    frontend always sees one shape.
+    """
+    from app.plugins.utils.config import normalize_config_value
+
+    config = {
+        key: normalize_config_value(val)
+        if isinstance(val, dict) and ("value" in val or "default" in val)
+        else val
+        for key, val in config.items()
+    }
 
     def serialize_value(val):
         if val is None:
@@ -94,12 +128,16 @@ def _serialize_instance_config(config: dict[str, Any]) -> dict[str, Any]:
 
 def _build_instance_response(db_plugin: PluginDB, running: bool) -> PluginInstanceResponse:
     serialized_config = _serialize_instance_config(db_plugin.config or {})
+    config, has_value = redact_secrets(
+        serialized_config, secret_keys_for_type(db_plugin.type_id, serialized_config)
+    )
     return PluginInstanceResponse(
         id=db_plugin.id,
         name=db_plugin.name,
         enabled=db_plugin.enabled,
         running=running,
-        config=mask_sensitive_config(serialized_config, mask_for_frontend=True),
+        config=config,
+        has_value=has_value,
         display_order=db_plugin.display_order or 0,
     )
 
@@ -146,12 +184,9 @@ async def start_plugin_instance(instance_id: str):
             plugin.enabled = db_plugin.enabled
             await plugin_manager.register(plugin)
         else:
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"Failed to create plugin instance {instance_id}. "
-                    f"Plugin type {db_plugin.type_id} may not be available."
-                ),
+            raise internal_error(
+                "plugin_instance_create_failed",
+                "Could not create the plugin instance: its plugin type is not available.",
             )
 
     if plugin.is_running():
@@ -187,7 +222,10 @@ async def start_plugin_instance(instance_id: str):
             "running": plugin.is_running(),
         }
     else:
-        raise HTTPException(status_code=500, detail=f"Failed to start plugin {instance_id}")
+        raise internal_error(
+            "plugin_start_failed",
+            "Could not start the plugin instance. Check the server logs for details.",
+        )
 
 
 @router.post("/plugins/instances/{instance_id}/stop", response_model=PluginInstanceActionResponse)
@@ -221,6 +259,10 @@ async def stop_plugin_instance(instance_id: str):
         }
 
     if not plugin.is_running():
+        # A stop is deliberate even when nothing was running (e.g. initialize()
+        # failed at boot): record it, so the data route stops retrying instead
+        # of reviving the instance on the next dashboard poll.
+        plugin.stopped_by_request = True
         return {
             "success": True,
             "message": f"Plugin {instance_id} is already stopped",
@@ -253,7 +295,10 @@ async def stop_plugin_instance(instance_id: str):
             "running": False,
         }
     else:
-        raise HTTPException(status_code=500, detail=f"Failed to stop plugin {instance_id}")
+        raise internal_error(
+            "plugin_stop_failed",
+            "Could not stop the plugin instance. Check the server logs for details.",
+        )
 
 
 @router.get("/plugins/{plugin_id}/instances", response_model=PluginInstanceListResponse)
@@ -309,7 +354,7 @@ async def delete_plugin_instance(instance_id: str):
         await plugin_manager.unregister(instance_id)
 
     type_id = db_plugin.type_id
-    await db_plugin.delete()
+    await _delete_instance(db_plugin)
 
     try:
         await event_system.emit_event(
@@ -335,13 +380,10 @@ async def create_plugin_instance(
     """
     Create a plugin instance via an explicit instance lifecycle endpoint.
 
-    This currently adapts to the existing plugin hook contract by translating
-    the typed payload into the legacy config-update metadata fields.
+    The typed payload is translated into the config-update metadata fields
+    understood by the generic instance manager.
     """
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
+    if plugin_loader.get_plugin_class(plugin_id) is None:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
     instance_config = {
@@ -352,29 +394,34 @@ async def create_plugin_instance(
 
     db_plugin_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
-    update_coroutines = hook_manager.hook.handle_plugin_config_update(
-        type_id=plugin_id,
-        config=instance_config,
-        enabled=None,
-        db_type=db_plugin_type,
-        session=None,
-    )
-    results = await asyncio.gather(*update_coroutines, return_exceptions=True)
+    try:
+        result = await apply_plugin_config_update(plugin_id, instance_config, None, db_plugin_type)
+    except Exception as e:
+        raise internal_error(
+            "plugin_instance_create_failed",
+            "Could not create the plugin instance. Check the server logs for details.",
+            error=e,
+        ) from e
 
-    created_instance_id = None
-    for result in results:
-        if isinstance(result, Exception) or result is None:
-            continue
-        created_instance_id = result.get("instance_id")
-        if created_instance_id:
-            break
-
+    if result and result.get("error"):
+        logger.error("Instance creation failed for {}: {}", plugin_id, result["error"])
+        raise internal_error(
+            "plugin_instance_create_failed",
+            "Could not create the plugin instance. Check the required settings and the logs.",
+        )
+    created_instance_id = result.get("instance_id") if result else None
     if not created_instance_id:
-        raise HTTPException(status_code=400, detail="Plugin did not create an instance")
+        raise HTTPException(
+            status_code=400,
+            detail="Plugin did not create an instance (check the required settings)",
+        )
 
     db_plugin = await PluginDB.objects.get_or_none(id=created_instance_id)
     if not db_plugin:
-        raise HTTPException(status_code=500, detail="Created plugin instance not found in database")
+        raise internal_error(
+            "plugin_instance_create_failed",
+            "The plugin instance was created but could not be read back. Check the server logs.",
+        )
 
     plugin = plugin_manager.get_plugin(created_instance_id)
     instance = _build_instance_response(db_plugin, plugin.is_running() if plugin else False)
@@ -419,6 +466,22 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
         config = instance_data["config"]
         # Merge with existing config if it's a partial update
         if isinstance(config, dict):
+            # Secrets come back blank (or legacy-masked) from the edit form;
+            # those mean "unchanged" and must not overwrite the stored value.
+            stored_config = dict(db_plugin.config or {})
+            known = {**stored_config, **config}
+            secrets = secret_keys_for_type(db_plugin.type_id, known)
+            # ...unless the endpoint they authenticate against changes.
+            try:
+                check_secret_endpoint(
+                    config,
+                    stored_config,
+                    secrets,
+                    endpoint_keys_for_type(db_plugin.type_id, known),
+                )
+            except SecretEndpointChangedError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+            config = drop_unchanged_secrets(config, secrets)
             # Ormar JSON fields detect changes automatically
             existing_config = dict(db_plugin.config or {})
             existing_config.update(config)
@@ -429,7 +492,7 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     if "name" in instance_data:
         db_plugin.name = instance_data["name"]
 
-    await db_plugin.save_with_timestamp()
+    await _save_instance(db_plugin)
 
     # Update plugin instance in memory if it exists
     plugin = plugin_manager.get_plugin(instance_id)
@@ -483,10 +546,8 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                         f"Failed to emit plugin_instance_created event "
                         f"for instance {instance_id}: {e}"
                     )
-            except Exception as e:
-                logger.error(
-                    f"Error creating and starting plugin {instance_id}: {e}", exc_info=True
-                )
+            except Exception:
+                logger.exception("Error creating and starting plugin {}", instance_id)
                 plugin = None
 
     if plugin:
@@ -506,8 +567,8 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
 
                         if isinstance(plugin, BackendPlugin):
                             await backend_plugin_scheduler.register_plugin_tasks(plugin)
-                    except Exception as e:
-                        logger.error(f"Error starting plugin {instance_id}: {e}", exc_info=True)
+                    except Exception:
+                        logger.exception("Error starting plugin {}", instance_id)
             else:
                 plugin.disable()
                 # Stop the plugin if it's running
@@ -521,15 +582,15 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
                         if isinstance(plugin, BackendPlugin):
                             await backend_plugin_scheduler.unregister_plugin_tasks(instance_id)
                         await plugin.cleanup()
-                    except Exception as e:
-                        logger.warning(f"Error stopping plugin {instance_id}: {e}", exc_info=True)
+                    except Exception:
+                        logger.opt(exception=True).warning("Error stopping plugin {}", instance_id)
 
         # Update config if provided
         if updated_config is not None:
             try:
                 await plugin.configure(updated_config)
-            except Exception as e:
-                logger.warning(f"Error updating plugin {instance_id} config: {e}", exc_info=True)
+            except Exception:
+                logger.opt(exception=True).warning("Error updating plugin {} config", instance_id)
 
     # Emit plugin_instance_updated event if instance was updated (but not newly created)
     if (
@@ -599,7 +660,7 @@ async def update_plugin_instances_order(
     for db_plugin in db_plugins:
         if db_plugin.id in instance_orders:
             db_plugin.display_order = instance_orders[db_plugin.id]
-            await db_plugin.save_with_timestamp()
+            await _save_instance(db_plugin)
             updated_count += 1
 
     if updated_count > 0:

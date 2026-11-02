@@ -1,19 +1,21 @@
-"""Generic plugin instance management utilities.
+"""Generic plugin instance management.
 
-This module provides a generic implementation of handle_plugin_config_update
-that eliminates the need for plugins to implement hundreds of lines of
-boilerplate instance management code.
+`apply_plugin_config_update` is the host-side entry point for plugin-type
+config updates: it derives everything it needs from the registered plugin
+class (`metadata` + optional class hooks) and routes through the generic
+handler. Plugins implement no config-update hooks of their own.
 """
 
-import logging
+import hashlib
+import inspect
 from collections.abc import Callable
 from typing import Any
+
+from loguru import logger
 
 from app.models.db_models import PluginDB
 from app.plugins.manager import plugin_manager
 from app.plugins.registry import plugin_registry
-
-logger = logging.getLogger(__name__)
 
 
 class InstanceManagerConfig:
@@ -24,7 +26,7 @@ class InstanceManagerConfig:
         type_id: str,
         single_instance: bool = False,
         instance_id: str | None = None,
-        validate_config: Callable[[dict[str, Any]], bool] | None = None,
+        validate_config: Callable[[dict[str, Any]], Any] | None = None,
         generate_instance_id: Callable[[dict[str, Any], str], str] | None = None,
         normalize_config: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
         prepare_instance_config: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
@@ -41,14 +43,14 @@ class InstanceManagerConfig:
             single_instance: If True, only one instance is allowed (uses fixed instance_id)
             instance_id: Fixed instance ID for single-instance plugins
             validate_config: Function to validate config before creating instance.
-                           Returns True if config is valid, False otherwise.
+                           May be sync or async; returns truthy if config is valid.
             generate_instance_id: Function to generate instance ID from config.
                                 Signature: (config: dict, type_id: str) -> str
             normalize_config: Function to normalize config values.
                             Signature: (config: dict) -> dict
             prepare_instance_config: Function to prepare final config for instance creation.
-                                   Signature: (config: dict, metadata: dict) -> dict
-                                   metadata contains: instance_name, instance_enabled, etc.
+                                   Signature: (config: dict, context: dict) -> dict
+                                   context contains: instance_name, instance_enabled, etc.
             on_instance_created: Callback after instance is created.
                                Signature: (plugin: BasePlugin, result: dict) -> None
             on_instance_updated: Callback after instance is updated.
@@ -70,16 +72,64 @@ class InstanceManagerConfig:
         self.default_instance_name = default_instance_name or f"{name_template} Instance"
 
 
+def _config_hash_instance_id(config: dict[str, Any], type_id: str) -> str:
+    """Fallback instance id: type_id + short hash of the whole config."""
+    config_str = str(sorted(config.items()))
+    config_hash = hashlib.md5(config_str.encode(), usedforsecurity=False).hexdigest()[:8]
+    return f"{type_id}-{config_hash}"
+
+
+async def apply_plugin_config_update(
+    type_id: str,
+    config: dict[str, Any],
+    enabled: bool | None,
+    db_type: Any,
+) -> dict[str, Any] | None:
+    """Apply a plugin-type config update for a registered plugin class.
+
+    Derives the instance-manager configuration from the plugin class:
+    `metadata` supplies identity/naming/multiplicity, the class supplies
+    `normalize_config` / `validate_config` / `instance_id_for` /
+    `prepare_instance_config`.
+
+    Returns:
+        Result dict from the generic handler, or None if the type is unknown.
+    """
+    from app.plugins.loader import plugin_loader
+
+    cls = plugin_loader.get_plugin_class(type_id)
+    if cls is None or cls.metadata is None:
+        return None
+    metadata = cls.metadata
+
+    def generate_instance_id(c: dict[str, Any], t: str) -> str:
+        return cls.instance_id_for(c) or _config_hash_instance_id(c, t)
+
+    manager_config = InstanceManagerConfig(
+        type_id=type_id,
+        single_instance=not metadata.supports_multiple_instances,
+        instance_id=metadata.fixed_instance_id,
+        validate_config=cls.validate_config,
+        generate_instance_id=generate_instance_id,
+        normalize_config=cls.normalize_config,
+        prepare_instance_config=cls.prepare_instance_config,
+        default_instance_name=metadata.default_instance_name or metadata.name,
+    )
+
+    return await handle_plugin_config_update_generic(
+        type_id, config, enabled, db_type, manager_config
+    )
+
+
 async def handle_plugin_config_update_generic(
     type_id: str,
     config: dict[str, Any],
     enabled: bool | None,
     db_type: Any,
-    session: Any,  # Kept for backward compatibility with hooks, but not used
     manager_config: InstanceManagerConfig,
 ) -> dict[str, Any] | None:
     """
-    Generic implementation of handle_plugin_config_update hook.
+    Generic implementation of a plugin-type config update.
 
     This function handles the common patterns:
     - Config validation
@@ -89,14 +139,11 @@ async def handle_plugin_config_update_generic(
     - Lifecycle management (enable/disable/start/stop)
     - Error handling
 
-    Plugins provide callbacks for plugin-specific logic only.
-
     Args:
         type_id: Plugin type ID
         config: Configuration dictionary
         enabled: Whether plugin type is enabled
         db_type: PluginTypeDB instance
-        session: Database session (kept for backward compatibility, but not used with Ormar)
         manager_config: InstanceManagerConfig with plugin-specific callbacks
 
     Returns:
@@ -117,9 +164,12 @@ async def handle_plugin_config_update_generic(
     if manager_config.normalize_config:
         config = manager_config.normalize_config(config)
 
-    # Validate config if callback provided
+    # Validate config if callback provided (sync or async)
     if manager_config.validate_config:
-        if not manager_config.validate_config(config):
+        valid = manager_config.validate_config(config)
+        if inspect.isawaitable(valid):
+            valid = await valid
+        if not valid:
             logger.info(f"[{type_id}] Skipping instance creation - config validation failed")
             return {"instance_created": False, "instance_updated": False}
 
@@ -140,12 +190,12 @@ async def handle_plugin_config_update_generic(
     # Prepare instance config
     instance_config = config.copy()
     if manager_config.prepare_instance_config:
-        metadata = {
+        context = {
             "instance_name": instance_name,
             "instance_enabled": instance_enabled_flag,
             "type_enabled": enabled,
         }
-        instance_config = manager_config.prepare_instance_config(config, metadata)
+        instance_config = manager_config.prepare_instance_config(config, context)
 
     # Query database for existing instance
     db_instance = None
@@ -183,8 +233,8 @@ async def handle_plugin_config_update_generic(
                 if not existing_plugin:
                     await db_instance.delete()
                     db_instance = None
-    except Exception as e:
-        logger.warning(f"[{type_id}] Error querying database: {e}", exc_info=True)
+    except Exception:
+        logger.opt(exception=True).warning("[{}] Error querying database", type_id)
         db_instance = None
 
     # Determine enabled status
@@ -205,22 +255,25 @@ async def handle_plugin_config_update_generic(
             if manager_config.generate_instance_id:
                 plugin_instance_id = manager_config.generate_instance_id(config, type_id)
             else:
-                # Fallback: use type_id with hash
-                import hashlib
-
-                config_str = str(sorted(config.items()))
-                config_hash = hashlib.md5(config_str.encode()).hexdigest()[:8]
-                plugin_instance_id = f"{type_id}-{config_hash}"
+                plugin_instance_id = _config_hash_instance_id(config, type_id)
 
         # Ensure uniqueness
         existing = await PluginDB.objects.get_or_none(id=plugin_instance_id)
 
         if existing:
-            # Add timestamp to make unique
+            # The base id collides — append a suffix and re-check until it's
+            # actually free. Without the re-check, a suffixed id that also exists
+            # would be handed to register_plugin, raise "already registered", and
+            # silently re-enable the wrong instance instead of creating a new one
+            # (the timestamp wraps every 100s). See calvin-eaf.
             import time
 
-            timestamp = int(time.time() * 1000) % 100000
-            plugin_instance_id = f"{plugin_instance_id}-{timestamp}"
+            base_id = plugin_instance_id
+            suffix = int(time.time() * 1000) % 100000
+            plugin_instance_id = f"{base_id}-{suffix}"
+            while await PluginDB.objects.get_or_none(id=plugin_instance_id):
+                suffix += 1
+                plugin_instance_id = f"{base_id}-{suffix}"
 
         logger.info(
             f"[{type_id}] Creating new instance: {plugin_instance_id} with name: {instance_name}"
@@ -264,7 +317,7 @@ async def handle_plugin_config_update_generic(
                 }
             raise
         except Exception as e:
-            logger.error(f"[{type_id}] Failed to create instance: {e}", exc_info=True)
+            logger.exception("[{}] Failed to create instance", type_id)
             return {"instance_created": False, "error": str(e)}
     else:
         # Update existing instance
@@ -299,16 +352,16 @@ async def handle_plugin_config_update_generic(
                     try:
                         await plugin.initialize()
                         plugin.start()
-                    except Exception as e:
-                        logger.error(f"[{type_id}] Error starting plugin: {e}", exc_info=True)
+                    except Exception:
+                        logger.exception("[{}] Error starting plugin", type_id)
             else:
                 plugin.disable()
                 if plugin.is_running():
                     try:
                         plugin.stop()
                         await plugin.cleanup()
-                    except Exception as e:
-                        logger.warning(f"[{type_id}] Error stopping plugin: {e}", exc_info=True)
+                    except Exception:
+                        logger.opt(exception=True).warning("[{}] Error stopping plugin", type_id)
 
             result = {
                 "instance_updated": True,
@@ -323,7 +376,6 @@ async def handle_plugin_config_update_generic(
             # If plugin_loader can't create it, just update the DB entry
             logger.info(f"[{type_id}] Instance {db_instance.id} exists in DB but not in manager")
             try:
-                # Try to create plugin instance using pluggy hooks
                 from app.plugins.loader import plugin_loader
 
                 plugin = plugin_loader.create_plugin_instance(
@@ -343,6 +395,8 @@ async def handle_plugin_config_update_generic(
 
                     await plugin_manager.register(plugin)
                     await plugin.initialize()
+                    if final_enabled:
+                        plugin.start()
 
                     result = {
                         "instance_created": True,  # Treat as creation since it wasn't in manager
@@ -364,9 +418,7 @@ async def handle_plugin_config_update_generic(
                         "warning": "Plugin instance updated in DB but not registered in manager",
                     }
             except Exception as e:
-                logger.error(
-                    f"[{type_id}] Failed to register existing instance: {e}", exc_info=True
-                )
+                logger.exception("[{}] Failed to register existing instance", type_id)
                 # Still update the DB entry even if registration fails
                 result = {
                     "instance_updated": True,
@@ -374,19 +426,27 @@ async def handle_plugin_config_update_generic(
                     "warning": f"DB updated but registration failed: {str(e)}",
                 }
 
-        # Update in database
+        # Update in database. This is the write that runs while other plugin
+        # operations hold the SQLite write lock, so it retries (audit R11).
         db_instance.config = instance_config
         db_instance.enabled = final_enabled
-        await db_instance.save_with_timestamp()
-        if db_type and hasattr(db_type, "save_with_timestamp"):
-            # Only update if it's a real Ormar model (not a mock in tests)
-            try:
-                db_type.enabled = final_enabled
-                await db_type.save_with_timestamp()
-            except (AttributeError, TypeError):
-                # Fallback for mocks or if save_with_timestamp doesn't exist
-                if hasattr(db_type, "update"):
+
+        from app.utils.db_retry import retry_on_db_locked
+
+        @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+        async def _persist_update() -> None:
+            await db_instance.save_with_timestamp()
+            if db_type and hasattr(db_type, "save_with_timestamp"):
+                # Only update if it's a real Ormar model (not a mock in tests)
+                try:
                     db_type.enabled = final_enabled
-                    await db_type.update()
+                    await db_type.save_with_timestamp()
+                except (AttributeError, TypeError):
+                    # Fallback for mocks or if save_with_timestamp doesn't exist
+                    if hasattr(db_type, "update"):
+                        db_type.enabled = final_enabled
+                        await db_type.update()
+
+        await _persist_update()
 
         return result

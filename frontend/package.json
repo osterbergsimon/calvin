@@ -7,40 +7,70 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage",
-    "test:watch": "vitest --watch",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:webkit": "playwright test --project=webkit",
+    "test:e2e:phone": "playwright test --project=phone",
+    "test:e2e:a11y": "playwright test --project=a11y",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
+    "capture:tour": "node scripts/capture-tour.mjs",
     "lint": "eslint .",
-    "format": "prettier --write \"src/**/*.{js,jsx,vue,json,css}\""
+    "type-check": "vue-tsc --noEmit -p tsconfig.typecheck.json",
+    "format": "prettier --write \"src/**/*.{js,jsx,vue,json,css}\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx,vue,json,css}\"",
+    "gen:api": "openapi-typescript ../backend/tests/contract/openapi.json -o src/api/types.ts && prettier --write src/api/types.ts"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@fontsource/ibm-plex-sans-condensed": "^5.2.8",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/schibsted-grotesk": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "@mdi/js": "^7.4.47",
     "@tanstack/vue-query": "^5.91.0",
     "@vueuse/core": "^10.7.0",
-    "axios": "^1.6.0",
+    "axios": "~1.20.0",
     "pinia": "^2.1.7",
-    "vue": "^3.4.0",
+    "qrcode": "^1.5.4",
+    "simple-keyboard": "3.8.194",
+    "vue": "^3.5.44",
     "vue-router": "^4.2.5",
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.0.0",
     "@playwright/test": "^1.57.0",
     "@testing-library/jest-dom": "^6.1.0",
     "@testing-library/vue": "^8.0.0",
-    "@vitejs/plugin-vue": "^5.0.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "@vitest/ui": "^1.0.0",
+    "@vitejs/plugin-vue": "^6.0.10",
+    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/ui": "^5.0.5",
     "@vue/test-utils": "^2.4.0",
     "eslint": "^9.0.0",
     "eslint-plugin-vue": "^9.0.0",
     "globals": "^15.0.0",
     "jsdom": "^23.2.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.1.0",
-    "vite": "^5.0.0",
-    "vitest": "^1.0.0"
+    "typescript": "^5.9.3",
+    "vite": "8.3.4",
+    "vitest": "^5.0.5",
+    "vue-tsc": "^3.3.14"
+  },
+  "overrides": {
+    "minimatch": "^11.0.3",
+    "@redocly/openapi-core": {
+      "minimatch": "^5.1.9"
+    },
+    "js-beautify": {
+      "glob": "^14.0.3"
+    }
   }
 }

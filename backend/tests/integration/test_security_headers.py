@@ -1,0 +1,328 @@
+"""Integration tests for the CSP security-headers middleware."""
+
+import asyncio
+import tempfile
+from collections.abc import Generator
+from datetime import UTC, datetime
+from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import databases
+import pytest
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.testclient import TestClient
+
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.models.db_models import PluginDB
+from tests._support.db import (
+    cleanup_db_file,
+    create_tables_with_verify,
+    update_ormar_models_database,
+)
+
+
+@pytest.fixture
+def security_test_client(temp_image_dir: Path) -> Generator[TestClient, None, None]:
+    """TestClient with SecurityHeadersMiddleware wired up, backed by a fresh DB."""
+    import os
+
+    import app.config
+
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+        db_path = Path(tmp.name)
+
+    original_image_dir = os.environ.get("IMAGE_DIR")
+    os.environ["IMAGE_DIR"] = str(temp_image_dir.resolve())
+
+    original_db_url = app.config.settings.database_url
+    test_db_path_abs = db_path.resolve()
+    app.config.settings.database_url = f"sqlite:///{test_db_path_abs}"
+
+    create_tables_with_verify(db_path)
+
+    test_db_url = f"sqlite+aiosqlite:///{test_db_path_abs}"
+    test_database = databases.Database(test_db_url)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(test_database.connect())
+    finally:
+        loop.close()
+
+    import app.database as db_module
+
+    original_database = db_module.database
+    db_module.database = test_database
+    update_ormar_models_database(test_database)
+
+    from app.api.routes import health
+
+    test_app = FastAPI(title="Calvin Security Test API")
+    test_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    test_app.add_middleware(SecurityHeadersMiddleware)
+    test_app.include_router(health.router, prefix="/api", tags=["health"])
+
+    # HTMLResponse stand-in for the SPA's index.html FileResponse.
+    # (Using HTMLResponse rather than FileResponse to avoid needing a real file
+    # path in the fixture; the fragile BaseHTTPMiddleware+FileResponse combo is
+    # covered by the dedicated test_csp_present_on_html_response test below.)
+    @test_app.get("/spa")
+    async def _spa_root():
+        return HTMLResponse("<html><body>kiosk</body></html>")
+
+    with TestClient(test_app) as client:
+        yield client
+
+    # Teardown
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(test_database.disconnect())
+        finally:
+            loop.close()
+    except Exception:
+        pass
+
+    app.config.settings.database_url = original_db_url
+    db_module.database = original_database
+    update_ormar_models_database(original_database)
+
+    if original_image_dir is None:
+        os.environ.pop("IMAGE_DIR", None)
+    else:
+        os.environ["IMAGE_DIR"] = original_image_dir
+
+    cleanup_db_file(db_path)
+
+
+@pytest.mark.integration
+class TestSecurityHeaders:
+    def test_csp_present_on_api_response(self, security_test_client: TestClient):
+        response = security_test_client.get("/api/health")
+        csp = response.headers.get("content-security-policy")
+        assert csp is not None
+        assert "default-src 'self'" in csp
+        assert "frame-src 'self'" in csp
+
+    def test_frame_src_includes_configured_web_service_origin(
+        self, security_test_client: TestClient
+    ):
+        # Seed an enabled built-in web-service (iframe) instance directly via
+        # the async ORM, using the same pattern as conftest._seed_test_data.
+        async def _seed():
+            import ormar
+
+            try:
+                await PluginDB.objects.get(id="ws-grafana")
+            except ormar.NoMatch:
+                await PluginDB.objects.create(
+                    id="ws-grafana",
+                    type_id="iframe",
+                    plugin_type="service",
+                    name="Grafana",
+                    enabled=True,
+                    config={"url": "https://grafana.lab:3000/d/home"},
+                    display_order=0,
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        response = security_test_client.get("/api/health")
+        csp = response.headers.get("content-security-policy", "")
+        assert "https://grafana.lab:3000" in csp
+
+    def test_disabled_and_non_iframe_instances_excluded_from_frame_src(
+        self, security_test_client: TestClient
+    ):
+        """Disabled iframe instances and enabled non-iframe instances must not
+        appear in frame-src — only enabled type_id='iframe' instances count."""
+
+        async def _seed():
+            import ormar
+
+            # (a) disabled iframe instance — should be excluded
+            try:
+                await PluginDB.objects.get(id="ws-disabled-iframe")
+            except ormar.NoMatch:
+                await PluginDB.objects.create(
+                    id="ws-disabled-iframe",
+                    type_id="iframe",
+                    plugin_type="service",
+                    name="Disabled Iframe",
+                    enabled=False,
+                    config={"url": "https://disabled-kiosk.internal/board"},
+                    display_order=0,
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+
+            # (b) enabled non-iframe service instance — should be excluded
+            try:
+                await PluginDB.objects.get(id="ws-mealie-enabled")
+            except ormar.NoMatch:
+                await PluginDB.objects.create(
+                    id="ws-mealie-enabled",
+                    type_id="mealie",
+                    plugin_type="service",
+                    name="Mealie",
+                    enabled=True,
+                    config={"url": "https://mealie.internal/api"},
+                    display_order=1,
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
+                )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        response = security_test_client.get("/api/health")
+        csp = response.headers.get("content-security-policy", "")
+        assert "https://disabled-kiosk.internal" not in csp
+        assert "https://mealie.internal" not in csp
+
+    def test_csp_present_on_html_response(self, security_test_client: TestClient):
+        """Middleware must stamp CSP on non-API HTML (SPA) responses.
+
+        BaseHTTPMiddleware + FileResponse/HTMLResponse is a historically fragile
+        combo in Starlette — this test locks in that stamping still works when
+        the underlying response is HTML rather than JSON.  The route uses
+        HTMLResponse (a FileResponse stand-in) to avoid requiring a real file
+        path in the fixture.
+        """
+        response = security_test_client.get("/spa")
+        assert response.status_code == 200
+        csp = response.headers.get("content-security-policy")
+        assert csp is not None, "CSP header must be present on HTML responses"
+        assert "default-src 'self'" in csp
+        assert "frame-src 'self'" in csp
+
+    def test_allowlist_origin_appears_in_three_directives(self, security_test_client):
+        import json
+
+        from app.models.db_models import ConfigDB
+
+        async def _seed():
+            await ConfigDB.objects.create(
+                key="security_allowed_origins",
+                value=json.dumps(["https://grafana.lab:3000"]),
+                value_type="json",
+            )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
+        assert "img-src 'self' data: https://grafana.lab:3000" in csp
+        assert "connect-src 'self' https://grafana.lab:3000" in csp
+        assert "frame-src 'self' https://grafana.lab:3000" in csp
+
+    def test_plugin_browser_origins_appear_in_three_directives(self, security_test_client):
+        """An enabled plugin's declared browser_origins extend frame/img/connect-src."""
+        with patch(
+            "app.middleware.security_headers.get_plugin_browser_origins",
+            new=AsyncMock(return_value=["cast.example.com"]),
+        ):
+            csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
+
+        assert "img-src 'self' data: cast.example.com" in csp
+        assert "connect-src 'self' cast.example.com" in csp
+        assert "frame-src 'self' cast.example.com" in csp
+
+    def test_sealed_mode_forces_self_only_csp(self, security_test_client, monkeypatch):
+        """With sealed_mode on, the CSP is baseline self-only even when a web-service
+        embed, an admin allowlist entry, and a plugin browser_origins all exist."""
+        import json
+
+        from app.models.db_models import ConfigDB, PluginDB
+
+        class _Meta:
+            browser_origins = ["cast.example.com"]
+
+        class _Plugin:
+            metadata = _Meta()
+
+        import app.plugins.manager as manager_module
+
+        monkeypatch.setattr(
+            manager_module.plugin_manager, "get_plugins", lambda enabled_only=True: [_Plugin()]
+        )
+
+        async def _seed():
+            await ConfigDB.objects.create(
+                key="security_allowed_origins",
+                value=json.dumps(["https://grafana.lab:3000"]),
+                value_type="json",
+            )
+            await ConfigDB.objects.create(key="sealed_mode", value="true", value_type="bool")
+            await PluginDB.objects.create(
+                id="ws-embed",
+                type_id="iframe",
+                plugin_type="service",
+                name="Embed",
+                enabled=True,
+                config={"url": "https://embed.internal/board"},
+                display_order=0,
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
+            )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(_seed())
+        finally:
+            loop.close()
+
+        csp = security_test_client.get("/api/health").headers.get("content-security-policy", "")
+        # frame-src must have no extra origins beyond 'self'
+        frame_directive = next((d for d in csp.split("; ") if d.startswith("frame-src")), "")
+        assert frame_directive == "frame-src 'self'"
+        assert "cast.example.com" not in csp
+        assert "grafana.lab" not in csp
+        assert "embed.internal" not in csp
+        # Baseline directives intact
+        assert "default-src 'self'" in csp
+        assert "img-src 'self' data:" in csp
+        assert "connect-src 'self'" in csp
+
+    def test_db_error_falls_back_to_baseline_csp(self, security_test_client: TestClient):
+        """A DB failure during origins lookup must never discard the response as a 500.
+
+        The middleware must catch the exception and fall back to the baseline
+        self-only CSP so the underlying route's response is still returned.
+        """
+        with patch(
+            "app.middleware.security_headers.get_web_service_origins",
+            new=AsyncMock(side_effect=Exception("simulated DB lock")),
+        ):
+            response = security_test_client.get("/api/health")
+
+        assert response.status_code != 500
+        csp = response.headers.get("content-security-policy", "")
+        assert "default-src 'self'" in csp
+        assert "frame-src 'self'" in csp

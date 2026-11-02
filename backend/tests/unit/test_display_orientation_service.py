@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.config import settings
 from app.services.display_orientation_service import DisplayOrientationService
 
 
@@ -11,6 +12,13 @@ from app.services.display_orientation_service import DisplayOrientationService
 def orientation_service():
     """Create a DisplayOrientationService instance."""
     return DisplayOrientationService()
+
+
+@pytest.fixture(autouse=True)
+def _host_control_on():
+    """Most tests exercise the real xrandr path; host control is explicitly on."""
+    with patch.object(settings, "host_control", True):
+        yield
 
 
 class TestDisplayOrientationService:
@@ -482,3 +490,22 @@ class TestDisplayOrientationService:
             await orientation_service.sync_with_config()
 
             mock_apply.assert_called_once_with("landscape", True)
+
+    @pytest.mark.asyncio
+    async def test_apply_orientation_refused_without_host_control(self, orientation_service):
+        """Never run xrandr (or touch config.txt) when Calvin does not own the host."""
+        with (
+            patch.object(settings, "host_control", False),
+            patch.object(
+                orientation_service, "_apply_xrandr_orientation", new_callable=AsyncMock
+            ) as xrandr,
+            patch.object(
+                orientation_service, "_apply_config_txt_orientation", new_callable=AsyncMock
+            ) as config_txt,
+        ):
+            result = await orientation_service.apply_orientation("portrait", False)
+
+        assert result["success"] is False
+        assert "host control" in result["message"].lower()
+        xrandr.assert_not_called()
+        config_txt.assert_not_called()

@@ -4,13 +4,14 @@
 
 import { computed, ref } from "vue";
 import { useConfigStore } from "../stores/config";
-import { useKeyboardStore } from "../stores/keyboard";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
+import { friendlyError } from "../utils/friendlyError";
+import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
+import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
-  const keyboardStore = useKeyboardStore();
   const localConfig = ref({ ...initialConfig });
   const saving = ref(false);
   const error = ref("");
@@ -62,12 +63,34 @@ export function useConfigForm(initialConfig = {}) {
           response.applyDisplayRotation ?? response.apply_display_rotation ?? true,
         // Layout
         calendarSplit: response.calendarSplit ?? response.calendar_split ?? 70,
-        sideViewPosition: response.sideViewPosition ?? response.side_view_position ?? "right",
+        dashboardLayout: normalizeDashboardLayout(
+          response.dashboardLayout ?? response.dashboard_layout ?? null,
+          {
+            calendarSplit: response.calendarSplit ?? response.calendar_split ?? 70,
+            lastSideViewMode: response.lastSideViewMode ?? response.last_side_view_mode ?? "photos",
+          }
+        ),
+        dashboardScreens: normalizeDashboardScreens(
+          response.dashboardScreens ?? response.dashboard_screens ?? null
+        ),
+        // Global page assignment: what browsers and new screens show (the
+        // Default screen's Pages section).
+        availableScreens: Array.isArray(response.availableScreens)
+          ? response.availableScreens
+          : Array.isArray(response.available_screens)
+            ? response.available_screens
+            : null,
+        defaultScreenId: response.defaultScreenId ?? response.default_screen_id ?? null,
         lastSideViewMode: response.lastSideViewMode ?? response.last_side_view_mode ?? "photos",
         showWebServices: response.showWebServices ?? response.show_web_services ?? false,
         // Photos
         photoFrameEnabled: response.photoFrameEnabled ?? response.photo_frame_enabled ?? false,
         photoFrameTimeout: response.photoFrameTimeout ?? response.photo_frame_timeout ?? 300,
+        photoFrameSourceIds: Array.isArray(
+          response.photoFrameSourceIds ?? response.photo_frame_source_ids
+        )
+          ? (response.photoFrameSourceIds ?? response.photo_frame_source_ids)
+          : [],
         photoRotationInterval:
           response.photoRotationInterval ?? response.photo_rotation_interval ?? 30,
         imageDisplayMode: response.imageDisplayMode ?? response.image_display_mode ?? "smart",
@@ -75,8 +98,20 @@ export function useConfigForm(initialConfig = {}) {
         // UI
         showUI: response.showUI ?? response.show_ui ?? true,
         modeIndicatorTimeout: response.modeIndicatorTimeout ?? response.mode_indicator_timeout ?? 5,
+        focusLightMode: response.focusLightMode ?? response.focus_light_mode ?? "interaction",
+        focusLightDimOthers:
+          response.focusLightDimOthers ?? response.focus_light_dim_others ?? true,
+        loadingLight: response.loadingLight ?? response.loading_light ?? "comet",
+        touchControls: response.touchControls ?? response.touch_controls ?? "auto",
+        touchControlSize: response.touchControlSize ?? response.touch_control_size ?? "medium",
+        tapAnywhereReveal: response.tapAnywhereReveal ?? response.tap_anywhere_reveal ?? false,
+        hotCornerPosition:
+          response.hotCornerPosition ?? response.hot_corner_position ?? "bottom-left",
+        hotCornerOpacity: response.hotCornerOpacity ?? response.hot_corner_opacity ?? 55,
+        hotCornerSize: response.hotCornerSize ?? response.hot_corner_size ?? 64,
+        hotCornerLongPressMs:
+          response.hotCornerLongPressMs ?? response.hot_corner_long_press_ms ?? 500,
         // Calendar
-        calendarViewMode: response.calendarViewMode ?? response.calendar_view_mode ?? "month",
         timeFormat: response.timeFormat ?? response.time_format ?? "24h",
         weekStartDay: response.weekStartDay ?? response.week_start_day ?? 1,
         showWeekNumbers: response.showWeekNumbers ?? response.show_week_numbers ?? false,
@@ -112,11 +147,12 @@ export function useConfigForm(initialConfig = {}) {
           response.displayTimeoutEnabled ?? response.display_timeout_enabled ?? false,
         displayTimeout: response.displayTimeout ?? response.display_timeout ?? 0,
         // Keyboard
-        keyboardType:
-          response.keyboardType ??
-          response.keyboard_type ??
-          keyboardStore.keyboardType ??
-          "7-button",
+        onScreenKeyboard: response.onScreenKeyboard ?? response.on_screen_keyboard ?? "auto",
+        // The on-screen keyboard's layout is its own setting, never the UI language.
+        oskLayout: normalizeOskLayout(response.oskLayout ?? response.osk_layout ?? null),
+        oskExtraLayouts: normalizeOskExtraLayouts(
+          response.oskExtraLayouts ?? response.osk_extra_layouts ?? []
+        ),
         keyboardFeedbackEnabled:
           response.keyboardFeedbackEnabled ?? response.keyboard_feedback_enabled ?? true,
         keyboardFeedbackMode:
@@ -127,47 +163,49 @@ export function useConfigForm(initialConfig = {}) {
           response.rebootComboDuration ?? response.reboot_combo_duration ?? 10000,
         // Clock
         timezone: response.timezone ?? null,
-        clockEnabled: response.clockEnabled ?? response.clock_enabled ?? true,
-        clockDisplayMode: response.clockDisplayMode ?? response.clock_display_mode ?? "header",
         clockShowDate: response.clockShowDate ?? response.clock_show_date ?? false,
         clockShowSeconds: response.clockShowSeconds ?? response.clock_show_seconds ?? false,
-        clockPosition: response.clockPosition ?? response.clock_position ?? "top-right",
-        clockSize: response.clockSize ?? response.clock_size ?? "medium",
-        // New clock settings
-        clockWidgetEnabled: response.clockWidgetEnabled ?? response.clock_widget_enabled ?? false,
-        clockWidgetShowInKiosk:
-          response.clockWidgetShowInKiosk ?? response.clock_widget_show_in_kiosk ?? false,
-        clockWidgetPosition:
-          response.clockWidgetPosition ?? response.clock_widget_position ?? "top-right",
-        clockBarEnabled: response.clockBarEnabled ?? response.clock_bar_enabled ?? false,
         clockBarMode: response.clockBarMode ?? response.clock_bar_mode ?? "horizontal",
-        clockBarShowInNonKiosk:
-          response.clockBarShowInNonKiosk ?? response.clock_bar_show_in_non_kiosk ?? false,
         clockBarShowInKiosk:
           response.clockBarShowInKiosk ?? response.clock_bar_show_in_kiosk ?? false,
         clockBarPosition: response.clockBarPosition ?? response.clock_bar_position ?? "top",
         clockBarFontSize: response.clockBarFontSize ?? response.clock_bar_font_size ?? 16,
         clockBarDateFontSize:
           response.clockBarDateFontSize ?? response.clock_bar_date_font_size ?? 14,
-        clockBarLayout: response.clockBarLayout ?? response.clock_bar_layout ?? "single-line",
+        clockBarLayout:
+          response.clockBarLayout === "two-lines" || response.clock_bar_layout === "two-lines"
+            ? "two-lines"
+            : "single-line",
+        clockBarVerticalLayout:
+          response.clockBarVerticalLayout ??
+          response.clock_bar_vertical_layout ??
+          (response.clockBarLayout === "vertical-compact" ||
+          response.clock_bar_layout === "vertical-compact"
+            ? "compact-time"
+            : "upright"),
+        clockBarVerticalFontSize:
+          response.clockBarVerticalFontSize ?? response.clock_bar_vertical_font_size ?? 18,
+        clockBarVerticalDateFontSize:
+          response.clockBarVerticalDateFontSize ?? response.clock_bar_vertical_date_font_size ?? 11,
+        clockBarVerticalPadding:
+          response.clockBarVerticalPadding ?? response.clock_bar_vertical_padding ?? 8,
         clockBarPadding: response.clockBarPadding ?? response.clock_bar_padding ?? 8,
+        clockBarShowPluginItems:
+          response.clockBarShowPluginItems ?? response.clock_bar_show_plugin_items ?? true,
+        clockBarShowLogo: response.clockBarShowLogo ?? response.clock_bar_show_logo ?? true,
         // Other
-        mealPlanCardSize: response.mealPlanCardSize ?? response.meal_plan_card_size ?? "medium",
+        uiSize: response.uiSize ?? response.ui_size ?? "default",
         consoleLogEnabled: response.consoleLogEnabled ?? response.console_log_enabled ?? true,
         consoleLogLevel: response.consoleLogLevel ?? response.console_log_level ?? "info",
         configPollInterval: response.configPollInterval ?? response.config_poll_interval ?? 30,
         calendarRefreshInterval:
           response.calendarRefreshInterval ?? response.calendar_refresh_interval ?? 15,
         gitRepoUrl: response.gitRepoUrl ?? response.git_repo_url ?? null,
-        gitBranch: response.gitBranch ?? response.git_branch ?? "main",
+        gitBranch: response.gitBranch ?? response.git_branch ?? "develop",
         version: response.version ?? null,
+        revision: response.revision ?? null,
         frontendVersion: response.frontendVersion ?? response.frontend_version ?? null,
       };
-
-      // Update keyboard store
-      if (localConfig.value.keyboardType) {
-        keyboardStore.setKeyboardType(localConfig.value.keyboardType);
-      }
     } catch (err) {
       logError("[useConfigForm]", "Failed to load config:", err);
       error.value = "Failed to load configuration";
@@ -194,7 +232,7 @@ export function useConfigForm(initialConfig = {}) {
 
     try {
       const configToSave = updates || localConfig.value;
-      await configApi.updateConfig(configToSave);
+      // The store POSTs to the backend and applies the result; one request per save.
       await configStore.updateConfig(configToSave);
       lastSavedKeys.value = updates ? Object.keys(updates) : [];
       saveSuccess.value = true;
@@ -207,7 +245,7 @@ export function useConfigForm(initialConfig = {}) {
       }, 2500);
     } catch (err) {
       logError("[useConfigForm]", "Failed to save config:", err);
-      error.value = err.response?.data?.detail || err.message || "Failed to save configuration";
+      error.value = friendlyError(err, "save your settings");
       throw err;
     } finally {
       saving.value = false;

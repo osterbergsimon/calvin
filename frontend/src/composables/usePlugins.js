@@ -5,6 +5,8 @@
 
 import { ref, computed } from "vue";
 import * as pluginsApi from "../services/pluginsApi";
+import { useWebServicesStore } from "../stores/webServices";
+import { errorDetailMessage } from "../utils/apiErrors";
 import { logError, logWarn } from "../utils/logger";
 
 // Shared state (singleton pattern)
@@ -20,12 +22,15 @@ const selectedPluginZip = ref(null);
 const githubRepoUrl = ref("");
 const githubBranch = ref("main");
 const availablePlugins = ref([]);
+// The official add-on catalog, enumerated separately from `availablePlugins`
+// so browsing another repository never puts its rows under "Calvin catalog".
+const catalogPlugins = ref([]);
+const catalogEnumerating = ref(false);
+const catalogError = ref("");
 const pluginInstallError = ref("");
 const pluginInstallSuccess = ref("");
-const pluginRequiresRestart = ref(false);
 const pluginBranchSwitched = ref(false);
 const pluginActualBranch = ref("");
-const pluginFrontendRebuildResult = ref(null); // null | { success: bool, message: str }
 const expandedPlugins = ref({});
 const pluginFormData = ref({});
 const savingPlugin = ref(null);
@@ -45,7 +50,7 @@ const sortedPluginCategories = computed(() => {
     { type: "calendar", label: "Calendar", plugins: [] },
     { type: "image", label: "Image", plugins: [] },
     { type: "service", label: "Service", plugins: [] },
-    { type: "backend", label: "Backend", plugins: [] },
+    { type: "backend", label: "Background", plugins: [] },
     { type: "theme", label: "Theme", plugins: [] },
   ];
 
@@ -58,42 +63,6 @@ const sortedPluginCategories = computed(() => {
 
   return categories.filter(c => c.plugins.length > 0);
 });
-
-// Poll the backend rebuild-status endpoint until building is complete,
-// updating pluginFrontendRebuildResult along the way.
-let _rebuildPollTimer = null;
-function _startRebuildPolling() {
-  if (_rebuildPollTimer !== null) return; // already polling
-  pluginFrontendRebuildResult.value = {
-    building: true,
-    success: null,
-    message: "Building frontend, this may take a minute…",
-  };
-
-  const poll = async () => {
-    try {
-      const status = await pluginsApi.getRebuildStatus();
-      if (status.state === "building") {
-        pluginFrontendRebuildResult.value = {
-          building: true,
-          success: null,
-          message: status.message,
-        };
-        _rebuildPollTimer = setTimeout(poll, 2000);
-      } else {
-        _rebuildPollTimer = null;
-        pluginFrontendRebuildResult.value = {
-          building: false,
-          success: status.state === "done",
-          message: status.message,
-        };
-      }
-    } catch {
-      _rebuildPollTimer = null;
-    }
-  };
-  _rebuildPollTimer = setTimeout(poll, 1000);
-}
 
 export function usePlugins() {
   // Load plugins
@@ -131,9 +100,10 @@ export function usePlugins() {
             continue;
           }
 
-          // Get display_order from the plugin list first; it is app-managed,
-          // not part of the plugin-owned common_config_schema.
-          let displayOrder = plugin.display_order;
+          // Get display_order from plugin's common_config_schema first (from plugin list)
+          // This is the source of truth and avoids needing to fetch config separately
+          const pluginSchema = plugin.common_config_schema || {};
+          let displayOrder = pluginSchema.display_order;
 
           const [instancesResponse, configResponse] = await Promise.all([
             pluginsApi.getPluginInstances(plugin.id).catch(() => ({ instances: [] })),
@@ -190,29 +160,22 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
 
     try {
       const response = await pluginsApi.installPluginFromZip(file);
       pluginInstallSuccess.value = "Plugin installed successfully!";
-      pluginRequiresRestart.value = response.requires_restart || false;
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
-
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-        }, 5000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
 
       await loadPlugins();
+      return response.manifest?.id ? [response.manifest.id] : [];
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to install plugin";
+      pluginInstallError.value = errorDetailMessage(error, "Failed to install plugin");
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
+      return [];
     } finally {
       installingPlugin.value = false;
     }
@@ -281,8 +244,10 @@ export function usePlugins() {
       pluginActualBranch.value = response.branch || branch;
     } catch (error) {
       logError("[usePlugins]", "Failed to enumerate plugins from GitHub:", error);
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to enumerate plugins from GitHub";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to enumerate plugins from GitHub"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -291,47 +256,85 @@ export function usePlugins() {
     }
   };
 
+  // Enumerate the official catalog into its own list (§3.3). Independent of the
+  // "another GitHub repository" browse flow; failures leave it empty.
+  const enumerateCatalogPlugins = async (repoUrl, branch = "main") => {
+    catalogEnumerating.value = true;
+    catalogError.value = "";
+    catalogPlugins.value = [];
+    try {
+      const response = await pluginsApi.enumeratePluginsFromGitHub(repoUrl, branch);
+      const allItems = [
+        ...(response.plugins || []),
+        ...(response.themes || []).map(theme => ({ ...theme, type: "theme" })),
+      ];
+      let installedById = {};
+      try {
+        const installedResponse = await pluginsApi.getInstalledPlugins();
+        installedById = Object.fromEntries(
+          (installedResponse.plugins || []).map(plugin => [plugin.id, plugin])
+        );
+      } catch (error) {
+        if (error.response?.status !== 404) {
+          logWarn("[usePlugins]", "Failed to load installed plugins for the catalog:", error);
+        }
+      }
+      catalogPlugins.value = allItems.map(plugin =>
+        installedById[plugin.id]
+          ? {
+              ...plugin,
+              _installed: true,
+              _installedVersion: installedById[plugin.id].version || null,
+            }
+          : { ...plugin, _installed: false, _installedVersion: null }
+      );
+      return response;
+    } catch (error) {
+      logError("[usePlugins]", "Failed to enumerate the plugin catalog:", error);
+      catalogPlugins.value = [];
+      catalogError.value = errorDetailMessage(error, "Could not reach the plugin catalog");
+      return null;
+    } finally {
+      catalogEnumerating.value = false;
+    }
+  };
+
   // Install plugin from GitHub
   const installPluginFromGitHub = async (repoUrl, pluginPath, branch = "main", force = false) => {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
     pluginBranchSwitched.value = false;
     pluginActualBranch.value = "";
 
     try {
       const response = await pluginsApi.installPluginFromGitHub(repoUrl, pluginPath, branch, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
-      pluginRequiresRestart.value = response.requires_restart || false;
       pluginBranchSwitched.value = response.branch_switched || false;
       pluginActualBranch.value = response.branch || branch;
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
-
-      // Mark the installed plugin in-place so the list stays visible
+      // Mark the installed plugin in-place so both lists stay visible and the
+      // catalog row flips to Installed/Update without a re-enumerate.
       const installedId = response.manifest?.id || pluginPath;
-      const idx = availablePlugins.value.findIndex(
-        p => p.id === installedId || p.path === pluginPath
-      );
-      if (idx !== -1) {
-        availablePlugins.value[idx] = {
-          ...availablePlugins.value[idx],
+      const markInstalled = list => {
+        const idx = list.value.findIndex(p => p.id === installedId || p.path === pluginPath);
+        if (idx === -1) return;
+        list.value[idx] = {
+          ...list.value[idx],
           _installed: true,
-          _installedVersion: response.manifest?.version || availablePlugins.value[idx].version,
+          _installedVersion: response.manifest?.version || list.value[idx].version,
         };
-      }
+      };
+      markInstalled(availablePlugins);
+      markInstalled(catalogPlugins);
 
       await loadPlugins();
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-        }, 5000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
+      return [installedId];
     } catch (error) {
-      const errorDetail = error.response?.data?.detail || error.message || "";
+      const errorDetail = errorDetailMessage(error, "");
       if (errorDetail.includes("older than") || errorDetail.includes("version")) {
         pluginInstallError.value = errorDetail;
       } else {
@@ -340,6 +343,7 @@ export function usePlugins() {
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
+      return [];
     } finally {
       installingPlugin.value = false;
     }
@@ -350,14 +354,12 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
     pluginBranchSwitched.value = false;
     pluginActualBranch.value = "";
 
     const results = {
       success: [],
       failed: [],
-      requiresRestart: false,
     };
 
     try {
@@ -374,21 +376,15 @@ export function usePlugins() {
             name: plugin.name || plugin.id,
             response,
           });
-          if (response.requires_restart) {
-            results.requiresRestart = true;
-          }
           if (response.branch_switched) {
             pluginBranchSwitched.value = true;
             pluginActualBranch.value = response.branch || branch;
-          }
-          if (response.frontend_rebuild_in_progress) {
-            _startRebuildPolling();
           }
         } catch (error) {
           results.failed.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
-            error: error.response?.data?.detail || error.message || "Unknown error",
+            error: errorDetailMessage(error, "Unknown error"),
           });
         }
       }
@@ -398,14 +394,12 @@ export function usePlugins() {
         // All succeeded
         const successNames = results.success.map(s => s.name).join(", ");
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.success.length > 0 && results.failed.length > 0) {
         // Partial success
         const successNames = results.success.map(s => s.name).join(", ");
         const failedNames = results.failed.map(f => f.name).join(", ");
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${successNames}`;
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${failedNames}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.failed.length > 0) {
         // All failed
         const failedNames = results.failed.map(f => f.name).join(", ");
@@ -431,21 +425,19 @@ export function usePlugins() {
         await loadPlugins();
       }
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-          pluginInstallError.value = "";
-        }, 10000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+        pluginInstallError.value = "";
+      }, 10000);
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to install plugins from GitHub";
+      pluginInstallError.value = errorDetailMessage(error, "Failed to install plugins from GitHub");
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
     } finally {
       installingPlugin.value = false;
     }
+    return results.success.map(s => s.response?.manifest?.id || s.id);
   };
 
   // Enumerate plugins from a local path (dev mode only)
@@ -495,10 +487,10 @@ export function usePlugins() {
       });
     } catch (error) {
       logError("[usePlugins]", "Failed to enumerate plugins from local path:", error);
-      pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to enumerate plugins from local path";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to enumerate plugins from local path"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
@@ -512,16 +504,10 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
 
     try {
       const response = await pluginsApi.installPluginFromLocal(localPath, pluginPath, force);
       pluginInstallSuccess.value = "Plugin installed successfully!";
-      pluginRequiresRestart.value = response.requires_restart || false;
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
-
       // Mark the installed plugin in-place so the list stays visible
       const installedId = response.manifest?.id || pluginPath;
       const idx = availablePlugins.value.findIndex(
@@ -537,17 +523,19 @@ export function usePlugins() {
 
       await loadPlugins();
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-        }, 5000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+      }, 5000);
+      return [installedId];
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail || error.message || "Failed to install plugin from local path";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to install plugin from local path"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
+      return [];
     } finally {
       installingPlugin.value = false;
     }
@@ -558,9 +546,8 @@ export function usePlugins() {
     installingPlugin.value = true;
     pluginInstallError.value = "";
     pluginInstallSuccess.value = "";
-    pluginRequiresRestart.value = false;
 
-    const results = { success: [], failed: [], requiresRestart: false };
+    const results = { success: [], failed: [] };
 
     try {
       for (const plugin of plugins) {
@@ -571,26 +558,20 @@ export function usePlugins() {
             name: plugin.name || plugin.id,
             response,
           });
-          if (response.requires_restart) results.requiresRestart = true;
-          if (response.frontend_rebuild_in_progress) {
-            _startRebuildPolling();
-          }
         } catch (error) {
           results.failed.push({
             id: plugin.id,
             name: plugin.name || plugin.id,
-            error: error.response?.data?.detail || error.message || "Unknown error",
+            error: errorDetailMessage(error, "Unknown error"),
           });
         }
       }
 
       if (results.success.length > 0 && results.failed.length === 0) {
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map(s => s.name).join(", ")}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else if (results.success.length > 0) {
         pluginInstallSuccess.value = `Successfully installed ${results.success.length} plugin(s): ${results.success.map(s => s.name).join(", ")}`;
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map(f => f.name).join(", ")}`;
-        pluginRequiresRestart.value = results.requiresRestart;
       } else {
         pluginInstallError.value = `Failed to install ${results.failed.length} plugin(s): ${results.failed.map(f => `${f.name}: ${f.error}`).join("; ")}`;
       }
@@ -611,32 +592,28 @@ export function usePlugins() {
 
       if (results.success.length > 0) await loadPlugins();
 
-      if (!pluginRequiresRestart.value) {
-        setTimeout(() => {
-          pluginInstallSuccess.value = "";
-          pluginInstallError.value = "";
-        }, 10000);
-      }
+      setTimeout(() => {
+        pluginInstallSuccess.value = "";
+        pluginInstallError.value = "";
+      }, 10000);
     } catch (error) {
-      pluginInstallError.value =
-        error.response?.data?.detail ||
-        error.message ||
-        "Failed to install plugins from local path";
+      pluginInstallError.value = errorDetailMessage(
+        error,
+        "Failed to install plugins from local path"
+      );
       setTimeout(() => {
         pluginInstallError.value = "";
       }, 10000);
     } finally {
       installingPlugin.value = false;
     }
+    return results.success.map(s => s.response?.manifest?.id || s.id);
   };
 
   // Uninstall plugin
   const uninstallPlugin = async (pluginId, pluginType = null) => {
     try {
-      const response = await pluginsApi.uninstallPlugin(pluginId, pluginType);
-      if (response.frontend_rebuild_in_progress) {
-        _startRebuildPolling();
-      }
+      await pluginsApi.uninstallPlugin(pluginId, pluginType);
       await loadPlugins();
     } catch (error) {
       logError("[usePlugins]", "Failed to uninstall plugin:", error);
@@ -673,9 +650,11 @@ export function usePlugins() {
       const normalizedConfig = await loadPluginConfig(pluginId);
       pluginConfigs.value[pluginId] = { ...normalizedConfig };
       pluginFormData.value[pluginId] = { ...normalizedConfig };
+      await loadPlugins();
+      await useWebServicesStore().fetchServices();
       pluginSaveStatus.value[pluginId] = {
         success: true,
-        message: "Configuration saved successfully",
+        message: "Saved.",
       };
       setTimeout(() => {
         pluginSaveStatus.value[pluginId] = null;
@@ -684,7 +663,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to save config for plugin ${pluginId}:`, error);
       pluginSaveStatus.value[pluginId] = {
         success: false,
-        message: error.response?.data?.detail || error.message || "Failed to save configuration",
+        message: errorDetailMessage(error, "Failed to save configuration"),
       };
       throw error;
     } finally {
@@ -708,7 +687,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to test plugin ${pluginId}:`, error);
       pluginTestStatus.value[pluginId] = {
         success: false,
-        message: error.response?.data?.detail || error.message || "Test failed",
+        message: errorDetailMessage(error, "Test failed"),
       };
       throw error;
     } finally {
@@ -731,7 +710,7 @@ export function usePlugins() {
       logError("[usePlugins]", `Failed to fetch plugin ${pluginId}:`, error);
       pluginFetchStatus.value[pluginId] = {
         success: false,
-        message: error.response?.data?.detail || error.message || "Failed to initiate fetch",
+        message: errorDetailMessage(error, "Failed to initiate fetch"),
       };
       throw error;
     } finally {
@@ -896,12 +875,13 @@ export function usePlugins() {
     githubRepoUrl,
     githubBranch,
     availablePlugins,
+    catalogPlugins,
+    catalogEnumerating,
+    catalogError,
     pluginInstallError,
     pluginInstallSuccess,
-    pluginRequiresRestart,
     pluginBranchSwitched,
     pluginActualBranch,
-    pluginFrontendRebuildResult,
     expandedPlugins,
     pluginFormData,
     savingPlugin,
@@ -917,6 +897,7 @@ export function usePlugins() {
     loadPlugins,
     installPluginFromZip,
     enumeratePluginsFromGitHub,
+    enumerateCatalogPlugins,
     installPluginFromGitHub,
     installPluginsFromGitHub,
     enumeratePluginsFromLocal,

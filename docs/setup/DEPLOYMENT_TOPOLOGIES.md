@@ -1,0 +1,342 @@
+# Deployment Topologies
+
+Calvin's backend serves both the API (`/api/*`) and the built frontend
+(`/`) from a single FastAPI process. That gives you flexibility in how
+you split the work across hosts. Two shapes are officially supported.
+
+## Mode A — All-in-one Pi (default)
+
+The Pi runs everything: backend, frontend, and the kiosk browser.
+
+```
+┌─────────────────────────── Raspberry Pi ───────────────────────────┐
+│                                                                    │
+│   cog (kiosk)      ──> http://localhost:8000  ──> Calvin backend   │
+│                                                  │                 │
+│                                                  └── SQLite, data  │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+Use when:
+- One Pi, simple setup.
+- You want the SD card / SSD to be the single source of truth.
+
+Setup:
+
+```bash
+sudo bash scripts/setup.sh --mode prod
+```
+
+See [SETUP_LINUX.md](SETUP_LINUX.md) for the full walkthrough.
+
+The kiosk browser follows the same display-stack rule as a kiosk Pi (see
+[Display stack](KIOSK_INSTALL.md#display-stack-cog-default-everywhere-wayland-opt-in)):
+
+- A fresh install uses **cog** (WPE WebKit on DRM/KMS, `calvin-cog.service`),
+  on every board. It waits for the local backend before it opens the dashboard.
+- `--display-stack x11|wayland|cog` picks one explicitly:
+  `sudo bash scripts/setup.sh --mode prod --display-stack x11` gives the previous
+  X11 + Chromium kiosk (`calvin-x.service` + `calvin-kiosk.service`).
+- A re-run (or `update-calvin.sh`) keeps the stack recorded in
+  `/etc/default/calvin-kiosk` as `CALVIN_DISPLAY_STACK`. An all-in-one Pi
+  installed before this setting existed is X11 and stays X11; it is never
+  migrated silently. Re-run setup with `--display-stack cog` to move it.
+- X11 + Chromium stay installed on every stack, so switching back is one
+  re-run of setup with `--display-stack x11`, not a reimage.
+- `setup.sh --refresh` skips apt, except when the stack it applies needs a
+  package that is missing (`cog`, or `labwc` on Wayland): it installs that
+  first, and stops before changing any display unit if the install fails.
+
+The screen on/off schedule needs `vcgencmd`/`xset` (or, on cog, the panel
+helper) on the host, which the container does not have, so setup also installs
+the same `calvin-display-agent.service` the kiosk Pis use, pointed at
+`http://localhost:$CALVIN_PORT` (it reads the global config; it does not show
+up under Settings → Screens). Rotation and output settings go in
+`/etc/default/calvin-kiosk` exactly as on a kiosk Pi.
+
+## Mode B — Remote backend + kiosk Pi
+
+The backend (and its data) live on a home server. One or more Pis run
+**only** Chromium, pointed at the server's URL.
+
+```
+┌─────── Home server ───────┐         ┌──── Raspberry Pi ────┐
+│                           │         │                      │
+│   Calvin backend          │ <─────  │   Chromium (kiosk)   │
+│   ├── SQLite, photos      │   LAN   │                      │
+│   └── plugin data         │         │                      │
+└───────────────────────────┘         └──────────────────────┘
+```
+
+Use when:
+- You already run a 24/7 server and don't want SQLite / photos / plugin
+  data on the Pi's SD card.
+- You want multiple kiosk Pis sharing one backend (each just runs
+  Chromium against the same URL).
+- Plugin syncs are heavy and you want them on a beefier host.
+
+### Why no proxy on the Pi?
+
+The kiosk Pi opens the server's URL directly in Chromium. From the
+browser's view it's same-origin: the server hosts both `/` and
+`/api/*`. No CORS, no reverse proxy on the Pi, no env vars baked into
+the frontend. The Pi is genuinely "dumb."
+
+### What stays on the Pi
+
+- X server, openbox, Chromium — installed by `setup-kiosk.sh`.
+- Display / cursor / screensaver tweaks.
+- Anything OS-level you've added (e.g. a hardware reboot button script
+  driven by `evdev`). Calvin's app code does not handle hardware input
+  in the browser path; physical buttons are wired up at the OS level.
+
+### What moves to the server
+
+- The backend Docker container (or whatever you use to run it).
+- `/var/lib/calvin/` — SQLite database, photos, plugin install dirs,
+  kiosk signing key.
+- Plugin installs, including their pip dependencies (live, no rebuild).
+
+### Setup
+
+**1. Server.** Run the standard backend deployment, but bind the port
+to a LAN-reachable interface. On Unraid, use the Docker template in
+[UNRAID.md](UNRAID.md). On a regular Linux server, the simplest path is
+the same Docker compose used in Mode A:
+
+```bash
+# On the server (any Linux box with Docker):
+# v0.1.0 = the release you want; use develop only to test the next one.
+git clone -b v0.1.0 https://github.com/osterbergsimon/calvin.git
+cd calvin
+cp deploy/calvin.env.example docker/.env
+# Edit docker/.env — set CALVIN_IMAGE_TAG=v0.1.0, CALVIN_PORT, DATABASE_URL, etc.
+docker compose -f docker/docker-compose.yml up -d
+```
+
+Verify it answers from another host on the LAN:
+
+```bash
+curl http://<server-host>:8000/api/health
+```
+
+Pin the server to a stable hostname (mDNS `homeserver.local`, a static
+DHCP lease, or a DNS entry) so the kiosk URL doesn't drift.
+
+**2. Pi.** On a fresh Raspberry Pi OS Lite, run the installer the server serves:
+
+```bash
+curl -fsSL http://homeserver.local:8000/api/kiosks/install.sh | sudo bash
+```
+
+**Step-by-step guide, including the signed (SSH) variant, the signing key, and supported Pi models:
+[KIOSK_INSTALL.md](KIOSK_INSTALL.md).** The installer downloads
+`setup-kiosk.sh` from the server and runs it. From a checkout,
+`sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000`
+does the same. `setup-kiosk.sh` installs `xserver-xorg`, `openbox`, `chromium`, and friends;
+writes `/etc/default/calvin-kiosk` with the backend URL; and installs the
+kiosk bundle:
+
+- `calvin-x.service` — starts the X server on tty1.
+- `calvin-kiosk-remote.service` — waits for the backend to answer,
+  then launches Chromium in kiosk mode against `CALVIN_BACKEND_URL`.
+- `calvin-display-agent.service` — applies rotation/resolution and the
+  screen on/off schedule (see below).
+- `calvin-kiosk-update.service` — a root oneshot used by the remote
+  display-agent update flow.
+
+The update bundle installed by `update-kiosk.sh --bootstrap` also includes the
+first-boot helper where the image uses it.
+
+The installer reboots when it finishes, and Chromium opens to the dashboard.
+
+> **Zero-touch alternative:** instead of SSHing in, you can bake the
+> backend URL + wifi into the card before first boot so the Pi
+> self-provisions. See [KIOSK_INSTALL.md](KIOSK_INSTALL.md#option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi).
+
+### Screen scheduling on a Mode-B kiosk
+
+Calvin's screen on/off schedule is authored in the dashboard UI, but the
+backend cannot reach a remote kiosk's display. `setup-kiosk.sh` therefore
+installs **`calvin-display-agent.service`**, a small local agent that reads the
+schedule from `${CALVIN_BACKEND_URL}/api/config` and powers the panel with
+`vcgencmd`/`xset`. It computes on/off boundaries locally and wakes exactly at
+the next one, and re-reads the config every `CALVIN_DISPLAY_REFRESH_SECONDS`
+(default 60, set in `/etc/default/calvin-kiosk` to override), so a schedule
+edit reaches the panel within about a minute. Set the schedule in the UI as
+usual; the kiosk follows it. Logs: `journalctl -u calvin-display-agent.service`.
+
+### Screen rotation on a Mode-B kiosk
+
+Screen rotation, output selection, and resolution are **physical to each Pi**, so they live in
+the device-local `/etc/default/calvin-kiosk`, not in the (global) server config. The display-agent
+applies them via `xrandr` at startup and whenever the per-kiosk device-config version changes:
+
+- `CALVIN_DISPLAY_ROTATION` — rotation mode: `normal`, `left`, `right`, or `inverted`.
+- `CALVIN_DISPLAY_OUTPUT` — the xrandr output name (e.g. `HDMI-1`) to select as **primary** and
+  target for resolution/rotation. Optional; when unset the agent auto-detects the first connected output.
+- `CALVIN_DISPLAY_RESOLUTION` — the mode to apply, as `WIDTHxHEIGHT` or `WIDTHxHEIGHT@RATE`
+  (e.g. `1920x1080` or `1920x1080@60`). Optional; when unset the current mode is left unchanged.
+
+Example:
+
+```
+CALVIN_DISPLAY_ROTATION=left
+CALVIN_DISPLAY_OUTPUT=HDMI-1
+CALVIN_DISPLAY_RESOLUTION=1920x1080@60
+```
+
+These device-local env vars win over the equivalent server config (`displayOutput` / `displayResolution` / `displayRotation`);
+the display-agent applies them via `xrandr` at startup and whenever the per-kiosk device-config version
+changes. Then `sudo systemctl restart calvin-display-agent.service`. This replaces the
+old backend-side `display_orientation_service`, which cannot reach a remote kiosk's display. (Per-device settings are tracked under epic `calvin-dd9`.)
+
+### Kiosk agent self-update
+
+The small Python display-agent and its systemd units that `setup-kiosk.sh`
+installs can be updated remotely without re-running setup or SSHing into the Pi.
+
+**Flow:** Settings → Screens → Kiosk software → **Update all** (or **Update** in one screen's
+**Software** section) → the backend sets a per-kiosk `agentUpdateRequested` flag → the
+kiosk picks it up on its next config poll → it fires the root oneshot
+`calvin-kiosk-update.service` →
+`update-kiosk.sh` fetches the bundle from
+`${CALVIN_BACKEND_URL}/api/kiosks/agent/*`, verifies sha256 (+ `py_compile`
+for Python files), backs up the current files, atomic-swaps only changed files,
+restarts only the affected units, and auto-rolls-back if the agent doesn't come
+up healthy within 30 seconds.
+
+The **bundle source is the local Calvin server** — the kiosk needs no internet
+access and carries no full repo checkout. Six files make up the bundle: the
+display-agent script, three systemd units, the updater script, and the oneshot
+update service unit.
+
+The Screens list summarises the fleet in a **Kiosk software** row: how many
+kiosks can be updated to the available bundle, with **Update all** in one click.
+Each kiosk card shows its running version and the outcome of its last update; a
+kiosk whose OS/Python is too old is marked "update needs a newer OS" and is
+never included in **Update all**. While at least one kiosk is behind, System ›
+Updates shows a pointer to that row.
+
+**`min_python` floor:** the manifest carries `"min_python": "3.9"`. If the
+kiosk's Python is below 3.9 the update is aborted (status: "device python <
+3.9; keeping current agent") — the kiosk needs an OS upgrade before it can
+accept a newer bundle. The same floor is enforced at startup: the agent exits
+immediately on Python < 3.9.
+
+For full details — health-check readiness marker, sudoers fragment, auto-clear
+of the flag, initial bundle install, and the `zipapp` future option — see the
+[Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update)
+section in `KIOSK_PROVISIONING.md`.
+
+### Kiosk identity
+
+Each kiosk Pi has a stable **`CALVIN_KIOSK_ID`** in `/etc/default/calvin-kiosk`,
+generated by `setup-kiosk.sh` as `<hostname>-<machine-id suffix>` (a stock Pi
+image defaults its hostname to `raspberrypi`, so the machine-id suffix keeps
+multiple Pis unique). Rename it to something friendly (`kitchen`, `hallway`) and
+`sudo systemctl restart calvin-kiosk-remote.service`.
+
+The kiosk's Chromium opens `${CALVIN_BACKEND_URL}/?kiosk=<id>`, so the server
+learns which kiosk is talking to it: every `/api/config?kiosk=<id>` request
+registers the kiosk (id, hostname, last-seen). List known kiosks with
+`curl http://<server>:8000/api/kiosks`. A request with **no** id behaves exactly
+as before — this is the foundation the per-kiosk config model builds on.
+
+### Per-kiosk configuration
+
+Each kiosk reads its **effective config** from `GET /api/kiosks/<id>/config` — the
+global config with that kiosk's overrides applied (device-physical values like
+rotation included; the browser ignores what it can't act on, the display-agent
+applies them). The response carries an `ETag`/`deviceConfigVersion` so a client can
+cheaply detect device-physical changes (`If-None-Match` → `304`).
+
+Per-kiosk overrides are edited via `GET/PUT /api/kiosks/<id>/overrides` (a sparse
+layer that replaces on PUT). `GET /api/config` is now **global-only** (Mode-A Pis and
+the template new kiosks inherit). List known kiosks with `curl http://<server>:8000/api/kiosks`.
+
+**Assigning content to a kiosk.** Two override keys control which screens a kiosk shows:
+`availableScreens` (a list of screen ids the kiosk may switch between — omit for all) and
+`defaultScreenId` (the screen it boots into). Set them via
+`PUT /api/kiosks/<id>/overrides`. In this mode the active screen is **local to each kiosk** —
+switching screens on one kiosk (keyboard or on-screen dots) no longer changes the others, and
+a kiosk boots to its `defaultScreenId`. The screen catalog itself is authored once, globally.
+
+**Per-kiosk orientation from the server.** When `CALVIN_KIOSK_ID` is set, the display-agent
+fetches the kiosk's effective config (`/api/kiosks/<id>/config`) and applies the server-configured
+`orientation` via `xrandr` — re-applying only when it changes (tracked by `deviceConfigVersion`).
+Set a kiosk's orientation with `PUT /api/kiosks/<id>/overrides`. The device-local
+`CALVIN_DISPLAY_ROTATION` env still **wins** as a break-glass override; the schedule is likewise
+now per-kiosk (each kiosk reads its own effective config).
+
+**Managing screens from the UI.** Settings → **Screens** lists every screen that has connected
+(name, id, last-seen, Online/Offline). Select one to open its page: **Name** and **Pages** (which
+pages it shows and which one it starts on), **Display** (orientation, upside down, rotation),
+**Power**, **Touch & keyboard** and **Software**. Every row says **Same as all screens** or **Only
+this screen**, and **Use the shared setting** clears that one override so the screen inherits again.
+The shared defaults live under the **All screens** card on the same page. Changes save immediately
+and the screen applies them at its next check-in (~30s).
+
+### Changing the backend URL later
+
+```bash
+sudo nano /etc/default/calvin-kiosk
+sudo systemctl restart calvin-kiosk-remote.service
+# The display agent reads the same file for rotation/schedule:
+sudo systemctl restart calvin-display-agent.service
+```
+
+### CORS
+
+Mode B does **not** require any CORS configuration: the browser hits
+the server's URL directly, so requests to `/api/*` are same-origin.
+
+CORS only matters if you run `npm run dev` on a different host than
+the backend (e.g. hacking on the frontend from a laptop while pointing
+at the home server). For that case the backend already exposes
+`CORS_ORIGINS` and `CORS_ALLOW_ALL` env vars — see
+[backend/app/config.py](https://github.com/osterbergsimon/calvin/blob/develop/backend/app/config.py).
+
+### Public URL (phone setup and Add kiosk)
+
+Settings shows the server's address as a QR code ("set up from your phone"),
+and **Screens › + Add a screen** prints `curl -fsSL <server>/api/kiosks/install.sh | sudo bash`.
+The address comes from `PUBLIC_URL` when set, otherwise from the browser's own
+address, falling back to the LAN IP the backend detects for itself. That last
+guess is wrong in Docker (it sees the container IP), so on Docker/Unraid set
+`PUBLIC_URL=http://<server-lan-ip>:8000` in `.env` (passed through by
+`docker/docker-compose.yml`) or the template's **Public URL** field.
+
+The served installer (`GET /api/kiosks/install.sh`) bakes the same address in,
+so behind a TLS-terminating reverse proxy set `PUBLIC_URL=https://<your-domain>`.
+Without it the app only sees the proxy's plain-HTTP request: it can use
+`X-Forwarded-Proto`/`X-Forwarded-Host` instead, but only from a peer listed in
+`CALVIN_TRUSTED_PROXIES` (comma-separated IPs/CIDRs, `*` for any; empty by
+default). Forwarded headers from any other client are ignored, so a kiosk
+cannot be pointed at an attacker-chosen URL.
+
+### Security note
+
+Calvin's backend has no built-in authentication. Mode B exposes it on
+your LAN, so:
+
+- Bind to the LAN interface, not `0.0.0.0` on a host that's reachable
+  from the internet.
+- Don't port-forward it. If you need remote access, put it behind a
+  VPN or reverse proxy with auth.
+
+## Picking a mode
+
+| Question                                           | Mode A  | Mode B   |
+| -------------------------------------------------- | ------- | -------- |
+| Single Pi, no other hardware                       | ✅      |          |
+| Already run a 24/7 home server                     |         | ✅       |
+| Multiple displays sharing one dashboard            |         | ✅       |
+| Want SQLite + photos off the SD card               |         | ✅       |
+| Want everything reachable on first boot, no LAN    | ✅      |          |
+| Plugin installs are heavy (image processing)       |         | ✅       |
+
+You can switch later — both modes use the same backend image and the
+same `/var/lib/calvin/` data layout. Migrating is mostly: stop the
+backend on the Pi, copy `/var/lib/calvin/` to the server, start it
+there, and reflash the Pi with `setup-kiosk.sh`.

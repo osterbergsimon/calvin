@@ -1,13 +1,12 @@
 """Plugin registration and unregistration logic."""
 
-import logging
 from typing import Any
+
+from loguru import logger
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
-
-logger = logging.getLogger(__name__)
 
 
 async def register_plugin(
@@ -30,7 +29,7 @@ async def register_plugin(
     Returns:
         Registered plugin instance
     """
-    # Create plugin instance using pluggy hooks
+    # Create plugin instance from the loader's type registry
     plugin = plugin_loader.create_plugin_instance(
         plugin_id=plugin_id,
         type_id=type_id,
@@ -40,17 +39,9 @@ async def register_plugin(
 
     if not plugin:
         # Check if plugin type is registered
-        plugin_types = plugin_loader.get_plugin_types()
-        type_info = next((t for t in plugin_types if t.get("type_id") == type_id), None)
-        if not type_info:
-            raise ValueError(
-                f"Plugin type '{type_id}' is not installed or not loaded. "
-                f"Please install the plugin from the plugin repository first."
-            )
         raise ValueError(
-            f"Failed to create plugin instance for type_id: {type_id}. "
-            f"The plugin type is registered but instance creation failed. "
-            f"Check the plugin's create_plugin_instance hook implementation."
+            f"Plugin type '{type_id}' is not installed or not loaded. "
+            f"Please install the plugin from the plugin repository first."
         )
 
     # Configure plugin
@@ -85,8 +76,57 @@ async def register_plugin(
 
     await _save_plugin_to_db()
 
-    # Initialize plugin
-    await plugin.initialize()
+    # Initialize plugin, and mark an enabled one running: data routes (e.g.
+    # GET /plugins/{id}/data) refuse instances that aren't running.
+    try:
+        await plugin.initialize()
+    except SystemExit as exc:
+        # A plugin calling sys.exit() during initialize() must not take the
+        # process down; leave it registered but disabled (audit R12).
+        logger.opt(exception=exc).error(
+            "Plugin {} called sys.exit() during initialize(); marking it disabled", plugin_id
+        )
+        plugin.stop()
+        try:
+
+            @retry_on_db_locked(max_retries=3, initial_delay=0.1, max_delay=0.5)
+            async def _disable_row() -> None:
+                db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
+                if db_plugin:
+                    db_plugin.enabled = False
+                    await db_plugin.save_with_timestamp()
+
+            await _disable_row()
+        except Exception:
+            logger.exception("Failed to mark plugin {} disabled", plugin_id)
+    else:
+        if plugin.enabled:
+            # Mirror plugin_manager.start_plugin(): a newly created backend
+            # plugin must start its worker and scheduled tasks now, not wait for
+            # the next restart (calvin-qq4l).
+            from app.plugins.protocols import BackendPlugin
+            from app.services.backend_scheduler import backend_plugin_scheduler
+
+            if isinstance(plugin, BackendPlugin):
+                try:
+                    await plugin.start_worker()
+                except NotImplementedError:
+                    # Plugin doesn't implement start_worker, that's fine
+                    pass
+                except Exception:
+                    logger.opt(exception=True).warning(
+                        "Error starting worker for backend plugin {}", plugin_id
+                    )
+
+            plugin.start()
+
+            if isinstance(plugin, BackendPlugin):
+                try:
+                    await backend_plugin_scheduler.register_plugin_tasks(plugin)
+                except Exception:
+                    logger.exception(
+                        "Error registering scheduled tasks for backend plugin {}", plugin_id
+                    )
 
     return plugin
 
@@ -105,10 +145,9 @@ async def unregister_plugin(plugin_id: str) -> bool:
     if plugin:
         try:
             await plugin.cleanup()
-        except Exception as e:
-            logger.warning(
-                f"Error cleaning up plugin {plugin_id} during unregister: {e}",
-                exc_info=True,
+        except Exception:
+            logger.opt(exception=True).warning(
+                "Error cleaning up plugin {} during unregister", plugin_id
             )
             # Continue with deletion even if cleanup fails
 
@@ -137,20 +176,14 @@ async def unregister_plugin(plugin_id: str) -> bool:
                     deleted_from_db = False
                 else:
                     logger.info(f"Verified: Plugin {plugin_id} successfully removed from database")
-            except Exception as e:
-                logger.error(
-                    f"Error deleting plugin {plugin_id} from database: {e}",
-                    exc_info=True,
-                )
+            except Exception:
+                logger.exception("Error deleting plugin {} from database", plugin_id)
                 deleted_from_db = False
                 raise
         else:
             logger.warning(f"Plugin {plugin_id} not found in database during unregister")
-    except Exception as e:
-        logger.error(
-            f"Unexpected error during database deletion of {plugin_id}: {e}",
-            exc_info=True,
-        )
+    except Exception:
+        logger.exception("Unexpected error during database deletion of {}", plugin_id)
         # Don't re-raise here - we want to continue and unregister from manager
         # But mark as not deleted
         deleted_from_db = False

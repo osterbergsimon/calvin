@@ -2,39 +2,46 @@
 
 import hashlib
 import os
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 from PIL import Image, ImageOps
 
-from app.plugins.hooks import hookimpl
+from app.config import resolve_path, settings
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ImagePlugin
-from app.plugins.sdk.image import (
-    build_image_manager_config,
-    build_image_plugin_metadata,
-)
-from app.plugins.utils.instance_manager import handle_plugin_config_update_generic
+from app.utils.photo_folders import RESERVED_FOLDERS, InvalidFolder, normalize_folder
 
-# Loguru automatically includes module/function info in logs
+# A share-link folder holds this hidden file; only such subfolders are scanned.
+SHARE_FOLDER_MARKER = ".calvin-share"
+
+
+def _default_image_dir() -> Path:
+    """Resolve the image directory: IMAGE_DIR env var, else settings.image_dir.
+
+    The env var is re-read so a change made after startup (tests do this)
+    still applies; relative values resolve like every other path setting.
+    """
+    image_dir_str = os.getenv("IMAGE_DIR")
+    if image_dir_str:
+        return resolve_path(Path(image_dir_str))
+    return settings.image_dir
 
 
 class LocalImagePlugin(ImagePlugin):
     """Local filesystem image plugin."""
 
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        metadata = build_image_plugin_metadata(
-            type_id="local",
-            name="Local Images",
-            description="Upload and store images on the server. Images are stored in ./data/images",
-            plugin_class=cls,
-            common_config_schema={},
-            instance_config_schema={},
-            supports_multiple_instances=False,
-        )
-        metadata["ui_sections"] = [
+    metadata = PluginMetadata(
+        type_id="local",
+        name="Local Images",
+        description="Upload and store images on the server. Images are stored in Calvin's data directory",
+        default_instance_name="Local Images",
+        supports_multiple_instances=False,
+        fixed_instance_id="local-images",
+        ui_sections=[
             {
                 "id": "upload",
                 "type": "upload",
@@ -43,51 +50,27 @@ class LocalImagePlugin(ImagePlugin):
                 "multiple": True,
                 "help_text": "Select one or more image files to upload (JPG, PNG, WebP, GIF)",
             },
-            {
-                "id": "manage",
-                "type": "manage_images",
-                "title": "Manage Images",
-                "collapsible": True,
-            },
-        ]
-        return metadata
+        ],
+    )
 
-    def __init__(
-        self,
-        plugin_id: str,
-        name: str,
-        image_dir: Path | str,
-        thumbnail_dir: Path | str | None = None,
-        enabled: bool = True,
-    ):
-        """
-        Initialize local image plugin.
-
-        Args:
-            plugin_id: Unique identifier for the plugin
-            name: Human-readable name
-            image_dir: Directory containing images
-            thumbnail_dir: Directory for storing thumbnails (defaults to image_dir/thumbnails)
-            enabled: Whether the plugin is enabled
-        """
+    def __init__(self, plugin_id: str, name: str, enabled: bool = True):
         super().__init__(plugin_id, name, enabled)
-        self.image_dir = Path(image_dir)
-        self.image_dir.mkdir(parents=True, exist_ok=True)
-        self.thumbnail_dir = Path(thumbnail_dir) if thumbnail_dir else self.image_dir / "thumbnails"
-        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
         self.thumbnail_size = (200, 200)
         self.supported_formats = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
         self._images: list[dict[str, Any]] = []
+        self._set_image_dir(_default_image_dir())
+
+    def _set_image_dir(self, image_dir: Path) -> None:
+        """Point the plugin at an image directory, creating it and its thumbnails dir."""
+        self.image_dir = Path(image_dir)
+        self.image_dir.mkdir(parents=True, exist_ok=True)
+        self.thumbnail_dir = self.image_dir / "thumbnails"
+        self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
 
     async def initialize(self) -> None:
         """Initialize the plugin."""
         # Scan images on initialization
         await self.scan_images()
-
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        # Nothing to cleanup for local filesystem
-        pass
 
     async def configure(self, config: dict[str, Any]) -> None:
         """
@@ -98,36 +81,16 @@ class LocalImagePlugin(ImagePlugin):
         """
         await super().configure(config)
 
-        # Check if IMAGE_DIR environment variable has changed
-        current_image_dir = os.getenv("IMAGE_DIR")
-        if current_image_dir:
-            new_image_dir = Path(current_image_dir).resolve()
-            if self.image_dir.resolve() != new_image_dir:
-                logger.info(
-                    f"[Local Images] IMAGE_DIR changed from {self.image_dir} "
-                    f"to {new_image_dir}, updating plugin"
-                )
-                self.image_dir = new_image_dir
-                self.image_dir.mkdir(parents=True, exist_ok=True)
-                self.thumbnail_dir = self.image_dir / "thumbnails"
-                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
-
-        if "image_dir" in config and config["image_dir"]:
-            # Extract actual value from config (handle schema objects)
-            image_dir_value = config["image_dir"]
-            # If it's a dict (schema object), extract the value or default
-            if isinstance(image_dir_value, dict):
-                image_dir_str = image_dir_value.get("value") or image_dir_value.get("default") or ""
-            else:
-                image_dir_str = str(image_dir_value)
-
-            # Only update if we have a valid string value
-            if image_dir_str and image_dir_str.strip():
-                self.image_dir = Path(image_dir_str)
-                self.image_dir.mkdir(parents=True, exist_ok=True)
-                # Always set thumbnail_dir to image_dir/thumbnails
-                self.thumbnail_dir = self.image_dir / "thumbnails"
-                self.thumbnail_dir.mkdir(parents=True, exist_ok=True)
+        # The IMAGE_DIR / data-dir setting always decides where images live.
+        # Older installs stored image_dir/thumbnail_dir (a cwd-relative
+        # "./data/images") in this instance's config; those keys are ignored.
+        new_image_dir = _default_image_dir()
+        if self.image_dir != new_image_dir:
+            logger.info(
+                f"[Local Images] image dir changed from {self.image_dir} "
+                f"to {new_image_dir}, updating plugin"
+            )
+            self._set_image_dir(new_image_dir)
 
     async def get_images(self) -> list[dict[str, Any]]:
         """
@@ -191,10 +154,6 @@ class LocalImagePlugin(ImagePlugin):
         Returns:
             List of image metadata dictionaries
         """
-        import logging
-
-        logger = logging.getLogger(__name__)
-
         logger.debug(f"[Local Images] scan_images() called for plugin {self.plugin_id}")
         logger.debug(f"[Local Images] image_dir: {self.image_dir}")
         logger.debug(f"[Local Images] image_dir exists: {self.image_dir.exists()}")
@@ -208,20 +167,23 @@ class LocalImagePlugin(ImagePlugin):
             self._images = []
             return []
 
-        all_files = list(self.image_dir.iterdir())
+        all_files = self._candidate_files()
         logger.debug(f"[Local Images] Found {len(all_files)} files/dirs in image_dir")
 
-        for file_path in sorted(self.image_dir.iterdir()):
+        for file_path in all_files:
             if file_path.is_file() and file_path.suffix.lower() in self.supported_formats:
                 try:
                     logger.debug(f"[Local Images] Processing image file: {file_path.name}")
                     # Get image metadata
                     with Image.open(file_path) as img:
                         width, height = img.size
-                        file_size = file_path.stat().st_size
+                        file_stat = file_path.stat()
+                        file_size = file_stat.st_size
 
                         # Generate image ID from file path hash
-                        image_id = hashlib.md5(str(file_path).encode()).hexdigest()
+                        image_id = hashlib.md5(
+                            str(file_path).encode(), usedforsecurity=False
+                        ).hexdigest()
 
                         # Generate thumbnail if it doesn't exist
                         thumbnail_path = self._get_thumbnail_path(image_id)
@@ -235,7 +197,13 @@ class LocalImagePlugin(ImagePlugin):
                             "width": width,
                             "height": height,
                             "size": file_size,
+                            # The Local photos browser shows when each photo was written.
+                            "modified": datetime.fromtimestamp(file_stat.st_mtime, UTC).isoformat(),
                             "format": file_path.suffix.lower(),
+                            # "" for the image dir itself, else its one-level subfolder.
+                            "folder": (
+                                file_path.parent.name if file_path.parent != self.image_dir else ""
+                            ),
                             "source": self.plugin_id,  # Mark which plugin provided this
                         }
                         images.append(image_metadata)
@@ -283,13 +251,73 @@ class LocalImagePlugin(ImagePlugin):
         self._images = images
         return images
 
-    async def upload_image(self, file_data: bytes, filename: str) -> dict[str, Any] | None:
+    def _folder_dirs(self) -> list[Path]:
+        """Share-link folders: one-level subfolders that carry the share marker.
+
+        Any other subfolder (an owner's archive, backups) stays out of the
+        library, exactly as before share links existed. The marker stays when a
+        link is revoked, so photos kept after a revoke stay on show.
+        """
+        if not self.image_dir.exists():
+            return []
+        return sorted(
+            child
+            for child in self.image_dir.iterdir()
+            if child.is_dir()
+            and not child.name.startswith(".")
+            and child.name.casefold() not in RESERVED_FOLDERS
+            and (child / SHARE_FOLDER_MARKER).is_file()
+        )
+
+    def mark_share_folder(self, folder: str) -> Path:
+        """Create ``folder`` if needed and make it part of the library (share links)."""
+        target = self.image_dir / normalize_folder(folder)
+        target.mkdir(parents=True, exist_ok=True)
+        (target / SHARE_FOLDER_MARKER).touch(exist_ok=True)
+        return target
+
+    def _candidate_files(self) -> list[Path]:
+        """Entries of the image dir, then of each photo subfolder (calvin-mwqo)."""
+        entries = sorted(self.image_dir.iterdir())
+        for folder in self._folder_dirs():
+            entries.extend(sorted(folder.iterdir()))
+        return entries
+
+    def list_folders(self) -> list[str]:
+        """Names of the share-link folders, sorted."""
+        return [folder.name for folder in self._folder_dirs()]
+
+    def _safe_upload_path(self, filename: str, target_dir: Path | None = None) -> Path:
+        """
+        Turn an untrusted upload filename into a new file path inside image_dir.
+
+        Keeps only the basename (either separator), falls back to a generated
+        name for empty/hidden names, never reuses an existing file, and asserts
+        the result is a direct child of image_dir (audit S3).
+        """
+        name = (filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+        if not name or name.startswith("."):
+            suffix = Path(name).suffix.lower()
+            suffix = suffix if suffix in self.supported_formats else ".jpg"
+            name = f"upload-{uuid.uuid4().hex[:12]}{suffix}"
+        directory = target_dir or self.image_dir
+        file_path = directory / name
+        if file_path.exists():
+            file_path = directory / f"{file_path.stem}-{uuid.uuid4().hex[:8]}{file_path.suffix}"
+        if file_path.resolve().parent != directory.resolve():
+            raise ValueError(f"Upload filename escapes the image directory: {filename!r}")
+        return file_path
+
+    async def upload_image(
+        self, file_data: bytes, filename: str, folder: str | None = None
+    ) -> dict[str, Any] | None:
         """
         Upload an image to the local filesystem.
 
         Args:
             file_data: Image file data as bytes
             filename: Original filename
+            folder: Optional subfolder of the image dir (created if missing)
 
         Returns:
             Image metadata dictionary or None if upload failed
@@ -297,17 +325,22 @@ class LocalImagePlugin(ImagePlugin):
         try:
             # Ensure image directory exists
             self.image_dir.mkdir(parents=True, exist_ok=True)
-            # Save file to image directory
-            file_path = self.image_dir / filename
-            with open(file_path, "wb") as f:
+            target_dir = self.image_dir
+            if folder is not None:
+                target_dir = self.mark_share_folder(folder)
+            file_path = self._safe_upload_path(filename, target_dir)
+            with open(file_path, "xb") as f:
                 f.write(file_data)
 
             # Rescan to include new image
             await self.scan_images()
 
             # Return the new image
-            image_id = hashlib.md5(str(file_path).encode()).hexdigest()
+            image_id = hashlib.md5(str(file_path).encode(), usedforsecurity=False).hexdigest()
             return await self.get_image(image_id)
+        except InvalidFolder:
+            logger.warning("Refused upload into invalid folder {!r}", folder)
+            return None
         except Exception:
             logger.exception("Error uploading image {}", filename)
             return None
@@ -384,82 +417,3 @@ class LocalImagePlugin(ImagePlugin):
         if thumbnail_path.exists():
             return thumbnail_path
         return None
-
-
-# Register this plugin with pluggy
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register LocalImagePlugin type."""
-    return [LocalImagePlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> LocalImagePlugin | None:
-    """Create a LocalImagePlugin instance."""
-    if type_id != "local":
-        return None
-
-    from pathlib import Path
-
-    enabled = config.get("enabled", False)  # Default to disabled
-
-    # Use IMAGE_DIR environment variable if set, otherwise use hardcoded directory
-    # Images are stored in ./data/images (relative to current working directory)
-    # Resolve to absolute path for reliability
-    import os
-
-    image_dir_str = os.getenv("IMAGE_DIR")
-    if image_dir_str:
-        image_dir = Path(image_dir_str).resolve()
-    else:
-        image_dir = Path("./data/images").resolve()
-
-    # Thumbnail directory is always image_dir/thumbnails
-    # We pass None and let the plugin set it automatically
-    return LocalImagePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        image_dir=image_dir,
-        thumbnail_dir=None,  # Will be set to image_dir/thumbnails automatically
-        enabled=enabled,
-    )
-
-
-@hookimpl
-async def handle_plugin_config_update(
-    type_id: str,
-    config: dict[str, Any],
-    enabled: bool | None,
-    db_type: Any,
-    session: Any,
-) -> dict[str, Any] | None:
-    """Handle Local Images plugin configuration update and instance management."""
-    if type_id != "local":
-        return None
-
-    def on_instance_updated(plugin: Any, result: dict[str, Any]) -> None:
-        """Callback after instance update (IMAGE_DIR is handled in configure method)."""
-        # IMAGE_DIR environment variable changes are handled in the plugin's configure method
-        # which is called by the generic handler. No additional action needed here.
-        pass
-
-    manager_config = build_image_manager_config(
-        type_id="local",
-        single_instance=True,
-        instance_id="local-images",
-        default_instance_name="Local Images",
-        on_instance_updated=on_instance_updated,
-    )
-
-    return await handle_plugin_config_update_generic(
-        type_id, config, enabled, db_type, session, manager_config
-    )
-
-
-# Auto-register this module with pluggy when imported
-# The loader will discover and register this module automatically

@@ -5,6 +5,7 @@ import zipfile
 
 import pytest
 
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.plugin_installer import PluginInstaller
 
 
@@ -17,20 +18,10 @@ def temp_plugins_dir(tmp_path):
 
 
 @pytest.fixture
-def temp_frontend_dir(tmp_path):
-    """Create a temporary frontend directory."""
-    frontend_dir = tmp_path / "frontend" / "src" / "components" / "plugins"
-    frontend_dir.mkdir(parents=True)
-    return frontend_dir
-
-
-@pytest.fixture
-def plugin_installer(temp_plugins_dir, temp_frontend_dir, monkeypatch):
+def plugin_installer(temp_plugins_dir, monkeypatch):
     """Create a PluginInstaller instance with temporary directories."""
     installer = PluginInstaller()
-    # Override directories with temp paths
     installer.plugins_dir = temp_plugins_dir
-    installer.frontend_plugins_dir = temp_frontend_dir
     return installer
 
 
@@ -43,6 +34,7 @@ def valid_plugin_manifest():
         "description": "A test plugin",
         "version": "1.0.0",
         "type": "service",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
         "author": "Test Author",
         "license": "MIT",
     }
@@ -59,18 +51,19 @@ def valid_plugin_package(tmp_path, valid_plugin_manifest):
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(valid_plugin_manifest, f, indent=2)
 
-    # Create plugin.py
+    # Create plugin.py (contract 1.0: one class with a metadata attribute)
     plugin_py = plugin_dir / "plugin.py"
     plugin_py.write_text(
         '''"""Test plugin."""
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
 
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register plugin type."""
-    return [{"type_id": "test_plugin", "plugin_type": PluginType.SERVICE}]
+
+class TestPlugin(ServicePlugin):
+    metadata = PluginMetadata(type_id="test_plugin", name="Test Plugin")
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {"ok": True}
 '''
     )
 
@@ -79,12 +72,14 @@ def register_plugin_types() -> list[dict[str, Any]]:
 
 @pytest.fixture
 def plugin_package_with_frontend(tmp_path, valid_plugin_package):
-    """Create a plugin package with frontend components."""
+    """Create a plugin package with frontend static assets."""
     frontend_dir = valid_plugin_package / "frontend"
     frontend_dir.mkdir()
 
-    component_file = frontend_dir / "TestComponent.vue"
-    component_file.write_text("<template><div>Test Component</div></template>")
+    component_file = frontend_dir / "dist.js"
+    component_file.write_text(
+        "customElements.define('calvin-test-plugin', class extends HTMLElement {})"
+    )
 
     return valid_plugin_package
 
@@ -110,35 +105,49 @@ class TestPluginInstaller:
         path = plugin_installer.get_plugin_path("test_plugin")
         assert path == plugin_installer.plugins_dir / "test_plugin"
 
-    def test_get_frontend_plugin_path(self, plugin_installer):
-        """Test getting frontend plugin path."""
-        path = plugin_installer.get_frontend_plugin_path("test_plugin")
-        assert path == plugin_installer.frontend_plugins_dir / "test_plugin"
-
     def test_validate_plugin_directory_valid(self, plugin_installer, valid_plugin_package):
         """Test validating a valid plugin directory."""
         manifest = plugin_installer.validate_plugin_package(valid_plugin_package)
         assert manifest["id"] == "test_plugin"
         assert manifest["name"] == "Test Plugin"
 
-    def test_validate_plugin_directory_defaults_protocol_version(
-        self, plugin_installer, valid_plugin_package
-    ):
-        """Test plugin manifests default to protocol version 1 when omitted."""
-        manifest = plugin_installer.validate_plugin_package(valid_plugin_package)
-        assert manifest.get("protocol_version", 1) == 1
-
-    def test_validate_plugin_directory_unsupported_protocol_version(
+    def test_validate_plugin_directory_missing_api_version_rejected(
         self, plugin_installer, tmp_path, valid_plugin_manifest
     ):
-        """Test validating plugin directory with unsupported protocol version."""
+        """api_version is required — a manifest without it is rejected, not default-filled."""
         plugin_dir = tmp_path / "invalid_plugin"
         plugin_dir.mkdir()
-        manifest = {**valid_plugin_manifest, "protocol_version": 2}
+        manifest = {k: v for k, v in valid_plugin_manifest.items() if k != "api_version"}
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
 
-        with pytest.raises(ValueError, match="Unsupported plugin.json protocol version"):
+        with pytest.raises(ValueError, match="must declare api_version"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_validate_plugin_directory_newer_api_version_rejected(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        """Test validating plugin directory with an unsupported (newer) api_version."""
+        plugin_dir = tmp_path / "invalid_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "api_version": CURRENT_PLUGIN_API_VERSION + 1}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        with pytest.raises(ValueError, match="newer than this Calvin"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_validate_plugin_directory_non_int_api_version_rejected(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        """Test validating plugin directory with a non-integer api_version."""
+        plugin_dir = tmp_path / "invalid_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "api_version": "1"}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+
+        with pytest.raises(ValueError, match="api_version must be an integer"):
             plugin_installer.validate_plugin_package(plugin_dir)
 
     def test_validate_plugin_directory_missing_manifest(self, plugin_installer, tmp_path):
@@ -201,6 +210,7 @@ class TestPluginInstaller:
             "name": "Test Backend",
             "version": "1.0.0",
             "type": "backend",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -238,6 +248,25 @@ class TestPluginInstaller:
         assert (plugin_path / "plugin.json").exists()
         assert (plugin_path / "plugin.py").exists()
 
+    def test_install_plugin_from_zip_rejects_path_traversal(
+        self, plugin_installer, tmp_path, valid_plugin_manifest, temp_plugins_dir
+    ):
+        """A zip member escaping the plugin dir must be rejected, writing nothing (calvin-8cv)."""
+        zip_path = tmp_path / "evil_plugin.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            # Manifest under a subdir → triggers the subdirectory-extraction branch.
+            zipf.writestr("evil_plugin/plugin.json", json.dumps(valid_plugin_manifest))
+            zipf.writestr("evil_plugin/plugin.py", "# noop\n")
+            # Traversal member: strips to '../escaped.txt' and would land in plugins_dir.
+            zipf.writestr("evil_plugin/../escaped.txt", "pwned")
+
+        with pytest.raises(ValueError, match="traversal|[Uu]nsafe"):
+            plugin_installer.install_plugin(zip_path)
+
+        # Nothing escaped, and the partial plugin dir was cleaned up.
+        assert not (temp_plugins_dir / "escaped.txt").exists()
+        assert not plugin_installer.get_plugin_path("test_plugin").exists()
+
     def test_install_plugin_with_custom_id(self, plugin_installer, valid_plugin_package):
         """Test installing a plugin with a custom ID override."""
         manifest = plugin_installer.install_plugin(valid_plugin_package, plugin_id="custom_id")
@@ -254,16 +283,16 @@ class TestPluginInstaller:
         with pytest.raises(ValueError, match="already installed"):
             plugin_installer.install_plugin(valid_plugin_package)
 
-    def test_install_plugin_with_frontend_components(
+    def test_install_plugin_with_frontend_static_assets(
         self, plugin_installer, plugin_package_with_frontend
     ):
-        """Test installing a plugin with frontend components."""
+        """Frontend assets stay inside the plugin's data dir; the host serves
+        them through /api/plugins/{id}/static/*. Nothing gets copied into the
+        host source tree."""
         plugin_installer.install_plugin(plugin_package_with_frontend)
 
-        # Check frontend components were installed
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_plugin")
-        assert frontend_path.exists()
-        assert (frontend_path / "TestComponent.vue").exists()
+        plugin_path = plugin_installer.get_plugin_path("test_plugin")
+        assert (plugin_path / "frontend" / "dist.js").exists()
 
     def test_install_plugin_cleanup_on_error(self, plugin_installer, tmp_path):
         """Test that plugin installation is cleaned up on error."""
@@ -293,25 +322,106 @@ class TestPluginInstaller:
         assert not plugin_path.exists()
 
     def test_uninstall_plugin_with_frontend(self, plugin_installer, plugin_package_with_frontend):
-        """Test uninstalling a plugin with frontend components."""
+        """Uninstalling removes the plugin dir, which contains its frontend assets."""
         plugin_installer.install_plugin(plugin_package_with_frontend)
 
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_plugin")
-        assert frontend_path.exists()
+        plugin_path = plugin_installer.get_plugin_path("test_plugin")
+        assert (plugin_path / "frontend").exists()
 
         plugin_installer.uninstall_plugin("test_plugin")
 
-        assert not frontend_path.exists()
+        assert not plugin_path.exists()
 
     def test_uninstall_plugin_not_installed(self, plugin_installer):
         """Test uninstalling a plugin that's not installed."""
         with pytest.raises(ValueError, match="not installed"):
             plugin_installer.uninstall_plugin("nonexistent")
 
+    def test_uninstall_removes_pip_packages(
+        self, plugin_installer, valid_plugin_package, monkeypatch
+    ):
+        """uninstall_plugin pip-uninstalls the packages it installed (calvin-10s)."""
+        monkeypatch.setattr(
+            plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"]
+        )
+        plugin_installer.install_plugin(valid_plugin_package)
+        assert plugin_installer.get_plugin_manifest("test_plugin")["_installed_packages"] == [
+            "cowsay==6.1"
+        ]
+
+        removed = []
+        monkeypatch.setattr(
+            plugin_installer, "_uninstall_pip_requirements", lambda pkgs: removed.append(pkgs)
+        )
+        plugin_installer.uninstall_plugin("test_plugin")
+        assert removed == [["cowsay==6.1"]]
+
+    def test_uninstall_keeps_packages_another_plugin_needs(
+        self, plugin_installer, valid_plugin_package, valid_plugin_manifest, monkeypatch
+    ):
+        """A package another installed plugin still declares is not removed (calvin-10s)."""
+        monkeypatch.setattr(
+            plugin_installer, "_install_pip_requirements", lambda m: ["shared==1.0"]
+        )
+        plugin_installer.install_plugin(valid_plugin_package)
+
+        # A second plugin on disk also depends on shared==1.0.
+        other = plugin_installer.plugins_dir / "other_plugin"
+        other.mkdir()
+        (other / "plugin.json").write_text(
+            json.dumps(
+                {
+                    **valid_plugin_manifest,
+                    "id": "other_plugin",
+                    "_installed_packages": ["shared==1.0"],
+                }
+            )
+        )
+
+        removed = []
+        monkeypatch.setattr(
+            plugin_installer, "_uninstall_pip_requirements", lambda pkgs: removed.append(pkgs)
+        )
+        plugin_installer.uninstall_plugin("test_plugin")
+        assert removed == [[]]  # shared==1.0 kept because other_plugin needs it
+
+    def test_failed_install_rolls_back_pip_packages(
+        self, plugin_installer, valid_plugin_package, monkeypatch
+    ):
+        """A failure after pip install rolls back the installed packages (calvin-10s)."""
+        from app.services import plugin_installer as pi_mod
+
+        monkeypatch.setattr(
+            plugin_installer, "_install_pip_requirements", lambda m: ["cowsay==6.1"]
+        )
+        rolled_back = []
+        monkeypatch.setattr(
+            plugin_installer, "_uninstall_pip_requirements", lambda pkgs: rolled_back.append(pkgs)
+        )
+
+        def boom(*args, **kwargs):
+            raise OSError("disk full")
+
+        # Manifest write fails after pip install succeeds.
+        monkeypatch.setattr(pi_mod.json, "dump", boom)
+        with pytest.raises(ValueError, match="Failed to install"):
+            plugin_installer.install_plugin(valid_plugin_package)
+
+        assert rolled_back == [["cowsay==6.1"]]
+        assert not plugin_installer.get_plugin_path("test_plugin").exists()
+
     def test_get_installed_plugins_empty(self, plugin_installer):
         """Test getting installed plugins when none are installed."""
         plugins = plugin_installer.get_installed_plugins()
         assert plugins == []
+
+    def test_get_installed_plugins_skips_non_object_manifest(self, plugin_installer):
+        """A plugin.json holding a JSON array is skipped, not raised as TypeError (CLV-23)."""
+        bad_dir = plugin_installer.plugins_dir / "bad"
+        bad_dir.mkdir()
+        (bad_dir / "plugin.json").write_text("[]")
+
+        assert plugin_installer.get_installed_plugins() == []
 
     def test_get_installed_plugins(self, plugin_installer, valid_plugin_package):
         """Test getting list of installed plugins."""
@@ -415,3 +525,44 @@ class TestPluginInstaller:
         assert not (plugin_path / ".git").exists()
         # .gitignore should not be copied
         assert not (plugin_path / ".gitignore").exists()
+
+
+@pytest.mark.unit
+class TestPluginDependenciesValidation:
+    """dependencies.packages is the single (validated) pip-dependency mechanism."""
+
+    def _package_with_deps(self, tmp_path, valid_plugin_manifest, deps):
+        plugin_dir = tmp_path / "deps_plugin"
+        plugin_dir.mkdir()
+        manifest = {**valid_plugin_manifest, "dependencies": deps}
+        (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
+        (plugin_dir / "plugin.py").write_text("# Plugin code")
+        return plugin_dir
+
+    def test_valid_packages_list_accepted(self, plugin_installer, tmp_path, valid_plugin_manifest):
+        plugin_dir = self._package_with_deps(
+            tmp_path, valid_plugin_manifest, {"packages": ["psutil>=5.9", "httpx"]}
+        )
+        manifest = plugin_installer.validate_plugin_package(plugin_dir)
+        assert manifest["dependencies"]["packages"] == ["psutil>=5.9", "httpx"]
+
+    def test_non_list_packages_rejected(self, plugin_installer, tmp_path, valid_plugin_manifest):
+        plugin_dir = self._package_with_deps(
+            tmp_path, valid_plugin_manifest, {"packages": "psutil>=5.9"}
+        )
+        with pytest.raises(ValueError, match="dependencies.packages must be a list"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_empty_string_package_rejected(self, plugin_installer, tmp_path, valid_plugin_manifest):
+        plugin_dir = self._package_with_deps(
+            tmp_path, valid_plugin_manifest, {"packages": ["psutil", " "]}
+        )
+        with pytest.raises(ValueError, match="dependencies.packages must be a list"):
+            plugin_installer.validate_plugin_package(plugin_dir)
+
+    def test_non_dict_dependencies_rejected(
+        self, plugin_installer, tmp_path, valid_plugin_manifest
+    ):
+        plugin_dir = self._package_with_deps(tmp_path, valid_plugin_manifest, ["psutil"])
+        with pytest.raises(ValueError, match="dependencies must be an object"):
+            plugin_installer.validate_plugin_package(plugin_dir)

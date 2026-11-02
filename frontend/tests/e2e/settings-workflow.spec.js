@@ -27,16 +27,16 @@ test.describe("Settings Workflow", () => {
   });
 
   test("should save configuration changes", async ({ page }) => {
-    // Find a setting to change (e.g., clock enabled)
-    const clockEnabledCheckbox = page
+    // Find a clock-related checkbox to toggle (e.g., show date / show seconds)
+    const clockCheckbox = page
       .locator(
         'input[type="checkbox"][name*="clock" i], input[type="checkbox"][aria-label*="clock" i]'
       )
       .first();
-    if ((await clockEnabledCheckbox.count()) > 0) {
+    if ((await clockCheckbox.count()) > 0) {
       // Toggle the setting
-      const initialState = await clockEnabledCheckbox.isChecked();
-      await clockEnabledCheckbox.setChecked(!initialState);
+      const initialState = await clockCheckbox.isChecked();
+      await clockCheckbox.setChecked(!initialState);
       await page.waitForTimeout(300);
 
       // Look for save button

@@ -1,5 +1,6 @@
 """Platform detection utilities."""
 
+import asyncio
 import subprocess
 from pathlib import Path
 
@@ -63,3 +64,12 @@ def has_x11() -> bool:
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
+
+
+async def run_command(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
+    """Run ``subprocess.run`` in a worker thread.
+
+    Async routes and services must not call ``subprocess.run`` directly: it blocks
+    the event loop, freezing every other request (kiosk polls, SSE) until it returns.
+    """
+    return await asyncio.to_thread(lambda: subprocess.run(cmd, **kwargs))

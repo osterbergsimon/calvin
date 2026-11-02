@@ -136,11 +136,3 @@ export function log(level = "info", prefix, ...args) {
       logInfo(prefix, ...args);
   }
 }
-
-/**
- * Check if debug logging is enabled
- * Useful for components that want to conditionally enable debug features
- */
-export function isDebugEnabled() {
-  return shouldLog("debug");
-}

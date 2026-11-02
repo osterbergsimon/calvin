@@ -1,241 +1,251 @@
 <template>
-  <div class="updates-tab">
-    <CollapsibleSection title="Update Settings" icon="🔄" :expanded="true">
-      <SettingItem label="Git Repository URL" help="GitHub repository URL for updates">
-        <input
-          v-model="localGitRepoUrl"
-          type="text"
-          placeholder="https://github.com/user/repo.git"
-          @change="handleGitRepoChange"
-          @blur="handleGitRepoChange"
-        />
-      </SettingItem>
+  <SettingRow
+    v-if="isContainer"
+    label="How to update"
+    description="Calvin runs in Docker, so you update it there: pull the new image and restart the container."
+    stacked
+  >
+    <dl>
+      <dt>Unraid</dt>
+      <dd>Docker tab → <strong>Check for Updates</strong> → apply update on Calvin.</dd>
+      <dt>Compose</dt>
+      <dd><code>docker compose pull &amp;&amp; docker compose up -d</code></dd>
+    </dl>
+  </SettingRow>
 
-      <SettingItem label="Git Branch" help="Branch to update from">
-        <select :value="gitBranch" @change="handleGitBranchChange">
-          <option v-for="branch in availableBranches" :key="branch" :value="branch">
-            {{ branch }}
-          </option>
-        </select>
-      </SettingItem>
+  <template v-else>
+    <SettingRow label="Install updates" description="Download and install the latest Calvin.">
+      <Button
+        :disabled="statusRefreshLoading"
+        :loading="statusRefreshLoading"
+        @click="refreshSystemStatus"
+      >
+        Check status
+      </Button>
+      <Button
+        variant="primary"
+        :disabled="updating"
+        :loading="updating"
+        loading-label="Updating…"
+        @click="handleTriggerUpdate"
+      >
+        Update now
+      </Button>
+    </SettingRow>
+  </template>
 
-      <SettingItem label="Update Actions" help="Trigger system update">
-        <div class="button-group">
-          <button class="btn-primary" :disabled="updating" @click="handleTriggerUpdate">
-            {{ updating ? "Updating..." : "🔄 Trigger Update" }}
-          </button>
-        </div>
-      </SettingItem>
+  <SettingRow label="Calvin" data-test="readout-calvin">
+    <template #description>
+      <InlineNote>Whether Calvin is running and if an update is under way.</InlineNote>
+      <InlineNote v-if="backendHealth?.error" tone="err" data-test="readout-note">
+        {{ backendHealth.errorText }}
+      </InlineNote>
+      <details v-if="backendHealth?.error" data-test="readout-details">
+        <summary>Details</summary>
+        <p>{{ backendHealth.error }}</p>
+      </details>
+    </template>
+    <Tag :tone="backendTone" data-test="backend-health-value">{{ backendHealthLabel }}</Tag>
+  </SettingRow>
+  <SettingRow
+    v-if="!isContainer"
+    label="Updates"
+    :description="updatePhaseLabel"
+    data-test="readout-updates"
+  >
+    <Tag :tone="updateTone" data-test="update-status-value">{{ updateStatusLabel }}</Tag>
+  </SettingRow>
+  <SettingRow v-if="updateStatusCheckedAt" label="Last checked" data-test="readout-last-checked">
+    <span>{{ formatDateTime(updateStatusCheckedAt) }}</span>
+  </SettingRow>
 
-      <div v-if="updateMessage" :class="updateMessageClass" class="update-message">
-        {{ updateMessage }}
-      </div>
+  <SettingRow
+    v-if="!isContainer && updateStatus && hasUpdateDetails"
+    label="Update details"
+    stacked
+  >
+    <dl>
+      <template v-if="updateStatus.message">
+        <dt>Message</dt>
+        <dd>{{ updateStatus.message }}</dd>
+      </template>
+      <template v-if="updateStatus.progress !== undefined">
+        <dt>Progress</dt>
+        <dd>{{ updateStatus.progress }}%</dd>
+      </template>
+      <template v-if="updateStatus.started_at">
+        <dt>Started</dt>
+        <dd>{{ formatDateTime(updateStatus.started_at) }}</dd>
+      </template>
+      <template v-if="updateStatus.finished_at">
+        <dt>Finished</dt>
+        <dd>{{ formatDateTime(updateStatus.finished_at) }}</dd>
+      </template>
+      <template v-if="updateStatus.current_commit_short">
+        <dt>Current</dt>
+        <dd>
+          {{ updateStatus.current_commit_short }}
+          <span v-if="updateStatus.current_commit_msg"
+            >— {{ updateStatus.current_commit_msg }}</span
+          >
+        </dd>
+      </template>
+      <template v-if="updateStatus.new_commit_short">
+        <dt>Latest</dt>
+        <dd>
+          {{ updateStatus.new_commit_short }}
+          <span v-if="updateStatus.new_commit_msg">— {{ updateStatus.new_commit_msg }}</span>
+        </dd>
+      </template>
+      <template v-if="updateStatus.log_file">
+        <dt>Log file</dt>
+        <dd>{{ updateStatus.log_file }}</dd>
+      </template>
+      <template v-if="updateStatus.error">
+        <dt>Error</dt>
+        <dd>
+          <details data-test="update-error-details">
+            <summary>Details</summary>
+            <p>{{ updateStatus.error }}</p>
+          </details>
+        </dd>
+      </template>
+    </dl>
+  </SettingRow>
 
-      <div v-if="updateStatus" class="update-status">
-        <SettingItem label="Update Status">
-          <div class="status-details">
-            <p><strong>Status:</strong> {{ updateStatus.status }}</p>
-            <p v-if="updateStatus.message"><strong>Message:</strong> {{ updateStatus.message }}</p>
-            <p v-if="updateStatus.progress !== undefined">
-              <strong>Progress:</strong> {{ updateStatus.progress }}%
-            </p>
-            <p v-if="updateStatus.log_file">
-              <strong>Log file:</strong> {{ updateStatus.log_file }}
-            </p>
-          </div>
-        </SettingItem>
-
-        <SettingItem v-if="updateStatus.last_log" label="Latest log output">
-          <pre class="update-log">{{ updateStatus.last_log }}</pre>
-        </SettingItem>
-
-        <SettingItem
-          v-if="updateStatus.current_commit_short || updateStatus.new_commit_short"
-          label="Commit info"
-        >
-          <div class="status-details">
-            <p v-if="updateStatus.current_commit_short">
-              <strong>Current:</strong>
-              {{ updateStatus.current_commit_short }}
-              <span v-if="updateStatus.current_commit_msg">
-                — {{ updateStatus.current_commit_msg }}
-              </span>
-            </p>
-            <p v-if="updateStatus.new_commit_short">
-              <strong>Latest:</strong>
-              {{ updateStatus.new_commit_short }}
-              <span v-if="updateStatus.new_commit_msg"> — {{ updateStatus.new_commit_msg }} </span>
-            </p>
-          </div>
-        </SettingItem>
-      </div>
-    </CollapsibleSection>
-  </div>
+  <SettingRow v-if="!isContainer && updateStatus?.last_log" label="Latest log output" stacked>
+    <pre data-test="update-log">{{ updateStatus.last_log }}</pre>
+  </SettingRow>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import { useSystem } from "@/composables";
-import { getGitBranches } from "@/services/configApi";
-import CollapsibleSection from "../../shared/CollapsibleSection.vue";
-import SettingItem from "../../shared/SettingItem.vue";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import Tag from "@/components/ui/Tag.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
-const props = defineProps({
-  gitRepoUrl: {
-    type: String,
-    default: "",
-  },
-  gitBranch: {
-    type: String,
-    default: "main",
-  },
+const {
+  updating,
+  updateStatus,
+  updateStatusLoading,
+  updateStatusCheckedAt,
+  backendHealth,
+  backendHealthLoading,
+  backendHealthCheckedAt,
+  environment,
+  loadEnvironment,
+  triggerUpdate,
+  getUpdateStatus,
+  getBackendHealth,
+} = useSystem();
+
+// In Docker the git updater and update-script status don't apply.
+const isContainer = computed(() => environment.value?.deployment === "docker");
+
+const statusRefreshLoading = computed(
+  () => updateStatusLoading.value || backendHealthLoading.value
+);
+
+const backendHealthLabel = computed(() => {
+  if (backendHealthLoading.value) return "Checking…";
+  const status = backendHealth.value?.status;
+  if (status === "healthy") return "Running";
+  if (status === "unhealthy") return "Not responding";
+  // A completed check can't be "not checked": say we don't know the state
+  // rather than contradict the time beside it.
+  return backendHealthCheckedAt.value ? "Unknown" : "Not checked yet";
 });
 
-const emit = defineEmits(["update:gitRepoUrl", "update:gitBranch"]);
+// The Tag tone is the status: ok (green) · warn (in-flight) · err (red) ·
+// neutral (unknown/idle).
+const backendTone = computed(() => {
+  if (backendHealthLoading.value) return "warn";
+  if (backendHealth.value?.status === "healthy") return "ok";
+  if (backendHealth.value?.status === "unhealthy") return "err";
+  return "neutral";
+});
 
-const { updating, updateStatus, updateMessage, updateMessageClass, triggerUpdate } = useSystem();
+// Statuses and phases are server vocabulary; the screen shows plain words and
+// never the raw value (CLV-63).
+const updateStatusLabel = computed(() => {
+  if (updateStatusLoading.value) return "Checking…";
+  const status = updateStatus.value?.status;
+  if (status === "idle") return "Up to date";
+  if (status === "running") return "Updating";
+  if (status === "error") return "Update failed";
+  return "Not checked yet";
+});
 
-const availableBranches = ref([props.gitBranch || "main"]);
-const localGitRepoUrl = ref(props.gitRepoUrl || "");
-const lastEmittedGitRepoUrl = ref(props.gitRepoUrl || "");
+const updateTone = computed(() => {
+  if (updateStatusLoading.value) return "warn";
+  const status = updateStatus.value?.status;
+  if (status === "idle") return "ok";
+  if (status === "running") return "warn";
+  if (status === "error") return "err";
+  return "neutral";
+});
 
-const handleGitRepoChange = () => {
-  if (
-    localGitRepoUrl.value !== props.gitRepoUrl &&
-    localGitRepoUrl.value !== lastEmittedGitRepoUrl.value
-  ) {
-    lastEmittedGitRepoUrl.value = localGitRepoUrl.value;
-    emit("update:gitRepoUrl", localGitRepoUrl.value);
-  }
+const PHASE_LABELS = {
+  pulling: "Downloading",
+  pulling_code: "Downloading",
+  downloading: "Downloading",
+  deps: "Installing",
+  installing: "Installing",
+  dependencies: "Installing",
+  building: "Preparing the screens",
+  building_frontend: "Preparing the screens",
+  restarting: "Restarting",
 };
 
-const handleGitBranchChange = event => {
-  emit("update:gitBranch", event.target.value);
+const updatePhaseLabel = computed(() => {
+  const phase = updateStatus.value?.phase;
+  if (!phase) return "";
+  return PHASE_LABELS[String(phase).toLowerCase()] || "";
+});
+
+const hasUpdateDetails = computed(() => {
+  const s = updateStatus.value;
+  if (!s) return false;
+  return Boolean(
+    s.message ||
+      s.progress !== undefined ||
+      s.started_at ||
+      s.finished_at ||
+      s.current_commit_short ||
+      s.new_commit_short ||
+      s.log_file ||
+      s.error
+  );
+});
+
+const formatDateTime = value => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const handleTriggerUpdate = async () => {
   await triggerUpdate();
 };
 
-const loadBranches = async () => {
-  try {
-    const branches = await getGitBranches();
-    availableBranches.value = branches.branches || [props.gitBranch || "main"];
-  } catch (error) {
-    console.error("Failed to load branches:", error);
+const refreshSystemStatus = async () => {
+  if (isContainer.value) {
+    await getBackendHealth();
+    return;
   }
+  await Promise.allSettled([getBackendHealth(), getUpdateStatus()]);
 };
 
-onMounted(() => {
-  loadBranches();
+onMounted(async () => {
+  await loadEnvironment();
+  refreshSystemStatus();
 });
-
-watch(
-  () => props.gitRepoUrl,
-  repoUrl => {
-    localGitRepoUrl.value = repoUrl || "";
-    lastEmittedGitRepoUrl.value = repoUrl || "";
-    if (repoUrl) {
-      loadBranches();
-    }
-  }
-);
 </script>
-
-<style scoped>
-.updates-tab {
-  width: 100%;
-}
-
-.button-group {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.btn-primary {
-  padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.update-message {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-}
-
-.update-message.success {
-  background: rgba(40, 167, 69, 0.1);
-  border: 1px solid rgba(40, 167, 69, 0.3);
-  color: #28a745;
-}
-
-.update-message.error {
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  color: #dc3545;
-}
-
-.update-message.info {
-  background: rgba(23, 162, 184, 0.1);
-  border: 1px solid rgba(23, 162, 184, 0.3);
-  color: #0c5460;
-}
-
-.update-message.warning {
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-  color: #856404;
-}
-
-.update-status {
-  margin-top: 1rem;
-}
-
-.status-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.status-details p {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-primary);
-}
-
-.status-details strong {
-  color: var(--text-primary);
-}
-
-.update-log {
-  max-height: 260px;
-  overflow: auto;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
-  border-radius: 4px;
-  padding: 0.75rem;
-  white-space: pre-wrap;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.8rem;
-  line-height: 1.25rem;
-}
-</style>

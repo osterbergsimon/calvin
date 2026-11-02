@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.plugin_installer import plugin_installer
 
 
@@ -29,12 +30,13 @@ class TestGitHubPluginEnumeration:
                         "name": "GitHub Plugin 1",
                         "version": "1.0.0",
                         "type": "service",
+                        "api_version": CURRENT_PLUGIN_API_VERSION,
                     }
                 ),
             )
             zipf.writestr("repo-main/plugin1/plugin.py", "# Plugin 1")
 
-            # Plugin 2 with frontend
+            # Plugin 2 with frontend static assets
             zipf.writestr(
                 "repo-main/plugin2/plugin.json",
                 json.dumps(
@@ -43,11 +45,15 @@ class TestGitHubPluginEnumeration:
                         "name": "GitHub Plugin 2",
                         "version": "2.0.0",
                         "type": "calendar",
+                        "api_version": CURRENT_PLUGIN_API_VERSION,
                     }
                 ),
             )
             zipf.writestr("repo-main/plugin2/plugin.py", "# Plugin 2")
-            zipf.writestr("repo-main/plugin2/frontend/Component.vue", "<template></template>")
+            zipf.writestr(
+                "repo-main/plugin2/frontend/dist.js",
+                "customElements.define('calvin-github-plugin2', class extends HTMLElement {})",
+            )
 
             # plugins.json manifest
             zipf.writestr(
@@ -239,10 +245,27 @@ class TestGitHubPluginInstallation:
                         "name": "GitHub Install Plugin",
                         "version": "1.0.0",
                         "type": "service",
+                        "api_version": CURRENT_PLUGIN_API_VERSION,
                     }
                 ),
             )
-            zipf.writestr("repo-main/plugin1/plugin.py", "# Plugin code")
+            zipf.writestr(
+                "repo-main/plugin1/plugin.py",
+                """\"\"\"Minimal install fixture.\"\"\"
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
+
+
+class GithubInstallPlugin(ServicePlugin):
+    metadata = PluginMetadata(
+        type_id="github_install_plugin",
+        name="GitHub Install Plugin",
+    )
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {"ok": True}
+""",
+            )
 
         return zip_path
 
@@ -255,110 +278,53 @@ class TestGitHubPluginInstallation:
 
 from typing import Any
 
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ServicePlugin
 
 
 class TestServicePlugin(ServicePlugin):
     """Test service plugin for installation testing."""
 
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        return {
-            "type_id": "test_plugin",
-            "plugin_type": PluginType.SERVICE,
-            "name": "Test Plugin",
-            "description": "A basic test plugin for plugin installation testing",
-            "version": "1.0.0",
-            "common_config_schema": {
-                "message": {
-                    "type": "string",
-                    "description": "Test message to display",
-                    "default": "Hello from test plugin!",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "Enter a message",
-                        "validation": {
-                            "required": False,
-                        },
+    metadata = PluginMetadata(
+        type_id="test_plugin",
+        name="Test Plugin",
+        description="A basic test plugin for plugin installation testing",
+        version="1.0.0",
+        common_config_schema={
+            "message": {
+                "type": "string",
+                "description": "Test message to display",
+                "default": "Hello from test plugin!",
+                "ui": {
+                    "component": "input",
+                    "placeholder": "Enter a message",
+                    "validation": {
+                        "required": False,
                     },
                 },
             },
-            "display_schema": {
-                "type": "api",
-                "api_endpoint": None,
-                "method": None,
-                "data_schema": None,
-                "render_template": "iframe",
+        },
+        instance_config_schema={
+            "message": {
+                "type": "string",
+                "description": "Test message to display",
+                "default": "Hello from test plugin!",
             },
-            "plugin_class": cls,
-        }
-
-    def __init__(
-        self,
-        plugin_id: str,
-        name: str,
-        message: str = "Hello from test plugin!",
-        enabled: bool = True,
-    ):
-        super().__init__(plugin_id, name, enabled)
-        self.message = message
-
-    async def initialize(self) -> None:
-        """Initialize the plugin."""
-        pass
-
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        pass
-
-    async def get_content(self) -> dict[str, Any]:
-        """Get service content for display."""
-        return {
-            "type": "iframe",
-            "url": "about:blank",
-            "config": {
-                "message": self.message,
-            },
-        }
-
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """Validate plugin configuration."""
-        return True
-
-
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register TestServicePlugin type."""
-    return [TestServicePlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> TestServicePlugin | None:
-    """Create a TestServicePlugin instance."""
-    if type_id != "test_plugin":
-        return None
-
-    enabled = config.get("enabled", False)
-    message = config.get("message", "Hello from test plugin!")
-
-    if isinstance(message, dict):
-        message = message.get("value") or message.get("default") or "Hello from test plugin!"
-    message = str(message) if message else "Hello from test plugin!"
-
-    return TestServicePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        message=message,
-        enabled=enabled,
+        },
+        display_schema={
+            "kind": "status",
+            "title": "Test Plugin",
+            "item": {"label": "Message", "value_path": "$.message"},
+        },
     )
+
+    async def fetch(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the payload the display schema binds to."""
+        return {"message": self.config.get("message", "Hello from test plugin!")}
 '''
 
         with zipfile.ZipFile(zip_path, "w") as zipf:
@@ -371,6 +337,7 @@ def create_plugin_instance(
                         "name": "Test Plugin",
                         "version": "1.0.0",
                         "type": "service",
+                        "api_version": CURRENT_PLUGIN_API_VERSION,
                         "description": "A basic test plugin for plugin installation testing",
                         "author": "Calvin Test Suite",
                         "license": "MIT",
@@ -447,7 +414,7 @@ def create_plugin_instance(
         data = response.json()
         assert data["success"] is True
         assert data["manifest"]["id"] == "github_install_plugin"
-        assert data["requires_restart"] is True
+        assert data["requires_restart"] is False
 
         # Verify plugin is installed
         plugin_path = plugin_installer.get_plugin_path("github_install_plugin")
@@ -607,7 +574,7 @@ def create_plugin_instance(
         assert data["success"] is True
         assert data["manifest"]["id"] == "test_plugin"
         assert data["manifest"]["name"] == "Test Plugin"
-        assert data["requires_restart"] is True
+        assert data["requires_restart"] is False
 
         # Verify plugin is installed
         plugin_path = plugin_installer.get_plugin_path("test_plugin")
@@ -675,6 +642,94 @@ def create_plugin_instance(
 
 
 @pytest.mark.integration
+class TestInstallRestartRequired:
+    """Verify that requires_restart in the install response mirrors the manifest."""
+
+    @pytest.fixture
+    def minimal_zip_path(self, tmp_path):
+        """Minimal zip containing a plugin.json so the path-existence check passes."""
+        zip_path = tmp_path / "minimal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            zipf.writestr(
+                "repo-main/myplugin/plugin.json",
+                json.dumps(
+                    {"id": "myplugin", "name": "My Plugin", "version": "1.0.0", "type": "service"}
+                ),
+            )
+        return zip_path
+
+    @pytest.mark.parametrize(
+        "requirements,expected_restart",
+        [
+            ({"restart_required": True}, True),
+            ({"restart_required": False}, False),
+            ({}, False),  # no restart_required key — defaults to False
+        ],
+    )
+    @patch("app.api.routes.plugins.github.load_plugin_types_for_single", new_callable=AsyncMock)
+    @patch("app.api.routes.plugins.github._validate_just_installed_plugin")
+    @patch("app.api.routes.plugins.github._check_plugin_in_child", new_callable=AsyncMock)
+    @patch("app.api.routes.plugins.github.plugin_loader")
+    @patch("app.api.routes.plugins.github.plugin_installer")
+    @patch("httpx.AsyncClient")
+    def test_install_github_plugin_restart_required(
+        self,
+        mock_client_class,
+        mock_plugin_installer,
+        mock_plugin_loader,
+        mock_check_in_child,
+        mock_validate,
+        mock_load_single,
+        requirements,
+        expected_restart,
+        test_client,
+        minimal_zip_path,
+    ):
+        """requires_restart in the response must reflect manifest.requirements.restart_required."""
+        with open(minimal_zip_path, "rb") as f:
+            zip_content = f.read()
+
+        async def mock_get_async(*args, **kwargs):
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.content = zip_content
+            mock_response.raise_for_status = MagicMock()
+            return mock_response
+
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=None)
+        mock_client.get = AsyncMock(side_effect=mock_get_async)
+        mock_client_class.return_value = mock_client
+
+        # Installer returns a manifest whose requirements match the parametrized case.
+        manifest = {"id": "myplugin", "name": "My Plugin", "version": "1.0.0", "type": "service"}
+        if requirements:
+            manifest["requirements"] = requirements
+        mock_plugin_installer.install_plugin_from_repo.return_value = manifest
+        mock_validate.return_value = []
+
+        response = test_client.post(
+            "/api/plugins/github/install",
+            json={
+                "repo_url": "https://github.com/user/repo",
+                "plugin_path": "myplugin",
+                "branch": "main",
+            },
+        )
+
+        if response.status_code == 404:
+            pytest.skip("GitHub install route not available in test client")
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
+        data = response.json()
+        assert data["success"] is True
+        assert data["requires_restart"] is expected_restart
+
+
+@pytest.mark.integration
 class TestPluginUninstallAPI:
     """Test plugin uninstall API endpoint."""
 
@@ -695,6 +750,7 @@ class TestPluginUninstallAPI:
             "name": "Test Uninstall API",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -713,8 +769,8 @@ class TestPluginUninstallAPI:
         plugin_path = plugin_installer.get_plugin_path("test_uninstall_api")
         assert not plugin_path.exists()
 
-    def test_uninstall_plugin_with_frontend(self, test_client, tmp_path):
-        """Test uninstalling a plugin with frontend components."""
+    def test_uninstall_plugin_with_frontend_static_assets(self, test_client, tmp_path):
+        """Test uninstalling a plugin with frontend static assets."""
         # Clean up first
         try:
             plugin_installer.uninstall_plugin("test_uninstall_frontend")
@@ -730,29 +786,29 @@ class TestPluginUninstallAPI:
             "name": "Test Uninstall Frontend",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
 
         frontend_dir = plugin_dir / "frontend"
         frontend_dir.mkdir()
-        (frontend_dir / "Component.vue").write_text("<template></template>")
+        (frontend_dir / "dist.js").write_text(
+            "customElements.define('calvin-uninstall-test', class extends HTMLElement {})"
+        )
 
         plugin_installer.install_plugin(plugin_dir)
 
-        # Verify frontend exists
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_uninstall_frontend")
-        assert frontend_path.exists()
+        plugin_path = plugin_installer.get_plugin_path("test_uninstall_frontend")
+        assert (plugin_path / "frontend").exists()
 
         # Uninstall via API
         response = test_client.delete("/api/plugins/installed/test_uninstall_frontend")
 
         assert response.status_code == 200
 
-        # Verify both plugin and frontend are removed
-        plugin_path = plugin_installer.get_plugin_path("test_uninstall_frontend")
+        # Plugin dir (and its frontend assets) gone
         assert not plugin_path.exists()
-        assert not frontend_path.exists()
 
     def test_uninstall_plugin_not_found(self, test_client):
         """Test uninstalling a non-existent plugin."""

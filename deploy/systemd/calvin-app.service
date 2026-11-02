@@ -1,0 +1,19 @@
+[Unit]
+Description=Calvin Docker Compose Application
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/etc/calvin
+ExecStart=/usr/bin/docker compose -f /etc/calvin/docker-compose.yml up -d
+ExecStop=/usr/bin/docker compose -f /etc/calvin/docker-compose.yml down
+TimeoutStartSec=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-app
+
+[Install]
+WantedBy=multi-user.target

@@ -20,11 +20,15 @@ Calvin is a DAKBoard alternative designed to run on Raspberry Pi hardware. It pr
 New to Calvin? Get started quickly:
 
 1. **[Getting Started](setup/GETTING_STARTED.md)** - Complete guide covering all setup methods (native, Docker, dev containers)
-2. **[Getting Started with Docker](setup/GETTING_STARTED_DOCKER.md)** - Docker-specific setup guide
-3. **[Development Setup](setup/QUICKSTART_DEVELOP.md)** - Quick development setup on Windows
+2. **[Development Setup](setup/QUICKSTART_DEVELOP.md)** - Quick development setup on Windows
+3. **Docker Setup** - Containerized development and production setup; see `docker/README.md`
 4. **[Setup Scripts](setup/SETUP_SCRIPTS.md)** - Automated setup scripts for production and development
 5. **[Production Setup](setup/SETUP_LINUX.md)** - Install Calvin on Raspberry Pi or Linux
-6. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
+6. **[Deployment Topologies](setup/DEPLOYMENT_TOPOLOGIES.md)** - All-in-one Pi vs. remote backend + kiosk Pi
+7. **[Install a Kiosk Pi](setup/KIOSK_INSTALL.md)**: fresh SD card to Calvin kiosk with one command (Mode B)
+8. **[Kiosk Provisioning & Self-Update](setup/KIOSK_PROVISIONING.md)** - Zero-touch Pi provisioning and admin-triggered display-agent updates from the server
+9. **[Unraid Deployment](setup/UNRAID.md)** - Run the backend as an Unraid Docker app
+10. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
 
 ## Documentation Structure
 
@@ -32,6 +36,9 @@ New to Calvin? Get started quickly:
 - Installation guides for different platforms
 - Quick start guides for development
 - Configuration setup
+
+### Releasing
+- [Release process](RELEASING.md): develop → main promotion, release-please, tags and images
 
 ### Plugins
 - Plugin development guide
@@ -42,7 +49,14 @@ New to Calvin? Get started quickly:
 ### Configuration
 - Remote configuration
 - Settings behavior
+- [Backup and restore](configuration/BACKUP_RESTORE.md)
+- [Data directory (`CALVIN_DATA_DIR`)](configuration/DATA_DIR.md)
+- [Host control (`CALVIN_HOST_CONTROL`)](configuration/HOST_CONTROL.md)
+- [Share links: let guests add photos](configuration/SHARE_LINKS.md)
 - System configuration
+
+### Integrations
+- [MCP server for AI assistants](integrations/MCP.md)
 
 ### Architecture
 - Event system documentation
@@ -65,4 +79,4 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ---
 
-**Last Updated**: 2024
+**Last Updated**: 2026

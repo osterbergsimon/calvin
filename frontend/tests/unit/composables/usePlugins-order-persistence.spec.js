@@ -24,7 +24,7 @@ describe("usePlugins - Order Persistence", () => {
   });
 
   describe("Loading display_order from plugin list", () => {
-    it("should load display_order from the plugin list value", async () => {
+    it("should load display_order from plugin's common_config_schema", async () => {
       const mockPlugins = {
         plugins: [
           {
@@ -32,16 +32,18 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: "1",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "1",
+            },
           },
           {
             id: "picsum",
             name: "Picsum",
             type: "image",
             enabled: true,
-            display_order: "0",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "0",
+            },
           },
         ],
       };
@@ -54,12 +56,12 @@ describe("usePlugins - Order Persistence", () => {
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
 
-      // Verify display orders were loaded from the app-managed plugin value
+      // Verify display orders were loaded from common_config_schema
       expect(imagePluginDisplayOrders.value["local"]).toBe(1);
       expect(imagePluginDisplayOrders.value["picsum"]).toBe(0);
     });
 
-    it("should fallback to config API if display_order not in plugin list", async () => {
+    it("should fallback to config API if display_order not in schema", async () => {
       const mockPlugins = {
         plugins: [
           {
@@ -67,7 +69,7 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            common_config_schema: {},
+            common_config_schema: {}, // No display_order
           },
         ],
       };
@@ -84,7 +86,7 @@ describe("usePlugins - Order Persistence", () => {
       expect(imagePluginDisplayOrders.value["local"]).toBe(5);
     });
 
-    it("should prefer plugin list value over config API value", async () => {
+    it("should prefer schema value over config API value", async () => {
       const mockPlugins = {
         plugins: [
           {
@@ -92,8 +94,9 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: "10",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "10", // Schema has 10
+            },
           },
         ],
       };
@@ -106,11 +109,11 @@ describe("usePlugins - Order Persistence", () => {
       const { imagePluginDisplayOrders, loadPlugins } = usePlugins();
       await loadPlugins();
 
-      // Should prefer app-managed plugin value (10) over config value (5)
+      // Should prefer schema value (10) over config value (5)
       expect(imagePluginDisplayOrders.value["local"]).toBe(10);
     });
 
-    it("should handle integer display_order values in plugin list", async () => {
+    it("should handle integer display_order values in schema", async () => {
       const mockPlugins = {
         plugins: [
           {
@@ -118,8 +121,9 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: 7,
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: 7, // Integer, not string
+            },
           },
         ],
       };
@@ -169,8 +173,9 @@ describe("usePlugins - Order Persistence", () => {
             name: "Weather",
             type: "service",
             enabled: true,
-            display_order: "3",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "3",
+            },
           },
         ],
       };
@@ -196,8 +201,9 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: "0",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "0",
+            },
           },
         ],
       };
@@ -235,16 +241,18 @@ describe("usePlugins - Order Persistence", () => {
             name: "Picsum",
             type: "image",
             enabled: true,
-            display_order: "1",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "1",
+            },
           },
           {
             id: "local",
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: "0",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "0",
+            },
           },
         ],
       };
@@ -276,8 +284,9 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: "2",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "2",
+            },
           },
         ],
       };
@@ -300,8 +309,9 @@ describe("usePlugins - Order Persistence", () => {
             name: "Local Images",
             type: "image",
             enabled: true,
-            display_order: "2",
-            common_config_schema: {},
+            common_config_schema: {
+              display_order: "2", // Same value as before
+            },
           },
         ],
       };

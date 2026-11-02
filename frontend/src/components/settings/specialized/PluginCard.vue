@@ -1,66 +1,94 @@
 <template>
-  <div class="plugin-card">
-    <!-- Plugin Header -->
-    <div class="plugin-header">
-      <div class="plugin-header-top">
-        <div class="plugin-info">
-          <div class="plugin-title-row">
-            <!-- Running indicator -->
-            <span
-              v-if="instances.length > 0"
-              class="running-indicator-aggregate"
-              :class="getAggregatedRunningClass(instances)"
-              :title="getAggregatedRunningTooltip(instances)"
-            >
-              {{ getAggregatedRunningSymbol(instances) }}
-            </span>
-            <strong>{{ plugin.name }}</strong>
-            <span class="plugin-type-badge" :class="`type-${plugin.type}`">
-              {{ plugin.type }}
-            </span>
-          </div>
-          <p class="plugin-description">
-            {{ plugin.description }}
-          </p>
-        </div>
-        <div class="plugin-header-actions">
-          <!-- Settings button -->
-          <button
-            v-if="hasSettings"
-            class="btn-icon-only btn-settings-icon"
-            :class="{ active: expanded }"
-            :title="expanded ? 'Hide settings' : 'Show settings'"
-            @click="$emit('toggle-expand', plugin.id)"
-          >
-            ⚙️
-          </button>
-          <!-- Uninstall button -->
-          <button
-            v-if="plugin._installed"
-            class="btn-remove btn-icon-only"
-            :title="plugin.type === 'theme' ? 'Uninstall this theme' : 'Uninstall this plugin'"
-            @click="$emit('uninstall', plugin.id, plugin.type)"
-          >
-            🗑️
-          </button>
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              :checked="plugin.enabled"
-              @change="$emit('toggle-enabled', plugin.id, $event.target.checked)"
-            />
-            <span class="slider" />
-          </label>
-        </div>
-      </div>
-    </div>
+  <div class="pc-card" :class="{ 'pc-card--off': !plugin.enabled && !isTheme }">
+    <ListRow :name="plugin.name || plugin.id" class="pc-row">
+      <template #meta>
+        <span class="pc-meta-line">
+          <Tag class="pc-badge">{{ kindLabel }}</Tag>
+          <span v-if="plugin.version" class="pc-ver">v{{ plugin.version }}</span>
+          <span class="pc-summary">
+            <template v-if="isTheme && plugin.selectable === false">
+              Needs an update to work with this Calvin.
+            </template>
+            <template v-else-if="isTheme">
+              Choose it in
+              <Button variant="link" size="sm" class="pc-link" @click="$emit('open-appearance')">
+                Dashboard › Appearance
+              </Button>
+            </template>
+            <template v-else-if="isBackground">
+              Works in the background. No sources to add.
+            </template>
+            <template v-else-if="!plugin.enabled">
+              Turned off<template v-if="sourceCount">
+                · {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}</template
+              ><template v-else> · not used</template>
+            </template>
+            <template v-else-if="sourceCount">
+              <Button variant="link" size="sm" class="pc-link" @click="$emit('used-by', plugin.id)">
+                Used by {{ sourceCount }} source{{ sourceCount === 1 ? "" : "s" }}
+              </Button>
+            </template>
+            <template v-else>
+              Not used yet<template v-if="canAddSource">
+                ·
+                <Button
+                  variant="link"
+                  size="sm"
+                  class="pc-link"
+                  @click="$emit('add-source', plugin.id)"
+                >
+                  Add a source
+                </Button></template
+              >
+            </template>
+          </span>
+        </span>
+      </template>
 
-    <!-- Plugin Config (when expanded) -->
-    <div v-if="plugin.enabled && expanded" class="plugin-config">
-      <!-- Plugin Settings -->
-      <div v-if="hasGlobalSettings">
-        <h4 class="config-section-title">Plugin Settings</h4>
-        <div v-for="(schema, key) in globalConfigSchema" :key="key" class="plugin-setting">
+      <template #actions>
+        <ToggleSwitch
+          v-if="!isTheme"
+          :model-value="plugin.enabled"
+          :aria-label="`Enable ${plugin.name}`"
+          @update:model-value="$emit('toggle-enabled', plugin.id, $event)"
+        />
+        <Button
+          v-if="showUpdate"
+          variant="primary"
+          class="pc-btn--update"
+          :loading="updating"
+          loading-label="Updating…"
+          @click="$emit('update', plugin.id)"
+        >
+          Update to v{{ latestVersion }}
+        </Button>
+        <Button
+          v-if="hasSettings && plugin.enabled"
+          variant="secondary"
+          :aria-expanded="expanded ? 'true' : 'false'"
+          @click="$emit('toggle-expand', plugin.id)"
+        >
+          Settings
+          <span class="pc-chevron" :class="{ 'pc-chevron--open': expanded }" aria-hidden="true"
+            >›</span
+          >
+        </Button>
+        <Button
+          v-if="plugin._installed"
+          variant="danger"
+          class="pc-btn--danger"
+          @click="$emit('uninstall', plugin.id, plugin.type)"
+        >
+          Uninstall
+        </Button>
+      </template>
+    </ListRow>
+
+    <!-- Body: plugin-level settings only. Sources live in Content. -->
+    <Card v-if="plugin.enabled && expanded" class="pc-body">
+      <div v-if="hasGlobalSettings" class="pc-section">
+        <h4 class="pc-section-title heading-group">Settings</h4>
+        <div v-for="(schema, key) in globalConfigSchema" :key="key" class="pc-field">
           <PluginFieldRenderer
             :plugin-id="plugin.id"
             :field-key="key"
@@ -70,12 +98,11 @@
           />
         </div>
 
-        <!-- Plugin Actions -->
         <PluginActions
-          v-if="globalPluginActions.length > 0"
+          v-if="pluginActions.length > 0"
           :plugin-id="plugin.id"
-          :actions="globalPluginActions"
-          :saving="saving === plugin.id ? plugin.id : null"
+          :actions="pluginActions"
+          :saving="saving === plugin.id || saving === true"
           :testing="typeof testing === 'object' && testing ? testing[plugin.id] || {} : {}"
           :fetching="typeof fetching === 'object' && fetching ? fetching[plugin.id] || {} : {}"
           :save-status="saveStatus"
@@ -89,50 +116,30 @@
         />
       </div>
 
-      <!-- Plugin Sections -->
       <PluginSections
-        v-if="plugin.ui_sections && plugin.ui_sections.length > 0 && plugin.enabled"
-        :plugin-id="plugin.id"
-        :plugin-instances="instances"
+        v-if="plugin.ui_sections && plugin.ui_sections.length > 0"
         :sections="plugin.ui_sections"
-        :images="images"
         :uploading="uploading"
         :upload-error="uploadError"
         :upload-success="uploadSuccess"
         @upload="$emit('upload', $event)"
-        @delete-image="$emit('delete-image', $event)"
       />
-
-      <!-- Plugin Instances -->
-      <PluginInstances
-        v-if="showInstances"
-        :plugin="plugin"
-        :instances="instances"
-        :get-instance-summary="instance => getInstanceSummary(plugin, instance)"
-        @add-instance="$emit('add-instance', plugin.id)"
-        @edit-instance="handleEditInstance"
-        @delete-instance="$emit('delete-instance', $event)"
-        @toggle-instance="handleToggleInstance"
-        @order-change="handleInstanceOrderChange"
-      />
-    </div>
-
-    <!-- Disabled Message -->
-    <div v-else-if="!plugin.enabled" class="plugin-disabled-message">
-      <p class="help-text">
-        This plugin type is disabled. It won't appear in dropdowns and existing instances will be
-        hidden (but not deleted).
-      </p>
-    </div>
+    </Card>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import Button from "@/components/ui/Button.vue";
+import Card from "@/components/ui/Card.vue";
+import ListRow from "@/components/ui/ListRow.vue";
+import Tag from "@/components/ui/Tag.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { pluginKindLabel } from "@/utils/pluginKind";
+import { isNewerVersion } from "@/utils/pluginVersions";
 import PluginFieldRenderer from "../../PluginFieldRenderer.vue";
 import PluginActions from "../../PluginActions.vue";
 import PluginSections from "../../PluginSections.vue";
-import PluginInstances from "./PluginInstances.vue";
 
 const props = defineProps({
   plugin: {
@@ -175,10 +182,6 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  images: {
-    type: Array,
-    default: () => [],
-  },
   uploading: {
     type: Boolean,
     default: false,
@@ -191,6 +194,15 @@ const props = defineProps({
     type: String,
     default: "",
   },
+  // Catalog version when the official catalog has a newer release (§3.3).
+  latestVersion: {
+    type: String,
+    default: "",
+  },
+  updating: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits([
@@ -202,319 +214,118 @@ const emit = defineEmits([
   "test-connection",
   "fetch-now",
   "custom-action",
-  "add-instance",
-  "edit-instance",
-  "delete-instance",
-  "toggle-instance",
-  "instance-order-change",
+  "used-by",
+  "add-source",
+  "open-appearance",
+  "update",
   "upload",
-  "delete-image",
 ]);
 
-const hasSettings = computed(() => {
-  return (
-    Object.keys(props.plugin.config_schema || {}).length > 0 ||
-    Object.keys(props.plugin.instance_config_schema || {}).length > 0 ||
-    props.instances.length > 0
-  );
-});
+const kindLabel = computed(() => pluginKindLabel(props.plugin));
 
-const globalConfigSchema = computed(() => {
-  return getGlobalConfigSchema(props.plugin);
-});
+// Only a genuinely newer catalog version offers Update; an equal or older one
+// (a downgrade) does not.
+const showUpdate = computed(() => isNewerVersion(props.latestVersion, props.plugin.version));
 
-const hasGlobalSettings = computed(() => {
-  return Object.keys(globalConfigSchema.value).length > 0;
-});
+const isTheme = computed(() => props.plugin.type === "theme");
+const isBackground = computed(() => props.plugin.type === "backend");
+const sourceCount = computed(() => props.instances.length);
+const canAddSource = computed(() => ["calendar", "image", "service"].includes(props.plugin.type));
 
-const globalPluginActions = computed(() => {
-  const actions = props.plugin.ui_actions || [];
-  const hasInstances =
-    props.plugin.supports_multiple_instances !== false && props.plugin.type !== "theme";
+const hasGlobalSettings = computed(() => Object.keys(globalConfigSchema.value).length > 0);
 
-  return actions.filter(action => {
-    if (action.scope === "instance") {
-      return false;
-    }
-    if (action.scope === "global") {
-      return true;
-    }
-    if (hasInstances && ["test", "fetch", "geocode"].includes(action.type)) {
-      return false;
-    }
-    return true;
-  });
-});
+const hasSettings = computed(() => hasGlobalSettings.value);
 
-const showInstances = computed(() => {
-  return (
-    props.plugin.enabled &&
-    props.plugin.type !== "theme" &&
-    props.plugin.supports_multiple_instances !== false
-  );
-});
+const globalConfigSchema = computed(() => getGlobalConfigSchema(props.plugin));
 
-// Trust schema placement: common_config_schema = global, instance_config_schema = instance.
-// Skip internal _ fields and fields marked hidden in their UI config.
-const getGlobalConfigSchema = plugin => {
-  return Object.fromEntries(
+// Trust schema placement: common_config_schema = global. Skip internal _ fields
+// and fields marked hidden in their UI config.
+const getGlobalConfigSchema = plugin =>
+  Object.fromEntries(
     Object.entries(plugin.common_config_schema || {}).filter(
-      ([key, schema]) =>
-        !key.startsWith("_") && schema && typeof schema === "object" && !schema.ui?.hidden
+      ([key, schema]) => !key.startsWith("_") && !schema.ui?.hidden
     )
   );
-};
 
-const getInstanceSummary = (plugin, instance) => {
-  const schema = plugin.instance_config_schema || {};
-  const config = instance.config || {};
-  for (const [key, fieldSchema] of Object.entries(schema)) {
-    if (key.startsWith("_") || fieldSchema.type !== "string") continue;
-    const val = config[key];
-    if (val && typeof val === "string" && val.trim()) {
-      return val.length > 60 ? val.slice(0, 57) + "..." : val;
-    }
+const pluginActions = computed(() => {
+  const actions = props.plugin.ui_actions || [];
+  if (actions.length > 0) return actions;
+  if (!hasGlobalSettings.value) return [];
+  return [{ id: "save", type: "save", label: "Save Settings", style: "primary" }];
+});
+
+const unwrapConfigValue = (value, schema = {}) => {
+  if (value && typeof value === "object") {
+    if ("value" in value) return value.value ?? "";
+    if ("default" in value) return value.default ?? "";
   }
-  return null;
+  if (value !== undefined && value !== null) return value;
+  return schema.default ?? (schema.type === "boolean" ? false : "");
 };
 
-const getFormValue = (key, schema) => {
-  return props.formData[key] ?? schema.default ?? (schema.type === "boolean" ? false : "");
-};
+const getFormValue = (key, schema) => unwrapConfigValue(props.formData[key], schema);
 
-const getAggregatedRunningClass = instances => {
-  const runningCount = instances.filter(i => i.running).length;
-  const totalCount = instances.length;
-
-  if (runningCount === 0) return "all-stopped";
-  if (runningCount === totalCount) return "all-running";
-  return "partial-running";
-};
-
-const getAggregatedRunningTooltip = instances => {
-  const runningCount = instances.filter(i => i.running).length;
-  const totalCount = instances.length;
-  return `${runningCount}/${totalCount} instances running`;
-};
-
-const getAggregatedRunningSymbol = instances => {
-  const runningCount = instances.filter(i => i.running).length;
-  const totalCount = instances.length;
-
-  if (runningCount === 0) return "○";
-  if (runningCount === totalCount) return "●";
-  return "◐";
-};
-
-const handleUpdateFormValue = (key, value) => {
+const handleUpdateFormValue = (key, value) =>
   emit("update-form-value", props.plugin.id, key, value);
-};
-
-const handleCustomAction = action => {
-  emit("custom-action", props.plugin.id, action);
-};
-
-const handleEditInstance = instance => {
-  emit("edit-instance", props.plugin.id, instance);
-};
-
-const handleToggleInstance = (instanceId, enabled) => {
-  emit("toggle-instance", instanceId, enabled);
-};
-
-const handleInstanceOrderChange = newOrder => {
-  emit("instance-order-change", props.plugin.id, newOrder);
-};
+const handleCustomAction = action => emit("custom-action", props.plugin.id, action);
 </script>
 
 <style scoped>
-.plugin-card {
-  width: 100%;
-}
-
-.plugin-header {
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.plugin-header-top {
+.pc-card {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
+  flex-direction: column;
+  gap: var(--gap-stack);
 }
 
-.plugin-info {
-  flex: 1;
+.pc-card--off {
+  opacity: 0.72;
 }
 
-.plugin-title-row {
+.pc-meta-line {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: var(--gap-inline);
 }
 
-.running-indicator-aggregate {
-  font-size: 1.2rem;
+.pc-summary {
+  font-family: var(--font-ui);
+  font-size: var(--text-meta);
+  color: var(--ink-2);
+}
+
+.pc-ver {
+  flex-shrink: 0;
+  font-family: var(--font-data);
+  font-size: var(--text-caption);
+  color: var(--ink-3);
+}
+
+.pc-chevron {
+  font-size: var(--text-title);
   line-height: 1;
+  transition: transform var(--dur-fast) var(--ease);
 }
 
-.running-indicator-aggregate.all-running {
-  color: #4caf50;
+.pc-chevron--open {
+  transform: rotate(90deg);
 }
 
-.running-indicator-aggregate.all-stopped {
-  color: #f44336;
-}
-
-.running-indicator-aggregate.partial-running {
-  color: #ff9800;
-}
-
-.plugin-type-badge {
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.plugin-type-badge.type-calendar {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.plugin-type-badge.type-image {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-
-.plugin-type-badge.type-service {
-  background: #e8f5e9;
-  color: #388e3c;
-}
-
-.plugin-type-badge.type-theme {
-  background: #fff3e0;
-  color: #f57c00;
-}
-
-.plugin-type-badge.type-backend {
-  background: #e1bee7;
-  color: #6a1b9a;
-}
-
-.plugin-description {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-}
-
-.plugin-header-actions {
+.pc-body {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: var(--gap-stack);
 }
 
-.btn-icon-only {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s;
+.pc-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
 }
 
-.btn-icon-only:hover {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
-}
-
-.btn-icon-only.active {
-  background: var(--accent-primary);
-  color: white;
-  border-color: var(--accent-primary);
-}
-
-.btn-remove {
-  color: #f44336;
-}
-
-.btn-remove:hover {
-  background: rgba(244, 67, 54, 0.1);
-  border-color: #f44336;
-}
-
-.toggle-switch {
-  position: relative;
-  display: inline-block;
-  width: 44px;
-  height: 24px;
-}
-
-.toggle-switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #ccc;
-  transition: 0.4s;
-  border-radius: 24px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 18px;
-  width: 18px;
-  left: 3px;
-  bottom: 3px;
-  background-color: white;
-  transition: 0.4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: var(--accent-primary);
-}
-
-input:checked + .slider:before {
-  transform: translateX(20px);
-}
-
-.plugin-config {
-  padding: 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.config-section-title {
-  margin: 0 0 1rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.plugin-setting {
-  margin-bottom: 1rem;
-}
-
-.plugin-disabled-message {
-  padding: 1rem 1.5rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.help-text {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
+@media (prefers-reduced-motion: reduce) {
+  .pc-chevron {
+    transition: none;
+  }
 }
 </style>

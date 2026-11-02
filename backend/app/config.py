@@ -1,11 +1,43 @@
 """Configuration management."""
 
-import logging
 from pathlib import Path
 
+from loguru import logger
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-logger = logging.getLogger(__name__)
+# backend/ — where alembic.ini, the shipped built-in themes and (by default)
+# the data dir live. Derived from this file, never from the working dir.
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+# Default data dir, and where every install wrote before CALVIN_DATA_DIR
+# was read (app.utils.legacy_data migrates it when the root moves).
+LEGACY_DATA_DIR = BACKEND_DIR / "data"
+
+# The official add-on catalog (the calvin-plugins repository). Plugins ›
+# Install lists it on open and the Content provider picker may install from it
+# (design 2026-10-30-content-and-plugins §3.3/§3.7); PLUGIN_CATALOG_REPO
+# overrides it. The picker only ever installs from this one catalog: another
+# repository is a deliberate visit in Plugins, never a one-click add.
+DEFAULT_PLUGIN_CATALOG_REPO = "https://github.com/osterbergsimon/calvin-plugins"
+
+# Path settings that default to <data_dir>/<default> unless set explicitly.
+_DATA_PATHS = (
+    "log_dir",
+    "image_dir",
+    "image_cache_dir",
+    "plugins_dir",
+    "themes_dir",
+    "kiosk_signing_key_path",
+    "backup_dir",
+    "admin_auth_path",
+)
+
+
+def resolve_path(path: Path) -> Path:
+    """Absolute path; relative ones are taken from the backend dir, not the cwd."""
+    path = Path(path).expanduser()
+    return path if path.is_absolute() else (BACKEND_DIR / path).resolve()
 
 
 class Settings(BaseSettings):
@@ -16,12 +48,23 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # API
-    api_host: str = "0.0.0.0"
+    api_host: str = "0.0.0.0"  # nosec B104 - intentional: Pi serves the LAN
     api_port: int = 8000
 
-    # Database
-    # Use absolute path to avoid path resolution issues
-    database_url: str = "sqlite:///./data/db/calvin.db"
+    # Data directory: the root of everything Calvin writes (DB, images,
+    # plugins, themes, caches, logs, kiosk signing key, backups). Read from
+    # CALVIN_DATA_DIR; the default is backend/data of this checkout, so a
+    # dev or bare-metal install never depends on the working directory.
+    # Each path below can still be overridden on its own (DATABASE_URL,
+    # IMAGE_DIR, PLUGIN_DIR, ...); unset ones derive from data_dir. Relative
+    # values resolve against the backend dir (the historical working dir).
+    data_dir: Path = Field(
+        default=LEGACY_DATA_DIR,
+        validation_alias=AliasChoices("calvin_data_dir", "data_dir"),
+    )
+
+    # Database (default: sqlite:///<data_dir>/db/calvin.db)
+    database_url: str = ""
 
     @property
     def database_path(self) -> Path:
@@ -29,16 +72,7 @@ class Settings(BaseSettings):
         db_path_str = self.database_url.replace("sqlite:///", "").replace(
             "sqlite+aiosqlite:///", ""
         )
-        # Remove leading ./ if present
-        if db_path_str.startswith("./"):
-            db_path_str = db_path_str[2:]
-        # If path starts with /, it's already absolute
-        if db_path_str.startswith("/"):
-            return Path(db_path_str)
-        # Otherwise resolve relative to backend directory
-        # Find backend directory (where this config file is located)
-        backend_dir = Path(__file__).parent.parent
-        return (backend_dir / db_path_str).resolve()
+        return resolve_path(Path(db_path_str))
 
     @property
     def database_url_absolute(self) -> str:
@@ -47,14 +81,35 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
-    log_dir: Path = Path("./logs")
+    log_dir: Path = Path("logs")
 
     # Image Storage
-    image_dir: Path = Path("./data/images")
-    image_cache_dir: Path = Path("./data/cache/images")
+    image_dir: Path = Path("images")
+    # Remote image bytes cache (app.services.remote_image_cache)
+    image_cache_dir: Path = Path("image_cache")
+    # Total size cap for that cache; least recently used images are evicted
+    # past it, so the cache can't slowly fill the SD card.
+    image_cache_max_mb: int = Field(default=500, ge=1)
+    # A single remote image larger than this is refused, not read into memory.
+    image_cache_max_item_mb: int = Field(default=25, ge=1)
 
-    # Plugin Storage
-    plugins_dir: Path = Path("./data/plugins")
+    # Plugin Storage.
+    # Deploy configs (docker compose, deploy/calvin.env.example) set the
+    # singular PLUGIN_DIR, so accept it alongside the convention-following
+    # PLUGINS_DIR. Without this the env is silently ignored and container
+    # installs fall back to ./data/plugins inside the bind-mounted repo,
+    # creating root-owned dirs that break a host-run backend. (calvin-0ds)
+    plugins_dir: Path = Field(
+        default=Path("plugins"),
+        validation_alias=AliasChoices("plugins_dir", "plugin_dir"),
+    )
+
+    # Installed (uploaded) themes. Built-in themes ship with the code.
+    themes_dir: Path = Path("themes")
+
+    # The repository Plugins › Install and the Content provider picker treat as
+    # the add-on catalog. Defaults to the official calvin-plugins repo.
+    plugin_catalog_repo: str = DEFAULT_PLUGIN_CATALOG_REPO
 
     # Photo Frame Mode
     photo_frame_enabled: bool = False
@@ -68,10 +123,107 @@ class Settings(BaseSettings):
         False  # Allow all origins (development only, not recommended for production)
     )
 
+    # How the backend is deployed: "native" (host install with update/restart
+    # scripts) or "docker" (set by docker/Dockerfile). In a container the host
+    # actions — update script, systemd restarts, reboot — don't apply.
+    deployment: str = Field(
+        default="native",
+        validation_alias=AliasChoices("calvin_deployment", "deployment"),
+    )
+
+    # May Calvin act on the machine it runs on (reboot, systemd restarts,
+    # xset/xrandr/vcgencmd)? Only true when Calvin owns the machine: a native
+    # Pi/kiosk install that is not a dev checkout. A developer desktop, a dev
+    # backend and a Docker container all default to off, so a stray Reboot
+    # click can never reboot the owner's PC. CALVIN_HOST_CONTROL=1 forces it on
+    # (and =0 forces it off) for deployments that don't match the heuristic.
+    host_control: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("calvin_host_control", "host_control"),
+    )
+
     # System paths (for Raspberry Pi deployment)
     update_script_path: Path = Path("/usr/local/bin/update-calvin.sh")
     repo_dir: Path = Path("/home/calvin/calvin")
     system_path: str = "/home/calvin/.local/bin:/usr/local/bin:/usr/bin:/bin"
+    kiosk_signing_key_path: Path = Path("kiosk-signing.key")
+    # Where the kiosk bundle + installer scripts live (deploy/, scripts/ layout).
+    # Unset = repo_dir (a Pi/source checkout); the Docker image sets it explicitly.
+    kiosk_bundle_dir: Path | None = None
+    # The URL phones and new kiosks should use to reach this server
+    # (e.g. http://calvin.lan:8000). Unset = auto-detect from the LAN address,
+    # which is wrong behind Docker NAT or a reverse proxy — set it there.
+    public_url: str = ""
+    # Peers allowed to set X-Forwarded-Proto/X-Forwarded-Host for the public
+    # base URL the kiosk installer bakes in (CLV-34): comma-separated IPs/CIDRs,
+    # "*" for any. Empty = trust no one, so a forwarded header from an arbitrary
+    # client can never choose the URL. Forwarded headers are also ignored when
+    # PUBLIC_URL is set, because that setting wins.
+    trusted_proxies: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_trusted_proxies", "trusted_proxies"),
+    )
+
+    # Backups (calvin-8gx)
+    backup_dir: Path = Path("backups")
+
+    # Admin auth (CLV-9). The secret file sits next to the kiosk signing key,
+    # never in the DB or a backup. CALVIN_ADMIN_PASSWORD always wins on start.
+    admin_auth_path: Path = Path("admin-auth.json")
+    admin_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_admin_password", "admin_password"),
+    )
+    # One-time code gating the first admin password (CLV-61). Empty = generate
+    # one and keep it in a 0600 file; set it for headless installs.
+    setup_code: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_setup_code", "setup_code"),
+    )
+    allowed_hosts: str = Field(
+        default="",
+        validation_alias=AliasChoices("calvin_allowed_hosts", "allowed_hosts"),
+    )
+
+    @model_validator(mode="after")
+    def _derive_paths(self) -> "Settings":
+        """Anchor unset paths under data_dir and make every path absolute."""
+        # An empty CALVIN_DATA_DIR= parses as "." and counts as unset too.
+        if self.data_dir == Path("."):
+            self.data_dir = LEGACY_DATA_DIR
+        self.data_dir = resolve_path(self.data_dir)
+        defaults = type(self).model_fields
+        for name in _DATA_PATHS:
+            value = getattr(self, name)
+            # An empty env value (BACKUP_DIR=) parses as "." and counts as unset.
+            if name not in self.model_fields_set or value == Path("."):
+                setattr(self, name, self.data_dir / defaults[name].default)
+            else:
+                setattr(self, name, resolve_path(value))
+        if not self.database_url:
+            self.database_url = f"sqlite:///{self.data_dir / 'db' / 'calvin.db'}"
+        elif self.database_url.startswith(("sqlite:///", "sqlite+aiosqlite:///")):
+            self.database_url = self.database_url_absolute
+        return self
+
+    @model_validator(mode="after")
+    def _derive_host_control(self) -> "Settings":
+        """Default host_control from the deployment when CALVIN_HOST_CONTROL is unset.
+
+        Calvin may only reboot or otherwise drive the machine when it owns it:
+        a native (non-container) install on a Raspberry Pi that is not a dev
+        checkout. A desktop, a dev backend and a container all keep it off.
+        """
+        if "host_control" in self.model_fields_set:
+            return self
+        # Imported lazily: platform probes /proc and vcgencmd, and config is
+        # imported by almost everything.
+        from app.utils.platform import is_raspberry_pi
+
+        self.host_control = (
+            self.deployment == "native" and not self.is_dev_mode and is_raspberry_pi()
+        )
+        return self
 
     @property
     def is_dev_mode(self) -> bool:
@@ -114,6 +266,7 @@ class Settings(BaseSettings):
         self.image_dir.mkdir(parents=True, exist_ok=True)
         self.image_cache_dir.mkdir(parents=True, exist_ok=True)
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
+        self.themes_dir.mkdir(parents=True, exist_ok=True)
         # Extract database path and ensure directory exists
         # Use the database_path property to get absolute path
         db_path = self.database_path
@@ -140,8 +293,8 @@ class Settings(BaseSettings):
                         shutil.copy2(wrong_path, db_path)
                         logger.info(f"Database migrated successfully to {db_path}")
                         # Old file is kept for safety - user can remove manually if needed
-                    except Exception as e:
-                        logger.warning(f"Failed to migrate database: {e}", exc_info=True)
+                    except Exception:
+                        logger.opt(exception=True).warning("Failed to migrate database")
                     break
 
 

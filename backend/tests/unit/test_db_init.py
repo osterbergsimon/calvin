@@ -349,3 +349,13 @@ async def test_initialize_database_enables_wal_mode():
                 db_path.unlink()
             except PermissionError:
                 pass
+
+
+@pytest.mark.asyncio
+async def test_initialize_database_fails_without_alembic_ini(tmp_path, monkeypatch):
+    """A missing alembic.ini is a broken install: fail instead of skipping migrations."""
+    import app.utils.db_init as db_init
+
+    monkeypatch.setattr(db_init, "BACKEND_DIR", tmp_path)
+    with pytest.raises(RuntimeError, match="Alembic config not found"):
+        await initialize_database(tmp_path / "db" / "calvin.db")

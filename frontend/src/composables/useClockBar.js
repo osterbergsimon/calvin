@@ -1,0 +1,288 @@
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useConfigStore } from "../stores/config";
+
+/**
+ * Shared clock-bar logic used by both ClockBarHorizontal and ClockBarVertical.
+ *
+ * @param {Object} opts
+ * @param {() => boolean} opts.enabled         Whether the bar is enabled (reactive getter).
+ * @param {() => boolean} opts.showInKiosk     Show when UI is hidden.
+ * @param {() => boolean} opts.showInNonKiosk  Show when UI is visible.
+ * @param {() => boolean} [opts.previewMode]   When true, always show and use preview overrides.
+ * @param {() => number|null} [opts.previewTimeSize]
+ * @param {() => number|null} [opts.previewDateSize]
+ * @param {() => string|null} [opts.previewLayout]
+ * @param {() => number|null} [opts.previewPadding]
+ * @param {() => number|null} [opts.previewPluginItemSize]
+ * @param {() => 'horizontal'|'vertical'} [opts.orientation]
+ */
+// Fixed edge gutter (px) along the bar's inline axis, so the leading logo is never
+// flush against the screen edge regardless of the thickness slider.
+const INLINE_GUTTER = 8;
+
+export function useClockBar(opts) {
+  const configStore = useConfigStore();
+
+  const get = (fn, fallback = null) => (typeof fn === "function" ? fn() : fallback);
+
+  const isPreview = computed(() => !!get(opts.previewMode, false));
+  const orientation = computed(() => get(opts.orientation, "horizontal"));
+
+  const shouldShow = computed(() => {
+    if (isPreview.value) return true;
+    if (!get(opts.enabled, true)) return false;
+    if (get(opts.showInNonKiosk, false) && configStore.shouldShowUI) return true;
+    if (get(opts.showInKiosk, false) && !configStore.shouldShowUI) return true;
+    return false;
+  });
+
+  const showDate = computed(() => !!configStore.clockShowDate);
+  // Plugin tiles are rendered unconditionally: each one is gated by its own
+  // toggle in Dashboard › Clock bar items. Decision C removed the global "Show
+  // plugin info" switch, so a stale master flag can no longer hide every tile
+  // with no control to bring it back.
+  const showSeconds = computed(() => !!configStore.clockShowSeconds);
+  // Reject anything Intl can't accept as a time zone. The backend persists an
+  // unset timezone as the literal string "None" (str(None)), which would make
+  // every Intl formatter below throw "invalid time zone: None" and crash the
+  // render. Validate once here so downstream formatters only ever see a real
+  // IANA zone or null (= system timezone).
+  const isValidTimeZone = tz => {
+    if (!tz) return false;
+    try {
+      new Intl.DateTimeFormat(undefined, { timeZone: tz });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const timezone = computed(() =>
+    isValidTimeZone(configStore.timezone) ? configStore.timezone : null
+  );
+  const timeFormat = computed(() => configStore.timeFormat || "24h");
+
+  const fontSize = computed(() => {
+    const preview = get(opts.previewTimeSize, null);
+    if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalFontSize || 18;
+    return configStore.clockBarFontSize || 16;
+  });
+
+  const dateFontSize = computed(() => {
+    const preview = get(opts.previewDateSize, null);
+    if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalDateFontSize || 11;
+    return configStore.clockBarDateFontSize || 14;
+  });
+
+  // Size of plugin statusbar item readouts (the value/number). Drives an override
+  // of --plugin-value-size-sm scoped to the bar's PluginStatusbarItems wrapper.
+  const pluginItemSize = computed(() => {
+    const preview = get(opts.previewPluginItemSize, null);
+    if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") return configStore.clockBarVerticalPluginItemSize ?? 16;
+    return configStore.clockBarPluginItemSize ?? 16;
+  });
+
+  const layout = computed(() => {
+    const preview = get(opts.previewLayout, null);
+    if (isPreview.value && preview !== null) return preview;
+    if (orientation.value === "vertical") {
+      if (configStore.clockBarVerticalLayout) return configStore.clockBarVerticalLayout;
+      return configStore.clockBarLayout === "vertical-compact" ? "compact-time" : "upright";
+    }
+    return configStore.clockBarLayout || "single-line";
+  });
+
+  const barPadding = computed(() => {
+    const preview = get(opts.previewPadding, null);
+    if (isPreview.value && preview !== null) return preview;
+    // Nullish coalescing, not ||: padding 0 is valid ("all the way down") and
+    // must not fall back to the 8px default.
+    if (orientation.value === "vertical") return configStore.clockBarVerticalPadding ?? 8;
+    return configStore.clockBarPadding ?? 8;
+  });
+
+  // The slider controls the bar's *thickness* (cross-axis) only. Padding along the
+  // bar's inline axis just squeezes the fixed-size logo toward the screen edge, so
+  // that axis stays pinned to a small constant gutter. CSS shorthand is "Y X":
+  //   horizontal bar → Y = thickness (slider), X = gutter
+  //   vertical bar   → Y = gutter,             X = thickness (slider)
+  const barPaddingStyle = computed(() => {
+    const thickness = barPadding.value;
+    return orientation.value === "vertical"
+      ? `${INLINE_GUTTER}px ${thickness}px`
+      : `${thickness}px ${INLINE_GUTTER}px`;
+  });
+
+  const currentTime = ref(new Date());
+  let timer = null;
+
+  const buildOptions = (base = {}) => {
+    const options = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: timeFormat.value === "12h",
+      ...base,
+    };
+    if (showSeconds.value) options.second = "2-digit";
+    if (timezone.value) options.timeZone = timezone.value;
+    return options;
+  };
+
+  const formattedTime = computed(() => {
+    const now = currentTime.value;
+    try {
+      return now.toLocaleTimeString(undefined, buildOptions());
+    } catch {
+      const fallback = {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: timeFormat.value === "12h",
+      };
+      if (showSeconds.value) fallback.second = "2-digit";
+      return now.toLocaleTimeString(undefined, fallback);
+    }
+  });
+
+  const compactTimeParts = computed(() => {
+    const now = currentTime.value;
+    const fallback = {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: timeFormat.value === "12h",
+    };
+    if (showSeconds.value) fallback.second = "2-digit";
+    if (timezone.value) fallback.timeZone = timezone.value;
+
+    try {
+      const formatter = new Intl.DateTimeFormat(undefined, fallback);
+      const parts = formatter.formatToParts(now);
+      return {
+        hour: parts.find(part => part.type === "hour")?.value || "00",
+        minute: parts.find(part => part.type === "minute")?.value || "00",
+        second: showSeconds.value ? parts.find(part => part.type === "second")?.value || "" : "",
+        dayPeriod: parts.find(part => part.type === "dayPeriod")?.value || "",
+      };
+    } catch {
+      const [time, dayPeriod = ""] = now.toLocaleTimeString(undefined, fallback).split(" ");
+      const [hour = "00", minute = "00", second = ""] = time.split(":");
+      return {
+        hour,
+        minute,
+        second: showSeconds.value ? second : "",
+        dayPeriod,
+      };
+    }
+  });
+
+  const formattedDate = computed(() => {
+    if (!showDate.value) return "";
+    const now = currentTime.value;
+    const options = {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    };
+    if (timezone.value) options.timeZone = timezone.value;
+    try {
+      return now.toLocaleDateString(undefined, options);
+    } catch {
+      return now.toLocaleDateString(undefined, {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    }
+  });
+
+  const compactDateParts = computed(() => {
+    if (!showDate.value) return null;
+    const now = currentTime.value;
+    const options = {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    };
+    if (timezone.value) options.timeZone = timezone.value;
+
+    try {
+      const formatter = new Intl.DateTimeFormat(undefined, options);
+      const parts = formatter.formatToParts(now);
+      return {
+        weekday: parts.find(part => part.type === "weekday")?.value || "",
+        month: parts.find(part => part.type === "month")?.value || "",
+        day: parts.find(part => part.type === "day")?.value || "",
+        year: parts.find(part => part.type === "year")?.value || "",
+      };
+    } catch {
+      return null;
+    }
+  });
+
+  // Tick aligned to the next second (when seconds are shown) or next minute boundary.
+  // Avoids drift from a fixed setInterval and skips re-renders the user can't see.
+  const scheduleNextTick = () => {
+    const now = new Date();
+    const delay = showSeconds.value
+      ? 1000 - now.getMilliseconds()
+      : 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+    timer = setTimeout(tick, Math.max(delay, 16));
+  };
+
+  const tick = () => {
+    timer = null;
+    if (shouldShow.value) {
+      currentTime.value = new Date();
+    }
+    scheduleNextTick();
+  };
+
+  const stopTimer = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+
+  // Re-align tick cadence when seconds toggle changes.
+  watch(showSeconds, () => {
+    stopTimer();
+    if (shouldShow.value) scheduleNextTick();
+  });
+
+  watch(shouldShow, visible => {
+    if (visible && !timer) {
+      currentTime.value = new Date();
+      scheduleNextTick();
+    } else if (!visible) {
+      stopTimer();
+    }
+  });
+
+  onMounted(() => {
+    if (shouldShow.value) {
+      scheduleNextTick();
+    }
+  });
+
+  onUnmounted(stopTimer);
+
+  return {
+    shouldShow,
+    showDate,
+    formattedTime,
+    compactTimeParts,
+    formattedDate,
+    compactDateParts,
+    fontSize,
+    dateFontSize,
+    pluginItemSize,
+    layout,
+    barPadding,
+    barPaddingStyle,
+  };
+}

@@ -47,6 +47,14 @@ export async function restartFrontend() {
 }
 
 /**
+ * Deployment (native / docker) and which host actions are available.
+ */
+export async function getSystemEnvironment() {
+  const response = await api.get("/system/environment");
+  return response.data;
+}
+
+/**
  * Trigger system update.
  */
 export async function triggerUpdate() {

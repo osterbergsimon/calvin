@@ -1,5 +1,6 @@
 """Main FastAPI application entry point."""
 
+import asyncio
 import logging
 import os
 import sys
@@ -17,6 +18,7 @@ from loguru import logger
 
 # Configure logging FIRST, before any other imports that might trigger database initialization
 # Import settings first to get log level
+from app import __version__
 from app.config import settings
 
 # Remove loguru's default handler and configure our own
@@ -96,55 +98,62 @@ class InterceptHandler(logging.Handler):
 # Set up standard logging interception for compatibility
 logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
 
-# Reduce SQLAlchemy verbosity by setting its loggers to WARNING
-# This must be done BEFORE database.py is imported (which creates the engine)
-sqlalchemy_loggers = [
+# Configure SQL-related stdlib loggers to flow through InterceptHandler.
+# CALVIN_SQL_ECHO=1 turns on SQL statement logging without editing this file.
+# Runtime queries go Ormar -> `databases` lib -> aiosqlite, so `databases` is
+# the useful logger; SQLAlchemy loggers cover metadata.create_all() in init.
+# Must be done BEFORE database.py is imported (which creates the engine).
+_sql_log_level = logging.DEBUG if os.environ.get("CALVIN_SQL_ECHO") == "1" else logging.WARNING
+for sql_logger_name in (
+    "databases",
     "sqlalchemy.engine",
     "sqlalchemy.pool",
     "sqlalchemy.dialects",
-]
-for sql_logger_name in sqlalchemy_loggers:
+):
     sql_logger = logging.getLogger(sql_logger_name)
-    sql_logger.setLevel(logging.WARNING)
+    sql_logger.setLevel(_sql_log_level)
     sql_logger.handlers = [InterceptHandler()]
     sql_logger.propagate = False
 
 logger.info(f"Loguru logging configured with level: {log_level}")
 
-from fastapi import FastAPI, HTTPException, Request  # noqa: E402
+from fastapi import Depends, FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.encoders import jsonable_encoder  # noqa: E402
 from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
+from starlette.routing import Route  # noqa: E402
 
 from app.api.routes import (  # noqa: E402
+    backup,
     calendar,
     config,
+    demo,
     health,
     images,
     keyboard,
+    kiosks,
     plugins,
+    security,
+    share,
     system,
 )
+from app.mcp_server.gateway import mcp_gateway  # noqa: E402
+from app.security.install import apply_startup_admin_password, install_security  # noqa: E402
+from app.security.route_policy import enforce_route_policy  # noqa: E402
 from app.services.scheduler import calendar_scheduler  # noqa: E402
 
-# Plugins are auto-discovered via pluggy hooks when modules are imported
+# Plugin classes are auto-discovered by the loader when modules are imported
 
 # Use loguru logger (already imported at top of file)
 
 
 async def _initialize_database():
     """Initialize database and run migrations."""
-    from pathlib import Path
-
     from app.database import database
     from app.utils.db_init import initialize_database
 
-    # Extract database path from settings
-    db_path_str = settings.database_url.replace("sqlite:///", "")
-    db_path = Path(db_path_str) if db_path_str.startswith("/") else Path(db_path_str).resolve()
-
-    # Use the unified initialization function
-    await initialize_database(db_path, database=database, run_migrations=True)
+    await initialize_database(settings.database_path, database=database, run_migrations=True)
     logger.info("Database initialized and migrations completed")
 
 
@@ -186,61 +195,36 @@ async def _initialize_plugins():
     await plugin_registry.load_plugins_from_db()
     logger.info("Loaded plugins from database")
 
-    # Auto-create default instances for image plugins if enabled and no instance exists
-    # Local images plugin
+    # Auto-create default instances for image plugins if enabled and no instance exists.
+    # Local images store under settings.image_dir (IMAGE_DIR / data dir), so the
+    # instance config carries no path of its own.
     await _create_default_plugin_instance(
         plugin_registry,
         type_id="local",
         plugin_id="local-images",
         name="Local Images",
-        config={
-            "image_dir": "./data/images",
-            "thumbnail_dir": "./data/images/thumbnails",
-        },
+        config={},
     )
 
 
+DEFAULT_KEYBOARD_MAPPINGS = {
+    "KEY_1": "generic_prev",
+    "KEY_2": "generic_expand_close",
+    "KEY_3": "generic_next",
+    "KEY_4": "region_next",
+    "KEY_5": "screen_prev",
+    "KEY_6": "screen_next",
+    "KEY_7": "mode_settings",
+}
+
+
 async def _initialize_keyboard_mappings():
-    """Initialize default keyboard mappings if none exist."""
+    """Seed the default keyboard mapping if none exist."""
     from app.services.keyboard_mapping_service import keyboard_mapping_service
 
-    mappings = await keyboard_mapping_service.get_all_mappings()
-
-    # Set default 7-button keyboard mappings
-    default_7button = {
-        "KEY_1": "generic_prev",
-        "KEY_2": "generic_expand_close",
-        "KEY_3": "generic_next",
-        "KEY_4": "mode_calendar",
-        "KEY_5": "mode_photos",
-        "KEY_6": "mode_web_services",
-        "KEY_7": "generic_refresh",
-    }
-
-    # Set default standard keyboard mappings (same pattern, different keys)
-    default_standard = {
-        "KEY_LEFT": "generic_prev",
-        "KEY_UP": "generic_expand_close",
-        "KEY_RIGHT": "generic_next",
-        "KEY_DOWN": "mode_calendar",
-        "KEY_SPACE": "mode_photos",
-        "KEY_1": "mode_web_services",
-        "KEY_2": "generic_refresh",
-    }
-
-    # Initialize mappings if none exist
-    if not mappings:
-        await keyboard_mapping_service.set_mappings("7-button", default_7button)
-        await keyboard_mapping_service.set_mappings("standard", default_standard)
+    if not await keyboard_mapping_service.get_mappings():
+        await keyboard_mapping_service.set_mappings(DEFAULT_KEYBOARD_MAPPINGS)
         logger.info("Initialized default keyboard mappings")
-    else:
-        # Ensure both keyboard types have mappings
-        if "7-button" not in mappings or not mappings["7-button"]:
-            await keyboard_mapping_service.set_mappings("7-button", default_7button)
-            logger.info("Initialized 7-button keyboard mappings")
-        if "standard" not in mappings or not mappings["standard"]:
-            await keyboard_mapping_service.set_mappings("standard", default_standard)
-            logger.info("Initialized standard keyboard mappings")
 
 
 async def _initialize_image_service():
@@ -251,6 +235,55 @@ async def _initialize_image_service():
     await plugin_image_service.scan_images()
     plugin_image_count = len(await plugin_image_service.get_images())
     logger.info(f"Plugin image service initialized: {plugin_image_count} images found")
+
+
+# Warm-up work that makes network calls with long timeouts (image scan, calendar
+# preload) runs after startup instead of blocking it, so /api/health answers
+# immediately (audit R8). The set keeps a reference to each running task; a
+# task removed from it would be a candidate for garbage collection mid-flight.
+_startup_tasks: set[asyncio.Task] = set()
+
+
+def _track_startup_task(name: str, coro) -> asyncio.Task:
+    """Run a coroutine as a tracked background task and log any failure."""
+    task = asyncio.create_task(coro, name=name)
+    _startup_tasks.add(task)
+
+    def _on_done(done: asyncio.Task) -> None:
+        _startup_tasks.discard(done)
+        if done.cancelled():
+            return
+        exc = done.exception()
+        if exc is not None:
+            logger.opt(exception=exc).error("Startup warm-up task {} failed: {}", name, exc)
+
+    task.add_done_callback(_on_done)
+    return task
+
+
+async def _warm_up_calendar() -> None:
+    """Preload the current and adjacent months into the calendar cache."""
+    from app.services import plugin_calendar_service
+
+    await plugin_calendar_service.preload_months(months_to_preload=1)
+    logger.info("Calendar months preloaded")
+
+
+def _start_warmup_tasks() -> list[asyncio.Task]:
+    """Start the post-startup cache warm-ups and return their tasks."""
+    return [
+        _track_startup_task("startup-image-scan", _initialize_image_service()),
+        _track_startup_task("startup-calendar-preload", _warm_up_calendar()),
+    ]
+
+
+async def _cancel_startup_tasks() -> None:
+    """Cancel warm-up tasks still running at shutdown."""
+    pending = [task for task in _startup_tasks if not task.done()]
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 async def _set_default_config_if_missing(config_service, key: str, default_value):
@@ -271,20 +304,44 @@ async def _initialize_default_config():
         "orientation": "landscape",
         "apply_display_rotation": True,
         "calendar_split": 70.0,
-        "keyboard_type": "7-button",
+        "dashboard_layout": {
+            "version": 1,
+            "preset": "split_two",
+            "regions": [
+                {"id": "region-1", "kind": "calendar", "size": 70},
+                {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+            ],
+        },
+        "dashboard_screens": {
+            "version": 2,
+            "activeScreenId": "screen-home",
+            "screens": [
+                {
+                    "id": "screen-home",
+                    "name": "Home",
+                    "layout": {
+                        "version": 1,
+                        "preset": "split_two",
+                        "regions": [
+                            {"id": "region-1", "kind": "calendar", "serviceId": None, "size": 70},
+                            {"id": "region-2", "kind": "photos", "serviceId": None, "size": 30},
+                        ],
+                    },
+                    "activeRegionId": "region-1",
+                }
+            ],
+        },
         "photo_frame_enabled": False,
         "photo_frame_timeout": 300,  # 5 minutes
         "config_poll_interval": 30,  # 30 seconds
         "show_ui": True,
         "photo_rotation_interval": 30,  # 30 seconds
-        "calendar_view_mode": "month",  # 'month' | 'week' | 'day' | 'rolling'
         "time_format": "24h",  # '12h' or '24h'
         "mode_indicator_timeout": 5,  # 5 seconds
         "keyboard_feedback_enabled": True,
         "keyboard_feedback_mode": "normal",
         "week_start_day": 1,  # Monday
         "show_week_numbers": False,
-        "side_view_position": "right",
         "theme_mode": "auto",
         "dark_mode_start": 18,  # 6 PM
         "dark_mode_end": 6,  # 6 AM
@@ -312,6 +369,19 @@ async def _initialize_default_config():
         await config_service.set_value("display_schedule", json.dumps(default_schedule))
 
 
+async def _restore_on_start():
+    """Seed a fresh install from CALVIN_RESTORE_FROM or <backup dir>/restore-on-start.*.
+
+    Runs after plugins load and before defaults, so defaults only fill what
+    the backup does not set. Never raises (see app.services.backup.seed).
+    """
+    from app.services.backup.seed import restore_on_start
+
+    outcome = await restore_on_start()
+    if outcome != "none":
+        logger.info(f"Restore on start: {outcome}")
+
+
 async def _start_schedulers():
     """Start background schedulers."""
     from app.services.backend_scheduler import backend_plugin_scheduler
@@ -320,15 +390,37 @@ async def _start_schedulers():
     await calendar_scheduler.start()
     # Log message is now handled in scheduler.start()
 
-    await display_power_service.start()
-    logger.info("Display power scheduler started")
+    if await display_power_service.start():
+        logger.info("Display power scheduler started")
 
     # Start backend plugin scheduler (plugins will register their tasks on initialization)
     await backend_plugin_scheduler.start()
 
+    from app.services.backup.store import auto_backup_scheduler
+
+    await auto_backup_scheduler.start()
+
 
 async def _sync_display_orientation():
     """Sync display orientation with config (on Raspberry Pi, if enabled)."""
+    from app.utils.host_control import host_control_enabled
+
+    if not host_control_enabled():
+        # A dev backend or container does not own the screen; xrandr would hit
+        # the developer's desktop instead (calvin-hhok).
+        logger.info("CALVIN_HOST_CONTROL is off - skipping startup display orientation sync")
+        return
+
+    from app.utils.platform import has_x11
+
+    if not await asyncio.to_thread(has_x11):
+        # Mode B (remote/display-less backend): the device-side display-agent owns
+        # orientation. Skip the backend-local xrandr sync instead of failing on it.
+        logger.debug(
+            "No local X display; skipping backend orientation sync (device-side agent owns it)"
+        )
+        return
+
     from app.services.config_service import config_service
     from app.services.display_orientation_service import display_orientation_service
 
@@ -350,7 +442,7 @@ async def _sync_display_orientation():
 
 
 # Theme sync removed - themes are loaded from filesystem on-demand
-# No database storage needed for themes (see ORMAR_MIGRATION_PLAN.md Part 7)
+# No database storage needed for themes.
 
 
 async def _shutdown_services():
@@ -358,6 +450,8 @@ async def _shutdown_services():
     from app.plugins.manager import plugin_manager
     from app.services.backend_scheduler import backend_plugin_scheduler
     from app.services.display_power_service import display_power_service
+
+    await _cancel_startup_tasks()
 
     await display_power_service.stop()
     logger.info("Display power scheduler stopped")
@@ -368,41 +462,81 @@ async def _shutdown_services():
     # Stop backend plugin scheduler (cleanup scheduled tasks)
     backend_plugin_scheduler.stop()
 
+    from app.services.backup.store import auto_backup_scheduler
+
+    auto_backup_scheduler.stop()
+
     await plugin_manager.cleanup_all()
     logger.info("Plugins cleaned up")
+
+
+def _ensure_kiosk_signing_key():
+    """Create the kiosk manifest signing key at startup (best-effort).
+
+    Provisioning a signed kiosk needs this key out-of-band, so it must exist before
+    the first kiosk ever contacts the server.
+    """
+    from app.services import kiosk_bundle
+
+    try:
+        path = kiosk_bundle.ensure_signing_key()
+        logger.info(f"Kiosk manifest signing key: {path.resolve()}")
+    except Exception as e:
+        logger.warning(f"Could not create kiosk signing key: {e}")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
     from app.database import connect_db, disconnect_db
+    from app.utils.legacy_data import migrate_legacy_data
 
     # Startup
     try:
         logger.info("Starting application lifecycle...")
+        # Before the DB opens and the kiosk key is created: an install whose
+        # data root moved off <backend>/data gets its old files copied over.
+        migrate_legacy_data(settings)
         await connect_db()
         logger.info("Database connected")
         await _initialize_database()
         logger.info("Database initialized")
+        # CALVIN_ADMIN_PASSWORD always wins, before anything that could serve.
+        apply_startup_admin_password()
         await _initialize_plugins()
         logger.info("Plugins initialized")
+        await _restore_on_start()
         await _initialize_keyboard_mappings()
         logger.info("Keyboard mappings initialized")
-        await _initialize_image_service()
-        logger.info("Image service initialized")
         await _initialize_default_config()
         logger.info("Default config initialized")
+        from app.services.kiosk_registry import (
+            migrate_global_photo_frame,
+            migrate_global_room_name,
+            migrate_global_screen_controls,
+        )
+
+        await migrate_global_room_name()
+        await migrate_global_screen_controls()
+        await migrate_global_photo_frame()
+        logger.info("Per-screen migrations checked")
         await _start_schedulers()
         logger.info("Schedulers started")
         await _sync_display_orientation()
         logger.info("Display orientation synced")
+        _ensure_kiosk_signing_key()
+        # Image scan and calendar preload make slow network calls; run them
+        # after startup so the app answers /api/health immediately (audit R8).
+        warmup_tasks = _start_warmup_tasks()
+        logger.info(f"Started {len(warmup_tasks)} background warm-up task(s)")
         # Themes are loaded from filesystem on-demand - no database sync needed
         logger.info("Application startup complete - ready to serve requests")
     except Exception as e:
         logger.exception(f"Error during startup: {e}")
         raise
 
-    yield
+    async with mcp_gateway.lifespan():
+        yield
 
     # Shutdown
     logger.info("Shutting down application...")
@@ -416,6 +550,7 @@ app = FastAPI(
     description="Lightweight DAKBoard alternative for Raspberry Pi",
     version="0.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(enforce_route_policy)],
 )
 
 # CORS middleware
@@ -434,6 +569,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+from app.middleware.security_headers import SecurityHeadersMiddleware  # noqa: E402
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Admin auth: the app-level dependency is registered above; this adds the auth
+# router and Host/Origin middleware (CLV-9).
+install_security(app)
 
 
 # Dev-only HTTP request logging — enable with CALVIN_DEV_LOG_HTTP=1
@@ -483,60 +626,61 @@ async def fastapi_http_exception_handler(request: Request, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors with detailed logging."""
-    errors = exc.errors()
-    # Try to get request body for logging, but don't fail if we can't read it
-    body_info = "N/A"
-    try:
-        if request.method in ("POST", "PUT", "PATCH"):
-            body = await request.body()
-            body_info = body.decode("utf-8", errors="replace")[:500]  # Limit length
-    except Exception:
-        pass  # Ignore errors reading body
+    """Handle request validation errors.
 
+    Only the location, type and message of each error are logged or returned:
+    the request body and each error's ``input``/``ctx`` can carry passwords,
+    and ``ctx`` may hold exception objects that aren't JSON-serialisable
+    (audit S9).
+    """
+    errors = [
+        {"type": e.get("type"), "loc": e.get("loc"), "msg": e.get("msg")} for e in exc.errors()
+    ]
     logger.error(
-        f"Validation error: {errors} | "
-        f"Path: {request.url.path} | Method: {request.method} | "
-        f"Body: {body_info}"
+        f"Validation error: {errors} | Path: {request.url.path} | Method: {request.method}"
     )
     return JSONResponse(
         status_code=422,
-        content={"detail": errors, "body": "Validation error"},
+        content={"detail": jsonable_encoder(errors), "body": "Validation error"},
     )
 
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """Catch-all exception handler to log all unhandled errors."""
-    import traceback
-
-    # Log full exception details with stack trace
-    logger.error(
-        f"Unhandled exception: {type(exc).__name__}: {exc} | "
+    # Full details (which may include secrets from exception messages) go to
+    # the server log only; clients get a generic message (audit S9).
+    logger.opt(exception=exc).error(
+        f"Unhandled exception: {type(exc).__name__} | "
         f"Path: {request.url.path} | Method: {request.method} | "
         f"Client: {request.client.host if request.client else 'unknown'}"
-    )
-    logger.error(f"Full traceback:\n{traceback.format_exc()}")
-
-    # Include error details in response for debugging (only in development)
-    error_detail = (
-        str(exc) if settings.log_level.upper() in ("DEBUG", "INFO") else "Internal server error"
     )
 
     return JSONResponse(
         status_code=500,
-        content={"detail": error_detail, "type": type(exc).__name__},
+        content={"detail": "Internal server error", "type": type(exc).__name__},
     )
 
 
 # Include routers
 app.include_router(health.router, prefix="/api", tags=["health"])
 app.include_router(config.router, prefix="/api", tags=["config"])
+app.include_router(kiosks.router, prefix="/api", tags=["kiosks"])
 app.include_router(calendar.router, prefix="/api", tags=["calendar"])
 app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
 app.include_router(images.router, prefix="/api", tags=["images"])
 app.include_router(plugins.router, prefix="/api", tags=["plugins"])
 app.include_router(system.router, prefix="/api/system", tags=["system"])
+app.include_router(security.router, prefix="/api", tags=["security"])
+app.include_router(backup.router, prefix="/api", tags=["backup"])
+app.include_router(demo.router, prefix="/api", tags=["demo"])
+app.include_router(share.router, prefix="/api", tags=["share"])
+app.include_router(share.share_target_router)
+
+# MCP server (CLV-33). Not a FastAPI route, so the gateway authenticates itself:
+# every request needs a bearer API key. Both spellings avoid a redirect on POST.
+for _mcp_path in ("/api/mcp", "/api/mcp/"):
+    app.router.routes.append(Route(_mcp_path, mcp_gateway, methods=["GET", "POST", "DELETE"]))
 
 # Serve static files from frontend dist directory
 # Get the project root (parent of backend directory)
@@ -549,7 +693,7 @@ if frontend_dist.exists():
     assets_dir = frontend_dist / "assets"
     if assets_dir.exists():
         # Use custom static file handler to add cache control headers
-        @app.get("/assets/{file_path:path}")
+        @app.get("/assets/{file_path:path}", include_in_schema=False)
         async def serve_asset(file_path: str):
             """Serve static assets with cache control headers for development."""
             asset_path = assets_dir / file_path
@@ -572,10 +716,72 @@ if frontend_dist.exists():
     else:
         logger.warning(f"Assets directory not found: {assets_dir}")
 
+    # Serve Vite public/ root assets (favicon, PWA manifest, touch icons) before
+    # the SPA catch-all. Without this, /favicon.svg returns index.html.
+    async def serve_frontend_public_file(file_name: str):
+        public_path = frontend_dist / file_name
+        if public_path.exists() and public_path.is_file():
+            return FileResponse(
+                str(public_path),
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
+
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Not found")
+
+    @app.api_route("/favicon.svg", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_favicon_svg():
+        return await serve_frontend_public_file("favicon.svg")
+
+    @app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_apple_touch_icon():
+        return await serve_frontend_public_file("apple-touch-icon.png")
+
+    @app.api_route("/site.webmanifest", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_site_webmanifest():
+        return await serve_frontend_public_file("site.webmanifest")
+
+    @app.api_route("/icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_icon_192():
+        return await serve_frontend_public_file("icon-192.png")
+
+    @app.api_route("/icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_icon_512():
+        return await serve_frontend_public_file("icon-512.png")
+
+    @app.api_route("/sw.js", methods=["GET", "HEAD"], include_in_schema=False)
+    async def serve_service_worker():
+        return await serve_frontend_public_file("sw.js")
+
+    # The guest page of a share link (calvin-mwqo) links its own PWA manifest,
+    # so "Add to Home screen" installs this link and Android's Share menu offers
+    # it. The page itself is the SPA; a dead token is explained there.
+    @app.get("/share/{token}", include_in_schema=False)
+    @app.get("/share/{token}/", include_in_schema=False)
+    async def serve_share_page(token: str):
+        from fastapi import HTTPException
+        from fastapi.responses import HTMLResponse
+
+        index_path = frontend_dist / "index.html"
+        if not index_path.exists():
+            raise HTTPException(status_code=404, detail="Not found")
+        return HTMLResponse(
+            share.share_page_html(index_path.read_text(encoding="utf-8"), token),
+            headers={
+                "Cache-Control": "no-store",
+                "Referrer-Policy": "no-referrer",
+            },
+        )
+
     # Serve index.html for root path
-    @app.get("/")
+    @app.get("/", operation_id="root__get", summary="Root")
     async def serve_frontend_root():
-        """Serve frontend index.html for root path."""
+        """Root endpoint."""
         index_path = frontend_dist / "index.html"
         if index_path.exists():
             return FileResponse(
@@ -586,12 +792,12 @@ if frontend_dist.exists():
                     "Expires": "0",
                 },
             )
-        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        return {"message": "Calvin Dashboard API", "version": __version__}
 
     # Serve index.html for all other non-API routes (SPA routing)
     # This must come after API routes and asset mounts to avoid intercepting them
     # Only handle GET requests for SPA routing - POST requests should only go to API routes
-    @app.get("/{full_path:path}")
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_frontend_get(full_path: str):
         """Serve frontend index.html for SPA routing (GET only)."""
         # Don't handle API routes, docs, or assets (already handled by mounts/routers)
@@ -616,10 +822,10 @@ if frontend_dist.exists():
                     "Expires": "0",
                 },
             )
-        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        return {"message": "Calvin Dashboard API", "version": __version__}
 else:
     # Fallback if frontend dist doesn't exist (development mode)
     @app.get("/")
     async def root():
         """Root endpoint."""
-        return {"message": "Calvin Dashboard API", "version": "0.1.0"}
+        return {"message": "Calvin Dashboard API", "version": __version__}

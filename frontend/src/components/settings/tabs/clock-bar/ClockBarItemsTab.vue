@@ -1,0 +1,275 @@
+<template>
+  <div class="clock-bar-items-tab">
+    <p class="section-description">
+      Choose which plugin tiles appear in the clock bar. Each tile keeps its own preview and live
+      data — toggling here just controls whether it's shown.
+    </p>
+
+    <div v-if="loading" class="state-message">Loading installed plugins&hellip;</div>
+
+    <div v-else-if="barCapableServices.length === 0" class="state-message empty-state">
+      <p>No clock bar info yet.</p>
+      <button type="button" class="btn-add" @click="addClockBarInfo">Add clock bar info</button>
+    </div>
+
+    <template v-else>
+      <p class="items-summary">
+        <strong>{{ visibleCount }}</strong> of {{ barCapableServices.length }} tile{{
+          barCapableServices.length === 1 ? "" : "s"
+        }}
+        shown
+      </p>
+
+      <ul class="items-list">
+        <li
+          v-for="service in barCapableServices"
+          :key="service.id"
+          class="item-row"
+          :class="{ 'item-row-hidden': !isVisible(service) }"
+        >
+          <div class="preview" :title="`Live preview of ${service.name}`">
+            <SchemaStatusbarItem :service-id="service.id" :schema="service.statusbar_schema" />
+          </div>
+          <div class="meta">
+            <div class="title">{{ service.name }}</div>
+            <div class="subtitle">{{ service.plugin_name || service.plugin_id }}</div>
+          </div>
+          <label
+            class="switch"
+            :class="{ saving: pendingId === service.id }"
+            :title="isVisible(service) ? 'Click to hide' : 'Click to show'"
+          >
+            <ToggleSwitch
+              :model-value="isVisible(service)"
+              :aria-label="`Show ${service.name} in the clock bar`"
+              :disabled="pendingId === service.id"
+              @update:model-value="value => toggle(service, value)"
+            />
+            <span class="switch-label">{{ isVisible(service) ? "Shown" : "Hidden" }}</span>
+          </label>
+        </li>
+      </ul>
+    </template>
+
+    <div v-if="errorMessage" class="error-message" role="alert">{{ errorMessage }}</div>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useWebServicesStore } from "@/stores/webServices";
+import * as pluginsApi from "@/services/pluginsApi";
+import { logError } from "@/utils/logger";
+import SchemaStatusbarItem from "@/components/plugins/SchemaStatusbarItem.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+
+const webServicesStore = useWebServicesStore();
+const router = useRouter();
+
+const loading = ref(false);
+const pendingId = ref(null);
+const errorMessage = ref("");
+
+const barCapableServices = computed(() =>
+  webServicesStore.services.filter(s => s.statusbar_schema?.kind)
+);
+
+const visibleCount = computed(() => barCapableServices.value.filter(isVisible).length);
+
+function asBoolean(value) {
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+  }
+  return value === true || value === 1;
+}
+
+function isVisible(service) {
+  const cfg = service.config || {};
+  if ("show_in_statusbar" in cfg) return asBoolean(cfg.show_in_statusbar);
+  return true;
+}
+
+async function toggle(service, nextValue) {
+  pendingId.value = service.id;
+  errorMessage.value = "";
+  try {
+    await pluginsApi.updatePluginInstance(service.id, {
+      name: service.name,
+      enabled: service.enabled !== false,
+      plugin_id: service.plugin_id,
+      config: {
+        ...(service.config || {}),
+        show_in_statusbar: nextValue,
+      },
+    });
+    await webServicesStore.fetchServices();
+  } catch (err) {
+    errorMessage.value = `Couldn't change ${service.name}. Try again.`;
+    logError("[ClockBarItemsTab]", "Failed to toggle show_in_statusbar:", err);
+  } finally {
+    pendingId.value = null;
+  }
+}
+
+// Adding clock-bar info happens in Content (§3.5): this list stays the
+// show/hide and order control and links there for adding.
+const addClockBarInfo = () =>
+  router.push({ path: "/settings", query: { setting: "content-clock-bar", add: "clock" } });
+
+onMounted(async () => {
+  if (webServicesStore.services.length === 0) {
+    loading.value = true;
+    try {
+      await webServicesStore.fetchServices();
+    } finally {
+      loading.value = false;
+    }
+  }
+});
+</script>
+
+<style scoped>
+.clock-bar-items-tab {
+  width: 100%;
+  padding: 1.25rem;
+}
+
+.section-description {
+  margin: 0 0 1rem;
+  color: var(--ink-2);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+
+.section-description code {
+  padding: 0.05rem 0.35rem;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: 0.85em;
+}
+
+.state-message {
+  padding: 1rem;
+  color: var(--ink-3);
+  font-size: var(--fs-md);
+}
+
+.empty-state p {
+  margin: 0 0 0.75rem;
+}
+
+.btn-add {
+  min-height: var(--touch-target);
+  padding: 0.5rem 1rem;
+  background: var(--focus);
+  color: var(--focus-ink);
+  border: 0;
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  font-weight: var(--weight-title);
+  cursor: pointer;
+}
+
+.btn-add:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.items-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.item-row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  min-height: var(--touch-target);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  min-width: 80px;
+  min-height: 32px;
+}
+
+/* A tile with no live preview yet leaves no empty slot (CLV-45 review). */
+.preview:empty {
+  display: none;
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta .title {
+  font-family: var(--font-ui);
+  font-weight: var(--weight-title);
+  color: var(--ink);
+}
+
+.meta .subtitle {
+  margin-top: 0.15rem;
+  font-size: var(--text-meta);
+  font-family: var(--font-ui);
+  color: var(--ink-2);
+}
+
+.items-summary {
+  margin: 0 0 0.6rem;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+}
+
+.items-summary strong {
+  color: var(--ink);
+}
+
+.item-row-hidden {
+  opacity: 0.55;
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-inline);
+  cursor: pointer;
+  font-size: var(--text-body);
+  font-family: var(--font-ui);
+  color: var(--ink);
+  user-select: none;
+  min-height: var(--touch-target);
+}
+
+.switch-label {
+  min-width: 3.2rem;
+}
+
+.switch.saving {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.error-message {
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.85rem;
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
+  border-radius: var(--radius-xs);
+  color: var(--ink);
+  font-size: var(--fs-md);
+}
+</style>

@@ -21,54 +21,87 @@ This shared approach reduces code duplication and makes the scripts more maintai
 
 **Features:**
 - Creates `calvin` user if it doesn't exist
-- Installs all system dependencies
-- Installs UV (Python package manager)
-- Installs Node.js 20+
+- Installs kiosk dependencies, Docker, and the Docker Compose plugin
 - Clones/configures Git repository
-- Installs backend dependencies (production + linux extras)
-- Installs frontend dependencies (production)
-- Builds frontend for production
-- Creates data directories
-- Configures systemd services
+- Creates runtime data directories under `/var/lib/calvin`
+- Installs `/etc/calvin/docker-compose.yml` and `/etc/calvin/.env` (compose auto-loads the latter)
+- Picks the kiosk display stack like `setup-kiosk.sh` does: cog by default, `--display-stack x11|wayland|cog` to choose, and a re-run keeps the stack recorded in `/etc/default/calvin-kiosk` (an older X11 install stays X11). See [Display stack](KIOSK_INSTALL.md#display-stack-cog-default-everywhere-wayland-opt-in)
+- Writes the kiosk session env `/etc/default/calvin-kiosk-display` (on X11/Wayland: the session variables plus the board's Chromium flags — `--disable-gpu` on Pi 3-class boards, see [Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu))
+- Installs `calvin-app.service` plus every display unit (`calvin-cog.service`, `calvin-x.service`, `calvin-wayland.service`, `calvin-kiosk.service`) and enables exactly one display owner: `calvin-cog.service` on cog, otherwise the compositor plus `calvin-kiosk.service` (Chromium)
 - Sets up display and kiosk mode
 - Configures auto-start on boot
 
 **Usage:**
 
 ```bash
-# Standard installation (main branch)
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+# Stable release (recommended): pin the latest tag from
+# https://github.com/osterbergsimon/calvin/releases
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
 
-# Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+# Testers / latest changes (develop branch)
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
-**Using a Different Branch:**
+**Using another branch, a release tag, or a fork:** put the variables *after*
+`sudo` so they reach the script (`sudo` drops your environment, and
+`VAR=x curl ...` only sets them for `curl`):
 
 ```bash
-export GIT_BRANCH=develop
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
+curl -fsSL https://raw.githubusercontent.com/<you>/calvin/<ref>/scripts/setup.sh \
+  | sudo GIT_REPO=https://github.com/<you>/calvin.git GIT_BRANCH=<ref> bash
 ```
 
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop wget ...`), as inline assignments don't propagate through pipes to `sudo`.
+The default branch is `develop`. `main` is release-only and cannot be deployed
+(setup uses `develop` instead, also on hosts that still record `main`). Every
+branch runs the `:develop` image; a release tag (`vX.Y.Z`) runs that release's
+`:X.Y.Z` image instead. Pin any other image tag with `CALVIN_IMAGE_TAG=<tag>`.
 
-**Using a Fork or Custom Repository:**
+### Installing a release versus develop
+
+A **release** is a `vX.Y.Z` tag cut on `main` (see
+[RELEASING.md](../RELEASING.md)). Pin the tag in both places — the URL the
+script is fetched from and `GIT_BRANCH`, which the script uses to clone the
+checkout and choose the image:
 
 ```bash
-GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch \
-  wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
 ```
+
+No `CALVIN_IMAGE_TAG` is needed: a tag ref selects `:v0.1.0`. To upgrade later,
+re-run setup with the newer tag — the checkout moves to the new tag, the image
+tag follows it, and the data directory is untouched. `update-calvin.sh` on a
+tag-pinned host keeps that tag (it does not jump to a newer release), so a
+deliberate re-run is the upgrade step.
+
+`develop` stays available for testers:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
+```
+
+It tracks the newest code and publishes `:develop` on every push, so a
+`update-calvin.sh` or a setup re-run picks up whatever is on `develop` at that
+moment — useful, but not a stable version. Before the first release exists,
+`develop` is the only installable ref.
+
+`CALVIN_IMAGE_TAG` still wins over both when you want a specific image (for
+example `CALVIN_IMAGE_TAG=sha-<commit>` for a rollback) while running setup from
+a branch.
+
 
 **What Happens:**
 1. System packages are updated
-2. All dependencies are installed
+2. Kiosk packages are installed, plus Docker CE and the compose plugin from
+   download.docker.com (the Debian/Raspberry Pi OS `docker.io` has no compose v2;
+   an existing working `docker compose` is left alone). Any apt failure stops setup.
 3. Repository is cloned/updated to `/home/calvin/calvin`
-4. Backend and frontend are built and configured
-5. Systemd services are installed and enabled
-6. Display is configured for kiosk mode
-7. System is ready - **reboot required** to start services
+4. Compose configuration is installed under `/etc/calvin`
+5. Runtime data directories are created under `/var/lib/calvin`
+6. Systemd services are installed and enabled
+7. Display is configured for kiosk mode
+8. System is ready - **reboot required** to start services
 
 **After Setup:**
 ```bash
@@ -77,48 +110,35 @@ sudo reboot
 
 After reboot, the dashboard will automatically start and be available at `http://localhost:8000`.
 
-### Development Setup (`scripts/setup-dev.sh`)
+### Development Setup (`scripts/setup.sh --mode dev`)
 
 **Purpose:** Development setup with hot reload for Raspberry Pi.
 
 **Features:**
-- Everything from production setup, plus:
-- Creates 4GB swap file (for Pi 3B+ with limited RAM)
-- Uses venv for backend (more stable on Pi 3B+)
-- Installs dev dependencies
-- Creates `.dev` marker file for hot reload
-- Configures dev-specific frontend service (Vite dev server)
-- Sets up hot reload for both backend and frontend
-- Connects to dev server on port 5173
+- Installs the same kiosk and Docker runtime
+- Uses `docker/docker-compose.dev.yml`
+- Bind-mounts `/home/calvin/calvin` into the app container
+- Sets up hot reload for backend and frontend
+- Keeps the kiosk pointed at `http://localhost:8000`
 
 **Usage:**
 
 ```bash
 # Standard development installation
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 
 # Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
 ```
 
-**Using a Different Branch:**
-
-```bash
-export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
-```
-
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop curl ...`), as inline assignments don't propagate through pipes to `sudo`.
+**Using another branch or a fork:** as for production, pass the variables
+after `sudo`: `... | sudo GIT_BRANCH=<branch> bash -s -- --mode dev`.
 
 **What Happens:**
-1. Same as production setup, but with development features
-2. Swap file is created for better performance
-3. Backend uses venv (more stable than UV on Pi 3B+)
-4. Dev dependencies are installed
-5. Hot reload is enabled for both backend and frontend
-6. Frontend dev server runs on port 5173
+1. Same base setup as production
+2. The dev compose file is installed to `/etc/calvin/docker-compose.yml`
+3. The checkout is bind-mounted into the app container
+4. Hot reload is enabled for backend and frontend
 
 **After Setup:**
 ```bash
@@ -126,15 +146,12 @@ sudo reboot
 ```
 
 After reboot:
-- Backend runs with hot reload (code changes auto-reload)
-- Frontend runs with hot reload (Vite dev server on port 5173)
-- Dashboard available at `http://localhost:5173`
+- Docker Compose runs the hot-reload dev stack
+- Dashboard available at `http://localhost:8000`
 
 **Development Workflow:**
 - Make code changes in `/home/calvin/calvin`
-- Backend automatically reloads on file changes
-- Frontend automatically reloads via Vite HMR
-- No manual restart needed
+- Backend and frontend reload through the dev compose stack
 
 ### Windows Development Setup (`setup-windows.ps1`)
 
@@ -156,7 +173,7 @@ After reboot:
 ```
 
 **What Happens:**
-1. Checks for Python 3.11+, Node.js 20+, Git
+1. Checks for Python 3.12+, Node.js 20+, Git
 2. Installs UV if not present
 3. Switches to develop branch (if Git available)
 4. Installs backend dependencies with dev extras
@@ -179,6 +196,29 @@ npm run dev
 
 **Note:** Keyboard input uses a mock handler on Windows. Full keyboard support is available on Linux/Raspberry Pi.
 
+### Zero-touch Kiosk Provisioning (`scripts/bake-kiosk-firstrun.sh`)
+
+**Purpose:** Bake a first-boot bundle onto a freshly-flashed card so a Pi
+self-provisions into a Mode-B kiosk with no SSH and no per-Pi typing.
+
+**Usage:**
+
+```bash
+sudo bash scripts/bake-kiosk-firstrun.sh \
+  --backend-url http://homeserver.local:8000 \
+  --wifi-ssid HomeNet --wifi-psk 's3cret' --wifi-country SE \
+  --hostname kitchen \
+  --signing-key-file calvin.key \
+  --boot-dir /media/$USER/bootfs
+```
+
+The card gets the kiosk installer (`deploy/kiosk-agent/install-kiosk.sh`); on boot 2
+it pulls the rest from the Calvin server. Without a card, the same installer runs as
+`curl -fsSL http://<server>:8000/api/kiosks/install.sh | sudo bash`.
+
+Full walkthrough: [KIOSK_INSTALL.md](KIOSK_INSTALL.md) and
+[KIOSK_PROVISIONING.md](KIOSK_PROVISIONING.md).
+
 ## Script Configuration
 
 All scripts support environment variables for customization:
@@ -186,10 +226,20 @@ All scripts support environment variables for customization:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `GIT_REPO` | Git repository URL | `https://github.com/osterbergsimon/calvin.git` |
-| `GIT_BRANCH` | Git branch to use | `main` |
+| `GIT_BRANCH` | Git branch to use | `develop` (`main` is release-only and replaced by `develop`) |
 | `CALVIN_DIR` | Installation directory | `/home/calvin/calvin` (Linux) |
-| `CALVIN_USER` | User to run services | `calvin` (Linux) |
+| `CALVIN_DATA_DIR` | Data volume on the host | `/var/lib/calvin` |
+| `CALVIN_IMAGE_TAG` | Pin the runtime image (otherwise `develop`; `:latest` is not published yet; a pin already in `/etc/calvin/.env` is kept) | — |
 | `LOG_FILE` | Log file path | `/var/log/calvin-setup.log` (Linux) |
+
+Pass them after `sudo` (`sudo GIT_BRANCH=x bash setup.sh`). The service user is
+always `calvin`: the systemd units, sudoers rules and kiosk bundle hard-code it,
+so setup refuses a different `CALVIN_USER`.
+
+Baked kiosk cards (`bake-kiosk-firstrun.sh --ssh-pubkey`) get a separate admin
+user for recovery (`calvin-admin` by default, `--admin-user` to rename it):
+key-only SSH login and passwordless sudo. `calvin` itself has no password, no
+sudo, and is not in the `docker` group.
 
 ## Testing the Scripts
 
@@ -213,7 +263,12 @@ npm install -g bats
 ```bash
 cd scripts
 bats tests/
+for t in tests/test_*.sh; do bash "$t" || echo "FAILED: $t"; done
 ```
+
+CI also runs shellcheck on every script and a Docker-CE install smoke test in
+`debian:bookworm` and `debian:trixie` arm64 containers
+(`scripts/ci/pi-os-smoke.sh`).
 
 Or use the Makefile:
 ```bash
@@ -266,12 +321,13 @@ The scripts have been refactored with the following improvements:
    # Linux
    sudo cat /var/log/calvin-setup.log
    
-   # Or check the repository log
-   cat /home/calvin/calvin/backend/logs/calvin-update.log
+   # Or check the updater log (root-owned, outside the checkout)
+   sudo cat /var/lib/calvin-update-status/calvin-update.log
+   # Older installs: /home/calvin/calvin/backend/logs/calvin-update.log
    ```
 
 2. **Verify prerequisites:**
-   - Python 3.11+ installed
+   - Python 3.12+ installed
    - Node.js 20+ installed
    - Git installed
    - Root/sudo access (for Linux scripts)
@@ -300,16 +356,15 @@ For repository-based usage (most common), the scripts work correctly as they're 
 
 1. **Check service status:**
    ```bash
-   sudo systemctl status calvin-backend
-   sudo systemctl status calvin-frontend
-   # Or for dev mode:
-   sudo systemctl status calvin-frontend-dev
+   sudo systemctl status calvin-app
+   sudo systemctl status calvin-cog     # cog (default)
+   sudo systemctl status calvin-kiosk   # X11/Wayland (Chromium)
    ```
 
 2. **Check logs:**
    ```bash
-   sudo journalctl -u calvin-backend -n 50
-   sudo journalctl -u calvin-frontend -n 50
+   sudo journalctl -u calvin-app -n 50
+   sudo journalctl -u calvin-cog -n 50     # or calvin-kiosk on X11/Wayland
    ```
 
 3. **Verify permissions:**
@@ -321,27 +376,59 @@ For repository-based usage (most common), the scripts work correctly as they're 
 ### Development Mode Issues
 
 1. **Hot reload not working:**
-   - Verify `.dev` file exists: `ls -la /home/calvin/calvin/backend/.dev`
-   - Check backend service logs for `--reload` flag
-   - Verify frontend dev service is running
-
-2. **Swap file issues:**
-   - Check swap: `free -h`
-   - Verify swap file: `ls -lh /swapfile`
-   - If needed, recreate: `sudo swapoff /swapfile && sudo rm /swapfile`
+   - Verify `/etc/calvin/docker-compose.yml` came from `docker-compose.dev.yml`
+   - Check compose logs: `sudo docker compose -f /etc/calvin/docker-compose.yml logs`
+   - Restart the stack: `sudo systemctl restart calvin-app`
 
 ## Updating After Setup
 
-After initial setup, use the update script:
-
 ```bash
-update-calvin.sh
+sudo update-calvin.sh
 ```
 
-Or with force flag to rebuild dependencies:
-```bash
-update-calvin.sh --force
-```
+In production mode it:
+
+1. fast-forwards `/home/calvin/calvin` to `origin/<GIT_BRANCH>` (a checkout with
+   local changes or local commits is left as it is, with a warning);
+2. re-installs the host files with `setup.sh --refresh` (compose file, systemd
+   units, helper scripts and sudoers, X/openbox config, display agent, and
+   `update-calvin.sh` itself) — no apt or Docker. They come from a fresh clone of
+   `GIT_REPO`/`GIT_BRANCH` in the root-only `/var/lib/calvin-update`, never from
+   the checkout in calvin's home: that runs as root, and the app user can edit
+   the checkout. Local edits there are not installed as root;
+3. records the running image, pulls the configured tag and restarts Compose;
+4. waits for `http://localhost:$CALVIN_PORT/api/health`. If the new image does
+   not come up (failed restart or health check) it puts back the previous image
+   and the previous `/etc/calvin/docker-compose.yml` and `.env`, restarts on them,
+   and exits with an error. A failed refresh or pull restores the host files and
+   restarts nothing. The state (including `previous_image`) is in
+   `/var/lib/calvin-update-status/calvin-update-state.json` next to the update
+   log (`CALVIN_UPDATE_STATUS_DIR` or `UPDATE_STATE_FILE`/`UPDATE_LOG_FILE`
+   override both). The dir is root-owned, so the app user cannot plant a
+   symlink for root to write through.
+
+Root does that clone, so `GIT_REPO` must be readable without the calvin user's
+credentials (an `https://` URL). Hosts set up before this behaviour existed run
+an older `update-calvin.sh` that does not refresh anything: re-run setup once
+(`curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash`),
+and later updates refresh themselves.
+
+Development installs pull the configured git branch into `/home/calvin/calvin`
+with `--autostash`, refresh the host files the same way, then recreate the dev
+Compose containers so dependency changes are picked up.
+
+OS and Chromium security updates are installed by `unattended-upgrades`, which
+setup enables (Debian, Debian-Security and the Raspberry Pi archive).
+
+### Kiosk Pis (Mode B)
+
+A remote kiosk Pi runs only the display-agent, not the full stack, so it does
+not use `update-calvin.sh` and does not carry a repo checkout. Update its agent
+from the server instead: **Settings → Screens → Update**. The kiosk pulls a
+verified file bundle from the backend on its next poll, swaps only what changed,
+restarts only the affected services, and auto-rolls-back if the agent does not
+come up healthy — no SSH or re-provisioning needed. See
+[Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
 
 ## Contributing
 

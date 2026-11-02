@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Verifies emit_firstrun produces a firstrun.sh with the baked values embedded.
+set -euo pipefail
+
+# shellcheck source=../bake-kiosk-firstrun.sh
+source "$(dirname "$0")/../bake-kiosk-firstrun.sh" --source-only 2>/dev/null || true
+
+parse_args \
+  --backend-url http://homeserver.local:8000 \
+  --boot-dir /tmp --hostname kitchen \
+  --wifi-ssid HomeNet --wifi-psk s3cret --wifi-country SE
+
+out="$(emit_firstrun)"
+
+# Baked values are emitted via printf '%q' — clean values (no shell metacharacters)
+# are emitted without quotes.  Verify each value is present in its %q form.
+echo "$out" | grep -qF "BACKEND_URL=http://homeserver.local:8000" \
+    || { echo "FAIL: backend url not baked"; exit 1; }
+# No GitHub fetch at all: the installer is baked onto the card and pulls the rest
+# from the Calvin server.
+if echo "$out" | grep -q 'githubusercontent\|SETUP_KIOSK_URL'; then
+    echo "FAIL: firstrun still fetches from GitHub"; exit 1; fi
+echo "$out" | grep -q '/usr/local/bin/calvin-kiosk-install.sh' \
+    || { echo "FAIL: installer not baked"; exit 1; }
+echo "$out" | grep -qF "SERVER_URL='@CALVIN_SERVER_URL@'" \
+    || { echo "FAIL: installer body not embedded verbatim"; exit 1; }
+echo "$out" | grep -q '/etc/hostname' || { echo "FAIL: hostname not set"; exit 1; }
+echo "$out" | grep -qF "CALVIN_HOSTNAME=kitchen" || { echo "FAIL: hostname value missing"; exit 1; }
+echo "$out" | grep -qF "WIFI_SSID=HomeNet" || { echo "FAIL: wifi ssid not baked"; exit 1; }
+echo "$out" | grep -q 'calvin-kiosk-firstboot.service' || { echo "FAIL: firstboot unit not embedded"; exit 1; }
+echo "$out" | grep -q 'calvin-kiosk-firstboot.sh' || { echo "FAIL: firstboot wrapper not embedded"; exit 1; }
+echo "$out" | grep -q 'systemd.run' || { echo "FAIL: does not strip its own cmdline hook"; exit 1; }
+# The baked secrets (wifi PSK, signing key) must not stay on the FAT boot partition.
+echo "$out" | grep -qF 'rm -f /boot/firmware/firstrun.sh' \
+    || { echo "FAIL: firstrun.sh does not delete itself"; exit 1; }
+# The embedded installer round-trips byte-for-byte through the quoted heredoc.
+here_dir="$(cd "$(dirname "$0")" && pwd)"
+diff <(echo "$out" | sed -n "/<<'INSTALLER_EOF'\$/,/^INSTALLER_EOF\$/p" | sed '1d;$d') \
+     "$here_dir/../../deploy/kiosk-agent/install-kiosk.sh" >/dev/null \
+    || { echo "FAIL: embedded installer differs from deploy/kiosk-agent/install-kiosk.sh"; exit 1; }
+
+# Wifi is runtime-guarded, so the block is always present but baked empty when
+# no SSID is given.  printf '%q' of an empty string produces ''.
+parse_args --backend-url http://h:8000 --boot-dir /tmp
+out2="$(emit_firstrun)"
+echo "$out2" | grep -qF "WIFI_SSID=''" || { echo "FAIL: empty wifi not baked"; exit 1; }
+
+# --- signing key is baked and written to a 0600 file at first boot (calvin-5vw) ---
+SIG_KEY_HEX="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+parse_args --backend-url http://h:8000 --boot-dir /tmp --signing-key "$SIG_KEY_HEX"
+out3="$(emit_firstrun)"
+echo "$out3" | grep -qF "SIGNING_KEY=$SIG_KEY_HEX" || { echo "FAIL: signing key not baked (emit_var)"; exit 1; }
+echo "$out3" | grep -q "calvin-kiosk-signing" || { echo "FAIL: firstrun does not write the signing file"; exit 1; }
+# shellcheck disable=SC2016  # literal ${SIGNING_ENV_FILE} in the generated script
+echo "$out3" | grep -q 'chmod 600 "${SIGNING_ENV_FILE}"' || { echo "FAIL: signing file not chmod 600"; exit 1; }
+# And with no signing key, printf '%q' of empty string bakes SIGNING_KEY=''
+parse_args --backend-url http://h:8000 --boot-dir /tmp
+out4="$(emit_firstrun)"
+echo "$out4" | grep -qF "SIGNING_KEY=''" || { echo "FAIL: empty signing key not baked"; exit 1; }
+
+echo "PASS"

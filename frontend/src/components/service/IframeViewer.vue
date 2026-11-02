@@ -14,7 +14,12 @@
     <!-- CORS/Iframe Error Message -->
     <div v-if="iframeError" class="iframe-error-message">
       <div class="error-content">
-        <h3>⚠️ Cannot Display Service</h3>
+        <h3 class="heading-title">
+          <svg class="error-content__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path :d="mdiAlert" />
+          </svg>
+          Cannot Display Service
+        </h3>
         <p>
           This service cannot be embedded in an iframe due to security restrictions
           (CORS/X-Frame-Options).
@@ -35,6 +40,7 @@
 
 <script setup>
 import { ref, watch, onUnmounted } from "vue";
+import { mdiAlert } from "@mdi/js";
 
 const props = defineProps({
   url: {
@@ -42,6 +48,8 @@ const props = defineProps({
     required: true,
   },
 });
+
+const emit = defineEmits(["error"]);
 
 const iframe = ref(null);
 const iframeError = ref(false);
@@ -57,6 +65,7 @@ const handleIframeLoad = () => {
 
 const handleIframeError = () => {
   iframeError.value = true;
+  emit("error");
   if (iframeLoadTimeout.value) {
     clearTimeout(iframeLoadTimeout.value);
     iframeLoadTimeout.value = null;
@@ -92,6 +101,7 @@ watch(
           const iframeEl = iframe.value;
           if (iframeEl.contentDocument === null && iframeEl.contentWindow === null) {
             iframeError.value = true;
+            emit("error");
           }
         } catch (e) {
           // CORS error is expected, not necessarily a problem
@@ -121,7 +131,7 @@ onUnmounted(() => {
   width: 100%;
   height: 100%;
   border: none;
-  background: var(--bg-primary);
+  background: var(--bg-1);
 }
 
 .service-iframe.iframe-error {
@@ -137,8 +147,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
-  z-index: 10;
+  background: var(--bg-1);
+  z-index: var(--z-raised);
 }
 
 .error-content {
@@ -148,24 +158,33 @@ onUnmounted(() => {
 }
 
 .error-content h3 {
-  margin: 0 0 1rem 0;
-  color: var(--accent-error);
-  font-size: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-2);
+  margin: 0 0 var(--gap-4);
+  color: var(--err-text);
+}
+
+.error-content__icon {
+  width: 1.2em;
+  height: 1.2em;
+  flex: 0 0 auto;
+  fill: currentColor;
 }
 
 .error-content p {
   margin: 0.5rem 0;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .service-url {
   font-family: monospace;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   word-break: break-all;
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--ink);
+  background: var(--bg-2);
   padding: 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin: 1rem 0;
 }
 
@@ -179,30 +198,30 @@ onUnmounted(() => {
 .btn-open-new,
 .btn-retry {
   padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-size: 1rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-base);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--dur);
 }
 
 .btn-open-new {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--focus);
+  color: var(--focus-ink);
   text-decoration: none;
   border: none;
 }
 
 .btn-open-new:hover {
-  background: var(--accent-secondary);
+  filter: brightness(1.08);
 }
 
 .btn-retry {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--bg-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 
 .btn-retry:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-0);
 }
 </style>

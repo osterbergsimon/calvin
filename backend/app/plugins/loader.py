@@ -1,27 +1,136 @@
-"""Dynamic plugin loader using pluggy."""
+"""Declarative plugin loader.
+
+Discovers `BasePlugin` subclasses that declare a `metadata = PluginMetadata(...)`
+class attribute — in the built-in plugin packages and in installed plugin
+directories — and keeps a `type_id -> class` registry. Registration,
+instantiation, and config handling all derive from the class; plugins define
+no module-level hooks.
+"""
 
 import importlib
 import importlib.util
 import pkgutil
 import sys
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 from loguru import logger
 
-from app.plugins.definitions import PluginDefinition
-from app.plugins.hooks import plugin_manager
+from app.plugins.base import BasePlugin, PluginType
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION, PluginMetadata
+from app.plugins.protocols import BackendPlugin, CalendarPlugin, ImagePlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
+from app.services.plugin_packages import ensure_plugin_packages_on_path
+from app.services.validation import validate_plugin_id
 
-# Loguru automatically includes module/function info in logs
+_FAMILY_BASES: tuple[tuple[type[BasePlugin], PluginType], ...] = (
+    (CalendarPlugin, PluginType.CALENDAR),
+    (ImagePlugin, PluginType.IMAGE),
+    (ServicePlugin, PluginType.SERVICE),
+    (BackendPlugin, PluginType.BACKEND),
+)
+
+
+def _plugin_family(cls: type[BasePlugin]) -> PluginType | None:
+    """Derive the plugin family from the class's protocol base."""
+    for base, plugin_type in _FAMILY_BASES:
+        if issubclass(cls, base):
+            return plugin_type
+    return None
+
+
+def import_plugin_module(plugin_id: str, plugin_path: Path, module_name: str) -> ModuleType:
+    """Import an installed plugin's ``plugin.py`` under its unique module name.
+
+    The plugin directory is on ``sys.path`` only while the module executes,
+    so a bundled ``json.py``/``app.py`` can't shadow stdlib or host modules
+    for every later import (audit R12).
+
+    Shared with the isolated install check (``app.plugins.check_plugin``) so a
+    child process validates exactly the import the server will perform.
+    """
+    plugin_py = plugin_path / "plugin.py"
+    plugin_dir_str = str(plugin_path)
+    added_to_path = plugin_dir_str not in sys.path
+    if added_to_path:
+        sys.path.insert(0, plugin_dir_str)
+    try:
+        spec = importlib.util.spec_from_file_location(module_name, plugin_py)
+        if not spec or not spec.loader:
+            raise ImportError(f"Could not create an import spec for {plugin_py}")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
+    finally:
+        if added_to_path:
+            try:
+                sys.path.remove(plugin_dir_str)
+            except ValueError:
+                pass
 
 
 class PluginLoader:
-    """Dynamic plugin loader using pluggy."""
+    """Discovers plugin classes and keeps the type registry."""
 
     def __init__(self):
         """Initialize plugin loader."""
+        self._types: dict[str, type[BasePlugin]] = {}
+        # module name -> type_ids registered from it (for unload on uninstall)
+        self._module_types: dict[str, set[str]] = {}
         self._loaded_modules: set[str] = set()
+        # installed plugin id -> human-readable load error (for install-time surfacing)
+        self._load_errors: dict[str, str] = {}
+
+    # ------------------------------------------------------------------
+    # Discovery
+    # ------------------------------------------------------------------
+
+    def register_module(self, module: ModuleType) -> list[str]:
+        """Discover and register all plugin classes declared in a module.
+
+        A plugin class is a `BasePlugin` subclass that declares its own
+        `metadata` attribute (inherited metadata doesn't count — that's how a
+        subclass can reuse an implementation under a new type_id).
+
+        Returns:
+            The type_ids registered from this module.
+        """
+        registered: list[str] = []
+        for obj in list(vars(module).values()):
+            if not (isinstance(obj, type) and issubclass(obj, BasePlugin)):
+                continue
+            metadata = obj.__dict__.get("metadata")
+            if metadata is None:
+                continue
+            if not isinstance(metadata, PluginMetadata):
+                raise TypeError(
+                    f"{obj.__name__}.metadata must be a PluginMetadata instance "
+                    f"(got {type(metadata).__name__})"
+                )
+            family = _plugin_family(obj)
+            if family is None:
+                raise TypeError(
+                    f"{obj.__name__} must subclass one of the plugin family protocols "
+                    "(CalendarPlugin, ImagePlugin, ServicePlugin, BackendPlugin)"
+                )
+            type_id = metadata.type_id
+            existing = self._types.get(type_id)
+            if existing is not None and existing is not obj:
+                logger.error(
+                    "Duplicate plugin type_id {!r}: {} conflicts with {} — keeping the first",
+                    type_id,
+                    obj.__name__,
+                    existing.__name__,
+                )
+                continue
+            self._types[type_id] = obj
+            self._module_types.setdefault(module.__name__, set()).add(type_id)
+            registered.append(type_id)
+        if registered:
+            self._loaded_modules.add(module.__name__)
+        return registered
 
     def load_plugins_from_package(self, package_name: str) -> None:
         """
@@ -35,51 +144,74 @@ class PluginLoader:
             package_path = Path(package.__file__).parent if package.__file__ else None
 
             if package_path:
-                # Load all modules in the package
                 for _, module_name, is_pkg in pkgutil.iter_modules([str(package_path)]):
-                    if not is_pkg:
-                        full_module_name = f"{package_name}.{module_name}"
-                        if full_module_name not in self._loaded_modules:
-                            try:
-                                module = importlib.import_module(full_module_name)
-                                # Check if module has hook implementations
-                                # (register_plugin_types or create_plugin_instance)
-                                has_hooks = hasattr(module, "register_plugin_types") or hasattr(
-                                    module, "create_plugin_instance"
-                                )
-                                if has_hooks:
-                                    # Register the module with pluggy
-                                    # so it can discover hook implementations
-                                    try:
-                                        plugin_manager.register(module)
-                                        self._loaded_modules.add(full_module_name)
-                                        logger.info(
-                                            "Registered plugin module: {}", full_module_name
-                                        )
-                                    except ValueError:
-                                        # Already registered
-                                        # (e.g., if module is imported multiple times)
-                                        pass
-                            except Exception:
-                                logger.exception("Error loading plugin module {}", full_module_name)
-
-                # Also load subpackages
-                for _, module_name, is_pkg in pkgutil.iter_modules([str(package_path)]):
+                    full_module_name = f"{package_name}.{module_name}"
                     if is_pkg:
-                        full_module_name = f"{package_name}.{module_name}"
                         self.load_plugins_from_package(full_module_name)
+                        continue
+                    if full_module_name in self._loaded_modules:
+                        continue
+                    try:
+                        module = importlib.import_module(full_module_name)
+                        registered = self.register_module(module)
+                        if registered:
+                            logger.info(
+                                "Registered plugin module {} (types: {})",
+                                full_module_name,
+                                ", ".join(registered),
+                            )
+                    except Exception:
+                        logger.exception("Error loading plugin module {}", full_module_name)
 
         except Exception:
             logger.exception("Error loading plugins from package {}", package_name)
+
+    @staticmethod
+    def _manifest_label(manifest: Any) -> str:
+        """Best-effort name for a manifest too malformed to carry a valid id."""
+        if isinstance(manifest, dict):
+            installed_path = manifest.get("_installed_path")
+            if isinstance(installed_path, str) and installed_path:
+                return Path(installed_path).name
+            raw_id = manifest.get("id")
+            if isinstance(raw_id, str) and raw_id:
+                return raw_id
+        return "<unknown plugin>"
+
+    def _record_malformed_manifest(self, manifest: Any, message: str) -> None:
+        """Log and record a load error for a manifest we cannot identify by id."""
+        label = self._manifest_label(manifest)
+        self._load_errors[label] = message
+        logger.error("Skipping installed plugin {}: {}", label, message)
+
+    def _validated_plugin_id(self, manifest: Any) -> str | None:
+        """Return the manifest's validated plugin id, or None if it is malformed."""
+        if not isinstance(manifest, dict):
+            self._record_malformed_manifest(
+                manifest,
+                f"plugin manifest is not a JSON object (got {type(manifest).__name__})",
+            )
+            return None
+        try:
+            return validate_plugin_id(manifest.get("id"))
+        except ValueError as exc:
+            self._record_malformed_manifest(manifest, str(exc))
+            return None
 
     def load_installed_plugins(self) -> None:
         """
         Load plugins from the installed plugins directory.
 
-        Installed plugins are stored in data/plugins/{plugin_id}/ and contain
-        a plugin.py file with pluggy hooks.
+        Installed plugins are stored in data/plugins/{plugin_id}/ and contain a
+        plugin.py declaring the plugin class. The manifest's `api_version` must
+        match the host's supported version — stale plugins are skipped loudly.
         """
         installed_plugins = plugin_installer.get_installed_plugins()
+
+        # Plugin pip dependencies live on the data volume, not in the image
+        # venv, so they survive an image update (calvin-26c). Appended — after
+        # the interpreter's own site-packages — so core packages win.
+        ensure_plugin_packages_on_path()
 
         # Ensure backend directory is in sys.path so plugins can import from app.*
         # Find backend directory (where this file is located: backend/app/plugins/loader.py)
@@ -89,81 +221,116 @@ class PluginLoader:
             sys.path.insert(0, backend_dir_str)
 
         for plugin_manifest in installed_plugins:
-            plugin_id = plugin_manifest["id"]
-            plugin_path = plugin_installer.get_plugin_path(plugin_id)
+            plugin_id = self._validated_plugin_id(plugin_manifest)
+            if plugin_id is None:
+                continue
+            try:
+                plugin_path = plugin_installer.get_plugin_path(plugin_id)
+            except ValueError as e:
+                self._record_malformed_manifest(plugin_manifest, f"unsafe plugin path: {e}")
+                continue
             plugin_py = plugin_path / "plugin.py"
 
             if not plugin_py.exists():
                 logger.warning("plugin.py not found for installed plugin {}", plugin_id)
                 continue
 
+            api_version = plugin_manifest.get("api_version")
+            if api_version != CURRENT_PLUGIN_API_VERSION:
+                message = (
+                    f"api_version {api_version!r} is not supported (host supports "
+                    f"{CURRENT_PLUGIN_API_VERSION}). Reinstall the plugin from the "
+                    "plugin repository."
+                )
+                self._load_errors[plugin_id] = message
+                logger.error("Skipping installed plugin {}: {}", plugin_id, message)
+                continue
+
+            module_name = f"installed_plugin_{plugin_id}"
+            if module_name in self._loaded_modules:
+                continue
+
             try:
-                # Add plugin directory to Python path temporarily
-                plugin_dir_str = str(plugin_path)
-                if plugin_dir_str not in sys.path:
-                    sys.path.insert(0, plugin_dir_str)
+                module = import_plugin_module(plugin_id, plugin_path, module_name)
 
-                # Import the plugin module
-                # Use a unique module name to avoid conflicts
-                module_name = f"installed_plugin_{plugin_id}"
-
-                # Load the plugin.py file as a module
-                spec = importlib.util.spec_from_file_location(module_name, plugin_py)
-                if spec and spec.loader:
-                    module = importlib.util.module_from_spec(spec)
-                    sys.modules[module_name] = module
-                    spec.loader.exec_module(module)
-
-                    # Register with pluggy if it has hooks
-                    has_hooks = hasattr(module, "register_plugin_types") or hasattr(
-                        module, "create_plugin_instance"
+                registered = self.register_module(module)
+                if registered:
+                    self._load_errors.pop(plugin_id, None)
+                    logger.info(
+                        "Registered installed plugin {} (types: {})",
+                        plugin_id,
+                        ", ".join(registered),
                     )
-                    if has_hooks:
-                        try:
-                            plugin_manager.register(module)
-                            self._loaded_modules.add(module_name)
-                            logger.info("Registered installed plugin: {}", plugin_id)
-                        except ValueError:
-                            # Already registered
-                            pass
+                else:
+                    logger.warning(
+                        "Installed plugin {} declares no plugin class "
+                        "(a BasePlugin subclass with a `metadata` attribute)",
+                        plugin_id,
+                    )
 
-            except Exception:
-                logger.exception("Error loading installed plugin {}", plugin_id)
+            except KeyboardInterrupt:
+                raise
+            except BaseException as exc:
+                # BaseException, not Exception: a plugin's sys.exit() used to
+                # escape and take the whole startup down with it (audit R12).
+                self._load_errors[plugin_id] = f"{type(exc).__name__}: {exc}"
+                sys.modules.pop(module_name, None)
+                logger.opt(exception=exc).error(
+                    "Error loading installed plugin {} ({}): {}", plugin_id, type(exc).__name__, exc
+                )
+
+    def unload_installed_plugin(self, plugin_id: str) -> None:
+        """Remove an installed plugin's classes and module (on uninstall)."""
+        module_name = f"installed_plugin_{plugin_id}"
+        for type_id in self._module_types.pop(module_name, set()):
+            self._types.pop(type_id, None)
+        self._loaded_modules.discard(module_name)
+        self._load_errors.pop(plugin_id, None)
+        sys.modules.pop(module_name, None)
+
+    def get_load_error(self, plugin_id: str) -> str | None:
+        """Get the recorded load error for an installed plugin, if any."""
+        return self._load_errors.get(plugin_id)
+
+    def installed_plugin_type_ids(self, plugin_id: str) -> set[str]:
+        """Get the type_ids registered by an installed plugin's module."""
+        return set(self._module_types.get(f"installed_plugin_{plugin_id}", set()))
 
     def load_all_plugins(self) -> None:
         """Load all plugins from the plugins package and installed plugins."""
-        # Load built-in plugins from calendar, image, and service subpackages
-        # Backend plugins are installed from the calvin-plugins repository
+        # Built-in plugins live in the host repo; everything else is installed
+        # from the calvin-plugins repository.
         self.load_plugins_from_package("app.plugins.calendar")
         self.load_plugins_from_package("app.plugins.image")
         self.load_plugins_from_package("app.plugins.service")
-        # Note: Backend plugins are installed from external repositories (e.g., calvin-plugins)
-        # They are loaded via load_installed_plugins() below
 
-        # Load installed plugins
         self.load_installed_plugins()
 
-    def get_plugin_types(self) -> list[PluginDefinition]:
+    # ------------------------------------------------------------------
+    # Registry access
+    # ------------------------------------------------------------------
+
+    def get_plugin_class(self, type_id: str) -> type[BasePlugin] | None:
+        """Get the plugin class registered for a type_id."""
+        return self._types.get(type_id)
+
+    def get_plugin_types(self) -> list[PluginMetadata]:
         """
-        Get all registered plugin types, normalized into typed definitions.
+        Get all registered plugin types with runtime fields filled.
 
         Returns:
-            List of normalized plugin definitions
+            List of plugin metadata, with `plugin_class` and `plugin_type` set.
         """
-        plugin_types: list[PluginDefinition] = []
-        results = plugin_manager.hook.register_plugin_types()
-        for result in results:
-            if result:
-                raw_definitions = result if isinstance(result, list) else [result]
-                for raw_definition in raw_definitions:
-                    try:
-                        plugin_types.append(PluginDefinition.from_raw(raw_definition))
-                    except Exception as e:
-                        logger.error(
-                            "Error normalizing plugin type from hook result: {}",
-                            e,
-                            exc_info=True,
-                        )
+        plugin_types: list[PluginMetadata] = []
+        for cls in self._types.values():
+            metadata = cls.metadata
+            if metadata is None:
+                continue
+            plugin_types.append(
+                metadata.model_copy(
+                    update={"plugin_class": cls, "plugin_type": _plugin_family(cls)}
+                )
+            )
         return plugin_types
 
     def create_plugin_instance(
@@ -172,30 +339,26 @@ class PluginLoader:
         type_id: str,
         name: str,
         config: dict[str, Any],
-    ) -> Any:
+    ) -> BasePlugin | None:
         """
-        Create a plugin instance using pluggy hooks.
+        Create a plugin instance for a registered type.
+
+        The instance is constructed with the standard (plugin_id, name, enabled)
+        signature; callers apply config via `await instance.configure(config)`.
 
         Args:
             plugin_id: Unique identifier for the plugin instance
             type_id: Plugin type ID (e.g., 'google', 'local')
             name: Human-readable name
-            config: Plugin configuration dictionary
+            config: Plugin configuration dictionary (only `enabled` is read here)
 
         Returns:
-            Plugin instance or None if not found
+            Plugin instance or None if the type is not registered
         """
-        results = plugin_manager.hook.create_plugin_instance(
-            plugin_id=plugin_id,
-            type_id=type_id,
-            name=name,
-            config=config,
-        )
-        # Return the first non-None result
-        for result in results:
-            if result is not None:
-                return result
-        return None
+        cls = self._types.get(type_id)
+        if cls is None:
+            return None
+        return cls(plugin_id=plugin_id, name=name, enabled=bool(config.get("enabled", False)))
 
 
 # Global plugin loader instance

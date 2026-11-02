@@ -1,0 +1,178 @@
+import { describe, it, expect } from "vitest";
+import { mdiSilverwareForkKnife } from "@mdi/js";
+import { mount } from "@vue/test-utils";
+import PluginInstaller from "@/components/settings/specialized/PluginInstaller.vue";
+
+const CATALOG = [
+  {
+    id: "mealie",
+    name: "Mealie",
+    type: "service",
+    version: "1.0.0",
+    description: "Recipes and meal plans from your Mealie server",
+    keywords: ["recipes"],
+    icon: "mdi:silverware-fork-knife",
+    path: "mealie",
+    _installed: false,
+  },
+  {
+    id: "internal_tool",
+    name: "Internal tool",
+    type: "service",
+    version: "1.0.0",
+    description: "Not part of the published catalog.",
+    catalog: false,
+    path: "internal-tool",
+    _installed: false,
+  },
+  {
+    id: "test_plugin",
+    name: "Test Plugin",
+    type: "service",
+    version: "2.0.0",
+    description: "A basic test plugin for plugin installation testing",
+    keywords: ["test", "example"],
+    path: "test_plugin",
+    _installed: false,
+  },
+  {
+    id: "immich",
+    name: "Immich",
+    type: "image",
+    version: "2.1.0",
+    description: "Albums from your Immich server.",
+    keywords: ["photos"],
+    path: "immich",
+    _installed: true,
+    _installedVersion: "2.0.0",
+  },
+  {
+    id: "weather",
+    name: "Weather",
+    type: "service",
+    version: "1.0.0",
+    description: "Temperature and forecast in the clock bar.",
+    keywords: ["weather"],
+    path: "weather",
+    _installed: true,
+    _installedVersion: "1.0.0",
+  },
+];
+
+const mountWith = (props = {}) =>
+  mount(PluginInstaller, {
+    props: {
+      repoUrl: "https://github.com/x/y",
+      branch: "main",
+      catalogPlugins: CATALOG,
+      catalogRepoUrl: "https://github.com/osterbergsimon/calvin-plugins",
+      ...props,
+    },
+  });
+
+describe("PluginInstaller catalog (§3.3)", () => {
+  it("lists the catalog on open, with nothing to type first", () => {
+    const w = mountWith({ devMode: false });
+    expect(w.find(".catalog-title").text()).toBe("Install from the Calvin catalog");
+    expect(w.text()).toContain("Mealie");
+    expect(w.text()).toContain("Recipes and meal plans from your Mealie server");
+  });
+
+  it("hides the plugin repo's test fixtures from end users", () => {
+    const w = mountWith({ devMode: false });
+    expect(w.text()).not.toContain("Test Plugin");
+  });
+
+  it("still lists test plugins in dev mode", () => {
+    const w = mountWith({ devMode: true });
+    expect(w.text()).toContain("Test Plugin");
+  });
+
+  it("never lists catalog:false entries, in either mode", () => {
+    for (const devMode of [false, true]) {
+      const w = mountWith({ devMode });
+      expect(w.find('[data-catalog-plugin-id="internal_tool"]').exists()).toBe(false);
+      expect(w.text()).not.toContain("Internal tool");
+    }
+  });
+
+  it("renders a curated mdi icon as an SVG glyph", () => {
+    const w = mountWith({ devMode: false });
+    const row = w.find('[data-catalog-plugin-id="mealie"]');
+    expect(row.find(".catalog-icon svg").exists()).toBe(true);
+    expect(row.find(".catalog-icon svg path").attributes("d")).toBe(mdiSilverwareForkKnife);
+  });
+
+  it("labels the kind in plain words, never the raw type", () => {
+    const w = mountWith({ devMode: false });
+    expect(w.find('[data-catalog-plugin-id="mealie"]').text()).toContain("Web page & app");
+  });
+
+  it("filters kinds with the same Tabs the Installed list uses", () => {
+    const w = mountWith({ devMode: false });
+    const tabs = w.findComponent({ name: "Tabs" });
+    expect(tabs.exists()).toBe(true);
+    expect(tabs.props("items").map(option => option.label)).toEqual([
+      "All",
+      "Photos",
+      "Web page & app",
+    ]);
+    expect(w.find('[role="tablist"]').attributes("aria-label")).toBe("Plugin kind");
+    expect(w.findComponent({ name: "SegmentedControl" }).exists()).toBe(false);
+  });
+
+  it("selects a catalog kind through the tabs", async () => {
+    const w = mountWith({ devMode: false });
+    const tabs = w.findComponent({ name: "Tabs" });
+    tabs.vm.$emit("update:modelValue", "image");
+    await w.vm.$nextTick();
+    expect(w.findComponent({ name: "Tabs" }).props("modelValue")).toBe("image");
+    expect(w.find('[data-catalog-plugin-id="immich"]').exists()).toBe(true);
+    expect(w.find('[data-catalog-plugin-id="mealie"]').exists()).toBe(false);
+  });
+
+  it("installs from the catalog repository, not the other-repository field", async () => {
+    const w = mountWith({ devMode: false });
+    await w.find('[data-catalog-plugin-id="mealie"] button.btn--primary').trigger("click");
+
+    expect(w.emitted("install")[0][0]).toMatchObject({
+      path: "mealie",
+      repoUrl: "https://github.com/osterbergsimon/calvin-plugins",
+      branch: "main",
+    });
+  });
+
+  it("offers Update only when the catalog version is newer", () => {
+    const w = mountWith({ devMode: false });
+
+    const immich = w.find('[data-catalog-plugin-id="immich"]');
+    expect(immich.text()).toContain("Update");
+    // Update is an install action: the same primary button as Install, not a
+    // separate amber look (CLV-45 review).
+    const updateButton = immich.find("button.btn--primary");
+    expect(updateButton.exists()).toBe(true);
+    expect(updateButton.classes()).not.toContain("btn-update");
+
+    // Same version: no Update, the row says Installed and links to Content.
+    const weather = w.find('[data-catalog-plugin-id="weather"]');
+    expect(weather.text()).not.toContain("Update");
+    expect(weather.text()).toContain("Installed");
+    expect(weather.text()).toContain("Add a source");
+  });
+
+  it("emits add-source for an installed plugin", async () => {
+    const w = mountWith({ devMode: false });
+    const weather = w.find('[data-catalog-plugin-id="weather"]');
+    const addButton = weather.findAll("button").find(button => button.text() === "Add a source");
+    await addButton.trigger("click");
+
+    expect(w.emitted("add-source")[0]).toEqual(["weather"]);
+  });
+
+  it("never asks for a restart: contract 1.0 installs are live", () => {
+    const w = mountWith({ devMode: false, requiresRestart: true });
+    expect(w.find(".restart-notice").exists()).toBe(false);
+    expect(w.text().toLowerCase()).not.toContain("restart");
+    expect(w.text()).not.toContain("systemctl");
+  });
+});

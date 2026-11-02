@@ -1,95 +1,85 @@
 <template>
   <div :key="service.id" class="service-viewer">
-    <!-- Loading plugin component -->
-    <div v-if="pluginComponentLoading" class="loading-state">
-      <div class="spinner" />
-      <p>Loading component...</p>
-    </div>
+    <DashboardPanel
+      :title="panelTitle"
+      :subtitle="subtitle"
+      :variant="panelVariant"
+      :header-visible="headerVisible"
+      :focused="focused"
+    >
+      <template v-if="$slots.actions" #actions>
+        <slot name="actions" />
+      </template>
 
-    <!-- Plugin-provided component (highest priority) -->
-    <component
-      v-if="pluginComponent && !pluginComponentLoading && !pluginComponentError"
-      :is="pluginComponent"
-      :service-id="service.id"
-      :api-endpoint="apiEndpoint"
-      :url="service.url || service.config?.url || ''"
-    />
-
-    <!-- Generic viewers (fallback for plugins without custom components) -->
-    <WeatherViewer
-      v-else-if="displayType === 'api' && renderTemplate === 'weather'"
-      :service-id="service.id"
-      :service-name="service.name"
-    />
-    <GenericApiViewer v-else-if="displayType === 'api'" :service="service" />
-    <div v-else class="unknown-service">
-      <p>Unknown service type: {{ displayType }}</p>
-      <p v-if="pluginComponentError" class="error-text">
-        Component error: {{ pluginComponentError }}
-      </p>
-      <p v-if="componentPath" class="error-text">Component path: {{ componentPath }}</p>
-      <p v-if="!componentPath && displayType === 'iframe'" class="error-text">
-        No component path found for iframe service. Check display_schema.component.
-      </p>
-    </div>
+      <SchemaRenderer
+        v-if="schemaKind"
+        :schema="service.display_schema"
+        :data="schemaData"
+        :plugin-id="service.id"
+        :plugin-name="service.plugin_name || service.name"
+        :link-action="linkAction"
+      />
+      <div v-else class="unknown-service">
+        <p>This can't be shown here.</p>
+        <p class="error-text">Its plugin needs an update.</p>
+      </div>
+    </DashboardPanel>
   </div>
 </template>
 
 <script setup>
 import { computed, watch } from "vue";
-import WeatherViewer from "./WeatherViewer.vue";
-import GenericApiViewer from "./GenericApiViewer.vue";
-import { usePluginComponent } from "../../composables/usePluginComponent";
-import { logDebug, logError } from "../../utils/logger";
+import DashboardPanel from "../DashboardPanel.vue";
+import SchemaRenderer from "../plugins/SchemaRenderer.vue";
+import { useSchemaData } from "../../composables/useSchemaData";
+import { resolvePath } from "../../utils/jsonPath";
+import { logDebug } from "../../utils/logger";
 
 const props = defineProps({
   service: {
     type: Object,
     required: true,
   },
+  subtitle: {
+    type: String,
+    default: "",
+  },
+  headerVisible: {
+    type: Boolean,
+    default: true,
+  },
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  linkAction: { type: String, default: null },
+  // Region this viewer fills; its data fetches light that region's frame.
+  regionId: { type: String, default: null },
 });
 
-const displayType = computed(() => {
-  if (props.service.display_schema?.type) {
-    return props.service.display_schema.type;
-  }
-  // If service has a URL, assume it's an iframe service
-  if (props.service.url || props.service.config?.url) {
-    return "iframe";
-  }
-  // If service has plugin_id but no URL, it might be an API service
-  if (props.service.plugin_id) {
-    return "api";
-  }
-  // Default to iframe
-  return "iframe";
+const schemaKind = computed(() => props.service.display_schema?.kind || null);
+const displaySchema = computed(() => props.service.display_schema || {});
+const schemaQuery = useSchemaData(
+  computed(() => props.service.id),
+  displaySchema,
+  computed(() => Boolean(schemaKind.value)),
+  { regionId: computed(() => props.regionId) }
+);
+const schemaData = computed(() => schemaQuery.data.value);
+const panelTitle = computed(() => {
+  const pathTitle = displaySchema.value.title_path
+    ? resolvePath(schemaData.value, displaySchema.value.title_path)
+    : null;
+  const resolvedTitle =
+    typeof pathTitle === "string" || typeof pathTitle === "number" ? String(pathTitle) : null;
+  return resolvedTitle || displaySchema.value.title || props.service.name || "Service";
+});
+const panelVariant = computed(() => {
+  const variant = displaySchema.value.panel_variant;
+  if (["default", "dense", "media", "iframe"].includes(variant)) return variant;
+  return schemaKind.value === "iframe" ? "iframe" : "default";
 });
 
-const renderTemplate = computed(() => {
-  return props.service.display_schema?.render_template;
-});
-
-const apiEndpoint = computed(() => {
-  if (props.service.display_schema?.api_endpoint) {
-    return props.service.display_schema.api_endpoint.replace("{service_id}", props.service.id);
-  }
-  // For plugins without api_endpoint in display_schema, use the new plugin API format
-  if (props.service.plugin_id && props.service.id) {
-    return `/api/plugins/${props.service.id}/data`;
-  }
-  // Support both old format (service.url) and new format (service.config?.url)
-  return props.service.url || props.service.config?.url || "";
-});
-
-// Try to load plugin-provided component
-const {
-  component: pluginComponent,
-  loading: pluginComponentLoading,
-  error: pluginComponentError,
-  componentPath,
-} = usePluginComponent(props.service);
-
-// Debug logging
 watch(
   () => props.service,
   service => {
@@ -104,34 +94,29 @@ watch(
   },
   { immediate: true }
 );
-
-watch(componentPath, path => {
-  logDebug("[ServiceViewer]", "Component path:", path);
-});
-
-watch(pluginComponent, comp => {
-  logDebug("[ServiceViewer]", "Plugin component loaded:", comp);
-});
-
-watch(pluginComponentError, err => {
-  if (err) {
-    logError("[ServiceViewer]", "Component error:", err);
-  }
-});
 </script>
 
 <style scoped>
 .service-viewer {
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 .unknown-service {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
   padding: 2rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
+  gap: 0.5rem;
+}
+
+.error-text {
+  font-size: 0.85em;
+  font-style: italic;
 }
 </style>

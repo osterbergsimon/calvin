@@ -1,0 +1,32 @@
+[Unit]
+Description=Calvin Wayland Compositor (labwc)
+# Same shape as calvin-x.service, one display server later: the unit takes tty1
+# over from getty and opens a PAM/logind session on it, which is what gives the
+# compositor DRM master and a usable XDG_RUNTIME_DIR (pam_systemd creates
+# /run/user/<uid>; labwc publishes wayland-0 there).
+After=systemd-user-sessions.service network.target getty@tty1.service
+# Exactly one compositor owns tty1: starting this stops the X server and vice
+# versa, so a stale enable can never leave both fighting for the DRM device.
+Conflicts=getty@tty1.service calvin-x.service
+Before=calvin-kiosk.service calvin-kiosk-remote.service
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+PAMName=login
+UtmpIdentifier=tty1
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Environment="HOME=/home/calvin"
+Environment="XDG_SESSION_TYPE=wayland"
+ExecStart=/usr/bin/labwc
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target

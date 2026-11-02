@@ -1,23 +1,39 @@
 """Health check endpoints."""
 
-import logging
-
 from fastapi import APIRouter
-
-logger = logging.getLogger(__name__)
+from fastapi.responses import JSONResponse
+from loguru import logger
 
 router = APIRouter()
 
 
+async def _database_is_reachable() -> bool:
+    """Run the cheapest possible query against the app database."""
+    from app.database import database
+
+    try:
+        await database.fetch_val("SELECT 1")
+        return True
+    except Exception as exc:
+        # Keep the response body generic; the detail belongs in the log (audit S9).
+        logger.warning("Health check database probe failed: {}", exc)
+        return False
+
+
 @router.get("/health")
 async def health_check():
-    """Basic health check endpoint."""
-    try:
-        logger.info("Health check endpoint called")
-        return {"status": "healthy"}
-    except Exception as e:
-        logger.exception(f"Error in health check: {e}")
-        raise
+    """Basic health check endpoint.
+
+    Contains a cheap database query so a container health check (and the kiosk
+    boot wait) sees a broken database instead of a constant "healthy" (audit D14).
+    """
+    logger.debug("Health check endpoint called")
+    if not await _database_is_reachable():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "database": "error"},
+        )
+    return {"status": "healthy", "database": "ok"}
 
 
 @router.get("/health/detailed")
@@ -49,8 +65,8 @@ async def test_db_health_check():
             "database_connected": db_connected,
             "config_items_count": count,
         }
-    except Exception as e:
+    except Exception:
         import traceback
 
-        logger.exception(f"Database health check failed: {e}\n{traceback.format_exc()}")
+        logger.exception("Database health check failed\n{}", traceback.format_exc())
         raise

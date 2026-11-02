@@ -1,10 +1,11 @@
 """Validation utilities for plugins and themes."""
 
 from .manifest_validator import (
-    validate_manifest_format_version,
-    validate_manifest_protocol_version,
+    resolve_child_dir,
+    validate_manifest_api_version,
     validate_manifest_required_fields,
     validate_path_traversal,
+    validate_plugin_id,
     validate_plugin_optional_fields,
     validate_plugin_type,
     validate_theme_variables,
@@ -15,9 +16,10 @@ from .package_validator import (
 )
 
 __all__ = [
+    "resolve_child_dir",
+    "validate_plugin_id",
     "validate_manifest_required_fields",
-    "validate_manifest_format_version",
-    "validate_manifest_protocol_version",
+    "validate_manifest_api_version",
     "validate_path_traversal",
     "validate_plugin_type",
     "validate_plugin_optional_fields",

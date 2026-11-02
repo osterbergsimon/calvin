@@ -1,5 +1,7 @@
 """Integration tests for plugin instance API endpoints."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -39,18 +41,12 @@ class TestPluginInstanceEndpoints:
         """Test starting a non-existent plugin instance."""
         response = test_client.post("/api/plugins/instances/nonexistent-instance/start")
 
-        if response.status_code == 404:
-            pytest.skip("Plugin instance start route not available in test client")
-
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
 
     def test_stop_plugin_instance_not_found(self, test_client: TestClient):
         """Test stopping a non-existent plugin instance."""
         response = test_client.post("/api/plugins/instances/nonexistent-instance/stop")
-
-        if response.status_code == 404:
-            pytest.skip("Plugin instance stop route not available in test client")
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -120,3 +116,46 @@ class TestPluginInstanceEndpoints:
         assert data["success"] is True
         assert data["instance"]["name"] == "Test Iframe Service"
         assert data["instance"]["config"]["url"] == "https://example.com"
+        # An enabled instance is running right after creation, so its data
+        # route serves it without a lazy restart (audit R5).
+        assert data["instance"]["running"] is True
+
+    def test_create_plugin_instance_surfaces_creation_error(self, test_client: TestClient):
+        """A failed creation is a coded 500, not a success and not a leaked cause (R6/S9)."""
+        with patch(
+            "app.api.routes.plugins.instances.apply_plugin_config_update",
+            new=AsyncMock(return_value={"instance_created": False, "error": "boom"}),
+        ):
+            response = test_client.post(
+                "/api/plugins/iframe/instances",
+                json={"name": "Broken", "config": {"url": "https://example.com"}},
+            )
+
+        assert response.status_code == 500
+        assert response.json()["detail"]["code"] == "plugin_instance_create_failed"
+        assert "boom" not in response.text
+
+    def test_create_plugin_instance_rejects_when_nothing_created(self, test_client: TestClient):
+        """Config the plugin refuses (validation failed) is a 400, not a success."""
+        with patch(
+            "app.api.routes.plugins.instances.apply_plugin_config_update",
+            new=AsyncMock(return_value={"instance_created": False, "instance_updated": False}),
+        ):
+            response = test_client.post(
+                "/api/plugins/iframe/instances",
+                json={"name": "Invalid", "config": {}},
+            )
+
+        assert response.status_code == 400
+
+    def test_update_plugin_type_surfaces_config_update_error(self, test_client: TestClient):
+        """PUT /plugins/{id} no longer swallows a failing config update (audit R6)."""
+        with patch(
+            "app.api.routes.plugins.management.apply_plugin_config_update",
+            new=AsyncMock(side_effect=RuntimeError("kaput")),
+        ):
+            response = test_client.put("/api/plugins/iframe", json={"display_order": "3"})
+
+        assert response.status_code == 500
+        assert response.json()["detail"]["code"] == "plugin_config_apply_failed"
+        assert "kaput" not in response.text

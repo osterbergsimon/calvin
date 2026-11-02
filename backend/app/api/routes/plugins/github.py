@@ -1,6 +1,5 @@
 """GitHub and local plugin installation endpoints."""
 
-import logging
 import re
 import shutil
 import tempfile
@@ -10,14 +9,20 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Body, HTTPException
+from loguru import logger
 
+from app.api.routes.plugins.management import (
+    _check_plugin_in_child,
+    _require_valid_id,
+    _validate_just_installed_plugin,
+)
 from app.api.routes.plugins.themes import _register_theme_in_db
 from app.config import settings
 from app.plugins.loader import plugin_loader
-from app.services.plugin_installer import frontend_build_manager, plugin_installer
+from app.plugins.registry.loader import load_plugin_types_for_single
+from app.services.plugin_installer import plugin_installer, run_installer_op
 from app.services.theme_installer import theme_installer
-
-logger = logging.getLogger(__name__)
+from app.utils.errors import internal_error
 
 router = APIRouter()
 
@@ -138,9 +143,11 @@ async def enumerate_plugins_from_github(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to enumerate plugins from GitHub: {e}", exc_info=True)
-        error_detail = str(e) if str(e) else "Unknown error occurred"
-        raise HTTPException(status_code=500, detail=f"Failed to enumerate plugins: {error_detail}")
+        raise internal_error(
+            "plugin_source_enumerate_failed",
+            "Could not read that repository. Check the URL and the server logs.",
+            error=e,
+        ) from e
     finally:
         # Clean up temp files
         if temp_path and temp_path.exists():
@@ -176,6 +183,8 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
     branch = request.get("branch")
     plugin_id = request.get("plugin_id")
     force = request.get("force", False)
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     if not repo_url:
         raise HTTPException(status_code=400, detail="repo_url is required")
@@ -263,7 +272,7 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
             if theme_path.exists():
                 # Install theme
                 manifest = theme_installer.install_theme_from_repo(
-                    repo_root, plugin_path, plugin_id
+                    repo_root, plugin_path, plugin_id, force=force
                 )
                 # Register theme in database
                 await _register_theme_in_db(manifest)
@@ -278,51 +287,83 @@ async def install_plugin_from_github(request: dict[str, Any] = Body(...)):
                 }
             elif plugin_path_check.exists():
                 # Install plugin
-                manifest = plugin_installer.install_plugin_from_repo(
-                    repo_root, plugin_path, plugin_id, force=force
+                manifest = await run_installer_op(
+                    plugin_installer.install_plugin_from_repo,
+                    repo_root,
+                    plugin_path,
+                    plugin_id,
+                    force=force,
                 )
+
+                # Validate in a child interpreter before the server imports it.
+                installed_id = manifest["id"]
+                await _check_plugin_in_child(installed_id)
 
                 # Reload plugins to include the newly installed one
                 # Wrap in try-except to handle loading errors gracefully
                 try:
                     plugin_loader.load_installed_plugins()
-                except Exception as load_error:
-                    logger.warning(
-                        f"Plugin {manifest['id']} installed but failed to load: {load_error}. "
+                except Exception:
+                    logger.opt(exception=True).warning(
+                        "Plugin {} installed but failed to load. "
                         "It will be available after server restart.",
-                        exc_info=True,
+                        manifest["id"],
                     )
                     # Don't fail the installation - the plugin files are installed correctly
                     # It just needs a restart to be loaded
 
-                actual_branch = "master" if branch_switched else branch
-                if manifest.get("_has_frontend"):
-                    frontend_build_manager.start_background_build(
-                        plugin_installer.get_frontend_dir()
+                # Surface metadata validation failures immediately. See
+                # _validate_just_installed_plugin for details.
+                validation_errors = _validate_just_installed_plugin(installed_id)
+                if validation_errors:
+                    try:
+                        await run_installer_op(plugin_installer.uninstall_plugin, installed_id)
+                    except Exception as cleanup_exc:  # noqa: BLE001
+                        logger.warning(
+                            f"Failed to roll back invalid plugin {installed_id} "
+                            f"after validation errors: {cleanup_exc}"
+                        )
+                    detail = f"Plugin {installed_id} failed validation:\n  - " + "\n  - ".join(
+                        validation_errors
                     )
+                    raise HTTPException(status_code=400, detail=detail)
+
+                actual_branch = "master" if branch_switched else branch
+                # Register the plugin type now so it appears without a restart.
+                await load_plugin_types_for_single(manifest["id"])
                 return {
                     "success": True,
                     "message": f"Plugin {manifest['id']} installed successfully from {repo_url}",
                     "manifest": manifest,
                     "branch": actual_branch,
                     "branch_switched": branch_switched,
-                    "requires_restart": True,
-                    "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+                    "requires_restart": manifest.get("requirements", {}).get(
+                        "restart_required", False
+                    ),
                 }
             else:
                 raise HTTPException(
                     status_code=400,
                     detail=f"Neither plugin.json nor theme.json found in {plugin_path}",
                 )
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")
+            raise internal_error(
+                "plugin_install_failed",
+                "Could not install the plugin. Check the server logs for details.",
+                error=e,
+            ) from e
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to install plugin from GitHub: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+        raise internal_error(
+            "plugin_install_failed",
+            "Could not install the plugin. Check the server logs for details.",
+            error=e,
+        ) from e
     finally:
         # Clean up temp files
         if temp_path and temp_path.exists():
@@ -440,6 +481,8 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
     plugin_path = request.get("plugin_path")
     plugin_id = request.get("plugin_id")
     force = request.get("force", False)
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     if not local_path:
         raise HTTPException(status_code=400, detail="local_path is required")
@@ -457,7 +500,9 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
 
     try:
         if theme_json.exists():
-            manifest = theme_installer.install_theme_from_repo(repo_path, plugin_path, plugin_id)
+            manifest = theme_installer.install_theme_from_repo(
+                repo_path, plugin_path, plugin_id, force=force
+            )
             await _register_theme_in_db(manifest)
             return {
                 "success": True,
@@ -466,9 +511,18 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                 "requires_restart": False,
             }
         elif plugin_json_path.exists():
-            manifest = plugin_installer.install_plugin_from_repo(
-                repo_path, plugin_path, plugin_id, force=force
+            manifest = await run_installer_op(
+                plugin_installer.install_plugin_from_repo,
+                repo_path,
+                plugin_path,
+                plugin_id,
+                force=force,
             )
+
+            # Validate in a child interpreter before the server imports it.
+            installed_id = manifest["id"]
+            await _check_plugin_in_child(installed_id)
+
             try:
                 plugin_loader.load_installed_plugins()
             except Exception as load_error:
@@ -477,14 +531,26 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
                     "It will be available after server restart."
                 )
 
-            if manifest.get("_has_frontend"):
-                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
+            validation_errors = _validate_just_installed_plugin(installed_id)
+            if validation_errors:
+                try:
+                    await run_installer_op(plugin_installer.uninstall_plugin, installed_id)
+                except Exception as cleanup_exc:  # noqa: BLE001
+                    logger.warning(
+                        f"Failed to roll back invalid plugin {installed_id} "
+                        f"after validation errors: {cleanup_exc}"
+                    )
+                detail = f"Plugin {installed_id} failed validation:\n  - " + "\n  - ".join(
+                    validation_errors
+                )
+                raise HTTPException(status_code=400, detail=detail)
+
+            await load_plugin_types_for_single(manifest["id"])
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
-                "requires_restart": True,
-                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+                "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
             }
         else:
             raise HTTPException(
@@ -496,5 +562,8 @@ async def install_plugin_from_local(request: dict[str, Any] = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to install plugin from local path: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to install: {str(e)}")
+        raise internal_error(
+            "plugin_install_failed",
+            "Could not install the plugin. Check the server logs for details.",
+            error=e,
+        ) from e

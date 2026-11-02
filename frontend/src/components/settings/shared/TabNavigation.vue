@@ -14,13 +14,21 @@
     >
       <span v-if="tab.icon" class="tab-icon">{{ tab.icon }}</span>
       <span class="tab-label">{{ tab.label }}</span>
-      <span v-if="tab.badge" class="tab-badge">{{ tab.badge }}</span>
+      <Tag
+        v-if="tab.badge"
+        class="tab-badge"
+        count
+        :tone="activeTab === tab.id ? 'focus' : 'neutral'"
+      >
+        {{ tab.badge }}
+      </Tag>
     </button>
   </div>
 </template>
 
 <script setup>
 import { nextTick, ref } from "vue";
+import Tag from "@/components/ui/Tag.vue";
 
 const props = defineProps({
   tabs: {
@@ -92,9 +100,9 @@ const handleKeydown = event => {
 <style scoped>
 .tab-navigation {
   display: flex;
-  gap: 0.5rem;
-  border-bottom: 2px solid var(--border-color);
-  margin-bottom: 1.5rem;
+  gap: var(--space-sm);
+  border-bottom: 2px solid var(--line);
+  margin-bottom: var(--space-3xl);
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -103,52 +111,45 @@ const handleKeydown = event => {
 .tab-button {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
+  gap: var(--space-sm);
+  padding: 0.75rem var(--space-2xl);
+  min-height: var(--touch-target);
   background: transparent;
   border: none;
   border-bottom: 3px solid transparent;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
+  color: var(--ink-2);
+  font-size: var(--fs-control);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-strong);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
   white-space: nowrap;
   position: relative;
   margin-bottom: -2px;
 }
 
 .tab-button:hover {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+  color: var(--ink);
+  background: var(--bg-2);
+}
+
+.tab-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .tab-button.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
-  font-weight: 600;
+  color: var(--focus-text);
+  border-bottom-color: var(--focus-text);
+  font-weight: var(--weight-title);
 }
 
 .tab-icon {
-  font-size: 1.1rem;
+  font-size: var(--fs-lg);
 }
 
 .tab-label {
   flex: 1;
-}
-
-.tab-badge {
-  padding: 0.125rem 0.5rem;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.tab-button.active .tab-badge {
-  background: var(--accent-primary);
-  color: white;
 }
 
 /* Scrollbar styling for tab navigation */
@@ -157,15 +158,15 @@ const handleKeydown = event => {
 }
 
 .tab-navigation::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: var(--bg-2);
 }
 
 .tab-navigation::-webkit-scrollbar-thumb {
-  background: var(--border-color);
+  background: var(--line);
   border-radius: 2px;
 }
 
 .tab-navigation::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: var(--ink-3);
 }
 </style>

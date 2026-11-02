@@ -1,0 +1,309 @@
+# Zero-touch kiosk provisioning
+
+Prepare a Raspberry Pi card once so a non-technical person can plug in
+power and reach a running Calvin kiosk — no SSH, no typing on the Pi.
+
+This is for **Mode B** (remote backend + kiosk Pi). See
+[DEPLOYMENT_TOPOLOGIES.md](DEPLOYMENT_TOPOLOGIES.md). For the short version
+(including the one-command install over SSH), start with
+[KIOSK_INSTALL.md](KIOSK_INSTALL.md).
+
+## What you need
+
+- A Raspberry Pi and an SD card / SSD.
+- Raspberry Pi Imager.
+- The Calvin repo checked out on your workstation (Linux/macOS) at the release
+  your server runs — a `vX.Y.Z` tag; `develop` is fine to test the next one.
+  Only the bake script and the installer it embeds come from this checkout. The
+  Pi gets everything else from your Calvin server, never from GitHub.
+- Your backend URL, e.g. `http://homeserver.local:8000`.
+- Recommended: the server's signing key (see
+  [KIOSK_INSTALL.md](KIOSK_INSTALL.md#step-0-get-the-signing-key-from-the-server-recommended)).
+
+## Step 1 — Flash a CLEAN image
+
+In Raspberry Pi Imager, choose **Raspberry Pi OS Lite (64-bit)** and flash.
+
+> **Important:** Do **not** use Imager's OS-customization (the gear /
+> "Edit settings"). Calvin's bake step writes its own first-boot hook, and
+> Imager's customization writes a competing one. Flash a clean image.
+
+## Step 2 — Bake the first-boot bundle
+
+Re-insert the flashed card; the boot partition auto-mounts (often
+`/media/$USER/bootfs`). From the repo root:
+
+```bash
+sudo bash scripts/bake-kiosk-firstrun.sh \
+  --backend-url http://homeserver.local:8000 \
+  --hostname kitchen \
+  --wifi-ssid HomeNet --wifi-psk 's3cret' --wifi-country SE \
+  --ssh-pubkey ~/.ssh/id_ed25519.pub \
+  --signing-key-file calvin.key \
+  --boot-dir /media/$USER/bootfs
+```
+
+Only `--backend-url` and `--boot-dir` are required. Omit `--wifi-*` if the
+Pi is on Ethernet. `--ssh-pubkey` creates a recovery admin user,
+`calvin-admin` (rename with `--admin-user`), with key-only SSH login and
+passwordless sudo; without it the kiosk has no admin login. `calvin`, which runs
+Chromium, gets no SSH key and no sudo. The old `--git-repo`/`--git-branch` flags are gone because nothing is
+fetched from GitHub any more.
+
+Eject the card.
+
+## Step 3 — Boot
+
+Put the card in the Pi and power on. It self-provisions unattended:
+
+1. **Boot 1** sets hostname, wifi and SSH, creates the admin user (if a key was
+   baked), turns off the interactive first-user wizard (`userconfig.service`),
+   seeds config and the signing key,
+   installs the kiosk installer (`/usr/local/bin/calvin-kiosk-install.sh`),
+   deletes `firstrun.sh` from the boot partition (it held the wifi PSK and key),
+   and reboots.
+2. **Boot 2** waits up to 15 minutes for the server's `/api/health`, then
+   runs the installer. The installer fetches `setup-kiosk.sh` from the server
+   (verified against the signed manifest when a key is baked), installs X,
+   openbox, Chromium and the Calvin services, and reboots.
+3. **Boot 3** — Chromium opens the dashboard.
+
+First provisioning takes several minutes (package installs). Boot 2 prints its
+progress on the screen (tty1): waiting for the server, installing, or the
+error and that it will retry. Over SSH: `ssh calvin-admin@<kiosk>` then
+`journalctl -u calvin-kiosk-firstboot -f`.
+
+## After provisioning
+
+The kiosk behaves exactly like one set up by hand with `setup-kiosk.sh`:
+stable `CALVIN_KIOSK_ID`, display-power agent, rotation via
+`/etc/default/calvin-kiosk`. See the [kiosk identity](DEPLOYMENT_TOPOLOGIES.md#kiosk-identity)
+section to rename it.
+
+## Kiosk agent self-update
+
+The kiosk's Python display-agent and its systemd units can be updated remotely
+from the Calvin admin UI — no SSH, no re-flash.
+
+### How it works
+
+1. **Admin triggers the update.** In Settings → Screens, click **Update** next to
+   a kiosk. This sets a per-kiosk `agentUpdateRequested` flag in the backend
+   registry (`POST /api/kiosks/{id}/update`).
+
+2. **Agent sees the flag on its next config poll.** On every successful
+   `GET /api/kiosks/{id}/config` (roughly once per minute), the display-agent
+   checks for `agentUpdateRequested: true` and a new `agentAvailableVersion`. If
+   the available version differs from its own running version
+   (`/var/lib/calvin/agent-version.json`) and hasn't already been tried this
+   session, the agent fires the root oneshot updater:
+
+   ```
+   sudo -n systemctl start --no-block calvin-kiosk-update.service
+   ```
+
+   The sudoers fragment installed at `/etc/sudoers.d/calvin-kiosk-update`
+   (mode 0440) allows exactly this call for the `calvin` user — nothing else.
+
+3. **Updater fetches the bundle from the local backend.** `update-kiosk.sh`
+   (installed to `/usr/local/bin/`) pulls the bundle manifest from
+   `GET /api/kiosks/agent/manifest` and downloads only changed files from
+   `GET /api/kiosks/agent/files/{name}`. The bundle source is the **local
+   Calvin server**, not GitHub — no internet access required on the kiosk.
+
+   The bundle is 6 files: the display-agent script, three systemd units, the
+   updater itself, and the oneshot service unit. The updater only installs these
+   six, each at its fixed path and mode (0755 scripts, 0644 units), and only
+   restarts or enables their units; anything else in a manifest is refused. A
+   new bundle file therefore needs the updater that knows it: when a manifest
+   brings both, the old updater installs the known files and re-runs the new
+   updater for the rest. Units that should be enabled are re-enabled on every
+   run. This pinning is defence in depth only: the updater is itself a bundle
+   file and runs as root, so without a signing key a hostile server can still
+   ship its own updater. Only the manifest signature protects against that. No full repo checkout lives
+   on the kiosk.
+
+4. **Verify, backup, atomic swap, restart.** For each changed file the updater:
+   - verifies the sha256 against the manifest value,
+   - runs `py_compile` on Python files,
+   - backs up the current file to `/var/lib/calvin/agent-backup/`,
+   - atomic-replaces via `install -m <mode>`,
+   - restarts only the systemd units that own the changed files (uses
+     `daemon-reload` when a unit file changed).
+
+5. **Auto-rollback on unhealthy agent.** If the display-agent was among the
+   restarted units, the updater waits up to 30 seconds for it to become both
+   `active` and to have written the ready-marker
+   (`/run/calvin/agent-ready`, a tmpfs file created on the first successful
+   backend contact). If the agent doesn't come up healthy in time, all changed
+   files are restored from backup and the affected units are restarted again.
+
+6. **Update flag auto-clears.** On the next config poll after a successful
+   update the agent reports its new version via the `kagent` query parameter.
+   The backend auto-clears `agentUpdateRequested` once it sees
+   `kagent == agentAvailableVersion`.
+
+### Bundle source: local Calvin server only
+
+`setup-kiosk.sh` and `update-kiosk.sh` both pull the bundle from
+`${CALVIN_BACKEND_URL}/api/kiosks/agent/*`. The kiosk needs no internet access
+and no copy of the Calvin git repo; everything comes from the server it is
+already talking to.
+
+### Updating the updater itself
+
+`update-kiosk.sh` is part of the bundle, so it updates itself like any other file. Before a
+new copy is adopted it is verified up front — `bash -n` for syntax and a read-only
+`--self-check` run (which fetches and parses the manifest but changes nothing). If either
+fails, the whole update aborts before anything is swapped and the current, known-good updater
+stays installed. This is what makes it safe to evolve the updater remotely: a dead-on-arrival
+updater is never installed. `--self-check` validates the new code against the *current*
+manifest and environment, so it proves the updater starts and can parse today's manifest — a
+new updater that misbehaves only mid-apply, or that expects a future manifest shape or a new
+env var, is only partially exercised. That residual gap is bounded by the durable no-retry
+guard (`agent-update-state.json`), which prevents a failing version from re-triggering in a
+loop.
+
+### New units and removed components
+
+The updater is authoritative over kiosk-side bundle state. When a bundle release adds a new
+always-on service (a unit marked `enable` in the manifest), the update enables and starts it
+after the agent health check passes. When a release drops a file or unit, the updater compares
+the manifest against the device receipt (`agent-manifest.json`) and, again only after the agent
+is confirmed healthy, stops + disables the unit and removes the file. Both actions happen only
+post-health, so an unhealthy update rolls back the changed agent files and reconciles nothing.
+
+### Interrupted updates self-heal
+
+The version file and receipt are written last, only on success. If power is lost mid-update the
+version is not advanced, so the backend still sees the old version, the update stays pending, and
+the next poll re-runs the updater; the checksum loop re-syncs any half-written file. Combined
+with the durable no-retry guard (`agent-update-state.json`), a kiosk cannot get stuck in a
+half-updated state.
+
+### Trust model
+
+Two controls now protect a kiosk update:
+
+- **Manifest signing is implemented** (see below). A kiosk with a baked key
+  verifies the signature before trusting the manifest, the file hashes or any
+  downloaded file.
+- **The signing key and backups need the admin password.** Kiosk signing is
+  host-side, and `GET /api/backup/export` — which can include the kiosk signing
+  key and stored plugin secrets — answers only an admin session (CLV-9, see
+  [Admin authentication](../configuration/ADMIN_AUTH.md)). A LAN client without
+  the password can no longer download the key or a backup.
+
+Residuals:
+
+- **Unsigned kiosks still trust the LAN.** A kiosk with no key baked keeps
+  integrity-only (sha256) checks, so a LAN attacker who can MITM the backend
+  could serve matching-sha files. Bake the key to close that gap.
+- **The server process holds the HMAC key**, so code an admin installs (a
+  plugin) can read it. Moving to Ed25519 manifests signed at release time, where
+  the server holds only the public key, is planned (see below).
+- **No anti-rollback.** The bundle version is a content hash (a change marker,
+  not a monotonic counter), so a server rolled back to an older bundle will be
+  adopted.
+
+### Manifest signing (closing the LAN-MITM)
+
+The backend signs the bundle manifest with HMAC-SHA256 using a shared secret generated on first
+run at `<data dir>/kiosk-signing.key` (see [Data directory](../configuration/DATA_DIR.md); mode `0600`; the path is logged the first time it is created).
+When a kiosk has that secret baked, it verifies the manifest signature before trusting the
+manifest, the file hashes, or any downloaded file — closing the LAN man-in-the-middle gap that
+plain sha256 integrity leaves open.
+
+**Enable it on a kiosk (out-of-band — never over the LAN):**
+
+1. On the server, read the secret over your existing trusted access. The server
+   creates it at startup and logs the path (`Kiosk manifest signing key: …`):
+   - Unraid: `/mnt/user/appdata/calvin/kiosk-signing.key`
+   - Docker: `/var/lib/calvin/kiosk-signing.key` in the container, which is the data volume
+     (`CALVIN_DATA_DIR`), so it survives image updates
+   - Source checkout: `backend/data/kiosk-signing.key` (or `$CALVIN_DATA_DIR/kiosk-signing.key`)
+2. Pass it to provisioning:
+   - Over SSH: copy the key **and** `install-kiosk.sh` from the server, then run
+     `sudo bash install-kiosk.sh --backend-url <url> --signing-key-file <path>` (exact commands in
+     [KIOSK_INSTALL.md](KIOSK_INSTALL.md#option-a-install-over-ssh-on-a-running-pi)). Don't pass the
+     key to the `curl … | sudo bash` form: that script comes over plain HTTP.
+   - Zero-touch: `bake-kiosk-firstrun.sh ... --signing-key-file <path>` (or `--signing-key <hex>`).
+   - Manual: `setup-kiosk.sh --backend-url <url> --signing-key <hex>`.
+
+   The key is written to a dedicated root-only file `/etc/default/calvin-kiosk-signing` (mode
+   `0600`) — never the world-readable `/etc/default/calvin-kiosk`.
+
+**Behavior once a key is baked (fail-closed):** the updater aborts and installs nothing if the
+signature is invalid, **missing** (an attacker must not be able to strip it to fall back to
+LAN-trust), or uses an unknown algorithm. A kiosk with **no** key baked keeps the previous
+LAN-trust behavior, so signing is opt-in per kiosk — but note the backend always signs, so a
+keyed kiosk requires a backend running this version or newer.
+
+**Key rotation:** delete `<data dir>/kiosk-signing.key` on the server (a new one is generated on the
+next manifest request) and re-bake / re-run `--signing-key` on each kiosk. There is no automatic
+rotation.
+
+**Stronger isolation (planned):** the shared key means the server process — and
+therefore any installed plugin — can forge manifests. The plan is Ed25519
+manifests signed at release time in CI (private key in a GitHub Actions secret),
+with kiosks pinning the public key: the server then holds no signing key at all.
+That supersedes the earlier per-kiosk KDF idea (calvin-580); kiosk-side
+verification for the current HMAC scheme is unchanged until it lands.
+
+### Python version floor (`min_python`)
+
+The bundle manifest carries `"min_python": "3.9"`. The updater checks the
+kiosk's Python version before downloading anything; if the device Python is
+below 3.9 the update is aborted with a `python-too-old` status and the current
+agent is left in place. The agent reports the updater's status and message on
+its next config poll, so the backend's `agentUpdateStatus` is `"error"` and its
+`agentUpdateMessage` is `"device python < 3.9; keeping current agent"` — the
+kiosk will need an OS upgrade before the agent can be updated, and the Screens
+list marks it "update needs a newer OS".
+
+The display-agent itself enforces the same floor at startup and exits
+immediately if it runs on Python older than 3.9.
+
+### Initial install
+
+The one-command installer (`deploy/kiosk-agent/install-kiosk.sh`, served at
+`/api/kiosks/install.sh` with the server URL baked in, and baked onto the card by
+`bake-kiosk-firstrun.sh`) downloads `setup-kiosk.sh` + `setup-common.sh` from
+`/api/kiosks/installer/*`. It checks them against the `installer` hashes in the signed
+manifest, then runs `setup-kiosk.sh`. Those hashes are signed but are not part of the
+bundle `version`, so editing a setup script never flags kiosks for an agent update.
+
+`setup-kiosk.sh` calls `bootstrap_kiosk` (in `scripts/setup-common.sh`), which fetches
+`update-kiosk.sh` from the backend, verifies it against the manifest, and runs it with
+`--bootstrap`. `--bootstrap` installs the whole bundle (agent, units, updater), enables the
+boot units, and seeds both `/var/lib/calvin/agent-version.json` and the device receipt
+`/var/lib/calvin/agent-manifest.json`. It performs no restart, health check, or rollback —
+first boot has nothing running and reboots afterward. The updater is now the single install
+path; there is no separate bundle-install routine.
+
+### Future option: zipapp
+
+If the agent is ever split into multiple Python modules, packaging it as a
+`zipapp` `.pyz` file is a supported path — the bundle endpoint can serve any
+allowlisted file. PyInstaller and PyCrucible were rejected because they produce
+architecture-specific artifacts; the current `python3` script works on any
+Debian-family Raspberry Pi OS without recompilation.
+
+### "Update all" kiosks
+
+Bulk-updating all kiosks at once is not yet implemented. Each kiosk must be
+triggered individually. Bulk update is tracked as `calvin-3d1`.
+
+## Troubleshooting
+
+- **Nothing happens on first boot:** confirm you flashed a *clean* image
+  (no Imager customization) and that `cmdline.txt` on the card contains
+  `systemd.run=/boot/firmware/firstrun.sh`.
+- **Wifi doesn't connect:** check `--wifi-country` was set (regulatory
+  domain) and the PSK is correct.
+- **Provisioning failed:** the screen shows the last status. SSH in as the
+  admin user (if you baked a key) and read
+  `journalctl -u calvin-kiosk-firstboot`. If the server was unreachable for the
+  whole 15-minute wait, the unit fails and systemd retries it every minute
+  (`Restart=on-failure`) until the server answers. Fix, then
+  `sudo rm /var/lib/calvin/firstboot.done && sudo systemctl start calvin-kiosk-firstboot`.

@@ -1,85 +1,54 @@
-.PHONY: help install dev dev-logs dev-logs-read dev-verbose test test-watch test-watch-frontend lint format type-check build clean doctor
+.PHONY: help install dev dev-logs dev-logs-read dev-down test test-watch test-watch-frontend lint format type-check build clean doctor demo-seed demo-clear
+
+# One compose project per checkout, so several worktrees can run `make dev`
+# at once (set CALVIN_PORT / CALVIN_FRONTEND_PORT in docker/.env to avoid
+# port clashes). Override with `make dev DEV_PROJECT=...`.
+DEV_PROJECT ?= calvin-dev-$(shell basename "$(CURDIR)" | tr 'A-Z' 'a-z' | tr -c 'a-z0-9_\n-' '-')
+COMPOSE_DEV := docker compose -p $(DEV_PROJECT) -f docker/docker-compose.dev.yml
+COMPOSE_PROD := docker compose -f docker/docker-compose.yml
 
 help:
 	@echo "Available commands:"
-	@echo "  make install        - Install all dependencies"
-	@echo "  make dev            - Start development servers (backend, docs in background)"
-	@echo "  make dev-logs       - Start development servers with visible logs"
-	@echo "  make dev-logs-read  - Read recent dev logs (useful for AI assistant)"
-	@echo "  make dev-verbose    - Like dev-logs but with HTTP request logging on"
-	@echo "  make doctor         - Check dev environment (versions, ports, venv)"
-	@echo "  make test           - Run all tests"
-	@echo "  make test-watch     - Re-run backend unit tests on file change"
+	@echo "  make install        - One-time setup (creates docker/.env from example)"
+	@echo "  make dev            - Start dev stack (docker compose, streams logs)"
+	@echo "  make dev-logs       - Tail logs from running dev stack"
+	@echo "  make dev-logs-read  - Show last 50 lines of dev logs"
+	@echo "  make dev-down       - Stop dev stack"
+	@echo "  make doctor         - Check docker + dev env"
+	@echo "  make test           - Run all tests (native)"
+	@echo "  make test-watch     - Re-run backend tests (all but slow) on file change"
 	@echo "  make test-watch-frontend - Re-run frontend tests on file change"
 	@echo "  make test-scripts   - Test setup scripts (requires bats)"
-	@echo "  make lint           - Run linters"
-	@echo "  make format         - Format code"
-	@echo "  make type-check     - Run type checkers"
-	@echo "  make build          - Build for production"
-	@echo "  make clean          - Clean build artifacts"
+	@echo "  make lint           - Run linters (native)"
+	@echo "  make format         - Format code (native)"
+	@echo "  make type-check     - Run type checkers (native; vue-tsc covers src/api only)"
+	@echo "  make build          - Build the production docker image"
+	@echo "  make clean          - Tear down dev stack and remove dev data"
+	@echo "  make demo-seed      - Add sample calendar/photos/pages (DATA_DIR=... for the dev stack)"
+	@echo "  make demo-clear     - Remove only the sample data"
 
 install:
-	@echo "Installing dependencies..."
-	@if [ "$$(uname -s)" = "Linux" ]; then \
-		echo "Linux detected - installing with evdev support..."; \
-		cd backend && uv sync --extra linux --extra dev; \
+	@if [ ! -f docker/.env ]; then \
+		echo "Creating docker/.env from docker/dev.env.example..."; \
+		cp docker/dev.env.example docker/.env; \
 	else \
-		echo "Installing dependencies (no evdev on non-Linux systems)..."; \
-		cd backend && uv sync --extra dev; \
+		echo "docker/.env already exists — leaving it alone"; \
 	fi
-	cd frontend && npm install
+	@echo "Done. Run 'make dev' to start."
 
 dev:
-	@echo "Starting development servers..."
-	@echo "Backend: http://localhost:8000"
-	@echo "Frontend: http://localhost:5173"
-	@echo "Docs: http://localhost:8001"
-	cd backend && uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000 &
-	uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 &
-	cd frontend && npm run dev
+	@echo "Starting dev stack via docker compose..."
+	@echo "Project:  $(DEV_PROJECT) (ports from docker/.env, default 8000 / 5173)"
+	$(COMPOSE_DEV) up
 
 dev-logs:
-	@echo "Starting development servers with visible logs..."
-	@echo ""
-	@mkdir -p logs
-	@echo "Logs are also being written to:"
-	@echo "  Backend:  logs/dev-backend.log"
-	@echo "  Frontend: logs/dev-frontend.log"
-	@echo "  Combined: logs/dev-combined.log"
-	@echo ""
-	@echo "Backend: http://localhost:8000"
-	@echo "Frontend: http://localhost:5173"
-	@echo "Docs: http://localhost:8001"
-	@echo "API Docs: http://localhost:8000/docs"
-	@echo ""
-	@echo "Press Ctrl+C to stop all servers"
-	@echo "────────────────────────────────────────────────────────────────────────────────"
-	@echo ""
-	@> logs/dev-backend.log && > logs/dev-frontend.log && > logs/dev-docs.log && > logs/dev-combined.log
-	@trap 'kill 0' EXIT INT TERM; \
-	(cd backend && PYTHONUNBUFFERED=1 uv run uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8000 2>&1 | \
-		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [BACKEND] "$$0; print logline >> "../logs/dev-backend.log"; print logline >> "../logs/dev-combined.log"; print "\033[36m[BACKEND]\033[0m "$$0; fflush()}') & \
-	(uv run --project backend mkdocs serve --dev-addr 127.0.0.1:8001 2>&1 | \
-		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [DOCS] "$$0; print logline >> "logs/dev-docs.log"; print logline >> "logs/dev-combined.log"; print "\033[33m[DOCS]\033[0m "$$0; fflush()}') & \
-	(cd frontend && npm run dev 2>&1 | \
-		awk '{timestamp=strftime("%Y-%m-%d %H:%M:%S"); logline="["timestamp"] [FRONTEND] "$$0; print logline >> "../logs/dev-frontend.log"; print logline >> "../logs/dev-combined.log"; print "\033[35m[FRONTEND]\033[0m "$$0; fflush()}') & \
-	wait
+	$(COMPOSE_DEV) logs -f
 
 dev-logs-read:
-	@if [ ! -f logs/dev-combined.log ]; then \
-		echo "No dev logs found. Have you started 'make dev-logs' yet?"; \
-		echo "Expected log files in: logs/"; \
-		exit 1; \
-	fi
-	@echo "Last 50 lines from combined log:"
-	@echo "────────────────────────────────────────────────────────────────────────────────"
-	@tail -n 50 logs/dev-combined.log 2>/dev/null | \
-		sed 's/\[BACKEND\]/\033[36m[BACKEND]\033[0m/g' | \
-		sed 's/\[FRONTEND\]/\033[35m[FRONTEND]\033[0m/g' || echo "No log content found"
-	@echo "────────────────────────────────────────────────────────────────────────────────"
-	@echo "Full log: logs/dev-combined.log"
-	@echo "Backend log: logs/dev-backend.log"
-	@echo "Frontend log: logs/dev-frontend.log"
+	$(COMPOSE_DEV) logs --tail=50
+
+dev-down:
+	$(COMPOSE_DEV) down
 
 test:
 	cd backend && uv sync --extra dev && uv run pytest
@@ -112,47 +81,58 @@ format:
 	cd backend && uv run ruff format .
 	cd frontend && npm run format
 
+# Frontend type-checking is narrow on purpose: vue-tsc covers the typed API
+# layer (frontend/src/api, including the generated types.ts) only. The rest of
+# the frontend is JavaScript and .vue files are not checked yet.
 type-check:
 	cd backend && uv run mypy app/
 	cd frontend && npm run type-check
 
 build:
-	cd frontend && npm run build
+	$(COMPOSE_PROD) build
 
 clean:
+	-$(COMPOSE_DEV) down -v
+	rm -rf docker/.calvin-dev-data
 	rm -rf backend/.venv
 	rm -rf frontend/node_modules
 	rm -rf frontend/dist
 	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
 
-dev-verbose:
-	@CALVIN_DEV_LOG_HTTP=1 $(MAKE) dev-logs
-
 test-watch:
-	cd backend && uv run ptw -- -m "unit and not slow"
+	cd backend && uv run ptw -- -m "not slow"
 
 test-watch-frontend:
-	cd frontend && npm run test -- --watch
+	cd frontend && npm run test:watch
+
+# Sample data for demos and screenshots (CLV-67). For the docker dev stack the
+# data dir is docker/.calvin-dev-data: `make demo-seed DATA_DIR=$PWD/docker/.calvin-dev-data`.
+# A running backend loads plugin instances at startup, so restart it afterwards.
+demo-seed:
+	cd backend && uv run python -m app.demo seed $(if $(DATA_DIR),--data-dir "$(DATA_DIR)",)
+
+demo-clear:
+	cd backend && uv run python -m app.demo clear $(if $(DATA_DIR),--data-dir "$(DATA_DIR)",)
 
 doctor:
 	@echo "Calvin dev-environment doctor"
 	@echo "─────────────────────────────"
-	@printf "uv:         "; command -v uv >/dev/null 2>&1 && uv --version || echo "MISSING — install from https://docs.astral.sh/uv/"
-	@printf "python:     "; command -v python >/dev/null 2>&1 && python --version || echo "MISSING"
-	@printf "node:       "; command -v node >/dev/null 2>&1 && node --version || echo "MISSING"
-	@printf "npm:        "; command -v npm >/dev/null 2>&1 && npm --version || echo "MISSING"
-	@printf "pre-commit: "; command -v pre-commit >/dev/null 2>&1 && pre-commit --version || echo "MISSING — run: pip install pre-commit (or: uv tool install pre-commit)"
+	@printf "docker:         "; command -v docker >/dev/null 2>&1 && docker --version || echo "MISSING — install Docker Desktop / engine"
+	@printf "docker compose: "; docker compose version >/dev/null 2>&1 && docker compose version || echo "MISSING — needs Docker Compose v2"
 	@echo ""
-	@echo "Backend venv:"
-	@if [ -d backend/.venv ]; then echo "  backend/.venv exists"; else echo "  MISSING — run: make install"; fi
+	@printf "docker/.env:    "; if [ -f docker/.env ]; then echo "present"; else echo "MISSING — run: make install"; fi
 	@echo ""
-	@echo "Ports (8000 backend, 5173 frontend, 8001 docs):"
-	@for p in 8000 5173 8001; do \
+	@echo "Native toolchain (only needed for test/lint/format/type-check):"
+	@printf "  uv:   "; command -v uv >/dev/null 2>&1 && uv --version || echo "missing"
+	@printf "  node: "; command -v node >/dev/null 2>&1 && node --version || echo "missing"
+	@printf "  npm:  "; command -v npm >/dev/null 2>&1 && npm --version || echo "missing"
+	@echo ""
+	@echo "Ports (8000 backend, 5173 frontend):"
+	@for p in 8000 5173; do \
 		if command -v lsof >/dev/null 2>&1 && lsof -i :$$p -sTCP:LISTEN >/dev/null 2>&1; then \
 			echo "  $$p: IN USE"; \
 		else \
 			echo "  $$p: free"; \
 		fi; \
 	done
-

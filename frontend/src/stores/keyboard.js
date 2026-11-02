@@ -1,65 +1,95 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import axios from "axios";
+import api from "@/services/api";
+import { logError } from "@/utils/logger";
+import { friendlyError } from "@/utils/friendlyError";
 
 export const useKeyboardStore = defineStore("keyboard", () => {
-  const mappings = ref({});
-  const keyboardType = ref("7-button"); // Current keyboard type
+  const mappings = ref({}); // { KEY_x: action }
   const available = ref(false);
   const loading = ref(false);
   const error = ref(null);
+  // One friendly sentence for the screen; `error` keeps the raw text for logs.
+  const errorText = ref("");
 
-  const fetchMappings = async (keyboardType = null) => {
+  const captureActive = ref(false);
+  let captureResolver = null;
+
+  const fetchMappings = async () => {
     loading.value = true;
     error.value = null;
+    errorText.value = "";
     try {
-      const url = keyboardType
-        ? `/api/keyboard/mappings?keyboard_type=${keyboardType}`
-        : "/api/keyboard/mappings";
-      const response = await axios.get(url);
+      const response = await api.get("/keyboard/mappings");
       mappings.value = response.data.mappings || {};
       available.value = true;
       return response.data;
     } catch (err) {
       error.value = err.message;
-      console.error("Failed to fetch keyboard mappings:", err);
+      errorText.value = friendlyError(err, "load the keyboard settings");
       available.value = false;
+      logError("[Keyboard]", "Failed to fetch mappings:", err);
       throw err;
     } finally {
       loading.value = false;
     }
   };
 
-  const updateMappings = async newMappings => {
-    loading.value = true;
-    error.value = null;
-    try {
-      const response = await axios.post("/api/keyboard/mappings", {
-        mappings: newMappings,
-      });
-      mappings.value = response.data.mappings || {};
-      return response.data;
-    } catch (err) {
-      error.value = err.message;
-      console.error("Failed to update keyboard mappings:", err);
-      throw err;
-    } finally {
-      loading.value = false;
-    }
+  const setMapping = async (key, action) => {
+    await api.put(`/keyboard/mappings/${key}`, { action });
+    mappings.value = { ...mappings.value, [key]: action };
   };
 
-  const setKeyboardType = type => {
-    keyboardType.value = type;
+  const removeMapping = async key => {
+    await api.delete(`/keyboard/mappings/${key}`);
+    const next = { ...mappings.value };
+    delete next[key];
+    mappings.value = next;
+  };
+
+  const updateMappings = async map => {
+    await api.post("/keyboard/mappings", { mappings: map });
+    mappings.value = { ...map };
+  };
+
+  // --- press-to-capture primitives ---
+  const beginCapture = () => {
+    captureActive.value = true;
+    return new Promise(resolve => {
+      captureResolver = resolve;
+    });
+  };
+
+  const handleCaptureKey = keyCode => {
+    if (!captureActive.value) return;
+    captureActive.value = false;
+    const resolve = captureResolver;
+    captureResolver = null;
+    // Escape is reserved to cancel.
+    resolve?.(keyCode === "KEY_ESCAPE" ? null : keyCode);
+  };
+
+  const cancelCapture = () => {
+    if (!captureActive.value) return;
+    captureActive.value = false;
+    const resolve = captureResolver;
+    captureResolver = null;
+    resolve?.(null);
   };
 
   return {
     mappings,
-    keyboardType,
     available,
     loading,
     error,
+    errorText,
+    captureActive,
     fetchMappings,
+    setMapping,
+    removeMapping,
     updateMappings,
-    setKeyboardType,
+    beginCapture,
+    handleCaptureKey,
+    cancelCapture,
   };
 });

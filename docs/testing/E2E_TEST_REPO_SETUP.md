@@ -32,13 +32,14 @@ export TEST_GITHUB_BRANCH="main"  # Optional, defaults to "main"
    │   ├── plugin.json
    │   ├── plugin.py
    │   └── frontend/
-   │       └── Component.vue
+   │       └── dist.js
    └── README.md
    ```
 
 3. **Example plugin.json**:
    ```json
    {
+     "api_version": 1,
      "id": "test_e2e_plugin",
      "name": "Test E2E Plugin",
      "version": "1.0.0",
@@ -52,17 +53,19 @@ export TEST_GITHUB_BRANCH="main"  # Optional, defaults to "main"
 4. **Example plugin.py**:
    ```python
    """Test plugin for E2E testing."""
-   from typing import Any
-   from app.plugins.base import PluginType
-   from app.plugins.hooks import hookimpl
+   from app.plugins.definitions import PluginMetadata
+   from app.plugins.protocols import ServicePlugin
 
-   @hookimpl
-   def register_plugin_types() -> list[dict[str, Any]]:
-       """Register plugin type."""
-       return [{
-           "type_id": "test_e2e_plugin",
-           "plugin_type": PluginType.SERVICE
-       }]
+
+   class TestE2EPlugin(ServicePlugin):
+       metadata = PluginMetadata(
+           type_id="test_e2e_plugin",
+           name="Test E2E Plugin",
+           description="A test plugin for E2E testing",
+       )
+
+       async def fetch(self, start_date=None, end_date=None):
+           return {"status": "ok"}
    ```
 
 5. **Optional: plugins.json manifest**:
@@ -177,4 +180,3 @@ jobs:
   - Scheduled nightly builds
   - Local development validation
   - Debugging integration issues
-

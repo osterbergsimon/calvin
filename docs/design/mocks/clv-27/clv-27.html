@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OSK hardware keyboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --bg-2:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#fff; --shadow-hover:rgba(0,0,0,.15);
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } h1 { font-family:var(--font-display); margin:0 0 20px; }
+figure { margin:0 0 32px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { position:relative; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; }
+.kiosk { width:1280px; height:720px; }
+.wide { width:1280px; display:grid; grid-template-columns:1fr 1fr; }
+.top { height:64px; background:var(--bg-1); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 20px; font-weight:600; letter-spacing:.12em; }
+.center { position:absolute; inset:64px 0 0 0; display:flex; align-items:center; justify-content:center; }
+.card { width:26rem; padding:1.75rem; background:var(--bg-1); border:1px solid var(--line); border-radius:16px; }
+.card h2 { margin:0 0 6px; font-size:1.35rem; } .card p { margin:0 0 18px; color:var(--ink-2); font-size:.92rem; }
+.card label { display:block; font-weight:500; font-size:.9rem; margin-bottom:6px; }
+.card input { width:100%; height:48px; border:1px solid var(--focus); box-shadow:0 0 0 2px color-mix(in srgb, var(--focus) 20%, transparent); border-radius:8px; padding:0 14px; font:1rem var(--font-ui); background:var(--bg-2); }
+.card .primary { margin-top:16px; height:48px; border-radius:10px; background:var(--focus); color:var(--focus-ink); display:flex; align-items:center; justify-content:center; font-weight:600; }
+.kbtn { position:absolute; right:16px; bottom:16px; height:48px; padding:0 16px; display:flex; align-items:center; gap:10px; background:var(--bg-1); border:1px solid var(--line); border-radius:10px; box-shadow:0 6px 18px -8px var(--shadow-hover); font-size:.9rem; font-weight:500; }
+.kbtn svg { width:20px; height:20px; fill:var(--ink-2); }
+.col { padding:24px 28px; border-right:1px solid var(--line); } .col:last-child { border-right:0; }
+.eyebrow { font-family:var(--font-data); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase; color:var(--ink-3); margin:0 0 12px; }
+.sec { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; margin-bottom:16px; }
+.sec h3 { margin:0; padding:14px 18px 6px; font-size:1rem; font-weight:600; }
+.row { display:flex; align-items:center; gap:16px; padding:11px 18px; border-top:1px solid var(--line-soft); min-height:3.5rem; }
+.sec h3 + .row { border-top:0; }
+.txt { flex:1; min-width:0; } .txt b { font-weight:500; font-size:.95rem; } .txt p { margin:2px 0 0; font-size:.8rem; color:var(--ink-2); line-height:1.35; }
+.chip { display:inline-block; margin-left:8px; font-size:.7rem; font-weight:500; color:var(--ink-2); border:1px solid var(--line); border-radius:6px; padding:0 6px; vertical-align:2px; }
+.seg { flex:none; display:flex; border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:.85rem; }
+.seg span { padding:9px 14px; border-left:1px solid var(--line); } .seg span:first-child { border-left:0; }
+.seg .on { background:color-mix(in srgb, var(--focus) 16%, var(--bg-2)); font-weight:500; }
+.pill { flex:none; height:40px; padding:0 14px; display:flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:10px; font-size:.88rem; }
+.pill::after { content:"▾"; color:var(--ink-3); font-size:.75rem; }
+.tlink { color:var(--ink); text-decoration:underline; text-underline-offset:3px; font-weight:500; }
+.src { color:var(--ink-3) !important; } .own { color:var(--ink) !important; font-weight:600; }
+.link { flex:none; font-size:.85rem; text-decoration:underline; text-underline-offset:3px; }
+.state { font-family:var(--font-data); font-size:.7rem; color:var(--ink-3); padding:8px 18px 0; letter-spacing:.06em; }
+</style>
+</head>
+<body>
+<main class="board">
+  <h1>CLV-27: on-screen keyboard off / hardware auto</h1>
+  <svg width="0" height="0" style="position:absolute"><symbol id="kb" viewBox="0 0 24 24"><path d="M4,5A2,2 0 0,0 2,7V17A2,2 0 0,0 4,19H20A2,2 0 0,0 22,17V7A2,2 0 0,0 20,5H4M4,7H20V17H4V7M5,8V10H7V8H5M8,8V10H10V8H8M11,8V10H13V8H11M14,8V10H16V8H14M17,8V10H19V8H17M5,11V13H7V11H5M8,11V13H10V11H8M11,11V13H13V11H11M14,11V13H16V11H14M17,11V13H19V11H17M8,14V16H16V14H8Z"/></symbol></svg>
+
+  <figure>
+    <div class="frame kiosk">
+      <div class="top">CAL·VIN</div>
+      <div class="center"><div class="card"><h2>Settings are locked</h2><p>Enter the admin password to change settings.</p><label>Admin password</label><input type="password" value="" /><div class="primary">Unlock</div></div></div>
+      <div class="kbtn"><svg><use href="#kb"/></svg>Keyboard</div>
+    </div>
+    <figcaption><b>K1 · Lock screen, keyboard hidden (Auto has learned a hardware keyboard, or the mode is Off).</b> The password field has focus. Someone with a keyboard just types. Anyone else taps <b>Keyboard</b> bottom-right and the full OSK opens, with the CLV-21 layout key inside it. In Auto, that tap also forgets the learned keyboard.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="frame wide">
+      <div class="col">
+        <p class="eyebrow">Screen &amp; keyboard › On-screen keyboard</p>
+        <div class="sec">
+          <h3>On-screen keyboard</h3>
+          <p class="state">AUTO · NOTHING LEARNED</p>
+          <div class="row"><div class="txt"><b>On-screen keyboard<span class="chip">This screen</span></b><p>Shows on touchscreens when you tap a text field. Typing on a real keyboard hides it on this screen.</p></div><div class="seg"><span class="on">Auto</span><span>On</span><span>Off</span></div></div>
+          <p class="state">AUTO · LEARNED</p>
+          <div class="row"><div class="txt"><b>On-screen keyboard<span class="chip">This screen</span></b><p>Hidden here because a keyboard was used. <span class="tlink">Show it again</span></p></div><div class="seg"><span class="on">Auto</span><span>On</span><span>Off</span></div></div>
+          <p class="state">OFF</p>
+          <div class="row"><div class="txt"><b>On-screen keyboard<span class="chip">This screen</span></b><p>Never shows by itself. On a touchscreen, tap Keyboard by a field to open it.</p></div><div class="seg"><span>Auto</span><span>On</span><span class="on">Off</span></div></div>
+          <div class="row"><div class="txt"><b>Keyboard layout</b><p>The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.</p></div><div class="pill">English</div></div>
+        </div>
+      </div>
+      <div class="col">
+        <p class="eyebrow">Kiosks › Hallway</p>
+        <div class="sec">
+          <h3>Touch &amp; keyboard</h3>
+          <div class="row"><div class="txt"><b>On-screen keyboard</b><p class="own">Only this kiosk</p></div><span class="link">Use the shared setting</span><div class="seg"><span>Auto</span><span>On</span><span class="on">Off</span></div></div>
+        </div>
+        <div class="sec">
+          <h3>Touch &amp; keyboard</h3>
+          <div class="row"><div class="txt"><b>On-screen keyboard</b><p class="src">Same as all screens</p></div><div class="seg"><span class="on">Auto</span><span>On</span><span>Off</span></div></div>
+        </div>
+      </div>
+    </div>
+    <figcaption><b>K2 · The setting on the screen itself</b> (left, three description states). <b>K3 · The same setting per kiosk from a phone</b> (right): overridden, then inherited. On a kiosk, both write that kiosk's override. On any other browser the left row is saved in that browser.</figcaption>
+  </figure>
+</main>
+</body>
+</html>

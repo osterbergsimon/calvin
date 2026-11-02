@@ -4,6 +4,7 @@ import { expect, afterEach, vi, beforeEach } from "vitest";
 import { cleanup } from "@testing-library/vue";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import axios from "axios";
+import { setActivePinia, createPinia } from "pinia";
 
 // Mock axios globally to prevent network errors in tests
 // Store created instances so we can apply default mocks to them
@@ -61,7 +62,7 @@ if (typeof window !== "undefined") {
     configurable: true,
     value: vi.fn().mockImplementation(query => {
       return {
-        matches: false,
+        matches: /\(any-pointer:\s*fine\)/.test(query),
         media: query,
         onchange: null,
         addListener: vi.fn(), // deprecated
@@ -81,11 +82,21 @@ beforeEach(() => {
   // Reset mocks but keep default implementations
   vi.clearAllMocks();
 
+  // The kiosk id (and Settings tab hints) persist in sessionStorage; start each
+  // test from a clean tab so one test's ?kiosk= can't leak into the next.
+  sessionStorage.clear();
+
+  // Provide a fresh Pinia instance so components that use stores (e.g.
+  // useTouchCapability → useConfigStore) can mount without errors.
+  // Tests that need specific store state create their own via setActivePinia().
+  setActivePinia(createPinia());
+
   // Helper function to apply default implementations to an axios instance
   const applyDefaults = instance => {
     // Default config response - prevents errors when useTheme calls fetchConfig
     instance.get.mockImplementation(url => {
-      if (url === "/api/config" || url?.includes("/api/config")) {
+      // "/config" is the same route through the shared services/api.js client.
+      if (url === "/api/config" || url === "/config" || url?.includes("/api/config")) {
         return Promise.resolve({
           data: {
             orientation: "landscape",
@@ -125,6 +136,12 @@ beforeEach(() => {
 expect.extend(matchers);
 
 // Cleanup after each test
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  // Components load leaves through defineAsyncComponent(). If a test ends before
+  // those chunks are fetched, the import lands after the jsdom environment is
+  // torn down and vitest fails the run with "EnvironmentTeardownError ... after
+  // the environment was torn down". Let every pending dynamic import settle
+  // while the environment is still alive.
+  await vi.dynamicImportSettled();
 });

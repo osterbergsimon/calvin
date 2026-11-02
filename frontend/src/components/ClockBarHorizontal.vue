@@ -3,16 +3,23 @@
     v-if="shouldShow"
     class="clock-bar-horizontal"
     :class="[`position-${position}`, { 'show-date': showDate }]"
-    :style="{ padding: `${barPadding}px` }"
+    :style="{ padding: barPaddingStyle }"
+    role="status"
+    aria-label="Status bar"
+    aria-live="polite"
   >
     <div class="clock-bar-outer">
-      <!-- Left spacer: invisible mirror of right side to keep clock centered -->
-      <div class="clock-bar-side clock-bar-left" aria-hidden="true">
-        <PluginStatusbarItems ghost />
-        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon clock-refresh-ghost" />
+      <div class="clock-bar-side clock-bar-left">
+        <BarLogo v-if="showLogo" />
+        <span v-if="!previewMode && roomLabel" class="clock-bar-room">{{ roomLabel }}</span>
+        <ScreenDots
+          v-if="!previewMode"
+          :screens="screens"
+          :active-screen-id="activeScreenId"
+          @select-screen="activateScreen"
+        />
       </div>
 
-      <!-- Center: time + date -->
       <div
         class="clock-bar-content"
         :class="{
@@ -26,20 +33,26 @@
         }}</span>
       </div>
 
-      <!-- Right: plugin statusbar items -->
       <div class="clock-bar-side clock-bar-right">
-        <PluginStatusbarItems />
-        <span v-if="isBackgroundRefreshing" class="clock-refresh-icon" aria-hidden="true" />
+        <PluginStatusbarItems :size="pluginItemSize" />
+        <BarActionCluster v-if="!previewMode" :compact="false" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { computed, onMounted } from "vue";
 import { useConfigStore } from "../stores/config";
-import { useCalendarStore } from "../stores/calendar";
+import { useKiosksStore } from "../stores/kiosks";
+import { useClockBar } from "../composables/useClockBar";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { getActiveDashboardScreen } from "../utils/layout";
+import { getKioskId } from "../utils/kioskId";
 import PluginStatusbarItems from "./PluginStatusbarItems.vue";
+import BarActionCluster from "./BarActionCluster.vue";
+import BarLogo from "./BarLogo.vue";
+import ScreenDots from "./ui/ScreenDots.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -83,283 +96,165 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  previewPluginItemSize: {
+    type: Number,
+    default: null,
+  },
+});
+
+const {
+  shouldShow,
+  showDate,
+  formattedTime,
+  formattedDate,
+  fontSize,
+  dateFontSize,
+  pluginItemSize,
+  layout,
+  barPaddingStyle,
+} = useClockBar({
+  enabled: () => props.enabled,
+  showInKiosk: () => props.showInKiosk,
+  showInNonKiosk: () => props.showInNonKiosk,
+  previewMode: () => props.previewMode,
+  previewTimeSize: () => props.previewTimeSize,
+  previewDateSize: () => props.previewDateSize,
+  previewLayout: () => props.previewLayout,
+  previewPadding: () => props.previewPadding,
+  previewPluginItemSize: () => props.previewPluginItemSize,
+  orientation: () => "horizontal",
 });
 
 const configStore = useConfigStore();
+const showLogo = computed(() => configStore.clockBarShowLogo !== false);
 
-const currentTime = ref(new Date());
-let timeInterval = null;
+const { activateScreen } = useKeyboardActions();
+const screensConfig = computed(() => configStore.effectiveDashboardScreens);
+const screens = computed(() => screensConfig.value.screens);
+const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 
-// Check if clock bar should be displayed
-const shouldShow = computed(() => {
-  // Always show in preview mode
-  if (props.previewMode) return true;
-
-  if (!props.enabled) return false;
-
-  // Show in non-kiosk mode (UI visible)
-  if (props.showInNonKiosk && configStore.shouldShowUI) {
-    return true;
-  }
-  // Show in kiosk mode (UI hidden)
-  if (props.showInKiosk && !configStore.shouldShowUI) {
-    return true;
-  }
-  return false;
-});
-
-// Get timezone from config
-const timezone = computed(() => {
-  return configStore.timezone || null;
-});
-
-// Get time format from config
-const timeFormat = computed(() => {
-  return configStore.timeFormat || "24h";
-});
-
-// Get date format from config (if available)
-// Note: dateFormat is currently not used but kept for future enhancement
-// const dateFormat = computed(() => {
-//   // Use locale-based formatting for now
-//   // Can be enhanced with custom date format settings
-//   return "locale";
-// });
-
-// Get show date setting
-const showDate = computed(() => {
-  return configStore.clockShowDate || false;
-});
-
-// Get show seconds setting
-const showSeconds = computed(() => {
-  return configStore.clockShowSeconds || false;
-});
-
-// Get font sizes and layout (use preview props if in preview mode)
-const fontSize = computed(() => {
-  if (props.previewMode && props.previewTimeSize !== null) {
-    return props.previewTimeSize;
-  }
-  return configStore.clockBarFontSize || 16;
-});
-
-const dateFontSize = computed(() => {
-  if (props.previewMode && props.previewDateSize !== null) {
-    return props.previewDateSize;
-  }
-  return configStore.clockBarDateFontSize || 14;
-});
-
-const layout = computed(() => {
-  if (props.previewMode && props.previewLayout !== null) {
-    return props.previewLayout;
-  }
-  return configStore.clockBarLayout || "single-line";
-});
-
-const barPadding = computed(() => {
-  if (props.previewMode && props.previewPadding !== null) {
-    return props.previewPadding;
-  }
-  return configStore.clockBarPadding || 8;
-});
-
-const calendarStore = useCalendarStore();
-
-const isBackgroundRefreshing = computed(() => calendarStore.backgroundRefreshing);
-
-// Format time
-const formattedTime = computed(() => {
-  const now = currentTime.value;
-
-  const options = {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: timeFormat.value === "12h",
-  };
-
-  if (showSeconds.value) {
-    options.second = "2-digit";
-  }
-
-  if (timezone.value) {
-    options.timeZone = timezone.value;
-  }
-
-  try {
-    return now.toLocaleTimeString(undefined, options);
-  } catch {
-    // Fallback if timezone is invalid
-    const fallbackOptions = {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: timeFormat.value === "12h",
-    };
-    if (showSeconds.value) {
-      fallbackOptions.second = "2-digit";
-    }
-    return now.toLocaleTimeString(undefined, fallbackOptions);
-  }
-});
-
-// Format date - respects locale and date format preferences
-const formattedDate = computed(() => {
-  if (!showDate.value) return "";
-
-  const now = currentTime.value;
-  const options = {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  };
-
-  if (timezone.value) {
-    options.timeZone = timezone.value;
-  }
-
-  try {
-    return now.toLocaleDateString(undefined, options);
-  } catch {
-    // Fallback if timezone is invalid
-    return now.toLocaleDateString(undefined, {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-});
-
-// Update time
-const updateTime = () => {
-  if (!shouldShow.value) {
-    timeInterval = setTimeout(updateTime, 1000);
-    return;
-  }
-
-  currentTime.value = new Date();
-
-  const interval = showSeconds.value ? 1000 : 60000;
-  timeInterval = setTimeout(updateTime, interval);
-};
-
-// Watch for changes in clockShowSeconds to adjust update interval
-watch(
-  () => configStore.clockShowSeconds,
-  () => {
-    if (timeInterval) {
-      clearTimeout(timeInterval);
-      timeInterval = null;
-    }
-    if (shouldShow.value) {
-      updateTime();
-    }
-  }
-);
-
-// Watch for shouldShow changes to start/stop updates
-watch(shouldShow, newValue => {
-  if (newValue) {
-    if (!timeInterval) {
-      updateTime();
-    }
-  } else {
-    if (timeInterval) {
-      clearTimeout(timeInterval);
-      timeInterval = null;
-    }
-  }
+// The room name is a screen's own Name (its displayName override), never a
+// global value: a browser that is not a known screen shows nothing, and an
+// unnamed screen shows nothing here too (CLV-84). The screen's card falls back
+// to its hostname; the clock bar does not.
+const kioskId = getKioskId();
+const kiosksStore = useKiosksStore();
+const roomLabel = computed(() => {
+  if (!kioskId) return "";
+  const self = kiosksStore.kiosks.find(kiosk => kiosk.id === kioskId);
+  return self?.overrides?.displayName || "";
 });
 
 onMounted(() => {
-  if (shouldShow.value) {
-    updateTime();
-  }
-});
-
-onUnmounted(() => {
-  if (timeInterval) {
-    clearTimeout(timeInterval);
-    timeInterval = null;
-  }
+  if (kioskId) kiosksStore.loadKiosks();
 });
 </script>
 
 <style scoped>
 .clock-bar-horizontal {
   width: 100%;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  position: relative;
+  /* Above the dashboard stage (--z-raised) so the bar never sits under a
+     region's focus glow. */
+  z-index: var(--z-sticky);
   user-select: none;
-  /* Padding is set via inline style from barPadding computed property */
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .clock-bar-horizontal.position-bottom {
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--line);
   border-bottom: none;
 }
 
 .clock-bar-horizontal.position-between {
+  z-index: var(--z-sticky);
   border: none;
-  background: transparent;
-  /* Padding is set via inline style from barPadding computed property */
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border-radius: var(--radius-control);
 }
 
 .clock-bar-content {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  font-family: "Courier New", monospace;
+  gap: var(--gap-4);
 }
 
 .clock-bar-content.layout-two-lines {
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--gap-1);
   align-items: center;
 }
 
 .clock-time {
-  font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: var(--weight-title);
+  color: var(--ink);
   white-space: nowrap;
 }
 
 .clock-date {
-  color: var(--text-secondary);
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink-2);
   white-space: nowrap;
 }
 
-/* Minimal styling for between position */
-.clock-bar-horizontal.position-between {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+.clock-bar-room {
+  font-family: var(--font-ui);
+  color: var(--ink-3);
+  font-size: var(--text-body);
+}
+
+/* On a phone the bar cannot hold the wordmark, the room, the clock, the
+   connection pill and the ⋯ menu on one line: the row ran past the screen and
+   scrolled sideways, cutting the clock (CLV-66). The room name is the least
+   load-bearing piece there and still shows in Settings. */
+@media (--bp-phone) {
+  .clock-bar-horizontal .clock-bar-room {
+    display: none;
+  }
+  /* Screen dots are 44px touch targets each and cannot shrink; at 390px they
+     ran under the centred time ("●15:31"). Below the phone breakpoint the dots
+     give way so the clock keeps its own room. */
+  .clock-bar-horizontal .screen-dots {
+    display: none;
+  }
+  .clock-bar-outer {
+    gap: var(--gap-2);
+  }
 }
 
 .clock-bar-horizontal.position-between .clock-time {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .clock-bar-horizontal.position-between .clock-date {
-  font-size: 0.75rem;
+  font-size: var(--text-caption);
 }
 
-/* Three-column layout: left mirror | center time | right plugin items */
 .clock-bar-outer {
   display: flex;
   align-items: center;
   width: 100%;
+  gap: var(--gap-4);
+  min-width: 0;
 }
 
 .clock-bar-side {
   flex: 1;
   display: flex;
   align-items: center;
+  /* One spacing token for both sides: the wordmark, room name and screen dots
+     (left) and the plugin tiles and actions (right) never touch. */
+  gap: var(--gap-inline);
   min-width: 0;
 }
 
@@ -372,29 +267,9 @@ onUnmounted(() => {
 }
 
 .clock-bar-content {
-  flex: 0 1 auto;
-}
-
-.clock-refresh-icon {
-  display: inline-block;
-  width: 0.5rem;
-  height: 0.5rem;
-  border: 1.5px solid var(--text-secondary);
-  border-top-color: transparent;
-  border-radius: 50%;
-  margin: 0 0.5rem;
-  animation: clock-spin 1s linear infinite;
-  flex-shrink: 0;
-}
-
-.clock-refresh-ghost {
-  visibility: hidden;
-  animation: none;
-}
-
-@keyframes clock-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  /* The centred clock keeps its full width: the side groups yield instead of
+     the time being squeezed under the screen dots (CLV-91). */
+  flex: 0 0 auto;
+  min-width: 0;
 }
 </style>

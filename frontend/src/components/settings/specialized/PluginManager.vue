@@ -1,87 +1,79 @@
 <template>
   <div class="plugin-manager">
-    <!-- Plugin Type Tabs -->
-    <TabNavigation :tabs="pluginTabs" :active-tab="activeTab" @tab-change="handleTabChange" />
+    <!-- Plain-kind filters, All first (§3.3) -->
+    <Tabs
+      class="pm-tabs"
+      :model-value="activeTab"
+      :items="filterOptions"
+      aria-label="Plugin kind"
+      @update:model-value="handleTabChange"
+    />
 
-    <!-- Loading State -->
-    <div v-if="loading" class="loading-state">
-      <p>Loading plugins...</p>
-    </div>
+    <!-- Loading -->
+    <InlineNote v-if="loading" class="pm-status">Loading plugins…</InlineNote>
 
-    <!-- Empty State -->
-    <div v-else-if="activePlugins.length === 0" class="empty-state">
-      <p>{{ emptyMessage }}</p>
-    </div>
+    <!-- Empty -->
+    <EmptyState
+      v-else-if="activePlugins.length === 0"
+      compact
+      :inset="false"
+      data-test="plugin-manager-empty"
+      :icon="mdiPuzzleOutline"
+      :message="emptyMessage"
+    />
 
-    <!-- Plugin Cards -->
-    <div v-else class="plugins-list">
-      <!-- Info message for Themes tab -->
-      <div v-if="activeTab === 'theme' && showThemeInfo" class="theme-info-message">
-        <div class="help-text">
-          <p style="margin: 0 0 0.5rem 0">
-            <strong>💡 Installing Themes:</strong> Themes are installed the same way as plugins!
-          </p>
-          <ol style="margin: 0.5rem 0 0 1.5rem; text-align: left">
-            <li>Use the installation section above (Zip File or GitHub tab)</li>
-            <li>Enter a GitHub repository URL and click "List Plugins"</li>
-            <li>Themes will appear in the list alongside plugins</li>
-            <li>Click "Install" next to any theme you want</li>
-          </ol>
-          <p style="margin: 0.5rem 0 0 0">
-            Built-in themes (Light, Dark, Ocean, Forest, Sunset) are always available and can be
-            selected in
-            <strong>UI Settings → Select Theme</strong>.
-          </p>
-        </div>
-      </div>
+    <!-- Plugin cards -->
+    <div v-else class="pm-list">
+      <!-- Theme install hint -->
+      <InlineNote v-if="activeTab === 'theme' && showThemeInfo" class="pm-note">
+        Themes are plugins too: install them here, then choose one in Dashboard › Appearance.
+      </InlineNote>
 
-      <!-- Plugin Cards -->
-      <div
+      <PluginCard
         v-for="plugin in activePlugins"
         :key="plugin.id"
-        class="plugin-item"
-        :class="{ disabled: !plugin.enabled }"
-      >
-        <PluginCard
-          :plugin="plugin"
-          :instances="instances[plugin.id] || []"
-          :expanded="expandedPlugins[plugin.id] || false"
-          :form-data="formData[plugin.id] || {}"
-          :saving="saving === plugin.id ? plugin.id : null"
-          :testing="testing[plugin.id] || {}"
-          :fetching="fetching[plugin.id] || {}"
-          :save-status="saveStatus[plugin.id]"
-          :test-status="testStatus[plugin.id]"
-          :fetch-status="fetchStatus[plugin.id]"
-          :images="images"
-          :uploading="uploading"
-          :upload-error="uploadError"
-          :upload-success="uploadSuccess"
-          @toggle-expand="handleToggleExpand"
-          @toggle-enabled="handleToggleEnabled"
-          @uninstall="handleUninstall"
-          @update-form-value="handleUpdateFormValue"
-          @save-config="handleSaveConfig"
-          @test-connection="handleTestConnection"
-          @fetch-now="handleFetchNow"
-          @custom-action="handleCustomAction"
-          @add-instance="handleAddInstance"
-          @edit-instance="handleEditInstance"
-          @delete-instance="handleDeleteInstance"
-          @toggle-instance="handleToggleInstance"
-          @instance-order-change="handleInstanceOrderChange"
-          @upload="handleUpload"
-          @delete-image="handleDeleteImage"
-        />
-      </div>
+        :data-plugin-id="plugin.id"
+        :plugin="plugin"
+        :instances="instances[plugin.id] || []"
+        :expanded="expandedPlugins[plugin.id] || false"
+        :form-data="formData[plugin.id] || {}"
+        :saving="saving === plugin.id ? plugin.id : null"
+        :testing="testing[plugin.id] || {}"
+        :fetching="fetching[plugin.id] || {}"
+        :save-status="saveStatus[plugin.id]"
+        :test-status="testStatus[plugin.id]"
+        :fetch-status="fetchStatus[plugin.id]"
+        :uploading="uploading"
+        :upload-error="uploadError"
+        :upload-success="uploadSuccess"
+        :latest-version="(latestVersions || {})[plugin.id] || ''"
+        :updating="updatingPlugin === plugin.id"
+        @toggle-expand="handleToggleExpand"
+        @toggle-enabled="handleToggleEnabled"
+        @uninstall="handleUninstall"
+        @update-form-value="handleUpdateFormValue"
+        @save-config="handleSaveConfig"
+        @test-connection="handleTestConnection"
+        @fetch-now="handleFetchNow"
+        @custom-action="handleCustomAction"
+        @used-by="pluginId => emit('used-by', pluginId)"
+        @add-source="pluginId => emit('add-source', pluginId)"
+        @open-appearance="emit('open-appearance')"
+        @update="pluginId => emit('update', pluginId)"
+        @upload="handleUpload"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
-import TabNavigation from "../shared/TabNavigation.vue";
+import { mdiPuzzleOutline } from "@mdi/js";
+import EmptyState from "@/components/ui/EmptyState.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import Tabs from "@/components/ui/Tabs.vue";
 import PluginCard from "./PluginCard.vue";
+import { pluginKindFilters, pluginKindKey } from "@/utils/pluginKind";
 
 const props = defineProps({
   plugins: {
@@ -99,7 +91,7 @@ const props = defineProps({
   },
   activeTab: {
     type: String,
-    default: "calendar",
+    default: "all",
   },
   expandedPlugins: {
     type: Object,
@@ -133,10 +125,6 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
-  images: {
-    type: Array,
-    default: () => [],
-  },
   uploading: {
     type: Boolean,
     default: false,
@@ -153,6 +141,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // plugin id -> newer catalog version (§3.3).
+  latestVersions: {
+    type: Object,
+    default: () => ({}),
+  },
+  updatingPlugin: {
+    type: String,
+    default: "",
+  },
 });
 
 const emit = defineEmits([
@@ -165,150 +162,64 @@ const emit = defineEmits([
   "test-connection",
   "fetch-now",
   "custom-action",
-  "add-instance",
-  "edit-instance",
-  "delete-instance",
-  "toggle-instance",
-  "instance-order-change",
+  "used-by",
+  "add-source",
+  "open-appearance",
+  "update",
   "upload",
-  "delete-image",
 ]);
 
-const pluginTabs = computed(() => {
-  const categories = [
-    { id: "calendar", label: "Calendar", icon: "📅" },
-    { id: "image", label: "Image", icon: "🖼️" },
-    { id: "service", label: "Service", icon: "⚙️" },
-    { id: "backend", label: "Backend", icon: "🔧" },
-    { id: "theme", label: "Theme", icon: "🎨" },
-  ];
+const filterOptions = computed(() =>
+  pluginKindFilters(props.plugins).map(option => ({ value: option.id, label: option.label }))
+);
 
-  // Show tabs that have plugins OR show backend/theme tabs always (for installation)
-  // This allows users to see backend/theme tabs even when listing from repo
-  return categories.filter(cat => {
-    // Always show backend and theme tabs (they can be installed from repos)
-    if (cat.id === "backend" || cat.id === "theme") {
-      return true;
-    }
-    // For other types, only show if there are plugins
-    return props.plugins.some(p => p.type === cat.id);
-  });
-});
+const activePlugins = computed(() =>
+  props.activeTab === "all"
+    ? props.plugins
+    : props.plugins.filter(plugin => pluginKindKey(plugin) === props.activeTab)
+);
 
-const activePlugins = computed(() => {
-  return props.plugins.filter(p => p.type === props.activeTab);
-});
+const emptyMessage = computed(() =>
+  props.activeTab === "theme"
+    ? "No themes installed yet. Install one from a repository above."
+    : "No add-ons of this kind are installed yet."
+);
 
-const emptyMessage = computed(() => {
-  if (props.activeTab === "theme") {
-    return "No themes found. Install themes using the installation section above.";
-  }
-  return `No ${props.activeTab} plugins found.`;
-});
-
-const handleTabChange = tabId => {
-  emit("tab-change", tabId);
-};
-
-const handleToggleExpand = pluginId => {
-  emit("toggle-expand", pluginId);
-};
-
-const handleToggleEnabled = (pluginId, enabled) => {
-  emit("toggle-enabled", pluginId, enabled);
-};
-
-const handleUninstall = (pluginId, pluginType) => {
-  emit("uninstall", pluginId, pluginType);
-};
-
-const handleUpdateFormValue = (pluginId, key, value) => {
+const handleTabChange = tabId => emit("tab-change", tabId);
+const handleToggleExpand = pluginId => emit("toggle-expand", pluginId);
+const handleToggleEnabled = (pluginId, enabled) => emit("toggle-enabled", pluginId, enabled);
+const handleUninstall = (pluginId, pluginType) => emit("uninstall", pluginId, pluginType);
+const handleUpdateFormValue = (pluginId, key, value) =>
   emit("update-form-value", pluginId, key, value);
-};
-
-const handleSaveConfig = pluginId => {
-  emit("save-config", pluginId);
-};
-
-const handleTestConnection = pluginId => {
-  emit("test-connection", pluginId);
-};
-
-const handleFetchNow = pluginId => {
-  emit("fetch-now", pluginId);
-};
-
-const handleCustomAction = (pluginId, action) => {
-  emit("custom-action", pluginId, action);
-};
-
-const handleAddInstance = pluginId => {
-  emit("add-instance", pluginId);
-};
-
-const handleEditInstance = (pluginId, instance) => {
-  emit("edit-instance", pluginId, instance);
-};
-
-const handleDeleteInstance = instanceId => {
-  emit("delete-instance", instanceId);
-};
-
-const handleToggleInstance = (instanceId, enabled) => {
-  emit("toggle-instance", instanceId, enabled);
-};
-
-const handleInstanceOrderChange = (pluginId, newOrder) => {
-  emit("instance-order-change", pluginId, newOrder);
-};
-
-const handleUpload = file => {
-  emit("upload", file);
-};
-
-const handleDeleteImage = imageId => {
-  emit("delete-image", imageId);
-};
+const handleSaveConfig = pluginId => emit("save-config", pluginId);
+const handleTestConnection = pluginId => emit("test-connection", pluginId);
+const handleFetchNow = pluginId => emit("fetch-now", pluginId);
+const handleCustomAction = (pluginId, action) => emit("custom-action", pluginId, action);
+const handleUpload = file => emit("upload", file);
 </script>
 
 <style scoped>
 .plugin-manager {
   width: 100%;
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
 
-.loading-state,
-.empty-state {
-  padding: 2rem;
+.pm-tabs {
+  margin-bottom: var(--gap-5);
+}
+
+.pm-status {
+  padding: var(--gap-5) 0;
   text-align: center;
-  color: var(--text-secondary);
 }
 
-.theme-info-message {
-  margin-bottom: 1.5rem;
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-radius: 6px;
-}
-
-.plugins-list {
+.pm-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--gap-stack);
 }
 
-.plugin-item {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.plugin-item:hover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.plugin-item.disabled {
-  opacity: 0.6;
+.pm-note {
+  margin-bottom: var(--gap-stack);
 }
 </style>

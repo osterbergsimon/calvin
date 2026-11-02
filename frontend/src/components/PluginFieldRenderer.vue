@@ -1,12 +1,13 @@
 <template>
-  <div class="plugin-field">
-    <label>{{ (schema && typeof schema === "object" && schema.description) || fieldKey }}</label>
+  <div v-if="!isHidden" class="plugin-field">
+    <label :for="fieldId">{{ label }}</label>
 
     <!-- Directory input (no browse button - directory browser removed) -->
     <div v-if="ui && ui.component === 'directory'" class="directory-input">
       <input
+        :id="fieldId"
         type="text"
-        :value="value"
+        :value="fieldValue"
         :placeholder="ui.placeholder || 'Enter directory path...'"
         class="form-input"
         @input="$emit('update', $event.target.value)"
@@ -16,8 +17,9 @@
     <!-- Text input -->
     <input
       v-else-if="ui && ui.component === 'input'"
+      :id="fieldId"
       type="text"
-      :value="value"
+      :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
@@ -26,8 +28,9 @@
     <!-- Password input -->
     <input
       v-else-if="ui && ui.component === 'password'"
+      :id="fieldId"
       type="password"
-      :value="value"
+      :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
@@ -36,47 +39,39 @@
     <!-- Number input -->
     <input
       v-else-if="ui && ui.component === 'number'"
+      :id="fieldId"
       type="number"
-      :value="value"
-      :min="ui.min"
-      :max="ui.max"
+      :value="fieldValue"
+      :min="ui.validation?.min"
+      :max="ui.validation?.max"
+      :step="numberStep"
       :placeholder="ui.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />
 
-    <!-- Select dropdown -->
-    <select
+    <!-- Select: the shared pill, never a native select -->
+    <SelectPill
       v-else-if="ui && ui.component === 'select'"
-      :value="value"
-      class="form-input"
-      @change="$emit('update', $event.target.value)"
-    >
-      <option v-for="option in ui.options" :key="option.value" :value="option.value">
-        {{ option.label || option.value }}
-      </option>
-    </select>
+      :id="fieldId"
+      :model-value="selectValue"
+      :options="selectOptions"
+      :aria-label="label"
+      @update:model-value="emitSelected"
+    />
 
     <!-- Select with scan button — fetches options from the backend -->
     <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
       <div class="scan-select-row">
-        <select :value="value" class="form-input" @change="$emit('update', $event.target.value)">
-          <option value="" disabled>
-            {{
-              scanning
-                ? "Scanning…"
-                : scannedOptions.length
-                  ? "— Select device —"
-                  : "— Click Scan to discover —"
-            }}
-          </option>
-          <option v-if="value && !scannedOptions.find(o => o.value === value)" :value="value">
-            {{ value }}
-          </option>
-          <option v-for="opt in scannedOptions" :key="opt.value" :value="opt.value">
-            {{ opt.label || opt.value }}
-          </option>
-        </select>
+        <SelectPill
+          class="scan-select-pill"
+          :id="fieldId"
+          :model-value="selectValue"
+          :options="scanSelectOptions"
+          :display-label="fieldValue ? '' : scanPlaceholder"
+          :aria-label="label"
+          @update:model-value="emitSelected"
+        />
         <button type="button" class="btn-secondary" :disabled="scanning" @click="runScan">
           {{ scanning ? "Scanning…" : "Scan" }}
         </button>
@@ -87,61 +82,54 @@
     <!-- Textarea -->
     <textarea
       v-else-if="ui && ui.component === 'textarea'"
-      :value="value"
+      :id="fieldId"
+      :value="fieldValue"
       :placeholder="ui.placeholder"
       class="form-input"
       rows="3"
       @input="$emit('update', $event.target.value)"
     />
 
-    <!-- Checkbox -->
-    <label
-      v-else-if="
-        (ui && ui.component === 'checkbox') ||
-        (schema && typeof schema === 'object' && schema.type === 'boolean')
-      "
-      class="checkbox-label"
-    >
-      <input
-        type="checkbox"
-        :checked="value === true || value === 'true' || value === 1 || value === '1'"
-        class="checkbox-input"
-        @change="$emit('update', $event.target.checked)"
-      />
-      <span class="checkbox-text">
-        {{ ui && ui.help_text ? ui.help_text : (schema && schema.description) || fieldKey }}
-      </span>
-    </label>
+    <!-- Boolean: the shared on/off toggle, never a native checkbox -->
+    <ToggleSwitch
+      v-else-if="isBoolean"
+      :id="fieldId"
+      :model-value="isChecked"
+      :aria-label="label"
+      @update:model-value="$emit('update', $event)"
+    />
 
     <!-- Fallback: Default input based on schema type -->
     <input
       v-else-if="schema && typeof schema === 'object' && schema.type === 'string'"
+      :id="fieldId"
       type="text"
-      :value="value"
+      :value="fieldValue"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />
     <input
       v-else-if="schema && typeof schema === 'object' && schema.type === 'password'"
+      :id="fieldId"
       type="password"
-      :value="value"
+      :value="fieldValue"
+      :placeholder="ui?.placeholder"
       class="form-input"
       @input="$emit('update', $event.target.value)"
     />
 
-    <!-- Help text and links -->
-    <span
-      v-if="ui && (ui.help_text || ui.help_link)"
-      class="help-text"
-      style="display: block; margin-top: 0.5rem"
-    >
+    <!-- The schema description is the hint line under the field -->
+    <span v-if="descriptionText" class="help-text">{{ descriptionText }}</span>
+
+    <!-- Extra author help text and links -->
+    <span v-if="ui && (ui.help_text || ui.help_link)" class="help-text">
       <span v-if="ui.help_text">{{ ui.help_text }}</span>
       <a
         v-if="ui.help_link"
         :href="ui.help_link"
         target="_blank"
         rel="noopener noreferrer"
-        style="color: var(--accent-color); text-decoration: underline"
+        style="color: var(--focus-text); text-decoration: underline"
       >
         {{ ui.help_link }}
       </a>
@@ -152,6 +140,9 @@
 <script setup>
 import { computed, ref } from "vue";
 import axios from "axios";
+import SelectPill from "@/components/ui/SelectPill.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { fieldLabel, isHiddenField } from "@/utils/pluginFields";
 
 const props = defineProps({
   pluginId: {
@@ -167,20 +158,91 @@ const props = defineProps({
     default: () => ({}),
   },
   value: {
-    type: [String, Boolean, Number],
+    type: [String, Boolean, Number, Object],
     default: "",
   },
 });
-
-defineEmits(["update"]);
 
 const ui = computed(() => {
   return props.schema && typeof props.schema === "object" ? props.schema.ui : null;
 });
 
+// `label` is the form label; without one the key is humanised. The description
+// is a hint line — it was historically used as the label, which read like a
+// sentence and left the field unnamed (CLV-74).
+const label = computed(() => fieldLabel(props.fieldKey, props.schema));
+const descriptionText = computed(() => {
+  const description = props.schema?.description;
+  return typeof description === "string" ? description.trim() : "";
+});
+const isHidden = computed(() => isHiddenField(props.fieldKey, props.schema));
+const isBoolean = computed(
+  () => ui.value?.component === "checkbox" || props.schema?.type === "boolean"
+);
+const fieldId = computed(() =>
+  `plugin-field-${props.pluginId}-${props.fieldKey}`.replace(/[^a-zA-Z0-9_-]/g, "-")
+);
+
+// `<input type="number">` defaults to step=1, which rejects decimals (e.g.
+// geographic coordinates) as a stepMismatch on form submit. Derive step from
+// the declared type — decimals for "number", whole numbers for "integer" — and
+// let an explicit ui.step (or ui.validation.step) override.
+const numberStep = computed(() => {
+  const explicit = ui.value?.step ?? ui.value?.validation?.step;
+  if (explicit != null) return explicit;
+  return props.schema?.type === "integer" ? "1" : "any";
+});
+
+// Config values are bare scalars in the 1.0 contract; callers resolve
+// schema defaults before passing a value in.
+const fieldValue = computed(() => props.value);
+
+const isChecked = computed(() => {
+  const value = fieldValue.value;
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+  }
+  return value === true || value === 1;
+});
+
 const scannedOptions = ref([]);
 const scanning = ref(false);
 const scanError = ref(null);
+
+// SelectPill matches the selection with ===, and the stored value is a string
+// (see emitSelected), so option values are compared as strings too. A native
+// select coerced both sides the same way.
+const toOption = option => ({
+  value: String(option.value),
+  label: option.label || String(option.value),
+});
+
+const selectValue = computed(() => {
+  const value = fieldValue.value;
+  return value === null || value === undefined || value === "" ? null : String(value);
+});
+
+const selectOptions = computed(() => (ui.value?.options || []).map(toOption));
+
+// The saved value stays pickable before (or without) a scan finding it.
+const scanSelectOptions = computed(() => {
+  const scanned = scannedOptions.value.map(toOption);
+  const saved = selectValue.value;
+  if (saved !== null && !scanned.some(option => option.value === saved)) {
+    return [{ value: saved, label: String(saved) }, ...scanned];
+  }
+  return scanned;
+});
+
+const scanPlaceholder = computed(() => {
+  if (scanning.value) return "Scanning…";
+  return scannedOptions.value.length ? "— Select device —" : "— Click Scan to discover —";
+});
+
+// A native select always reported its value as a string; keep that contract so
+// plugin configs don't change type when the control does.
+const emit = defineEmits(["update"]);
+const emitSelected = value => emit("update", String(value));
 
 async function runScan() {
   scanning.value = true;
@@ -209,8 +271,9 @@ async function runScan() {
 .plugin-field label {
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-size: var(--text-body);
+  font-weight: var(--weight-title);
+  color: var(--ink);
 }
 
 .directory-input {
@@ -228,20 +291,20 @@ async function runScan() {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  background: var(--bg-0);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
   white-space: nowrap;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
 }
 
 .btn-secondary:disabled {
@@ -252,52 +315,40 @@ async function runScan() {
 .form-input {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  transition: border-color 0.2s ease;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--bg-2);
+  color: var(--ink);
+  font-size: var(--fs-md);
+  transition: border-color var(--dur) ease;
+}
+
+/* Match the modal's Name control; textareas stay content-sized. */
+input.form-input {
+  height: var(--control-height);
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--accent-primary);
+  border-color: var(--focus);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 22%, transparent);
 }
 
 .form-input::placeholder {
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .help-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-top: 0.5rem;
   display: block;
+  margin-top: var(--gap-1);
+  font-size: var(--text-meta);
+  line-height: normal;
+  color: var(--ink-2);
 }
 
 .help-text a {
-  color: var(--accent-color);
+  color: var(--focus-text);
   text-decoration: underline;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  user-select: none;
-}
-
-.checkbox-input {
-  width: auto;
-  margin: 0;
-  cursor: pointer;
-}
-
-.checkbox-text {
-  color: var(--text-primary);
-  font-size: 0.9rem;
 }
 
 .scan-select-row {
@@ -306,14 +357,15 @@ async function runScan() {
   align-items: center;
 }
 
-.scan-select-row .form-input {
+.scan-select-pill {
   flex: 1;
+  min-width: 0;
 }
 
 .scan-error {
   display: block;
   margin-top: 0.4rem;
-  font-size: 0.8rem;
-  color: var(--color-error, #e05555);
+  font-size: var(--fs-xs);
+  color: var(--color-error, var(--err-text));
 }
 </style>

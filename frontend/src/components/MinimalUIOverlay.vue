@@ -1,112 +1,169 @@
 <template>
-  <div v-if="!configStore.shouldShowUI" class="minimal-ui-overlay" :class="buttonPositionClass">
-    <button
-      class="ui-toggle-btn"
-      title="Show UI"
-      aria-label="Show UI"
-      @click="configStore.showUITemporarily(60)"
-    >
-      <svg
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
+  <IconButton
+    v-if="visible"
+    class="hot-corner"
+    :class="`hot-corner--${position}`"
+    variant="ghost"
+    size="custom"
+    label="Show controls"
+    title="Show controls (press and hold)"
+    :style="cornerStyle"
+    @click="configStore.showUITemporarily(60)"
+  >
+    <span class="hot-corner__scrim" aria-hidden="true" />
+    <svg class="hot-corner__icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"
         stroke="currentColor"
         stroke-width="2"
-      >
-        <circle cx="12" cy="12" r="3" />
-        <path
-          d="M12 1v6m0 6v6M23 12h-6m-6 0H1M20.66 3.34l-4.24 4.24m0 4.24l4.24 4.24M3.34 20.66l4.24-4.24m0-4.24L3.34 7.94"
-        />
-      </svg>
-    </button>
-  </div>
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+    </svg>
+  </IconButton>
 </template>
 
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
+import { normalizeHotCornerPosition, HOT_CORNER_DEFAULTS } from "../utils/hotCorner";
+import IconButton from "./ui/IconButton.vue";
 
 const configStore = useConfigStore();
 
-// Position button opposite to clock position to avoid conflicts
-const buttonPositionClass = computed(() => {
-  const clockPos = configStore.clockPosition || "top-right";
+const position = computed(() => normalizeHotCornerPosition(configStore.hotCornerPosition));
 
-  // If clock is in top-right, put button in bottom-left (and vice versa)
-  // If clock is in top-left, put button in bottom-right (and vice versa)
-  switch (clockPos) {
-    case "top-right":
-      return "position-bottom-left";
-    case "top-left":
-      return "position-bottom-right";
-    case "bottom-right":
-      return "position-top-left";
-    case "bottom-left":
-      return "position-top-right";
-    default:
-      return "position-bottom-left"; // Default fallback
-  }
+// A pure hint — shown whenever the UI is hidden. The reveal itself is a
+// long-press detected at the dashboard level (useHotCornerReveal), so this
+// element stays pointer-events:none and never intercepts a content tap.
+const visible = computed(() => !configStore.shouldShowUI);
+
+// Square touch target / long-press hit-box size (px), also drives icon + inset.
+const size = computed(() => {
+  const v = Number(configStore.hotCornerSize);
+  return Number.isFinite(v) && v > 0 ? v : HOT_CORNER_DEFAULTS.size;
 });
+
+// 0–100 setting → 0–1 rest opacity (0 = invisible but the long-press still works).
+const restOpacity = computed(() => {
+  const v = Number(configStore.hotCornerOpacity);
+  return Math.max(0, Math.min(1, (Number.isFinite(v) ? v : HOT_CORNER_DEFAULTS.opacity) / 100));
+});
+
+// Geometry of its own (size, rest opacity) is a component token; the button
+// chrome itself comes from ui/IconButton.
+const cornerStyle = computed(() => ({
+  "--hot-corner-size": `${size.value}px`,
+  "--icon-size": `${size.value}px`,
+  "--rest-opacity": restOpacity.value,
+}));
 </script>
 
 <style scoped>
-.minimal-ui-overlay {
+/* A deliberate reveal affordance tucked into a screen corner: a subtle hint
+   that stays unobtrusive over content (calendar/photos). It never captures
+   pointer events — short taps fall through to content; a press-and-hold in the
+   corner is what reveals the UI. The dark glass scrim keeps the icon legible
+   over any background. Rest opacity + size are user-set. */
+.hot-corner {
   position: fixed;
-  z-index: 1001; /* Above clock (1000) */
+  /* Same layer as the clock bars but later in the DOM, so it paints over the
+     top bar; the dashboard stage below sits on --z-raised. */
+  z-index: var(--z-sticky);
+  width: var(--hot-corner-size, 64px);
+  height: var(--hot-corner-size, 64px);
+  color: var(--on-scrim);
+  pointer-events: none; /* never intercept content taps; reveal is a long-press */
+  opacity: var(--rest-opacity, 0.55);
+  transition: opacity var(--dur) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+/* Keyboard users can still Tab to the button and reveal with Enter (pointer-events
+   doesn't disable keyboard activation); brighten it while focused. */
+.hot-corner:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
-.minimal-ui-overlay.position-top-left {
-  top: 0.5rem;
-  left: 0.5rem;
+/* Readability scrim: hugs the screen corner, never the button's box chrome. */
+.hot-corner__scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.minimal-ui-overlay.position-top-right {
-  top: 0.5rem;
-  right: 0.5rem;
+.hot-corner__icon {
+  width: calc(var(--hot-corner-size, 64px) * 0.34);
+  height: calc(var(--hot-corner-size, 64px) * 0.34);
 }
 
-.minimal-ui-overlay.position-bottom-left {
-  bottom: 0.5rem;
-  left: 0.5rem;
+/* Per-corner anchoring: inner corner rounded, gradient + icon hug the edge.
+   Inset + radius scale with the target size. */
+.hot-corner--bottom-left {
+  bottom: 0;
+  left: 0;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 0 calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19);
+}
+.hot-corner--bottom-left .hot-corner__scrim {
+  border-top-right-radius: calc(var(--hot-corner-size, 64px) * 0.28);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
+}
+.hot-corner--bottom-right {
+  bottom: 0;
+  right: 0;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19) 0;
+}
+.hot-corner--bottom-right .hot-corner__scrim {
+  border-top-left-radius: calc(var(--hot-corner-size, 64px) * 0.28);
+  background: linear-gradient(
+    225deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
+}
+.hot-corner--top-left {
+  top: 0;
+  left: 0;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: calc(var(--hot-corner-size, 64px) * 0.19) 0 0 calc(var(--hot-corner-size, 64px) * 0.19);
+}
+.hot-corner--top-left .hot-corner__scrim {
+  border-bottom-right-radius: calc(var(--hot-corner-size, 64px) * 0.28);
+  background: linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
+}
+.hot-corner--top-right {
+  top: 0;
+  right: 0;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: calc(var(--hot-corner-size, 64px) * 0.19) calc(var(--hot-corner-size, 64px) * 0.19) 0 0;
+}
+.hot-corner--top-right .hot-corner__scrim {
+  border-bottom-left-radius: calc(var(--hot-corner-size, 64px) * 0.28);
+  background: linear-gradient(
+    315deg,
+    color-mix(in srgb, var(--scrim-solid) 42%, transparent),
+    transparent 70%
+  );
 }
 
-.minimal-ui-overlay.position-bottom-right {
-  bottom: 0.5rem;
-  right: 0.5rem;
-}
-
-.ui-toggle-btn {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.7);
-  padding: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.ui-toggle-btn:hover {
-  background: rgba(0, 0, 0, 0.6);
-  border-color: rgba(255, 255, 255, 0.4);
-  color: rgba(255, 255, 255, 0.9);
-  transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.ui-toggle-btn:active {
-  transform: scale(0.95);
-}
-
-.ui-toggle-btn svg {
-  width: 16px;
-  height: 16px;
+@media (prefers-reduced-motion: reduce) {
+  .hot-corner {
+    transition: none;
+  }
 }
 </style>
