@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-rc.2](https://github.com/osterbergsimon/calvin/compare/v0.1.0-rc.1...v0.1.0-rc.2) (2026-11-02)
+
+
+### Bug Fixes
+
+* **release:** drop package-name so release-please matches the release PR ([98e558c](https://github.com/osterbergsimon/calvin/commit/98e558c9259ccb97740f68788623f48c1f01edb7))
+* **release:** let release-please create v0.1.0-rc.1 ([e2ee062](https://github.com/osterbergsimon/calvin/commit/e2ee0620586ec83cc1bca20a5267c0da552ea5ab))
+
 ## [0.1.0-rc.1](https://github.com/osterbergsimon/calvin/compare/v0.1.0...v0.1.0-rc.1) (2026-11-02)
 
 
