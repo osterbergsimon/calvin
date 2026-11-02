@@ -549,9 +549,10 @@ const handleVisibilityChange = () => {
 
 // Load calendar sources on mount
 onMounted(async () => {
-  measureHeaderWidth();
   if (typeof ResizeObserver !== "undefined") {
     headerObserver = new ResizeObserver(entries => {
+      // contentRect is the cached measurement: no clientWidth read (which
+      // forces layout) per render or input event.
       const width = entries[0]?.contentRect?.width;
       if (width > 0) headerWidth.value = width;
     });
@@ -610,10 +611,6 @@ const headerEl = ref(null);
 const headerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
 let headerObserver = null;
 const isNarrowHeader = computed(() => isPhoneWidth(headerWidth.value));
-const measureHeaderWidth = () => {
-  const width = headerEl.value?.clientWidth ?? 0;
-  if (width > 0) headerWidth.value = width;
-};
 const focusedDayIndex = ref(null);
 const focusedEventIndex = ref(null);
 const eventRefs = ref({});
