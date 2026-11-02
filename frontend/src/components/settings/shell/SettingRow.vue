@@ -80,10 +80,11 @@ defineProps({
   margin: 0;
 }
 .setting-row__control {
-  /* A control with intrinsic width (a row of chips, a stepper) must be allowed
-     to shrink on a phone: flex-shrink: 0 sized it to max-content and pushed the
-     whole settings page 55px wider than a 390px screen (CLV-66). */
-  flex-shrink: 1;
+  /* Never narrower than its own content: a long description wraps in the left
+     column instead of squeezing a segmented control until its card clips it
+     (calvin-y14e). A phone still wraps the control below the label via the
+     media query at the bottom of this file. */
+  flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
 }
