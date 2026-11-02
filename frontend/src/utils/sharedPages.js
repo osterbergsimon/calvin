@@ -56,23 +56,33 @@ export function pageDeletePlan({ pageId, defaultList, screens }) {
     nextDefault = stripped.length ? stripped : null;
   }
 
-  const screenPatches = (screens || []).map(screen => {
-    const previous = screen?.overrides || {};
-    let next = previous;
-    if (Array.isArray(previous.availableScreens) && previous.availableScreens.includes(pageId)) {
-      next = { ...next };
-      const stripped = previous.availableScreens.filter(id => id !== pageId);
-      if (stripped.length) next.availableScreens = stripped;
-      else delete next.availableScreens;
-    }
-    if (next.defaultScreenId === pageId) {
-      if (next === previous) next = { ...next };
-      delete next.defaultScreenId;
-    }
-    return { id: screen.id, overrides: next, changed: next !== previous };
-  });
+  const screenPatches = (screens || []).map(screen => ({
+    id: screen.id,
+    ...removePageFromOverrides(screen?.overrides, pageId),
+  }));
 
   return { defaultList: nextDefault, screens: screenPatches };
+}
+
+/**
+ * Fresh override layer after deleting a page: strip it from the list, drop an
+ * empty list, and clear a start page that pointed at it. Only those two keys
+ * change; every other override is kept as it was read from the server.
+ */
+export function removePageFromOverrides(overrides, pageId) {
+  const previous = overrides || {};
+  let next = previous;
+  if (Array.isArray(previous.availableScreens) && previous.availableScreens.includes(pageId)) {
+    next = { ...next };
+    const stripped = previous.availableScreens.filter(id => id !== pageId);
+    if (stripped.length) next.availableScreens = stripped;
+    else delete next.availableScreens;
+  }
+  if (next.defaultScreenId === pageId) {
+    if (next === previous) next = { ...next };
+    delete next.defaultScreenId;
+  }
+  return { overrides: next, changed: next !== previous };
 }
 
 /**
@@ -91,10 +101,18 @@ export function pageTogglePlan({
   pages,
 }) {
   const allIds = pageIds(pages);
-  const defaultIds = effectiveAvailablePages(null, { availableScreens: defaultList }, pages);
-  const current = targetIsDefault
-    ? defaultIds
-    : effectiveAvailablePages(targetOverrides, { availableScreens: defaultList }, pages);
+  const catalogIds = new Set(allIds);
+  const defaultIds = effectiveAvailablePages(null, { availableScreens: defaultList }, pages).filter(
+    id => catalogIds.has(id)
+  );
+  const current = (
+    targetIsDefault
+      ? defaultIds
+      : effectiveAvailablePages(targetOverrides, { availableScreens: defaultList }, pages)
+  ).filter(id => catalogIds.has(id));
+  // Ignore ids left behind by pages deleted before overrides were cleaned up.
+  // Otherwise a ghost would satisfy the last-page guard while the catalog
+  // filter below empties the list.
   const next = new Set(current);
   if (checked) next.add(pageId);
   else next.delete(pageId);

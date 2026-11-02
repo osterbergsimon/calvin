@@ -132,6 +132,20 @@ describe("Pages & regions shared pages", () => {
     expect(patch.availableScreens).toEqual(["home", newPage.id]);
   });
 
+  it("writes no screen list when saving the new page's catalog fails", async () => {
+    const { w, store, saveConfig } = await mountEditor({
+      initialPreviewKiosk: "kitchen",
+      kiosks: [kiosk("kitchen", { overrides: { displayName: "Kitchen" } })],
+    });
+    saveConfig.mockRejectedValueOnce(new Error("offline"));
+    await addPage(w);
+
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+    expect(w.find('[data-test="shown-on-error"]').text()).toBe(
+      "Couldn't create the page. Try again."
+    );
+  });
+
   it("duplicates from a screen without leaking the copy to Default", async () => {
     const { w, store, saveConfig } = await mountEditor({
       initialPreviewKiosk: "kitchen",
@@ -249,6 +263,54 @@ describe("Pages & regions shared pages", () => {
     expect(saveConfig).toHaveBeenCalledWith({ availableScreens: ["photos"] });
   });
 
+  it("does not offer Hide when the only other page is a ghost id", async () => {
+    const { w } = await mountEditor({
+      initialPreviewKiosk: "kitchen",
+      kiosks: [
+        kiosk("kitchen", {
+          overrides: { displayName: "Kitchen", availableScreens: ["ghost", "home"] },
+        }),
+      ],
+    });
+    expect(w.find('[data-test="hide-page-btn"]').exists()).toBe(false);
+  });
+
+  it("clears a following screen's start page when hiding that page from Default", async () => {
+    const { w, store, saveConfig } = await mountEditor({
+      config: baseConfig({ availableScreens: ["home", "photos"] }),
+      kiosks: [
+        kiosk("hall", {
+          overrides: { displayName: "Hallway", defaultScreenId: "home" },
+        }),
+      ],
+    });
+    await w.find('[data-test="hide-page-btn"]').trigger("click");
+    await flushPromises();
+
+    expect(saveConfig).toHaveBeenCalledWith({ availableScreens: ["photos"] });
+    expect(store.fetchOverrides).toHaveBeenCalledWith("hall");
+    expect(store.saveOverrides).toHaveBeenCalledWith("hall", { displayName: "Hallway" });
+  });
+
+  it("clears a following screen's start page when Change… hides the page from Default", async () => {
+    const { w, store, saveConfig } = await mountEditor({
+      config: baseConfig({ availableScreens: ["home", "photos"] }),
+      kiosks: [
+        kiosk("hall", {
+          overrides: { displayName: "Hallway", defaultScreenId: "home" },
+        }),
+      ],
+    });
+    await w.find('[data-test="change-shown-on"]').trigger("click");
+    await flushPromises();
+    await w.find('[aria-label="Show this page on Browsers & new screens"]').trigger("click");
+    await flushPromises();
+
+    expect(saveConfig).toHaveBeenCalledWith({ availableScreens: ["photos"] });
+    expect(store.fetchOverrides).toHaveBeenCalledWith("hall");
+    expect(store.saveOverrides).toHaveBeenCalledWith("hall", { displayName: "Hallway" });
+  });
+
   it("deletes without a confirm when no other target shows the page", async () => {
     const { w, saveConfig } = await mountEditor({
       config: baseConfig({ availableScreens: ["photos"] }),
@@ -271,7 +333,7 @@ describe("Pages & regions shared pages", () => {
     await deleteButton(w).trigger("click");
     await flushPromises();
     const confirm = w.findAllComponents({ name: "ConfirmModal" }).find(c => c.props("show"));
-    expect(confirm.props("title")).toBe("Delete “Home” everywhere?");
+    expect(confirm.props("title")).toBe('Delete "Home" everywhere?');
     expect(confirm.props("message")).toBe(
       "Hallway and browsers also show it. To take it off Kitchen only, use Hide on Kitchen."
     );
@@ -298,6 +360,79 @@ describe("Pages & regions shared pages", () => {
     expect(patch.defaultScreenId).toBeNull();
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { availableScreens: ["photos"] });
     expect(store.saveOverrides).toHaveBeenCalledWith("hall", {});
+  });
+
+  it("Delete everywhere re-reads each screen and patches only the page keys", async () => {
+    const fresh = {
+      kitchen: {
+        displayName: "Kitchen",
+        availableScreens: ["home", "photos"],
+        screenNow: { power: "on", setAt: "2026-11-02T10:00:00Z" },
+      },
+      hall: {
+        displayName: "Hallway",
+        defaultScreenId: "home",
+        availableScreens: ["home"],
+      },
+      office: { displayName: "Office" },
+    };
+    const { w, store, saveConfig } = await mountEditor({
+      initialPreviewKiosk: "kitchen",
+      kiosks: [
+        kiosk("kitchen", { overrides: { displayName: "Kitchen" } }),
+        kiosk("hall", { overrides: { displayName: "Hallway" } }),
+        kiosk("office", { overrides: { displayName: "Office" } }),
+      ],
+    });
+    store.fetchOverrides.mockImplementation(async id =>
+      JSON.parse(JSON.stringify(fresh[id] ?? {}))
+    );
+
+    await deleteButton(w).trigger("click");
+    await flushPromises();
+    w.findAllComponents({ name: "ConfirmModal" })
+      .find(c => c.props("show"))
+      .vm.$emit("confirm");
+    await flushPromises();
+
+    expect(saveConfig).toHaveBeenCalled();
+    expect(store.fetchOverrides).toHaveBeenCalledWith("kitchen");
+    expect(store.fetchOverrides).toHaveBeenCalledWith("hall");
+    expect(store.fetchOverrides).toHaveBeenCalledWith("office");
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      displayName: "Kitchen",
+      availableScreens: ["photos"],
+      screenNow: { power: "on", setAt: "2026-11-02T10:00:00Z" },
+    });
+    expect(store.saveOverrides).toHaveBeenCalledWith("hall", { displayName: "Hallway" });
+    expect(store.saveOverrides).not.toHaveBeenCalledWith("office", expect.anything());
+  });
+
+  it("reports a screen save failure after the catalog is deleted", async () => {
+    const { w, store, saveConfig } = await mountEditor({
+      initialPreviewKiosk: "kitchen",
+      kiosks: [
+        kiosk("kitchen", { overrides: { displayName: "Kitchen" } }),
+        kiosk("hall", { overrides: { displayName: "Hallway", availableScreens: ["home"] } }),
+      ],
+    });
+    const save = store.saveOverrides.getMockImplementation();
+    store.saveOverrides.mockImplementation(async (id, overrides) => {
+      if (id === "hall") throw new Error("offline");
+      return save(id, overrides);
+    });
+
+    await deleteButton(w).trigger("click");
+    await flushPromises();
+    w.findAllComponents({ name: "ConfirmModal" })
+      .find(c => c.props("show"))
+      .vm.$emit("confirm");
+    await flushPromises();
+
+    expect(saveConfig).toHaveBeenCalled();
+    expect(w.find('[data-test="shown-on-error"]').text()).toBe(
+      "Couldn't update Hallway. Try again."
+    );
   });
 });
 
