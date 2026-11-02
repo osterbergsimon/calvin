@@ -625,7 +625,7 @@ import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vu
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import ScreensLayout from "@/components/settings/shared/ScreensLayout.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";

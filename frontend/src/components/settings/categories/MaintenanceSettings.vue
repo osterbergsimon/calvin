@@ -137,7 +137,7 @@ import CollapsibleSettingsSection from "@/components/settings/shell/CollapsibleS
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import UpdatesTab from "@/components/settings/tabs/system/UpdatesTab.vue";
 import UpdateSourceRows from "@/components/settings/tabs/system/UpdateSourceRows.vue";
 import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";

@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { mount, enableAutoUnmount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
 
