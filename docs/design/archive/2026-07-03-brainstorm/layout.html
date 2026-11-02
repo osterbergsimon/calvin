@@ -1,0 +1,88 @@
+<style>
+  .wf { background:#14161a; border:1px solid #2a2f38; border-radius:8px; padding:12px; font-size:12px; color:#c9d1d9; }
+  .wf .cap { display:flex; align-items:center; gap:8px; background:#1b2733; border:1px dashed #3b82f6; color:#9db8d6; border-radius:6px; padding:8px 10px; margin-bottom:10px; }
+  .wf .row { display:flex; align-items:center; gap:10px; background:#191c22; border:1px solid #2a2f38; border-radius:6px; padding:7px 9px; margin-bottom:6px; }
+  .wf .chip { min-width:26px; height:26px; display:flex; align-items:center; justify-content:center; background:#0d1117; border:1px solid #3a4150; border-radius:5px; font-weight:700; font-family:monospace; }
+  .wf .act { flex:1; }
+  .wf .tag { font-size:10px; padding:1px 6px; border-radius:10px; background:#243b53; color:#7fb1e6; }
+  .wf .tagm { background:#3a2b12; color:#e0a458; }
+  .wf .ic { opacity:.5; }
+  .wf .tile { background:#191c22; border:1px solid #2a2f38; border-radius:8px; padding:10px 6px; text-align:center; }
+  .wf .tile .n { font-family:monospace; font-weight:700; font-size:16px; color:#e6edf3; }
+  .wf .tile .a { font-size:10px; color:#9db8d6; margin-top:4px; line-height:1.2; }
+  .wf .grid7 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .wf .muted { color:#6b7280; font-size:11px; margin-top:8px; }
+  .wf .panehead { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; margin:2px 0 6px; }
+  .wf .cat { background:#191c22; border:1px solid #2a2f38; border-radius:6px; padding:6px 9px; margin-bottom:5px; display:flex; justify-content:space-between; }
+</style>
+
+<h2>How should the keyboard editor be shaped?</h2>
+<p class="subtitle">One unified keyboard · press-to-bind · generic actions first-class. Pick the primary layout — click a card to select. We'll refine the winner.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="wf">
+        <div class="cap">⌨ &nbsp;Press a button to bind it…</div>
+        <div class="row"><span class="chip">1</span><span class="act">Previous</span><span class="tag">Generic</span><span class="ic">✎ ✕</span></div>
+        <div class="row"><span class="chip">2</span><span class="act">Expand / Close</span><span class="tag">Generic</span><span class="ic">✎ ✕</span></div>
+        <div class="row"><span class="chip">3</span><span class="act">Next</span><span class="tag">Generic</span><span class="ic">✎ ✕</span></div>
+        <div class="row"><span class="chip">7</span><span class="act">Open Settings</span><span class="tag tagm">Mode</span><span class="ic">✎ ✕</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Binding list</h3>
+      <p>Vertical rows: key chip → action + group tag. Capture bar on top to add. The bound 1–7 read like the physical remote top-to-bottom. Closest to today, but rebuilt & grouped.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="wf">
+        <div class="panehead">Your buttons</div>
+        <div class="grid7">
+          <div class="tile"><div class="n">1</div><div class="a">Previous</div></div>
+          <div class="tile"><div class="n">2</div><div class="a">Expand/Close</div></div>
+          <div class="tile"><div class="n">3</div><div class="a">Next</div></div>
+          <div class="tile"><div class="n">4</div><div class="a">Region Next</div></div>
+          <div class="tile"><div class="n">5</div><div class="a">Screen Prev</div></div>
+          <div class="tile"><div class="n">6</div><div class="a">Screen Next</div></div>
+          <div class="tile"><div class="n">7</div><div class="a">Settings</div></div>
+          <div class="tile" style="border-style:dashed;color:#6b7280"><div class="n">＋</div><div class="a">press</div></div>
+        </div>
+        <div class="muted">▸ Other keys (0) — for full keyboards</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Device board</h3>
+      <p>Numbered tiles laid out like the remote; each shows its action. Click a tile → edit in a popover. Extra (non 1–7) keys fold into "Other keys." Strongest device mental-model.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="wf" style="display:flex; gap:8px;">
+        <div style="flex:1">
+          <div class="panehead">Actions</div>
+          <div class="cat"><span>▾ Generic (4)</span></div>
+          <div class="row" style="margin-left:6px"><span class="act">Next</span><span class="ic">＋</span></div>
+          <div class="row" style="margin-left:6px"><span class="act">Previous</span><span class="ic">＋</span></div>
+          <div class="cat"><span>▸ Modes (4)</span></div>
+          <div class="cat"><span>▸ Navigation</span></div>
+        </div>
+        <div style="flex:1">
+          <div class="panehead">Bound keys</div>
+          <div class="row"><span class="chip">1</span><span class="act">Previous</span></div>
+          <div class="row"><span class="chip">3</span><span class="act">Next</span></div>
+          <div class="row"><span class="chip">7</span><span class="act">Settings</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Catalog + keys</h3>
+      <p>Two panes: grouped/searchable action catalog on the left (generic on top), bound keys on the right. Assign by picking an action then pressing a key. Most powerful; heaviest UI.</p>
+    </div>
+  </div>
+
+</div>

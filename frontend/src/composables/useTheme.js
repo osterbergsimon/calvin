@@ -3,6 +3,64 @@ import { useConfigStore } from "../stores/config";
 import { useThemesStore } from "../stores/themes";
 
 /**
+ * Normalize a selected-theme id to `null` when there is no custom theme.
+ * A config round-trip can stringify a Python `None` into the literal "None"
+ * (or "null"), which is truthy and would trigger GET /api/plugins/None → 400.
+ * @param {*} id
+ * @returns {string|null}
+ */
+function normalizeThemeId(id) {
+  if (id == null || id === "" || id === "None" || id === "null") return null;
+  return id;
+}
+
+const THEME_VARIABLE_KEYS = [
+  "shadow",
+  "shadow-hover",
+  "bg-0",
+  "bg-1",
+  "bg-2",
+  "line",
+  "line-soft",
+  "ink",
+  "ink-2",
+  "ink-3",
+  "focus",
+  "focus-ink",
+  "focus-text",
+  "ok",
+  "ok-ink",
+  "ok-text",
+  "warn",
+  "warn-ink",
+  "warn-text",
+  "err",
+  "err-ink",
+  "err-text",
+  ...Array.from({ length: 8 }, (_, i) => `event-${i + 1}`),
+];
+
+// The same value syntax the backend allowlist enforces. The backend rejects an
+// unsafe value at install and flags it at load; this is the last line of
+// defence, so a stale or hand-edited theme.json can never write a var()/url().
+const THEME_COLOUR_VALUE = /^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9.,%\s/+-]+\))$/i;
+
+// D1: a theme is a palette family; light/dark is the mode. These two ids were
+// themes in 0.1.0 and are migrated away on load, once.
+const LEGACY_MODE_THEMES = { light: null, dark: "dark" };
+
+const appliedCustomThemeKeys = new Set();
+
+function clearCustomThemeVariables() {
+  if (typeof window === "undefined") return;
+  const root = document.documentElement;
+  for (const key of new Set([...THEME_VARIABLE_KEYS, ...appliedCustomThemeKeys])) {
+    root.style.removeProperty(`--${key}`);
+  }
+  appliedCustomThemeKeys.clear();
+}
+
+/**
  * Composable for managing theme (dark mode and custom themes).
  * Supports manual toggle, time-based, system theme detection, and custom theme selection.
  */
@@ -18,6 +76,8 @@ export function useTheme() {
   const darkModeEnd = ref(6); // 6 AM (06:00) - when to switch to light mode
   let timeCheckInterval = null;
   let systemThemeWatcher = null;
+  // Run the D1 migration at most once per app instance.
+  let legacyThemeMigrated = false;
 
   // Check if current time is within dark mode hours
   const isDarkTime = () => {
@@ -57,27 +117,34 @@ export function useTheme() {
 
   // Apply custom theme variables
   const applyCustomTheme = async themeId => {
-    if (!themeId || typeof window === "undefined") return;
+    if (!normalizeThemeId(themeId) || typeof window === "undefined") return;
 
     try {
       const theme = await themesStore.getTheme(themeId);
-      if (!theme || !theme.variables) return;
+
+      // Load-time contract verdict from the backend. A theme that fails is
+      // kept installed but is not selectable: fall back to Calvin's palette.
+      if (!theme || theme.selectable === false) {
+        clearCustomThemeVariables();
+        return;
+      }
+
+      const variables = { ...theme.variables, ...(isDark.value ? theme.dark_mode || {} : {}) };
+      if (!variables || typeof variables !== "object") return;
+
+      clearCustomThemeVariables();
 
       const root = document.documentElement;
-      const variables = theme.variables;
-
-      // Apply light mode variables
       for (const [key, value] of Object.entries(variables)) {
-        root.style.setProperty(`--${key}`, value);
-      }
-
-      // Apply dark mode variables if available
-      if (theme.dark_mode && isDark.value) {
-        for (const [key, value] of Object.entries(theme.dark_mode)) {
-          root.style.setProperty(`--${key}`, value);
-        }
+        // Colours only, allowlisted keys only. Role, spacing, radius, z-index
+        // and legacy names can never reach the page from a theme.
+        if (!THEME_VARIABLE_KEYS.includes(key)) continue;
+        if (typeof value !== "string" || !THEME_COLOUR_VALUE.test(value.trim())) continue;
+        root.style.setProperty(`--${key}`, value.trim());
+        appliedCustomThemeKeys.add(key);
       }
     } catch (err) {
+      clearCustomThemeVariables();
       console.error(`Failed to apply custom theme ${themeId}:`, err);
     }
   };
@@ -97,11 +164,9 @@ export function useTheme() {
     if (selectedThemeId.value) {
       await applyCustomTheme(selectedThemeId.value);
     } else {
-      // Reset to default theme variables (from theme.css)
-      // This is handled by the CSS file, but we can explicitly reset if needed
-      const _root = document.documentElement;
-      // Remove any custom theme variables that might have been set
-      // The default theme.css will take over
+      // No custom theme: clear inline custom variables so the .light/.dark
+      // defaults in theme.css can take over again.
+      clearCustomThemeVariables();
     }
   };
 
@@ -165,6 +230,23 @@ export function useTheme() {
     await saveTheme();
   };
 
+  // D1 migration: a config saved by 0.1.0 may point at the retired Light or
+  // Dark theme. Map it to Calvin default once; Dark also sets the mode so the
+  // screen looks the same as before. Follow device / On a schedule keep working
+  // because the theme no longer overrides the mode.
+  const migrateLegacyTheme = async () => {
+    if (legacyThemeMigrated) return;
+    const legacy = normalizeThemeId(configStore.selectedTheme);
+    if (!(legacy in LEGACY_MODE_THEMES)) return;
+
+    legacyThemeMigrated = true;
+    selectedThemeId.value = null;
+    themesStore.setSelectedTheme(null);
+    const mode = LEGACY_MODE_THEMES[legacy];
+    if (mode) themeMode.value = mode;
+    await saveTheme();
+  };
+
   // Load theme from config
   const loadTheme = async () => {
     await configStore.fetchConfig();
@@ -174,8 +256,9 @@ export function useTheme() {
       themeMode.value = configStore.themeMode;
     }
     if (configStore.selectedTheme !== undefined) {
-      selectedThemeId.value = configStore.selectedTheme;
-      themesStore.setSelectedTheme(configStore.selectedTheme);
+      const normalized = normalizeThemeId(configStore.selectedTheme);
+      selectedThemeId.value = normalized;
+      themesStore.setSelectedTheme(normalized);
     }
     if (configStore.darkModeStart !== undefined) {
       darkModeStart.value = configStore.darkModeStart;
@@ -184,6 +267,7 @@ export function useTheme() {
       darkModeEnd.value = configStore.darkModeEnd;
     }
 
+    await migrateLegacyTheme();
     await updateTheme();
     startTimeCheck();
   };
@@ -213,6 +297,8 @@ export function useTheme() {
   watch(selectedThemeId, async newThemeId => {
     if (newThemeId) {
       await applyCustomTheme(newThemeId);
+    } else {
+      await applyTheme(isDark.value);
     }
     await saveTheme();
   });
@@ -239,10 +325,11 @@ export function useTheme() {
   watch(
     () => configStore.selectedTheme,
     async newTheme => {
-      if (newTheme !== undefined && newTheme !== selectedThemeId.value) {
-        selectedThemeId.value = newTheme;
-        themesStore.setSelectedTheme(newTheme);
-        await applyCustomTheme(newTheme);
+      const normalized = normalizeThemeId(newTheme);
+      if (newTheme !== undefined && normalized !== selectedThemeId.value) {
+        selectedThemeId.value = normalized;
+        themesStore.setSelectedTheme(normalized);
+        await applyCustomTheme(normalized);
       }
     }
   );

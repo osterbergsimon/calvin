@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
+import { nextTick } from "vue"; // eslint-disable-line no-unused-vars
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
 import { useConfigStore } from "@/stores/config";
@@ -26,6 +27,17 @@ describe("ClockBarVertical", () => {
     setActivePinia(createPinia());
   });
 
+  const globalMountOptions = {
+    stubs: {
+      BarActionCluster: true,
+      PluginStatusbarItems: {
+        props: ["orientation"],
+        template:
+          '<div class="plugin-statusbar-stub" :data-orientation="orientation || \'horizontal\'" />',
+      },
+    },
+  };
+
   it("should render when enabled and showInNonKiosk is true and UI is visible", () => {
     const store = useConfigStore();
     store.showUI = true;
@@ -38,7 +50,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -57,7 +69,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -76,7 +88,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -92,7 +104,7 @@ describe("ClockBarVertical", () => {
         enabled: false,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -111,18 +123,18 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
     expect(wrapper.find(".clock-bar-vertical.position-right").exists()).toBe(true);
   });
 
-  it("should display time and date on same line", () => {
+  it("should display compact time and date for compact vertical layout", () => {
     const store = useConfigStore();
     store.showUI = true;
     store.clockShowDate = true;
-    store.clockBarLayout = "single-line";
+    store.clockBarVerticalLayout = "compact-time-date";
 
     const wrapper = mount(ClockBarVertical, {
       props: {
@@ -132,14 +144,14 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
     const content = wrapper.find(".clock-bar-content");
     expect(content.exists()).toBe(true);
-    // Check that layout is single-line (time and date on same line)
-    expect(content.classes()).toContain("layout-single-line");
+    expect(content.classes()).toContain("layout-vertical-compact");
+    expect(content.classes()).toContain("layout-compact-date");
     expect(wrapper.find(".clock-time").exists()).toBe(true);
     expect(wrapper.find(".clock-date").exists()).toBe(true);
   });
@@ -156,7 +168,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -177,7 +189,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -197,7 +209,7 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -207,7 +219,7 @@ describe("ClockBarVertical", () => {
   it("should apply font size from config", () => {
     const store = useConfigStore();
     store.showUI = true;
-    store.clockBarFontSize = 18;
+    store.clockBarVerticalFontSize = 18;
 
     const wrapper = mount(ClockBarVertical, {
       props: {
@@ -217,12 +229,108 @@ describe("ClockBarVertical", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
     const timeElement = wrapper.find(".clock-time");
     expect(timeElement.exists()).toBe(true);
     expect(timeElement.attributes("style")).toContain("font-size: 18px");
+  });
+
+  it("renders statusbar items vertically regardless of the retired global switch", async () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    // Decision C removed the global "Show plugin info" toggle: a stale false
+    // value must not hide every tile with no control to bring them back.
+    store.clockBarShowPluginItems = false;
+
+    const wrapper = mount(ClockBarVertical, {
+      props: {
+        position: "left",
+        showInNonKiosk: true,
+        showInKiosk: false,
+        enabled: true,
+      },
+      global: {
+        ...globalMountOptions,
+      },
+    });
+
+    const statusbar = wrapper.find(".plugin-statusbar-stub");
+    expect(statusbar.exists()).toBe(true);
+    expect(statusbar.attributes("data-orientation")).toBe("vertical");
+  });
+
+  it("renders stacked screen dots for page navigation when there is more than one screen (calvin-rvd)", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.dashboardScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+          },
+        },
+        {
+          id: "media",
+          name: "Media",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "photos", size: 100 }],
+          },
+        },
+      ],
+    };
+
+    const wrapper = mount(ClockBarVertical, {
+      props: { position: "left", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { ...globalMountOptions },
+    });
+
+    const dots = wrapper.findAll(".screen-dot");
+    expect(dots).toHaveLength(2);
+    expect(wrapper.find(".screen-dots--vertical").exists()).toBe(true);
+    // the active screen's dot is marked current
+    expect(wrapper.find('.screen-dot[aria-current="true"]').attributes("aria-label")).toBe(
+      "Show screen: Home"
+    );
+  });
+
+  it("does not render screen dots with a single screen", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.dashboardScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+          },
+        },
+      ],
+    };
+
+    const wrapper = mount(ClockBarVertical, {
+      props: { position: "left", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { ...globalMountOptions },
+    });
+
+    expect(wrapper.find(".screen-dot").exists()).toBe(false);
   });
 });

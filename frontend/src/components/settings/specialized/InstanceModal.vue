@@ -1,159 +1,137 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="handleClose">
-    <div class="modal-content instance-modal">
-      <div class="modal-header">
-        <h3>
-          {{
-            editingInstance
-              ? `Edit ${currentPlugin?.name || "Instance"}`
-              : `Add ${currentPlugin?.name || ""} ${instanceLabel}`
-          }}
-        </h3>
-        <button class="btn-close-modal" @click="handleClose">×</button>
-      </div>
-      <div class="modal-body">
-        <div v-if="error" class="error-message">
-          {{ error }}
-        </div>
-        <form @submit.prevent="handleSave">
-          <!-- Instance Name -->
-          <div class="form-group">
-            <label>Instance Name</label>
-            <input
-              v-model="formData.name"
-              type="text"
-              class="form-input"
-              placeholder="Enter instance name"
-              required
-            />
-          </div>
+  <Dialog :model-value="show" :title="dialogTitle" @update:model-value="handleDialog">
+    <InlineNote v-if="error" class="instance-modal__note" tone="err">{{ error }}</InlineNote>
+    <form id="instance-form" class="instance-form" @submit.prevent="handleSave">
+      <TextField v-model="formData.name" label="Name" :placeholder="namePlaceholder" required />
 
-          <!-- Instance-specific fields from instance_config_schema -->
-          <template
-            v-if="
-              currentPlugin?.instance_config_schema &&
-              Object.keys(currentPlugin.instance_config_schema).length > 0
-            "
+      <!-- Instance-specific fields from instance_config_schema -->
+      <template v-if="instanceFields.length > 0">
+        <div v-for="[key, schema] in instanceFields" :key="key" class="form-group">
+          <PluginFieldRenderer
+            :plugin-id="currentPlugin.id"
+            :field-key="key"
+            :schema="fieldSchema(key, schema)"
+            :value="getFormValue(key, schema)"
+            @update="updateFormValue(key, $event)"
+          />
+          <!-- Geocode button for location field (for weather plugins like YR.no) -->
+          <Button
+            v-if="key === 'location' && hasGeocodeAction"
+            variant="secondary"
+            class="instance-modal__geocode"
+            :disabled="geocoding || !formData.location"
+            :loading="geocoding"
+            loading-label="Getting coordinates…"
+            @click="handleGeocode"
           >
-            <div
-              v-for="(schema, key) in currentPlugin.instance_config_schema"
-              :key="key"
-              class="form-group"
-            >
-              <PluginFieldRenderer
-                :plugin-id="currentPlugin.id"
-                :field-key="key"
-                :schema="schema"
-                :value="getFormValue(key, schema)"
-                @update="updateFormValue(key, $event)"
-              />
-              <!-- Geocode button for location field (for weather plugins like YR.no) -->
-              <button
-                v-if="key === 'location' && hasGeocodeAction"
-                type="button"
-                class="btn-geocode"
-                :disabled="geocoding || !formData.location"
-                @click="handleGeocode"
-              >
-                {{ geocoding ? "Geocoding..." : "Get Coordinates" }}
-              </button>
-              <div
-                v-if="key === 'location' && geocodeStatus"
-                :class="geocodeStatus.success ? 'success-message' : 'error-message'"
-                style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
-              >
-                {{ geocodeStatus.message }}
-              </div>
-            </div>
-          </template>
+            Get coordinates
+          </Button>
+          <InlineNote
+            v-if="key === 'location' && geocodeStatus"
+            class="instance-modal__note"
+            :tone="geocodeStatus.success ? 'ok' : 'err'"
+          >
+            {{ geocodeStatus.message }}
+          </InlineNote>
+        </div>
+      </template>
 
-          <!-- Fallback for plugins without instance_config_schema -->
-          <template v-else>
-            <div class="form-group">
-              <p class="help-text">
-                This plugin type does not support instance-specific configuration.
-              </p>
-            </div>
-          </template>
+      <!-- Fallback for plugins without instance_config_schema -->
+      <template v-else>
+        <InlineNote>This plugin type has no settings of its own.</InlineNote>
+      </template>
 
-          <!-- Calendar-specific fields (color and show_time) -->
-          <template v-if="currentPlugin?.type === 'calendar'">
-            <div class="form-group">
-              <label>Calendar Color</label>
-              <div style="display: flex; align-items: center; gap: 0.5rem">
-                <input
-                  v-model="formData.color"
-                  type="color"
-                  class="color-input"
-                  style="width: 60px; height: 40px; cursor: pointer"
-                />
-                <input
-                  v-model="formData.color"
-                  type="text"
-                  class="form-input"
-                  placeholder="#2196f3"
-                  style="flex: 1"
-                />
-              </div>
-              <span class="help-text"> Choose a color for events from this calendar source </span>
-            </div>
-            <div class="form-group">
-              <label>
-                <input v-model="formData.show_time" type="checkbox" />
-                Show Event Times
-              </label>
-              <span class="help-text">
-                Display time information for events from this calendar
-              </span>
-            </div>
-          </template>
+      <!-- Calendar-specific fields (colour and show_time) -->
+      <template v-if="currentPlugin?.type === 'calendar'">
+        <div class="form-group">
+          <ColourField
+            v-model="formData.color"
+            label="Colour"
+            hint="These eight follow the theme; pick a custom colour if you need one."
+          />
+        </div>
+        <SettingRow
+          flush
+          label="Show event times"
+          description="Display time information for events from this calendar"
+        >
+          <ToggleSwitch
+            :model-value="formData.show_time"
+            aria-label="Show event times"
+            @update:model-value="formData.show_time = $event"
+          />
+        </SettingRow>
+      </template>
 
-          <!-- Enable/Disable -->
-          <div class="form-group">
-            <label>
-              <input v-model="formData.enabled" type="checkbox" />
-              Enable this instance
-            </label>
-          </div>
+      <!-- Enable/Disable -->
+      <SettingRow flush label="Enabled">
+        <ToggleSwitch
+          :model-value="formData.enabled"
+          aria-label="Enabled"
+          @update:model-value="formData.enabled = $event"
+        />
+      </SettingRow>
 
-          <!-- Test Connection Button (if plugin supports it) -->
-          <div v-if="hasTestAction" class="form-group">
-            <button type="button" class="btn-secondary" :disabled="testing" @click="handleTest">
-              {{ testing ? "Testing..." : "Test Connection" }}
-            </button>
-            <div
-              v-if="testStatus"
-              :class="testStatus.success ? 'success-message' : 'error-message'"
-              style="margin-top: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
-            >
-              {{ testStatus.message }}
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <button type="button" class="btn-secondary" @click="handleClose">Cancel</button>
-            <button type="submit" class="btn-primary" :disabled="saving">
-              {{ saving ? "Saving..." : "Save" }}
-            </button>
-          </div>
-        </form>
+      <!-- Test connection Button (if plugin supports it) -->
+      <div v-if="hasTestAction" class="form-group">
+        <Button
+          variant="secondary"
+          :disabled="testing"
+          :loading="testing"
+          loading-label="Testing…"
+          @click="handleTest"
+        >
+          Test connection
+        </Button>
+        <InlineNote
+          v-if="testStatus"
+          class="instance-modal__note"
+          :tone="testStatus.success ? 'ok' : 'err'"
+        >
+          {{ testStatus.message }}
+        </InlineNote>
       </div>
-    </div>
-  </div>
+    </form>
+
+    <template #actions>
+      <Button @click="handleClose">Cancel</Button>
+      <Button
+        type="submit"
+        form="instance-form"
+        variant="primary"
+        :loading="saving"
+        loading-label="Saving…"
+      >
+        Save
+      </Button>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
 import { ref, watch, computed } from "vue";
-
-const instanceLabelMap = {
-  calendar: "Calendar Source",
-  image: "Image Source",
-  backend: "Instance",
-  service: "Instance",
-};
 import PluginFieldRenderer from "@/components/PluginFieldRenderer.vue";
+import Button from "@/components/ui/Button.vue";
+import ColourField from "@/components/ui/ColourField.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import TextField from "@/components/ui/TextField.vue";
+import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
+import { isHiddenField } from "@/utils/pluginFields";
 import * as pluginsApi from "@/services/pluginsApi";
 import { useCalendarStore } from "@/stores/calendar";
+import { nextEventColour } from "@/utils/themePalettes";
+import { errorDetailMessage } from "@/utils/apiErrors";
+
+// Plain words: the form adds a source, never an "instance". The plugin's own
+// instance_label wins, then the kind's noun.
+const instanceLabelMap = {
+  calendar: "calendar source",
+  image: "photo source",
+  backend: "source",
+  service: "source",
+};
 
 const props = defineProps({
   show: {
@@ -180,7 +158,7 @@ const formData = ref({
   name: "",
   enabled: true,
   // Calendar-specific fields
-  color: "#2196f3",
+  color: "#275f86",
   show_time: true,
 });
 const error = ref("");
@@ -190,10 +168,53 @@ const testStatus = ref(null);
 const geocoding = ref(false);
 const geocodeStatus = ref(null);
 
-const instanceLabel = computed(
-  () =>
-    currentPlugin.value?.instance_label || instanceLabelMap[currentPlugin.value?.type] || "Instance"
-);
+const instanceLabel = computed(() => {
+  const plugin = currentPlugin.value;
+  return plugin?.instance_label || instanceLabelMap[plugin?.type] || "source";
+});
+
+// The form shows only real instance settings: `hidden` fields and type-level
+// internals (display_order) are never rendered, though their defaults still
+// travel with the saved config.
+const instanceFields = computed(() => {
+  const schema = currentPlugin.value?.instance_config_schema;
+  if (!schema || typeof schema !== "object") return [];
+  return Object.entries(schema).filter(([key, field]) => !isHiddenField(key, field));
+});
+
+// "Add Recipe list" when the plugin names its instances; otherwise "Add a source".
+const addTitle = computed(() => {
+  const declared = currentPlugin.value?.instance_label;
+  return declared ? `Add ${declared}` : `Add a ${instanceLabel.value}`;
+});
+
+// A label that just repeats the kind ("calendar") makes a poor example, so a
+// calendar suggests a real name and other kinds drop the placeholder.
+const namePlaceholder = computed(() => {
+  const plugin = currentPlugin.value;
+  if (!plugin?.instance_label) return "e.g. Family photos";
+  if (plugin.type === "calendar") return "e.g. Family";
+  if (plugin.instance_label.toLowerCase() === String(plugin.type || "").toLowerCase()) return "";
+  return `e.g. ${plugin.instance_label}`;
+});
+
+// Config values are bare scalars (the backend normalizes legacy wrappers);
+// this only fills schema defaults for fields the instance hasn't set yet.
+const configValueOrDefault = (value, schema = {}) => {
+  if (value !== undefined) return value;
+  if (schema.default !== undefined) return schema.default;
+  return schema.type === "boolean" ? false : "";
+};
+
+// Secret values never come back from the API: an edited instance carries ""
+// plus has_value[key]. Say a value is saved; a blank field keeps it on save.
+const fieldSchema = (key, schema) => {
+  if (!editingInstance.value?.has_value?.[key]) return schema;
+  return {
+    ...schema,
+    ui: { ...(schema.ui || {}), placeholder: "Saved — leave blank to keep" },
+  };
+};
 
 // Computed property for test action check
 const hasTestAction = computed(() => {
@@ -203,24 +224,106 @@ const hasTestAction = computed(() => {
   );
 });
 
-// Computed property for geocode action check (check if plugin has geocode endpoint)
+// A plugin gets the location-lookup button by declaring a geocode ui_action
+// in its metadata — never by id.
 const hasGeocodeAction = computed(() => {
-  if (!currentPlugin.value) return false;
-  // Check if plugin has a geocode action in ui_actions, or if it's a weather plugin
-  const hasGeocodeInActions =
-    currentPlugin.value.ui_actions &&
-    currentPlugin.value.ui_actions.some(
-      action => action.type === "geocode" || action.endpoint?.includes("geocode")
-    );
-  // Also check plugin ID or type for common weather plugins
-  const isWeatherPlugin =
-    currentPlugin.value.id === "yr.no" ||
-    currentPlugin.value.id === "yr_weather" ||
-    currentPlugin.value.type === "weather";
-  return hasGeocodeInActions || isWeatherPlugin;
+  return Boolean(
+    currentPlugin.value?.ui_actions &&
+      currentPlugin.value.ui_actions.some(action => action.type === "geocode")
+  );
 });
 
-// Watch for plugin/instance changes
+const initializeForm = async () => {
+  if (!currentPlugin.value) return;
+
+  const form = {
+    name: "",
+    enabled: true,
+    // Calendar-specific defaults
+    color: "#275f86",
+    show_time: true,
+  };
+
+  if (editingInstance.value) {
+    // Editing: use instance values
+    form.name = editingInstance.value.name || "";
+    form.enabled =
+      editingInstance.value.enabled !== undefined ? editingInstance.value.enabled : true;
+
+    if (currentPlugin.value.instance_config_schema) {
+      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
+        form[key] = configValueOrDefault(editingInstance.value.config?.[key], schema);
+      }
+    }
+
+    // Load calendar-specific settings if editing calendar instance
+    if (currentPlugin.value.type === "calendar") {
+      try {
+        await calendarStore.fetchSources();
+        const source = calendarStore.sources.find(s => s.id === editingInstance.value.id);
+        if (source) {
+          // Convert color to hex format if needed
+          if (source.color) {
+            if (source.color.startsWith("#")) {
+              form.color = source.color;
+            } else {
+              // Convert named color to hex
+              const colorMap = {
+                green: "#4caf50",
+                red: "#f44336",
+                blue: "#275f86",
+                yellow: "#ffeb3b",
+                orange: "#ff9800",
+                purple: "#9c27b0",
+                pink: "#e91e63",
+                cyan: "#00bcd4",
+                teal: "#009688",
+                indigo: "#3f51b5",
+                brown: "#795548",
+                grey: "#9e9e9e",
+                gray: "#9e9e9e",
+              };
+              form.color = colorMap[source.color.toLowerCase()] || "#275f86";
+            }
+          }
+          form.show_time = source.show_time !== false;
+        }
+      } catch (error) {
+        console.error("Failed to load calendar source settings:", error);
+        // Continue with defaults
+      }
+    }
+  } else {
+    // New instance: use schema defaults
+    if (currentPlugin.value.instance_config_schema) {
+      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
+        if (schema.default !== undefined) {
+          form[key] = schema.default;
+        } else if (schema.type === "boolean") {
+          form[key] = false;
+        } else {
+          form[key] = "";
+        }
+      }
+    }
+
+    // A new calendar takes the next unused palette colour (audit §3).
+    if (currentPlugin.value.type === "calendar") {
+      try {
+        await calendarStore.fetchSources();
+        form.color = nextEventColour((calendarStore.sources || []).map(source => source.color));
+      } catch (error) {
+        console.error("Failed to pick a calendar colour:", error);
+      }
+    }
+  }
+
+  formData.value = form;
+  error.value = "";
+};
+
+// Watch for plugin/instance changes. These live below initializeForm: an
+// immediate watcher runs during setup, so calling a const declared later threw.
 watch(
   () => props.plugin,
   newPlugin => {
@@ -260,104 +363,24 @@ watch(
   }
 );
 
-const initializeForm = async () => {
-  if (!currentPlugin.value) return;
-
-  const form = {
-    name: "",
-    enabled: true,
-    // Calendar-specific defaults
-    color: "#2196f3",
-    show_time: true,
-  };
-
-  if (editingInstance.value) {
-    // Editing: use instance values
-    form.name = editingInstance.value.name || "";
-    form.enabled =
-      editingInstance.value.enabled !== undefined ? editingInstance.value.enabled : true;
-
-    if (currentPlugin.value.instance_config_schema) {
-      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
-        form[key] =
-          editingInstance.value.config?.[key] !== undefined
-            ? editingInstance.value.config[key]
-            : schema.default !== undefined
-              ? schema.default
-              : schema.type === "boolean"
-                ? false
-                : "";
-      }
-    }
-
-    // Load calendar-specific settings if editing calendar instance
-    if (currentPlugin.value.type === "calendar") {
-      try {
-        await calendarStore.fetchSources();
-        const source = calendarStore.sources.find(s => s.id === editingInstance.value.id);
-        if (source) {
-          // Convert color to hex format if needed
-          if (source.color) {
-            if (source.color.startsWith("#")) {
-              form.color = source.color;
-            } else {
-              // Convert named color to hex
-              const colorMap = {
-                green: "#4caf50",
-                red: "#f44336",
-                blue: "#2196f3",
-                yellow: "#ffeb3b",
-                orange: "#ff9800",
-                purple: "#9c27b0",
-                pink: "#e91e63",
-                cyan: "#00bcd4",
-                teal: "#009688",
-                indigo: "#3f51b5",
-                brown: "#795548",
-                grey: "#9e9e9e",
-                gray: "#9e9e9e",
-              };
-              form.color = colorMap[source.color.toLowerCase()] || "#2196f3";
-            }
-          }
-          form.show_time = source.show_time !== false;
-        }
-      } catch (error) {
-        console.error("Failed to load calendar source settings:", error);
-        // Continue with defaults
-      }
-    }
-  } else {
-    // New instance: use schema defaults
-    if (currentPlugin.value.instance_config_schema) {
-      for (const [key, schema] of Object.entries(currentPlugin.value.instance_config_schema)) {
-        if (schema.default !== undefined) {
-          form[key] = schema.default;
-        } else if (schema.type === "boolean") {
-          form[key] = false;
-        } else {
-          form[key] = "";
-        }
-      }
-    }
-  }
-
-  formData.value = form;
-  error.value = "";
-};
-
 const getFormValue = (key, schema) => {
-  return formData.value[key] !== undefined
-    ? formData.value[key]
-    : schema.default !== undefined
-      ? schema.default
-      : schema.type === "boolean"
-        ? false
-        : "";
+  return configValueOrDefault(formData.value[key], schema);
 };
 
 const updateFormValue = (key, value) => {
   formData.value[key] = value;
+};
+
+const dialogTitle = computed(() =>
+  editingInstance.value
+    ? `Edit ${editingInstance.value.name || instanceLabel.value}`
+    : addTitle.value
+);
+
+// The shared Dialog closes itself (scrim, Escape or its close button); the
+// form treats that as Cancel and leaves saving to the Save button.
+const handleDialog = open => {
+  if (!open) handleClose();
 };
 
 const handleClose = () => {
@@ -416,7 +439,7 @@ const handleGeocode = async () => {
     console.error("Failed to geocode location:", err);
     geocodeStatus.value = {
       success: false,
-      message: err.response?.data?.detail || err.message || "Failed to geocode location",
+      message: errorDetailMessage(err, "Failed to geocode location"),
     };
   } finally {
     geocoding.value = false;
@@ -438,17 +461,18 @@ const handleTest = async () => {
     const testConfig = {};
     if (plugin.instance_config_schema) {
       for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-        // Skip display_order - instance order is managed by the instance list.
+        // Skip display_order - it's a global plugin setting
         if (key === "display_order") {
           continue;
         }
-        const value = formData.value[key];
+        const value = configValueOrDefault(formData.value[key], schema);
         if (value !== undefined && value !== null) {
           // Handle different types
           if (schema.type === "string" && typeof value === "string") {
             testConfig[key] = value.trim();
           } else if (schema.type === "integer" || schema.type === "number") {
-            testConfig[key] = Number(value) || schema.default || 0;
+            // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
+            testConfig[key] = value !== "" ? Number(value) : (schema.default ?? 0);
           } else if (schema.type === "boolean") {
             testConfig[key] = Boolean(value);
           } else {
@@ -460,7 +484,8 @@ const handleTest = async () => {
       }
     }
 
-    const response = await pluginsApi.testPlugin(pluginId, testConfig);
+    // When editing, blank secrets are filled server-side from the stored instance.
+    const response = await pluginsApi.testPlugin(pluginId, testConfig, editingInstance.value?.id);
 
     testStatus.value = {
       success: response.success,
@@ -477,7 +502,7 @@ const handleTest = async () => {
     console.error("Failed to test instance connection:", err);
     testStatus.value = {
       success: false,
-      message: err.response?.data?.detail || err.message || "Failed to test connection",
+      message: errorDetailMessage(err, "Failed to test connection"),
     };
   } finally {
     testing.value = false;
@@ -495,21 +520,22 @@ const handleSave = async () => {
     const plugin = currentPlugin.value;
 
     // Build config from instance_config_schema fields
-    // Exclude display_order - instance order is managed by the instance list.
+    // Exclude display_order - it's a global plugin setting, not instance-specific
     const config = {};
     if (plugin.instance_config_schema) {
       for (const [key, schema] of Object.entries(plugin.instance_config_schema)) {
-        // Skip display_order - it's handled by drag ordering in the instance list.
+        // Skip display_order - it's handled at the plugin level
         if (key === "display_order") {
           continue;
         }
-        const value = formData.value[key];
+        const value = configValueOrDefault(formData.value[key], schema);
         if (value !== undefined && value !== null) {
           // Handle different types
           if (schema.type === "string" && typeof value === "string") {
             config[key] = value.trim();
           } else if (schema.type === "integer" || schema.type === "number") {
-            config[key] = Number(value) || schema.default || 0;
+            // Preserve a legitimate 0 — Number(0) is falsy so `|| default` would drop it.
+            config[key] = value !== "" ? Number(value) : (schema.default ?? 0);
           } else if (schema.type === "boolean") {
             config[key] = Boolean(value);
           } else {
@@ -540,7 +566,7 @@ const handleSave = async () => {
           if (source) {
             await calendarStore.updateSource(editingInstance.value.id, {
               ...source,
-              color: formData.value.color || "#2196f3",
+              color: formData.value.color || "#275f86",
               show_time: formData.value.show_time !== false,
             });
           }
@@ -570,7 +596,7 @@ const handleSave = async () => {
             isCalendar: true,
             instanceName: formData.value.name.trim(),
             calendarConfig: {
-              color: formData.value.color || "#2196f3",
+              color: formData.value.color || "#275f86",
               show_time: formData.value.show_time !== false,
               ical_url: config.ical_url || "",
               type: pluginId,
@@ -582,7 +608,7 @@ const handleSave = async () => {
     handleClose();
   } catch (err) {
     console.error("Failed to save instance:", err);
-    error.value = err.response?.data?.detail || err.message || "Failed to save instance";
+    error.value = errorDetailMessage(err, "Failed to save instance");
   } finally {
     saving.value = false;
   }
@@ -590,196 +616,23 @@ const handleSave = async () => {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+.instance-form {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.instance-modal {
-  background: var(--bg-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow);
-  max-width: 600px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.btn-close-modal {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-close-modal:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: 1.5rem;
+  flex-direction: column;
+  gap: var(--gap-group);
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
-}
-
-.form-group label {
-  display: block;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 0.5rem;
-  font-size: 0.95rem;
-}
-
-.form-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  transition: all 0.2s;
-}
-
-.form-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-}
-
-.help-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin-top: 0.25rem;
-  line-height: 1.4;
-}
-
-.error-message {
-  padding: 0.75rem 1rem;
-  background: #fee;
-  color: #c33;
-  border: 1px solid #fcc;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-.success-message {
-  padding: 0.75rem 1rem;
-  background: #efe;
-  color: #3c3;
-  border: 1px solid #cfc;
-  border-radius: 4px;
-}
-
-.modal-actions {
   display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color);
+  flex-direction: column;
+  gap: var(--gap-inline);
 }
 
-.btn-primary,
-.btn-secondary {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
+.instance-modal__geocode {
+  align-self: flex-start;
 }
 
-.btn-primary {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #1976d2;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-secondary {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-}
-
-.btn-secondary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-geocode {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-geocode:hover:not(:disabled) {
-  background: #1976d2;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-geocode:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.instance-modal__note {
+  margin-top: var(--gap-1);
 }
 </style>

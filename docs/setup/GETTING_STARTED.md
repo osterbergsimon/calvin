@@ -1,445 +1,286 @@
 # Getting Started with Calvin
 
-Welcome to Calvin! This guide will help you get started with Calvin Dashboard, whether you're setting up for development or production deployment.
+Calvin is a self-hosted Raspberry Pi dashboard — calendars, photos, web
+services — with a Vue 3 frontend and a FastAPI backend. This page gets
+you running in development and points you at the right deployment doc
+for production.
 
-## Choose Your Setup Method
+## Two things you might want to do
 
-Calvin supports multiple setup methods depending on your needs:
-
-1. **[Native Installation](#native-installation)** - Direct installation on your system (recommended for development)
-   - **Windows**: Automated PowerShell script
-   - **Linux/Raspberry Pi**: Automated bash scripts
-   - **Manual Setup**: Step-by-step manual installation
-
-2. **[Docker Setup](#docker-setup)** - Containerized deployment (recommended for production and consistent environments)
-   - Development with hot-reload
-   - Production deployment
-   - Distributed deployment (backend and frontend on separate machines)
-
-3. **[VS Code Dev Containers](#vs-code-dev-containers)** - Fully configured development environment in containers
+- **Run Calvin in development** to hack on it. → [Development](#development)
+- **Deploy Calvin to a Raspberry Pi** to actually use it. →
+  [Deployment](#deployment)
 
 ## Prerequisites
 
-Before you begin, ensure you have:
+- **Docker** (with Compose v2) — required for the dev workflow.
+- **Git**.
+- **`uv`** and **Node.js 20+** — only needed if you want to run native
+  tests, linters, or formatters in your editor. Not needed to run the
+  app.
 
-- **Python 3.11+** - [Download Python](https://www.python.org/downloads/)
-- **Node.js 20+** (LTS recommended) - [Download Node.js](https://nodejs.org/)
-- **Git** - [Download Git](https://git-scm.com/downloads)
-- **UV** - Python package manager (installed automatically by setup scripts)
+The backend targets Python 3.12+, but you don't install Python locally
+unless you're running native tooling — the dev container ships with
+the right interpreter.
 
-### Platform-Specific Notes
+## Development
 
-- **Windows**: Keyboard input uses a mock handler (normal for development). Full keyboard support works on Linux/Raspberry Pi.
-- **Linux/Raspberry Pi**: Full keyboard support available via `evdev` package.
-- **Docker**: Works on all platforms that support Docker.
+The dev workflow is Docker Compose. One stack runs the backend with
+hot-reload (`uvicorn --reload`) and the frontend with the Vite dev
+server, both bind-mounting your checkout.
 
-## Native Installation
-
-### Windows Development Setup
-
-The easiest way to get started on Windows is using the automated setup script.
-
-#### Quick Start
-
-```powershell
-# 1. Clone the repository
+```bash
 git clone https://github.com/osterbergsimon/calvin.git
 cd calvin
 
-# 2. Run the setup script
-.\setup-windows.ps1
+make install   # creates docker/.env from the example, one-time
+make dev       # starts the dev stack, streams logs
+```
 
-# 3. Start development servers
+Windows uses the same targets through a PowerShell wrapper:
+
+```powershell
+.\make.ps1 install
 .\make.ps1 dev
 ```
 
-The setup script will:
-- Check for Python 3.11+, Node.js 20+, and Git
-- Install UV if not present
-- Switch to the `develop` branch (if Git is available)
-- Install all backend dependencies (with dev extras)
-- Install all frontend dependencies
+**Access points:**
+- Backend + API: <http://localhost:8000>
+- Frontend dev server (with HMR): <http://localhost:5173>
+- API docs: <http://localhost:8000/docs>
 
-#### Manual Setup
+`make dev-down` stops the stack. `make doctor` checks your Docker
+install and shows what ports are in use. `make clean` tears the stack
+down and removes dev data.
 
-If you prefer manual setup or the script doesn't work for your environment:
+### VS Code Dev Containers
 
-```powershell
-# Install backend dependencies
-cd backend
-uv sync --extra dev
-cd ..
+The repo ships a `.devcontainer/` config. Open the folder in VS Code,
+run **Dev Containers: Reopen in Container**, and you get the same dev
+stack with extensions pre-installed.
 
-# Install frontend dependencies
-cd frontend
-npm install
-cd ..
+### Running tests, lint, format, type-check natively
 
-# Start development servers (in separate terminals)
-# Terminal 1 - Backend:
-cd backend
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Terminal 2 - Frontend:
-cd frontend
-npm run dev
-```
-
-**Access Points:**
-- Backend API: http://localhost:8000
-- Frontend Dev Server: http://localhost:5173
-- API Documentation: http://localhost:8000/docs
-
-For more details, see [Windows Setup Guide](SETUP_WINDOWS.md) or [Quick Start - Windows](QUICKSTART_WINDOWS.md).
-
-### Linux/Raspberry Pi Setup
-
-Calvin provides automated setup scripts for Raspberry Pi and Linux systems. These scripts handle complete system configuration including user creation, service setup, and display configuration.
-
-#### Production Setup (Raspberry Pi)
-
-For production deployment on Raspberry Pi:
+These targets shell out to `uv` and `npm` directly (faster than
+round-tripping through Docker, and they integrate with editors):
 
 ```bash
-# One-command installation
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
-
-# Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+make test          # backend pytest + frontend vitest
+make lint          # ruff + eslint
+make format        # ruff format + prettier
+make type-check    # mypy + vue-tsc
 ```
 
-**What it does:**
-- Creates `calvin` user if needed
-- Installs all system dependencies (Python, Node.js, UV, etc.)
-- Clones the repository to `/home/calvin/calvin`
-- Installs backend dependencies (with `linux` extra for keyboard support)
-- Installs and builds frontend for production
-- Configures systemd services for auto-start
-- Sets up display and kiosk mode
-- Configures auto-login and X server
+`make type-check` type-checks the backend with mypy and the frontend with
+`vue-tsc`, but the frontend scope is deliberately narrow: only `src/api/`
+(including the generated `types.ts`) is checked. The rest of the frontend is
+JavaScript, so `.vue` and `.js` files are not type-checked yet.
 
-**After setup:**
+If you don't have `uv`/`node` installed, the Windows setup script
+(`.\setup-windows.ps1`) and the Linux dev script
+(`scripts/setup-dev.sh`) install them for you. They are otherwise
+unnecessary.
+
+### Sample data
+
+Calvin can fill itself with realistic sample content — a calendar, photos and
+two dashboard pages — so you can try it, take screenshots, or run a demo
+before connecting any accounts. No accounts or internet access are needed,
+and nothing you created is touched:
+
 ```bash
+# Dev stack: the compose stack keeps its data in docker/.calvin-dev-data.
+make demo-seed DATA_DIR=$PWD/docker/.calvin-dev-data
+
+# Native install: the same data dir the service uses (CALVIN_DATA_DIR, or
+# backend/data when unset).
+cd backend && uv run python -m app.demo seed
+
+# Remove exactly the seeded items again.
+make demo-clear DATA_DIR=$PWD/docker/.calvin-dev-data
+```
+
+For a Docker install, point `--data-dir` at the directory bind-mounted as
+`/var/lib/calvin`, or run the command inside the container.
+
+`seed` adds:
+
+- a sample calendar with events anchored to today (served by the backend at
+  `/api/demo/calendar.ics`, so it also works in Docker),
+- twelve small CC0 sample photos in the local photos source,
+- two pages — “calendar + photos” and “photo frame” — but **only when you
+  have no pages of your own** (Calvin's untouched default “Home” page is
+  replaced),
+- a manifest at `<data-dir>/demo/manifest.json` marking every seeded item.
+
+`clear` reads that manifest and removes only those items, so your own
+calendars, photos, pages and screen names survive both commands. The demo
+sets no room name: that is each screen's own Name in Settings › Screens. Plugin
+instances load at startup, so restart Calvin after seeding or clearing to
+see the change.
+
+The two sample pages are only added when you have no
+pages of your own. Calvin's untouched default “Home” page is replaced; as
+soon as you rename, edit or add a page, seeding leaves your pages alone.
+The calendar and photos are added either way.
+
+The equivalent commands are `uv run python -m app.demo seed|clear` from
+`backend/`; add `--data-dir DIR` to point at another data directory and
+`--calendar-url URL` if the backend is not reachable at
+`http://127.0.0.1:<API_PORT>`.
+
+
+## Deployment
+
+Production runs in one of two shapes — see
+**[Deployment Topologies](DEPLOYMENT_TOPOLOGIES.md)** for the full
+comparison and the security caveats.
+
+**Mode A — All-in-one Pi.** One Pi runs backend, frontend, and the
+kiosk browser. Easiest to set up. From the Pi:
+
+```bash
+# Stable release (replace v0.1.0 with the latest tag from
+# https://github.com/osterbergsimon/calvin/releases)
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
 sudo reboot
 ```
 
-After reboot, the dashboard will automatically start and be available at `http://localhost:8000`.
+The script installs Docker, the kiosk dependencies, the published runtime
+image for that release, and the systemd units. The dashboard comes up at
+`http://localhost:8000` after reboot.
 
-#### Development Setup (Raspberry Pi)
+The kiosk browser is **cog** (WPE WebKit) by default, the same as on a kiosk Pi.
+Add `--display-stack x11` for X11 + Chromium instead
+(`... | sudo GIT_BRANCH=v0.1.0 bash -s -- --display-stack x11`). A re-run keeps
+the stack the Pi already has; an older all-in-one Pi stays on X11 until you
+re-run setup with `--display-stack cog`. See
+[Display stack](KIOSK_INSTALL.md#display-stack-cog-default-everywhere-wayland-opt-in).
 
-For development with hot-reload on Raspberry Pi:
+When the kiosk runs Chromium (X11 or Wayland), on Pi 3-class boards (Pi 3/3B+, Zero 2 W, CM3) the kiosk runs Chromium without
+its GPU path, because that path crashes the dashboard renderer on their VC4
+graphics; Pi 4/5 keep it. The flags live in
+`/etc/default/calvin-kiosk-display`; see
+[Pi 3 and GPU](KIOSK_INSTALL.md#pi-3-and-gpu) for the override.
+
+Testers can track the integration branch instead. It runs the `:develop` image
+and moves with every push:
 
 ```bash
-# Development installation with hot-reload
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
-
-# Or using curl
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
-**What it does:**
-- Everything from production setup, plus:
-- Creates 4GB swap file (for Pi 3B+ with limited RAM)
-- Uses venv for backend (more stable on Pi 3B+)
-- Installs dev dependencies
-- Configures hot-reload for both backend and frontend
-- Frontend dev server runs on port 5173
+`main` is release-only and is never installed directly — releases are installed
+by tag. Pass `GIT_BRANCH=<branch-or-tag>` after `sudo`
+(`... | sudo GIT_BRANCH=v0.1.0 bash`) to pin another ref, or `--mode dev` for
+a hot-reload Pi. Details in
+[SETUP_LINUX.md](SETUP_LINUX.md) and
+[SETUP_SCRIPTS.md](SETUP_SCRIPTS.md#installing-a-release-versus-develop).
+Before the first release exists, use the `develop` command.
 
-**After setup:**
+**Mode B — Remote backend + kiosk Pi.** A home server runs the
+backend; one or more Pis run only Chromium pointed at the server's
+URL. Move SQLite and photos off the SD card, share one backend across
+multiple displays.
+
+For Unraid, use the Docker template in [UNRAID.md](UNRAID.md).
+
 ```bash
+# Server: same Docker compose as Mode A.
+docker compose -f docker/docker-compose.yml up -d
+
+# Pi (kiosk only):
+sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000
 sudo reboot
 ```
 
-After reboot:
-- Backend runs with hot-reload (code changes auto-reload)
-- Frontend runs with hot-reload (Vite dev server on port 5173)
-- Dashboard available at `http://localhost:5173`
+Details and the picker table live in
+[DEPLOYMENT_TOPOLOGIES.md](DEPLOYMENT_TOPOLOGIES.md).
 
-#### Using Different Branches
+The Pi's display-agent (rotation, resolution, on/off schedule) can be updated
+later without SSH or re-flashing: click **Update** on the kiosk in Settings →
+Screens, and it pulls a verified bundle from the server on its next poll. See
+[Kiosk agent self-update](KIOSK_PROVISIONING.md#kiosk-agent-self-update).
 
-```bash
-# Production setup with develop branch
-export GIT_BRANCH=develop
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo -E bash
+## First sign-in
 
-# Development setup with develop branch
-export GIT_BRANCH=develop
-curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo -E bash
-```
-
-> **Note:** Use `sudo -E` to preserve environment variables. Without `-E`, `sudo` will not pass `GIT_BRANCH` or `GIT_REPO` to the script, and it will default to the `main` branch.
-> 
-> **Important:** Export the variable first (`export GIT_BRANCH=develop`) rather than setting it inline (`GIT_BRANCH=develop wget ...`), as inline assignments don't propagate through pipes to `sudo`.
-
-#### Using a Fork or Custom Repository
+A fresh install has no admin password. Open **Settings** and Calvin asks for a
+one-time **setup code** together with the password you want. The code is in the
+server log, and in `setup-code.txt` in the data directory:
 
 ```bash
-GIT_REPO=https://github.com/yourusername/calvin.git GIT_BRANCH=your-branch \
-  wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+# Docker / Compose
+docker logs calvin | grep "Calvin setup code"
+
+# Unraid (Docker tab → Calvin → Logs works too)
+docker logs calvin | grep "Calvin setup code"
+
+# Pi all-in-one
+sudo journalctl -u calvin-app -n 100 | grep "Calvin setup code"
 ```
 
-#### Linux Development Setup (Non-Raspberry Pi)
+A kiosk that reaches Calvin over loopback (`http://localhost:8000`) shows the
+code on its own setup screen. Once a password exists the code stops working.
+For a headless install you can choose the code up front with
+`CALVIN_SETUP_CODE`; see [Admin authentication](../configuration/ADMIN_AUTH.md#first-run).
 
-For development on a Linux machine (not Raspberry Pi):
+## Verifying it works
 
-```bash
-# Clone repository
-git clone https://github.com/osterbergsimon/calvin.git
-cd calvin
+After `make dev` (or after a Pi reboot), check:
 
-# Install dependencies (includes evdev for keyboard support)
-make install
+- `http://localhost:8000/api/health` returns `{"status":"healthy"}`.
+- `http://localhost:8000/` shows the dashboard.
+- `http://localhost:8000/docs` shows the API.
 
-# Start development servers
-make dev
-```
-
-Or manually:
-
-```bash
-# Install backend dependencies (includes evdev for keyboard support)
-cd backend
-uv sync --extra linux --extra dev
-cd ../frontend
-npm install
-
-# Start development servers (in separate terminals)
-# Terminal 1 - Backend:
-cd backend
-uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-# Terminal 2 - Frontend:
-cd frontend
-npm run dev
-```
-
-**Note:** The `scripts/setup.sh` and `scripts/setup-dev.sh` scripts are for **Raspberry Pi deployment** (require root, set up systemd services). For Linux development, use the Makefile or manual commands above.
-
-For more details, see [Linux Setup Guide](SETUP_LINUX.md) or [Setup Scripts Documentation](SETUP_SCRIPTS.md).
-
-## Docker Setup
-
-Docker provides a consistent, isolated environment for both development and production. Calvin supports multiple Docker deployment scenarios.
-
-### Quick Start with Docker
-
-#### Development Mode (Hot-Reload)
-
-```bash
-# From project root
-docker-compose -f docker/docker-compose.dev.yml up
-```
-
-**Access Points:**
-- Backend API: http://localhost:8000
-- Frontend Dev Server: http://localhost:5173
-- API Documentation: http://localhost:8000/docs
-
-**Features:**
-- Hot-reload for both backend and frontend
-- Source code mounted as volumes
-- Fast iteration cycle
-
-#### Production Mode (Local - Separate Containers)
-
-```bash
-# From project root
-docker-compose -f docker/docker-compose.prod-separate.yml up -d
-```
-
-**Access Points:**
-- Backend API: http://localhost:8000
-- Frontend: http://localhost:80
-- API Documentation: http://localhost:8000/docs
-
-**Features:**
-- Optimized multi-stage builds
-- Nginx for frontend static file serving
-- Separate containers for scalability
-
-#### Production Mode (Monolithic - Legacy)
-
-```bash
-# From project root
-docker-compose -f docker/docker-compose.prod.yml up -d calvin-prod
-```
-
-**Access Points:**
-- Application: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
-
-### Distributed Deployment
-
-Run backend and frontend on separate machines:
-
-#### Step 1: Backend Server
-
-On the machine hosting the backend (e.g., home server):
-
-```bash
-# Set CORS origins (comma-separated list of frontend URLs)
-export CORS_ORIGINS=http://192.168.1.50:80,http://rpi.local:80
-
-# Start backend
-docker-compose -f docker/docker-compose.backend-only.yml up -d
-```
-
-Backend will be available at `http://backend-server-ip:8000`.
-
-#### Step 2: Frontend (Raspberry Pi)
-
-On the machine hosting the frontend (e.g., Raspberry Pi):
-
-```bash
-# Set the backend URL (embedded at build time)
-export BACKEND_URL=http://192.168.1.100:8000/api
-
-# Start frontend
-docker-compose -f docker/docker-compose.frontend-only.yml up -d
-```
-
-Frontend will be available at `http://localhost:80`.
-
-**Important Notes:**
-- Backend URL is embedded at build time - rebuild frontend image if backend URL changes
-- Ensure CORS is properly configured on the backend
-- Verify network connectivity between machines
-- Consider firewall rules
-
-### Multi-Architecture Builds
-
-Calvin Docker images support multiple architectures (amd64, arm64, arm/v7) for deployment on various platforms including Raspberry Pi.
-
-```bash
-cd docker
-
-# Build for all architectures and push to registry
-./build-multiarch.sh --both --push --repo your-registry/calvin --tag latest
-
-# Build only backend
-./build-multiarch.sh --backend --push --repo your-registry/calvin
-
-# Build only frontend
-./build-multiarch.sh --frontend --push --repo your-registry/calvin
-
-# Build for local use (single platform, current architecture)
-./build-multiarch.sh --both
-```
-
-For detailed Docker documentation, see:
-- [Getting Started with Docker](GETTING_STARTED_DOCKER.md) - Complete getting started guide
-- [Docker Overview](DOCKER_OVERVIEW.md) - Deployment scenarios and configuration
-- [Docker Building and Running](DOCKER_BUILDING_AND_RUNNING.md) - Detailed build and run instructions
-
-## VS Code Dev Containers
-
-VS Code Dev Containers provide a fully configured development environment in containers.
-
-### Prerequisites
-
-- VS Code with [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
-- Docker Desktop or Docker Engine
-
-### Opening in Dev Container
-
-1. Open VS Code in the project root
-2. Press `F1` or `Ctrl+Shift+P` (Windows/Linux) / `Cmd+Shift+P` (Mac)
-3. Select "Dev Containers: Reopen in Container"
-4. VS Code will build and start the containers automatically
-
-### Features
-
-- Pre-configured Python and Node.js environments
-- VS Code extensions automatically installed
-- Port forwarding configured (8000, 5173)
-- Full development environment in container
-- Code mounted as volumes for hot-reload
-
-### Customization
-
-Edit `.devcontainer/devcontainer.json` to customize:
-- VS Code extensions
-- Settings
-- Port forwarding
-- Features
-
-**Note:** If you don't have a `.devcontainer` directory yet, you can create one based on the Docker development setup. See the [Getting Started with Docker](GETTING_STARTED_DOCKER.md) guide for details.
-
-## Verification
-
-After setup, verify your installation:
-
-1. **Backend Health Check**: http://localhost:8000/api/health
-2. **API Documentation**: http://localhost:8000/docs
-3. **Frontend**: http://localhost:5173 (dev) or http://localhost:80 (production)
-
-## Next Steps
-
-1. **Configure Calvin**: Set up your calendars, image sources, and plugins
-2. **Explore Plugins**: Check out the [Plugin Development Guide](../plugins/PLUGIN_DEVELOPMENT_GUIDE.md)
-3. **Read Documentation**: Browse the [documentation index](../index.md) for more information
-4. **Contribute**: See [Contributing Guide](../CONTRIBUTING.md) for development guidelines
+In dev, `http://localhost:5173/` is the Vite-served frontend with HMR;
+it proxies API calls to the backend on `:8000`.
 
 ## Troubleshooting
 
-### Common Issues
+**Port already in use** (`8000` or `5173`):
 
-#### Port Already in Use
-
-**Windows:**
-```powershell
-netstat -ano | findstr :8000
-taskkill /PID <PID> /F
-```
-
-**Linux/Mac:**
 ```bash
-lsof -i :8000
-kill -9 <PID>
+make dev-down       # stop the dev stack first
+lsof -i :8000       # Linux/macOS — find the holdout
+# Windows: netstat -ano | findstr :8000  ;  taskkill /PID <pid> /F
 ```
 
-#### UV Not Found
-
-**Windows:**
-- Restart PowerShell after installing UV
-- Or add UV to PATH: `C:\Users\<username>\.cargo\bin\`
-
-**Linux:**
-```bash
-export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
-```
-
-#### Docker Permission Issues (Linux)
+**Docker permission denied (Linux)**: add yourself to the `docker`
+group, then re-login.
 
 ```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-#### Services Not Starting (Raspberry Pi)
+**Pi services not starting**:
 
 ```bash
-# Check service status
-sudo systemctl status calvin-backend
-sudo systemctl status calvin-frontend
-
-# Check logs
-sudo journalctl -u calvin-backend -n 50
-sudo journalctl -u calvin-frontend -n 50
+sudo systemctl status calvin-app
+sudo journalctl -u calvin-app -n 50
+sudo systemctl status calvin-cog          # Mode A, cog (default)
+sudo systemctl status calvin-kiosk        # Mode A, X11/Wayland (Chromium)
+sudo systemctl status calvin-kiosk-remote # Mode B
 ```
 
-### Getting Help
+**Native tooling missing** (only matters if you run `make test` /
+`lint` / etc.): re-run `.\setup-windows.ps1` or
+`scripts/setup-dev.sh`, or install `uv` and Node 20+ manually.
 
-- Check the [documentation index](../index.md) for detailed guides
-- Review [Setup Scripts Documentation](SETUP_SCRIPTS.md) for script-specific issues
-- See [Getting Started with Docker](GETTING_STARTED_DOCKER.md) for Docker-specific issues
-- Open an issue on [GitHub](https://github.com/osterbergsimon/calvin/issues)
+## Next steps
 
-## Related Documentation
+- [Plugin Development Guide](../plugins/PLUGIN_DEVELOPMENT_GUIDE.md) —
+  write your own plugin.
+- [Deployment Topologies](DEPLOYMENT_TOPOLOGIES.md) — pick a runtime
+  shape.
+- [Documentation index](../index.md) — everything else.
 
-- [Windows Setup Guide](SETUP_WINDOWS.md) - Detailed Windows setup
-- [Linux Setup Guide](SETUP_LINUX.md) - Detailed Linux setup
-- [Setup Scripts Documentation](SETUP_SCRIPTS.md) - Automated setup scripts
-- [Quick Start - Development](QUICKSTART_DEVELOP.md) - Fast development setup
-- [Quick Start - Windows](QUICKSTART_WINDOWS.md) - Fast Windows setup
-- [Getting Started with Docker](GETTING_STARTED_DOCKER.md) - Complete Docker guide
+## Related docs
+
+- [Deployment Topologies](DEPLOYMENT_TOPOLOGIES.md) — Mode A vs Mode B.
+- [SETUP_LINUX.md](SETUP_LINUX.md) — native Linux development guide, plus the Pi production quick start.
+- [SETUP_WINDOWS.md](SETUP_WINDOWS.md) — native Windows tooling setup.
+- [SETUP_SCRIPTS.md](SETUP_SCRIPTS.md) — setup-script reference.
+- [QUICKSTART_DEVELOP.md](QUICKSTART_DEVELOP.md) — terse dev setup.
+- `docker/README.md` — Docker compose reference.

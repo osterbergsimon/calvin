@@ -1,0 +1,101 @@
+/* Global accessibility baseline for the redesign. */
+
+:where(
+  button,
+  a,
+  input,
+  select,
+  textarea,
+  [role="radio"],
+  [role="switch"],
+  [role="option"]
+):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+/* Strip the browser's native number-input spinner chrome app-wide. The up/down
+   arrows read as unstyled next to Calvin's custom fields; numeric values are
+   driven by typing (and, where present, adjacent steppers/sliders). */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Themed scrollbars app-wide. Uses the semantic surface tokens so scrollbars
+   follow the active theme + light/dark mode instead of the browser default.
+   Firefox honours the inherited scrollbar-width/scrollbar-color; WebKit/Blink
+   use the ::-webkit-scrollbar pseudo-elements. (A component may still override
+   locally — e.g. TabNavigation's slim 4px bar.) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 999px;
+  /* transparent border + padding-box keeps the thumb visually slim inside the
+     track gutter and gives it breathing room from the content edge. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Heading roles (docs/design/frontend-doctrine.md §2 and §4.5). A heading has
+   one of three looks: the section eyebrow (owned by SettingsSection), a title
+   or a group label. A component puts the class on its heading and keeps only
+   layout (margin, flex, truncation, colour for an error) in its own style.
+   - .heading-title: panel, dialog and inspector titles (--text-title).
+   - .heading-group: a sub-heading inside a panel, the same look as the
+     SettingGroup label (--text-label, sentence case). */
+.heading-title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-title);
+  font-weight: var(--weight-title);
+  color: var(--ink);
+}
+
+.heading-group {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-label);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

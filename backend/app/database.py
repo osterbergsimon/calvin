@@ -1,34 +1,50 @@
 """Database configuration and session management."""
 
-import logging
-import os
-
 import databases
+from loguru import logger
 from sqlalchemy import MetaData
 
 from app.config import settings
 
-# CALVIN_SQL_ECHO=1 turns on SQL statement logging without editing this file.
-#
-# Runtime queries go Ormar -> `databases` lib -> aiosqlite (NOT through a SQLAlchemy
-# engine), so the useful logger is `databases`. We also flip the SQLAlchemy loggers
-# because metadata.create_all() in init/tests does run through a sync SA engine.
-# All emitted records flow through loguru via InterceptHandler in app.main.
-_SQL_ECHO = os.environ.get("CALVIN_SQL_ECHO") == "1"
-_sql_log_level = logging.DEBUG if _SQL_ECHO else logging.WARNING
+# SQL logger configuration (CALVIN_SQL_ECHO) lives in app.main alongside the
+# rest of the loguru/InterceptHandler bridge.
 
-# Runtime queries — Ormar/databases lib
-logging.getLogger("databases").setLevel(_sql_log_level)
+# How long SQLite waits for a lock before raising "database is locked".
+SQLITE_BUSY_TIMEOUT_SECONDS = 5.0
+SQLITE_BUSY_TIMEOUT_MS = int(SQLITE_BUSY_TIMEOUT_SECONDS * 1000)
 
-# Schema/init — SQLAlchemy core (metadata.create_all, sync engine in init_db)
-for _name in ("sqlalchemy.engine", "sqlalchemy.pool", "sqlalchemy.dialects"):
-    _lg = logging.getLogger(_name)
-    _lg.setLevel(_sql_log_level)
-    _lg.propagate = True
+
+def _database_dialect(database: databases.Database):
+    return getattr(getattr(database, "_backend", None), "_dialect", None)
+
+
+if not hasattr(databases.Database, "dialect"):
+    setattr(databases.Database, "dialect", property(_database_dialect))
+
+
+def ensure_database_dialect(database: databases.Database) -> databases.Database:
+    """Expose the SQLAlchemy dialect where Ormar 0.21 expects it."""
+
+    return database
+
+
+def create_database(url: str) -> databases.Database:
+    """Create a Database instance with Ormar compatibility shims applied.
+
+    The SQLite backend opens a fresh aiosqlite connection per transaction, so
+    `PRAGMA busy_timeout` on the first connection only ever applied to that one
+    connection (audit R11). The driver-level `timeout` argument applies to every
+    connection the pool opens.
+    """
+
+    if "sqlite" in url:
+        return ensure_database_dialect(databases.Database(url, timeout=SQLITE_BUSY_TIMEOUT_SECONDS))
+    return ensure_database_dialect(databases.Database(url))
+
 
 # Create database connection for Ormar
 # Use absolute path to avoid path resolution issues
-database = databases.Database(
+database = create_database(
     settings.database_url_absolute.replace("sqlite:///", "sqlite+aiosqlite:///")
 )
 
@@ -39,49 +55,22 @@ metadata = MetaData()
 async def connect_db():
     """Connect to database and configure SQLite for better concurrency."""
     await database.connect()
+    ensure_database_dialect(database)
 
     # Enable WAL mode for better concurrency (allows multiple readers and one writer)
     # This significantly improves SQLite's ability to handle concurrent access
     try:
         await database.execute("PRAGMA journal_mode=WAL")
         # Set busy timeout to handle temporary locks (wait up to 5 seconds)
-        await database.execute("PRAGMA busy_timeout=5000")
+        await database.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
         # Set synchronous mode to NORMAL for better performance (WAL mode makes this safe)
         await database.execute("PRAGMA synchronous=NORMAL")
     except Exception as e:
         # If PRAGMA commands fail, log but don't fail connection
         # (might happen if database is read-only or other issues)
-        logger = logging.getLogger(__name__)
         logger.warning(f"Failed to configure SQLite PRAGMA settings: {e}")
 
 
 async def disconnect_db():
     """Disconnect from database."""
     await database.disconnect()
-
-
-async def init_db():
-    """Initialize database (create tables)."""
-    # Connect if not already connected
-    if not database.is_connected:
-        await connect_db()  # Use connect_db() to ensure WAL mode is enabled
-
-    # Create tables using metadata
-    # Note: Ormar will create tables automatically when models are imported
-    # But we can also use metadata.create_all for explicit control
-    from sqlalchemy import create_engine
-
-    # For table creation, we need a sync engine
-    # Use absolute path to avoid path resolution issues
-    sync_url = settings.database_url_absolute.replace("sqlite+aiosqlite:///", "sqlite:///")
-    sync_engine = create_engine(sync_url, echo=False)
-
-    # Enable WAL mode on sync engine as well (for table creation)
-    with sync_engine.connect() as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.commit()
-
-    metadata.create_all(sync_engine)
-    sync_engine.dispose()

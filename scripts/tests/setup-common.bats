@@ -107,6 +107,7 @@ teardown() {
 GIT_REPO=https://github.com/test/repo.git
 GIT_BRANCH=main
 REPO_DIR=/test/dir
+CALVIN_MODE=prod
 EOF
     }
     
@@ -115,6 +116,7 @@ EOF
     assert_file_exists "${TEST_ETC_DEFAULT}/calvin-update"
     assert_file_contains "${TEST_ETC_DEFAULT}/calvin-update" "GIT_REPO=https://github.com/test/repo.git"
     assert_file_contains "${TEST_ETC_DEFAULT}/calvin-update" "GIT_BRANCH=main"
+    assert_file_contains "${TEST_ETC_DEFAULT}/calvin-update" "CALVIN_MODE=prod"
 }
 
 # Test swap file setup logic

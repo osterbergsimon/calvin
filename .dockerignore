@@ -1,0 +1,18 @@
+# Keep the build context small and stop local artefacts (node_modules,
+# venvs, dev data) from leaking into docker/Dockerfile's COPY steps.
+.git
+.beads
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+frontend/dist
+frontend/test-results
+backend/data/*
+!backend/data/themes
+backend/logs
+.calvin-dev-data
+docs
+**/.env

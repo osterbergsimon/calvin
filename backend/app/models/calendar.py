@@ -31,6 +31,9 @@ class CalendarSource(BaseModel):
     api_key: str | None = None  # For API-based sources
     color: str | None = None  # Hex color code for calendar events (e.g., "#2196f3")
     show_time: bool = True  # Show event times in calendar
+    # Responses never carry ical_url/api_key (a private feed URL is a bearer
+    # credential); this says which of them are stored. Blank on update = keep.
+    has_value: dict[str, bool] = Field(default_factory=dict)
 
 
 class CalendarEventsResponse(BaseModel):

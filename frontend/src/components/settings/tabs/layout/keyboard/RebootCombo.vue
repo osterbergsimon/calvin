@@ -1,0 +1,165 @@
+<template>
+  <SettingRow
+    label="Reboot combination"
+    description="Hold both buttons together for a few seconds to restart the device."
+    stacked
+  >
+    <div class="rc-keys">
+      <button
+        type="button"
+        class="rc-key"
+        :class="{ 'rc-key--capturing': capturingSlot === 1 }"
+        :aria-label="`${capturingSlot === 1 ? 'Press a button…' : label1} first key — first reboot key`"
+        @click="captureKey(1)"
+      >
+        <span class="rc-key-cap">{{ capturingSlot === 1 ? "Press a button…" : label1 }}</span
+        >{{ " " }}<span class="rc-key-hint">first key</span>
+      </button>
+      <span class="rc-plus" aria-hidden="true">+</span>
+      <button
+        type="button"
+        class="rc-key"
+        :class="{ 'rc-key--capturing': capturingSlot === 2 }"
+        :aria-label="`${capturingSlot === 2 ? 'Press a button…' : label2} second key — second reboot key`"
+        @click="captureKey(2)"
+      >
+        <span class="rc-key-cap">{{ capturingSlot === 2 ? "Press a button…" : label2 }}</span
+        >{{ " " }}<span class="rc-key-hint">second key</span>
+      </button>
+    </div>
+    <p v-if="warning" class="rc-warn" role="alert">{{ warning }}</p>
+  </SettingRow>
+
+  <SettingRow
+    label="Hold duration"
+    description="How long to hold the combination before it reboots."
+  >
+    <div class="rc-duration">
+      <NumberStepper
+        :model-value="durationSeconds"
+        :min="1"
+        :max="60"
+        aria-label="Reboot hold duration in seconds"
+        @update:model-value="onDuration"
+      />
+      <span class="rc-dur-unit">seconds</span>
+    </div>
+  </SettingRow>
+</template>
+
+<script setup>
+import { ref, computed } from "vue";
+import NumberStepper from "@/components/ui/NumberStepper.vue";
+import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import { useKeyCapture } from "@/composables/useKeyCapture";
+import { formatKeyLabel } from "@/utils/keyCode";
+
+const props = defineProps({
+  config: { type: Object, required: true },
+});
+const emit = defineEmits(["update:config"]);
+
+const { capture, cancel } = useKeyCapture();
+const capturingSlot = ref(0); // 0 = idle, 1 = first key, 2 = second key
+const warning = ref("");
+
+const key1 = computed(() => props.config.rebootComboKey1 || "KEY_1");
+const key2 = computed(() => props.config.rebootComboKey2 || "KEY_7");
+const label1 = computed(() => formatKeyLabel(key1.value));
+const label2 = computed(() => formatKeyLabel(key2.value));
+const durationSeconds = computed(() =>
+  Math.round((props.config.rebootComboDuration || 10000) / 1000)
+);
+
+const captureKey = async slot => {
+  // Clicking the active slot again cancels the capture.
+  if (capturingSlot.value) {
+    cancel();
+    capturingSlot.value = 0;
+    return;
+  }
+  warning.value = "";
+  capturingSlot.value = slot;
+  try {
+    const code = await capture();
+    if (!code) return; // Escape / cancelled — keep the current key
+    const other = slot === 1 ? key2.value : key1.value;
+    if (code === other) {
+      // A combo of the same key twice would fire on a single button — reject it.
+      warning.value = "The two keys must be different.";
+      return;
+    }
+    emit("update:config", slot === 1 ? { rebootComboKey1: code } : { rebootComboKey2: code });
+  } finally {
+    capturingSlot.value = 0;
+  }
+};
+
+const onDuration = secs => {
+  const clamped = Math.max(1, Math.min(60, Math.round(secs)));
+  emit("update:config", { rebootComboDuration: clamped * 1000 });
+};
+</script>
+
+<style scoped>
+/* Key tiles mirror the key-binding tiles (.kbt) so the reboot combo reads as
+   part of the same keyboard surface, not a separate widget. */
+.rc-keys {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rc-key {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 104px;
+  min-height: var(--touch-target);
+  padding: 10px 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.rc-key:hover {
+  border-color: var(--focus);
+}
+.rc-key:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.rc-key--capturing {
+  border-color: var(--focus);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--focus) 12%, var(--bg-1));
+}
+.rc-key-cap {
+  font-family: var(--font-data);
+  font-weight: var(--weight-title);
+  font-size: var(--fs-lg);
+  color: var(--ink);
+}
+.rc-key-hint {
+  font-size: var(--fs-2xs);
+  color: var(--ink-2);
+}
+.rc-plus {
+  color: var(--ink-3);
+  font-size: var(--fs-xl);
+}
+.rc-warn {
+  margin: 12px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--warn-text);
+}
+.rc-duration {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rc-dur-unit {
+  color: var(--ink-2);
+  font-size: var(--fs-md);
+}
+</style>

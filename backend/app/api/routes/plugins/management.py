@@ -1,6 +1,5 @@
 """Plugin management endpoints - CRUD operations, installation, and actions."""
 
-import asyncio
 import json
 import shutil
 import sys
@@ -12,54 +11,95 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Body, File, HTTPException, Query, UploadFile
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.base import PluginType
-from app.plugins.definitions import strip_app_managed_config_fields
-from app.plugins.hooks import plugin_manager as hook_manager
+from app.plugins.isolated_check import run_isolated_plugin_check
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.registry.loader import load_plugin_types_for_single
+from app.plugins.utils.instance_manager import apply_plugin_config_update
+from app.plugins.utils.secrets import (
+    SecretEndpointChangedError,
+    check_secret_endpoint,
+    endpoint_keys_for_type,
+    keep_stored_secrets,
+    secret_keys_for_type,
+)
 from app.services.config_service import config_service
+from app.services.csp import get_sealed_mode
 from app.services.event_system import event_system
-from app.services.plugin_installer import frontend_build_manager, plugin_installer
+from app.services.plugin_installer import plugin_installer, run_installer_op
 from app.services.theme_installer import theme_installer
+from app.services.validation import validate_plugin_id
+from app.utils.errors import internal_error
 
-from .config import normalize_plugin_config
+from .config import mask_sensitive_config, normalize_plugin_config
 from .themes import BUILTIN_THEMES, _unregister_theme_from_db
+
+
+def _require_valid_id(plugin_id: str) -> None:
+    """Reject an unsafe plugin/theme id with 400 before it reaches the filesystem."""
+    try:
+        validate_plugin_id(plugin_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
 
 router = APIRouter()
 
+# Cross-cutting type-level keys that all plugins support, regardless of
+# whether they declare them in their own common_config_schema.
+UNIVERSAL_TYPE_CONFIG_KEYS = frozenset({"display_order"})
 
-# Cross-cutting type-level config values that all plugins support, regardless of
-# whether they declare them in their own common_config_schema. These are values,
-# not schema fields, so they should not be returned as common_config_schema.
-def _parse_display_order(value: Any) -> int:
-    if isinstance(value, dict):
-        value = value.get("value", value.get("default", 0))
+
+async def _check_plugin_in_child(plugin_id: str) -> None:
+    """Import a freshly installed plugin in a child process before the server does.
+
+    A rejected upload is never imported into the server: the child reports import,
+    ``sys.exit()`` and metadata errors, and on any error the plugin is rolled back
+    (directory removed, pip packages undone) and the caller gets a 400.
+    """
+    errors = await run_installer_op(run_isolated_plugin_check, plugin_id)
+    if not errors:
+        return
     try:
-        return int(value) if value not in (None, "") else 0
-    except (TypeError, ValueError):
-        return 0
+        await run_installer_op(plugin_installer.uninstall_plugin, plugin_id)
+    except Exception as cleanup_exc:  # noqa: BLE001
+        logger.warning(
+            "Failed to roll back plugin {} after the isolated check failed: {}",
+            plugin_id,
+            cleanup_exc,
+        )
+    detail = f"Plugin {plugin_id} failed validation:\n  - " + "\n  - ".join(errors)
+    raise HTTPException(status_code=400, detail=detail)
 
 
-def _split_type_config(
-    type_info: dict[str, Any], config: dict[str, Any]
-) -> tuple[dict[str, Any], int | None]:
-    metadata_schema = strip_app_managed_config_fields(
-        type_info.get("common_config_schema", {}) or {}
-    )
-    plugin_keys = set(metadata_schema.keys())
-    plugin_config = {key: value for key, value in config.items() if key in plugin_keys}
-    display_order = (
-        _parse_display_order(config["display_order"]) if "display_order" in config else None
-    )
-    return plugin_config, display_order
+def _validate_just_installed_plugin(plugin_id: str) -> list[str]:
+    """Check that a freshly installed plugin actually registered a plugin class.
 
-
-class RebuildStatusResponse(BaseModel):
-    state: str
-    message: str
+    Returns a list of human-readable error strings (empty if the plugin loaded
+    cleanly). Since PluginMetadata is validated at class-definition time, a
+    display_schema.kind typo or malformed metadata raises during import — the
+    loader records that error and we surface it here at install time, instead
+    of letting the plugin install "successfully" but never appear in the UI.
+    """
+    load_error = plugin_loader.get_load_error(plugin_id)
+    if load_error:
+        return [load_error]
+    module_name = f"installed_plugin_{plugin_id}"
+    if sys.modules.get(module_name) is None:
+        return [
+            f"Plugin module {module_name!r} did not load. "
+            "Check the backend log for an import or syntax error in plugin.py."
+        ]
+    if not plugin_loader.installed_plugin_type_ids(plugin_id):
+        return [
+            "plugin.py does not declare a plugin class "
+            "(a BasePlugin subclass with a `metadata = PluginMetadata(...)` attribute)."
+        ]
+    return []
 
 
 class PluginManifestEnvelope(BaseModel):
@@ -71,13 +111,11 @@ class PluginInstallResponse(BaseModel):
     message: str
     manifest: dict[str, Any]
     requires_restart: bool
-    frontend_rebuild_in_progress: bool
 
 
 class PluginDeleteResponse(BaseModel):
     success: bool
     message: str
-    frontend_rebuild_in_progress: bool = False
 
 
 class PluginListResponse(BaseModel):
@@ -132,25 +170,23 @@ async def get_plugins(
                 detail=f"Invalid plugin type: {plugin_type}. Valid types: {valid_types}",
             )
 
-    # Get plugin types from pluggy hooks
     plugin_types = plugin_loader.get_plugin_types()
 
     # Filter out test plugins
-    plugin_types = [t for t in plugin_types if not t.get("type_id", "").startswith("test_")]
+    plugin_types = [t for t in plugin_types if not t.type_id.startswith("test_")]
 
     # Filter by plugin type if specified
     if pt:
-        plugin_types = [t for t in plugin_types if t.get("plugin_type") == pt]
+        plugin_types = [t for t in plugin_types if t.plugin_type == pt]
 
     # Load enabled status and error messages from database
     try:
         db_types_list = await PluginTypeDB.objects.all()
         db_types = {db_type.type_id: db_type for db_type in db_types_list}
-    except Exception as e:
-        logger.error(
-            f"[get_plugins] Failed to load plugin types from database: {e}. "
-            "This may indicate missing tables. Check database initialization.",
-            exc_info=True,
+    except Exception:
+        logger.exception(
+            "[get_plugins] Failed to load plugin types from database. "
+            "This may indicate missing tables. Check database initialization."
         )
         # Continue with empty dict - app won't crash but plugins won't load
         db_types = {}
@@ -160,43 +196,49 @@ async def get_plugins(
     # Only add regular plugins if not filtering for themes only
     if not only_themes:
         for type_info in plugin_types:
-            type_id = type_info.get("type_id")
-            plugin_type_enum = type_info.get("plugin_type")
+            type_id = type_info.type_id
+            plugin_type_enum = type_info.plugin_type
 
             # Get plugin type info from database (including error messages)
             db_type = db_types.get(type_id)
             enabled = db_type.enabled if db_type else True  # Default to enabled
             error_message = db_type.error_message if db_type else None
 
-            # Keep schema and saved values separate. Historical data may have
-            # leaked instance fields or raw values into common_config_schema;
-            # those values are still exposed by /plugins/{id}/config when needed.
-            metadata_schema = type_info.get("common_config_schema", {}) or {}
-            global_schema = strip_app_managed_config_fields(metadata_schema)
-            instance_schema = strip_app_managed_config_fields(
-                type_info.get("instance_config_schema", {}) or {}
+            # Keep field schema separate from saved values. Older versions stored
+            # common config values in common_config_schema, but the frontend needs
+            # schema entries here; values are loaded from /plugins/{id}/config.
+            metadata_schema = type_info.common_config_schema or {}
+            db_schema = (
+                db_type.common_config_schema if db_type and db_type.common_config_schema else {}
             )
+            merged_schema = {**metadata_schema}
+            for key in UNIVERSAL_TYPE_CONFIG_KEYS:
+                if key in db_schema:
+                    merged_schema[key] = db_schema[key]
 
             plugin_info: dict[str, Any] = {
                 "id": type_id,
-                "name": type_info.get("name", ""),
+                "name": type_info.name,
                 "type": plugin_type_enum.value
                 if hasattr(plugin_type_enum, "value")
                 else str(plugin_type_enum),
-                "description": type_info.get("description", ""),
-                "config_schema": global_schema,  # Legacy name
-                "common_config_schema": global_schema,  # Also send as common_config_schema for frontend
-                "instance_config_schema": instance_schema,
+                "description": type_info.description or "",
+                "icon": type_info.icon,
+                "config_schema": merged_schema,  # Legacy name
+                "common_config_schema": merged_schema,  # Also send as common_config_schema for frontend
+                "instance_config_schema": type_info.instance_config_schema,
                 "enabled": enabled,
-                "display_order": db_type.display_order if db_type else 0,
-                "ui_actions": type_info.get("ui_actions", []),  # Plugin-specific actions (buttons)
+                "ui_actions": type_info.ui_actions,  # Plugin-specific actions (buttons)
                 # Plugin-specific sections (upload, manage, etc.)
-                "ui_sections": type_info.get("ui_sections", []),
+                "ui_sections": type_info.ui_sections,
                 # Whether plugin supports multiple instances
-                # (defaults to True for backward compatibility)
-                "supports_multiple_instances": type_info.get("supports_multiple_instances", True),
+                "supports_multiple_instances": type_info.supports_multiple_instances,
                 # Human-readable label for a single instance (e.g. "Location", "Device")
-                "instance_label": type_info.get("instance_label"),
+                "instance_label": type_info.instance_label,
+                # Display metadata, so the settings UI can tell a web page from a
+                # card/clock-bar plugin without a request per plugin.
+                "display_schema": type_info.display_schema,
+                "statusbar_schema": type_info.statusbar_schema,
             }
 
             # Include error message if plugin is broken
@@ -226,6 +268,9 @@ async def get_plugins(
                     "supports_multiple_instances": False,
                     "is_builtin": True,
                     "version": theme_manifest.get("version", "1.0.0"),
+                    "selectable": theme_manifest.get("selectable", True),
+                    "validation_errors": theme_manifest.get("validation_errors", []),
+                    "validation_warnings": theme_manifest.get("validation_warnings", []),
                 }
                 result.append(theme_entry)
 
@@ -253,24 +298,18 @@ async def get_plugins(
                     "supports_multiple_instances": False,
                     "is_builtin": False,
                     "version": theme_manifest.get("version", "1.0.0"),
+                    "selectable": theme_manifest.get("selectable", True),
+                    "validation_errors": theme_manifest.get("validation_errors", []),
+                    "validation_warnings": theme_manifest.get("validation_warnings", []),
                 }
                 result.append(theme_entry)
-        except Exception as e:
-            logger.error(f"[get_plugins] Error including themes: {e}", exc_info=True)
+        except Exception:
+            logger.exception("[get_plugins] Error including themes")
 
     return {"plugins": result, "total": len(result)}
 
 
 # Specific routes must come before parameterized routes to avoid path conflicts
-@router.get("/plugins/rebuild-status", response_model=RebuildStatusResponse)
-async def get_rebuild_status():
-    """Return the current state of a background frontend rebuild."""
-    return {
-        "state": frontend_build_manager.state,
-        "message": frontend_build_manager.message,
-    }
-
-
 @router.get("/plugins/installed", response_model=PluginListResponse)
 async def get_installed_plugins():
     """
@@ -296,7 +335,11 @@ async def get_installed_plugins():
         result = plugins + themes
         return {"plugins": result, "total": len(result)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get installed plugins: {str(e)}")
+        raise internal_error(
+            "plugin_list_failed",
+            "Could not list installed plugins. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/plugins/inspect", response_model=PluginManifestEnvelope)
@@ -304,7 +347,7 @@ async def inspect_plugin(file: UploadFile = File(...)):
     """
     Read plugin.json from a zip without installing it.
 
-    Returns the manifest so the caller can check python_dependencies and
+    Returns the manifest so the caller can check dependencies.packages and
     show a security warning before committing to an install.
     """
     if not file.filename:
@@ -345,6 +388,8 @@ async def install_plugin(
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
+    if plugin_id is not None:
+        _require_valid_id(plugin_id)
 
     # Save uploaded file to temporary location
     temp_path = None
@@ -356,10 +401,35 @@ async def install_plugin(
 
         # Install plugin
         try:
-            manifest = plugin_installer.install_plugin(temp_path, plugin_id)
+            manifest = await run_installer_op(plugin_installer.install_plugin, temp_path, plugin_id)
+
+            # Validate it in a child interpreter first: the server must never
+            # import an upload that errors, exits or hangs at import time.
+            installed_id = manifest["id"]
+            await _check_plugin_in_child(installed_id)
 
             # Reload plugins to include the newly installed one
             plugin_loader.load_installed_plugins()
+
+            # Surface metadata validation failures immediately. Without this,
+            # a plugin with (e.g.) an invalid display_schema.kind would install
+            # "successfully" but never appear in the UI because get_plugin_types
+            # silently swallows the PluginDefinition.from_raw error.
+            validation_errors = _validate_just_installed_plugin(installed_id)
+            if validation_errors:
+                # Roll back: remove the broken plugin so the user can fix and retry.
+                try:
+                    await run_installer_op(plugin_installer.uninstall_plugin, installed_id)
+                except Exception as cleanup_exc:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to roll back invalid plugin {} after validation errors: {}",
+                        installed_id,
+                        cleanup_exc,
+                    )
+                detail = f"Plugin {installed_id} failed validation:\n  - " + "\n  - ".join(
+                    validation_errors
+                )
+                raise HTTPException(status_code=400, detail=detail)
 
             # Emit plugin_installed event
             try:
@@ -380,20 +450,24 @@ async def install_plugin(
                     f"Failed to emit plugin_installed event for plugin {manifest['id']}: {e}"
                 )
 
-            if manifest.get("_has_frontend"):
-                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
-
+            # Register the plugin type now so it appears without a restart.
+            await load_plugin_types_for_single(installed_id)
             return {
                 "success": True,
                 "message": f"Plugin {manifest['id']} installed successfully",
                 "manifest": manifest,
-                "requires_restart": True,
-                "frontend_rebuild_in_progress": manifest.get("_has_frontend", False),
+                "requires_restart": manifest.get("requirements", {}).get("restart_required", False),
             }
+        except HTTPException:
+            raise
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to install plugin: {str(e)}")
+            raise internal_error(
+                "plugin_install_failed",
+                "Could not install the plugin. Check the server logs for details.",
+                error=e,
+            ) from e
     finally:
         # Clean up temp file
         if temp_path and temp_path.exists():
@@ -415,6 +489,7 @@ async def get_installed_plugin(plugin_id: str):
     Returns:
         Plugin manifest
     """
+    _require_valid_id(plugin_id)
     manifest = plugin_installer.get_plugin_manifest(plugin_id)
     if not manifest:
         raise HTTPException(status_code=404, detail=f"Plugin {plugin_id} not found")
@@ -432,6 +507,7 @@ async def uninstall_plugin(plugin_id: str):
     Returns:
         Success message
     """
+    _require_valid_id(plugin_id)
     try:
         # Check if it's a theme by checking database
         db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
@@ -470,8 +546,7 @@ async def uninstall_plugin(plugin_id: str):
             }
         else:
             # Uninstall regular plugin
-            had_frontend = plugin_installer.get_frontend_plugin_path(plugin_id).exists()
-            plugin_installer.uninstall_plugin(plugin_id)
+            await run_installer_op(plugin_installer.uninstall_plugin, plugin_id)
 
             # Stop and delete all instances of this plugin type
             db_instances = await PluginDB.objects.filter(type_id=plugin_id).all()
@@ -504,24 +579,9 @@ async def uninstall_plugin(plugin_id: str):
                 await db_type.delete()
                 logger.info(f"Removed plugin {plugin_id} from database")
 
-            # Unregister the plugin module from pluggy so it no longer appears in get_plugin_types()
-            module_name = f"installed_plugin_{plugin_id}"
-            registered_module = sys.modules.get(module_name)
-            if registered_module is not None:
-                try:
-                    hook_manager.unregister(registered_module)
-                except Exception as e:
-                    logger.warning(f"Failed to unregister plugin hook for {plugin_id}: {e}")
-                del sys.modules[module_name]
-
-            plugin_loader._loaded_modules = {
-                m
-                for m in plugin_loader._loaded_modules
-                if not m.startswith(f"installed_plugin_{plugin_id}")
-            }
-
-            if had_frontend:
-                frontend_build_manager.start_background_build(plugin_installer.get_frontend_dir())
+            # Remove the plugin's classes and module so it no longer appears
+            # in get_plugin_types()
+            plugin_loader.unload_installed_plugin(plugin_id)
 
             # Emit plugin_uninstalled event
             try:
@@ -544,12 +604,21 @@ async def uninstall_plugin(plugin_id: str):
             return {
                 "success": True,
                 "message": f"Plugin {plugin_id} uninstalled successfully",
-                "frontend_rebuild_in_progress": had_frontend,
             }
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise internal_error(
+            "plugin_not_uninstallable",
+            "Could not uninstall this plugin: it is not installed by Calvin or cannot be "
+            "removed automatically.",
+            status_code=404,
+            error=e,
+        ) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to uninstall plugin: {str(e)}")
+        raise internal_error(
+            "plugin_uninstall_failed",
+            "Could not uninstall the plugin. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.get("/plugins/{plugin_id}")
@@ -593,9 +662,9 @@ async def get_plugin(plugin_id: str):
         theme_manifest.pop("_installed_path", None)
         return theme_manifest
 
-    # Not a theme - get plugin type from pluggy hooks
+    # Not a theme - look up the registered plugin type
     plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+    type_info = next((t for t in plugin_types if t.type_id == plugin_id), None)
 
     if not type_info:
         raise HTTPException(status_code=404, detail="Plugin type not found")
@@ -606,24 +675,26 @@ async def get_plugin(plugin_id: str):
     enabled = db_type.enabled if db_type else True
     error_message = db_type.error_message if db_type else None
 
-    # Keep schema and saved values separate. Saved values are exposed by
-    # /plugins/{id}/config and should not be rendered as schema fields.
-    metadata_schema = type_info.get("common_config_schema", {}) or {}
-    global_schema = strip_app_managed_config_fields(metadata_schema)
+    # Keep field schema separate from saved values. Values are served by
+    # /plugins/{id}/config, while this endpoint provides plugin metadata.
+    metadata_schema = type_info.common_config_schema or {}
+    db_schema = db_type.common_config_schema if db_type and db_type.common_config_schema else {}
+    merged_schema = {**metadata_schema}
+    for key in UNIVERSAL_TYPE_CONFIG_KEYS:
+        if key in db_schema:
+            merged_schema[key] = db_schema[key]
 
     plugin_info: dict[str, Any] = {
-        "id": type_info.get("type_id"),
-        "name": type_info.get("name", ""),
-        "type": type_info.get("plugin_type").value
-        if hasattr(type_info.get("plugin_type"), "value")
-        else str(type_info.get("plugin_type")),
-        "description": type_info.get("description", ""),
-        "config_schema": global_schema,
-        "common_config_schema": global_schema,
-        "display_schema": type_info.get("display_schema"),
-        "statusbar_schema": type_info.get("statusbar_schema"),
+        "id": type_info.type_id,
+        "name": type_info.name,
+        "type": type_info.plugin_type.value
+        if hasattr(type_info.plugin_type, "value")
+        else str(type_info.plugin_type),
+        "description": type_info.description or "",
+        "config_schema": merged_schema,
+        "display_schema": type_info.display_schema,
+        "statusbar_schema": type_info.statusbar_schema,
         "enabled": enabled,
-        "display_order": db_type.display_order if db_type else 0,
     }
 
     # Include error message if plugin is broken
@@ -631,6 +702,41 @@ async def get_plugin(plugin_id: str):
         plugin_info["error_message"] = error_message
 
     return plugin_info
+
+
+async def _keep_stored_type_secrets(
+    plugin_id: str, config: dict[str, Any], instance_id: str | None = None
+) -> dict[str, Any]:
+    """
+    Fill secrets the settings form sent back blank or masked from what is stored.
+
+    Secrets are never sent to the frontend, so a blank one means "unchanged"
+    (audit S4). Stored values come from the type config and, when the update
+    targets an instance, from that instance. A stored secret is never reused
+    when the request changes the URL/host it authenticates against; that is a
+    400 asking the caller to re-enter it.
+    """
+    stored: dict[str, Any] = {}
+    stored_json = await config_service.get_value(f"plugin_{plugin_id}_config")
+    if stored_json:
+        try:
+            stored.update(json.loads(stored_json))
+        except json.JSONDecodeError:
+            pass
+    instance_id = instance_id or config.get("_instance_id")
+    if instance_id:
+        db_instance = await PluginDB.objects.get_or_none(id=instance_id, type_id=plugin_id)
+        if db_instance:
+            stored.update(db_instance.config or {})
+    known = {**stored, **config}
+    keys = secret_keys_for_type(plugin_id, known)
+    if not keys:
+        return config
+    try:
+        check_secret_endpoint(config, stored, keys, endpoint_keys_for_type(plugin_id, known))
+    except SecretEndpointChangedError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return keep_stored_secrets(config, stored, keys)
 
 
 async def _update_plugin_type(
@@ -651,12 +757,12 @@ async def _update_plugin_type(
     logger.debug(f"Updating plugin type {plugin_id} with config keys: {list(config.keys())}")
 
     # Clean config values - ensure all values are strings, not objects
-    cleaned_config = normalize_plugin_config(config)
+    cleaned_config = await _keep_stored_type_secrets(plugin_id, normalize_plugin_config(config))
     config = cleaned_config
 
-    # Get plugin type from pluggy hooks first
+    # Look up the registered plugin type first
     plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
+    type_info = next((t for t in plugin_types if t.type_id == plugin_id), None)
 
     if not type_info:
         # Check if it might be an instance ID to provide helpful error
@@ -680,12 +786,32 @@ async def _update_plugin_type(
     # Check if it's a theme first (themes use type_id directly)
     db_type = await PluginTypeDB.objects.get_or_none(type_id=plugin_id)
 
+    # Sealed-mode guard: refuse to ENABLE a plugin that declares browser_origins,
+    # so the operator never ends up with a silently browser-blocked widget. Only
+    # a False->True transition is blocked; already-enabled plugins are untouched.
+    if enabled is True and getattr(type_info, "browser_origins", None):
+        already_enabled = bool(db_type and db_type.enabled)
+        if not already_enabled and await get_sealed_mode():
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Cannot enable a plugin that declares browser_origins while "
+                    "sealed mode is on. Disable sealed mode first (Settings → Security)."
+                ),
+            )
+
     if db_type and db_type.plugin_type == PluginType.THEME.value:
         # It's a theme - handle enabled status only (themes don't have config)
         if enabled is not None:
             previous_enabled = db_type.enabled
             db_type.enabled = enabled
-            await db_type.save_with_timestamp()
+            from app.utils.db_retry import retry_on_db_locked
+
+            @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+            async def _save_theme_db_type():
+                await db_type.save_with_timestamp()
+
+            await _save_theme_db_type()
 
             # Emit plugin_enabled or plugin_disabled events if enabled status changed
             if previous_enabled is not None and previous_enabled != enabled:
@@ -728,70 +854,78 @@ async def _update_plugin_type(
     # If not found as plugin type, create it
     if not db_type:
         # Create new plugin type in database
-        plugin_type = type_info.get("plugin_type")
-        # Only store keys that are defined in the plugin's own common_config_schema
-        metadata_schema = strip_app_managed_config_fields(
-            type_info.get("common_config_schema", {}) or {}
+        plugin_type = type_info.plugin_type
+        # Store schema in common_config_schema, not ordinary config values.
+        # Ordinary values are stored in config_service below.
+        metadata_schema = type_info.common_config_schema or {}
+        filtered_config = (
+            {k: v for k, v in config.items() if k in UNIVERSAL_TYPE_CONFIG_KEYS} if config else {}
         )
-        filtered_config, display_order = _split_type_config(type_info, config)
         initial_schema = {**metadata_schema, **filtered_config}
         logger.debug(
             f"Creating new plugin type {plugin_id} with schema: {initial_schema}, "
-            f"config={config}, metadata_schema={metadata_schema}"
+            f"config={mask_sensitive_config(config)}, metadata_schema={metadata_schema}"
         )
-        db_type = await PluginTypeDB.objects.create(
-            type_id=plugin_id,
-            plugin_type=plugin_type.value if hasattr(plugin_type, "value") else str(plugin_type),
-            name=type_info.get("name", ""),
-            description=type_info.get("description", ""),
-            version=type_info.get("version"),
-            common_config_schema=initial_schema,
-            display_order=display_order if display_order is not None else 0,
-            enabled=enabled if enabled is not None else True,
-        )
+        from app.utils.db_retry import retry_on_db_locked
+
+        @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+        async def _create_plugin_type():
+            return await PluginTypeDB.objects.create(
+                type_id=plugin_id,
+                plugin_type=plugin_type.value
+                if hasattr(plugin_type, "value")
+                else str(plugin_type),
+                name=type_info.name,
+                description=type_info.description or "",
+                version=type_info.version,
+                common_config_schema=initial_schema,
+                enabled=enabled if enabled is not None else True,
+            )
+
+        db_type = await _create_plugin_type()
     else:
         # Update existing plugin type
         if enabled is not None:
             db_type.enabled = enabled
         if config:
-            current_schema = strip_app_managed_config_fields(db_type.common_config_schema or {})
-            # Only allow keys defined in the plugin's own common_config_schema —
-            # prevents instance config fields from leaking into the type-level schema.
-            filtered_config, display_order = _split_type_config(type_info, config)
+            current_schema = db_type.common_config_schema or {}
+            # Only universal schema-backed values are stored here. Regular
+            # plugin settings are persisted in config_service below.
+            filtered_config = {k: v for k, v in config.items() if k in UNIVERSAL_TYPE_CONFIG_KEYS}
             updated_schema = {**current_schema, **filtered_config}
             db_type.common_config_schema = updated_schema
-            if display_order is not None:
-                db_type.display_order = display_order
             logger.debug(
                 f"Updated plugin {plugin_id} common_config_schema: "
-                f"old={current_schema}, new={updated_schema}, config={config}"
+                f"old={current_schema}, new={updated_schema}, config={mask_sensitive_config(config)}"
             )
-        await db_type.save_with_timestamp()
+        from app.utils.db_retry import retry_on_db_locked
+
+        @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+        async def _save_plugin_type():
+            await db_type.save_with_timestamp()
+
+        await _save_plugin_type()
 
     # Save common config to config service for backward compatibility
-    persisted_config, display_order = _split_type_config(type_info, config)
-    if display_order is not None:
-        persisted_config["display_order"] = display_order
-    if persisted_config:
+    if config:
         config_key = f"plugin_{plugin_id}_config"
-        config_json = json.dumps(persisted_config)
+        config_json = json.dumps(config)
         await config_service.set_value(config_key, config_json)
 
-    # Call plugin-specific config update handlers (if any)
-    hook_config = persisted_config.copy()
-    update_coroutines = hook_manager.hook.handle_plugin_config_update(
-        type_id=plugin_id,
-        config=hook_config,
-        enabled=enabled,
-        db_type=db_type,
-        session=None,  # No session needed with Ormar
-    )
-    await asyncio.gather(*update_coroutines, return_exceptions=True)
+    # Apply the config update to the plugin's instances
+    try:
+        await apply_plugin_config_update(plugin_id, cleaned_config.copy(), enabled, db_type)
+    except Exception as e:
+        raise internal_error(
+            "plugin_config_apply_failed",
+            "Could not apply the plugin configuration. Check the server logs for details.",
+            error=e,
+        ) from e
 
     # Emit plugin_enabled or plugin_disabled events if enabled status changed
     if enabled is not None and previous_enabled is not None and previous_enabled != enabled:
         # Get plugin type as string
-        plugin_type_enum = type_info.get("plugin_type")
+        plugin_type_enum = type_info.plugin_type
         plugin_type_str = (
             plugin_type_enum.value if hasattr(plugin_type_enum, "value") else str(plugin_type_enum)
         )
@@ -819,9 +953,19 @@ async def _update_plugin_type(
     }
 
 
+# Coerce a raw JSON `enabled` to `bool | None` with the same lax semantics as the
+# typed PluginTypeConfigUpdateRequest.enabled, so both enable endpoints behave
+# identically. This closes a guard bypass: an untyped {"enabled": "true"} must not
+# skip the sealed-mode check by staying a truthy string.
+_ENABLED_ADAPTER = TypeAdapter(bool | None)
+
+
 @router.put("/plugins/{plugin_id}", response_model=PluginTypeConfigUpdateResponse)
 async def update_plugin(plugin_id: str, config: dict[str, Any]):
-    enabled = config.get("enabled") if "enabled" in config else None
+    try:
+        enabled = _ENABLED_ADAPTER.validate_python(config.get("enabled"))
+    except ValidationError:
+        raise HTTPException(status_code=422, detail="'enabled' must be a boolean")
     config_without_enabled = {k: v for k, v in config.items() if k != "enabled"}
     return await _update_plugin_type(plugin_id, config_without_enabled, enabled)
 
@@ -834,9 +978,10 @@ async def update_plugin_config(plugin_id: str, request: PluginTypeConfigUpdateRe
 @router.post("/plugins/{plugin_id}/fetch")
 async def fetch_plugin(plugin_id: str):
     """
-    Manually trigger plugin fetch/check operation.
+    Manually trigger a fetch/check operation on a plugin type's instances.
 
-    Uses plugin hooks to allow plugins to implement their own fetch logic.
+    Calls `fetch()` on each enabled instance of the type (e.g. an imap
+    plugin's "check now" action).
 
     Args:
         plugin_id: Plugin type ID (e.g., 'imap')
@@ -844,42 +989,38 @@ async def fetch_plugin(plugin_id: str):
     Returns:
         Fetch result with success status, message, and details
     """
-    # Get plugin types from pluggy hooks
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
+    if plugin_loader.get_plugin_class(plugin_id) is None:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
-    plugin_class = type_info.get("plugin_class")
-    if plugin_class is not None:
-        class_result = await plugin_class.fetch_type_data(instance_id=None)
-        if class_result is not None:
-            return class_result
-
-    # Legacy compatibility: fall back to hook-based fetch handlers
-    # Pluggy returns a list of coroutines for async hooks, we need to await them
-    fetch_coroutines = hook_manager.hook.fetch_plugin_data(
-        type_id=plugin_id,
-        instance_id=None,
-    )
-    fetch_results = await asyncio.gather(*fetch_coroutines, return_exceptions=True)
-
-    # Check if any plugin handled the fetch
-    for result in fetch_results:
-        # Skip exceptions (they're wrapped in the result)
-        if isinstance(result, Exception):
+    results: list[dict[str, Any]] = []
+    db_instances = await PluginDB.objects.filter(type_id=plugin_id).all()
+    for db_instance in db_instances:
+        instance = plugin_manager.get_plugin(db_instance.id)
+        if instance is None or not instance.enabled:
+            continue
+        try:
+            result = await instance.fetch()
+        except Exception as e:
+            logger.opt(exception=e).error("Error fetching from instance {}", db_instance.id)
+            results.append(
+                {
+                    "success": False,
+                    "code": "plugin_fetch_failed",
+                    "message": "Could not fetch from this plugin. Check the server logs.",
+                }
+            )
             continue
         if result is not None:
-            return result
+            results.append(result)
 
-    # Default: plugin doesn't support fetching
-    return {
-        "success": False,
-        "message": "This plugin type does not support manual fetch",
-        "images_downloaded": False,
-        "image_count": 0,
-    }
+    if not results:
+        return {
+            "success": False,
+            "message": "This plugin type does not support manual fetch",
+        }
+    if len(results) == 1:
+        return results[0]
+    return {"success": True, "results": results}
 
 
 @router.get("/plugins/{plugin_id}/scan")
@@ -896,32 +1037,16 @@ async def scan_plugin_options(
     Returns:
         Dict with 'options' list of {value, label} dicts
     """
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
+    plugin_class = plugin_loader.get_plugin_class(plugin_id)
+    if plugin_class is None:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
-    plugin_class = type_info.get("plugin_class")
-    if plugin_class:
-        try:
-            class_result = await plugin_class.scan_type_options(field)
-            if class_result is not None:
-                return class_result
-        except Exception as e:
-            logger.debug(f"Class-based scan_type_options failed for {plugin_id}: {e}")
-
-    scan_coroutines = hook_manager.hook.scan_plugin_options(
-        type_id=plugin_id,
-        field_key=field,
-    )
-    results = await asyncio.gather(*scan_coroutines, return_exceptions=True)
-
-    for result in results:
-        if isinstance(result, Exception):
-            continue
-        if result is not None:
-            return result
+    try:
+        class_result = await plugin_class.scan_options(field)
+        if class_result is not None:
+            return class_result
+    except Exception as e:
+        logger.debug(f"scan_options failed for {plugin_id}: {e}")
 
     return {"options": [], "error": "Plugin does not support option scanning for this field"}
 
@@ -936,7 +1061,7 @@ async def get_plugin_data(
     Get data from a service plugin instance.
 
     This is a generic endpoint that works for all service plugins that implement
-    the fetch_service_data() method (e.g., weather plugins).
+    the fetch() method (e.g., weather plugins).
 
     Args:
         plugin_id: Plugin instance ID
@@ -962,22 +1087,43 @@ async def get_plugin_data(
             status_code=404, detail="Service plugin instance not found or not a service plugin"
         )
 
-    # Ensure plugin is initialized and running
+    # A disabled or deliberately stopped instance stays that way: a dashboard
+    # poll must not undo a manual stop by restarting it.
+    if not db_plugin.enabled or not plugin_instance.enabled:
+        raise HTTPException(status_code=409, detail="Plugin instance is disabled")
     if not plugin_instance.is_running():
-        try:
-            await plugin_instance.initialize()
-            plugin_instance.start()
-        except Exception as e:
-            logger.error(f"Error initializing plugin {plugin_id}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"Failed to initialize plugin: {str(e)}")
+        if plugin_instance.stopped_by_request:
+            raise HTTPException(status_code=409, detail="Plugin instance is stopped")
+        # Enabled but never came up (e.g. initialize() failed at boot because
+        # the network wasn't up yet): retry, so it recovers on its own. Serialize
+        # the retry per instance — concurrent dashboard polls must not run
+        # initialize() in parallel — and re-check inside the lock because the
+        # poll we waited behind may already have brought the instance up.
+        async with plugin_manager.get_lifecycle_lock(plugin_id):
+            if not plugin_instance.is_running():
+                if plugin_instance.stopped_by_request:
+                    raise HTTPException(status_code=409, detail="Plugin instance is stopped")
+                try:
+                    await plugin_instance.initialize()
+                    plugin_instance.start()
+                except Exception as e:
+                    raise internal_error(
+                        "plugin_start_failed",
+                        "The plugin instance could not start. Check the server logs for details.",
+                        status_code=503,
+                        error=e,
+                    ) from e
 
     try:
-        data = await plugin_instance.fetch_service_data(start_date=start_date, end_date=end_date)
+        data = await plugin_instance.fetch(start_date=start_date, end_date=end_date)
         if data is not None:
             return data
     except Exception as e:
-        logger.error(f"Error calling fetch_service_data for {plugin_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to fetch plugin data: {str(e)}")
+        raise internal_error(
+            "plugin_data_fetch_failed",
+            "Could not fetch data from the plugin. Check the server logs for details.",
+            error=e,
+        ) from e
 
     # If plugin returned None, it doesn't support data fetching
     raise HTTPException(
@@ -1005,24 +1151,21 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
 
-    # Verify plugin type (optional - allow geocoding even if plugin instance doesn't exist yet)
-    # This allows users to geocode before saving the plugin configuration
-    # Check if plugin exists and is yr_weather type
+    # Geocoding is available to any plugin whose metadata declares a `geocode`
+    # ui_action — no plugin ids are special-cased. Unsaved instances may pass
+    # a type_id directly (geocode-before-save).
     db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
-
-    # If plugin exists, verify it's the right type
-    if db_plugin and db_plugin.type_id != "yr_weather":
-        raise HTTPException(
-            status_code=400, detail="Geocoding is only available for Yr.no weather plugins"
+    type_id = db_plugin.type_id if db_plugin else plugin_id
+    plugin_class = plugin_loader.get_plugin_class(type_id)
+    if plugin_class is not None and plugin_class.metadata is not None:
+        declares_geocode = any(
+            action.get("type") == "geocode" for action in plugin_class.metadata.ui_actions
         )
-
-    # If plugin doesn't exist, check if the plugin_id matches the expected pattern
-    # This allows geocoding for new plugin instances before they're saved
-    # We'll allow it if the plugin_id looks like it could be a yr_weather plugin
-    # (starts with 'yr_weather' or is just 'yr_weather')
-    if not db_plugin:
-        # Allow geocoding for new instances - we'll validate the location instead
-        pass
+        if not declares_geocode:
+            raise HTTPException(
+                status_code=400,
+                detail="This plugin does not support location lookup",
+            )
 
     try:
         # Use OpenStreetMap Nominatim API (free, no API key required)
@@ -1124,46 +1267,60 @@ async def geocode_location(plugin_id: str, request: dict[str, Any] = Body(...)):
             }
 
     except httpx.HTTPStatusError as e:
+        logger.warning("Geocoding service returned HTTP {}", e.response.status_code)
         return {
             "success": False,
-            "message": f"Geocoding service error: {e.response.status_code}",
+            "code": "geocode_service_error",
+            "message": (
+                f"The geocoding service answered with HTTP {e.response.status_code}. "
+                "Try again later."
+            ),
         }
     except httpx.HTTPError as e:
+        logger.opt(exception=e).warning("Geocoding request failed for {}", location)
         return {
             "success": False,
-            "message": f"Network error: {str(e)}",
+            "code": "geocode_network_error",
+            "message": "Could not reach the geocoding service. Check the server logs.",
         }
     except Exception as e:
+        logger.opt(exception=e).error("Geocoding failed for {}", location)
         return {
             "success": False,
-            "message": f"Error: {str(e)}",
+            "code": "geocode_failed",
+            "message": "Could not look up that location. Check the server logs.",
         }
 
 
 @router.post("/plugins/{plugin_id}/test")
-async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(default=None)):
+async def test_plugin(
+    plugin_id: str,
+    test_config: dict[str, Any] | None = Body(default=None),
+    instance_id: str | None = None,
+):
     """
     Test plugin connection/configuration.
 
-    Uses plugin hooks to allow plugins to implement their own connection testing logic.
+    Dispatches to the plugin class's test_connection() classmethod.
 
     Args:
         plugin_id: Plugin type ID (e.g., 'imap', 'mealie')
         test_config: Optional config to use for testing (if not provided, uses saved config)
+        instance_id: Optional instance being edited; secrets left blank in
+            test_config are taken from its stored config
 
     Returns:
         Test result with success status and message
     """
-    # Get plugin types from pluggy hooks
-    plugin_types = plugin_loader.get_plugin_types()
-    type_info = next((t for t in plugin_types if t.get("type_id") == plugin_id), None)
-
-    if not type_info:
+    plugin_class = plugin_loader.get_plugin_class(plugin_id)
+    if plugin_class is None:
         raise HTTPException(status_code=404, detail="Plugin type not found")
 
     # Use provided test_config if available, otherwise get saved config
     if test_config:
-        config = normalize_plugin_config(test_config)
+        config = await _keep_stored_type_secrets(
+            plugin_id, normalize_plugin_config(test_config), instance_id
+        )
     else:
         # Get plugin config
         config_key = f"plugin_{plugin_id}_config"
@@ -1177,32 +1334,13 @@ async def test_plugin(plugin_id: str, test_config: dict[str, Any] | None = Body(
         else:
             config = {}
 
-    plugin_class = type_info.get("plugin_class")
-    if plugin_class:
-        try:
-            class_result = await plugin_class.test_type_config(config)
-            if class_result is not None:
-                return class_result
-        except Exception as e:
-            logger.debug(f"Class-based test_type_config failed for {plugin_id}: {e}")
+    try:
+        class_result = await plugin_class.test_connection(config)
+        if class_result is not None:
+            return class_result
+    except Exception as e:
+        logger.debug(f"test_connection failed for {plugin_id}: {e}")
 
-    # Call plugin-specific test handlers via hooks
-    # Pluggy returns a list of coroutines for async hooks, we need to await them
-    test_coroutines = hook_manager.hook.test_plugin_connection(
-        type_id=plugin_id,
-        config=config,
-    )
-    test_results = await asyncio.gather(*test_coroutines, return_exceptions=True)
-
-    # Check if any plugin handled the test
-    for result in test_results:
-        # Skip exceptions (they're wrapped in the result)
-        if isinstance(result, Exception):
-            continue
-        if result is not None:
-            return result
-
-    # Default: plugin doesn't support testing
     return {
         "success": False,
         "message": "This plugin type does not support connection testing",
@@ -1261,10 +1399,11 @@ async def run_backend_plugin_task(plugin_id: str):
             "message": f"Plugin '{plugin_id}' does not support scheduled tasks",
         }
     except Exception as e:
-        logger.exception(f"Error running task for backend plugin {plugin_id}")
+        logger.opt(exception=e).error("Error running task for backend plugin {}", plugin_id)
         return {
             "success": False,
-            "message": f"Error running task: {str(e)}",
+            "code": "plugin_task_failed",
+            "message": "Could not run the plugin task. Check the server logs for details.",
         }
 
 

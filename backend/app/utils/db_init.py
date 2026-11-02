@@ -5,14 +5,18 @@ It ensures all tables are created and migrations are run properly.
 """
 
 import asyncio
-import logging
 from pathlib import Path
 
 import databases
+from loguru import logger
 
-from app.database import metadata
-
-logger = logging.getLogger(__name__)
+from app.config import BACKEND_DIR
+from app.database import (
+    SQLITE_BUSY_TIMEOUT_MS,
+    create_database,
+    ensure_database_dialect,
+    metadata,
+)
 
 
 async def initialize_database(
@@ -43,17 +47,19 @@ async def initialize_database(
     # Create database connection if not provided
     if database is None:
         db_url = f"sqlite+aiosqlite:///{database_path.resolve()}"
-        database = databases.Database(db_url)
+        database = create_database(db_url)
         # Connect to database
         if not database.is_connected:
             await database.connect()
             # Enable WAL mode for better concurrency
             try:
                 await database.execute("PRAGMA journal_mode=WAL")
-                await database.execute("PRAGMA busy_timeout=5000")
+                await database.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
                 await database.execute("PRAGMA synchronous=NORMAL")
             except Exception as e:
                 logger.warning(f"Failed to configure SQLite PRAGMA settings during init: {e}")
+    else:
+        ensure_database_dialect(database)
 
     # Import all models to ensure they're registered in metadata
     # This is needed for Alembic to know about the models
@@ -76,45 +82,12 @@ async def initialize_database(
         # Get database URL for Alembic (convert async to sync)
         db_url = f"sqlite:///{database_path.resolve()}"
 
-        # Get absolute path to alembic.ini
-        # Try multiple strategies to find alembic.ini
-        alembic_ini_path = None
-
-        # Strategy 1: Relative to database path (production structure)
-        # database_path structure: backend/data/db/calvin.db (when resolved)
-        # alembic.ini is at: backend/alembic.ini
-        # So we go up 2 levels from database_path to get to backend
-        backend_dir = database_path.resolve().parent.parent.parent
-        potential_path = backend_dir / "alembic.ini"
-        if potential_path.exists():
-            alembic_ini_path = potential_path
-
-        # Strategy 2: Current working directory (for tests)
-        if alembic_ini_path is None or not alembic_ini_path.exists():
-            import os
-
-            cwd = Path(os.getcwd())
-            potential_path = cwd / "alembic.ini"
-            if potential_path.exists():
-                alembic_ini_path = potential_path
-
-        # Strategy 3: Search upward from database path
-        if alembic_ini_path is None or not alembic_ini_path.exists():
-            current = database_path.resolve().parent
-            while current != current.parent:  # Stop at filesystem root
-                potential_path = current / "alembic.ini"
-                if potential_path.exists():
-                    alembic_ini_path = potential_path
-                    break
-                current = current.parent
-
-        if alembic_ini_path is None or not alembic_ini_path.exists():
-            logger.warning(
-                f"Alembic config not found, migrations may fail. "
-                f"Tried: {backend_dir / 'alembic.ini'}, {Path.cwd() / 'alembic.ini'}"
-            )
-            # Don't fail, just skip migrations
-            return database
+        # alembic.ini ships next to the app package (backend/alembic.ini, or
+        # /app/alembic.ini in the image). Missing means a broken install:
+        # fail loudly rather than start on an un-migrated database.
+        alembic_ini_path = BACKEND_DIR / "alembic.ini"
+        if not alembic_ini_path.exists():
+            raise RuntimeError(f"Alembic config not found at {alembic_ini_path}; cannot migrate")
 
         # Configure Alembic
         # IMPORTANT: Known issue - alembic/env.py reads settings.database_url at import time

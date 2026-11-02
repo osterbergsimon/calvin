@@ -1,29 +1,25 @@
 """Plugin loading logic - loading plugin types and instances from database."""
 
-import logging
+from loguru import logger
 
 from app.models.db_models import PluginDB, PluginTypeDB
-from app.plugins.definitions import PluginDefinition, strip_app_managed_config_fields
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
 
-logger = logging.getLogger(__name__)
+# Built-in plugin classes live under this package; installed plugins load as
+# ``installed_plugin_<id>`` modules instead.
+_BUILTIN_MODULE_PREFIX = "app.plugins."
 
 
-def _parse_display_order(value: object) -> int:
-    if isinstance(value, dict):
-        value = value.get("value", value.get("default", 0))
-    if not isinstance(value, str | bytes | int | float):
-        return 0
-    try:
-        return int(value) if value not in (None, "") else 0
-    except (TypeError, ValueError):
-        return 0
+def _is_builtin(type_info) -> bool:
+    """True when the type ships with Calvin itself (not installed from a repo)."""
+    module = getattr(type_info.plugin_class, "__module__", "") or ""
+    return module.startswith(_BUILTIN_MODULE_PREFIX)
 
 
 async def load_plugin_types() -> None:
     """Load plugin types from database or register defaults."""
-    # Get plugin types from pluggy hooks
+    # Get plugin types from the loader's registry
     plugin_types = plugin_loader.get_plugin_types()
 
     for type_info in plugin_types:
@@ -31,8 +27,6 @@ async def load_plugin_types() -> None:
         error_message = None
 
         try:
-            # Validate required fields
-            type_info = PluginDefinition.from_raw(type_info)
             if not type_info.type_id:
                 continue
 
@@ -63,8 +57,11 @@ async def load_plugin_types() -> None:
                         description=type_info.description,
                         version=type_info.version,
                         common_config_schema=type_info.common_config_schema,
-                        display_order=0,
-                        enabled=False,  # Default to disabled - user must explicitly enable
+                        # First boot (calvin-0y6): built-in types start enabled so the
+                        # default Local Images source and Iframe services work out of
+                        # the box; installed plugins stay off until the user opts in.
+                        # Only the initial row is seeded — a later user toggle sticks.
+                        enabled=_is_builtin(type_info),
                         error_message=None,  # Clear any previous errors
                     )
                 else:
@@ -78,14 +75,13 @@ async def load_plugin_types() -> None:
                     db_type.description = type_info.description
                     db_type.version = type_info.version
 
-                    metadata_schema = strip_app_managed_config_fields(
-                        type_info.common_config_schema or {}
-                    )
+                    # Merge plugin metadata schema with existing database schema
+                    # This preserves user-set values (like display_order) while updating
+                    # with new schema from plugin metadata
+                    metadata_schema = type_info.common_config_schema or {}
                     existing_schema = db_type.common_config_schema or {}
-                    legacy_display_order = existing_schema.get("display_order")
-                    if legacy_display_order is not None:
-                        db_type.display_order = _parse_display_order(legacy_display_order)
-                    existing_schema = strip_app_managed_config_fields(existing_schema)
+                    # Merge: existing schema takes precedence (preserves user-set values),
+                    # but metadata schema can add new fields
                     merged_schema = {**metadata_schema, **existing_schema}
                     db_type.common_config_schema = merged_schema
 
@@ -99,9 +95,8 @@ async def load_plugin_types() -> None:
         except Exception as e:
             # Log the error and mark plugin as broken
             error_message = str(e)
-            logger.error(
-                f"Error loading plugin type {type_id or 'unknown'}: {error_message}",
-                exc_info=True,
+            logger.exception(
+                "Error loading plugin type {}: {}", type_id or "unknown", error_message
             )
 
             if type_id:
@@ -127,18 +122,69 @@ async def load_plugin_types() -> None:
                             description=None,
                             version=None,
                             common_config_schema={},
-                            display_order=0,
                             enabled=False,
                             error_message=error_message,
                         )
 
                 try:
                     await _save_error_status()
-                except Exception as db_error:
-                    logger.error(
-                        f"Error updating database for broken plugin {type_id}: {db_error}",
-                        exc_info=True,
-                    )
+                except Exception:
+                    logger.exception("Error updating database for broken plugin {}", type_id)
+
+
+async def load_plugin_types_for_single(plugin_id: str) -> None:
+    """Register a single plugin type in the database after install.
+
+    Mirrors the per-type save logic from ``load_plugin_types()`` for one
+    ``plugin_id`` so a freshly installed plugin appears in
+    ``get_plugin_types()`` output without a server restart. Handles both
+    create (no existing row) and update (row already exists). No-ops with a
+    warning if the type is not found after install.
+    """
+    plugin_types = plugin_loader.get_plugin_types()
+    type_info = next((t for t in plugin_types if t.type_id == plugin_id), None)
+    if type_info is None:
+        logger.warning(
+            "Plugin type {} not found after install — skipping DB registration", plugin_id
+        )
+        return
+
+    type_id: str = type_info.type_id
+
+    db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
+
+    from app.utils.db_retry import retry_on_db_locked
+
+    @retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
+    async def _save_plugin_type() -> None:
+        plugin_type_value = (
+            type_info.plugin_type.value
+            if type_info.plugin_type is not None
+            else str(type_info.plugin_type)
+        )
+        if not db_type:
+            await PluginTypeDB.objects.create(
+                type_id=type_id,
+                plugin_type=plugin_type_value,
+                name=type_info.name or type_id or "Unknown Plugin",
+                description=type_info.description,
+                version=type_info.version,
+                common_config_schema=type_info.common_config_schema,
+                enabled=False,
+                error_message=None,
+            )
+        else:
+            db_type.name = type_info.name or type_id or "Unknown Plugin"
+            db_type.description = type_info.description
+            db_type.version = type_info.version
+            metadata_schema = type_info.common_config_schema or {}
+            existing_schema = db_type.common_config_schema or {}
+            db_type.common_config_schema = {**metadata_schema, **existing_schema}
+            db_type.plugin_type = plugin_type_value
+            db_type.error_message = None
+            await db_type.save_with_timestamp()
+
+    await _save_plugin_type()
 
 
 async def load_plugin_instances() -> None:
@@ -155,10 +201,9 @@ async def load_plugin_instances() -> None:
                 try:
                     await existing.cleanup()
                     await instance_manager.unregister(db_plugin.id)
-                except Exception as e:
-                    logger.warning(
-                        f"Error cleaning up disabled plugin {db_plugin.id}: {e}",
-                        exc_info=True,
+                except Exception:
+                    logger.opt(exception=True).warning(
+                        "Error cleaning up disabled plugin {}", db_plugin.id
                     )
             continue
 
@@ -173,17 +218,15 @@ async def load_plugin_instances() -> None:
                     # Plugin should already be enabled (we only process enabled plugins)
                     if not existing.enabled:
                         existing.enable()
-                except Exception as e:
-                    logger.error(
-                        f"Error updating existing plugin {db_plugin.id}: {e}", exc_info=True
-                    )
+                except Exception:
+                    logger.exception("Error updating existing plugin {}", db_plugin.id)
                     # Disable plugin on error
                     existing.disable()
                     db_plugin.enabled = False
                     await db_plugin.save_with_timestamp()
                 continue
 
-            # Create plugin instance using pluggy hooks (only for enabled plugins)
+            # Create plugin instance (only for enabled plugins)
             plugin = None
             try:
                 plugin_config = db_plugin.config or {}
@@ -196,11 +239,11 @@ async def load_plugin_instances() -> None:
                     name=db_plugin.name,
                     config=plugin_config_with_enabled,
                 )
-            except Exception as e:
-                logger.error(
-                    f"Error creating plugin instance {db_plugin.id} "
-                    f"(type: {db_plugin.type_id}): {e}",
-                    exc_info=True,
+            except Exception:
+                logger.exception(
+                    "Error creating plugin instance {} (type: {})",
+                    db_plugin.id,
+                    db_plugin.type_id,
                 )
                 # Mark plugin as disabled in database on error
                 db_plugin.enabled = False
@@ -234,23 +277,24 @@ async def load_plugin_instances() -> None:
                     try:
                         await plugin.initialize()
                         plugin.start()
-                    except Exception as init_error:
-                        logger.error(
-                            f"Error initializing plugin {db_plugin.id}: {init_error}",
-                            exc_info=True,
-                        )
+                    except (Exception, SystemExit):
+                        # SystemExit: a plugin calling sys.exit() must not take
+                        # the whole startup down with it (audit R12).
+                        logger.exception("Error initializing plugin {}", db_plugin.id)
                         plugin.stop()
-                except Exception as e:
-                    logger.error(f"Error configuring plugin {db_plugin.id}: {e}", exc_info=True)
+                        try:
+                            db_plugin.enabled = False
+                            await db_plugin.save_with_timestamp()
+                        except Exception:
+                            logger.exception("Error marking plugin {} disabled", db_plugin.id)
+                except (Exception, SystemExit):
+                    logger.exception("Error configuring plugin {}", db_plugin.id)
                     # Only disable this specific plugin on error
                     try:
                         db_plugin.enabled = False
                         await db_plugin.save_with_timestamp()
-                    except Exception as db_error:
-                        logger.error(
-                            f"Error updating database for plugin {db_plugin.id}: {db_error}",
-                            exc_info=True,
-                        )
+                    except Exception:
+                        logger.exception("Error updating database for plugin {}", db_plugin.id)
             else:
                 # Plugin creation returned None - this could be normal
                 # if plugin type isn't registered
@@ -264,12 +308,9 @@ async def load_plugin_instances() -> None:
                 # Don't disable - the plugin might work later
                 # when the plugin type is registered
 
-        except Exception as e:
+        except Exception:
             # Catch-all for any unexpected errors
-            logger.error(
-                f"Unexpected error loading plugin instance {db_plugin.id}: {e}",
-                exc_info=True,
-            )
+            logger.exception("Unexpected error loading plugin instance {}", db_plugin.id)
             # Disable plugin on error
             try:
                 db_plugin.enabled = False

@@ -4,8 +4,32 @@ import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
 import { useConfigStore } from "../stores/config";
+import { useProgressStore } from "../stores/progress";
 import { useRouter } from "vue-router";
 import { logInfo, logError, logWarn, logDebug } from "../utils/logger";
+import {
+  cycleActiveDashboardRegion,
+  getActiveDashboardRegion,
+  getActiveDashboardScreen,
+  getLeafRegions,
+  normalizeDashboardScreens,
+  setActiveDashboardRegion,
+} from "../utils/layout";
+import { addMonths } from "../utils/dateMath";
+
+// Back-compat: stored mappings from before py5 (vocabulary unfreeze) may still
+// carry the old `mode_*` action values. The three jump actions were renamed to
+// reflect what they actually do (jump to the first screen containing a region
+// kind — never a mode switch); the two dead actions collapse to "none". A DB
+// migration rewrites persisted rows, but resolve here too so un-migrated
+// clients (localStorage caches, older exports) degrade gracefully.
+const LEGACY_ACTION_ALIASES = {
+  mode_calendar: "screen_jump_calendar",
+  mode_photos: "screen_jump_photos",
+  mode_web_services: "screen_jump_services",
+  mode_cycle: "none",
+  mode_spare: "none",
+};
 
 /**
  * Composable for handling keyboard actions.
@@ -16,8 +40,87 @@ export function useKeyboardActions() {
   const calendarStore = useCalendarStore();
   const imagesStore = useImagesStore();
   const webServicesStore = useWebServicesStore();
+  const progressStore = useProgressStore();
   const configStore = useConfigStore();
   const router = useRouter();
+
+  // RAW global catalog — used for persistence paths (region-view writes).
+  // Never pass this filtered set to a global save; screen selection uses
+  // configStore.activateDashboardScreen / cycleDashboardScreenBy instead.
+  const getDashboardScreens = () => normalizeDashboardScreens(configStore.dashboardScreens);
+
+  const getActiveRegion = () => {
+    // Use effectiveDashboardScreens so the kiosk-local activeScreenId is respected.
+    const screen = getActiveDashboardScreen(configStore.effectiveDashboardScreens);
+    return getActiveDashboardRegion(screen);
+  };
+
+  const activeRegionKindIs = kind => getActiveRegion()?.kind === kind;
+
+  // The focused calendar region's base view mode (per-region; falls back to
+  // "month"). Calendar navigation + view-cycle key off this, not global config.
+  const activeCalendarViewMode = () => {
+    const region = getActiveRegion();
+    return region?.kind === "calendar" ? (region.view?.mode ?? "month") : "month";
+  };
+
+  const saveDashboardScreens = screens => {
+    if (typeof configStore.setDashboardScreens === "function") {
+      configStore.setDashboardScreens(screens);
+    }
+    if (typeof configStore.updateConfig === "function") {
+      configStore.updateConfig({ dashboardScreens: screens }).catch(err => {
+        logError("[Keyboard]", "Failed to save dashboard screens:", err);
+      });
+    }
+  };
+
+  const activateScreenByIndex = index => {
+    // Use effective screens for index look-up so kiosk index 0 = first available.
+    const screensConfig = configStore.effectiveDashboardScreens;
+    const screen = screensConfig.screens[index];
+    if (!screen) return;
+    configStore.activateDashboardScreen(screen.id);
+    router.push("/");
+  };
+
+  const activateFirstScreenContainingKind = kind => {
+    // Search the EFFECTIVE (kiosk-filtered) screens so a kiosk only jumps to
+    // screens it is allowed to show. In Mode A, effectiveDashboardScreens equals
+    // the full catalog, so behaviour is unchanged.
+    const screensConfig = configStore.effectiveDashboardScreens;
+    let matchScreenIndex = -1;
+    let matchLeafId = null;
+    for (let index = 0; index < screensConfig.screens.length; index += 1) {
+      const leaf = getLeafRegions(screensConfig.screens[index].layout).find(
+        candidate => candidate.kind === kind
+      );
+      if (leaf) {
+        matchScreenIndex = index;
+        matchLeafId = leaf.id;
+        break;
+      }
+    }
+    if (matchScreenIndex < 0) return false;
+    const screen = screensConfig.screens[matchScreenIndex];
+    // Persist the active-region bookmark on the raw catalog (global write is
+    // correct here: region focus is not kiosk-local). Then activate the screen
+    // through the store's branched action so kiosk stays local-only.
+    const rawScreens = getDashboardScreens();
+    const rawScreen = rawScreens.screens.find(s => s.id === screen.id);
+    if (rawScreen && matchLeafId) {
+      const patchedScreens = {
+        ...rawScreens,
+        screens: rawScreens.screens.map(s =>
+          s.id === screen.id ? { ...s, activeRegionId: matchLeafId } : s
+        ),
+      };
+      saveDashboardScreens(patchedScreens);
+    }
+    configStore.activateDashboardScreen(screen.id);
+    router.push("/");
+    return true;
+  };
 
   // Handle calendar mode key press - cycle view mode if already in calendar mode
   const handleCalendarModePress = () => {
@@ -35,30 +138,15 @@ export function useKeyboardActions() {
       return;
     }
 
-    // We're already in calendar mode - cycle to next view mode
-    if (typeof configStore.cycleCalendarViewMode === "function") {
-      configStore
-        .cycleCalendarViewMode()
-        .then(newMode => {
-          logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode}`);
-        })
-        .catch(err => {
-          logError("[Keyboard]", "Failed to cycle calendar view mode:", err);
-        });
-    } else {
-      // Fallback: manually cycle if function doesn't exist (hot-reload issue)
+    // We're already in calendar mode - cycle the focused region's base view.
+    const region = getActiveRegion();
+    if (region?.kind === "calendar" && typeof configStore.updateRegionView === "function") {
       const modes = ["month", "week", "day"];
-      const currentIndex = modes.indexOf(configStore.calendarViewMode);
-      const nextIndex = (currentIndex + 1) % modes.length;
-      const newMode = modes[nextIndex];
-      configStore.setCalendarViewMode(newMode);
-      // Try to persist to backend
-      if (typeof configStore.updateConfig === "function") {
-        configStore.updateConfig({ calendarViewMode: newMode }).catch(err => {
-          logError("[Keyboard]", "Failed to save calendar view mode:", err);
-        });
-      }
-      logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode} (fallback)`);
+      const newMode = modes[(modes.indexOf(region.view?.mode ?? "month") + 1) % modes.length];
+      configStore
+        .updateRegionView(region.id, { mode: newMode })
+        .then(() => logInfo("[Keyboard]", `Calendar view mode cycled to: ${newMode}`))
+        .catch(err => logError("[Keyboard]", "Failed to cycle calendar view mode:", err));
     }
   };
 
@@ -317,6 +405,10 @@ export function useKeyboardActions() {
       "currentMode:",
       modeStore.currentMode
     );
+    // Normalize retired mode_* actions to their current vocabulary first.
+    if (Object.prototype.hasOwnProperty.call(LEGACY_ACTION_ALIASES, action)) {
+      action = LEGACY_ACTION_ALIASES[action];
+    }
     // Handle generic actions that adapt to current mode
     if (action === "generic_next") {
       action = getGenericNextAction();
@@ -329,33 +421,65 @@ export function useKeyboardActions() {
     }
 
     switch (action) {
-      // Mode switching
-      case "mode_calendar":
-        handleCalendarModePress();
+      // Screen jump — jump to the first screen containing a region of the given
+      // kind. (These were the old mode_* actions; the setMode() calls are
+      // vestigial and only survive for parity while modeStore is unwound in
+      // calvin-ine.)
+      case "screen_jump_calendar":
+        if (!activateFirstScreenContainingKind("calendar")) {
+          handleCalendarModePress();
+        } else {
+          modeStore.setMode(modeStore.MODES.CALENDAR);
+        }
         break;
-      case "mode_photos":
+      case "screen_jump_photos":
+        activateFirstScreenContainingKind("photos");
         modeStore.setMode(modeStore.MODES.PHOTOS);
         router.push("/");
         break;
-      case "mode_web_services":
+      case "screen_jump_services":
+        activateFirstScreenContainingKind("service");
         modeStore.setMode(modeStore.MODES.WEB_SERVICES);
         router.push("/");
-        break;
-      case "mode_spare":
-        // Spare button for future use - currently does nothing
-        // Can be mapped to any action later
         break;
       case "mode_settings":
         modeStore.setMode(modeStore.MODES.SETTINGS);
         router.push("/settings");
         break;
-      case "mode_cycle":
-        modeStore.cycleMode();
-        if (modeStore.currentMode === modeStore.MODES.SETTINGS) {
-          router.push("/settings");
-        } else {
-          router.push("/");
-        }
+      case "screen_next":
+        configStore.cycleDashboardScreenBy(1);
+        router.push("/");
+        break;
+      case "screen_prev":
+        configStore.cycleDashboardScreenBy(-1);
+        router.push("/");
+        break;
+      case "screen_1":
+      case "screen_2":
+      case "screen_3":
+      case "screen_4":
+      case "screen_5":
+      case "screen_6":
+      case "screen_7":
+        activateScreenByIndex(Number(action.replace("screen_", "")) - 1);
+        break;
+      case "region_next":
+        saveDashboardScreens(
+          cycleActiveDashboardRegion(
+            getDashboardScreens(),
+            1,
+            configStore.effectiveDashboardScreens.activeScreenId
+          )
+        );
+        break;
+      case "region_prev":
+        saveDashboardScreens(
+          cycleActiveDashboardRegion(
+            getDashboardScreens(),
+            -1,
+            configStore.effectiveDashboardScreens.activeScreenId
+          )
+        );
         break;
 
       // Calendar actions - context-aware based on view mode
@@ -363,12 +487,12 @@ export function useKeyboardActions() {
       // Note: Navigation preserves the selected event and keeps the modal open
       case "calendar_next":
       case "calendar_next_month": // Legacy name for backward compatibility
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Preserve selected event before navigation (modal stays open)
           const preservedEvent = calendarStore.selectedEvent;
           const preservedDate = calendarStore.selectedDate;
 
-          const viewMode = configStore.calendarViewMode;
+          const viewMode = activeCalendarViewMode();
           let newDate;
 
           if (viewMode === "day") {
@@ -381,9 +505,9 @@ export function useKeyboardActions() {
             weekStart.setDate(weekStart.getDate() + 7);
             newDate = new Date(weekStart);
           } else {
-            // Month/Rolling view: move to next month
-            newDate = new Date(calendarStore.currentDate);
-            newDate.setMonth(newDate.getMonth() + 1);
+            // Month/Rolling view: move to next month (clamped so a month-end
+            // date cannot skip the next month, e.g. Oct 31 -> Nov 30)
+            newDate = addMonths(calendarStore.currentDate, 1);
           }
 
           // Update current date (triggers calendar rerender)
@@ -404,12 +528,12 @@ export function useKeyboardActions() {
         break;
       case "calendar_prev":
       case "calendar_prev_month": // Legacy name for backward compatibility
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Preserve selected event before navigation (modal stays open)
           const preservedEvent = calendarStore.selectedEvent;
           const preservedDate = calendarStore.selectedDate;
 
-          const viewMode = configStore.calendarViewMode;
+          const viewMode = activeCalendarViewMode();
           let newDate;
 
           if (viewMode === "day") {
@@ -422,9 +546,9 @@ export function useKeyboardActions() {
             weekStart.setDate(weekStart.getDate() - 7);
             newDate = new Date(weekStart);
           } else {
-            // Month/Rolling view: move to previous month
-            newDate = new Date(calendarStore.currentDate);
-            newDate.setMonth(newDate.getMonth() - 1);
+            // Month/Rolling view: move to previous month (clamped so Mar 31
+            // becomes Feb 28/29 instead of Mar 3)
+            newDate = addMonths(calendarStore.currentDate, -1);
           }
 
           // Update current date (triggers calendar rerender)
@@ -446,8 +570,8 @@ export function useKeyboardActions() {
       case "calendar_expand":
       case "calendar_expand_today": // Legacy name for backward compatibility
         // Context-aware expand: expands events for current day/week based on view mode
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
-          const viewMode = configStore.calendarViewMode;
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
+          const viewMode = activeCalendarViewMode();
           let targetDate = new Date();
 
           if (viewMode === "day") {
@@ -555,31 +679,43 @@ export function useKeyboardActions() {
         }
         break;
       case "calendar_collapse":
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           calendarStore.clearSelectedEvent();
         }
         break;
       case "calendar_next_day":
         // Navigate to next day when event detail panel is open
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToNextDayWithEvents();
         }
         break;
       case "calendar_prev_day":
         // Navigate to previous day when event detail panel is open
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToPreviousDayWithEvents();
         }
         break;
       case "calendar_next_event":
         // Navigate to next event within day, or next day if on last event
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToNextEvent();
         }
         break;
       case "calendar_prev_event":
         // Navigate to previous event within day, or previous day if on first event
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR && calendarStore.selectedEvent) {
+        if (
+          (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) &&
+          calendarStore.selectedEvent
+        ) {
           navigateToPreviousEvent();
         }
         break;
@@ -590,7 +726,8 @@ export function useKeyboardActions() {
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
           (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
-          modeStore.currentMode === modeStore.MODES.CALENDAR
+          modeStore.currentMode === modeStore.MODES.CALENDAR ||
+          activeRegionKindIs("photos")
         ) {
           imagesStore.nextImage();
         }
@@ -600,7 +737,8 @@ export function useKeyboardActions() {
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
           (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) ||
-          modeStore.currentMode === modeStore.MODES.CALENDAR
+          modeStore.currentMode === modeStore.MODES.CALENDAR ||
+          activeRegionKindIs("photos")
         ) {
           imagesStore.previousImage();
         }
@@ -609,7 +747,8 @@ export function useKeyboardActions() {
         // Enter fullscreen photos mode
         if (
           modeStore.currentMode === modeStore.MODES.PHOTOS ||
-          modeStore.currentMode === modeStore.MODES.CALENDAR
+          modeStore.currentMode === modeStore.MODES.CALENDAR ||
+          activeRegionKindIs("photos")
         ) {
           modeStore.enterFullscreen(modeStore.MODES.PHOTOS);
           router.push("/");
@@ -618,6 +757,28 @@ export function useKeyboardActions() {
       case "photos_exit_fullscreen":
         // Exit fullscreen - return to dashboard
         if (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.PHOTOS) {
+          modeStore.exitFullscreen();
+          router.push("/");
+        }
+        break;
+
+      case "calendar_enter_fullscreen":
+        // Enter fullscreen calendar, carrying the active region's sources so the
+        // maximized view shows the same calendars the user was looking at.
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
+          const region = getActiveRegion();
+          const sourceIds =
+            region?.kind === "calendar" && Array.isArray(region.instanceIds)
+              ? region.instanceIds
+              : [];
+          const view = region?.kind === "calendar" ? region.view : null;
+          modeStore.enterFullscreen(modeStore.MODES.CALENDAR, { sourceIds, view });
+          router.push("/");
+        }
+        break;
+      case "calendar_exit_fullscreen":
+        // Exit fullscreen - return to dashboard
+        if (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.CALENDAR) {
           modeStore.exitFullscreen();
           router.push("/");
         }
@@ -646,7 +807,8 @@ export function useKeyboardActions() {
         // Works in web services mode or fullscreen web services
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) ||
+          activeRegionKindIs("service")
         ) {
           logDebug(
             "[Keyboard]",
@@ -671,7 +833,8 @@ export function useKeyboardActions() {
         // Works in web services mode or fullscreen web services
         if (
           modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES)
+          (modeStore.isFullscreen && modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) ||
+          activeRegionKindIs("service")
         ) {
           logDebug(
             "[Keyboard]",
@@ -700,9 +863,19 @@ export function useKeyboardActions() {
         }
         break;
       case "web_service_enter_fullscreen":
-        // Enter fullscreen web services mode
-        if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-          modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
+        // Enter fullscreen web services mode, carrying the active region's
+        // service so the maximized view shows the service the user pressed
+        // expand on — not the globally "current" service (which may belong to a
+        // different screen/region). Null context = WEB_SERVICES mode, where
+        // fullscreen cycles through all services from the current index.
+        if (
+          modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
+          activeRegionKindIs("service")
+        ) {
+          const region = getActiveRegion();
+          const serviceId =
+            region?.kind === "service" ? region.instanceIds?.[0] || region.serviceId || null : null;
+          modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES, serviceId ? { serviceId } : null);
           router.push("/");
         }
         break;
@@ -714,20 +887,28 @@ export function useKeyboardActions() {
       // Fall through to handle the resolved action
       // eslint-disable-next-line no-fallthrough
       case "calendar_refresh":
-        if (modeStore.currentMode === modeStore.MODES.CALENDAR) {
+        if (modeStore.currentMode === modeStore.MODES.CALENDAR || activeRegionKindIs("calendar")) {
           // Refresh calendar events
-          calendarStore.refreshEvents().catch(err => {
-            logError("[Keyboard]", "Failed to refresh calendar:", err);
-          });
+          // Refetches every calendar, not one region's: the app light.
+          progressStore
+            .track("calendar:refresh:keyboard", () => calendarStore.refreshEvents())
+            .catch(err => {
+              logError("[Keyboard]", "Failed to refresh calendar:", err);
+            });
           logInfo("[Keyboard]", "Refreshing calendar events");
         }
         break;
       case "service_refresh":
         // Refresh service plugin data (for web services)
-        if (modeStore.currentMode === modeStore.MODES.WEB_SERVICES) {
-          webServicesStore.refreshCurrentService().catch(err => {
-            logError("[Keyboard]", "Failed to refresh service:", err);
-          });
+        if (
+          modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
+          activeRegionKindIs("service")
+        ) {
+          progressStore
+            .track("plugin:refresh:keyboard", () => webServicesStore.refreshCurrentService())
+            .catch(err => {
+              logError("[Keyboard]", "Failed to refresh service:", err);
+            });
           logInfo("[Keyboard]", "Refreshing web service data");
         }
         break;
@@ -744,7 +925,9 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_next based on current mode
   const getGenericNextAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : getModeForActiveRegion() || modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to next event (within day or next day)
@@ -756,6 +939,7 @@ export function useKeyboardActions() {
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_next";
     } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
+      if (getActiveRegion()?.serviceId) return "none";
       return "web_service_next";
     } else {
       return "none"; // No action for other modes
@@ -765,7 +949,9 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_prev based on current mode
   const getGenericPrevAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : getModeForActiveRegion() || modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       // If event detail panel is open, navigate to previous event (within day or previous day)
@@ -777,6 +963,7 @@ export function useKeyboardActions() {
     } else if (activeMode === modeStore.MODES.PHOTOS) {
       return "images_prev";
     } else if (activeMode === modeStore.MODES.WEB_SERVICES) {
+      if (getActiveRegion()?.serviceId) return "none";
       return "web_service_prev";
     } else {
       return "none"; // No action for other modes
@@ -791,10 +978,14 @@ export function useKeyboardActions() {
         return "photos_exit_fullscreen";
       } else if (modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES) {
         return "web_service_close";
+      } else if (modeStore.fullscreenMode === modeStore.MODES.CALENDAR) {
+        // In fullscreen calendar, an expanded event closes first; otherwise
+        // exit fullscreen.
+        return calendarStore.selectedEvent ? "calendar_collapse" : "calendar_exit_fullscreen";
       }
     }
 
-    const currentMode = modeStore.currentMode;
+    const currentMode = getModeForActiveRegion() || modeStore.currentMode;
     if (currentMode === modeStore.MODES.CALENDAR) {
       // Check if event is expanded - if so, close it; otherwise expand (context-aware)
       if (calendarStore.selectedEvent) {
@@ -816,7 +1007,9 @@ export function useKeyboardActions() {
   // Get the appropriate action for generic_refresh based on current mode
   const getGenericRefreshAction = () => {
     // If in fullscreen, use fullscreen mode; otherwise use current mode
-    const activeMode = modeStore.isFullscreen ? modeStore.fullscreenMode : modeStore.currentMode;
+    const activeMode = modeStore.isFullscreen
+      ? modeStore.fullscreenMode
+      : getModeForActiveRegion() || modeStore.currentMode;
 
     if (activeMode === modeStore.MODES.CALENDAR) {
       return "calendar_refresh";
@@ -827,7 +1020,32 @@ export function useKeyboardActions() {
     }
   };
 
+  const getModeForActiveRegion = () => {
+    const kind = getActiveRegion()?.kind;
+    if (kind === "calendar") return modeStore.MODES.CALENDAR;
+    if (kind === "photos") return modeStore.MODES.PHOTOS;
+    if (kind === "service") return modeStore.MODES.WEB_SERVICES;
+    return null;
+  };
+
+  const focusRegion = regionId => {
+    saveDashboardScreens(
+      setActiveDashboardRegion(
+        getDashboardScreens(),
+        regionId,
+        configStore.effectiveDashboardScreens.activeScreenId
+      )
+    );
+  };
+
+  const activateScreen = screenId => {
+    configStore.activateDashboardScreen(screenId);
+    router.push("/");
+  };
+
   return {
     handleAction,
+    focusRegion,
+    activateScreen,
   };
 }

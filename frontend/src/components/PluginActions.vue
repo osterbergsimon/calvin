@@ -9,7 +9,7 @@
       :key="action.id"
       :class="action.style === 'primary' ? 'btn-primary' : 'btn-secondary'"
       :disabled="isActionDisabled(action)"
-      :title="action.type === 'custom' ? `Custom action: ${action.id}` : ''"
+      :title="action.type === 'custom' ? action.label || '' : ''"
       @click="handleAction(action)"
     >
       {{ getActionLabel(action) }}
@@ -19,21 +19,21 @@
     <span
       v-if="saveStatus"
       :class="saveStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
     >
       {{ saveStatus.message }}
     </span>
     <span
       v-if="testStatus"
       :class="testStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
     >
       {{ testStatus.message }}
     </span>
     <span
       v-if="fetchStatus"
       :class="fetchStatus.success ? 'success-message' : 'error-message'"
-      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: 4px"
+      style="margin-left: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius-xs)"
     >
       {{ fetchStatus.message }}
     </span>
@@ -146,15 +146,15 @@ const handleAction = _action => {
 }
 
 .btn-primary {
-  background: var(--accent-secondary);
-  color: #fff;
+  background: var(--focus);
+  color: var(--focus-ink);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 500;
+  transition: all var(--dur) ease;
+  font-weight: var(--weight-strong);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -168,19 +168,19 @@ const handleAction = _action => {
 }
 
 .btn-secondary {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
+  background: var(--bg-0);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
   padding: 0.75rem 1.5rem;
-  font-size: 0.9rem;
+  font-size: var(--fs-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur) ease;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--bg-secondary);
-  border-color: var(--accent-primary);
+  background: var(--bg-2);
+  border-color: var(--focus);
 }
 
 .btn-secondary:disabled {
@@ -189,18 +189,18 @@ const handleAction = _action => {
 }
 
 .success-message {
-  background: var(--accent-success, #10b981);
-  color: #fff;
+  background: var(--accent-success, var(--ok));
+  color: var(--ok-ink);
   padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-control);
 }
 
 .error-message {
-  background: var(--accent-error, #ef4444);
-  color: #fff;
+  background: var(--err);
+  color: var(--err-ink);
   padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-control);
 }
 </style>

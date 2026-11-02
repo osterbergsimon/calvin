@@ -1,77 +1,86 @@
-name: Build and Push Docker Images
+name: Build and Push Docker Image
+
+# Publishes ghcr.io/<owner>/calvin. develop is the deploy branch:
+#   push to develop  -> :develop + :sha-<commit>   (what Unraid / Pi run)
+#   push of a v* tag -> :X.Y.Z + :X.Y + :latest + :sha-<commit> (a prerelease tag such as v0.1.0-rc.1 gets :0.1.0-rc.1 and :sha-<commit> only)
+#   release please   -> release-please.yml dispatches this workflow at the new
+#                       tag with push_image=true, because a tag created with
+#                       GITHUB_TOKEN does not fire the push trigger below.
+#   pull request     -> amd64 build, nothing pushed. When the PR touches
+#                       anything that can change the image (backend deps,
+#                       docker/, this workflow) it ALSO builds arm64 and
+#                       arm/v7 under QEMU, so arm-only breakage is caught
+#                       before merge instead of after (CLV-40).
+#   manual dispatch  -> build; push :sha-<commit> (and :develop when run
+#                       on develop) only if push_image is ticked
+#
+# There is deliberately no schedule trigger: GitHub runs schedules only
+# from the default branch (main), so a nightly defined on develop never
+# fires, and it disables a scheduled workflow after 60 days without
+# commits on main (release-only), which would also stop this workflow
+# gating PRs. :develop is built on every push to develop instead.
 
 on:
   push:
     branches:
-      - main
       - develop
     tags:
       - 'v*'
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - 'mkdocs.yml'
   pull_request:
     branches:
       - main
       - develop
   workflow_dispatch:
     inputs:
-      push_images:
-        description: 'Push images to registry'
+      push_image:
+        description: 'Push image to registry'
         required: false
         default: false
         type: boolean
 
+concurrency:
+  group: docker-${{ github.ref }}
+  # A newer push to develop supersedes a running develop build.
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  PUBLISH: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/v'))) || (github.event_name == 'workflow_dispatch' && inputs.push_image) }}
 
 jobs:
+  # Decides whether a PR can affect the built image. Deliberately a JOB-level
+  # filter rather than a `paths:` trigger: a job skipped by `if` reports
+  # "skipped", which satisfies a required status check, while a workflow
+  # filtered out at the trigger level stays "pending" and blocks the merge.
   changes:
-    name: Detect Changes
+    name: Detect image-affecting changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
+      arm: ${{ steps.filter.outputs.arm }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          # Fetch full history to ensure proper comparison
-          # For push events: compares HEAD^ to HEAD
-          # For PR events: compares PR branch to base branch
-          fetch-depth: 0
-      
-      - name: Check for changes
-        uses: dorny/paths-filter@v2
+      - name: Filter changed paths
         id: filter
+        uses: dorny/paths-filter@v4
         with:
-          # For push events: use github.event.before (previous commit SHA from push event)
-          # For PR events: compare to base branch (github.base_ref)
-          # For tags/workflow_dispatch: omit base to use default behavior
-          base: ${{ github.event_name == 'pull_request' && github.base_ref || (github.event_name == 'push' && github.event.before || '') }}
           filters: |
-            backend:
-              - 'backend/app/**'
+            arm:
               - 'backend/pyproject.toml'
               - 'backend/uv.lock'
-              - 'docker/Dockerfile.backend-prod'
-              - 'docker/docker-compose*.yml'
-              - '.github/workflows/docker-build.yml'
-            frontend:
-              - 'frontend/src/**'
-              - 'frontend/public/**'
-              - 'frontend/index.html'
-              - 'frontend/vite.config.js'
-              - 'frontend/package*.json'
-              - 'docker/Dockerfile.frontend-prod'
-              - 'docker/nginx.conf'
-              - 'docker/docker-compose*.yml'
+              - 'docker/**'
               - '.github/workflows/docker-build.yml'
 
-  build-backend:
-    name: Build Backend Image
+  build:
+    name: Build Calvin Runtime Image
     runs-on: ubuntu-latest
-    needs: changes
-    # Always run on tags, manual dispatch, or if backend files changed
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || needs.changes.outputs.backend == 'true'
     permissions:
       contents: read
       packages: write
@@ -80,11 +89,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # A tag build knows its release version (vX.Y.Z); develop/PR builds leave
+      # it empty so the image falls back to app.__version__. The revision is
+      # always the commit being built, because the runtime image has no git.
+      - name: Resolve build version
+        id: version
+        run: |
+          version=""
+          case "$GITHUB_REF" in
+            refs/tags/v*) version="${GITHUB_REF_NAME#v}" ;;
+          esac
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: env.PUBLISH == 'true'
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/') || github.event.inputs.push_images == 'true')
+        if: env.PUBLISH == 'true'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -92,82 +118,131 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
-        id: meta-backend
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-backend
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
-            type=ref,event=branch
+            type=raw,value=develop,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=sha,prefix=sha-,format=short
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
-      - name: Build and push backend image
-        id: build-backend
-        uses: docker/build-push-action@v5
+      - name: Build and push runtime image
+        id: build
+        uses: docker/build-push-action@v6
         with:
           context: .
-          file: docker/Dockerfile.backend-prod
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/') || github.event.inputs.push_images == 'true') }}
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Image digest
-        run: echo "Backend image pushed with digest ${{ steps.build-backend.outputs.digest }}"
-
-  build-frontend:
-    name: Build Frontend Image
-    runs-on: ubuntu-latest
-    needs: changes
-    # Always run on tags, manual dispatch, or if frontend files changed
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') || needs.changes.outputs.frontend == 'true'
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/') || github.event.inputs.push_images == 'true')
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-frontend
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push frontend image
-        id: build-frontend
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/Dockerfile.frontend-prod
+          file: docker/Dockerfile
           build-args: |
             VITE_API_URL=/api
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
-          push: ${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/tags/') || github.event.inputs.push_images == 'true') }}
-          tags: ${{ steps.meta-frontend.outputs.tags }}
+            CALVIN_VERSION=${{ steps.version.outputs.value }}
+            CALVIN_GIT_SHA=${{ steps.version.outputs.sha }}
+          # Multi-arch only when pushing: amd64 for Unraid / servers, arm64
+          # and arm/v7 for all-in-one Pis. PR builds stay amd64-only.
+          platforms: ${{ env.PUBLISH == 'true' && 'linux/amd64,linux/arm64,linux/arm/v7' || 'linux/amd64' }}
+          push: ${{ env.PUBLISH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Image digest
-        run: echo "Frontend image pushed with digest ${{ steps.build-frontend.outputs.digest }}"
+      # Catches install-layout regressions the dev-venv tests cannot see: in the
+      # runtime image `app` is only importable via the cwd, and `python -I` drops
+      # that, so the child check must put the backend dir on sys.path itself.
+      - name: Build runtime image for the plugin-check smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            VITE_API_URL=/api
+            CALVIN_VERSION=${{ steps.version.outputs.value }}
+            CALVIN_GIT_SHA=${{ steps.version.outputs.sha }}
+          # The image from the step above, amd64-only and loaded locally so the
+          # check can run inside it. The GHA cache makes this a cache hit.
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: calvin-smoke:ci
+          cache-from: type=gha
+
+      - name: Smoke-test the isolated plugin check inside the image
+        run: |
+          docker run --rm --entrypoint /bin/sh \
+            -v "$PWD/docker/smoke-plugin-check.sh:/smoke.sh:ro" \
+            calvin-smoke:ci /smoke.sh
+
+      - name: Summary
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            echo "### Calvin image"
+            echo "Published: $PUBLISH"
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+            echo "Digest: \`$DIGEST\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Arm targets are what a PR can break silently: a dependency without an
+  # armv7 wheel (cffi 2.1.1) builds fine on amd64 and only fails on the
+  # post-merge multi-arch publish. Runs only for PRs that touch the image
+  # inputs; nothing is pushed and nothing is loaded locally.
+  build-arm:
+    name: Build Calvin Runtime Image (arm64, arm/v7)
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.arm == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # A tag build knows its release version (vX.Y.Z); develop/PR builds leave
+      # it empty so the image falls back to app.__version__. The revision is
+      # always the commit being built, because the runtime image has no git.
+      - name: Resolve build version
+        id: version
+        run: |
+          version=""
+          case "$GITHUB_REF" in
+            refs/tags/v*) version="${GITHUB_REF_NAME#v}" ;;
+          esac
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build arm64 + arm/v7 runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            VITE_API_URL=/api
+            CALVIN_VERSION=${{ steps.version.outputs.value }}
+            CALVIN_GIT_SHA=${{ steps.version.outputs.sha }}
+          platforms: linux/arm64,linux/arm/v7
+          push: false
+          # Shares the amd64 build's GHA cache for platform-independent
+          # layers (the frontend stage builds on $BUILDPLATFORM) and keeps
+          # its own scope for arm layers so the two jobs never fight over
+          # the same cache record.
+          cache-from: |
+            type=gha
+            type=gha,scope=pr-arm
+          cache-to: type=gha,mode=max,scope=pr-arm

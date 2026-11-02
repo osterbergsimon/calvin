@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useConfigStore } from "@/stores/config";
-import { useKeyboardStore } from "@/stores/keyboard";
 import * as configApi from "@/services/configApi";
 
 const { logErrorMock } = vi.hoisted(() => ({
@@ -22,10 +21,6 @@ vi.mock("@/stores/config", () => ({
   useConfigStore: vi.fn(),
 }));
 
-vi.mock("@/stores/keyboard", () => ({
-  useKeyboardStore: vi.fn(),
-}));
-
 // Mock configApi
 vi.mock("@/services/configApi", () => ({
   getConfig: vi.fn(),
@@ -34,7 +29,6 @@ vi.mock("@/services/configApi", () => ({
 
 describe("useConfigForm", () => {
   let mockConfigStore;
-  let mockKeyboardStore;
 
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -44,13 +38,7 @@ describe("useConfigForm", () => {
       updateConfig: vi.fn().mockResolvedValue({}),
     };
 
-    mockKeyboardStore = {
-      keyboardType: "7-button",
-      setKeyboardType: vi.fn(),
-    };
-
     useConfigStore.mockReturnValue(mockConfigStore);
-    useKeyboardStore.mockReturnValue(mockKeyboardStore);
   });
 
   describe("Initialization", () => {
@@ -117,6 +105,16 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value.showUI).toBe(false);
     });
 
+    it("maps the version and build revision from the API (calvin-hshq)", async () => {
+      configApi.getConfig.mockResolvedValue({ version: "0.1.0", revision: "8ea7088" });
+
+      const form = useConfigForm();
+      await form.loadConfig();
+
+      expect(form.localConfig.value.version).toBe("0.1.0");
+      expect(form.localConfig.value.revision).toBe("8ea7088");
+    });
+
     it("should use defaults when values are missing", async () => {
       const mockConfig = {};
 
@@ -130,9 +128,17 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value.showUI).toBe(true);
     });
 
-    it("should update keyboard store when keyboard type is set", async () => {
+    it("maps the Dashboard and Screens rows the settings categories need", async () => {
       const mockConfig = {
-        keyboardType: "5-button",
+        focusLightMode: "always",
+        focusLightDimOthers: false,
+        touchControls: "on",
+        touchControlSize: "large",
+        tapAnywhereReveal: true,
+        hotCornerPosition: "top-right",
+        hotCornerOpacity: 40,
+        hotCornerSize: 80,
+        hotCornerLongPressMs: 700,
       };
 
       configApi.getConfig.mockResolvedValue(mockConfig);
@@ -140,7 +146,16 @@ describe("useConfigForm", () => {
       const form = useConfigForm();
       await form.loadConfig();
 
-      expect(mockKeyboardStore.setKeyboardType).toHaveBeenCalledWith("5-button");
+      expect(form.localConfig.value).toMatchObject(mockConfig);
+    });
+
+    it("drops a leftover global room name so a full save cannot write it back (CLV-111)", async () => {
+      configApi.getConfig.mockResolvedValue({ displayName: "Lounge", display_name: "Lounge" });
+
+      const form = useConfigForm();
+      await form.loadConfig();
+
+      expect(form.localConfig.value).not.toHaveProperty("displayName");
     });
 
     it("should handle errors when loading config", async () => {
@@ -187,7 +202,6 @@ describe("useConfigForm", () => {
     it("should update a single config value", async () => {
       const mockConfig = { orientation: "landscape" };
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -196,9 +210,9 @@ describe("useConfigForm", () => {
       await form.updateConfigValue("orientation", "portrait");
 
       expect(form.localConfig.value.orientation).toBe("portrait");
-      expect(configApi.updateConfig).toHaveBeenCalledWith({
-        orientation: "portrait",
-      });
+      // One POST per save: the store sends it, configApi isn't called too (audit R9).
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
+      expect(mockConfigStore.updateConfig).toHaveBeenCalledTimes(1);
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith({
         orientation: "portrait",
       });
@@ -212,7 +226,6 @@ describe("useConfigForm", () => {
     it("should set saving flag during update", async () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -231,7 +244,7 @@ describe("useConfigForm", () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
       const error = new Error("Update failed");
-      configApi.updateConfig.mockRejectedValue(error);
+      mockConfigStore.updateConfig.mockRejectedValue(error);
 
       const form = useConfigForm();
       await form.loadConfig();
@@ -240,10 +253,13 @@ describe("useConfigForm", () => {
         "Update failed"
       );
 
-      expect(form.error.value).toBe("Update failed");
+      // CLV-63: one friendly sentence, never the raw error text.
+      expect(form.error.value).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(form.saveStatus.value).toEqual({
         state: "error",
-        message: "Update failed",
+        message: "Couldn't reach Calvin. Check that it's running and on the same network.",
       });
       expect(form.saving.value).toBe(false);
       expect(logErrorMock).toHaveBeenCalledWith("[useConfigForm]", "Failed to save config:", error);
@@ -254,13 +270,14 @@ describe("useConfigForm", () => {
       configApi.getConfig.mockResolvedValue(mockConfig);
       const error = {
         response: {
+          status: 422,
           data: {
             detail: "Validation error",
           },
         },
         message: "Request failed",
       };
-      configApi.updateConfig.mockRejectedValue(error);
+      mockConfigStore.updateConfig.mockRejectedValue(error);
 
       const form = useConfigForm();
       await form.loadConfig();
@@ -275,7 +292,6 @@ describe("useConfigForm", () => {
     it("should update multiple config values", async () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -290,7 +306,7 @@ describe("useConfigForm", () => {
 
       expect(form.localConfig.value.orientation).toBe("portrait");
       expect(form.localConfig.value.calendarSplit).toBe(75);
-      expect(configApi.updateConfig).toHaveBeenCalledWith(updates);
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(updates);
     });
 
@@ -300,7 +316,6 @@ describe("useConfigForm", () => {
         calendarSplit: 70,
       };
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -321,7 +336,6 @@ describe("useConfigForm", () => {
         orientation: "landscape",
       };
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -329,14 +343,13 @@ describe("useConfigForm", () => {
 
       await form.saveConfig();
 
-      expect(configApi.updateConfig).toHaveBeenCalledWith(form.localConfig.value);
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(form.localConfig.value);
     });
 
     it("should save specific updates", async () => {
       const mockConfig = {};
       configApi.getConfig.mockResolvedValue(mockConfig);
-      configApi.updateConfig.mockResolvedValue({});
       mockConfigStore.updateConfig.mockResolvedValue({});
 
       const form = useConfigForm();
@@ -346,7 +359,7 @@ describe("useConfigForm", () => {
 
       await form.saveConfig(updates);
 
-      expect(configApi.updateConfig).toHaveBeenCalledWith(updates);
+      expect(configApi.updateConfig).not.toHaveBeenCalled();
       expect(mockConfigStore.updateConfig).toHaveBeenCalledWith(updates);
     });
   });

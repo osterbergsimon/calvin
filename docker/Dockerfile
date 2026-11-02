@@ -1,0 +1,139 @@
+# Calvin runtime image — one image for backend + baked-in frontend dist.
+#
+# Stages:
+#   1. frontend-builder  — Vite-builds frontend/dist
+#   2. backend-builder   — uv installs backend deps into /app/.venv
+#   3. runtime           — slim Python with the venv + dist baked in
+#
+# The result is a single image that the FastAPI app serves under one
+# port: API at /api/*, SPA at everything else. No separate frontend
+# container, no nginx, no plugin install rebuild path.
+
+# ---------- 1. Frontend ----------
+# The dist is architecture-independent: build it once on the build host
+# instead of under QEMU for every target platform.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS frontend-builder
+
+WORKDIR /build
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+COPY frontend/ ./
+
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
+
+# The build context excludes .git, so stamp the same revision the backend
+# reports into index.html's frontend-version meta tag (CLV-63, calvin-hshq).
+ARG CALVIN_GIT_SHA=
+ENV GIT_COMMIT_HASH=${CALVIN_GIT_SHA}
+
+RUN npm run build
+
+
+# ---------- 2. Backend ----------
+FROM python:3.12-slim AS backend-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    gcc \
+    g++ \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libtiff-dev \
+    libwebp-dev \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+WORKDIR /build
+COPY backend/pyproject.toml backend/uv.lock ./
+COPY backend/app ./app
+COPY backend/alembic ./alembic
+COPY backend/alembic.ini ./
+
+RUN uv sync --frozen --no-dev
+
+
+# ---------- 3. Runtime ----------
+FROM python:3.12-slim AS runtime
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Backend (venv + source + alembic)
+COPY --from=backend-builder /build/.venv /app/.venv
+COPY --from=backend-builder /build/app /app/app
+COPY --from=backend-builder /build/alembic /app/alembic
+COPY --from=backend-builder /build/alembic.ini /app/alembic.ini
+
+# uv is what the plugin installer and the entrypoint use to pip-install
+# plugin dependencies into the persistent target on the data volume (the
+# uv venv has no pip). The image venv is replaced on every image update.
+COPY --from=backend-builder /usr/local/bin/uv /usr/local/bin/uv
+
+# Built-in themes ship with the code (read from <backend>/data/themes, not
+# the data dir). Everything the backend writes goes under CALVIN_DATA_DIR.
+COPY backend/data/themes/builtin.json /app/data/themes/builtin.json
+
+# Frontend dist — FastAPI serves /assets/* and falls back to index.html
+# for SPA routing. Backend's main.py probes ../frontend/dist relative
+# to /app/, so put the dist there.
+COPY --from=frontend-builder /build/dist /frontend/dist
+
+# Kiosk bundle + one-command installer, served to Raspberry Pi kiosks at
+# /api/kiosks/{install.sh,installer/*,agent/*} when this image is the server for
+# kiosk-only Pis (Mode B, e.g. Unraid). Same deploy/ + scripts/ layout as a checkout.
+COPY deploy/kiosk-agent /app/kiosk-bundle/deploy/kiosk-agent
+COPY deploy/systemd /app/kiosk-bundle/deploy/systemd
+COPY scripts/setup-kiosk.sh scripts/setup-common.sh /app/kiosk-bundle/scripts/
+
+# Runtime data directory: the root of every path the backend writes (DB,
+# images, plugins, themes, caches, logs, kiosk signing key, backups).
+# DATABASE_URL, IMAGE_DIR, PLUGIN_DIR, ... still override single paths.
+RUN mkdir -p /var/lib/calvin/db /var/lib/calvin/images /var/lib/calvin/plugins
+
+# The runtime image has no git: the API reads the version/revision from these
+# build args (stamped by .github/workflows/docker-build.yml), falling back to
+# app.__version__ when a develop build has no release version.
+ARG CALVIN_VERSION=
+ARG CALVIN_GIT_SHA=
+
+ENV CALVIN_DATA_DIR=/var/lib/calvin \
+    CALVIN_VERSION=${CALVIN_VERSION} \
+    CALVIN_GIT_SHA=${CALVIN_GIT_SHA} \
+    KIOSK_BUNDLE_DIR=/app/kiosk-bundle \
+    CALVIN_PORT=8000 \
+    CALVIN_DEPLOYMENT=docker \
+    VIRTUAL_ENV=/app/.venv \
+    UV_CACHE_DIR=/tmp/uv-cache \
+    PATH="/app/.venv/bin:$PATH"
+
+# Unraid convention: set PUID=99 / PGID=100 (nobody:users). The default
+# 0/0 keeps the server running as root, as before.
+ENV PUID=0 \
+    PGID=0
+
+COPY docker/entrypoint.sh /usr/local/bin/calvin-entrypoint
+
+EXPOSE 8000
+
+# Generous start period: on a fresh volume the entrypoint restores plugin
+# packages (and, as PUID/PGID, fixes appdata ownership) before the server
+# starts. Later starts find the persistent target current and skip that
+# network work. Failures during it don't count, and the first success ends
+# it, so a fast start is still reported healthy fast.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
+    CMD curl -fsS http://localhost:8000/api/health || exit 1
+
+ENTRYPOINT ["calvin-entrypoint"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

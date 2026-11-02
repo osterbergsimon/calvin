@@ -1,6 +1,8 @@
 # Plugin Installation Guide
 
-This guide explains how to install and manage plugins in Calvin.
+How to install and manage plugins in Calvin. Installation is **live** — a
+successfully installed plugin appears in the settings UI immediately, no
+server restart.
 
 ## Plugin Package Structure
 
@@ -9,23 +11,22 @@ A plugin package is a directory or zip file containing:
 ```
 my-plugin/
 ├── plugin.json          # Plugin manifest (required)
-├── plugin.py            # Plugin implementation (required)
-├── frontend/            # Frontend components (optional)
-│   └── MyComponent.vue
-└── assets/              # Static assets (optional)
-    └── icon.png
+├── plugin.py            # The plugin class (required)
+├── frontend/            # Pre-built web-component assets (optional)
+│   ├── dist.js
+│   └── dist.css
+└── assets/              # Backend static assets (optional)
 ```
 
 ## Plugin Manifest (plugin.json)
 
-The `plugin.json` file defines plugin metadata, dependencies, and installation requirements.
+Complete schema: [PLUGIN_PACKAGE_FORMAT.md](PLUGIN_PACKAGE_FORMAT.md).
 
-**See [PLUGIN_PACKAGE_FORMAT.md](./PLUGIN_PACKAGE_FORMAT.md#plugin-manifest-schema-pluginjson) for the complete schema specification.**
-
-### Minimal Example
+### Minimal example
 
 ```json
 {
+  "api_version": 1,
   "id": "my_plugin",
   "name": "My Plugin",
   "version": "1.0.0",
@@ -33,10 +34,11 @@ The `plugin.json` file defines plugin metadata, dependencies, and installation r
 }
 ```
 
-### Complete Example
+### Complete example
 
 ```json
 {
+  "api_version": 1,
   "id": "my_plugin",
   "name": "My Plugin",
   "version": "1.0.0",
@@ -46,299 +48,175 @@ The `plugin.json` file defines plugin metadata, dependencies, and installation r
   "license": "MIT",
   "homepage": "https://github.com/user/my-plugin",
   "keywords": ["api", "service"],
-  "dependencies": {
-    "python": ">=3.10",
-    "packages": {
-      "requests": ">=2.28.0",
-      "pydantic": "^2.0.0"
-    },
-    "calvin": ">=1.0.0"
-  },
+  "dependencies": {"packages": ["httpx>=0.27"]},
   "files": {
-    "include": ["plugin.py", "config.yaml"],
+    "include": ["plugin.py", "plugin.json"],
     "exclude": ["tests/**", "*.md"]
   },
-  "requirements": {
-    "restart_required": true,
-    "permissions": ["network"],
-    "config_required": true
-  }
+  "requirements": {"config_required": true}
 }
 ```
 
-### Required Fields
+Key points (details in the package format spec):
 
-- **`id`**: Unique plugin identifier (lowercase, underscores, hyphens)
-- **`name`**: Human-readable plugin name
-- **`version`**: Plugin version (semantic versioning)
-- **`type`**: Plugin type (`calendar`, `image`, or `service`)
-
-### Optional Fields
-
-#### Metadata
-- **`description`**: Plugin description
-- **`author`**: Plugin author name
-- **`license`**: License type (e.g., `"MIT"`, `"Apache-2.0"`)
-- **`homepage`**: Plugin homepage URL
-- **`repository`**: Source code repository URL
-- **`bugs`**: Bug tracker URL
-- **`keywords`**: Array of tags for discovery
-
-#### Dependencies
-- **`dependencies.python`**: Required Python version (e.g., `">=3.10"`)
-- **`dependencies.packages`**: Python package dependencies (PyPI names with version constraints)
-- **`dependencies.system`**: System-level dependencies
-- **`dependencies.calvin`**: Minimum required Calvin version
-
-#### Files
-- **`files.include`**: Array of files/directories to include (glob patterns)
-- **`files.exclude`**: Array of files/directories to exclude (glob patterns)
-
-#### Requirements
-- **`requirements.restart_required`**: Whether restart is needed after installation (default: `true`)
-- **`requirements.permissions`**: Array of required permissions (e.g., `["network", "filesystem"]`)
-- **`requirements.config_required`**: Whether configuration is required before use (default: `false`)
+- **`api_version`** (int) is required and must match the host's supported
+  contract version (currently `1`). Manifests without it — or with an older
+  or newer version — are rejected with a message saying whether to update the
+  plugin or update Calvin.
+- **`dependencies.packages`** is the only dependency mechanism: a list of pip
+  requirement strings, installed during install into the data dir's persistent
+  per-Python-version target (`<data dir>/python/<major>.<minor>/site-packages`),
+  which survives image updates. That target is searched *after* the
+  interpreter's own packages, so a plugin can never shadow a core dependency.
+- Retired keys (`format_version`, `protocol_version`, `python_dependencies`,
+  `dependencies.python`, `dependencies.calvin`) do nothing; the plugin-repo
+  validator rejects them.
 
 ## Plugin Implementation (plugin.py)
 
-The `plugin.py` file contains the plugin implementation using pluggy hooks:
+`plugin.py` declares one `BasePlugin`-family subclass with a
+`metadata = PluginMetadata(...)` attribute — no module-level hooks:
 
 ```python
 """My custom plugin."""
 
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ServicePlugin
 
 
 class MyServicePlugin(ServicePlugin):
-    """My custom service plugin."""
-
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        return {
-            "type_id": "my_plugin",
-            "plugin_type": PluginType.SERVICE,
-            "name": "My Plugin",
-            "description": "A custom plugin",
-            "version": "1.0.0",
-            "common_config_schema": {
-                "api_key": {
-                    "type": "password",
-                    "description": "API key",
-                    "ui": {
-                        "component": "password",
-                        "validation": {"required": True},
-                    },
-                },
+    metadata = PluginMetadata(
+        type_id="my_plugin",
+        name="My Plugin",
+        description="A custom plugin",
+        instance_config_schema={
+            "api_key": {
+                "type": "password",
+                "description": "API key",
+                "default": "",
+                "ui": {"component": "password", "validation": {"required": True}},
             },
-            "display_schema": {
-                "type": "api",
-                "api_endpoint": "/api/plugins/{service_id}/data",
-                "method": "GET",
-                "component": "my_plugin/MyComponent.vue",  # Optional: custom frontend component
-            },
-            "plugin_class": cls,
-        }
-
-    def __init__(self, plugin_id: str, name: str, api_key: str, enabled: bool = True):
-        """Initialize plugin."""
-        super().__init__(plugin_id, name, enabled)
-        self.api_key = api_key
-
-    async def initialize(self) -> None:
-        """Initialize the plugin."""
-        pass
-
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        pass
-
-    async def get_content(self) -> dict[str, Any]:
-        """Get service content for display."""
-        return {
-            "type": "api",
-            "url": f"/api/plugins/{self.plugin_id}/data",
-        }
-
-
-# Register plugin with pluggy
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register plugin type."""
-    return [MyServicePlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> MyServicePlugin | None:
-    """Create plugin instance."""
-    if type_id != "my_plugin":
-        return None
-
-    # enabled is supplied by Calvin's instance lifecycle; do not declare it in schemas.
-    enabled = config.get("enabled", False)
-    api_key = config.get("api_key", "")
-
-    return MyServicePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        api_key=api_key,
-        enabled=enabled,
+        },
+        display_schema={
+            "kind": "status",
+            "item": {"label": "Latest Value", "value_path": "$.value",
+                     "status_path": "$.status"},
+        },
     )
+
+    async def fetch(self, start_date=None, end_date=None):
+        """Return the payload display_schema binds to."""
+        return {"value": "ok", "status": "ok"}
 ```
 
-## Frontend Components
+The host discovers the class, generates the settings form from
+`instance_config_schema`, and constructs instances itself — see
+[PLUGIN_INTERFACE.md](PLUGIN_INTERFACE.md) and the authoring guide
+[`calvin-plugins/CREATING_PLUGINS.md`](https://github.com/osterbergsimon/calvin-plugins/tree/main/CREATING_PLUGINS.md).
 
-If your plugin provides frontend components, place them in the `frontend/` directory:
+## Plugin Display UI
 
-```
-my-plugin/
-├── plugin.json
-├── plugin.py
-└── frontend/
-    └── MyComponent.vue
-```
+Service plugins render through `display_schema` with a built-in `kind`
+(`status`, `card-grid`, `item-list`, `iframe`, `image-with-caption`,
+`metric-dashboard`, `weather-forecast`, `web-component`). For custom UI, ship
+a pre-built web component under `frontend/`; it is served at
+`/api/plugins/{plugin_id}/static/{asset}` and receives each data payload on
+its `data` property. There is never a frontend rebuild.
 
-**Important**: The `frontend/` directory contents will be copied to `frontend/src/components/plugins/{plugin_id}/` during installation.
-
-### Component Path in display_schema
-
-The component path in `display_schema.component` should be relative to `frontend/src/components/plugins/`:
-
-```python
-"display_schema": {
-    "type": "api",
-    "api_endpoint": "/api/plugins/{service_id}/data",
-    "method": "GET",
-    "component": "my_plugin/MyComponent.vue",  # {plugin_id}/ComponentName.vue
-}
-```
-
-**Example**: If your plugin ID is `my_plugin` and you have `frontend/MyComponent.vue`, the component path should be `my_plugin/MyComponent.vue`.
-
-### Subdirectories
-
-You can organize components in subdirectories:
-
-```
-my-plugin/
-└── frontend/
-    └── components/
-        └── MyComponent.vue
-```
-
-Then use: `"component": "my_plugin/components/MyComponent.vue"`
-
-### Frontend Component Installation
-
-During installation:
-1. The installer checks for a `frontend/` directory in your plugin package
-2. If found, it copies the entire `frontend/` directory to `frontend/src/components/plugins/{plugin_id}/`
-3. The component is then available via the path `{plugin_id}/...` in `display_schema.component`
-
-**Note**: The frontend components are automatically loaded by the `ServiceViewer` component using the `usePluginComponent` composable. No additional frontend code changes are needed.
+Full renderer reference: [PLUGIN_FRONTEND_COMPONENTS.md](PLUGIN_FRONTEND_COMPONENTS.md).
 
 ## Installing Plugins
 
-**See [PLUGIN_PACKAGE_FORMAT.md](./PLUGIN_PACKAGE_FORMAT.md) for the complete package format specification.**
-
 ### Via UI (Settings Page)
 
-1. **Upload Zip File**: Navigate to Settings → Plugins → Install New Plugin
-   - Click "Choose Zip File" and select a plugin zip file
-   - Zip files must contain exactly one plugin
-
-2. **Install from GitHub**:
-   - Enter GitHub repository URL
-   - Optionally specify a branch (defaults to main/master)
-   - Click "Browse Plugins" to see available plugins
-   - Select a plugin from the list and click "Install"
+1. **Upload zip file**: Settings → Plugins → Install New Plugin → choose a
+   zip containing exactly one plugin.
+2. **Install from GitHub**: enter the repository URL (optionally a branch),
+   click "Browse Plugins", pick a plugin, click "Install".
 
 ### Via API
 
-#### Upload Zip File
-
-1. **Package your plugin** as a zip file containing exactly one plugin
-2. **Upload via API**:
+Upload a zip:
 
 ```bash
 curl -X POST "http://localhost:8000/api/plugins/install" \
   -F "file=@my-plugin.zip"
 ```
 
-#### Install from GitHub Repository
-
-1. **Enumerate available plugins**:
+Install from a GitHub repository:
 
 ```bash
-curl "http://localhost:8000/api/plugins/enumerate-from-github?repo_url=https://github.com/user/repo&branch=main"
-```
-
-2. **Install a specific plugin**:
-
-```bash
-curl -X POST "http://localhost:8000/api/plugins/install-from-github" \
+# 1. Enumerate available plugins
+curl -X POST "http://localhost:8000/api/plugins/github/enumerate" \
   -H "Content-Type: application/json" \
-  -d '{
-    "repo_url": "https://github.com/user/repo",
-    "plugin_path": "plugin-directory",
-    "branch": "main"
-  }'
+  -d '{"repo_url": "https://github.com/user/repo", "branch": "main"}'
+
+# 2. Install one
+curl -X POST "http://localhost:8000/api/plugins/github/install" \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url": "https://github.com/user/repo", "plugin_path": "plugin-directory", "branch": "main"}'
 ```
 
-### Installation Process
+### What happens during install
 
-1. Plugin package is validated (checks for `plugin.json` and `plugin.py`)
-2. Plugin is extracted to `backend/data/plugins/{plugin_id}/`
-3. Frontend components are copied to `frontend/src/components/plugins/{plugin_id}/`
-4. Plugin is loaded and registered with pluggy
-5. Plugin type is added to the database (disabled by default)
+1. Package validated (structure, required fields, `api_version` gate).
+2. Files extracted to `backend/data/plugins/{plugin_id}/`.
+3. `dependencies.packages` pip-installed — **a failed package install rolls
+   the plugin back** and the error is returned.
+4. `plugin.py` imported; the plugin class is discovered and its
+   `PluginMetadata` validated — **a bad kind, retired display keys, or a
+   missing plugin class also roll the install back** with HTTP 400.
+5. The plugin type is registered in the database (disabled by default) and is
+   immediately visible in `GET /api/plugins` and the settings UI.
+
+Details: [PLUGIN_PERSISTENCE_AND_RESTART.md](PLUGIN_PERSISTENCE_AND_RESTART.md).
+
+### Common install errors
+
+| Error | Cause |
+|---|---|
+| `plugin.json must declare api_version …` | Manifest missing `api_version`. |
+| `api_version N is newer than this Calvin supports …` | Plugin targets a newer contract — update Calvin. |
+| `api_version N is no longer supported …` | Stale plugin — update/reinstall it from the plugin repository. |
+| `pip install failed for '<req>' …` | A `dependencies.packages` entry failed; the plugin was rolled back. |
+| `Plugin <id> failed validation: …` | `plugin.py` didn't import cleanly or declares no valid plugin class; rolled back. |
+| `Plugin <id> is already installed` | Uninstall first, or force-reinstall. |
 
 ## Managing Installed Plugins
 
-### List Installed Plugins
-
 ```bash
+# List installed plugins
 curl "http://localhost:8000/api/plugins/installed"
-```
 
-### Get Plugin Manifest
-
-```bash
+# Get a plugin's manifest
 curl "http://localhost:8000/api/plugins/installed/{plugin_id}"
-```
 
-### Uninstall Plugin
-
-```bash
+# Uninstall (stops instances, removes DB rows, unloads the module, deletes files)
 curl -X DELETE "http://localhost:8000/api/plugins/installed/{plugin_id}"
 ```
 
-## Plugin Discovery
+## Plugin Discovery at Startup
 
-Installed plugins are automatically discovered and loaded on application startup. The plugin loader:
+Installed plugins are also loaded on application startup:
 
-1. Scans `backend/data/plugins/` for installed plugins
-2. Loads each plugin's `plugin.py` file
-3. Registers plugins with pluggy
-4. Makes plugins available through the plugin registry
+1. The loader scans `backend/data/plugins/`.
+2. Each plugin's manifest `api_version` is checked — mismatches are skipped
+   with a recorded load error (surfaced as `error_message` in the plugin
+   listing).
+3. Each `plugin.py` is imported and its plugin class registered.
 
 ## Best Practices
 
-1. **Use semantic versioning** for plugin versions
-2. **Validate configuration** in `validate_config()` method
-3. **Handle errors gracefully** with proper error messages
-4. **Document dependencies** in `plugin.json`
-5. **Test plugins** before distribution
-6. **Follow naming conventions**: lowercase with underscores for IDs
+1. **Use semantic versioning** for the `version` field.
+2. **Validate configuration** in `validate_config` (async classmethod).
+3. **Return actionable error strings** in data payloads — they surface on
+   the dashboard.
+4. **Declare dependencies** in `dependencies.packages`.
+5. **Test before distribution** — run the plugin's test suite against the
+   Calvin backend (see CREATING_PLUGINS.md).
+6. **Follow naming conventions**: lowercase ids with underscores/hyphens.
 
-## Example Plugin Package
+## Examples
 
-See the built-in plugins in `backend/app/plugins/` for reference implementations.
+Reference plugin: [`mealie/`](https://github.com/osterbergsimon/calvin-plugins/tree/main/mealie) in
+`calvin-plugins`. Built-in plugins: `backend/app/plugins/{calendar,image,service}/`.

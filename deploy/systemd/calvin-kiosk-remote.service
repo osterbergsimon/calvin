@@ -1,0 +1,86 @@
+[Unit]
+Description=Calvin Dashboard Kiosk (remote backend)
+# The compositor is whatever the display-stack switch enabled (calvin-x.service
+# for X11, calvin-wayland.service for Wayland); it is deliberately not in Wants=
+# so an X11 unit can never be pulled into a Wayland session.
+# Do NOT add graphical.target to After=: this unit is WantedBy=multi-user.target,
+# and graphical.target is After=multi-user.target, so that pair is an ordering
+# cycle systemd breaks by deleting this job (the kiosk then never starts).
+# Wants= below still pulls the compositor in; After= orders us behind it.
+After=network-online.target calvin-x.service calvin-wayland.service
+Wants=network-online.target graphical.target
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+EnvironmentFile=/etc/default/calvin-kiosk
+# Session variables for the enabled stack: DISPLAY/XAUTHORITY on X11,
+# XDG_SESSION_TYPE/WAYLAND_DISPLAY/XDG_RUNTIME_DIR on Wayland. Written by setup;
+# the updater recreates it on older kiosks before installing these units.
+EnvironmentFile=/etc/default/calvin-kiosk-display
+Environment="HOME=/home/calvin"
+# Shell-side expansions are written $${...} (and % as %%): systemd expands
+# ${...} itself and turns e.g. ${CALVIN_BACKEND_URL%/} into an empty string.
+ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -sf "$${CALVIN_BACKEND_URL%%/}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin backend at ${CALVIN_BACKEND_URL} not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1 || { [ -n "$${WAYLAND_DISPLAY:-}" ] && [ -S "$${XDG_RUNTIME_DIR:-/run/user/1000}/$${WAYLAND_DISPLAY}" ]; }; do if [ $elapsed -ge $timeout ]; then echo "display server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/sleep 2
+ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
+ExecStartPre=/bin/sleep 1
+# The kiosk's own Chromium profile (see --user-data-dir below), so its cache
+# lives under that directory, not in the shared Chromium cache.
+ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.config/calvin-kiosk-chromium/Default/Cache/* "/home/calvin/.config/calvin-kiosk-chromium/Default/Code Cache"/* 2>/dev/null || true'
+# The display agent recovers from a renderer crash ("Aw, Snap!") by probing the
+# page over the Chrome DevTools Protocol: the crash leaves Chromium's browser
+# process alive, so Restart= alone never fires. Loopback only; the agent reads the
+# same CALVIN_KIOSK_CDP_PORT (default 9222) from the environment. Chromium 136+
+# (Trixie ships 156) ignores the debugging port on the default profile, so the
+# kiosk runs a dedicated one - never the user's browser profile.
+ExecStart=/bin/bash -c 'q=""; \
+    [ -n "${CALVIN_KIOSK_ID:-}" ] && q="kiosk=${CALVIN_KIOSK_ID}"; \
+    [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
+    url="$${CALVIN_BACKEND_URL%%/}/$${q:+?$${q}}"; \
+    /usr/bin/chromium \
+    $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
+    --kiosk \
+    --noerrdialogs \
+    --remote-debugging-port=$${CALVIN_KIOSK_CDP_PORT:-9222} \
+    --remote-debugging-address=127.0.0.1 \
+    --user-data-dir=/home/calvin/.config/calvin-kiosk-chromium \
+    --disable-infobars \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-features=TranslateUI,AudioServiceOutOfProcess \
+    --disable-ipc-flooding-protection \
+    --disable-background-networking \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --disable-backgrounding-occluded-windows \
+    --disable-breakpad \
+    --disable-component-update \
+    --disable-domain-reliability \
+    --disable-hang-monitor \
+    --disable-prompt-on-repost \
+    --disable-sync \
+    --disable-web-resources \
+    --metrics-recording-only \
+    --mute-audio \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-pings \
+    --use-mock-keychain \
+    --force-device-scale-factor=1 \
+    --disable-lcd-text \
+    --disable-application-cache \
+    --aggressive-cache-discard \
+    --disable-background-downloads \
+    --disk-cache-size=0 \
+    --media-cache-size=0 \
+    "$url"'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-kiosk
+
+[Install]
+WantedBy=multi-user.target

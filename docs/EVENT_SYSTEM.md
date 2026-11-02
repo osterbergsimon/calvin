@@ -25,6 +25,56 @@ The Calvin event system enables plugin-to-plugin communication and system-level 
 - **Rate Limiting**: 10 events/second per plugin per event type (configurable)
 - **No External Dependencies**: Pure asyncio implementation
 
+## Event Naming Convention
+
+Calvin distinguishes two namespaces:
+
+- **System-emitted events** use **bare snake_case** names that describe a noun + past-tense
+  verb: `image_uploaded`, `plugin_enabled`, `plugin_instance_started`. These are stable
+  contracts — the host owns them and won't rename them silently.
+- **Plugin-emitted events** must be **prefixed with the emitting plugin's `type_id`**:
+  `<plugin_id>.<event_name>`, e.g. `image_processor.image_processed`,
+  `mealie.recipe_imported`. The prefix prevents collisions between independently
+  developed plugins and makes log/trace output unambiguous.
+
+Subscribers may listen to either namespace. When you emit an event from a plugin, always
+include the prefix; when you subscribe, match the exact name.
+
+> **Legacy:** Some early plugins (notably `image-processor`) emit unprefixed events like
+> `image_processed` and `image_processing_failed`. New plugins **should** use the
+> prefixed form. Existing emitters will be migrated incrementally; subscribers should
+> tolerate both during the transition.
+
+## Event Registry
+
+Quick lookup of every event name a plugin author may want to emit or subscribe to. The
+detailed schema for each event lives in the section below.
+
+### System-emitted (stable contract)
+
+| Event | Emitted from | Trigger |
+|---|---|---|
+| `image_uploaded` | `LocalImagePlugin.scan_images()` | New image detected. |
+| `image_deleted` | `PluginImageService.delete_image()` | Image removed. |
+| `plugin_enabled` | `routes/plugins/management.update_plugin` | Plugin type enabled. |
+| `plugin_disabled` | `routes/plugins/management.update_plugin` | Plugin type disabled. |
+| `plugin_installed` | `routes/plugins/management.install_plugin` | Plugin installed. |
+| `plugin_uninstalled` | `routes/plugins/management.uninstall_plugin` | Plugin uninstalled. |
+| `plugin_instance_created` | `routes/plugins/instances.update_plugin_instance` | Instance row created. |
+| `plugin_instance_updated` | `routes/plugins/instances.update_plugin_instance` | Instance edited. |
+| `plugin_instance_started` | `routes/plugins/instances.start_plugin_instance` | Instance started. |
+| `plugin_instance_stopped` | `routes/plugins/instances.stop_plugin_instance` | Instance stopped. |
+
+### Plugin-emitted (example, not exhaustive)
+
+| Event | Emitter | Notes |
+|---|---|---|
+| `image_processed` | `image-processor` | Legacy unprefixed name; will become `image_processor.image_processed`. |
+| `image_processing_failed` | `image-processor` | Same — will become `image_processor.image_processing_failed`. |
+
+If you add a new event in your plugin, add a row here in the same PR so other plugin
+authors can find it.
+
 ## System-Emitted Events
 
 These events are emitted by the core system automatically:

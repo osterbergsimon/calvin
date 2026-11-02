@@ -1,46 +1,67 @@
-version: '3.8'
+# Calvin development compose — hot-reload backend + hot-reload frontend.
+#
+# Uses local source via bind mounts. Backend runs uvicorn --reload;
+# frontend runs Vite dev server with /api/* proxied to the backend.
+#
+# CALVIN_REPO_DIR controls the bind-mounted source tree. It defaults
+# to `..` (the repo root, when run with `docker compose -f
+# docker/docker-compose.dev.yml up`). The Pi setup writes the absolute
+# repo path into the .env file so the same compose can run from
+# /etc/calvin/.
+#
+# Usage from the repo (the Makefile wraps these):
+#   cp docker/dev.env.example docker/.env          # one-time (make install)
+#   docker compose -p calvin-dev-<checkout> -f docker/docker-compose.dev.yml up
+#
+# Several checkouts/worktrees can run side by side: there is no fixed
+# container_name, `make dev` passes a per-checkout project name, and the
+# host ports come from CALVIN_PORT / CALVIN_FRONTEND_PORT in docker/.env.
 
-# Development compose with hot-reload (no auto-pull, uses local code)
 services:
-  calvin-backend-dev:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.backend-dev
-    container_name: calvin-backend-dev
-    ports:
-      - "8000:8000"
-    volumes:
-      - ../backend:/app
-      - calvin-data:/app/data
-      - calvin-logs:/app/logs
+  calvin-backend:
+    image: python:3.12-slim
+    working_dir: /app/backend
     restart: unless-stopped
     environment:
-      - DATABASE_URL=sqlite:///app/data/db/calvin.db
-      - IMAGE_DIR=/app/data/images
-    command: uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-    networks:
-      - calvin-network
-
-  calvin-frontend-dev:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend-dev
-    container_name: calvin-frontend-dev
+      # Container-side data root (the mount below), so nothing the backend
+      # writes lands in the bind-mounted checkout.
+      CALVIN_DATA_DIR: /var/lib/calvin
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////var/lib/calvin/db/calvin.db}
+      IMAGE_DIR: ${IMAGE_DIR:-/var/lib/calvin/images}
+      PLUGIN_DIR: ${PLUGIN_DIR:-/var/lib/calvin/plugins}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:${CALVIN_FRONTEND_PORT:-5173},http://localhost:${CALVIN_PORT:-8000}}
+      CALVIN_MODE: dev
+      REPO_DIR: /app
+      UPDATE_SCRIPT_PATH: /app/scripts/update-calvin.sh
     ports:
-      - "5173:5173"
+      - "${CALVIN_PORT:-8000}:8000"
     volumes:
-      - ../frontend:/app
-      - /app/node_modules
+      - "${CALVIN_REPO_DIR:-..}:/app"
+      - "${CALVIN_DATA_DIR:-./.calvin-dev-data}:/var/lib/calvin"
+      - calvin-dev-venv:/app/backend/.venv
+    command: >
+      sh -c "
+        apt-get update && apt-get install -y --no-install-recommends curl git build-essential gcc g++ python3-dev libjpeg-dev zlib1g-dev libpng-dev libfreetype6-dev liblcms2-dev libtiff-dev libwebp-dev &&
+        pip install --no-cache-dir uv &&
+        uv sync --extra dev &&
+        uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+      "
+
+  calvin-frontend:
+    image: node:22-alpine
+    working_dir: /app/frontend
     restart: unless-stopped
-    command: npm run dev
-    networks:
-      - calvin-network
+    ports:
+      - "${CALVIN_FRONTEND_PORT:-5173}:5173"
+    environment:
+      VITE_API_PROXY_TARGET: http://calvin-backend:8000
+    volumes:
+      - "${CALVIN_REPO_DIR:-..}:/app"
+      - calvin-dev-node_modules:/app/frontend/node_modules
+    command: sh -c "npm install --prefer-offline --no-audit --no-fund && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - calvin-backend
 
 volumes:
-  calvin-data:
-  calvin-logs:
-
-networks:
-  calvin-network:
-    driver: bridge
-
+  calvin-dev-venv:
+  calvin-dev-node_modules:

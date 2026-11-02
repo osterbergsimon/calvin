@@ -1,10 +1,11 @@
 /** Tests for ClockBarHorizontal component. */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarHorizontal from "@/components/ClockBarHorizontal.vue";
 import { useConfigStore } from "@/stores/config";
+import { useKiosksStore } from "@/stores/kiosks";
 
 // Mock window.matchMedia
 Object.defineProperty(window, "matchMedia", {
@@ -24,7 +25,14 @@ Object.defineProperty(window, "matchMedia", {
 describe("ClockBarHorizontal", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    window.sessionStorage.clear();
   });
+
+  const globalMountOptions = {
+    stubs: {
+      BarActionCluster: true,
+    },
+  };
 
   it("should render when enabled and showInNonKiosk is true and UI is visible", () => {
     const store = useConfigStore();
@@ -38,7 +46,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -57,7 +65,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -76,7 +84,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -92,7 +100,7 @@ describe("ClockBarHorizontal", () => {
         enabled: false,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -111,7 +119,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -130,7 +138,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -151,7 +159,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -171,7 +179,7 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
@@ -191,12 +199,93 @@ describe("ClockBarHorizontal", () => {
         enabled: true,
       },
       global: {
-        plugins: [],
+        ...globalMountOptions,
       },
     });
 
     const timeElement = wrapper.find(".clock-time");
     expect(timeElement.exists()).toBe(true);
     expect(timeElement.attributes("style")).toContain("font-size: 24px");
+  });
+
+  it("shows a screen's own name in its clock bar", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    const store = useConfigStore();
+    store.showUI = true;
+    const kiosks = useKiosksStore();
+    kiosks.kiosks = [{ id: "kitchen", overrides: { displayName: "Vardagsrummet" } }];
+    kiosks.loadKiosks = vi.fn(async () => {});
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain("Vardagsrummet");
+  });
+
+  it("shows nothing in an unnamed screen's clock bar", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    // Only the screen's own Name override reaches the bar (CLV-84).
+    const store = useConfigStore();
+    store.showUI = true;
+    const kiosks = useKiosksStore();
+    kiosks.kiosks = [{ id: "kitchen", hostname: "kitchen-pi", overrides: {} }];
+    kiosks.loadKiosks = vi.fn(async () => {});
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+    await flushPromises();
+    expect(wrapper.find(".clock-bar-room").exists()).toBe(false);
+  });
+
+  it("shows no room in a browser that is not a set-up screen", async () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+    await flushPromises();
+    expect(wrapper.find(".clock-bar-room").exists()).toBe(false);
+  });
+
+  it("keeps the screen dots in the left group the phone rule hides", () => {
+    const store = useConfigStore();
+    store.showUI = true;
+    store.dashboardScreens = {
+      version: 2,
+      activeScreenId: "home",
+      screens: [
+        {
+          id: "home",
+          name: "Home",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "calendar", size: 100 }],
+          },
+        },
+        {
+          id: "media",
+          name: "Media",
+          activeRegionId: "region-1",
+          layout: {
+            version: 1,
+            preset: "single",
+            regions: [{ id: "region-1", kind: "photos", size: 100 }],
+          },
+        },
+      ],
+    };
+
+    const wrapper = mount(ClockBarHorizontal, {
+      props: { position: "top", showInNonKiosk: true, showInKiosk: false, enabled: true },
+      global: { stubs: { BarActionCluster: true } },
+    });
+
+    expect(wrapper.find(".clock-bar-left .screen-dots").exists()).toBe(true);
+    expect(wrapper.find(".clock-bar-content .clock-time").exists()).toBe(true);
   });
 });

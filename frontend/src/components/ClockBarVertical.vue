@@ -3,26 +3,90 @@
     v-if="shouldShow"
     class="clock-bar-vertical"
     :class="[`position-${position}`, { 'show-date': showDate }]"
-    :style="{ padding: `${barPadding}px` }"
+    :style="{ padding: barPaddingStyle }"
+    role="status"
+    aria-label="Status bar"
+    aria-live="polite"
   >
-    <div
-      class="clock-bar-content"
-      :class="{
-        'layout-single-line': layout === 'single-line',
-        'layout-two-lines': layout === 'two-lines',
-      }"
-    >
-      <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
-      <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
-        formattedDate
-      }}</span>
+    <div class="clock-bar-top">
+      <BarLogo v-if="showLogo" vertical />
+      <ScreenDots
+        v-if="!previewMode"
+        vertical
+        :screens="screens"
+        :active-screen-id="activeScreenId"
+        @select-screen="activateScreen"
+      />
+    </div>
+
+    <div class="clock-bar-middle">
+      <div
+        class="clock-bar-content"
+        :class="{
+          'layout-single-line': layout === 'single-line',
+          'layout-two-lines': layout === 'two-lines',
+          'layout-vertical-compact': isCompactLayout,
+          'layout-compact-date': layout === 'compact-time-date',
+        }"
+      >
+        <template v-if="isCompactLayout">
+          <span class="clock-time compact-time" :style="{ fontSize: `${fontSize}px` }">
+            <span>{{ compactTimeParts.hour }}</span>
+            <span>{{ compactTimeParts.minute }}</span>
+            <span v-if="compactTimeParts.second">{{ compactTimeParts.second }}</span>
+            <span v-if="compactTimeParts.dayPeriod" class="compact-period">{{
+              compactTimeParts.dayPeriod
+            }}</span>
+          </span>
+          <span
+            v-if="showDate && layout === 'compact-time-date' && compactDateParts"
+            class="clock-date compact-date compact-date-stacked"
+            :style="{ fontSize: `${dateFontSize}px` }"
+          >
+            <span v-if="compactDateParts.weekday">{{ compactDateParts.weekday }}</span>
+            <span>
+              {{ compactDateParts.day }}
+              {{ compactDateParts.month }}
+            </span>
+            <span v-if="compactDateParts.year" class="compact-date-year">{{
+              compactDateParts.year
+            }}</span>
+          </span>
+          <span
+            v-else-if="showDate"
+            class="clock-date compact-date"
+            :style="{ fontSize: `${dateFontSize}px` }"
+          >
+            {{ formattedDate }}
+          </span>
+        </template>
+        <template v-else>
+          <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
+          <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
+            formattedDate
+          }}</span>
+        </template>
+      </div>
+    </div>
+
+    <div class="clock-bar-bottom">
+      <PluginStatusbarItems orientation="vertical" :size="pluginItemSize" />
+
+      <BarActionCluster v-if="!previewMode" class="clock-bar-actions" :compact="true" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { computed } from "vue";
+import { useClockBar } from "../composables/useClockBar";
 import { useConfigStore } from "../stores/config";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { getActiveDashboardScreen } from "../utils/layout";
+import BarActionCluster from "./BarActionCluster.vue";
+import BarLogo from "./BarLogo.vue";
+import ScreenDots from "./ui/ScreenDots.vue";
+import PluginStatusbarItems from "./PluginStatusbarItems.vue";
 
 defineOptions({
   name: "ClockBarVertical",
@@ -66,196 +130,47 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  previewPluginItemSize: {
+    type: Number,
+    default: null,
+  },
+});
+
+const {
+  shouldShow,
+  showDate,
+  formattedTime,
+  compactTimeParts,
+  formattedDate,
+  compactDateParts,
+  fontSize,
+  dateFontSize,
+  pluginItemSize,
+  layout,
+  barPaddingStyle,
+} = useClockBar({
+  enabled: () => props.enabled,
+  showInKiosk: () => props.showInKiosk,
+  showInNonKiosk: () => props.showInNonKiosk,
+  previewMode: () => props.previewMode,
+  previewTimeSize: () => props.previewTimeSize,
+  previewDateSize: () => props.previewDateSize,
+  previewLayout: () => props.previewLayout,
+  previewPadding: () => props.previewPadding,
+  previewPluginItemSize: () => props.previewPluginItemSize,
+  orientation: () => "vertical",
 });
 
 const configStore = useConfigStore();
-
-const currentTime = ref(new Date());
-let timeInterval = null;
-
-// Check if clock bar should be displayed
-const shouldShow = computed(() => {
-  // Always show in preview mode
-  if (props.previewMode) return true;
-
-  if (!props.enabled) return false;
-
-  // Show in non-kiosk mode (UI visible)
-  if (props.showInNonKiosk && configStore.shouldShowUI) {
-    return true;
-  }
-  // Show in kiosk mode (UI hidden)
-  if (props.showInKiosk && !configStore.shouldShowUI) {
-    return true;
-  }
-  return false;
-});
-
-// Get timezone from config
-const timezone = computed(() => {
-  return configStore.timezone || null;
-});
-
-// Get time format from config
-const timeFormat = computed(() => {
-  return configStore.timeFormat || "24h";
-});
-
-// Get show date setting
-const showDate = computed(() => {
-  return configStore.clockShowDate || false;
-});
-
-// Get show seconds setting
-const showSeconds = computed(() => {
-  return configStore.clockShowSeconds || false;
-});
-
-// Get font sizes and layout (use preview props if in preview mode)
-const fontSize = computed(() => {
-  if (props.previewMode && props.previewTimeSize !== null) {
-    return props.previewTimeSize;
-  }
-  return configStore.clockBarFontSize || 16;
-});
-
-const dateFontSize = computed(() => {
-  if (props.previewMode && props.previewDateSize !== null) {
-    return props.previewDateSize;
-  }
-  return configStore.clockBarDateFontSize || 14;
-});
-
-const layout = computed(() => {
-  if (props.previewMode && props.previewLayout !== null) {
-    return props.previewLayout;
-  }
-  return configStore.clockBarLayout || "single-line";
-});
-
-const barPadding = computed(() => {
-  if (props.previewMode && props.previewPadding !== null) {
-    return props.previewPadding;
-  }
-  return configStore.clockBarPadding || 8;
-});
-
-// Format time
-const formattedTime = computed(() => {
-  const now = currentTime.value;
-
-  const options = {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: timeFormat.value === "12h",
-  };
-
-  if (showSeconds.value) {
-    options.second = "2-digit";
-  }
-
-  if (timezone.value) {
-    options.timeZone = timezone.value;
-  }
-
-  try {
-    return now.toLocaleTimeString(undefined, options);
-  } catch {
-    // Fallback if timezone is invalid
-    const fallbackOptions = {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: timeFormat.value === "12h",
-    };
-    if (showSeconds.value) {
-      fallbackOptions.second = "2-digit";
-    }
-    return now.toLocaleTimeString(undefined, fallbackOptions);
-  }
-});
-
-// Format date - respects locale and date format preferences
-const formattedDate = computed(() => {
-  if (!showDate.value) return "";
-
-  const now = currentTime.value;
-  const options = {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  };
-
-  if (timezone.value) {
-    options.timeZone = timezone.value;
-  }
-
-  try {
-    return now.toLocaleDateString(undefined, options);
-  } catch {
-    // Fallback if timezone is invalid
-    return now.toLocaleDateString(undefined, {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  }
-});
-
-// Update time
-const updateTime = () => {
-  if (!shouldShow.value) {
-    timeInterval = setTimeout(updateTime, 1000);
-    return;
-  }
-
-  currentTime.value = new Date();
-
-  const interval = showSeconds.value ? 1000 : 60000;
-  timeInterval = setTimeout(updateTime, interval);
-};
-
-// Watch for changes in clockShowSeconds to adjust update interval
-watch(
-  () => configStore.clockShowSeconds,
-  () => {
-    if (timeInterval) {
-      clearTimeout(timeInterval);
-      timeInterval = null;
-    }
-    if (shouldShow.value) {
-      updateTime();
-    }
-  }
+const showLogo = computed(() => configStore.clockBarShowLogo !== false);
+const isCompactLayout = computed(
+  () => layout.value === "compact-time" || layout.value === "compact-time-date"
 );
 
-// Watch for shouldShow changes to start/stop updates
-watch(shouldShow, newValue => {
-  if (newValue) {
-    if (!timeInterval) {
-      updateTime();
-    }
-  } else {
-    if (timeInterval) {
-      clearTimeout(timeInterval);
-      timeInterval = null;
-    }
-  }
-});
-
-onMounted(() => {
-  if (shouldShow.value) {
-    updateTime();
-  }
-});
-
-onUnmounted(() => {
-  if (timeInterval) {
-    clearTimeout(timeInterval);
-    timeInterval = null;
-  }
-});
+const { activateScreen } = useKeyboardActions();
+const screensConfig = computed(() => configStore.effectiveDashboardScreens);
+const screens = computed(() => screensConfig.value.screens);
+const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 </script>
 
 <style scoped>
@@ -263,66 +178,148 @@ onUnmounted(() => {
   height: 100%;
   width: auto;
   min-width: fit-content;
-  background: var(--bg-secondary);
-  border-right: 1px solid var(--border-color);
+  background: var(--bg-1);
+  border-right: 1px solid var(--line);
   display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--gap-3);
+  position: relative;
+  /* Above the dashboard stage (--z-raised) so the bar never sits under a
+     region's focus glow. */
+  z-index: var(--z-sticky);
   user-select: none;
   flex-shrink: 0;
   box-sizing: border-box;
-  /* Padding is set via inline style from barPadding computed property */
+  min-height: 0;
 }
 
 .clock-bar-vertical.position-right {
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--line);
   border-right: none;
 }
 
 .clock-bar-vertical.position-between {
+  z-index: var(--z-sticky);
   border: none;
-  background: transparent;
-  /* Padding is set via inline style from barPadding computed property */
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  border-radius: var(--radius-control);
+}
+
+.clock-bar-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--gap-2);
+  flex: 0 0 auto;
+}
+
+.clock-bar-middle {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-3);
+  min-height: 0;
+}
+
+.clock-bar-bottom {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gap-3);
+  min-height: 0;
 }
 
 .clock-bar-content {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  font-family: "Courier New", monospace;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
+  gap: var(--gap-1);
   white-space: nowrap;
+  text-align: center;
 }
 
 .clock-bar-content.layout-two-lines {
+  gap: var(--gap-1);
+}
+
+.clock-bar-content.layout-vertical-compact {
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--gap-2);
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}
+
+.compact-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-period {
+  margin-top: var(--gap-1);
+  font-size: 0.45em;
+  line-height: 1;
+}
+
+.compact-date {
+  max-height: 35vh;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compact-date-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-height: none;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-date-year {
+  font-size: 0.78em;
+  color: var(--ink-2);
 }
 
 .clock-time {
-  font-weight: 600;
-  color: var(--text-primary);
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: var(--weight-title);
+  color: var(--ink);
+  line-height: 1.1;
 }
 
 .clock-date {
-  color: var(--text-secondary);
-}
-
-/* Minimal styling for between position */
-.clock-bar-vertical.position-between {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink-2);
+  line-height: 1.1;
 }
 
 .clock-bar-vertical.position-between .clock-time {
-  font-size: 0.875rem;
+  font-size: var(--text-body);
 }
 
 .clock-bar-vertical.position-between .clock-date {
-  font-size: 0.75rem;
+  font-size: var(--text-caption);
+}
+
+.clock-bar-actions {
+  width: 100%;
+  flex: 0 0 auto;
 }
 </style>

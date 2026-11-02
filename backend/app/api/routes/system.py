@@ -2,22 +2,26 @@
 
 import asyncio
 import json
-import logging
 import os
 import re
 import shutil
+import socket
 import subprocess
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from loguru import logger
 
 from app.config import settings
 from app.services.display_power_service import display_power_service
-
-logger = logging.getLogger(__name__)
+from app.utils.errors import internal_error
+from app.utils.git_refs import validate_git_branch
+from app.utils.host_control import host_control_enabled, require_host_control
+from app.utils.platform import run_command
 
 router = APIRouter()
 
@@ -26,6 +30,27 @@ _RESTART_HELPER = Path("/usr/local/bin/restart-calvin-services.sh")
 # Delay before running `systemctl restart calvin-backend` so the HTTP response is sent first;
 # otherwise the client sees a network error even when restart succeeds.
 _BACKEND_RESTART_DELAY_SEC = 0.75
+
+# Shown wherever a host action is unavailable because Calvin runs in Docker.
+CONTAINER_UPDATE_INSTRUCTIONS = (
+    "Calvin runs in a Docker container, so updates and restarts happen on the host. "
+    "Unraid: Docker tab → Check for Updates → apply update. "
+    "Docker Compose: docker compose pull && docker compose up -d."
+)
+
+
+def _in_container() -> bool:
+    """True when running from the published Docker image (CALVIN_DEPLOYMENT=docker)."""
+    return settings.deployment == "docker"
+
+
+def _reject_in_container(action: str) -> None:
+    """Refuse a host-level action in a container instead of failing obscurely."""
+    if _in_container():
+        raise HTTPException(
+            status_code=409,
+            detail=f"{action} is not available in a container. {CONTAINER_UPDATE_INSTRUCTIONS}",
+        )
 
 
 def _restart_mechanism_available() -> bool:
@@ -53,17 +78,17 @@ def _attempt_restart_calvin_service(service: str) -> bool:
                 text=True,
             )
             if result.returncode == 0:
-                logger.info("%s restart initiated via helper script", service)
+                logger.info("{} restart initiated via helper script", service)
                 return True
             error_msg = result.stderr or result.stdout or "Unknown error"
-            logger.warning("Helper script failed: %s", error_msg)
+            logger.warning("Helper script failed: {}", error_msg)
         except FileNotFoundError:
             logger.warning("sudo not found")
         except subprocess.TimeoutExpired:
             logger.info("Helper script timed out (but may have initiated)")
             return True
-        except Exception as e:
-            logger.error("Helper script error: %s", e, exc_info=True)
+        except Exception:
+            logger.exception("Helper script error")
 
     try:
         result = subprocess.run(
@@ -73,25 +98,54 @@ def _attempt_restart_calvin_service(service: str) -> bool:
             text=True,
         )
         if result.returncode == 0:
-            logger.info("%s restart initiated via systemctl restart", service)
+            logger.info("{} restart initiated via systemctl restart", service)
             return True
-        logger.warning("systemctl restart failed: %s", result.stderr or "Unknown error")
+        logger.warning("systemctl restart failed: {}", result.stderr or "Unknown error")
     except FileNotFoundError:
         logger.warning("systemctl not found")
     except subprocess.TimeoutExpired:
         logger.info("systemctl restart timed out (but may have initiated)")
         return True
-    except Exception as e:
-        logger.error("systemctl restart error: %s", e, exc_info=True)
+    except Exception:
+        logger.exception("systemctl restart error")
 
     return False
 
 
+def _update_status_dir() -> Path:
+    """Root-owned dir the host updater writes its status to (calvin-1g25).
+
+    It lives outside calvin's checkout so the app user cannot plant a symlink
+    for root to write through. CALVIN_UPDATE_STATUS_DIR follows the updater's
+    own override. Older installs still have the files in the checkout, which
+    the fallbacks below keep reading.
+    """
+    return Path(os.environ.get("CALVIN_UPDATE_STATUS_DIR", "/var/lib/calvin-update-status"))
+
+
 _UPDATE_LOG_LOCATIONS = [
+    lambda: _update_status_dir() / "calvin-update.log",
     lambda: settings.repo_dir / "backend" / "logs" / "calvin-update.log",
     lambda: settings.repo_dir.parent / "calvin-update.log",
-    lambda: Path("/tmp/calvin-update.log"),
+    lambda: Path("/tmp/calvin-update.log"),  # nosec B108 - read-only fallback for log discovery
     lambda: Path("/var/log/calvin-update.log"),
+]
+_UPDATE_STATE_STALE_AFTER_SEC = 15 * 60
+_COMMIT_KEYS = {
+    "current_commit",
+    "current_commit_short",
+    "current_commit_msg",
+    "new_commit",
+    "new_commit_short",
+    "new_commit_msg",
+}
+
+_UPDATE_STATE_LOCATIONS = [
+    lambda: _update_status_dir() / "calvin-update-state.json",
+    lambda: settings.repo_dir / "backend" / "logs" / "calvin-update-state.json",
+    lambda: settings.repo_dir.parent / "calvin-update-state.json",
+    lambda: Path("/tmp/calvin-update-state.json"),  # nosec B108 - read-only fallback
+    lambda: Path("/var/log/calvin-update-state.json"),
 ]
 
 
@@ -103,6 +157,161 @@ def _find_update_log() -> Path | None:
     return None
 
 
+def _find_update_state() -> Path | None:
+    for loc_fn in _UPDATE_STATE_LOCATIONS:
+        p = loc_fn()
+        if p.exists():
+            return p
+    return None
+
+
+def _empty_update_status(status: str, message: str) -> dict[str, Any]:
+    return {
+        "status": status,
+        "message": message,
+        "current_commit": None,
+        "current_commit_short": None,
+        "current_commit_msg": None,
+        "new_commit": None,
+        "new_commit_short": None,
+        "new_commit_msg": None,
+        "backend_restarted": False,
+    }
+
+
+def _read_update_state(state_file: Path) -> dict[str, Any] | None:
+    try:
+        with open(state_file, encoding="utf-8") as f:
+            state = json.load(f)
+        return state if isinstance(state, dict) else None
+    except (OSError, json.JSONDecodeError):
+        logger.opt(exception=True).warning("Failed to read update state file: {}", state_file)
+        return None
+
+
+def _state_to_update_status(state: dict[str, Any], state_file: Path) -> dict[str, Any]:
+    raw_status = str(state.get("status") or "unknown").lower()
+    status = {
+        "success": "idle",
+        "complete": "idle",
+        "completed": "idle",
+        "running": "running",
+        "error": "error",
+        "failed": "error",
+    }.get(raw_status, "unknown")
+    message = str(state.get("message") or "Update status unknown. Check logs for details.")
+
+    if status == "running":
+        state_mtime = state_file.stat().st_mtime
+        stale_after = state.get("stale_after_seconds", _UPDATE_STATE_STALE_AFTER_SEC)
+        try:
+            stale_after = int(stale_after)
+        except (TypeError, ValueError):
+            stale_after = _UPDATE_STATE_STALE_AFTER_SEC
+
+        if (time.time() - state_mtime) > stale_after:
+            status = "error"
+            message = "Update appears to have stalled or failed"
+
+    data = _empty_update_status(status, message)
+    data.update(
+        {
+            "state_status": raw_status,
+            "phase": state.get("phase"),
+            "started_at": state.get("started_at"),
+            "updated_at": state.get("updated_at"),
+            "finished_at": state.get("finished_at"),
+            "error": state.get("error"),
+            "mode": state.get("mode"),
+            "branch": state.get("branch"),
+            "log_file": state.get("log_file"),
+            "state_file": str(state_file),
+            "backend_restarted": bool(state.get("backend_restarted", False)),
+        }
+    )
+
+    for key in _COMMIT_KEYS:
+        if key in state:
+            data[key] = state.get(key)
+
+    return data
+
+
+def _primary_ip() -> str | None:
+    """The address of the interface that carries the default route (no packet sent)."""
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(("10.255.255.255", 1))
+        return str(sock.getsockname()[0])
+    except OSError:
+        return None
+    finally:
+        sock.close()
+
+
+def _detect_lan_ips() -> list[str]:
+    """Non-loopback IPv4 addresses of this host, primary interface first."""
+    ips: list[str] = []
+    primary = _primary_ip()
+    if primary:
+        ips.append(primary)
+    try:
+        _, _, host_ips = socket.gethostbyname_ex(socket.gethostname())
+    except OSError:
+        host_ips = []
+    for ip in host_ips:
+        if ip not in ips:
+            ips.append(ip)
+    return [ip for ip in ips if not ip.startswith("127.")]
+
+
+@router.get("/network")
+async def get_network_info(request: Request):
+    """How a phone or a new kiosk can reach this server (first-run setup hand-off).
+
+    ``public_url`` (the PUBLIC_URL setting) is authoritative when set; otherwise
+    ``lan_urls`` lists the detected LAN addresses on the port this request used.
+    """
+    port = request.url.port or settings.api_port
+    return {
+        "public_url": settings.public_url.rstrip("/") or None,
+        "lan_urls": [f"http://{ip}:{port}" for ip in _detect_lan_ips()],
+        "hostname": socket.gethostname(),
+        "port": port,
+    }
+
+
+@router.get("/environment")
+async def get_environment():
+    """Report the deployment and which host actions the UI can offer."""
+    if _in_container():
+        return {
+            "deployment": "docker",
+            "host_control": False,
+            "capabilities": {"update": False, "restart": False, "reboot": False},
+            "update_instructions": CONTAINER_UPDATE_INSTRUCTIONS,
+        }
+    if not host_control_enabled():
+        # Native, but not a machine Calvin owns (dev backend, desktop). The
+        # routes answer 409; offering the buttons would only produce errors.
+        return {
+            "deployment": "native",
+            "host_control": False,
+            "capabilities": {"update": False, "restart": False, "reboot": False},
+            "update_instructions": None,
+        }
+    return {
+        "deployment": "native",
+        "host_control": True,
+        "capabilities": {
+            "update": settings.get_update_script_path().exists(),
+            "restart": _restart_mechanism_available(),
+            "reboot": True,
+        },
+        "update_instructions": None,
+    }
+
+
 @router.post("/update")
 async def trigger_update():
     """
@@ -110,6 +319,9 @@ async def trigger_update():
     Runs the update script asynchronously and returns immediately.
     """
     from app.services.config_service import config_service
+
+    _reject_in_container("Updating from the UI")
+    require_host_control("Updating from the UI")
 
     update_script = settings.get_update_script_path()
 
@@ -120,17 +332,43 @@ async def trigger_update():
         )
 
     try:
-        # Get git branch from config
-        git_branch = await config_service.get_value("git_branch", "main")
+        # Get git branch from config. It reaches git and the update script, and
+        # may predate validation (audit S7), so check it again here.
+        git_branch = await config_service.get_value("git_branch", "develop") or "develop"
+        try:
+            validate_git_branch(git_branch)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail="The configured update branch is invalid; set it again in Settings",
+            ) from exc
 
         # Ensure log directory exists
         log_dir = settings.repo_dir / "backend" / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / "calvin-update.log"
+        state_file = log_dir / "calvin-update-state.json"
 
         # Capture current end-of-file position so the stream endpoint knows
         # where this run's output begins (the log is appended, not truncated).
         log_offset = int(log_file.stat().st_size) if log_file.exists() else 0
+
+        state_file.write_text(
+            json.dumps(
+                {
+                    "status": "running",
+                    "phase": "starting",
+                    "message": "Starting Calvin update",
+                    "mode": os.environ.get("CALVIN_MODE"),
+                    "branch": git_branch,
+                    "log_file": str(log_file),
+                    "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
 
         # Run update script in background (non-blocking)
         # Redirect both stdout and stderr to log file AND keep them for error checking
@@ -145,13 +383,13 @@ async def trigger_update():
                     **os.environ,
                     "PATH": settings.system_path,
                     "GIT_BRANCH": git_branch,  # Pass git branch to update script
+                    "UPDATE_LOG_FILE": str(log_file),
+                    "UPDATE_STATE_FILE": str(state_file),
                 },
             )
 
         # Wait a moment to see if process starts successfully
-        import time
-
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
 
         # Check if process is still running (didn't immediately fail)
         if process.poll() is not None:
@@ -169,19 +407,45 @@ async def trigger_update():
                     "Log file not created. Script may not be executable or may have failed."
                 )
 
-            raise HTTPException(status_code=500, detail=error_msg)
+            state_file.write_text(
+                json.dumps(
+                    {
+                        "status": "error",
+                        "phase": "starting",
+                        "message": "Update script exited immediately.",
+                        "error": error_msg,
+                        "branch": git_branch,
+                        "log_file": str(log_file),
+                        "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "finished_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            logger.error(error_msg)
+            raise internal_error(
+                "update_start_failed",
+                "The update script exited immediately. Check the update log for details.",
+            )
 
         return {
             "status": "started",
             "message": f"Update process started (PID: {process.pid})",
             "pid": process.pid,
             "log_file": str(log_file),
+            "state_file": str(state_file),
             "log_offset": log_offset,
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to start update process: {str(e)}")
+        raise internal_error(
+            "update_start_failed",
+            "Could not start the update process. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.get("/update/status")
@@ -190,20 +454,18 @@ async def get_update_status():
     Get the status of the last update.
     Reads the last few lines from the update log.
     """
+    state_file = _find_update_state()
+    if state_file:
+        state = _read_update_state(state_file)
+        if state:
+            return _state_to_update_status(state, state_file)
+
     log_file = _find_update_log()
 
     if not log_file or not log_file.exists():
-        return {
-            "status": "unknown",
-            "message": "Update log not found. No updates have been run yet.",
-            "current_commit": None,
-            "current_commit_short": None,
-            "current_commit_msg": None,
-            "new_commit": None,
-            "new_commit_short": None,
-            "new_commit_msg": None,
-            "backend_restarted": False,
-        }
+        return _empty_update_status(
+            "unknown", "Update log not found. No updates have been run yet."
+        )
 
     try:
         # Read last 50 lines of log for better context (increased to capture commit info)
@@ -249,7 +511,7 @@ async def get_update_status():
                 try:
                     repo_path = settings.repo_dir
                     if (repo_path / ".git").exists():
-                        result = subprocess.run(
+                        result = await run_command(
                             ["git", "rev-parse", new_commit_short],
                             cwd=str(repo_path),
                             capture_output=True,
@@ -390,18 +652,12 @@ async def get_update_status():
             "backend_restarted": has_backend_restarted,
         }
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to read update log: {str(e)}",
-            "last_log": "",
-            "current_commit": None,
-            "current_commit_short": None,
-            "current_commit_msg": None,
-            "new_commit": None,
-            "new_commit_short": None,
-            "new_commit_msg": None,
-            "backend_restarted": False,
-        }
+        logger.opt(exception=e).error("Failed to read the update log")
+        data = _empty_update_status(
+            "error", "Failed to read the update log. Check the server logs for details."
+        )
+        data["last_log"] = ""
+        return data
 
 
 @router.get("/update/stream")
@@ -416,11 +672,48 @@ async def stream_update_log(log_offset: int = 0):
         timeout_sec = 10 * 60
         inactivity_timeout_sec = 90
         has_started = False
+        last_state_mtime = None
 
         while time.time() - start_time < timeout_sec:
             if time.time() - last_keepalive > 15:
                 yield ": keepalive\n\n"
                 last_keepalive = time.time()
+
+            state_file = _find_update_state()
+            if state_file:
+                try:
+                    state_mtime = state_file.stat().st_mtime
+                    if state_mtime != last_state_mtime:
+                        last_state_mtime = state_mtime
+                        last_activity = time.time()
+                        state = _read_update_state(state_file)
+                        if state:
+                            status_data = _state_to_update_status(state, state_file)
+                            stream_status = status_data["status"]
+                            if stream_status == "idle":
+                                stream_status = "complete"
+
+                            yield (
+                                "data: "
+                                + json.dumps(
+                                    {
+                                        "type": "status",
+                                        "status": stream_status,
+                                        "state": status_data,
+                                        "message": status_data.get("message"),
+                                        "phase": status_data.get("phase"),
+                                    }
+                                )
+                                + "\n\n"
+                            )
+
+                            if stream_status in {"complete", "error"}:
+                                return
+                except Exception as e:
+                    logger.opt(exception=e).error("Update state stream failed")
+                    yield (
+                        f"data: {json.dumps({'type': 'log', 'line': '[state stream error: see server logs]'})}\n\n"
+                    )
 
             log_file = _find_update_log()
             if log_file:
@@ -446,7 +739,10 @@ async def stream_update_log(log_offset: int = 0):
                             yield f"data: {json.dumps({'type': 'status', 'status': 'complete'})}\n\n"
                             return
                 except Exception as e:
-                    yield f"data: {json.dumps({'type': 'log', 'line': f'[stream error: {e}]'})}\n\n"
+                    logger.opt(exception=e).error("Update log stream failed")
+                    yield (
+                        f"data: {json.dumps({'type': 'log', 'line': '[stream error: see server logs]'})}\n\n"
+                    )
 
             if has_started and (time.time() - last_activity) > inactivity_timeout_sec:
                 yield f"data: {json.dumps({'type': 'status', 'status': 'error', 'message': 'Update appears to have stalled or failed. Check logs.'})}\n\n"
@@ -470,21 +766,31 @@ async def stream_update_log(log_offset: int = 0):
 @router.post("/display/power/on")
 async def turn_display_on():
     """Turn display on."""
+    require_host_control("Turning the display on")
     try:
         await display_power_service.turn_display_on()
         return {"status": "success", "message": "Display turned on"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to turn display on: {str(e)}")
+        raise internal_error(
+            "display_power_on_failed",
+            "Could not turn the display on. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/display/power/off")
 async def turn_display_off():
     """Turn display off."""
+    require_host_control("Turning the display off")
     try:
         await display_power_service.turn_display_off()
         return {"status": "success", "message": "Display turned off"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to turn display off: {str(e)}")
+        raise internal_error(
+            "display_power_off_failed",
+            "Could not turn the display off. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.get("/display/power/state")
@@ -494,19 +800,26 @@ async def get_display_state():
         state = await display_power_service.get_display_state()
         return state
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get display state: {str(e)}")
+        raise internal_error(
+            "display_state_failed",
+            "Could not read the display state. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/display/timeout/configure")
 async def configure_display_timeout():
     """Apply display timeout settings immediately."""
+    require_host_control("Configuring the display timeout")
     try:
         await display_power_service.configure_display_timeout()
         return {"status": "success", "message": "Display timeout configured"}
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to configure display timeout: {str(e)}"
-        )
+        raise internal_error(
+            "display_timeout_failed",
+            "Could not configure the display timeout. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/reload-ui")
@@ -516,6 +829,7 @@ async def reload_ui():
     This endpoint doesn't actually reload anything server-side,
     but can be used to trigger a client-side reload.
     """
+    require_host_control("Reloading the UI")
     return {
         "status": "success",
         "message": "UI reload signal sent. Clients should reload.",
@@ -528,14 +842,14 @@ async def restart_frontend():
     Restart the frontend service.
     Uses a helper script with sudo permissions to restart the calvin-frontend service.
     """
+    _reject_in_container("Restarting the frontend")
+    require_host_control("Restarting the frontend")
     try:
         if not _restart_mechanism_available():
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "No restart method available (missing /usr/local/bin/restart-calvin-services.sh "
-                    "and systemctl not found)."
-                ),
+            raise internal_error(
+                "restart_unavailable",
+                "No restart method is available on this system (missing "
+                "/usr/local/bin/restart-calvin-services.sh and systemctl).",
             )
         threading.Thread(
             target=lambda: _attempt_restart_calvin_service("frontend"), daemon=True
@@ -547,8 +861,11 @@ async def restart_frontend():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Frontend restart error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to restart frontend service: {str(e)}")
+        raise internal_error(
+            "frontend_restart_failed",
+            "Could not restart the frontend service. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/restart-backend")
@@ -561,14 +878,14 @@ async def restart_backend():
     can return HTTP 200 before systemd stops it; otherwise clients typically see a
     network error even when the restart succeeds.
     """
+    _reject_in_container("Restarting the backend")
+    require_host_control("Restarting the backend")
     try:
         if not _restart_mechanism_available():
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "No restart method available (missing /usr/local/bin/restart-calvin-services.sh "
-                    "and systemctl not found)."
-                ),
+            raise internal_error(
+                "restart_unavailable",
+                "No restart method is available on this system (missing "
+                "/usr/local/bin/restart-calvin-services.sh and systemctl).",
             )
 
         def _run_restart() -> None:
@@ -590,13 +907,19 @@ async def restart_backend():
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Backend restart error: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to restart backend service: {str(e)}")
+        raise internal_error(
+            "backend_restart_failed",
+            "Could not restart the backend service. Check the server logs for details.",
+            error=e,
+        ) from e
 
 
 @router.post("/reboot")
 async def reboot_system():
     """Reboot the Raspberry Pi."""
+    # In a container this would target the host (e.g. the Unraid server), never the kiosk.
+    _reject_in_container("Rebooting")
+    require_host_control("Rebooting")
     try:
         # Try multiple methods to reboot
         # Note: The backend service runs with NoNewPrivileges=true, so sudo might not work
@@ -605,7 +928,7 @@ async def reboot_system():
 
         # Method 1: systemctl reboot (might work without sudo)
         try:
-            result = subprocess.run(
+            result = await run_command(
                 ["systemctl", "reboot"],
                 capture_output=True,
                 timeout=5,
@@ -620,14 +943,14 @@ async def reboot_system():
         except subprocess.TimeoutExpired:
             logger.info("systemctl reboot timed out (but may have initiated)")
             reboot_attempted = True
-        except Exception as e:
-            logger.error(f"systemctl reboot error: {e}", exc_info=True)
+        except Exception:
+            logger.exception("systemctl reboot error")
 
         # Method 2: Use dbus to call systemd-logind (alternative to systemctl)
         # This might work if polkit rules are configured
         if not reboot_attempted:
             try:
-                result = subprocess.run(
+                result = await run_command(
                     [
                         "dbus-send",
                         "--system",
@@ -651,8 +974,8 @@ async def reboot_system():
             except subprocess.TimeoutExpired:
                 logger.info("dbus reboot timed out (but may have initiated)")
                 reboot_attempted = True
-            except Exception as e:
-                logger.error(f"dbus reboot error: {e}", exc_info=True)
+            except Exception:
+                logger.exception("dbus reboot error")
 
         if reboot_attempted:
             return {"status": "success", "message": "System reboot initiated"}
@@ -665,9 +988,15 @@ async def reboot_system():
                 "Check logs for details."
             )
             logger.error(error_detail)
-            raise HTTPException(status_code=500, detail=error_detail)
+            raise internal_error(
+                "reboot_failed",
+                "No reboot method worked. Check the polkit rules and the server logs.",
+            )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Reboot error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to reboot system: {str(e)}")
+        raise internal_error(
+            "reboot_failed",
+            "Could not reboot the system. Check the server logs for details.",
+            error=e,
+        ) from e

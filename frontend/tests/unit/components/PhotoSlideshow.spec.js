@@ -4,11 +4,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
+import { mdiChevronLeft, mdiChevronRight, mdiFullscreen } from "@mdi/js";
 import PhotoSlideshow from "@/components/PhotoSlideshow.vue";
 import { useImagesStore } from "@/stores/images";
 import { useConfigStore } from "@/stores/config";
+import { useProgressStore } from "@/stores/progress";
 
 describe("PhotoSlideshow", () => {
   let imagesStore;
@@ -80,8 +82,21 @@ describe("PhotoSlideshow", () => {
       const wrapper = createWrapper();
 
       expect(wrapper.find(".photo-placeholder").exists()).toBe(true);
-      expect(wrapper.find(".photo-placeholder").text()).toContain("No images available");
-      expect(wrapper.find(".photo-info").text()).toContain("data/images");
+      expect(wrapper.find(".photo-placeholder").text()).toContain("No photos yet");
+      // Points at the real place to add photos, not a server directory (F3)
+      expect(wrapper.find(".photo-placeholder").text()).toContain(
+        "Settings › Content › Image sources"
+      );
+      expect(wrapper.find(".photo-placeholder").text()).not.toContain("data/images");
+    });
+
+    it("the empty state's button deep-links to photo upload", () => {
+      imagesStore.loading = false;
+      imagesStore.currentImage = null;
+      const wrapper = createWrapper();
+      const empty = wrapper.findComponent({ name: "EmptyState" });
+      expect(empty.props("settingId")).toBe("content-images");
+      expect(wrapper.find('[data-test="empty-state-action"]').text()).toBe("Add photos");
     });
 
     it("should display image when available", () => {
@@ -96,37 +111,72 @@ describe("PhotoSlideshow", () => {
       expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1");
     });
 
-    it("should show error message when error exists", () => {
+    it("keeps raw error text off the wall (CLV-63)", () => {
       imagesStore.error = "Failed to load images";
       configStore.showUI = true;
       const wrapper = createWrapper();
 
-      expect(wrapper.find(".error-message").exists()).toBe(true);
-      expect(wrapper.find(".error-message").text()).toBe("Failed to load images");
+      expect(wrapper.find(".error-message").exists()).toBe(false);
+      expect(wrapper.text()).not.toContain("Failed to load images");
     });
   });
 
   describe("Header Display", () => {
-    it("should show header when UI is visible and not fullscreen", () => {
+    it("does not render a region title (content speaks for itself)", () => {
       configStore.showUI = true;
       const wrapper = createWrapper({ isFullscreen: false });
 
-      expect(wrapper.find(".slideshow-header").exists()).toBe(true);
-      expect(wrapper.find("h2").text()).toBe("Photos");
+      // Cycle B removed the large region title; the header is a slim controls
+      // strip only (no "Photos" heading).
+      expect(wrapper.find(".dashboard-panel__title").exists()).toBe(false);
+      expect(wrapper.find("h2").exists()).toBe(false);
     });
 
     it("should hide header when fullscreen", () => {
       configStore.showUI = true;
       const wrapper = createWrapper({ isFullscreen: true });
 
-      expect(wrapper.find(".slideshow-header").exists()).toBe(false);
+      expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
     });
 
     it("should hide header when UI is hidden", () => {
       configStore.showUI = false;
       const wrapper = createWrapper({ isFullscreen: false });
 
-      expect(wrapper.find(".slideshow-header").exists()).toBe(false);
+      expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
+    });
+
+    it("follows Dashboard size for the header controls", () => {
+      configStore.touchControlSize = "xsmall";
+      const small = createWrapper({ focused: true });
+      configStore.touchControlSize = "xlarge";
+      const large = createWrapper({ focused: true });
+      const rail = w =>
+        w.find(".region-header-controls").element.style.getPropertyValue("--region-rail-h");
+
+      expect(rail(small)).toBe("22px");
+      expect(rail(large)).toBe("40px");
+    });
+
+    it("uses mdi chevrons and a mdi fullscreen icon, not text glyphs", () => {
+      const wrapper = createWrapper({ focused: true });
+      const buttons = wrapper.findAll(".region-header-controls .icon-btn");
+
+      expect(buttons).toHaveLength(3);
+      expect(buttons.map(b => b.find("path").attributes("d"))).toEqual([
+        mdiChevronLeft,
+        mdiChevronRight,
+        mdiFullscreen,
+      ]);
+      for (const button of buttons) expect(button.text()).toBe("");
+    });
+
+    it("uses the neutral fullscreen control, matching calendar and service", () => {
+      const wrapper = createWrapper({ focused: true });
+      const fullscreen = wrapper.find('.region-header-controls [data-action="expand"]');
+
+      expect(fullscreen.classes()).toContain("icon-btn--default");
+      expect(fullscreen.classes()).not.toContain("icon-btn--primary");
     });
   });
 
@@ -151,34 +201,131 @@ describe("PhotoSlideshow", () => {
   });
 
   describe("Display Modes", () => {
-    it("should apply display mode class", () => {
+    it("should apply fit class passed by the region", () => {
       const image = createImage();
       imagesStore.currentImage = image;
-      configStore.imageDisplayMode = "fill";
-      const wrapper = createWrapper();
+      const wrapper = createWrapper({ fit: "fill" });
 
       expect(wrapper.find(".photo-image").classes()).toContain("photo-image-fill");
     });
 
-    it("should apply smart mode class", () => {
+    it("defaults to smart when the region has no fit", () => {
       const image = createImage();
       imagesStore.currentImage = image;
-      configStore.imageDisplayMode = "smart";
       const wrapper = createWrapper();
 
       expect(wrapper.find(".photo-image").classes()).toContain("photo-image-smart");
     });
+  });
 
-    it("should calculate smart mode styling for landscape images", () => {
-      const image = createImage({ width: 1920, height: 1080 }); // 16:9 landscape
-      imagesStore.currentImage = image;
-      configStore.imageDisplayMode = "smart";
-      configStore.orientation = "landscape";
-      const wrapper = createWrapper();
+  describe("Smart fit measures the region (CLV-49)", () => {
+    let observers;
+
+    beforeEach(() => {
+      observers = [];
+      globalThis.ResizeObserver = class {
+        constructor(callback) {
+          this.callback = callback;
+          this.observe = vi.fn();
+          this.disconnect = vi.fn();
+          this.unobserve = vi.fn();
+          observers.push(this);
+        }
+      };
+    });
+
+    afterEach(() => {
+      delete globalThis.ResizeObserver;
+    });
+
+    const setContainer = async (wrapper, width, height) => {
+      // Mount's async hook observes the container after its image fetch settles.
+      for (let i = 0; i < 10 && observers.length === 0; i += 1) {
+        await Promise.resolve();
+      }
+      await wrapper.vm.$nextTick();
+      // The component's own observer is the one watching the photo container.
+      const observer = observers[observers.length - 1];
+      observer.callback([{ contentRect: { width, height } }]);
+      await wrapper.vm.$nextTick();
+    };
+
+    it("fills a 16:9 region with a 3:2 photo", async () => {
+      imagesStore.currentImage = createImage({ width: 1500, height: 1000 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
 
       const img = wrapper.find(".photo-image");
-      // Smart mode should return objectFit based on aspect ratio
-      expect(img.classes()).toContain("photo-image-smart");
+      expect(img.attributes("style")).toContain("object-fit: cover");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
+    });
+
+    it("shows a portrait photo whole over a blurred backdrop in a full-width region", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      const img = wrapper.find(".photo-image");
+      expect(img.attributes("style")).toContain("object-fit: contain");
+      const backdrop = wrapper.find(".photo-backdrop");
+      expect(backdrop.exists()).toBe(true);
+      expect(backdrop.attributes("src")).toBe("/api/images/1");
+      expect(backdrop.attributes("aria-hidden")).toBe("true");
+    });
+
+    it("shows a landscape photo whole in a 9:16 region", async () => {
+      imagesStore.currentImage = createImage({ width: 1600, height: 900 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 900, 1600);
+
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(true);
+    });
+
+    it("recomputes the decision when the region is resized", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+
+      await setContainer(wrapper, 1600, 900); // 16:9 → whole photo
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+
+      await setContainer(wrapper, 1000, 1500); // portrait → fill
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: cover");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
+    });
+
+    it("uses naturalWidth/naturalHeight when stored dimensions are missing", async () => {
+      imagesStore.currentImage = createImage({ width: undefined, height: undefined });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      // Unknown shape: contain until the photo reports its own size.
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+
+      const img = wrapper.find(".photo-image");
+      Object.defineProperty(img.element, "naturalWidth", { value: 1600 });
+      Object.defineProperty(img.element, "naturalHeight", { value: 900 });
+      await img.trigger("load");
+      await wrapper.vm.$nextTick();
+
+      expect(img.attributes("style")).toContain("object-fit: cover");
+    });
+
+    it("Whole photo renders the backdrop", async () => {
+      imagesStore.currentImage = createImage({ width: 1500, height: 1000 });
+      const wrapper = createWrapper({ fit: "fit" });
+
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(true);
+    });
+
+    it("photo frame uses Smart whatever the region's fit is", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "fill", isFullscreen: true });
+      await setContainer(wrapper, 1600, 900);
+
+      expect(wrapper.find(".photo-image").classes()).toContain("photo-image-smart");
+      expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
     });
   });
 
@@ -218,7 +365,8 @@ describe("PhotoSlideshow", () => {
       await vi.waitFor(() => {
         expect(imagesStore.fetchImages).toHaveBeenCalled();
       });
-      await wrapper.vm.$nextTick(); // Wait for startAutoRotation to be called
+      // Let the mounted hook's fetch chain settle so startAutoRotation runs.
+      await flushPromises();
 
       // Fast-forward past rotation interval
       vi.advanceTimersByTime(5000);
@@ -328,6 +476,44 @@ describe("PhotoSlideshow", () => {
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
+    });
+  });
+
+  // CLV-115: loading the photo source lights the region; rotation does not.
+  describe("loading light", () => {
+    it("fetching the photo source lights this region's frame", async () => {
+      let resolve;
+      imagesStore.fetchImages = vi.fn(() => new Promise(r => (resolve = r)));
+      const progress = useProgressStore();
+      createWrapper({ regionId: "photos-1" });
+
+      await vi.advanceTimersByTimeAsync(500);
+      expect(progress.isFrameVisible("photos-1")).toBe(true);
+      expect(progress.appVisible).toBe(false);
+
+      resolve();
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(progress.isFrameVisible("photos-1")).toBe(false);
+    });
+
+    it("rotating and prefetching from cache never begin a source", async () => {
+      const image1 = createImage({ id: "1" });
+      const image2 = createImage({ id: "2" });
+      imagesStore.currentImage = image1;
+      imagesStore.fetchImages = vi.fn().mockImplementation(async () => {
+        imagesStore.images = [image1, image2];
+      });
+      const progress = useProgressStore();
+      createWrapper({ regionId: "photos-1", autoRotate: true, rotationInterval: 5000 });
+      await flushPromises();
+
+      const begin = vi.spyOn(progress, "begin");
+      const track = vi.spyOn(progress, "track");
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(imagesStore.nextImage).toHaveBeenCalled();
+      expect(begin).not.toHaveBeenCalled();
+      expect(track).not.toHaveBeenCalled();
     });
   });
 });

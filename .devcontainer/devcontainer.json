@@ -1,7 +1,7 @@
 {
   "name": "Calvin Dashboard - Full Stack",
   "dockerComposeFile": "../docker/docker-compose.dev.yml",
-  "service": "calvin-backend-dev",
+  "service": "calvin-backend",
   "workspaceFolder": "/app",
   "shutdownAction": "stopCompose",
   
@@ -10,24 +10,21 @@
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "ms-python.black-formatter",
-        "ms-python.isort",
+        "ms-python.debugpy",
+        "charliermarsh.ruff",
         "dbaeumer.vscode-eslint",
         "Vue.volar",
-        "Vue.vscode-typescript-vue-plugin",
-        "esbenp.prettier-vscode",
-        "ms-python.debugpy"
+        "esbenp.prettier-vscode"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/app/.venv/bin/python",
-        "python.linting.enabled": true,
-        "python.linting.pylintEnabled": false,
-        "python.formatting.provider": "black",
-        "python.formatting.blackArgs": ["--line-length", "100"],
-        "editor.formatOnSave": true,
-        "editor.codeActionsOnSave": {
-          "source.organizeImports": "explicit"
+        "python.defaultInterpreterPath": "/app/backend/.venv/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "explicit"
+          }
         },
+        "editor.formatOnSave": true,
         "files.exclude": {
           "**/__pycache__": true,
           "**/*.pyc": true,

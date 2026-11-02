@@ -1,392 +1,408 @@
 <template>
   <div class="plugin-installer">
-    <div class="plugin-install-tabs">
-      <button
-        class="install-tab"
-        :class="{ active: installMethod === 'zip' }"
-        @click="installMethod = 'zip'"
-      >
-        📦 Zip File
-      </button>
-      <button
-        class="install-tab"
-        :class="{ active: installMethod === 'github' }"
-        @click="installMethod = 'github'"
-      >
-        🐙 GitHub
-      </button>
-      <button
-        v-if="devMode"
-        class="install-tab install-tab--dev"
-        :class="{ active: installMethod === 'local' }"
-        @click="installMethod = 'local'"
-        title="Dev mode: install from local filesystem path"
-      >
-        🗂️ Local Path
-      </button>
-    </div>
+    <!-- From the Calvin catalog (§3.3): listed on open, nothing to type. -->
+    <section class="catalog" aria-label="Install from the Calvin catalog">
+      <h3 class="catalog-title heading-group">Install from the Calvin catalog</h3>
 
-    <!-- Zip File Upload -->
-    <div v-show="installMethod === 'zip'" class="plugin-install-content">
-      <input
-        ref="zipInput"
-        type="file"
-        accept=".zip"
-        style="display: none"
-        @change="handleZipSelect"
+      <TextField
+        v-model="searchQuery"
+        class="plugin-search"
+        label="Search plugins"
+        type="search"
+        placeholder="Search plugins…"
+        :disabled="installing"
       />
-      <div class="install-compact-row">
-        <button
-          type="button"
-          class="btn-upload"
-          :disabled="installing"
-          @click="$refs.zipInput?.click()"
-        >
-          {{ installing ? "Installing..." : "📦 Choose Zip File" }}
-        </button>
-        <span v-if="selectedFile" class="selected-file-compact">
-          {{ selectedFile.name }}
-        </span>
-      </div>
-    </div>
 
-    <!-- GitHub Repository -->
-    <div v-show="installMethod === 'github'" class="plugin-install-content">
-      <p class="help-text-compact">
-        Enter a GitHub repository URL and click "List Plugins" to see available plugins and themes.
-      </p>
-      <div class="install-compact-row">
-        <input
-          :model-value="repoUrl"
-          type="text"
-          placeholder="https://github.com/user/repo"
-          class="github-input-compact"
-          :disabled="enumerating || installing"
-          @input="handleRepoUrlInput"
-        />
-        <input
-          :model-value="branch"
-          type="text"
-          placeholder="main"
-          class="github-branch-compact"
-          :disabled="enumerating || installing"
-          @input="handleBranchInput"
-        />
-        <button
-          type="button"
-          class="btn-browse"
-          :disabled="!repoUrl || enumerating || installing"
-          @click="handleListPlugins"
-        >
-          {{ enumerating ? "Loading..." : "🔍 List Plugins" }}
-        </button>
-      </div>
+      <Tabs
+        v-if="catalogTypeOptions.length > 1"
+        :model-value="activeTypeTab"
+        :items="catalogTypeOptions"
+        aria-label="Plugin kind"
+        @update:model-value="activeTypeTab = $event"
+      />
 
-      <!-- Branch Switch Notice -->
-      <div
-        v-if="branchSwitched && availablePlugins.length > 0"
-        class="branch-switch-notice-compact"
-      >
-        ℹ️ Using branch: <strong>{{ actualBranch }}</strong>
-      </div>
+      <InlineNote v-if="catalogEnumerating">Loading the catalog…</InlineNote>
+      <InlineNote v-else-if="catalogError" tone="err">{{ catalogError }}</InlineNote>
+      <InlineNote v-else-if="catalogRows.length === 0">
+        Nothing in the catalog matches this filter.
+      </InlineNote>
 
-      <!-- Available Plugins List -->
-      <div v-if="filteredPlugins.length > 0" class="available-plugins-compact">
-        <!-- Search Bar -->
-        <div class="plugin-search-container">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="🔍 Search plugins..."
-            class="plugin-search-input"
-            :disabled="installing"
-          />
-        </div>
-
-        <!-- Type Tabs -->
-        <TabNavigation
-          :tabs="pluginTypeTabs"
-          :active-tab="activeTypeTab"
-          @tab-change="activeTypeTab = $event"
-        />
-
-        <!-- Plugin List Header -->
-        <div class="plugin-list-header">
-          <label class="select-all-checkbox">
-            <input
-              type="checkbox"
-              :checked="allSelected"
-              :indeterminate="someSelected"
-              @change="handleSelectAll"
-            />
-            <span>Select All</span>
-          </label>
-          <button
-            type="button"
-            class="btn-install-selected"
-            :disabled="installing || selectedPlugins.length === 0"
-            @click="handleInstallSelected"
-          >
-            {{
-              installing
-                ? `Installing ${selectedPlugins.length}...`
-                : `⬇️ Install Selected (${selectedPlugins.length})`
-            }}
-          </button>
-        </div>
-
-        <!-- Plugins List -->
-        <div
-          v-for="plugin in activeTypePlugins"
+      <div v-else class="catalog-list">
+        <ListRow
+          v-for="plugin in catalogRows"
           :key="plugin.id"
-          class="plugin-item-inline"
-          :class="{ 'plugin-installed': plugin._installed }"
+          :name="plugin.name || plugin.id"
+          :data-catalog-plugin-id="plugin.id"
+          class="catalog-row"
         >
-          <div class="plugin-checkbox-wrapper">
-            <input
-              type="checkbox"
-              :checked="isSelected(plugin.id)"
-              :disabled="installing"
-              @change="handleToggleSelect(plugin.id)"
-            />
-          </div>
-          <div class="plugin-info-inline">
-            <strong>{{ plugin.name || plugin.id }}</strong>
-            <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">
-              {{ plugin.type }}
+          <template #lead>
+            <span class="catalog-icon" aria-hidden="true">
+              <svg v-if="pluginIconPath(plugin)" class="catalog-icon-svg" viewBox="0 0 24 24">
+                <path :d="pluginIconPath(plugin)" fill="currentColor" />
+              </svg>
+              <img
+                v-else-if="isIconFile(plugin.icon)"
+                class="catalog-icon-img"
+                :src="pluginIconUrl(plugin)"
+                alt=""
+              />
+              <template v-else>{{ catalogLetter(plugin) }}</template>
             </span>
-            <span v-if="plugin.version" class="plugin-version-small"> v{{ plugin.version }} </span>
-            <span
-              v-if="plugin._installed"
-              class="plugin-installed-badge"
-              :class="{
-                'plugin-update-available':
-                  plugin._installedVersion &&
-                  plugin.version &&
-                  plugin._installedVersion !== plugin.version,
-              }"
+          </template>
+
+          <template #meta>
+            <span class="catalog-meta">
+              <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
+              <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
+              <span v-if="plugin.description" class="plugin-desc-inline">
+                {{ plugin.description }}
+              </span>
+            </span>
+          </template>
+
+          <template #actions>
+            <template v-if="plugin._installed">
+              <Button
+                v-if="hasUpdate(plugin)"
+                variant="primary"
+                :loading="installing"
+                loading-label="Installing…"
+                @click="handleInstallFromCatalog(plugin.path)"
+              >
+                Update
+              </Button>
+              <Tag v-else tone="ok" class="plugin-installed-badge">Installed</Tag>
+              <Button
+                v-if="!hasUpdate(plugin) && canAddSource(plugin)"
+                variant="secondary"
+                @click="$emit('add-source', plugin.id)"
+              >
+                Add a source
+              </Button>
+            </template>
+            <Button
+              v-else
+              variant="primary"
+              :loading="installing"
+              loading-label="Installing…"
+              @click="handleInstallFromCatalog(plugin.path)"
+            >
+              Install
+            </Button>
+          </template>
+        </ListRow>
+      </div>
+    </section>
+
+    <!-- Another GitHub source stays a deliberate visit (§3.3). -->
+    <details class="install-disclosure">
+      <summary>From another GitHub address</summary>
+      <div class="plugin-install-content">
+        <InlineNote class="help-text-compact">
+          Paste a GitHub address and choose List plugins.
+        </InlineNote>
+        <div class="install-compact-row">
+          <TextField
+            :model-value="repoUrl"
+            class="github-input-compact"
+            label="GitHub address"
+            placeholder="https://github.com/user/repo"
+            :disabled="enumerating || installing"
+            @update:model-value="handleRepoUrlInput"
+          />
+          <TextField
+            :model-value="branch"
+            class="github-branch-compact"
+            label="Version"
+            placeholder="main"
+            :disabled="enumerating || installing"
+            @update:model-value="handleBranchInput"
+          />
+          <Button
+            variant="secondary"
+            :disabled="!repoUrl || enumerating || installing"
+            @click="handleListPlugins"
+          >
+            {{ enumerating ? "Loading…" : "List plugins" }}
+          </Button>
+        </div>
+
+        <InlineNote
+          v-if="branchSwitched && availablePlugins.length > 0"
+          class="branch-switch-notice-compact"
+        >
+          Version: <strong>{{ actualBranch }}</strong>
+        </InlineNote>
+
+        <div v-if="filteredPlugins.length > 0" class="available-plugins-compact">
+          <div class="plugin-list-header">
+            <label class="plugin-check-all">
+              <input
+                type="checkbox"
+                :checked="allSelected"
+                :indeterminate="someSelected"
+                @change="handleSelectAll"
+              />
+              <span>Select all</span>
+            </label>
+            <Button
+              variant="secondary"
+              :disabled="installing || selectedPlugins.length === 0"
+              @click="handleInstallSelected"
             >
               {{
-                plugin._installedVersion &&
-                plugin.version &&
-                plugin._installedVersion !== plugin.version
-                  ? `Installed: v${plugin._installedVersion} → Update to v${plugin.version}`
-                  : `Installed: v${plugin._installedVersion || "?"}`
+                installing
+                  ? `Installing ${selectedPlugins.length}…`
+                  : `Install selected (${selectedPlugins.length})`
               }}
-            </span>
+            </Button>
           </div>
-          <div class="plugin-actions">
-            <button
-              v-if="
-                plugin._installed &&
-                plugin._installedVersion &&
-                plugin.version &&
-                plugin._installedVersion !== plugin.version
-              "
-              type="button"
-              class="btn-install btn-update"
-              :disabled="installing"
-              @click="handleInstall(plugin.path)"
-            >
-              {{ installing ? "Installing..." : "🔄 Update" }}
-            </button>
-            <button
-              v-else-if="plugin._installed"
-              type="button"
-              class="btn-install btn-reinstall"
-              :disabled="installing"
-              @click="handleForceUpdate(plugin.path)"
-              title="Reinstall this plugin"
-            >
-              {{ installing ? "Installing..." : "🔁 Reinstall" }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn-install"
-              :disabled="installing"
-              @click="handleInstall(plugin.path)"
-            >
-              {{ installing ? "Installing..." : "⬇️ Install" }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Local Path (dev mode only) -->
-    <div v-if="devMode" v-show="installMethod === 'local'" class="plugin-install-content">
-      <p class="help-text-compact">
-        Install directly from a local cloned repository. Enter an absolute path to the repo root.
-      </p>
-      <div class="install-compact-row">
-        <input
-          v-model="localPath"
-          type="text"
-          placeholder="/absolute/path/to/calvin-plugins"
-          class="github-input-compact"
-          :disabled="enumerating || installing || detecting"
-        />
-        <button
-          type="button"
-          class="btn-autodetect"
-          :disabled="enumerating || installing || detecting"
-          @click="handleAutoDetect"
-          title="Auto-detect sibling plugin repositories"
-        >
-          {{ detecting ? "Detecting..." : "📂 Auto-detect" }}
-        </button>
-        <button
-          type="button"
-          class="btn-browse"
-          :disabled="!localPath || enumerating || installing || detecting"
-          @click="handleListLocalPlugins"
-        >
-          {{ enumerating ? "Loading..." : "🔍 List Plugins" }}
-        </button>
-      </div>
-
-      <!-- Available Plugins List (reuses same filteredPlugins/availablePlugins state) -->
-      <div
-        v-if="installSource === 'local' && filteredPlugins.length > 0"
-        class="available-plugins-compact"
-      >
-        <div class="plugin-search-container">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="🔍 Search plugins..."
-            class="plugin-search-input"
-            :disabled="installing"
-          />
-        </div>
-        <TabNavigation
-          :tabs="pluginTypeTabs"
-          :active-tab="activeTypeTab"
-          @tab-change="activeTypeTab = $event"
-        />
-        <div class="plugin-list-header">
-          <label class="select-all-checkbox">
-            <input
-              type="checkbox"
-              :checked="allSelected"
-              :indeterminate="someSelected"
-              @change="handleSelectAll"
-            />
-            <span>Select All</span>
-          </label>
-          <button
-            type="button"
-            class="btn-install-selected"
-            :disabled="installing || selectedPlugins.length === 0"
-            @click="handleInstallSelectedLocal"
+          <ListRow
+            v-for="plugin in activeTypePlugins"
+            :key="plugin.id"
+            :name="plugin.name || plugin.id"
+            class="plugin-item-inline"
           >
-            {{
-              installing
-                ? `Installing ${selectedPlugins.length}...`
-                : `⬇️ Install Selected (${selectedPlugins.length})`
-            }}
-          </button>
+            <template #lead>
+              <span class="plugin-checkbox-wrapper">
+                <input
+                  type="checkbox"
+                  :checked="isSelected(plugin.id)"
+                  :disabled="installing"
+                  :aria-label="`Select ${plugin.name || plugin.id}`"
+                  @change="handleToggleSelect(plugin.id)"
+                />
+              </span>
+            </template>
+
+            <template #meta>
+              <span class="plugin-info-inline">
+                <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
+                <span v-if="plugin.version" class="plugin-version-small">
+                  v{{ plugin.version }}
+                </span>
+                <Tag
+                  v-if="plugin._installed"
+                  class="plugin-installed-badge"
+                  :tone="hasUpdate(plugin) ? 'warn' : 'ok'"
+                  :title="
+                    hasUpdate(plugin)
+                      ? `Installed: v${plugin._installedVersion} → Update to v${plugin.version}`
+                      : `Installed: v${plugin._installedVersion || '?'}`
+                  "
+                >
+                  {{ hasUpdate(plugin) ? "Update" : "Installed" }}
+                </Tag>
+                <span v-if="plugin.description" class="plugin-desc-inline">
+                  {{ plugin.description }}
+                </span>
+              </span>
+            </template>
+
+            <template #actions>
+              <Button
+                v-if="hasUpdate(plugin)"
+                variant="primary"
+                :loading="installing"
+                loading-label="Installing…"
+                @click="handleInstall(plugin.path)"
+              >
+                Update
+              </Button>
+              <Button
+                v-else-if="plugin._installed"
+                variant="secondary"
+                :loading="installing"
+                loading-label="Installing…"
+                title="Reinstall this plugin"
+                @click="handleForceUpdate(plugin.path)"
+              >
+                Reinstall
+              </Button>
+              <Button
+                v-else
+                variant="primary"
+                :loading="installing"
+                loading-label="Installing…"
+                @click="handleInstall(plugin.path)"
+              >
+                Install
+              </Button>
+            </template>
+          </ListRow>
         </div>
+      </div>
+    </details>
+
+    <!-- Local path stays dev-only (§3.3). -->
+    <details v-if="devMode" class="install-disclosure">
+      <summary>Local path (development)</summary>
+      <div class="plugin-install-content">
+        <InlineNote class="help-text-compact">
+          For plugin developers: install from a folder on the Calvin server.
+        </InlineNote>
+        <div class="install-compact-row">
+          <TextField
+            v-model="localPath"
+            class="github-input-compact"
+            label="Folder path"
+            placeholder="/absolute/path/to/calvin-plugins"
+            :disabled="enumerating || installing || detecting"
+          />
+          <Button
+            variant="secondary"
+            :disabled="enumerating || installing || detecting"
+            title="Auto-detect sibling plugin repositories"
+            @click="handleAutoDetect"
+          >
+            {{ detecting ? "Detecting…" : "Auto-detect" }}
+          </Button>
+          <Button
+            variant="secondary"
+            :disabled="!localPath || enumerating || installing || detecting"
+            @click="handleListLocalPlugins"
+          >
+            {{ enumerating ? "Loading…" : "List plugins" }}
+          </Button>
+        </div>
+
         <div
-          v-for="plugin in activeTypePlugins"
-          :key="plugin.id"
-          class="plugin-item-inline"
-          :class="{ 'plugin-installed': plugin._installed }"
+          v-if="installSource === 'local' && filteredPlugins.length > 0"
+          class="available-plugins-compact"
         >
-          <div class="plugin-checkbox-wrapper">
-            <input
-              type="checkbox"
-              :checked="isSelected(plugin.id)"
-              :disabled="installing"
-              @change="handleToggleSelect(plugin.id)"
-            />
-          </div>
-          <div class="plugin-info-inline">
-            <strong>{{ plugin.name || plugin.id }}</strong>
-            <span class="plugin-type-badge-small" :class="`type-${plugin.type}`">{{
-              plugin.type
-            }}</span>
-            <span v-if="plugin.version" class="plugin-version-small">v{{ plugin.version }}</span>
-            <span v-if="plugin._installed" class="plugin-installed-badge">
-              Installed: v{{ plugin._installedVersion || "?" }}
-            </span>
-          </div>
-          <div class="plugin-actions">
-            <button
-              v-if="plugin._installed"
-              type="button"
-              class="btn-install btn-reinstall"
-              :disabled="installing"
-              @click="handleInstallLocal(plugin.path, true)"
+          <div class="plugin-list-header">
+            <label class="plugin-check-all">
+              <input
+                type="checkbox"
+                :checked="allSelected"
+                :indeterminate="someSelected"
+                @change="handleSelectAll"
+              />
+              <span>Select all</span>
+            </label>
+            <Button
+              variant="secondary"
+              :disabled="installing || selectedPlugins.length === 0"
+              @click="handleInstallSelectedLocal"
             >
-              {{ installing ? "Installing..." : "🔁 Reinstall" }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn-install"
-              :disabled="installing"
-              @click="handleInstallLocal(plugin.path, false)"
-            >
-              {{ installing ? "Installing..." : "⬇️ Install" }}
-            </button>
+              {{
+                installing
+                  ? `Installing ${selectedPlugins.length}…`
+                  : `Install selected (${selectedPlugins.length})`
+              }}
+            </Button>
           </div>
+
+          <ListRow
+            v-for="plugin in activeTypePlugins"
+            :key="plugin.id"
+            :name="plugin.name || plugin.id"
+            class="plugin-item-inline"
+          >
+            <template #lead>
+              <span class="plugin-checkbox-wrapper">
+                <input
+                  type="checkbox"
+                  :checked="isSelected(plugin.id)"
+                  :disabled="installing"
+                  :aria-label="`Select ${plugin.name || plugin.id}`"
+                  @change="handleToggleSelect(plugin.id)"
+                />
+              </span>
+            </template>
+
+            <template #meta>
+              <span class="plugin-info-inline">
+                <Tag class="plugin-type-badge-small">{{ pluginKindLabel(plugin) }}</Tag>
+                <span v-if="plugin.version" class="plugin-version-small"
+                  >v{{ plugin.version }}</span
+                >
+                <Tag
+                  v-if="plugin._installed"
+                  tone="ok"
+                  class="plugin-installed-badge"
+                  :title="`Installed: v${plugin._installedVersion || '?'}`"
+                >
+                  Installed
+                </Tag>
+                <span v-if="plugin.description" class="plugin-desc-inline">
+                  {{ plugin.description }}
+                </span>
+              </span>
+            </template>
+
+            <template #actions>
+              <Button
+                v-if="plugin._installed"
+                variant="secondary"
+                :loading="installing"
+                loading-label="Installing…"
+                @click="handleInstallLocal(plugin.path, true)"
+              >
+                Reinstall
+              </Button>
+              <Button
+                v-else
+                variant="primary"
+                :loading="installing"
+                loading-label="Installing…"
+                @click="handleInstallLocal(plugin.path, false)"
+              >
+                Install
+              </Button>
+            </template>
+          </ListRow>
         </div>
       </div>
-    </div>
+    </details>
 
-    <!-- Installation Status Messages -->
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
-    <div v-if="success" class="success-message">
-      {{ success }}
-      <!-- Branch Switch Notification -->
-      <div v-if="branchSwitched" class="branch-switch-notice">
-        ℹ️ Branch switched from 'main' to 'master' (main branch not found)
-      </div>
-    </div>
-
-    <!-- Frontend Rebuild Progress -->
-    <div
-      v-if="rebuildStatus !== 'idle'"
-      :class="['rebuild-status', `rebuild-status--${rebuildStatus}`]"
-    >
-      <span v-if="rebuildStatus === 'building'" class="rebuild-spinner" aria-hidden="true"></span>
-      <span class="rebuild-status-text">{{ rebuildMessage }}</span>
-      <button v-if="rebuildStatus === 'done'" class="btn-refresh-inline" @click="handleRefresh">
-        Refresh Now
-      </button>
-    </div>
-
-    <!-- Restart Required Notice -->
-    <div v-if="requiresRestart" class="restart-notice">
-      <div class="restart-notice-content">
-        <strong>⚠️ Server Restart Required</strong>
-        <p>
-          The plugin has been installed but won't appear in the UI until the backend server is
-          restarted. This is because plugin types are registered in the database during server
-          startup.
-        </p>
-        <div class="restart-actions">
-          <button type="button" class="btn-primary" @click="handleRestart">
-            🔄 Restart Backend Now
-          </button>
-          <span class="restart-alternative">
-            Or restart manually via SSH:
-            <code>sudo systemctl restart calvin-backend</code>
+    <!-- A zip file remains a supported offline install path. -->
+    <details class="install-disclosure">
+      <summary>From a zip file</summary>
+      <div class="plugin-install-content">
+        <input
+          ref="zipInput"
+          type="file"
+          accept=".zip"
+          style="display: none"
+          @change="handleZipSelect"
+        />
+        <div class="install-compact-row">
+          <Button
+            variant="secondary"
+            :loading="installing"
+            loading-label="Installing…"
+            @click="$refs.zipInput?.click()"
+          >
+            Choose zip file
+          </Button>
+          <span v-if="selectedFile" class="selected-file-compact">
+            {{ selectedFile.name }}
           </span>
         </div>
       </div>
-    </div>
+    </details>
+
+    <!-- Installation Status Messages -->
+    <InlineNote v-if="error" class="installer-note" tone="err">{{ error }}</InlineNote>
+    <InlineNote v-if="success" class="installer-note" tone="ok">{{ success }}</InlineNote>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from "vue";
-import TabNavigation from "../shared/TabNavigation.vue";
+import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import ListRow from "@/components/ui/ListRow.vue";
+import Tabs from "@/components/ui/Tabs.vue";
+import Tag from "@/components/ui/Tag.vue";
+import TextField from "@/components/ui/TextField.vue";
 import * as pluginsApi from "@/services/pluginsApi";
+import { pluginKindFilters, pluginKindKey, pluginKindLabel } from "@/utils/pluginKind";
+import { isNewerVersion } from "@/utils/pluginVersions";
+import { isIconFile, pluginIconPath, pluginIconUrl } from "@/utils/pluginIcon";
+import { isCatalogEntry, isTestPlugin } from "@/utils/pluginCatalog";
 
 const props = defineProps({
   installing: {
@@ -413,6 +429,35 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
+  // The official catalog (§3.3), enumerated by the category on open. Kept apart
+  // from `availablePlugins` so browsing another repository can never put its
+  // rows under the "Calvin catalog" heading.
+  catalogPlugins: {
+    type: Array,
+    default: () => [],
+  },
+  catalogRepoUrl: {
+    type: String,
+    default: "",
+  },
+  // Installed plugin metadata, so a catalog row for an installed plugin gets
+  // its plain kind (e.g. Weather is "Clock bar", not "Web page & app").
+  knownPlugins: {
+    type: Array,
+    default: () => [],
+  },
+  catalogBranch: {
+    type: String,
+    default: "main",
+  },
+  catalogEnumerating: {
+    type: Boolean,
+    default: false,
+  },
+  catalogError: {
+    type: String,
+    default: "",
+  },
   error: {
     type: String,
     default: "",
@@ -420,10 +465,6 @@ const props = defineProps({
   success: {
     type: String,
     default: "",
-  },
-  requiresRestart: {
-    type: Boolean,
-    default: false,
   },
   branchSwitched: {
     type: Boolean,
@@ -437,13 +478,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  rebuildStatus: {
+  // Arrived from a Content picker's "Get more in Plugins ›": open on that kind.
+  initialType: {
     type: String,
-    default: "idle", // idle | building | done | error
-  },
-  rebuildMessage: {
-    type: String,
-    default: "",
+    default: "all",
   },
 });
 
@@ -454,13 +492,12 @@ const emit = defineEmits([
   "install-selected",
   "install-local",
   "install-selected-local",
-  "restart",
+  "add-source",
   "update:repoUrl",
   "update:branch",
   "force-update",
 ]);
 
-const installMethod = ref("zip");
 const installSource = ref("github"); // 'github' | 'local'
 const localPath = ref("");
 const detecting = ref(false);
@@ -468,13 +505,91 @@ const selectedPluginIds = ref(new Set());
 const searchQuery = ref("");
 const activeTypeTab = ref("all");
 
+// A Content picker's "Get more" link hands over a kind; show the catalog with
+// that filter already applied.
+watch(
+  () => props.initialType,
+  type => {
+    if (type && type !== "all") activeTypeTab.value = pluginKindKey({ type });
+  },
+  { immediate: true }
+);
+
+// The plugin repo ships fixtures for its own test suite ("test" keyword); end
+// users shouldn't be offered them, developers in dev mode still are (F8).
+// `catalog: false` entries are hidden in every mode: they are development-only
+// or otherwise not for the picker.
+const withoutTestFixtures = list => (props.devMode ? list : list.filter(p => !isTestPlugin(p)));
+
+// An Installed card's Update, and the catalog row's, only offer a genuinely
+// newer version (never a downgrade).
+const hasUpdate = plugin =>
+  Boolean(plugin._installed) && isNewerVersion(plugin.version, plugin._installedVersion);
+
+const canAddSource = plugin => ["calendar", "image", "service"].includes(plugin.type);
+
+// --- catalog panel ---------------------------------------------------------
+
+const enrichedCatalog = computed(() => {
+  const knownById = Object.fromEntries((props.knownPlugins || []).map(item => [item.id, item]));
+  return props.catalogPlugins.map(item => {
+    const known = knownById[item.id];
+    if (!known) return item;
+    return {
+      ...item,
+      icon: item.icon ?? known.icon,
+      display_schema: item.display_schema ?? known.display_schema,
+      statusbar_schema: item.statusbar_schema ?? known.statusbar_schema,
+    };
+  });
+});
+
+const catalogList = computed(() =>
+  withoutTestFixtures(enrichedCatalog.value).filter(isCatalogEntry)
+);
+
+const catalogFilters = computed(() => pluginKindFilters(catalogList.value));
+const catalogTypeOptions = computed(() =>
+  catalogFilters.value.map(option => ({ value: option.id, label: option.label }))
+);
+
+const catalogRows = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase();
+  return catalogList.value.filter(plugin => {
+    const matchesKind =
+      activeTypeTab.value === "all" || pluginKindKey(plugin) === activeTypeTab.value;
+    const matchesQuery =
+      !query ||
+      (plugin.name || "").toLowerCase().includes(query) ||
+      (plugin.id || "").toLowerCase().includes(query) ||
+      (plugin.description || "").toLowerCase().includes(query);
+    return matchesKind && matchesQuery;
+  });
+});
+
+const catalogLetter = plugin => (plugin.name || plugin.id || "?").charAt(0).toUpperCase();
+
+// Catalog rows install from the configured catalog only — never from whatever
+// repository happens to sit in the "another repository" fields.
+const handleInstallFromCatalog = pluginPath => {
+  emit("install", {
+    path: pluginPath,
+    repoUrl: props.catalogRepoUrl,
+    branch: props.catalogBranch || "main",
+    force: false,
+  });
+};
+
+// --- "another repository" / local lists ------------------------------------
+
 // Filter plugins by search query
 const filteredPlugins = computed(() => {
+  const list = withoutTestFixtures(props.availablePlugins);
   if (!searchQuery.value.trim()) {
-    return props.availablePlugins;
+    return list;
   }
   const query = searchQuery.value.toLowerCase();
-  return props.availablePlugins.filter(
+  return list.filter(
     p =>
       (p.name || "").toLowerCase().includes(query) ||
       (p.id || "").toLowerCase().includes(query) ||
@@ -497,31 +612,6 @@ const filteredPluginsByType = computed(() => {
     }
   });
   return grouped;
-});
-
-// Get plugin type tabs
-const pluginTypeTabs = computed(() => {
-  const tabs = [{ id: "all", label: "All", icon: "📦" }];
-  const typeLabels = {
-    calendar: { label: "Calendar", icon: "📅" },
-    image: { label: "Image", icon: "🖼️" },
-    service: { label: "Service", icon: "⚙️" },
-    backend: { label: "Backend", icon: "🔧" },
-    theme: { label: "Theme", icon: "🎨" },
-  };
-
-  Object.entries(filteredPluginsByType.value).forEach(([type, plugins]) => {
-    if (plugins.length > 0) {
-      tabs.push({
-        id: type,
-        label: typeLabels[type]?.label || type,
-        icon: typeLabels[type]?.icon || "📦",
-        badge: plugins.length.toString(),
-      });
-    }
-  });
-
-  return tabs;
 });
 
 // Get plugins for active tab
@@ -660,20 +750,12 @@ const handleForceUpdate = pluginPath => {
   });
 };
 
-const handleRestart = () => {
-  emit("restart");
+const handleRepoUrlInput = value => {
+  emit("update:repoUrl", value);
 };
 
-const handleRefresh = () => {
-  window.location.reload();
-};
-
-const handleRepoUrlInput = event => {
-  emit("update:repoUrl", event.target.value);
-};
-
-const handleBranchInput = event => {
-  emit("update:branch", event.target.value);
+const handleBranchInput = value => {
+  emit("update:branch", value);
 };
 
 // Watch for availablePlugins changes to clear selection when list changes
@@ -689,7 +771,6 @@ watch(
 // Watch for search query changes to reset to "all" tab
 watch(searchQuery, () => {
   if (activeTypeTab.value !== "all") {
-    // If searching and on a specific tab, check if that tab still has results
     const tabPlugins = filteredPluginsByType.value[activeTypeTab.value] || [];
     if (tabPlugins.length === 0) {
       activeTypeTab.value = "all";
@@ -699,283 +780,166 @@ watch(searchQuery, () => {
 </script>
 
 <style scoped>
+/* Sole content of the "Install" SettingsSection panel; inset to match SettingRow. */
 .plugin-installer {
   width: 100%;
+  padding: var(--panel-pad-y) var(--panel-pad-x);
 }
 
-.plugin-install-tabs {
+.catalog {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  border-bottom: 2px solid var(--border-color);
+  flex-direction: column;
+  gap: var(--gap-stack);
 }
 
-.install-tab {
-  padding: 0.75rem 1.25rem;
-  background: transparent;
-  border: none;
-  border-bottom: 3px solid transparent;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  font-weight: 500;
+.catalog-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-inline);
+}
+
+.catalog-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.2rem;
+  height: 2.2rem;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--bg-0);
+  color: var(--ink-2);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-title);
+}
+
+.catalog-icon-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.catalog-icon-svg {
+  width: 62%;
+  height: 62%;
+}
+
+.catalog-meta,
+.plugin-info-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap-inline);
+}
+
+.plugin-desc-inline {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-meta);
+  color: var(--ink-2);
+}
+
+.plugin-version-small {
+  color: var(--ink-2);
+  font-size: var(--text-caption);
+  font-family: var(--font-data);
+}
+
+.install-disclosure {
+  margin-top: var(--gap-5);
+  padding-top: var(--gap-3);
+  border-top: 1px solid var(--line);
+}
+
+.install-disclosure > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
   cursor: pointer;
-  transition: all 0.2s ease;
-  margin-bottom: -2px;
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  color: var(--ink-2);
 }
 
-.install-tab:hover {
-  color: var(--text-primary);
-  background: var(--bg-secondary);
+.install-disclosure > summary:hover {
+  color: var(--ink);
 }
 
-.install-tab.active {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
-  font-weight: 600;
+.install-disclosure > summary:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
-.install-tab--dev {
-  color: #e67e22;
-}
-
-.install-tab--dev.active {
-  color: #e67e22;
-  border-bottom-color: #e67e22;
-}
-
-.btn-autodetect {
-  padding: 0.5rem 1rem;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-autodetect:hover:not(:disabled) {
-  background: #5a6268;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-autodetect:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+/* Closed disclosures must take no room: Chromium keeps a skipped
+   `::details-content` subtree's last layout boxes around, which leaves
+   invisible inputs behind the next summary (and makes them hit-testable).
+   A descendant selector, because `details > *` no longer matches through
+   Chromium's `::details-content` wrapper. */
+.install-disclosure:not([open]) .plugin-install-content {
+  display: none;
 }
 
 .plugin-install-content {
-  padding: 1rem 0;
+  padding: var(--gap-4) 0 0;
 }
 
 .install-compact-row {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
   flex-wrap: wrap;
-}
-
-.btn-upload {
-  padding: 0.5rem 1rem;
-  background: #2196f3;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-upload:hover:not(:disabled) {
-  background: #1976d2;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.btn-upload:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.selected-file-compact {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
+  align-items: flex-end;
+  gap: var(--gap-3);
 }
 
 .github-input-compact {
   flex: 1;
-  min-width: 200px;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.9rem;
+  min-width: 12rem;
 }
 
 .github-branch-compact {
-  width: 100px;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.btn-browse {
-  padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-browse:hover:not(:disabled) {
-  background: var(--accent-secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-browse:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
+  width: 6rem;
 }
 
 .help-text-compact {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  margin: 0 0 0.75rem 0;
-  line-height: 1.4;
+  margin-bottom: var(--gap-3);
 }
 
-.branch-switch-notice-compact {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: rgba(23, 162, 184, 0.1);
-  border: 1px solid rgba(23, 162, 184, 0.3);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  color: #0c5460;
+.branch-switch-notice-compact,
+.installer-note {
+  margin-top: var(--gap-4);
 }
 
 .available-plugins-compact {
-  margin-top: 1rem;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-.plugin-search-container {
-  margin-bottom: 1rem;
-}
-
-.plugin-search-input {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-
-.plugin-search-input:focus {
-  outline: none;
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 2px rgba(var(--accent-primary-rgb, 33, 150, 243), 0.2);
-}
-
-.plugin-search-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  gap: var(--gap-inline);
+  margin-top: var(--gap-4);
 }
 
 .plugin-list-header {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  margin-bottom: 0.5rem;
+  gap: var(--gap-3);
 }
 
-.select-all-checkbox {
+.plugin-check-all {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--gap-inline);
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
 }
 
-.select-all-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+.plugin-check-all input[type="checkbox"],
+.plugin-checkbox-wrapper input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
   cursor: pointer;
-}
-
-.btn-install-selected {
-  padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-install-selected:hover:not(:disabled) {
-  background: var(--accent-secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-install-selected:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.plugin-item-inline {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  gap: 0.75rem;
-}
-
-.plugin-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.plugin-item-inline.plugin-installed {
-  background: rgba(40, 167, 69, 0.05);
-  border-color: rgba(40, 167, 69, 0.3);
+  accent-color: var(--focus);
 }
 
 .plugin-checkbox-wrapper {
@@ -983,285 +947,8 @@ watch(searchQuery, () => {
   align-items: center;
 }
 
-.plugin-checkbox-wrapper input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.plugin-info-inline {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-}
-
-.plugin-type-badge-small {
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.plugin-type-badge-small.type-calendar {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.plugin-type-badge-small.type-image {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-
-.plugin-type-badge-small.type-service {
-  background: #e8f5e9;
-  color: #388e3c;
-}
-
-.plugin-type-badge-small.type-theme {
-  background: #fff3e0;
-  color: #f57c00;
-}
-
-.plugin-type-badge-small.type-backend {
-  background: #e1bee7;
-  color: #6a1b9a;
-}
-
-.plugin-version-small {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.plugin-installed-badge {
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  font-weight: 500;
-  background: rgba(40, 167, 69, 0.1);
-  color: #28a745;
-  border: 1px solid rgba(40, 167, 69, 0.3);
-}
-
-.plugin-installed-badge.plugin-update-available {
-  background: rgba(255, 193, 7, 0.1);
-  color: #856404;
-  border-color: rgba(255, 193, 7, 0.3);
-}
-
-.btn-update {
-  background: #ffc107 !important;
-  color: #000 !important;
-}
-
-.btn-update:hover:not(:disabled) {
-  background: #ffb300 !important;
-}
-
-.btn-reinstall {
-  padding: 0.5rem 1rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-reinstall:hover:not(:disabled) {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-}
-
-.btn-reinstall:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.btn-install {
-  padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-install:hover:not(:disabled) {
-  background: var(--accent-secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.btn-install:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-.rebuild-status {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 6px;
-  font-size: 0.875rem;
-}
-
-.rebuild-status--building {
-  background: rgba(59, 130, 246, 0.12);
-  border: 1px solid rgba(59, 130, 246, 0.35);
-  color: #3b82f6;
-}
-
-.rebuild-status--done {
-  background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  color: #22c55e;
-}
-
-.rebuild-status--error {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
-  color: #ef4444;
-}
-
-.rebuild-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: rebuild-spin 0.8s linear infinite;
-  flex-shrink: 0;
-  opacity: 0.7;
-}
-
-@keyframes rebuild-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.rebuild-status-text {
-  flex: 1;
-}
-
-.btn-refresh-inline {
-  padding: 0.25rem 0.625rem;
-  background: rgba(34, 197, 94, 0.15);
-  color: inherit;
-  border: 1px solid currentColor;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  transition: background 0.2s;
-}
-
-.btn-refresh-inline:hover {
-  background: rgba(34, 197, 94, 0.3);
-}
-
-.error-message {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: rgba(220, 53, 69, 0.1);
-  border: 1px solid rgba(220, 53, 69, 0.3);
-  border-radius: 4px;
-  color: #dc3545;
-  font-size: 0.875rem;
-}
-
-.success-message {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: rgba(40, 167, 69, 0.1);
-  border: 1px solid rgba(40, 167, 69, 0.3);
-  border-radius: 4px;
-  color: #28a745;
-  font-size: 0.875rem;
-}
-
-.branch-switch-notice {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: rgba(23, 162, 184, 0.1);
-  border-radius: 4px;
-  font-size: 0.875rem;
-}
-
-.restart-notice {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: rgba(255, 193, 7, 0.1);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-  border-radius: 4px;
-}
-
-.restart-notice-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.restart-notice-content strong {
-  color: #856404;
-  font-size: 1rem;
-}
-
-.restart-notice-content p {
-  margin: 0;
-  color: #856404;
-  font-size: 0.875rem;
-}
-
-.restart-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.btn-primary {
-  padding: 0.5rem 1rem;
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  align-self: flex-start;
-}
-
-.btn-primary:hover {
-  background: var(--accent-secondary);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px var(--shadow);
-}
-
-.restart-alternative {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.restart-alternative code {
-  background: var(--bg-tertiary);
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.85rem;
+.selected-file-compact {
+  color: var(--ink-2);
+  font-size: var(--text-meta);
 }
 </style>

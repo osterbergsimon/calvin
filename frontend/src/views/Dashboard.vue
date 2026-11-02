@@ -5,200 +5,159 @@
       <ClockBarHorizontal
         v-if="showHorizontalBarTop"
         position="top"
-        :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
-        :show-in-kiosk="configStore.clockBarShowInKiosk"
+        :show-in-non-kiosk="true"
+        :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
         :enabled="true"
       />
-
-      <div v-if="configStore.shouldShowUI" class="dashboard-header">
-        <h1>Calvin Dashboard</h1>
-        <!-- Legacy clock widget in header (for backwards compatibility) -->
-        <Clock
-          v-if="configStore.clockEnabled && configStore.clockDisplayMode === 'header'"
-          :display-mode="configStore.clockDisplayMode"
-          :show-date="configStore.clockShowDate"
-        />
-        <!-- New clock widget in header -->
-        <Clock
-          v-if="
-            configStore.clockWidgetEnabled &&
-            !configStore.clockWidgetShowInKiosk &&
-            (configStore.clockWidgetPosition === 'top-left' ||
-              configStore.clockWidgetPosition === 'top-right' ||
-              configStore.clockWidgetPosition === 'top-center')
-          "
-          :display-mode="'header'"
-          :show-date="configStore.clockShowDate"
-        />
-        <div class="header-controls">
-          <div class="status-indicator">
-            <span :class="['status-dot', statusClass]" />
-            <span>{{ statusText }}</span>
-          </div>
-          <button
-            class="btn-orientation"
-            :title="`Switch to ${configStore.orientation === 'landscape' ? 'portrait' : 'landscape'} view`"
-            @click="toggleOrientation"
-          >
-            {{ configStore.orientation === "landscape" ? "📱" : "🖥️" }}
-            {{ configStore.orientation === "landscape" ? "Portrait" : "Landscape" }}
-          </button>
-          <button
-            v-if="modeStore.currentMode !== modeStore.MODES.WEB_SERVICES"
-            class="btn-web-services"
-            title="Show Web Services"
-            @click="showWebServices"
-          >
-            Web Services
-          </button>
-          <button v-else class="btn-web-services" title="Show Photos" @click="showPhotos">
-            Photos
-          </button>
-          <button
-            class="btn-side-position"
-            :title="sideViewPositionTitle"
-            @click="toggleSideViewPosition"
-          >
-            {{ sideViewPositionIcon }}
-          </button>
-          <button class="btn-settings" title="Settings" @click="goToSettings">⚙️ Settings</button>
-          <button class="btn-minimal" title="Hide UI" @click="configStore.toggleUI">⊖</button>
-        </div>
-      </div>
 
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
 
-      <!-- Connection indicator (shown when offline) -->
-      <ConnectionIndicator
-        class="connection-indicator-overlay"
-        :show-label="configStore.shouldShowUI"
-      />
+      <!--
+        Dashboard stage wraps the side perimeter bars and the body so that
+        vertical left/right bars sit at the dashboard edge regardless of the
+        active screen's layout direction (row vs column).
+      -->
+      <div class="dashboard-stage">
+        <!-- App-frame loading light: the whole perimeter, riding a clock bar's
+             seam where one exists. Region loads light their own frame. CLV-115. -->
+        <LoadingLight />
 
-      <!-- Clock Widget in Kiosk Mode -->
-      <Clock
-        v-if="
-          (configStore.clockWidgetEnabled && configStore.clockWidgetShowInKiosk) ||
-          (configStore.clockEnabled &&
-            configStore.clockDisplayMode === 'always' &&
-            !configStore.shouldShowUI)
-        "
-        :display-mode="'always'"
-        :show-date="configStore.clockShowDate"
-        :class="clockClass"
-      />
+        <ClockBarVertical
+          v-if="showVerticalBarLeft"
+          position="left"
+          :show-in-non-kiosk="true"
+          :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+          :enabled="true"
+        />
 
-      <div :class="['dashboard-main', mainLayoutClass]">
-        <!-- Fullscreen Mode (Photos or Web Services) -->
-        <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
-          <!-- Fullscreen Photos -->
-          <PhotoSlideshow
-            v-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
-            :is-fullscreen="true"
-            :auto-rotate="true"
-            :rotation-interval="configStore.photoRotationInterval * 1000"
-          />
-          <!-- Fullscreen Web Services -->
-          <WebServiceViewer
-            v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
-            :is-fullscreen="true"
+        <div :class="['dashboard-main', mainLayoutClass]">
+          <!-- Fullscreen Mode (Calendar, Photos or Web Services) -->
+          <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
+            <!-- Fullscreen Calendar -->
+            <CalendarView
+              v-if="modeStore.fullscreenMode === modeStore.MODES.CALENDAR"
+              :is-fullscreen="true"
+              :source-ids="modeStore.fullscreenContext?.sourceIds || []"
+              :view="modeStore.fullscreenContext?.view || null"
+            />
+            <!-- Fullscreen Photos -->
+            <PhotoSlideshow
+              v-else-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
+              :is-fullscreen="true"
+              :auto-rotate="true"
+              :rotation-interval="configStore.photoRotationInterval * 1000"
+              :source-ids="modeStore.fullscreenContext?.sourceIds || []"
+            />
+            <!-- Fullscreen Web Services -->
+            <WebServiceViewer
+              v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
+              :is-fullscreen="true"
+              :service-id="modeStore.fullscreenContext?.serviceId || null"
+            />
+          </div>
+
+          <!-- Dashboard View (Home) - Renders configured dashboard regions -->
+          <div
+            v-else
+            ref="dashboardViewEl"
+            :class="[
+              'mode-content',
+              'dashboard-view',
+              mainLayoutClass,
+              { 'dashboard-view--unlocked': !configStore.regionsLocked },
+            ]"
+            :style="regionChromeVars(configStore.touchControlSize)"
+          >
+            <template v-for="elementType in layoutOrder" :key="elementType">
+              <!-- Dashboard Region -->
+              <div
+                v-if="isRegionElement(elementType)"
+                class="dashboard-region-section"
+                :class="{ 'dashboard-region-section--lit': isLitSection(elementType) }"
+                :style="getRegionStyle(elementType)"
+              >
+                <DashboardRegion
+                  :region="getRegionForElement(elementType)"
+                  :path="regionPath(elementType)"
+                  :photo-rotation-interval="configStore.photoRotationInterval"
+                  :parent-direction="layoutDirection"
+                  :active-region-id="activeScreen.activeRegionId"
+                  :light-active="lightActive"
+                  :controls-visible="configStore.shouldShowUI"
+                  :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
+                  @focus-region="onFocusRegion"
+                />
+              </div>
+
+              <!-- Horizontal between bar (regions stacked vertically) -->
+              <ClockBarHorizontal
+                v-else-if="elementType === 'horizontalBarBetween'"
+                position="between"
+                :show-in-non-kiosk="true"
+                :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+                :enabled="true"
+              />
+
+              <!-- Vertical between bar (regions side by side) -->
+              <ClockBarVertical
+                v-else-if="elementType === 'verticalBarBetween'"
+                position="between"
+                :show-in-non-kiosk="true"
+                :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+                :enabled="true"
+              />
+            </template>
+
+            <!-- CLV-20: one welcome card while every content region is empty -->
+            <SetupWelcomeCard />
+
+            <!-- Drag-to-resize handles (only when the layout is unlocked) -->
+            <div
+              v-for="handle in resizeHandles"
+              :key="`resizer-${handle.firstIndex}`"
+              class="region-resizer"
+              :class="`region-resizer--${layoutDirection}`"
+              :style="resizerStyle(handle)"
+              role="separator"
+              aria-orientation="vertical"
+              :aria-label="`Drag to resize regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
+              @pointerdown="startRegionResize(handle.firstIndex, $event)"
+            >
+              <span class="region-resizer__grip" aria-hidden="true" />
+            </div>
+          </div>
+
+          <!-- Unlocked-layout banner: clear status + one-tap re-lock -->
+          <div v-if="!configStore.regionsLocked" class="layout-unlock-banner" role="status">
+            <span class="layout-unlock-banner__text"
+              >Layout unlocked — drag the dividers to resize</span
+            >
+            <Button
+              class="layout-unlock-banner__lock"
+              variant="primary"
+              size="sm"
+              @click="lockLayout"
+            >
+              Lock
+            </Button>
+          </div>
+
+          <!-- Horizontal Clock Bar at Bottom -->
+          <ClockBarHorizontal
+            v-if="showHorizontalBarBottom"
+            position="bottom"
+            :show-in-non-kiosk="true"
+            :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+            :enabled="true"
           />
         </div>
 
-        <!-- Dashboard View (Home) - Always shows calendar + side view -->
-        <div
-          v-else
-          :class="['mode-content', 'dashboard-view', mainLayoutClass, sideViewPositionClass]"
-        >
-          <!-- Render elements in computed order - no CSS order needed! -->
-          <template v-for="elementType in layoutOrder" :key="elementType">
-            <!-- Vertical Clock Bar at Left -->
-            <ClockBarVertical
-              v-if="elementType === 'verticalBarLeft'"
-              position="left"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
-
-            <!-- Calendar Section -->
-            <div
-              v-else-if="elementType === 'calendar'"
-              class="calendar-section"
-              :style="{
-                width: calendarWidth,
-                height: calendarHeight,
-              }"
-            >
-              <CalendarView />
-            </div>
-
-            <!-- Horizontal Clock Bar Between (Portrait) -->
-            <ClockBarHorizontal
-              v-else-if="elementType === 'horizontalBarBetween'"
-              position="between"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
-
-            <!-- Vertical Clock Bar Between (Landscape) -->
-            <ClockBarVertical
-              v-else-if="elementType === 'verticalBarBetween'"
-              position="between"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
-
-            <!-- Secondary Section -->
-            <div
-              v-else-if="elementType === 'secondary'"
-              class="secondary-section"
-              :style="{
-                width: secondaryWidth,
-                height: secondaryHeight,
-              }"
-            >
-              <!-- Show content based on current mode -->
-              <!-- When in calendar mode, show last side view mode (preserve state) -->
-              <WebServiceViewer
-                v-if="
-                  modeStore.currentMode === modeStore.MODES.WEB_SERVICES ||
-                  (modeStore.currentMode === modeStore.MODES.CALENDAR &&
-                    configStore.lastSideViewMode === 'web_services')
-                "
-                :is-fullscreen="false"
-              />
-              <PhotoSlideshow
-                v-else-if="
-                  modeStore.currentMode === modeStore.MODES.PHOTOS ||
-                  (modeStore.currentMode === modeStore.MODES.CALENDAR &&
-                    configStore.lastSideViewMode !== 'web_services')
-                "
-                :is-fullscreen="false"
-                :auto-rotate="true"
-                :rotation-interval="configStore.photoRotationInterval * 1000"
-              />
-            </div>
-
-            <!-- Vertical Clock Bar at Right -->
-            <ClockBarVertical
-              v-else-if="elementType === 'verticalBarRight'"
-              position="right"
-              :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
-              :show-in-kiosk="configStore.clockBarShowInKiosk"
-              :enabled="true"
-            />
-          </template>
-        </div>
-
-        <!-- Horizontal Clock Bar at Bottom -->
-        <ClockBarHorizontal
-          v-if="showHorizontalBarBottom"
-          position="bottom"
-          :show-in-non-kiosk="configStore.clockBarShowInNonKiosk"
-          :show-in-kiosk="configStore.clockBarShowInKiosk"
+        <ClockBarVertical
+          v-if="showVerticalBarRight"
+          position="right"
+          :show-in-non-kiosk="true"
+          :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
           :enabled="true"
         />
       </div>
@@ -207,228 +166,369 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, watch, defineAsyncComponent } from "vue";
-import axios from "axios";
+import {
+  onMounted,
+  onUnmounted,
+  onBeforeUnmount,
+  computed,
+  ref,
+  watch,
+  defineAsyncComponent,
+  provide,
+} from "vue";
 import LayoutManager from "../components/LayoutManager.vue";
+import DashboardRegion from "../components/DashboardRegion.vue";
+import SetupWelcomeCard from "../components/dashboard/SetupWelcomeCard.vue";
 import MinimalUIOverlay from "../components/MinimalUIOverlay.vue";
-import Clock from "../components/Clock.vue"; // Legacy - keeping for backwards compatibility
 import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
-import ConnectionIndicator from "../components/ConnectionIndicator.vue";
+import LoadingLight from "../components/LoadingLight.vue";
+import Button from "../components/ui/Button.vue";
 
-// Lazy load mode-specific components for better code splitting
-const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
+const CalendarView = defineAsyncComponent(() => import("../components/CalendarView.vue"));
+import { regionChromeVars } from "@/styles/regionChromeScale";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
-import { useRouter, useRoute } from "vue-router";
-import { getLayoutOrder } from "../utils/layout";
+import { useFirstLoadLight } from "../composables/useFirstLoadLight";
+import { useRoute } from "vue-router";
+import { useKeyboardActions } from "../composables/useKeyboardActions";
+import { useFocusLight } from "../composables/useFocusLight";
+import { useHotCornerReveal } from "../composables/useHotCornerReveal";
+import { useSetupPrompt } from "../composables/useSetupPrompt";
+import {
+  getActiveDashboardScreen,
+  getClockBarPlacementGap,
+  getGlobalClockBarSettings,
+  getLayoutDirection,
+  getNodeAtPath,
+  getRegionAxisStyle,
+  getLeafRegions,
+  normalizeDashboardScreens,
+  applyDragSizesById,
+  resizeAdjacentRegions,
+  resolveClockBarForScreen,
+} from "../utils/layout";
 
 const configStore = useConfigStore();
+
+// Press-and-hold in the reveal corner shows the UI while it's hidden. Runs at
+// the window level so the corner visual stays pointer-events:none and content
+// taps pass straight through. See calvin-arv.
+useHotCornerReveal(configStore);
 const modeStore = useModeStore();
-const router = useRouter();
 const route = useRoute();
 
-const status = ref("checking...");
-const statusClass = computed(() => {
-  if (status.value === "healthy") return "healthy";
-  if (status.value === "checking...") return "checking";
-  return "error";
-});
+// First load after a page load lights the app frame until the dashboard has
+// content. Region and plugin fetches report themselves (CLV-115).
+const firstLoadLight = useFirstLoadLight();
+const { focusRegion } = useKeyboardActions();
 
-const statusText = computed(() => {
-  return status.value.charAt(0).toUpperCase() + status.value.slice(1);
-});
-
-// Polling interval for config updates (configurable, default 30 seconds)
 let configPollInterval = null;
 
-const isLandscape = computed(() => configStore.orientation === "landscape");
-const isPortrait = computed(() => configStore.orientation === "portrait");
-
-const calendarWidth = computed(() => {
-  return isLandscape.value ? configStore.calendarWidth : "100%";
-});
-
-const calendarHeight = computed(() => {
-  return isPortrait.value ? configStore.calendarWidth : "100%";
-});
-
-const secondaryWidth = computed(() => {
-  return isLandscape.value ? configStore.photosWidth : "100%";
-});
-
-const secondaryHeight = computed(() => {
-  return isPortrait.value ? configStore.photosWidth : "100%";
-});
+const layoutDirection = computed(() =>
+  getLayoutDirection(activeScreen.value?.layout, configStore.orientation)
+);
 
 const mainLayoutClass = computed(() => {
-  return `layout-${configStore.orientation}`;
+  return `layout-${configStore.orientation} layout-direction-${layoutDirection.value}`;
 });
 
-const sideViewPositionClass = computed(() => {
-  return `side-${configStore.sideViewPosition}`;
-});
+const barVisible = computed(
+  () => configStore.shouldShowUI || configStore.effectiveClockBarShowInKiosk
+);
 
-const sideViewPositionTitle = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right"
-      ? "Move Side View to Left"
-      : "Move Side View to Right";
-  } else {
-    return configStore.sideViewPosition === "bottom"
-      ? "Move Side View to Top"
-      : "Move Side View to Bottom";
+const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
+const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
+
+// CLV-20: the ordered content regions of the active screen drive the single
+// setup prompt. EmptyState instances report which of them are setup-empty.
+const setupPrompt = useSetupPrompt();
+const setupContentRegions = computed(() =>
+  getLeafRegions(activeScreen.value?.layout)
+    .filter(region => ["calendar", "photos", "service"].includes(region.kind))
+    .map(region => ({ key: region.id, kind: region.kind }))
+);
+
+// A screen change resets the prompt; give the async region components time to
+// mount and report before treating an empty report list as "all configured".
+let settleTimer = null;
+const settleSetupPrompt = () => {
+  if (settleTimer) clearTimeout(settleTimer);
+  settleTimer = setTimeout(() => setupPrompt.markSettled(), 600);
+};
+watch(
+  setupContentRegions,
+  regions => {
+    setupPrompt.setContentRegions(regions);
+    settleSetupPrompt();
+  },
+  { immediate: true }
+);
+
+// Fullscreen swaps the dashboard view out (v-if in the template), so its
+// regions stop reporting for a while. Do not mistake that for configuration.
+watch(
+  () => modeStore.isFullscreen,
+  isFullscreen => {
+    if (isFullscreen) {
+      setupPrompt.detach();
+      if (settleTimer) {
+        clearTimeout(settleTimer);
+        settleTimer = null;
+      }
+    } else {
+      settleSetupPrompt();
+    }
   }
-});
+);
 
-const sideViewPositionIcon = computed(() => {
-  if (configStore.orientation === "landscape") {
-    return configStore.sideViewPosition === "right" ? "←" : "→";
-  } else {
-    return configStore.sideViewPosition === "bottom" ? "↑" : "↓";
-  }
-});
+const effectiveClockBar = computed(() =>
+  resolveClockBarForScreen(
+    activeScreen.value,
+    getGlobalClockBarSettings({
+      clockBarMode: configStore.clockBarMode,
+      clockBarPosition: configStore.clockBarPosition,
+    })
+  )
+);
 
-const clockClass = computed(() => {
-  // Use new widget position if widget is enabled, otherwise fall back to legacy position
-  const position =
-    configStore.clockWidgetEnabled && configStore.clockWidgetPosition
-      ? configStore.clockWidgetPosition
-      : configStore.clockPosition || "top-right";
-  return ["clock-overlay", "position-" + position];
-});
+const clockBarActive = computed(() => effectiveClockBar.value.enabled && barVisible.value);
+const isHorizontalMode = computed(() => effectiveClockBar.value.mode === "horizontal");
+const isVerticalMode = computed(() => effectiveClockBar.value.mode === "vertical");
+const clockBarPosition = computed(() => effectiveClockBar.value.position);
+const clockBarPlacementGap = computed(() =>
+  getClockBarPlacementGap(clockBarPosition.value, activeScreen.value?.layout?.regions?.length || 0)
+);
 
-// Computed properties for clock bar rendering
-const shouldShowHorizontalBar = computed(() => {
-  return configStore.clockBarEnabled && configStore.clockBarMode === "horizontal";
-});
+const showHorizontalBarTop = computed(
+  () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "top"
+);
 
-const shouldShowVerticalBar = computed(() => {
-  return configStore.clockBarEnabled && configStore.clockBarMode === "vertical";
-});
+const showHorizontalBarBottom = computed(
+  () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "bottom"
+);
 
-const showHorizontalBarTop = computed(() => {
-  return (
-    shouldShowHorizontalBar.value &&
-    configStore.clockBarPosition === "top" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+// Between-bar orientation follows the layout direction (perpendicular to the
+// region flow), not the user-selected mode. So a 'between' position renders as
+// a horizontal strip when regions stack and a vertical strip when they sit
+// side by side, regardless of whether the user picked horizontal or vertical
+// mode for the perimeter case.
+const betweenClockBarElement = computed(() =>
+  clockBarActive.value && clockBarPlacementGap.value !== null
+    ? layoutDirection.value === "row"
+      ? "verticalBarBetween"
+      : "horizontalBarBetween"
+    : null
+);
 
-const showHorizontalBarBottom = computed(() => {
-  return (
-    shouldShowHorizontalBar.value &&
-    configStore.clockBarPosition === "bottom" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+const showVerticalBarLeft = computed(
+  () => clockBarActive.value && isVerticalMode.value && clockBarPosition.value === "left"
+);
 
-const showHorizontalBarBetween = computed(() => {
-  return (
-    shouldShowHorizontalBar.value &&
-    configStore.clockBarPosition === "between" &&
-    configStore.orientation === "portrait" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
-
-const showVerticalBarLeft = computed(() => {
-  return (
-    shouldShowVerticalBar.value &&
-    configStore.clockBarPosition === "left" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
-
-const showVerticalBarRight = computed(() => {
-  return (
-    shouldShowVerticalBar.value &&
-    configStore.clockBarPosition === "right" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
-
-const showVerticalBarBetween = computed(() => {
-  return (
-    shouldShowVerticalBar.value &&
-    configStore.clockBarPosition === "between" &&
-    configStore.orientation === "landscape" &&
-    (configStore.clockBarShowInNonKiosk || configStore.clockBarShowInKiosk)
-  );
-});
+const showVerticalBarRight = computed(
+  () => clockBarActive.value && isVerticalMode.value && clockBarPosition.value === "right"
+);
 
 // Computed layout order - determines the order elements should be rendered
 const layoutOrder = computed(() => {
-  return getLayoutOrder({
-    orientation: configStore.orientation,
-    sideViewPosition: configStore.sideViewPosition,
-    showVerticalBarLeft: showVerticalBarLeft.value,
-    showVerticalBarRight: showVerticalBarRight.value,
-    showVerticalBarBetween: showVerticalBarBetween.value,
-    showHorizontalBarBetween: showHorizontalBarBetween.value,
+  const regionElements = activeScreen.value.layout.regions.map(region => `region:${region.id}`);
+  if (regionElements.length <= 1) return regionElements;
+
+  const placedBetween = clockBarPlacementGap.value;
+  const elements = [];
+  regionElements.forEach((regionElement, index) => {
+    if (index > 0 && index - 1 === placedBetween) {
+      if (betweenClockBarElement.value) elements.push(betweenClockBarElement.value);
+    }
+    elements.push(regionElement);
   });
+  return elements;
 });
 
-const toggleOrientation = () => {
-  const newOrientation = configStore.orientation === "landscape" ? "portrait" : "landscape";
-  configStore.setOrientation(newOrientation);
-  // Reset side view position to default when switching orientation
-  if (newOrientation === "landscape") {
-    configStore.setSideViewPosition("right");
-  } else {
-    configStore.setSideViewPosition("bottom");
-  }
+const isRegionElement = elementType => elementType.startsWith("region:");
+
+const getRegionForElement = elementType => {
+  const regionId = elementType.replace("region:", "");
+  return activeScreen.value.layout.regions.find(region => region.id === regionId);
 };
 
-const toggleSideViewPosition = async () => {
-  configStore.toggleSideViewPosition();
-  // Save the config change
-  try {
-    await configStore.updateConfig({
-      sideViewPosition: configStore.sideViewPosition,
+const regionPath = elementType => {
+  const regionId = elementType.replace("region:", "");
+  const idx = activeScreen.value.layout.regions.findIndex(r => r.id === regionId);
+  return idx >= 0 ? [idx] : [];
+};
+
+const getRegionStyle = elementType => {
+  const region = getRegionForElement(elementType);
+  // During a live drag, override sizes from dragSizes for instant feedback
+  // without persisting on every pointer move.
+  const override = region && dragSizes.value ? dragSizes.value[region.id] : undefined;
+  const sized = override != null ? { ...region, size: override } : region;
+  return getRegionAxisStyle(sized, layoutDirection.value);
+};
+
+// ── Drag-to-resize regions (top-level and nested) (calvin-fou) ──────────────
+const dashboardViewEl = ref(null);
+const dragSizes = ref(null); // { [regionId]: size } live override while dragging
+let resizeState = null; // { containerPath, firstIndex, rect, direction }
+
+// Provide the resize context so nested DashboardRegion components can
+// render their own handles and report drag-start events.
+provide("dashboardResize", {
+  dragSizes,
+  regionsLocked: computed(() => configStore.regionsLocked),
+  start: startNestedResize,
+});
+
+// One handle per divider between adjacent top-level regions, skipping the
+// divider occupied by a between-clock-bar. Positioned by cumulative size %.
+const resizeHandles = computed(() => {
+  if (configStore.regionsLocked) return [];
+  const regions = activeScreen.value?.layout?.regions || [];
+  if (regions.length < 2) return [];
+  const betweenGap = clockBarPlacementGap.value;
+  const sizeOf = region => (dragSizes.value?.[region.id] ?? region.size) || 0;
+  const handles = [];
+  let cumulative = 0;
+  for (let i = 0; i < regions.length - 1; i++) {
+    cumulative += sizeOf(regions[i]);
+    if (betweenGap !== null && i === betweenGap) continue; // a bar sits here
+    handles.push({ firstIndex: i, position: cumulative });
+  }
+  return handles;
+});
+
+const resizerStyle = handle =>
+  layoutDirection.value === "column"
+    ? { top: `${handle.position}%` }
+    : { left: `${handle.position}%` };
+
+// Generalised drag handler: works for any container in the layout tree.
+// containerPath=[] → top-level regions; else → split.regions of the node at that path.
+// containerEl is the DOM element whose bounding rect defines the drag coordinate space.
+function startNestedResize(containerPath, firstIndex, containerEl, direction) {
+  if (configStore.regionsLocked || !containerEl) return;
+  resizeState = {
+    containerPath,
+    firstIndex,
+    rect: containerEl.getBoundingClientRect(),
+    direction,
+  };
+  window.addEventListener("pointermove", onNestedResizeMove);
+  window.addEventListener("pointerup", stopNestedResize, { once: true });
+}
+
+const onNestedResizeMove = event => {
+  if (!resizeState) return;
+  const { containerPath, firstIndex, rect, direction } = resizeState;
+  const isColumn = direction === "column";
+  const offset = isColumn ? event.clientY - rect.top : event.clientX - rect.left;
+  const axis = isColumn ? rect.height : rect.width;
+  if (axis <= 0) return;
+  const layout = activeScreen.value.layout;
+  const container =
+    containerPath.length === 0
+      ? layout.regions
+      : (getNodeAtPath(layout, containerPath)?.split?.regions ?? []);
+  const before = container
+    .slice(0, firstIndex)
+    .reduce((s, r) => s + (Number(dragSizes.value?.[r.id] ?? r.size) || 0), 0);
+  const nextFirstSize = (offset / axis) * 100 - before;
+  const resized = resizeAdjacentRegions(container, firstIndex, nextFirstSize);
+  const map = { ...(dragSizes.value || {}) };
+  resized.forEach(r => {
+    map[r.id] = r.size;
+  });
+  dragSizes.value = map;
+};
+
+const commitRegionSizes = sizes => {
+  // WRITE must be based on the RAW full catalog (configStore.dashboardScreens), not
+  // the filtered effective set (dashboardScreens.value). In kiosk mode the effective
+  // set only contains the screens this kiosk can see; posting it to /api/config would
+  // silently delete every other screen from the global catalog (data loss).
+  const fullCatalog = normalizeDashboardScreens(configStore.dashboardScreens);
+  const activeId = activeScreen.value?.id;
+  const next = {
+    ...fullCatalog,
+    screens: fullCatalog.screens.map(screen =>
+      screen.id !== activeId
+        ? screen
+        : {
+            ...screen,
+            // applyDragSizesById walks the entire layout tree and patches any node
+            // whose id appears in `sizes`, so it works for both top-level and nested
+            // regions without separate code paths.
+            layout: applyDragSizesById(screen.layout, sizes),
+          }
+    ),
+  };
+  return configStore.updateConfig({ dashboardScreens: normalizeDashboardScreens(next) });
+};
+
+const stopNestedResize = () => {
+  window.removeEventListener("pointermove", onNestedResizeMove);
+  const sizes = dragSizes.value;
+  resizeState = null;
+  if (!sizes) {
+    dragSizes.value = null;
+    return;
+  }
+  // Keep the live override applied until the persisted config reflects the new
+  // sizes, then clear it. Clearing first would render one frame at the old
+  // committed size before the update lands — a visible snap-back on drop.
+  commitRegionSizes(sizes)
+    .catch(() => {}) // updateConfig already logs; keep the override-clear unconditional
+    .finally(() => {
+      dragSizes.value = null;
     });
-  } catch (error) {
-    console.error("Failed to save side view position:", error);
+};
+
+// Backward-compat aliases so the template's @pointerdown still works.
+const startRegionResize = (firstIndex, event) => {
+  if (configStore.regionsLocked) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const el = dashboardViewEl.value;
+  if (!el) return;
+  startNestedResize([], firstIndex, el, layoutDirection.value);
+};
+
+const lockLayout = () => {
+  configStore.updateConfig({ regionsLocked: true });
+};
+
+// 'interaction' follows touch/key/remote input and fades after a short idle,
+// independent of hide controls (calvin-3xz9). 'always' and 'off' are unchanged.
+const { lightActive } = useFocusLight(configStore);
+
+const onFocusRegion = regionId => {
+  // Focusing a region (for the focus-light / touch nav) must not bring the
+  // chrome back while the UI is hidden — the hot corner is the deliberate
+  // reveal. Only tap-anywhere opt-in re-shows the UI on a content tap.
+  if (
+    configStore.effectiveTapAnywhereReveal &&
+    typeof configStore.showUITemporarily === "function"
+  ) {
+    configStore.showUITemporarily(60);
   }
+  focusRegion(regionId);
 };
 
-const showWebServices = () => {
-  configStore.setLastSideViewMode("web_services");
-  modeStore.setMode(modeStore.MODES.WEB_SERVICES);
+// A region (section) is "lit" when the focus-light is active and it contains
+// the active leaf. The lit section is raised above its siblings so its glow
+// isn't clipped by a later-painted neighbour.
+const regionContainsLeaf = (region, leafId) => {
+  if (!region || !leafId) return false;
+  if (!region.split) return region.id === leafId;
+  return region.split.regions.some(sub => regionContainsLeaf(sub, leafId));
 };
-
-const showPhotos = () => {
-  configStore.setLastSideViewMode("photos");
-  modeStore.setMode(modeStore.MODES.PHOTOS);
+const isLitSection = elementType => {
+  if (!lightActive.value) return false;
+  return regionContainsLeaf(getRegionForElement(elementType), activeScreen.value?.activeRegionId);
 };
-
-const goToSettings = () => {
-  modeStore.setMode(modeStore.MODES.SETTINGS);
-  router.push("/settings");
-};
-
-const checkHealth = async () => {
-  try {
-    const response = await axios.get("/api/health", { timeout: 5000 });
-    if (response.data && response.data.status === "healthy") {
-      status.value = "healthy";
-    } else {
-      status.value = "unhealthy";
-    }
-  } catch (error) {
-    // Only set error if it's not a timeout or network error (might be temporary)
-    if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
-      status.value = "checking...";
-    } else {
-      status.value = "error";
-    }
-    console.error("Health check failed:", error);
-  }
-};
-
-let healthInterval = null;
 
 const startConfigPolling = () => {
   // Clear existing interval if any
@@ -473,25 +573,32 @@ watch(
 );
 
 onMounted(async () => {
-  // Check health immediately and then periodically
-  checkHealth();
-  healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
-
-  // Fetch config on mount
   await configStore.fetchConfig();
-  // Start config polling with configured interval
+  firstLoadLight.contentReady();
   startConfigPolling();
+  settleSetupPrompt();
+});
+
+onBeforeUnmount(() => {
+  // Children clear their setup reports while unmounting; do not read that as
+  // "everything got configured" and drop the per-device dismissal.
+  setupPrompt.detach();
 });
 
 onUnmounted(() => {
-  // Clean up polling intervals
   if (configPollInterval) {
     clearInterval(configPollInterval);
     configPollInterval = null;
   }
-  if (healthInterval) {
-    clearInterval(healthInterval);
-    healthInterval = null;
+  if (settleTimer) {
+    clearTimeout(settleTimer);
+    settleTimer = null;
+  }
+  // Drop any in-flight drag listeners and re-lock the layout on the way out so
+  // it never stays editable behind the user's back.
+  window.removeEventListener("pointermove", onNestedResizeMove);
+  if (!configStore.regionsLocked) {
+    configStore.updateConfig({ regionsLocked: true });
   }
 });
 </script>
@@ -504,187 +611,54 @@ onUnmounted(() => {
   flex-direction: column;
   padding: 0;
   gap: 0;
-  background: var(--bg-secondary);
+  background: var(--bg-0);
 }
 
-.dashboard:has(.dashboard-header) {
-  padding: 1rem;
-  gap: 1rem;
-}
-
-.dashboard-header {
+.dashboard-stage {
+  flex: 1;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  box-shadow: 0 2px 4px var(--shadow);
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.dashboard-header h1 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.header-controls {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-.status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-dot.checking {
-  background-color: #ff9800;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-.status-dot.healthy {
-  background-color: #4caf50;
-}
-
-.status-dot.error {
-  background-color: #f44336;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.btn-orientation {
-  background: var(--accent-secondary);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-orientation:hover {
-  background: var(--accent-secondary);
-  opacity: 0.9;
-}
-
-.btn-web-services {
-  background: var(--accent-primary);
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-web-services:hover {
-  background: var(--accent-primary);
-  opacity: 0.9;
-}
-
-.btn-side-position {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 1.2rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 40px;
-}
-
-.btn-side-position:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-settings {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-settings:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.btn-minimal {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-minimal:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
+  flex-direction: row;
+  min-height: 0;
+  min-width: 0;
+  /* Its own layer (--z-raised) under the perimeter clock bars (--z-sticky), so
+     a focused region's glow stays inside the stage and the bars stay on top. */
+  position: relative;
+  z-index: var(--z-raised);
 }
 
 .dashboard-main {
   flex: 1;
   display: flex;
-  gap: 1rem;
-  min-height: 0; /* Important for flex children */
-  flex-direction: row; /* Default to row (landscape) */
-}
-
-.dashboard-main.layout-portrait {
-  flex-direction: column; /* Portrait: stack vertically */
-}
-
-.dashboard-main.layout-landscape {
-  flex-direction: row; /* Landscape: side by side */
+  flex-direction: column;
+  gap: var(--gap-4);
+  min-height: 0;
+  min-width: 0;
+  /* Same rationale one level down: under the vertical (left/right) bars. */
+  position: relative;
+  z-index: var(--z-raised);
 }
 
 .mode-content {
   width: 100%;
-  height: 100%;
+  flex: 1 1 auto;
   display: flex;
-  gap: 1rem;
+  gap: var(--gap-2);
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Inset the region grid from the screen edges so each panel "floats" with
+   equal clearance on all sides (edge padding ≈ half the inter-panel gap),
+   giving the focus-light room to glow uniformly around the whole region. */
+.mode-content.dashboard-view {
+  padding: var(--gap-2);
+  position: relative; /* anchor the absolute drag-resize handles */
+}
+
+/* When unlocked, reserve room at the bottom so the fixed .layout-unlock-banner
+   (a centered pill at bottom: 1rem) doesn't occlude the bottom region's label. */
+.mode-content.dashboard-view.dashboard-view--unlocked {
+  padding-bottom: calc(var(--gap-8) * 2 + var(--gap-2));
 }
 
 .mode-content.dashboard-view.layout-portrait {
@@ -695,6 +669,16 @@ onUnmounted(() => {
   flex-direction: row; /* Landscape: side by side */
 }
 
+/* Direction overrides — when the user explicitly picks a direction,
+ * it takes precedence over the orientation default. */
+.mode-content.dashboard-view.layout-direction-row {
+  flex-direction: row;
+}
+
+.mode-content.dashboard-view.layout-direction-column {
+  flex-direction: column;
+}
+
 /* Clock bar positioning is now handled via inline styles using computed order values */
 /* This makes the layout more maintainable and less dependent on CSS specificity */
 
@@ -703,99 +687,101 @@ onUnmounted(() => {
   gap: 0;
 }
 
+/* ── Drag-to-resize handles (calvin-fou) ─────────────────────────────────── */
+.region-resizer {
+  position: absolute;
+  z-index: var(--z-raised); /* above lit regions so the grip is always grabbable */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none; /* let pointer events drive the drag on touch screens */
+}
+.region-resizer--row {
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+}
+.region-resizer--column {
+  left: 0;
+  right: 0;
+  height: 28px;
+  transform: translateY(-50%);
+  cursor: row-resize;
+}
+.region-resizer__grip {
+  background: var(--focus);
+  border: 1px solid var(--focus-edge);
+  border-radius: var(--radius-round);
+  box-shadow: 0 0 0 3px var(--focus-glow);
+}
+.region-resizer--row .region-resizer__grip {
+  width: 6px;
+  height: 54px;
+  max-height: 60%;
+}
+.region-resizer--column .region-resizer__grip {
+  height: 6px;
+  width: 54px;
+  max-width: 60%;
+}
+.region-resizer:hover .region-resizer__grip,
+.region-resizer:active .region-resizer__grip {
+  background: var(--focus);
+  box-shadow: 0 0 0 5px var(--focus-glow);
+}
+
+/* Unlocked-layout banner */
+.layout-unlock-banner {
+  position: fixed;
+  left: 50%;
+  bottom: var(--gap-4);
+  transform: translateX(-50%);
+  z-index: var(--z-dialog);
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+  padding: var(--gap-2) var(--gap-2) var(--gap-2) var(--gap-4);
+  background: var(--bg-1);
+  border: 1px solid var(--focus-edge);
+  border-radius: var(--radius-round);
+  box-shadow: var(--elev-1);
+  font-family: var(--font-ui);
+}
+.layout-unlock-banner__text {
+  font-size: var(--text-meta);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 .photos-mode,
 .web-services-mode {
   width: 100%;
   height: 100%;
 }
 
-.calendar-section {
-  min-width: 0; /* Important for flex children */
+.dashboard-region-section {
+  min-width: 0;
   min-height: 0;
-  width: 100%; /* Explicitly set width to 100% */
-  max-width: 100%; /* Ensure it doesn't exceed container */
-  flex-shrink: 0; /* Prevent flexbox from shrinking the calendar */
-  border-radius: 8px;
-  overflow: hidden;
-  overflow-x: clip; /* Better clipping for grid overflow on RPI */
+  width: 100%;
+  max-width: 100%;
+  /* shrink to fit the padded container so both panels keep their margin
+     (flex-shrink:0 caused the trailing panel to overflow past the edge) */
+  flex-shrink: 1;
+  border-radius: 0;
+  /* visible so the focused panel's neon box-shadow can bloom into the gap.
+     Panel content is still clipped by the panel's own overflow:hidden. */
+  overflow: visible;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  position: relative;
+  isolation: isolate;
 }
-
-.dashboard:not(:has(.dashboard-header)) .calendar-section {
-  border-radius: 0;
-}
-
-.secondary-section {
-  min-width: 0; /* Important for flex children */
-  min-height: 0;
-  width: 100%; /* Explicitly set width to 100% */
-  max-width: 100%; /* Ensure it doesn't exceed container */
-  border-radius: 8px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.dashboard:not(:has(.dashboard-header)) .secondary-section {
-  border-radius: 0;
-}
-
-.clock-overlay {
-  position: fixed;
-  z-index: 1000;
-  background: var(--bg-primary);
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px var(--shadow);
-  /* Offset from edges to avoid covering calendar elements */
-}
-
-.clock-overlay.position-top-left {
-  top: 0.5rem;
-  left: 0.5rem;
-}
-
-.clock-overlay.position-top-center {
-  top: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.clock-overlay.position-top-right {
-  top: 0.5rem;
-  right: 1rem;
-  /* Additional offset for top-right to avoid calendar day markers */
-}
-
-.clock-overlay.position-bottom-left {
-  bottom: 0.5rem;
-  left: 0.5rem;
-}
-
-.clock-overlay.position-bottom-center {
-  bottom: 0.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.clock-overlay.position-bottom-right {
-  bottom: 0.5rem;
-  right: 0.5rem;
-}
-
-.connection-indicator-overlay {
-  position: fixed;
-  top: 1rem;
-  left: 1rem;
-  z-index: 10000;
-  pointer-events: none;
-}
-
-/* Adjust position when UI is hidden to avoid clock overlap */
-.dashboard:not(:has(.dashboard-header)) .connection-indicator-overlay {
-  top: 1rem;
-  left: 1rem;
+/* Raise the focused region so its glow paints over the neighbouring panels
+   instead of being clipped by a later-painted sibling. */
+.dashboard-region-section--lit {
+  z-index: var(--z-raised);
 }
 </style>

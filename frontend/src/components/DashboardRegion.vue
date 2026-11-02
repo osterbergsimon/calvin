@@ -1,0 +1,307 @@
+<template>
+  <div
+    class="dashboard-region"
+    :class="{ 'dashboard-region--leaf': !region.split }"
+    @click="emit('focus-region', region.id)"
+  >
+    <template v-if="region.split">
+      <div
+        ref="splitContainerEl"
+        class="split-container"
+        :class="`split-container--${splitDirection}`"
+      >
+        <DashboardRegion
+          v-for="(sub, i) in region.split.regions"
+          :key="sub.id"
+          class="dashboard-subregion"
+          :class="{ 'dashboard-subregion--lit': subtreeContainsActive(sub) }"
+          :style="getSubStyle(sub)"
+          :region="sub"
+          :path="[...path, i]"
+          :photo-rotation-interval="photoRotationInterval"
+          :parent-direction="splitDirection"
+          :active-region-id="activeRegionId"
+          :light-active="lightActive"
+          :controls-visible="controlsVisible"
+          :dim-others="dimOthers"
+          @click.stop
+          @focus-region="emit('focus-region', $event)"
+        />
+        <!-- Drag handles between adjacent split children (when unlocked) -->
+        <div
+          v-for="handle in subResizeHandles"
+          :key="`sub-handle-${handle.firstIndex}`"
+          class="subregion-resizer"
+          :class="`subregion-resizer--${splitDirection}`"
+          :style="handle.style"
+          role="separator"
+          :aria-label="`Drag to resize sub-regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
+          @pointerdown.stop.prevent="
+            resizeCtx.start([...path], handle.firstIndex, splitContainerEl, splitDirection)
+          "
+        >
+          <span class="subregion-resizer__grip" aria-hidden="true" />
+        </div>
+      </div>
+    </template>
+    <template v-else>
+      <CalendarView
+        v-if="region.kind === 'calendar'"
+        :source-ids="region.instanceIds || []"
+        :view="region.view"
+        :region-id="region.id"
+        :focused="isFocused(region.id)"
+        :controls-visible="controlsFor(region.id)"
+        :dim="isDim(region.id)"
+        @vue:mounted="onContentMounted"
+      />
+      <PhotoSlideshow
+        v-else-if="region.kind === 'photos'"
+        :is-fullscreen="false"
+        :auto-rotate="true"
+        :rotation-interval="photoRotationInterval * 1000"
+        :source-ids="region.instanceIds || []"
+        :region-id="region.id"
+        :fit="region.view?.fit"
+        :focused="isFocused(region.id)"
+        :controls-visible="controlsFor(region.id)"
+        :dim="isDim(region.id)"
+        @vue:mounted="onContentMounted"
+      />
+      <WebServiceViewer
+        v-else-if="region.kind === 'service'"
+        :is-fullscreen="false"
+        :service-id="region.instanceIds?.[0] || region.serviceId"
+        :region-id="region.id"
+        :view="region.view"
+        :focused="isFocused(region.id)"
+        :controls-visible="controlsFor(region.id)"
+        :dim="isDim(region.id)"
+        @vue:mounted="onContentMounted"
+      />
+      <!-- This region's own loading light, on its focus-glow path (CLV-115) -->
+      <LoadingLight :region-id="region.id" />
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { computed, defineAsyncComponent, inject, onBeforeUnmount, ref } from "vue";
+import { getSplitDirection } from "@/utils/layout";
+import LoadingLight from "./LoadingLight.vue";
+import {
+  expectFirstLoadRegion,
+  firstLoadRegionMounted,
+  forgetFirstLoadRegion,
+} from "@/composables/useFirstLoadLight";
+
+const props = defineProps({
+  region: {
+    type: Object,
+    required: true,
+  },
+  path: {
+    type: Array,
+    default: () => [],
+  },
+  photoRotationInterval: {
+    type: Number,
+    required: true,
+  },
+  parentDirection: {
+    type: String,
+    default: "row",
+  },
+  activeRegionId: {
+    type: String,
+    default: null,
+  },
+  lightActive: {
+    type: Boolean,
+    default: false,
+  },
+  // Whether the region's own controls (calendar header, photo arrows, service
+  // actions) should be reachable. Kept separate from `lightActive`: the focus
+  // light follows input, while the controls follow hide/show controls.
+  // null = fall back to lightActive for standalone use/tests.
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
+  dimOthers: {
+    type: Boolean,
+    default: true,
+  },
+});
+
+const emit = defineEmits(["focus-region"]);
+
+// Inject the resize context provided by Dashboard.vue.
+// null default so DashboardRegion works standalone (e.g. in unit tests).
+const resizeCtx = inject("dashboardResize", null);
+
+// Template ref for the split container element (used as the coordinate space
+// when reporting a nested drag-start to the Dashboard resize context).
+const splitContainerEl = ref(null);
+
+const isFocused = leafId => props.lightActive && leafId === props.activeRegionId;
+const controlsFor = leafId =>
+  (props.controlsVisible ?? props.lightActive) && leafId === props.activeRegionId;
+const isDim = leafId => props.lightActive && props.dimOthers && leafId !== props.activeRegionId;
+
+const subtreeContainsActive = node => {
+  if (!props.lightActive || !props.activeRegionId) return false;
+  if (!node.split) return node.id === props.activeRegionId;
+  return node.split.regions.some(subtreeContainsActive);
+};
+
+// First-load light (CLV-115): a leaf with content to load is waited for until
+// its lazily loaded component has mounted and begun its fetch. The async
+// wrapper hands the vnode:mounted hook to the loaded component, so it fires
+// once that chunk has arrived and mounted, not when the empty wrapper does.
+const CONTENT_KINDS = ["calendar", "photos", "service"];
+const reportsFirstLoad = !props.region.split && CONTENT_KINDS.includes(props.region.kind);
+const reportedId = props.region.id;
+if (reportsFirstLoad) expectFirstLoadRegion(reportedId);
+const onContentMounted = () => {
+  if (reportsFirstLoad) firstLoadRegionMounted(reportedId);
+};
+onBeforeUnmount(() => {
+  if (reportsFirstLoad) forgetFirstLoadRegion(reportedId);
+});
+
+const CalendarView = defineAsyncComponent(() => import("./CalendarView.vue"));
+const PhotoSlideshow = defineAsyncComponent(() => import("./PhotoSlideshow.vue"));
+const WebServiceViewer = defineAsyncComponent(() => import("./WebServiceViewer.vue"));
+
+const splitDirection = computed(() =>
+  props.region.split ? getSplitDirection(props.region.split, props.parentDirection) : null
+);
+
+const getSubStyle = sub => {
+  // During a live drag, use the override from the Dashboard resize context for
+  // instant visual feedback without persisting on every pointer move.
+  const rawSize = resizeCtx?.dragSizes.value?.[sub.id] ?? sub.size;
+  const size = `${rawSize}%`;
+  return splitDirection.value === "column"
+    ? { height: size, width: "100%" }
+    : { width: size, height: "100%" };
+};
+
+// Compute handle positions (cumulative %) between adjacent split children.
+// Only computed when resizeCtx is available and layout is unlocked.
+const subResizeHandles = computed(() => {
+  if (!resizeCtx || resizeCtx.regionsLocked.value) return [];
+  const subs = props.region.split?.regions;
+  if (!subs || subs.length < 2) return [];
+  const sizeOf = sub => Number(resizeCtx.dragSizes.value?.[sub.id] ?? sub.size) || 0;
+  const handles = [];
+  let cumulative = 0;
+  for (let i = 0; i < subs.length - 1; i++) {
+    cumulative += sizeOf(subs[i]);
+    const style =
+      splitDirection.value === "column" ? { top: `${cumulative}%` } : { left: `${cumulative}%` };
+    handles.push({ firstIndex: i, style });
+  }
+  return handles;
+});
+</script>
+
+<style scoped>
+.dashboard-region {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* A leaf region is the containing block of its loading light, so the light
+   traces the same box as the panel's focus glow. */
+.dashboard-region--leaf {
+  position: relative;
+}
+
+/* Split container: fills the region and flows children in the split direction.
+   Position:relative so absolute nested resize handles are anchored to it. */
+.split-container {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: row; /* overridden by modifier below */
+  position: relative;
+}
+.split-container--row {
+  flex-direction: row;
+}
+.split-container--column {
+  flex-direction: column;
+}
+
+.dashboard-subregion {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Default stacking context so the focused sibling can be raised above its
+     neighbours — otherwise a later sub-region paints over its glow. */
+  position: relative;
+  isolation: isolate;
+}
+/* Raise the focused sub-region so its neon glow blooms over adjacent sub-regions
+   instead of being clipped by a later-painted sibling (mirrors the section --lit
+   treatment for top-level regions). */
+.dashboard-subregion--lit {
+  z-index: var(--z-raised);
+}
+
+/* ── Nested drag-to-resize handles ─────────────────────────────────────────── */
+.subregion-resizer {
+  position: absolute;
+  z-index: var(--z-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  /* Handles are positioned absolutely (left/top %) relative to the
+     split-container, which is position:relative. */
+  flex-shrink: 0;
+}
+.subregion-resizer--row {
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+}
+.subregion-resizer--column {
+  left: 0;
+  right: 0;
+  height: 28px;
+  transform: translateY(-50%);
+  cursor: row-resize;
+}
+.subregion-resizer__grip {
+  background: var(--focus);
+  border: 1px solid var(--focus-edge);
+  border-radius: var(--radius-round);
+  box-shadow: 0 0 0 3px var(--focus-glow);
+}
+.subregion-resizer--row .subregion-resizer__grip {
+  width: 6px;
+  height: 36px;
+  max-height: 60%;
+}
+.subregion-resizer--column .subregion-resizer__grip {
+  height: 6px;
+  width: 36px;
+  max-width: 60%;
+}
+.subregion-resizer:hover .subregion-resizer__grip,
+.subregion-resizer:active .subregion-resizer__grip {
+  box-shadow: 0 0 0 5px var(--focus-glow);
+}
+</style>

@@ -1,47 +1,34 @@
 """Theme helper functions for plugin management."""
 
 import json
-import logging
-from pathlib import Path
 from typing import Any
 
+from loguru import logger
+
+from app.config import BACKEND_DIR
 from app.models.db_models import PluginTypeDB
 from app.plugins.base import PluginType
-
-logger = logging.getLogger(__name__)
+from app.services.theme_contract import decorate_theme
+from app.utils.db_retry import retry_on_db_locked
 
 
 def _load_builtin_themes() -> dict[str, Any]:
     """Load built-in themes from JSON file."""
-    # Path: backend/app/api/routes/plugins/themes.py -> backend/data/themes/builtin.json
-    # __file__ is at backend/app/api/routes/plugins/themes.py
-    # .parent = backend/app/api/routes/plugins/
-    # .parent.parent = backend/app/api/routes/
-    # .parent.parent.parent = backend/app/api/
-    # .parent.parent.parent.parent = backend/app/
-    # .parent.parent.parent.parent.parent = backend/
-    backend_dir = Path(__file__).parent.parent.parent.parent.parent
-    themes_file = backend_dir / "data" / "themes" / "builtin.json"
-
-    # Try alternative path if first doesn't work (for when running from different locations)
+    # Ships with the code (backend/data/themes/builtin.json), independent of
+    # the data dir where installed themes live.
+    themes_file = BACKEND_DIR / "data" / "themes" / "builtin.json"
     if not themes_file.exists():
-        # Try relative to current working directory
-        cwd_themes = Path.cwd() / "data" / "themes" / "builtin.json"
-        if cwd_themes.exists():
-            themes_file = cwd_themes
-        else:
-            logger.warning(
-                f"Built-in themes file not found at {themes_file} or {cwd_themes}, "
-                "using empty themes"
-            )
-            return {}
+        logger.warning(f"Built-in themes file not found at {themes_file}, using empty themes")
+        return {}
 
     try:
         with open(themes_file, encoding="utf-8") as f:
             themes = json.load(f)
-            # Ensure is_builtin is True for all loaded themes
+            # Ensure is_builtin is True for all loaded themes and run the
+            # theme_api 2 load check on every startup, bundle included.
             for theme_id, theme_data in themes.items():
                 theme_data["is_builtin"] = True
+                themes[theme_id] = decorate_theme(theme_data)
             return themes
     except (json.JSONDecodeError, Exception) as e:
         logger.error(f"Failed to load built-in themes from {themes_file}: {e}")
@@ -52,6 +39,7 @@ def _load_builtin_themes() -> dict[str, Any]:
 BUILTIN_THEMES = _load_builtin_themes()
 
 
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
 async def _register_theme_in_db(manifest: dict[str, Any]) -> None:
     """
     Register a theme in PluginTypeDB (like other plugins).
@@ -87,6 +75,7 @@ async def _register_theme_in_db(manifest: dict[str, Any]) -> None:
         await db_type.save_with_timestamp()
 
 
+@retry_on_db_locked(max_retries=5, initial_delay=0.1, max_delay=1.0)
 async def _unregister_theme_from_db(theme_id: str) -> None:
     """
     Remove a theme from PluginTypeDB.

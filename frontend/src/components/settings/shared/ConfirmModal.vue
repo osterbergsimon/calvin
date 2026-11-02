@@ -1,24 +1,39 @@
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="handleCancel">
-    <div class="modal-content confirm-modal">
-      <div class="modal-header">
-        <h3>{{ title }}</h3>
-        <button class="btn-close-modal" @click="handleCancel">×</button>
-      </div>
-      <div class="modal-body">
-        <p>{{ message }}</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-secondary" @click="handleCancel">Cancel</button>
-        <button type="button" class="btn-danger" @click="handleConfirm">
-          {{ confirmText }}
-        </button>
-      </div>
-    </div>
-  </div>
+  <Dialog :model-value="show" :title="title" size="sm" @update:model-value="onDialogUpdate">
+    <p class="confirm-modal__message">{{ message }}</p>
+    <!-- Optional extra body under the message, e.g. a SettingRow with a ToggleSwitch. -->
+    <slot />
+    <template #actions>
+      <Button variant="secondary" data-test="confirm-cancel" @click="handleCancel">Cancel</Button>
+      <Button
+        v-if="alternativeText"
+        variant="secondary"
+        data-test="confirm-alternative"
+        @click="handleAlternative"
+      >
+        {{ alternativeText }}
+      </Button>
+      <Button
+        :variant="danger ? 'danger' : 'primary'"
+        data-test="confirm-accept"
+        @click="handleConfirm"
+      >
+        {{ confirmText }}
+      </Button>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
+import Button from "@/components/ui/Button.vue";
+import Dialog from "@/components/ui/Dialog.vue";
+
+// A thin wrapper over the shared Dialog (docs/design/frontend-doctrine.md §3):
+// the shell, scrim, focus trap, Escape and OSK placement are Dialog's. Only
+// the wording and the destructive action are confirm-specific. A destructive
+// confirm keeps the danger Button (filled by Dialog's action row); a confirming
+// action that is not destructive (e.g. "Make default") uses primary instead, so
+// the colour carries the meaning.
 defineProps({
   show: {
     type: Boolean,
@@ -36,9 +51,18 @@ defineProps({
     type: String,
     default: "Confirm",
   },
+  // Opt-in: only an action that loses something irreversible (uninstall,
+  // restore, revoke, remove, reset, restart/reboot) asks for the red Button.
+  danger: {
+    type: Boolean,
+    default: false,
+  },
+  // An optional less-destructive choice beside Cancel (e.g. "Hide on Kitchen"
+  // in the delete-everywhere confirm).
+  alternativeText: { type: String, default: "" },
 });
 
-const emit = defineEmits(["confirm", "cancel"]);
+const emit = defineEmits(["confirm", "cancel", "alternative"]);
 
 const handleConfirm = () => {
   emit("confirm");
@@ -47,123 +71,21 @@ const handleConfirm = () => {
 const handleCancel = () => {
   emit("cancel");
 };
+
+const handleAlternative = () => {
+  emit("alternative");
+};
+
+// Closing from Escape, the scrim or the × is a cancel.
+const onDialogUpdate = value => {
+  if (!value) handleCancel();
+};
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: var(--bg-primary);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  max-width: 500px;
-  width: 90%;
-  max-height: 90vh;
-  overflow: auto;
-}
-
-.confirm-modal {
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.25rem;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.modal-header h3 {
+.confirm-modal__message {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.btn-close-modal {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.btn-close-modal:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: 1.25rem;
-}
-
-.modal-body p {
-  margin: 0;
-  color: var(--text-primary);
+  color: var(--ink);
   line-height: 1.5;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1.25rem;
-  border-top: 1px solid var(--border-color);
-}
-
-.btn-secondary {
-  padding: 0.5rem 1rem;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-}
-
-.btn-danger {
-  padding: 0.5rem 1rem;
-  background: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-danger:hover {
-  background: #c82333;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.3);
 }
 </style>

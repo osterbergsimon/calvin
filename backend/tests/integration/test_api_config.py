@@ -18,6 +18,95 @@ def test_get_config(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient):
+    """Every field the frontend config registry tracks must be present in the response.
+
+    The frontend Pinia store's `applyConfigPayload` resets missing fields to defaults on
+    every fetch. If the backend ever omits one of these keys, polling will quietly clobber
+    locally-mutated values back to defaults. Keep this list in sync with
+    frontend/src/stores/configRegistry.js (CONFIG_FIELD_DEFINITIONS).
+    """
+    expected_keys = {
+        "orientation",
+        "orientationFlipped",
+        "applyDisplayRotation",
+        "calendarSplit",
+        "lastSideViewMode",
+        "photoFrameEnabled",
+        "photoFrameTimeout",
+        "showUI",
+        "modeIndicatorTimeout",
+        "photoRotationInterval",
+        "calendarRefreshInterval",
+        "timeFormat",
+        "weekStartDay",
+        "showWeekNumbers",
+        "weekendDays",
+        "showRedDays",
+        "maxVisibleEvents",
+        "themeMode",
+        "selectedTheme",
+        "darkModeStart",
+        "darkModeEnd",
+        "displayScheduleEnabled",
+        "displaySchedule",
+        "displayTimeoutEnabled",
+        "displayTimeout",
+        "rebootComboKey1",
+        "rebootComboKey2",
+        "rebootComboDuration",
+        "keyboardFeedbackEnabled",
+        "keyboardFeedbackMode",
+        "imageDisplayMode",
+        "timezone",
+        "clockShowDate",
+        "clockShowSeconds",
+        "clockBarMode",
+        "clockBarShowInKiosk",
+        "clockBarPosition",
+        "clockBarFontSize",
+        "clockBarDateFontSize",
+        "clockBarLayout",
+        "clockBarPadding",
+        "clockBarPluginItemSize",
+        "clockBarVerticalPluginItemSize",
+        "clockBarShowPluginItems",
+        "clockBarShowLogo",
+        "uiSize",
+        "consoleLogEnabled",
+        "consoleLogLevel",
+        "configPollInterval",
+        "devMode",
+        "pluginCatalogRepo",
+    }
+    response = test_client.get("/api/config")
+    assert response.status_code == 200
+    data = response.json()
+    missing = expected_keys - data.keys()
+    assert not missing, f"backend response missing registry-tracked keys: {sorted(missing)}"
+
+
+@pytest.mark.integration
+def test_get_config_reports_version_and_build_revision(test_client: TestClient, monkeypatch):
+    """Settings > System reads the release version plus the build revision
+    (calvin-hshq). On a checkout the revision comes from git; in an image it
+    comes from the build's CALVIN_GIT_SHA. The version is app.__version__."""
+    import app
+    from app import version as version_module
+
+    monkeypatch.delenv("CALVIN_VERSION", raising=False)
+    version_module.get_revision.cache_clear()
+
+    response = test_client.get("/api/config")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["version"] == app.__version__
+    assert data["revision"] is None or isinstance(data["revision"], str)
+    assert "frontendVersion" in data
+
+
+@pytest.mark.integration
 def test_update_config(test_client: TestClient):
     """Test updating configuration via API."""
     # Get current config
@@ -39,6 +128,116 @@ def test_update_config(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_ui_size_defaults_and_round_trips(test_client: TestClient):
+    """uiSize defaults to 'default', round-trips via camelCase, and persists as snake_case."""
+    # Default present in a fresh config
+    get_response = test_client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json().get("uiSize") == "default"
+
+    # POST camelCase, response echoes it
+    update_response = test_client.post("/api/config", json={"uiSize": "large"})
+    assert update_response.status_code == 200
+    assert update_response.json().get("uiSize") == "large"
+
+    # Persisted and surfaced as camelCase on subsequent GET
+    persisted = test_client.get("/api/config")
+    assert persisted.status_code == 200
+    assert persisted.json().get("uiSize") == "large"
+
+
+@pytest.mark.integration
+def test_plugin_catalog_repo_defaults_and_round_trips(test_client: TestClient):
+    """The add-on catalog is served as camelCase and persists as snake_case (§6)."""
+    default = test_client.get("/api/config")
+    assert default.status_code == 200
+    assert (
+        default.json().get("pluginCatalogRepo")
+        == "https://github.com/osterbergsimon/calvin-plugins"
+    )
+
+    update = test_client.post(
+        "/api/config", json={"pluginCatalogRepo": "https://github.com/someone/mirror"}
+    )
+    assert update.status_code == 200
+    assert update.json().get("pluginCatalogRepo") == "https://github.com/someone/mirror"
+
+    persisted = test_client.get("/api/config")
+    assert persisted.status_code == 200
+    assert persisted.json().get("pluginCatalogRepo") == "https://github.com/someone/mirror"
+
+
+@pytest.mark.integration
+def test_update_dashboard_layout_config(test_client: TestClient):
+    """Test updating dashboard region layout via API."""
+    dashboard_layout = {
+        "version": 1,
+        "preset": "service_service",
+        "regions": [
+            {"id": "primary", "kind": "service", "serviceId": "weather", "size": 55},
+            {"id": "secondary", "kind": "service", "serviceId": "meals", "size": 45},
+        ],
+    }
+
+    response = test_client.post("/api/config", json={"dashboardLayout": dashboard_layout})
+    assert response.status_code == 200
+
+    config = response.json()
+    assert config["dashboardLayout"] == dashboard_layout
+
+    get_response = test_client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json()["dashboardLayout"] == dashboard_layout
+
+
+@pytest.mark.integration
+def test_update_dashboard_screens_config(test_client: TestClient):
+    """Test updating dashboard screens via API."""
+    dashboard_screens = {
+        "version": 2,
+        "activeScreenId": "services",
+        "screens": [
+            {
+                "id": "home",
+                "name": "Home",
+                "layout": {
+                    "version": 1,
+                    "preset": "calendar_photos",
+                    "regions": [
+                        {"id": "primary", "kind": "calendar", "serviceId": None, "size": 70},
+                        {"id": "secondary", "kind": "photos", "serviceId": None, "size": 30},
+                    ],
+                },
+                "activeRegionId": "primary",
+            },
+            {
+                "id": "services",
+                "name": "Services",
+                "layout": {
+                    "version": 1,
+                    "preset": "service_service",
+                    "regions": [
+                        {"id": "primary", "kind": "service", "serviceId": "weather", "size": 50},
+                        {"id": "secondary", "kind": "service", "serviceId": "meals", "size": 50},
+                    ],
+                },
+                "activeRegionId": "secondary",
+            },
+        ],
+    }
+
+    response = test_client.post("/api/config", json={"dashboardScreens": dashboard_screens})
+    assert response.status_code == 200
+
+    config = response.json()
+    assert config["dashboardScreens"] == dashboard_screens
+
+    get_response = test_client.get("/api/config")
+    assert get_response.status_code == 200
+    assert get_response.json()["dashboardScreens"] == dashboard_screens
+
+
+@pytest.mark.integration
 def test_update_config_partial(test_client: TestClient):
     """Test partial config update."""
     # Update only one field
@@ -49,6 +248,14 @@ def test_update_config_partial(test_client: TestClient):
     # Verify only that field changed
     config = response.json()
     assert config.get("orientation") == "landscape"
+
+
+@pytest.mark.integration
+def test_get_config_is_global_and_records_nothing(test_client: TestClient):
+    resp = test_client.get("/api/config")
+    assert resp.status_code == 200
+    assert "orientation" in resp.json()
+    assert test_client.get("/api/kiosks").json() == {"kiosks": []}
 
 
 @pytest.mark.integration
@@ -147,3 +354,15 @@ class TestConfigGitBranches:
 
             # Should handle error gracefully
             assert response.status_code in [200, 400, 500]
+
+
+@pytest.mark.integration
+def test_get_config_defaults_git_branch_to_develop(test_client: TestClient):
+    """main is release-only and far behind; a fresh config must not steer updates there.
+
+    Saving settings writes gitBranch into /etc/default/calvin-update, and the Pi
+    update path maps main to the :latest image (audit P1/P8).
+    """
+    response = test_client.get("/api/config")
+    assert response.status_code == 200
+    assert response.json()["gitBranch"] == "develop"

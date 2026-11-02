@@ -1,0 +1,185 @@
+<template>
+  <div class="text-field">
+    <label
+      class="text-field__label"
+      :class="{ 'text-field__label--hidden': hideLabel }"
+      :for="fieldId"
+      >{{ label }}</label
+    >
+    <input
+      :id="fieldId"
+      ref="inputEl"
+      class="text-field__input"
+      :class="{ 'text-field__input--invalid': error }"
+      :type="type"
+      :value="modelValue"
+      :data-test="inputTest || undefined"
+      :name="name || undefined"
+      :step="step || undefined"
+      :placeholder="placeholder || undefined"
+      :autocomplete="autocomplete"
+      :autocapitalize="autocapitalize"
+      :maxlength="maxlength"
+      :disabled="disabled"
+      :readonly="readonly"
+      :required="required"
+      autocorrect="off"
+      spellcheck="false"
+      :aria-invalid="error ? 'true' : 'false'"
+      :aria-describedby="describedBy"
+      @input="$emit('update:modelValue', $event.target.value)"
+      @blur="$emit('blur', $event)"
+      @focus="$emit('focus', $event)"
+    />
+    <InlineNote v-if="error" :id="errorId" class="text-field__note" tone="err">
+      {{ error }}
+    </InlineNote>
+    <InlineNote
+      v-else-if="hint || $slots.hint"
+      :id="hintId"
+      class="text-field__note"
+      tone="neutral"
+    >
+      <slot name="hint">{{ hint }}</slot>
+    </InlineNote>
+  </div>
+</template>
+
+<script setup>
+import { computed, ref, useId, useSlots } from "vue";
+import InlineNote from "./InlineNote.vue";
+
+// The one text input (docs/design/frontend-doctrine.md §3), built from
+// PasswordField's shell: same label, 48px box, error line and aria wiring.
+// Secrets stay in PasswordField, numbers in NumberStepper.
+// `useId` is per instance: a module counter inside <script setup> restarts for
+// every instance, which gave every field the same id (and every label the
+// first field's name).
+const instanceId = useId();
+
+const props = defineProps({
+  modelValue: { type: String, default: "" },
+  label: { type: String, required: true },
+  inputId: { type: String, default: "" },
+  type: {
+    type: String,
+    default: "text",
+    validator: value => ["text", "email", "url", "search", "tel", "time"].includes(value),
+  },
+  name: { type: String, default: "" },
+  placeholder: { type: String, default: "" },
+  autocomplete: { type: String, default: "off" },
+  autocapitalize: { type: String, default: "off" },
+  maxlength: { type: [String, Number], default: undefined },
+  // Attach a test id to the input itself; a plain data-test attribute still
+  // lands on the wrapper (the gallery relies on that).
+  inputTest: { type: String, default: "" },
+  // Time inputs step in seconds ("3600" = whole hours).
+  step: { type: [String, Number], default: undefined },
+  hint: { type: String, default: "" },
+  // Keep the label for assistive tech when a visible label already names the
+  // group (e.g. the colour swatch and its hex value share one label).
+  hideLabel: { type: Boolean, default: false },
+  error: { type: String, default: "" },
+  disabled: { type: Boolean, default: false },
+  readonly: { type: Boolean, default: false },
+  required: { type: Boolean, default: false },
+});
+
+defineEmits(["update:modelValue", "blur", "focus"]);
+
+const slots = useSlots();
+const fallbackId = `text-field-${instanceId}`;
+const fieldId = computed(() => props.inputId || fallbackId);
+const errorId = computed(() => `${fieldId.value}-error`);
+const hintId = computed(() => `${fieldId.value}-hint`);
+const describedBy = computed(() => {
+  if (props.error) return errorId.value;
+  if (props.hint || slots.hint) return hintId.value;
+  return undefined;
+});
+
+const inputEl = ref(null);
+
+const focus = () => inputEl.value?.focus();
+const select = () => inputEl.value?.select();
+
+defineExpose({ focus, select });
+</script>
+
+<style scoped>
+.text-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.text-field__label {
+  margin-bottom: var(--gap-1);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+}
+
+.text-field__label--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  /* Visually hidden but still the input's accessible name. Do not use
+     overflow: hidden here: the phone layout audit reads a 1px clipped box as
+     truncated text. `clip`/`clip-path` hide it without reporting overflow. */
+  overflow: visible;
+  white-space: nowrap;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.text-field__input {
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0 var(--gap-3);
+  font: var(--weight-body) 1rem var(--font-ui);
+  color: var(--ink);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.text-field__input:hover:not(:disabled) {
+  border-color: var(--focus-edge);
+}
+
+.text-field__input:focus {
+  border-color: var(--focus);
+}
+
+.text-field__input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.text-field__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.text-field__input--invalid {
+  border-color: var(--err);
+}
+
+.text-field__note {
+  margin-top: var(--gap-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-field__input {
+    transition: none;
+  }
+}
+</style>

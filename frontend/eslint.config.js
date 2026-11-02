@@ -6,7 +6,13 @@ export default [
   js.configs.recommended,
   ...pluginVue.configs["flat/recommended"],
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/*.config.js", "vite.config.js"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/*.config.js",
+      "vite.config.js",
+      "src/api/types.ts",
+    ],
   },
   {
     languageOptions: {
@@ -20,7 +26,17 @@ export default [
       "vue/multi-word-component-names": [
         "error",
         {
-          ignores: ["Dashboard", "Settings"],
+          ignores: [
+            "Dashboard",
+            "Settings",
+            "Tag",
+            "Button",
+            "Card",
+            "Dialog",
+            "Menu",
+            "Popover",
+            "Tabs",
+          ],
         },
       ],
       // Allow unused variables that start with underscore

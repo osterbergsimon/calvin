@@ -13,7 +13,8 @@ except ImportError:
 from loguru import logger
 
 from app.services.config_service import config_service
-from app.utils.platform import has_x11, is_raspberry_pi
+from app.utils.host_control import host_control_enabled
+from app.utils.platform import has_x11, is_raspberry_pi, run_command
 
 # Loguru automatically includes module/function info in logs
 
@@ -25,14 +26,21 @@ class DisplayPowerService:
         self._running = False
         self._task: asyncio.Task | None = None
 
-    async def start(self):
-        """Start the display power scheduler."""
+    async def start(self) -> bool:
+        """Start the display power scheduler. Returns whether it was started."""
         if self._running:
-            return
+            return True
+        if not host_control_enabled():
+            logger.info(
+                "CALVIN_HOST_CONTROL is off - display power scheduler not started "
+                "(this backend does not own the display)"
+            )
+            return False
         self._running = True
         # Ensure display timeout is disabled on startup (default: keep display on)
         await self.configure_display_timeout()
         self._task = asyncio.create_task(self._scheduler_loop())
+        return True
 
     async def stop(self):
         """Stop the display power scheduler."""
@@ -169,6 +177,9 @@ class DisplayPowerService:
 
     async def turn_display_on(self):
         """Turn display on."""
+        if not host_control_enabled():
+            logger.debug("CALVIN_HOST_CONTROL is off - not turning the display on")
+            return
         # Set up X11 environment
         x11_env = {
             "DISPLAY": ":0",
@@ -179,9 +190,9 @@ class DisplayPowerService:
         # Try multiple methods to ensure display turns on
 
         # Method 1: vcgencmd (Raspberry Pi HDMI power control)
-        if is_raspberry_pi():
+        if await asyncio.to_thread(is_raspberry_pi):
             try:
-                result = subprocess.run(
+                result = await run_command(
                     ["vcgencmd", "display_power", "1"],
                     capture_output=True,
                     text=True,
@@ -195,9 +206,9 @@ class DisplayPowerService:
                 logger.debug(f"vcgencmd failed: {e}")
 
         # Method 2: xset dpms force on (X11 DPMS wake)
-        if has_x11():
+        if await asyncio.to_thread(has_x11):
             try:
-                result = subprocess.run(
+                result = await run_command(
                     ["xset", "dpms", "force", "on"],
                     capture_output=True,
                     text=True,
@@ -214,21 +225,21 @@ class DisplayPowerService:
             # Method 3: Disable DPMS and wake display
             try:
                 # Disable DPMS temporarily to wake display
-                subprocess.run(
+                await run_command(
                     ["xset", "-dpms"],
                     capture_output=True,
                     timeout=5,
                     env=x11_env,
                 )
                 # Re-enable DPMS
-                subprocess.run(
+                await run_command(
                     ["xset", "+dpms"],
                     capture_output=True,
                     timeout=5,
                     env=x11_env,
                 )
                 # Force display on
-                result = subprocess.run(
+                result = await run_command(
                     ["xset", "dpms", "force", "on"],
                     capture_output=True,
                     text=True,
@@ -244,7 +255,7 @@ class DisplayPowerService:
 
             # Method 4: Send a dummy key event to wake display (if xdotool is available)
             try:
-                result = subprocess.run(
+                result = await run_command(
                     ["xdotool", "key", "Shift"],
                     capture_output=True,
                     text=True,
@@ -260,6 +271,9 @@ class DisplayPowerService:
 
     async def turn_display_off(self):
         """Turn display off."""
+        if not host_control_enabled():
+            logger.debug("CALVIN_HOST_CONTROL is off - not turning the display off")
+            return
         # Set up X11 environment
         x11_env = {
             "DISPLAY": ":0",
@@ -270,9 +284,9 @@ class DisplayPowerService:
         # Try multiple methods to ensure display turns off
 
         # Method 1: vcgencmd (Raspberry Pi HDMI power control)
-        if is_raspberry_pi():
+        if await asyncio.to_thread(is_raspberry_pi):
             try:
-                result = subprocess.run(
+                result = await run_command(
                     ["vcgencmd", "display_power", "0"],
                     capture_output=True,
                     text=True,
@@ -286,9 +300,9 @@ class DisplayPowerService:
                 logger.debug(f"vcgencmd failed: {e}")
 
         # Method 2: xset dpms force off (X11 DPMS sleep)
-        if has_x11():
+        if await asyncio.to_thread(has_x11):
             try:
-                result = subprocess.run(
+                result = await run_command(
                     ["xset", "dpms", "force", "off"],
                     capture_output=True,
                     text=True,
@@ -305,9 +319,9 @@ class DisplayPowerService:
     async def get_display_state(self) -> dict:
         """Get current display power state."""
         # Try vcgencmd first (Raspberry Pi only)
-        if is_raspberry_pi():
+        if await asyncio.to_thread(is_raspberry_pi):
             try:
-                result = subprocess.run(
+                result = await run_command(
                     ["vcgencmd", "display_power"],
                     capture_output=True,
                     text=True,
@@ -331,6 +345,9 @@ class DisplayPowerService:
         Default behavior: Keep display on (disable timeout) unless explicitly enabled.
         Only enables timeout if both timeout_enabled is True AND timeout_seconds > 0.
         """
+        if not host_control_enabled():
+            logger.debug("CALVIN_HOST_CONTROL is off - not configuring the display timeout")
+            return
         # Get config values (can be called independently, so fetch here)
         config = await config_service.get_config()
         timeout_enabled = config.get("display_timeout_enabled", False)
@@ -352,7 +369,7 @@ class DisplayPowerService:
         }
 
         # Only attempt xset commands if X11 is available
-        if not has_x11():
+        if not await asyncio.to_thread(has_x11):
             logger.debug("X11 not available, skipping display timeout configuration")
             return
 
@@ -362,14 +379,14 @@ class DisplayPowerService:
             # Enable DPMS and set timeout
             try:
                 # Set screen saver timeout (xset uses seconds for 's' command)
-                subprocess.run(
+                await run_command(
                     ["xset", "s", str(timeout_seconds)],
                     capture_output=True,
                     timeout=5,
                     env=x11_env,
                 )
                 # Enable DPMS (Display Power Management Signaling)
-                subprocess.run(
+                await run_command(
                     ["xset", "+dpms"],
                     capture_output=True,
                     timeout=5,
@@ -377,7 +394,7 @@ class DisplayPowerService:
                 )
                 # Set DPMS standby, suspend, and off times (in seconds)
                 # Format: standby suspend off (all in seconds)
-                subprocess.run(
+                await run_command(
                     [
                         "xset",
                         "dpms",
@@ -396,21 +413,21 @@ class DisplayPowerService:
             # Always ensure timeout is disabled unless explicitly enabled above
             try:
                 # Disable screensaver
-                subprocess.run(
+                await run_command(
                     ["xset", "s", "off"],
                     capture_output=True,
                     timeout=5,
                     env=x11_env,
                 )
                 # Disable DPMS (Display Power Management Signaling)
-                subprocess.run(
+                await run_command(
                     ["xset", "-dpms"],
                     capture_output=True,
                     timeout=5,
                     env=x11_env,
                 )
                 # Prevent screen blanking
-                subprocess.run(
+                await run_command(
                     ["xset", "s", "noblank"],
                     capture_output=True,
                     timeout=5,

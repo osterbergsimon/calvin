@@ -79,7 +79,7 @@ describe("useEventHelpers", () => {
 
       const color = eventHelpers.getEventColor(event);
 
-      expect(color).toBe("#2196f3");
+      expect(color).toBe("var(--event-1)");
     });
 
     it("should return default color when event has no source", () => {
@@ -92,7 +92,25 @@ describe("useEventHelpers", () => {
 
       const color = eventHelpers.getEventColor(event);
 
-      expect(color).toBe("#2196f3");
+      expect(color).toBe("var(--event-1)");
+    });
+  });
+
+  describe("getEventInk", () => {
+    const inkFor = colour => eventHelpers.getEventInk({ id: "1", title: "Event", color: colour });
+
+    it("uses light ink on dark calendar colours", () => {
+      expect(inkFor("#1b242b")).toBe("var(--on-event-ink)");
+      expect(inkFor("#455a64")).toBe("var(--on-event-ink)");
+    });
+
+    it("uses dark ink on light calendar colours", () => {
+      expect(inkFor("#ffeb3b")).toBe("var(--on-event-ink-dark)");
+      expect(inkFor("#275f86")).toBe("var(--on-event-ink)");
+    });
+
+    it("falls back to light ink when the colour is not a hex value", () => {
+      expect(inkFor("hsl(200 50% 50%)")).toBe("var(--on-event-ink)");
     });
   });
 

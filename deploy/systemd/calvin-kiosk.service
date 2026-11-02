@@ -1,0 +1,85 @@
+[Unit]
+Description=Calvin Dashboard Kiosk
+# The compositor is whichever display stack setup.sh enabled (calvin-x.service
+# on X11, calvin-wayland.service on Wayland; on cog this unit is disabled). It is
+# deliberately not in Wants=: calvin-x conflicts with calvin-wayland, so pulling
+# it in here would tear down a Wayland session. graphical.target pulls in the
+# enabled compositor; After= orders us behind it.
+After=network.target calvin-app.service calvin-x.service calvin-wayland.service
+Requires=calvin-app.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=calvin
+Group=calvin
+# CALVIN_PORT (host port of the Calvin container); missing file -> 8000.
+EnvironmentFile=-/etc/calvin/.env
+# Session env (DISPLAY/XAUTHORITY plus CALVIN_CHROMIUM_DISPLAY_FLAGS), the same
+# file calvin-kiosk-remote.service and calvin-display-agent.service read. Written
+# by setup.sh from the board detection in setup-common.sh: VC4-class boards
+# (Pi 3/3B+, Zero 2 W, CM3) get --disable-gpu, because Chromium's GPU path
+# crashes the renderer there ("Aw, Snap! error 11"). Optional, so a kiosk unit
+# upgraded before the file exists still starts.
+EnvironmentFile=-/etc/default/calvin-kiosk-display
+Environment="DISPLAY=:0"
+Environment="HOME=/home/calvin"
+Environment="XAUTHORITY=/home/calvin/.Xauthority"
+# 240s health wait — generous enough for first boot on a Pi 3B+ when
+# the runtime image still has to be pulled from GHCR.
+ExecStartPre=/bin/bash -c 'timeout=240; elapsed=0; until curl -s "http://localhost:${CALVIN_PORT:-8000}/api/health" > /dev/null 2>&1; do if [ $elapsed -ge $timeout ]; then echo "Calvin app not ready after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/bash -c 'timeout=60; elapsed=0; until [ -S /tmp/.X11-unix/X0 ] || pgrep -x Xorg > /dev/null 2>&1 || { [ -n "$${WAYLAND_DISPLAY:-}" ] && [ -S "$${XDG_RUNTIME_DIR:-/run/user/1000}/$${WAYLAND_DISPLAY}" ]; }; do if [ $elapsed -ge $timeout ]; then echo "display server not available after $timeout seconds"; exit 1; fi; sleep 1; elapsed=$((elapsed+1)); done'
+ExecStartPre=/bin/sleep 2
+ExecStartPre=/bin/bash -c 'pkill -u calvin chromium || pkill -u calvin chromium-browser || true'
+ExecStartPre=/bin/sleep 1
+# The kiosk's own Chromium profile (--user-data-dir below): its cache lives under
+# that directory, not in the shared Chromium cache.
+ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.config/calvin-kiosk-chromium/Default/Cache/* "/home/calvin/.config/calvin-kiosk-chromium/Default/Code Cache"/* 2>/dev/null || true'
+# --user-data-dir: a dedicated profile. Chromium 136+ ignores the DevTools port
+# below on the default profile, and the display agent needs that port to recover
+# from a renderer crash ("Aw, Snap!").
+ExecStart=/bin/bash -c 'exec /usr/bin/chromium \
+    $${CALVIN_CHROMIUM_DISPLAY_FLAGS:-} \
+    --kiosk \
+    --noerrdialogs \
+    --remote-debugging-port=${CALVIN_KIOSK_CDP_PORT:-9222} \
+    --remote-debugging-address=127.0.0.1 \
+    --user-data-dir=/home/calvin/.config/calvin-kiosk-chromium \
+    --disable-infobars \
+    --autoplay-policy=no-user-gesture-required \
+    --disable-features=TranslateUI \
+    --disable-ipc-flooding-protection \
+    --disable-background-networking \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --disable-backgrounding-occluded-windows \
+    --disable-breakpad \
+    --disable-component-update \
+    --disable-domain-reliability \
+    --disable-features=AudioServiceOutOfProcess \
+    --disable-hang-monitor \
+    --disable-prompt-on-repost \
+    --disable-sync \
+    --disable-web-resources \
+    --metrics-recording-only \
+    --mute-audio \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-pings \
+    --use-mock-keychain \
+    --force-device-scale-factor=1 \
+    --disable-lcd-text \
+    --disable-application-cache \
+    --aggressive-cache-discard \
+    --disable-background-downloads \
+    --disk-cache-size=0 \
+    --media-cache-size=0 \
+    "http://localhost:${CALVIN_PORT:-8000}"'
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=calvin-kiosk
+
+[Install]
+WantedBy=multi-user.target

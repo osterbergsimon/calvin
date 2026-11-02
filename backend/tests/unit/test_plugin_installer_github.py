@@ -4,15 +4,15 @@ import json
 
 import pytest
 
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
 from app.services.plugin_installer import PluginInstaller
 
 
 @pytest.fixture
-def plugin_installer(temp_plugins_dir, temp_frontend_dir, monkeypatch):
+def plugin_installer(temp_plugins_dir, monkeypatch):
     """Create a PluginInstaller instance with temporary directories."""
     installer = PluginInstaller()
     installer.plugins_dir = temp_plugins_dir
-    installer.frontend_plugins_dir = temp_frontend_dir
     return installer
 
 
@@ -30,11 +30,12 @@ def mock_repo_structure(tmp_path):
         "name": "Plugin 1",
         "version": "1.0.0",
         "type": "service",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
     }
     (plugin1_dir / "plugin.json").write_text(json.dumps(manifest1))
     (plugin1_dir / "plugin.py").write_text("# Plugin 1 code")
 
-    # Plugin 2: Plugin with frontend
+    # Plugin 2: Plugin with frontend static assets
     plugin2_dir = repo_root / "plugin2"
     plugin2_dir.mkdir()
     manifest2 = {
@@ -42,12 +43,15 @@ def mock_repo_structure(tmp_path):
         "name": "Plugin 2",
         "version": "2.0.0",
         "type": "calendar",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
     }
     (plugin2_dir / "plugin.json").write_text(json.dumps(manifest2))
     (plugin2_dir / "plugin.py").write_text("# Plugin 2 code")
     frontend_dir = plugin2_dir / "frontend"
     frontend_dir.mkdir()
-    (frontend_dir / "Component.vue").write_text("<template><div>Component</div></template>")
+    (frontend_dir / "dist.js").write_text(
+        "customElements.define('calvin-plugin2', class extends HTMLElement {})"
+    )
 
     # Plugin 3: In subdirectory
     plugin3_dir = repo_root / "plugins" / "plugin3"
@@ -57,6 +61,7 @@ def mock_repo_structure(tmp_path):
         "name": "Plugin 3",
         "version": "3.0.0",
         "type": "image",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
     }
     (plugin3_dir / "plugin.json").write_text(json.dumps(manifest3))
     (plugin3_dir / "plugin.py").write_text("# Plugin 3 code")
@@ -106,6 +111,7 @@ def test_plugin_repo_structure(tmp_path):
         "name": "Test Plugin",
         "version": "1.0.0",
         "type": "service",
+        "api_version": CURRENT_PLUGIN_API_VERSION,
         "description": "A basic test plugin for plugin installation testing",
         "author": "Calvin Test Suite",
         "license": "MIT",
@@ -117,110 +123,52 @@ def test_plugin_repo_structure(tmp_path):
 
 from typing import Any
 
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
 from app.plugins.protocols import ServicePlugin
 
 
 class TestServicePlugin(ServicePlugin):
     """Test service plugin for installation testing."""
 
-    @classmethod
-    def get_plugin_metadata(cls) -> dict[str, Any]:
-        """Get plugin metadata for registration."""
-        return {
-            "type_id": "test_plugin",
-            "plugin_type": PluginType.SERVICE,
-            "name": "Test Plugin",
-            "description": "A basic test plugin for plugin installation testing",
-            "version": "1.0.0",
-            "common_config_schema": {
-                "message": {
-                    "type": "string",
-                    "description": "Test message to display",
-                    "default": "Hello from test plugin!",
-                    "ui": {
-                        "component": "input",
-                        "placeholder": "Enter a message",
-                        "validation": {
-                            "required": False,
-                        },
+    metadata = PluginMetadata(
+        type_id="test_plugin",
+        name="Test Plugin",
+        description="A basic test plugin for plugin installation testing",
+        version="1.0.0",
+        common_config_schema={
+            "message": {
+                "type": "string",
+                "description": "Test message to display",
+                "default": "Hello from test plugin!",
+                "ui": {
+                    "component": "input",
+                    "placeholder": "Enter a message",
+                    "validation": {
+                        "required": False,
                     },
                 },
             },
-            "display_schema": {
-                "type": "api",
-                "api_endpoint": None,
-                "method": None,
-                "data_schema": None,
-                "render_template": "iframe",
+        },
+        instance_config_schema={
+            "message": {
+                "type": "string",
+                "description": "Test message to display",
+                "default": "Hello from test plugin!",
             },
-            "plugin_class": cls,
-        }
-
-    def __init__(
-        self,
-        plugin_id: str,
-        name: str,
-        message: str = "Hello from test plugin!",
-        enabled: bool = True,
-    ):
-        super().__init__(plugin_id, name, enabled)
-        self.message = message
-
-    async def initialize(self) -> None:
-        """Initialize the plugin."""
-        pass
-
-    async def cleanup(self) -> None:
-        """Cleanup plugin resources."""
-        pass
-
-    async def get_content(self) -> dict[str, Any]:
-        """Get service content for display."""
-        return {
-            "type": "iframe",
-            "url": "about:blank",
-            "config": {
-                "message": self.message,
-            },
-        }
-
-    async def validate_config(self, config: dict[str, Any]) -> bool:
-        """Validate plugin configuration."""
-        return True
-
-
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    """Register TestServicePlugin type."""
-    return [TestServicePlugin.get_plugin_metadata()]
-
-
-@hookimpl
-def create_plugin_instance(
-    plugin_id: str,
-    type_id: str,
-    name: str,
-    config: dict[str, Any],
-) -> TestServicePlugin | None:
-    """Create a TestServicePlugin instance."""
-    if type_id != "test_plugin":
-        return None
-
-    enabled = config.get("enabled", False)
-    message = config.get("message", "Hello from test plugin!")
-
-    if isinstance(message, dict):
-        message = message.get("value") or message.get("default") or "Hello from test plugin!"
-    message = str(message) if message else "Hello from test plugin!"
-
-    return TestServicePlugin(
-        plugin_id=plugin_id,
-        name=name,
-        message=message,
-        enabled=enabled,
+        },
+        display_schema={
+            "kind": "status",
+            "item": {"label": "Message", "value_path": "$.message"},
+        },
     )
+
+    async def fetch(
+        self,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        """Return the payload the display schema binds to."""
+        return {"message": self.config.get("message", "Hello from test plugin!")}
 '''
     (test_plugin_dir / "plugin.py").write_text(plugin_code)
 
@@ -273,6 +221,42 @@ class TestPluginEnumeration:
         plugin1 = next(p for p in result["plugins"] if p["id"] == "plugin1")
         assert plugin1["description"] == "First plugin"
 
+    def test_enumerate_carries_catalog_opt_out_and_keywords(
+        self, plugin_installer, mock_repo_with_manifest
+    ):
+        """plugins.json `catalog: false` and `keywords` reach the UI (P2)."""
+        manifest_path = mock_repo_with_manifest / "plugins.json"
+        data = json.loads(manifest_path.read_text())
+        data["plugins"][0].update({"catalog": False, "keywords": ["test", "example"]})
+        # A non-boolean catalog value is not an opt-out.
+        data["plugins"][1]["catalog"] = "false"
+        manifest_path.write_text(json.dumps(data))
+
+        result = plugin_installer.enumerate_plugins_from_repo(mock_repo_with_manifest)
+
+        plugin1 = next(p for p in result["plugins"] if p["id"] == "plugin1")
+        assert plugin1["catalog"] is False
+        assert plugin1["keywords"] == ["test", "example"]
+
+        plugin2 = next(p for p in result["plugins"] if p["id"] == "plugin2")
+        assert plugin2["catalog"] is True
+        assert plugin2["keywords"] == []
+
+    def test_auto_discovery_defaults_entries_into_the_catalog(
+        self, plugin_installer, mock_repo_structure
+    ):
+        """Repos without plugins.json keep every discovered plugin visible."""
+        manifest1_path = mock_repo_structure / "plugin1" / "plugin.json"
+        manifest1 = json.loads(manifest1_path.read_text())
+        manifest1["keywords"] = ["test"]
+        manifest1_path.write_text(json.dumps(manifest1))
+
+        result = plugin_installer.enumerate_plugins_from_repo(mock_repo_structure)
+
+        plugin1 = next(p for p in result["plugins"] if p["id"] == "plugin1")
+        assert plugin1["catalog"] is True
+        assert plugin1["keywords"] == ["test"]
+
     def test_enumerate_plugins_skips_invalid(self, plugin_installer, tmp_path):
         """Test that invalid plugins are skipped during enumeration."""
         repo_root = tmp_path / "repo"
@@ -282,7 +266,15 @@ class TestPluginEnumeration:
         valid_plugin = repo_root / "valid"
         valid_plugin.mkdir()
         (valid_plugin / "plugin.json").write_text(
-            json.dumps({"id": "valid", "name": "Valid", "version": "1.0.0", "type": "service"})
+            json.dumps(
+                {
+                    "id": "valid",
+                    "name": "Valid",
+                    "version": "1.0.0",
+                    "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
+                }
+            )
         )
         (valid_plugin / "plugin.py").write_text("# Valid")
 
@@ -308,7 +300,15 @@ class TestPluginEnumeration:
         valid_plugin = repo_root / "valid"
         valid_plugin.mkdir()
         (valid_plugin / "plugin.json").write_text(
-            json.dumps({"id": "valid", "name": "Valid", "version": "1.0.0", "type": "service"})
+            json.dumps(
+                {
+                    "id": "valid",
+                    "name": "Valid",
+                    "version": "1.0.0",
+                    "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
+                }
+            )
         )
         (valid_plugin / "plugin.py").write_text("# Valid")
 
@@ -343,18 +343,20 @@ class TestPluginInstallFromRepo:
         assert (plugin_path / "plugin.json").exists()
         assert (plugin_path / "plugin.py").exists()
 
-    def test_install_plugin_from_repo_with_frontend(self, plugin_installer, mock_repo_structure):
-        """Test installing a plugin with frontend components from repo."""
+    def test_install_plugin_from_repo_with_frontend_static_assets(
+        self, plugin_installer, mock_repo_structure
+    ):
+        """Test installing a plugin with frontend static assets from repo."""
         manifest = plugin_installer.install_plugin_from_repo(
             mock_repo_structure, "plugin2", plugin_id=None
         )
 
         assert manifest["id"] == "plugin2"
 
-        # Check frontend components were installed
-        frontend_path = plugin_installer.get_frontend_plugin_path("plugin2")
-        assert frontend_path.exists()
-        assert (frontend_path / "Component.vue").exists()
+        # Frontend assets stay inside the plugin's data dir (host serves them
+        # via /api/plugins/{id}/static/*).
+        plugin_path = plugin_installer.get_plugin_path("plugin2")
+        assert (plugin_path / "frontend" / "dist.js").exists()
 
     def test_install_plugin_from_repo_path_traversal_protection(
         self, plugin_installer, mock_repo_structure
@@ -405,6 +407,7 @@ class TestPluginInstallFromRepo:
                     "name": "Corrupted Plugin",
                     "version": "1.0.0",
                     "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
                 }
             )
         )
@@ -418,10 +421,16 @@ class TestPluginInstallFromRepo:
         manifest_result = plugin_installer.get_plugin_manifest(plugin_id)
         assert manifest_result is None, "Corrupted plugin should not have a valid manifest"
 
-        # Should clean up corrupted directory and allow installation
-        # The cleanup happens in install_plugin_from_repo when it detects the manifest is None
+        # Without force the leftover is never deleted (audit S1, calvin-ua2)
+        with pytest.raises(ValueError, match="no plugin.json"):
+            plugin_installer.install_plugin_from_repo(
+                corrupted_plugin_repo, "plugin1", plugin_id=plugin_id
+            )
+        assert (plugin_path / "some_file.txt").exists()
+
+        # With force the (contained, valid-id) leftover is cleaned up and reinstalled
         manifest = plugin_installer.install_plugin_from_repo(
-            corrupted_plugin_repo, "plugin1", plugin_id=plugin_id
+            corrupted_plugin_repo, "plugin1", plugin_id=plugin_id, force=True
         )
 
         # Verify plugin was installed successfully
@@ -488,6 +497,7 @@ class TestVersionChecking:
             "name": "Test",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir1 / "plugin.json").write_text(json.dumps(manifest1))
         (plugin_dir1 / "plugin.py").write_text("# Plugin")
@@ -514,6 +524,7 @@ class TestVersionChecking:
             "name": "Test",
             "version": "2.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir1 / "plugin.json").write_text(json.dumps(manifest1))
         (plugin_dir1 / "plugin.py").write_text("# Plugin")
@@ -548,6 +559,7 @@ class TestVersionChecking:
             "name": "Test",
             "version": "2.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir1 / "plugin.json").write_text(json.dumps(manifest1))
         (plugin_dir1 / "plugin.py").write_text("# Plugin")

@@ -1,262 +1,101 @@
 /**
- * Unit tests for plugin instance toggle functionality
- * Tests functionality: enabling/disabling plugin instances, error handling
+ * Source on/off moved from the Plugins card to Content (CLV-44 §3.1): a
+ * source's toggle lives on its Content row and persists through the plugin
+ * instance API. These tests guard that contract.
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
-import { setActivePinia, createPinia } from "pinia";
-import PluginsCategory from "@/components/settings/categories/PluginsCategory.vue";
-import * as pluginsApi from "@/services/pluginsApi";
+import { mount, flushPromises } from "@vue/test-utils";
+import { ref } from "vue";
 
-// Mock pluginsApi
-vi.mock("@/services/pluginsApi", () => ({
-  getPlugins: vi.fn(),
-  getInstalledPlugins: vi.fn(),
-  getPluginInstances: vi.fn(),
-  updatePluginInstance: vi.fn(),
-  updatePlugin: vi.fn(),
-  getPluginConfig: vi.fn(),
+const pluginsRef = ref([]);
+const instancesRef = ref({});
+const mockLoadPlugins = vi.fn().mockResolvedValue(undefined);
+const mockUpdateInstanceOrder = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@/composables", () => ({
+  usePlugins: () => ({
+    plugins: pluginsRef,
+    pluginInstances: instancesRef,
+    loadingPlugins: ref(false),
+    loadPlugins: mockLoadPlugins,
+    updateInstanceOrder: mockUpdateInstanceOrder,
+  }),
 }));
 
-describe("PluginInstanceToggle", () => {
+vi.mock("@/services/pluginsApi", () => ({
+  updatePluginInstance: vi.fn(),
+  deletePluginInstance: vi.fn(),
+}));
+
+import * as pluginsApi from "@/services/pluginsApi";
+import ServicesTab from "@/components/settings/tabs/content/ServicesTab.vue";
+
+const service = (over = {}) => ({
+  id: "mealie",
+  name: "Mealie",
+  type: "service",
+  enabled: true,
+  display_schema: { kind: "card-grid" },
+  ...over,
+});
+
+const instance = (over = {}) => ({
+  id: "mealie-1",
+  name: "Recipes",
+  enabled: true,
+  running: true,
+  config: { url: "http://mealie.local" },
+  ...over,
+});
+
+const mountTab = async (config = {}) => {
+  const w = mount(ServicesTab, { props: { config } });
+  await flushPromises();
+  return w;
+};
+
+describe("Content source toggle", () => {
   beforeEach(() => {
-    setActivePinia(createPinia());
+    pluginsRef.value = [];
+    instancesRef.value = {};
+    mockLoadPlugins.mockClear();
+    mockUpdateInstanceOrder.mockClear();
     vi.clearAllMocks();
   });
 
-  describe("Instance Enable/Disable", () => {
-    it("should toggle instance enabled status", async () => {
-      pluginsApi.getPlugins.mockResolvedValue({
-        plugins: [
-          {
-            id: "imap",
-            name: "Email (IMAP)",
-            type: "backend",
-            enabled: true,
-          },
-        ],
-      });
-      pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
-      pluginsApi.getPluginInstances.mockResolvedValue({
-        instances: [
-          {
-            id: "imap-6444",
-            name: "IMAP Instance",
-            enabled: true,
-            running: false,
-            config: {},
-          },
-        ],
-      });
-      pluginsApi.updatePluginInstance.mockResolvedValue({
-        success: true,
-        instance: {
-          id: "imap-6444",
-          enabled: false,
-        },
-      });
-      pluginsApi.getPluginConfig.mockResolvedValue({});
+  it("toggles a source off through the plugin instance API and reloads", async () => {
+    pluginsRef.value = [service()];
+    instancesRef.value = { mealie: [instance()] };
+    pluginsApi.updatePluginInstance.mockResolvedValue({});
+    const w = await mountTab();
 
-      const wrapper = mount(PluginsCategory, {
-        global: {
-          stubs: {
-            PluginManager: true,
-            SettingsCategory: true,
-          },
-        },
-      });
+    await w.find(".sl-row .sl-action").exists();
+    const toggle = w.find(".sl-row").findComponent({ name: "ToggleSwitch" });
+    toggle.vm.$emit("update:modelValue", false);
+    await flushPromises();
 
-      // Wait for plugins to load
-      await wrapper.vm.$nextTick();
-
-      // Access the component method - it should exist on the component
-      if (wrapper.vm.handleToggleInstance) {
-        await wrapper.vm.handleToggleInstance("imap-6444", false);
-      } else {
-        // If method doesn't exist directly, simulate the call
-        await pluginsApi.updatePluginInstance("imap-6444", { enabled: false });
-      }
-
-      // Verify API was called correctly
-      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("imap-6444", {
-        enabled: false,
-      });
+    expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("mealie-1", {
+      name: "Recipes",
+      enabled: false,
+      plugin_id: "mealie",
+      config: { url: "http://mealie.local" },
     });
-
-    it("should handle toggle instance error", async () => {
-      pluginsApi.getPlugins.mockResolvedValue({
-        plugins: [
-          {
-            id: "mealie",
-            name: "Mealie",
-            type: "service",
-            enabled: true,
-          },
-        ],
-      });
-      pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
-      pluginsApi.getPluginInstances.mockResolvedValue({
-        instances: [
-          {
-            id: "mealie-7040",
-            name: "Mealie Instance",
-            enabled: true,
-            running: false,
-            config: {},
-          },
-        ],
-      });
-      pluginsApi.updatePluginInstance.mockRejectedValue(new Error("Failed to toggle instance"));
-      pluginsApi.getPluginConfig.mockResolvedValue({});
-
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-      const wrapper = mount(PluginsCategory, {
-        global: {
-          stubs: {
-            PluginManager: true,
-            SettingsCategory: true,
-          },
-        },
-      });
-
-      // Wait for plugins to load
-      await wrapper.vm.$nextTick();
-
-      // Simulate toggle instance with error
-      if (wrapper.vm.handleToggleInstance) {
-        await wrapper.vm.handleToggleInstance("mealie-7040", false);
-      } else {
-        // If method doesn't exist, test the API call directly
-        try {
-          await pluginsApi.updatePluginInstance("mealie-7040", {
-            enabled: false,
-          });
-        } catch (error) {
-          console.error("Failed to toggle instance:", error);
-        }
-      }
-
-      // Verify error was logged (if method exists) or API was called
-      if (wrapper.vm.handleToggleInstance) {
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          "Failed to toggle instance:",
-          expect.any(Error)
-        );
-      } else {
-        expect(pluginsApi.updatePluginInstance).toHaveBeenCalled();
-      }
-
-      consoleErrorSpy.mockRestore();
-    });
-
-    it("should reload plugins after successful toggle", async () => {
-      pluginsApi.getPlugins.mockResolvedValue({
-        plugins: [
-          {
-            id: "local",
-            name: "Local Images",
-            type: "image",
-            enabled: true,
-          },
-        ],
-      });
-      pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
-      pluginsApi.getPluginInstances.mockResolvedValue({
-        instances: [
-          {
-            id: "local-images",
-            name: "Local Images",
-            enabled: true,
-            running: true,
-            config: {},
-          },
-        ],
-      });
-      pluginsApi.updatePluginInstance.mockResolvedValue({
-        success: true,
-        instance: {
-          id: "local-images",
-          enabled: false,
-        },
-      });
-      pluginsApi.getPluginConfig.mockResolvedValue({});
-
-      const wrapper = mount(PluginsCategory, {
-        global: {
-          stubs: {
-            PluginManager: true,
-            SettingsCategory: true,
-          },
-        },
-      });
-
-      // Wait for plugins to load
-      await wrapper.vm.$nextTick();
-
-      // Clear previous calls
-      vi.clearAllMocks();
-
-      // Simulate toggle instance
-      await wrapper.vm.handleToggleInstance("local-images", false);
-
-      // Verify plugins were reloaded after successful toggle
-      expect(pluginsApi.getPlugins).toHaveBeenCalled();
-    });
+    expect(mockLoadPlugins).toHaveBeenCalled();
   });
 
-  describe("Backend Plugin Instance Toggle", () => {
-    it("should toggle backend plugin instance", async () => {
-      pluginsApi.getPlugins.mockResolvedValue({
-        plugins: [
-          {
-            id: "imap",
-            name: "Email (IMAP)",
-            type: "backend",
-            enabled: true,
-          },
-        ],
-      });
-      pluginsApi.getInstalledPlugins.mockResolvedValue({ plugins: [] });
-      pluginsApi.getPluginInstances.mockResolvedValue({
-        instances: [
-          {
-            id: "imap-backend-1",
-            name: "IMAP Backend",
-            enabled: true,
-            running: true,
-            config: {},
-          },
-        ],
-      });
-      pluginsApi.updatePluginInstance.mockResolvedValue({
-        success: true,
-        instance: {
-          id: "imap-backend-1",
-          enabled: false,
-          running: false,
-        },
-      });
-      pluginsApi.getPluginConfig.mockResolvedValue({});
+  it("survives a failed toggle without leaving the row stuck", async () => {
+    pluginsRef.value = [service()];
+    instancesRef.value = { mealie: [instance()] };
+    pluginsApi.updatePluginInstance.mockRejectedValue(new Error("nope"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      const wrapper = mount(PluginsCategory, {
-        global: {
-          stubs: {
-            PluginManager: true,
-            SettingsCategory: true,
-          },
-        },
-      });
+    const w = await mountTab();
+    const toggle = w.find(".sl-row").findComponent({ name: "ToggleSwitch" });
+    toggle.vm.$emit("update:modelValue", false);
+    await flushPromises();
 
-      await wrapper.vm.$nextTick();
-
-      // Toggle backend plugin instance
-      await wrapper.vm.handleToggleInstance("imap-backend-1", false);
-
-      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("imap-backend-1", {
-        enabled: false,
-      });
-    });
+    expect(pluginsApi.updatePluginInstance).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });

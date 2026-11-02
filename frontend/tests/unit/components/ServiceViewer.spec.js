@@ -1,0 +1,155 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import { ref } from "vue";
+import ServiceViewer from "@/components/service/ServiceViewer.vue";
+import { useConfigStore } from "@/stores/config";
+
+const schemaData = ref(null);
+const schemaDataCalls = [];
+
+vi.mock("@/composables/useSchemaData", () => ({
+  useSchemaData: (...args) => {
+    schemaDataCalls.push(args);
+    return { data: schemaData };
+  },
+}));
+
+describe("ServiceViewer", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    schemaData.value = null;
+    schemaDataCalls.length = 0;
+    useConfigStore().showUI = true;
+  });
+
+  const mountViewer = (service, extraProps = {}) =>
+    mount(ServiceViewer, {
+      props: { service, ...extraProps },
+      global: {
+        stubs: {
+          SchemaRenderer: {
+            props: ["schema", "data", "pluginId"],
+            template:
+              '<div class="schema-renderer-stub" :data-plugin-id="pluginId">{{ schema.kind }}</div>',
+          },
+        },
+      },
+    });
+
+  it("resolves panel title from title_path before literal title and service name", () => {
+    schemaData.value = { location: "Stockholm" };
+
+    const wrapper = mountViewer({
+      id: "weather",
+      name: "Fallback Service",
+      display_schema: {
+        kind: "weather-forecast",
+        title_path: "$.location",
+        title: "Literal Weather",
+      },
+    });
+
+    expect(wrapper.find(".dashboard-panel__title").text()).toBe("Stockholm");
+  });
+
+  it("falls back to literal title before service name", () => {
+    const wrapper = mountViewer({
+      id: "service",
+      name: "Service Name",
+      display_schema: { kind: "status-tile", title: "Literal Title" },
+    });
+
+    expect(wrapper.find(".dashboard-panel__title").text()).toBe("Literal Title");
+  });
+
+  it("ignores object title_path values instead of rendering them", () => {
+    schemaData.value = { location: { name: "Stockholm" } };
+
+    const wrapper = mountViewer({
+      id: "weather",
+      name: "Fallback Service",
+      display_schema: {
+        kind: "weather-forecast",
+        title_path: "$.location",
+        title: "Literal Weather",
+      },
+    });
+
+    expect(wrapper.find(".dashboard-panel__title").text()).toBe("Literal Weather");
+  });
+
+  it("falls back to service name when schema title fields are missing", () => {
+    const wrapper = mountViewer({
+      id: "service",
+      name: "Service Name",
+      display_schema: { kind: "status-tile" },
+    });
+
+    expect(wrapper.find(".dashboard-panel__title").text()).toBe("Service Name");
+  });
+
+  it("threads the focus state to the panel so a focused service region glows (calvin-ltx)", () => {
+    const svc = { id: "s", name: "S", display_schema: { kind: "status-tile" } };
+    expect(mountViewer(svc).find(".focus-panel.is-focused").exists()).toBe(false);
+
+    const focused = mount(ServiceViewer, {
+      props: { focused: true, service: svc },
+      global: { stubs: { SchemaRenderer: { template: '<div class="schema-renderer-stub" />' } } },
+    });
+    expect(focused.find(".focus-panel.is-focused").exists()).toBe(true);
+  });
+
+  it("can hide the shared panel header for fullscreen service rendering", () => {
+    const wrapper = mount(ServiceViewer, {
+      props: {
+        headerVisible: false,
+        service: {
+          id: "service",
+          name: "Service Name",
+          display_schema: { kind: "status-tile" },
+        },
+      },
+      global: {
+        stubs: {
+          SchemaRenderer: {
+            template: '<div class="schema-renderer-stub" />',
+          },
+        },
+      },
+    });
+
+    expect(wrapper.find(".dashboard-panel__header").exists()).toBe(false);
+  });
+
+  it("forwards linkAction to SchemaRenderer", () => {
+    const service = {
+      id: "mealie-1",
+      name: "Mealie",
+      display_schema: { kind: "card-grid" },
+      config: {},
+    };
+    const w = mount(ServiceViewer, {
+      props: { service, linkAction: "embed" },
+      global: {
+        stubs: {
+          SchemaRenderer: { name: "SchemaRenderer", props: ["linkAction"], template: "<div />" },
+        },
+      },
+    });
+    expect(w.findComponent({ name: "SchemaRenderer" }).props("linkAction")).toBe("embed");
+  });
+
+  // CLV-115: the plugin's data fetches light its own region's frame.
+  it("passes its region to the data fetch so the loading light uses that frame", () => {
+    mountViewer({ id: "weather", display_schema: { kind: "status" } }, { regionId: "r1" });
+    const [, , , options] = schemaDataCalls.at(-1);
+    expect(options.regionId.value).toBe("r1");
+  });
+
+  it("without a region the data fetch lights the app frame", () => {
+    mountViewer({ id: "weather", display_schema: { kind: "status" } });
+    const [, , , options] = schemaDataCalls.at(-1);
+    expect(options.regionId.value).toBe(null);
+  });
+});

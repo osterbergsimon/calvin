@@ -1,12 +1,14 @@
 """Display orientation service for managing screen rotation on Raspberry Pi."""
 
+import asyncio
 import subprocess
 from pathlib import Path
 
 from loguru import logger
 
 from app.services.config_service import config_service
-from app.utils.platform import has_x11, is_raspberry_pi
+from app.utils.host_control import host_control_enabled
+from app.utils.platform import has_x11, is_raspberry_pi, run_command
 
 # Loguru automatically includes module/function info in logs
 
@@ -32,7 +34,7 @@ class DisplayOrientationService:
             - flipped: bool (whether 180° rotated)
             - method: 'xrandr' | 'config.txt' | 'unknown'
         """
-        if not is_raspberry_pi():
+        if not await asyncio.to_thread(is_raspberry_pi):
             return {
                 "orientation": "unknown",
                 "flipped": False,
@@ -41,7 +43,7 @@ class DisplayOrientationService:
             }
 
         # Try to get orientation from xrandr (X11)
-        if has_x11():
+        if await asyncio.to_thread(has_x11):
             orientation = await self._get_xrandr_orientation()
             if orientation["orientation"] != "unknown":
                 return orientation
@@ -53,7 +55,7 @@ class DisplayOrientationService:
     async def _get_xrandr_orientation(self) -> dict:
         """Get orientation from xrandr."""
         try:
-            result = subprocess.run(
+            result = await run_command(
                 ["xrandr", "--query"],
                 capture_output=True,
                 text=True,
@@ -166,14 +168,20 @@ class DisplayOrientationService:
         Returns:
             Dictionary with result info
         """
-        if not is_raspberry_pi():
+        if not host_control_enabled():
+            logger.debug("CALVIN_HOST_CONTROL is off - not rotating the host display")
+            return {
+                "success": False,
+                "message": "Host control is disabled on this deployment - not rotating the display",
+            }
+        if not await asyncio.to_thread(is_raspberry_pi):
             return {
                 "success": False,
                 "message": "Not running on Raspberry Pi - orientation only affects UI layout",
             }
 
         # Try X11 first (xrandr) - works immediately without reboot
-        if has_x11():
+        if await asyncio.to_thread(has_x11):
             result = await self._apply_xrandr_orientation(orientation, flipped)
             if result["success"]:
                 return result
@@ -186,7 +194,7 @@ class DisplayOrientationService:
         """Apply orientation using xrandr (X11)."""
         try:
             # Get connected display
-            result = subprocess.run(
+            result = await run_command(
                 ["xrandr", "--query"],
                 capture_output=True,
                 text=True,
@@ -222,7 +230,7 @@ class DisplayOrientationService:
                 rotation = "normal"
 
             # Apply rotation
-            result = subprocess.run(
+            result = await run_command(
                 ["xrandr", "--output", display_name, "--rotate", rotation],
                 capture_output=True,
                 text=True,

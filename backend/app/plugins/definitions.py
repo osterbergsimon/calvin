@@ -1,81 +1,98 @@
-"""Typed plugin definition models.
+"""Typed plugin metadata — the single declarative contract for plugins.
 
-These models define the normalized contract returned by plugin discovery hooks.
-Plugins may still return raw dicts for backward compatibility; the loader
-normalizes them into these models before the rest of the app consumes them.
+A plugin is one `BasePlugin` subclass with a `metadata = PluginMetadata(...)`
+class attribute. The loader discovers these classes, fills in the runtime
+fields (`plugin_class`, `plugin_type`), and everything else — registration,
+instantiation, config normalization, config-update handling — is derived from
+this model. There are no registration hooks.
 """
 
+import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from loguru import logger
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.plugins.base import PluginType
 
-CURRENT_PLUGIN_PROTOCOL_VERSION = 1
-SUPPORTED_PLUGIN_PROTOCOL_VERSIONS = {CURRENT_PLUGIN_PROTOCOL_VERSION}
+# The one enforced contract version. Lives in plugin.json as `api_version`
+# (int, required for installed plugins); the installer rejects anything that
+# is missing, non-int, or newer than this.
+CURRENT_PLUGIN_API_VERSION = 1
 
-# Field names owned by the Calvin app UI/data model. Plugins may still receive
-# these values in runtime config when the app supplies them, but they cannot
-# declare their own generated settings controls for them.
-APP_MANAGED_CONFIG_FIELD_KEYS = frozenset(
-    {
-        "common_config_schema",
-        "config",
-        "created_at",
-        "display_order",
-        "display_schema",
-        "enabled",
-        "id",
-        "instance_config_schema",
-        "instance_label",
-        "name",
-        "plugin_id",
-        "plugin_type",
-        "running",
-        "statusbar_schema",
-        "supports_multiple_instances",
-        "type",
-        "type_id",
-        "ui_actions",
-        "ui_sections",
-        "updated_at",
-    }
-)
+DISPLAY_PANEL_VARIANTS = {"default", "dense", "media", "iframe"}
+# Panel kinds — must mirror `renderers` in frontend rendererRegistry.js
+# (enforced by tests/unit/test_display_kind_sync.py).
+SUPPORTED_DISPLAY_KINDS = {
+    "status",
+    "card-grid",
+    "item-list",
+    "iframe",
+    "image-with-caption",
+    "metric-dashboard",
+    "weather-forecast",
+    "web-component",
+}
+# Statusbar kinds — a statusbar item is a compact strip, not a full panel, so
+# it has its own (smaller) namespace. Mirrors SUPPORTED_STATUSBAR_KINDS in
+# rendererRegistry.js.
+SUPPORTED_STATUSBAR_KINDS = {"status"}
 
+# Keys from the retired pre-1.0 display contract (type:"api", render_template,
+# shipped .vue components). Rejected loudly so straddlers fail at load, not at
+# render.
+_LEGACY_DISPLAY_KEYS = {"type", "api_endpoint", "render_template", "component", "data_schema"}
 
-def strip_app_managed_config_fields(schema: dict[str, Any] | None) -> dict[str, Any]:
-    """Remove app-managed fields from plugin-declared config schemas."""
-    return {
-        key: value
-        for key, value in (schema or {}).items()
-        if key not in APP_MANAGED_CONFIG_FIELD_KEYS
-    }
+# `mdi:<name>` tile icons (design 2026-10-31-plugin-copy P1). The host resolves
+# the name from its curated frontend map; the backend only pins the shape here.
+# A malformed entry is a load-time warning, never a crash: the UI falls back to
+# the plugin name's first letter, exactly like an unknown name.
+_MDI_ICON_PATTERN = re.compile(r"^mdi:[a-z0-9-]+$")
 
 
-def validate_plugin_config_schema_keys(
+def _validate_schema_kind(
+    value: dict[str, Any] | None,
     *,
-    plugin_type_id: str,
-    schema_name: str,
-    schema: dict[str, Any] | None,
-) -> None:
-    """Raise if SDK-built plugin metadata declares app-managed settings fields."""
-    reserved_keys = sorted(set(schema or {}) & APP_MANAGED_CONFIG_FIELD_KEYS)
-    if not reserved_keys:
-        return
-
-    quoted = ", ".join(f"'{key}'" for key in reserved_keys)
-    raise ValueError(
-        f"Plugin '{plugin_type_id}' declares app-managed config field(s) in "
-        f"{schema_name}: {quoted}. These fields are owned by Calvin's settings UI/data model."
-    )
+    field_name: str,
+    allowed_kinds: set[str],
+    check_panel_variant: bool,
+) -> dict[str, Any] | None:
+    """Validate that a schema dict has a supported kind and (optionally) panel_variant."""
+    if value is None:
+        return value
+    legacy = sorted(_LEGACY_DISPLAY_KEYS & value.keys())
+    if legacy:
+        raise ValueError(
+            f"{field_name} uses retired pre-1.0 keys: {', '.join(legacy)}. "
+            "Declare a kind-based schema instead (see SUPPORTED_DISPLAY_KINDS)."
+        )
+    kind = value.get("kind")
+    if kind is None:
+        raise ValueError(f"{field_name}.kind is required when {field_name} is provided")
+    if kind not in allowed_kinds:
+        allowed = ", ".join(sorted(allowed_kinds))
+        raise ValueError(f"{field_name}.kind must be one of: {allowed} (got {kind!r})")
+    if check_panel_variant:
+        panel_variant = value.get("panel_variant")
+        if panel_variant is not None and panel_variant not in DISPLAY_PANEL_VARIANTS:
+            allowed = ", ".join(sorted(DISPLAY_PANEL_VARIANTS))
+            raise ValueError(f"{field_name}.panel_variant must be one of: {allowed}")
+    return value
 
 
 class ConfigFieldDefinition(BaseModel):
-    """Typed config field metadata with permissive extra support."""
+    """Typed config field metadata with permissive extra support.
+
+    ``label`` names the form field; ``description`` is the one-line hint shown
+    under it. A field without a label falls back to a humanised key in the UI.
+    ``hidden: true`` keeps a field out of the form (its default still applies).
+    """
 
     type: str | None = None
+    label: str | None = None
     description: str | None = None
     default: Any = None
+    hidden: bool = False
     ui: dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(extra="allow")
@@ -105,7 +122,7 @@ class SectionDefinition(BaseModel):
 class DisplaySchema(BaseModel):
     """Display metadata for service plugins."""
 
-    type: str | None = None
+    kind: str
 
     model_config = ConfigDict(extra="allow")
 
@@ -113,68 +130,138 @@ class DisplaySchema(BaseModel):
 class StatusbarSchema(BaseModel):
     """Statusbar metadata for service plugins."""
 
+    kind: str
+
     model_config = ConfigDict(extra="allow")
 
 
-class CapabilitySet(BaseModel):
-    """Declared plugin capabilities."""
+class PluginMetadata(BaseModel):
+    """The declarative plugin contract.
 
-    can_test_connection: bool = False
-    can_scan_options: bool = False
-    can_manual_fetch: bool = False
-    can_upload: bool = False
-    can_delete: bool = False
+    Authors set this as a class attribute on their `BasePlugin` subclass.
+    `plugin_class` and `plugin_type` are runtime fields filled by the loader —
+    plugins never declare them.
+    """
 
-
-class PluginDefinition(BaseModel):
-    """Normalized plugin definition consumed by the app."""
-
-    protocol_version: int = CURRENT_PLUGIN_PROTOCOL_VERSION
     type_id: str
-    plugin_type: PluginType
     name: str
     description: str | None = None
+    # Optional tile icon (design 2026-10-30-content-and-plugins §6): an emoji
+    # string, or a file served from the plugin's own static assets. Absent means
+    # the UI falls back to the plugin name's first letter.
+    icon: str | None = None
     version: str = "1.0.0"
     supports_multiple_instances: bool = True
     instance_label: str | None = None
+    default_instance_name: str | None = None
+    # Fixed instance id for single-instance plugins (default: "{type_id}-instance").
+    fixed_instance_id: str | None = None
+    # Config keys whose values identify an instance (same values -> same
+    # instance id, e.g. ["url"]). None -> instance id derives from a hash of
+    # the whole config.
+    instance_identity: list[str] | None = None
     common_config_schema: dict[str, Any] = Field(default_factory=dict)
     instance_config_schema: dict[str, Any] = Field(default_factory=dict)
     ui_actions: list[dict[str, Any]] = Field(default_factory=list)
     ui_sections: list[dict[str, Any]] = Field(default_factory=list)
     display_schema: dict[str, Any] | None = None
     statusbar_schema: dict[str, Any] | None = None
-    capabilities: CapabilitySet = Field(default_factory=CapabilitySet)
+    # Origins intrinsic to the plugin that the kiosk browser may reach (CSP
+    # host-sources; e.g. a fixed SDK host). Default empty = the plugin promises
+    # the kiosk only talks to Calvin. Site-specific origins belong in the admin
+    # allowlist, not here. See docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
+    browser_origins: list[str] = Field(default_factory=list)
+
+    # Runtime fields, filled by the loader.
+    plugin_type: PluginType | None = None
     plugin_class: type[Any] | None = None
 
-    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
+    @field_validator("display_schema")
     @classmethod
-    def from_raw(cls, raw: "PluginDefinition | dict[str, Any]") -> "PluginDefinition":
-        """Normalize a raw plugin definition into the typed model."""
-        if isinstance(raw, cls):
-            return raw.ensure_supported()
-        if isinstance(raw, dict):
-            return cls.model_validate(raw).ensure_supported()
-        raise TypeError(f"Unsupported plugin definition type: {type(raw)!r}")
+    def validate_display_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Validate known display schema shell fields while allowing renderer-specific keys."""
+        return _validate_schema_kind(
+            value,
+            field_name="display_schema",
+            allowed_kinds=SUPPORTED_DISPLAY_KINDS,
+            check_panel_variant=True,
+        )
 
-    def ensure_supported(self) -> "PluginDefinition":
-        """Validate that this plugin definition targets a supported protocol version."""
-        if self.protocol_version not in SUPPORTED_PLUGIN_PROTOCOL_VERSIONS:
-            supported = ", ".join(
-                str(version) for version in sorted(SUPPORTED_PLUGIN_PROTOCOL_VERSIONS)
+    @field_validator("statusbar_schema")
+    @classmethod
+    def validate_statusbar_schema(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Statusbar items have their own kind namespace — no full panels in the bar."""
+        return _validate_schema_kind(
+            value,
+            field_name="statusbar_schema",
+            allowed_kinds=SUPPORTED_STATUSBAR_KINDS,
+            check_panel_variant=False,
+        )
+
+    @field_validator("icon")
+    @classmethod
+    def validate_icon(cls, value: str | None) -> str | None:
+        """Warn (do not fail) on a malformed `mdi:` tile icon.
+
+        `icon` is an optional contract addition, so an emoji, a file path, or an
+        unknown-but-well-formed `mdi:<name>` all load unchanged. Only the shape
+        of the `mdi:` form is checked here; the curated name list lives in the
+        frontend, which falls back to the first letter for anything it cannot
+        resolve.
+        """
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError("icon must be a string")
+        icon = value.strip()
+        if icon.lower().startswith("mdi:") and not _MDI_ICON_PATTERN.match(icon):
+            logger.warning(
+                "PluginMetadata.icon {!r} is not a valid mdi icon; expected "
+                "'mdi:<name>' with lowercase letters, digits or hyphens. "
+                "The UI will fall back to the plugin name's first letter.",
+                value,
             )
+        return value
+
+    @field_validator("browser_origins")
+    @classmethod
+    def validate_browser_origins(cls, value: list[str]) -> list[str]:
+        """Each entry must be a valid CSP host-source (no CIDR); normalize + dedupe.
+
+        A malformed entry fails plugin load rather than silently emitting an
+        invalid CSP token at runtime. Imported lazily to avoid any
+        plugins<->services import ordering surprise during early load.
+        """
+        from app.services.csp import validate_origin
+
+        normalized: list[str] = []
+        for entry in value:
+            try:
+                origin = validate_origin(entry)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"browser_origins entry {entry!r} is invalid: {exc}") from exc
+            if origin not in normalized:
+                normalized.append(origin)
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_instance_identity(self) -> "PluginMetadata":
+        """Every instance_identity entry must be a real config key.
+
+        A typo silently breaks instance identity — a partial typo yields the same
+        id for different instances (collision), so fail plugin load instead of
+        degrading at runtime. Keys may come from either config schema (both feed
+        the config that instance_id_for hashes). See calvin-eaf.
+        """
+        if not self.instance_identity:
+            return self
+        known_keys = set(self.instance_config_schema) | set(self.common_config_schema)
+        unknown = [key for key in self.instance_identity if key not in known_keys]
+        if unknown:
             raise ValueError(
-                f"Unsupported plugin protocol version: {self.protocol_version}. "
-                f"Supported versions: {supported}"
+                f"instance_identity references unknown config key(s) {unknown}; "
+                f"valid keys: {sorted(known_keys)}"
             )
-        self.common_config_schema = strip_app_managed_config_fields(self.common_config_schema)
-        self.instance_config_schema = strip_app_managed_config_fields(self.instance_config_schema)
         return self
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Mapping-style compatibility for legacy callers."""
-        return getattr(self, key, default)
-
-    def __getitem__(self, key: str) -> Any:
-        """Mapping-style compatibility for legacy callers."""
-        return getattr(self, key)

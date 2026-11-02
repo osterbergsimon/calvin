@@ -2,10 +2,10 @@
 
 ## Prerequisites
 
-### 1. Install Python 3.11+
+### 1. Install Python 3.12+
 - Download from: https://www.python.org/downloads/
 - During installation, check "Add Python to PATH"
-- Verify: `python --version` (should show 3.11 or higher)
+- Verify: `python --version` (should show 3.12 or higher)
 
 ### 2. Install Node.js 20+
 - Download from: https://nodejs.org/
@@ -41,9 +41,9 @@ Calvin provides an automated setup script that handles all prerequisites and dep
 ```
 
 This script will:
-- Check for Python 3.11+, Node.js 20+, Git
+- Check for Python 3.12+, Node.js 20+, Git
 - Install UV if needed
-- Switch to develop branch (if Git available)
+- Warn if you are not on the `develop` branch (it never switches for you)
 - Install all backend dependencies (with dev extras)
 - Install all frontend dependencies
 - Provide instructions for starting development

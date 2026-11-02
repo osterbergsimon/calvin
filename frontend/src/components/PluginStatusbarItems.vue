@@ -1,60 +1,72 @@
 <template>
-  <div class="plugin-statusbar-items" :class="{ ghost }">
-    <component
-      v-for="item in loadedItems"
-      :is="item.component"
-      :key="item.serviceId"
-      :service-id="item.serviceId"
+  <div
+    class="plugin-statusbar-items"
+    :class="[`orientation-${orientation}`, { ghost }]"
+    :style="sizeStyle"
+  >
+    <SchemaStatusbarItem
+      v-for="service in schemaServices"
+      :key="service.id"
+      :service-id="service.id"
+      :schema="service.statusbar_schema"
     />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
-import { loadPluginComponent } from "../composables/usePluginComponent";
+import { useProgressStore } from "../stores/progress";
+import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
 
-defineProps({
+const props = defineProps({
   ghost: {
     type: Boolean,
     default: false,
   },
+  orientation: {
+    type: String,
+    default: "horizontal",
+    validator: value => ["horizontal", "vertical"].includes(value),
+  },
+  // Readout value size (px). Overrides --plugin-value-size-sm for this bar only,
+  // so plugin items size independently of the global plugin token. null = inherit.
+  size: {
+    type: Number,
+    default: null,
+  },
 });
 
-const webServicesStore = useWebServicesStore();
-
-const statusbarServices = computed(() =>
-  webServicesStore.services.filter(s => {
-    if (!s.statusbar_schema?.component) return false;
-    // If the plugin uses the show_in_statusbar convention, respect it.
-    // Absence of the key means the plugin controls visibility itself (e.g. yr_weather).
-    const cfg = s.config || {};
-    if ("show_in_statusbar" in cfg) return !!cfg.show_in_statusbar;
-    return true;
-  })
+const sizeStyle = computed(() =>
+  props.size != null ? { "--plugin-value-size-sm": `${props.size}px` } : null
 );
 
-const loadedItems = ref([]);
+const webServicesStore = useWebServicesStore();
+const progressStore = useProgressStore();
 
-watch(
-  statusbarServices,
-  async services => {
-    const items = await Promise.all(
-      services.map(async service => {
-        const component = await loadPluginComponent(service.statusbar_schema.component);
-        return component ? { serviceId: service.id, component } : null;
-      })
-    );
-    loadedItems.value = items.filter(Boolean);
-  },
-  { immediate: true }
+function asBoolean(value) {
+  if (typeof value === "string") {
+    return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
+  }
+  return value === true || value === 1;
+}
+
+function isStatusbarVisible(service) {
+  const cfg = service.config || {};
+  if ("show_in_statusbar" in cfg) return asBoolean(cfg.show_in_statusbar);
+  return true;
+}
+
+const schemaServices = computed(() =>
+  webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s))
 );
 
 onMounted(() => {
   if (webServicesStore.services.length === 0) {
-    webServicesStore.fetchServices();
+    // Clock-bar and status plugins belong to no region: the app frame (CLV-115).
+    progressStore.track("plugin:statusbar", () => webServicesStore.fetchServices());
   }
 });
 </script>
@@ -63,6 +75,11 @@ onMounted(() => {
 .plugin-statusbar-items {
   display: flex;
   align-items: center;
+}
+
+.plugin-statusbar-items.orientation-vertical {
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .plugin-statusbar-items.ghost {

@@ -2,14 +2,14 @@
 
 ## Prerequisites
 
-### 1. Install Python 3.11+
+### 1. Install Python 3.12+
 ```bash
 # Ubuntu/Debian
 sudo apt update
-sudo apt install python3.11 python3.11-venv python3-pip
+sudo apt install python3.12 python3.12-venv python3-pip
 
 # Fedora
-sudo dnf install python3.11 python3-pip
+sudo dnf install python3.12 python3-pip
 
 # Arch Linux
 sudo pacman -S python python-pip
@@ -38,8 +38,8 @@ npm --version
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Add to PATH (if not already added)
-export PATH="$HOME/.cargo/bin:$PATH"
+# uv installs into ~/.local/bin; the installer adds it to your shell profile
+export PATH="$HOME/.local/bin:$PATH"
 
 # Verify
 uv --version
@@ -70,11 +70,12 @@ cd /path/to/calvin
 ### 2. Install Backend Dependencies
 ```bash
 cd backend
-uv sync --extra linux
+uv sync --extra dev
 cd ..
 ```
 
-**Note:** The `--extra linux` flag installs `evdev` for full keyboard support on Linux.
+**Note:** `--extra dev` adds pytest, ruff, and mypy. No `--extra linux`
+(evdev) is needed: keyboard input is handled by the browser.
 
 ### 3. Install Frontend Dependencies
 ```bash
@@ -114,32 +115,17 @@ npm run dev
 
 ## Keyboard Support
 
-On Linux, full keyboard support is available via `evdev`:
-- ✅ 7-button keyboard support
-- ✅ Standard keyboard support
-- ✅ Auto-detection of keyboard devices
-- ✅ Remappable key bindings
+Keyboard input is browser-based: the frontend listens for DOM `keydown`
+events, so compact 7-button keypads and full keyboards work on any platform
+without kernel input access. Bindings are configured in Settings → Keyboard.
 
 ## Troubleshooting
 
 ### UV not found
-- Make sure UV is in your PATH: `export PATH="$HOME/.cargo/bin:$PATH"`
+- Make sure UV is in your PATH: `export PATH="$HOME/.local/bin:$PATH"`
 - Or add to `~/.bashrc` or `~/.zshrc`:
   ```bash
-  export PATH="$HOME/.cargo/bin:$PATH"
-  ```
-
-### evdev installation fails
-- Install kernel headers:
-  ```bash
-  # Ubuntu/Debian
-  sudo apt install linux-headers-$(uname -r)
-  
-  # Fedora
-  sudo dnf install kernel-devel
-  
-  # Arch Linux
-  sudo pacman -S linux-headers
+  export PATH="$HOME/.local/bin:$PATH"
   ```
 
 ### Port already in use
@@ -148,33 +134,37 @@ On Linux, full keyboard support is available via `evdev`:
   lsof -ti:8000 | xargs kill -9
   ```
 
-### Permission denied for /dev/input/*
-- Add user to input group:
-  ```bash
-  sudo usermod -a -G input $USER
-  ```
-- Log out and log back in for changes to take effect
-
 ## Development vs Production
 
 ### Development
-- Use `uv sync --extra linux --extra dev` to get all dependencies including `evdev`
+- Use `uv sync --extra dev` to get the tooling (pytest, ruff, mypy)
 - Run with `--reload` flag for auto-reload on code changes
-- Full keyboard support available
+- Keyboard input works through the browser
 
 ### Production (Raspberry Pi)
-- Use automated setup scripts: `scripts/setup.sh` (production) or `scripts/setup-dev.sh` (development)
+- Use automated setup script: `scripts/setup.sh` (`--mode prod` or `--mode dev`)
+- The script installs Docker + the kiosk; the app itself runs from the published `ghcr.io/osterbergsimon/calvin` container image (no native Python/Node/UV install on the Pi)
+- The manual install steps in the section above do **not** apply to Pi production — they're for non-Pi Linux dev machines
 - See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for details
-- Full keyboard support available
 
 **Quick Setup for Raspberry Pi:**
 
-Production:
+Stable release (recommended; replace `v0.1.0` with the latest tag from
+<https://github.com/osterbergsimon/calvin/releases>):
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup.sh \
+  | sudo GIT_BRANCH=v0.1.0 bash
+```
+
+Testers (tracks `develop`, publishes `:develop` on every push; the only option
+before the first release):
+```bash
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash
 ```
 
 Development (with hot reload):
 ```bash
-wget -O- https://raw.githubusercontent.com/osterbergsimon/calvin/main/scripts/setup-dev.sh | sudo bash
-```Both scripts handle the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information.
+curl -fsSL https://raw.githubusercontent.com/osterbergsimon/calvin/develop/scripts/setup.sh | sudo bash -s -- --mode dev
+```
+
+The setup script handles the complete setup automatically. See [Setup Scripts Documentation](SETUP_SCRIPTS.md) for more information, and [RELEASING.md](../RELEASING.md) for what a release contains.

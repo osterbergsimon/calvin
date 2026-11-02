@@ -2,9 +2,8 @@
   <div class="ordering-manager">
     <div class="setting-item">
       <p class="help-text">
-        Configure the display order of {{ type }} plugins and their instances. Drag plugins to
-        reorder them, and drag instances within each plugin to reorder instances. Each level can
-        only be reordered within its own scope.
+        Choose the order of {{ type }} plugins and what they show. Drag a plugin to reorder it, and
+        drag its entries within the plugin. Each level can only be reordered within its own scope.
       </p>
     </div>
 
@@ -31,66 +30,85 @@
             <div class="plugin-tree-header">
               <div class="plugin-order-handle">
                 <span class="order-number">{{ index + 1 }}</span>
-                <span class="plugin-drag-handle" title="Drag to reorder plugins"> ⋮⋮ </span>
+                <button
+                  type="button"
+                  class="plugin-drag-handle"
+                  :aria-label="`Drag to reorder ${plugin.name}`"
+                  :title="`Drag to reorder ${plugin.name}`"
+                >
+                  <span aria-hidden="true">⋮⋮</span>
+                </button>
               </div>
               <div class="plugin-info">
                 <strong>{{ plugin.name }}</strong>
-                <span v-if="pluginInstances[plugin.id]?.length > 0" class="instance-count-badge">
+                <Tag
+                  v-if="isMultiInstance(plugin) && pluginInstances[plugin.id]?.length > 0"
+                  class="instance-count-badge"
+                  count
+                  :aria-label="`${pluginInstances[plugin.id].length} ${
+                    pluginInstances[plugin.id].length === 1 ? 'source' : 'sources'
+                  }`"
+                >
                   {{ pluginInstances[plugin.id].length }}
-                  {{ pluginInstances[plugin.id].length === 1 ? "instance" : "instances" }}
-                </span>
+                </Tag>
               </div>
             </div>
 
-            <!-- Nested instances list -->
-            <div v-if="pluginInstances[plugin.id]?.length > 0" class="plugin-instances-tree">
-              <draggable
-                :model-value="pluginInstances[plugin.id]"
-                :animation="200"
-                handle=".instance-drag-handle"
-                :group="`${type}-instances`"
-                :data-plugin-id="plugin.id"
-                item-key="id"
-                @update:model-value="handleInstanceOrderChange(plugin.id, $event)"
-                @start="handleInstanceDragStart(plugin.id)"
-                @end="handleInstanceDragEnd(plugin.id)"
-              >
-                <template #item="{ element: instance }">
-                  <div class="instance-tree-item">
-                    <div class="instance-tree-header">
-                      <span class="instance-drag-handle" title="Drag to reorder instances">
-                        ⋮⋮
-                      </span>
-                      <span
-                        v-if="instance.running !== undefined"
-                        class="running-indicator"
-                        :class="{
-                          running: instance.running,
-                          stopped: !instance.running,
-                        }"
-                        :title="
-                          instance.running
-                            ? '● Green: Instance is running'
-                            : '○ Red: Instance is stopped'
-                        "
-                      >
-                        {{ instance.running ? "●" : "○" }}
-                      </span>
-                      <span class="instance-name">{{ instance.name }}</span>
-                      <span
-                        v-if="instance.config && getInstanceSummary(plugin.id, instance.config)"
-                        class="instance-summary"
-                      >
-                        {{ getInstanceSummary(plugin.id, instance.config) }}
-                      </span>
+            <!-- Nested instances: only for multi-instance plugins. Single-instance
+                 plugins have nothing to reorder, so the sub-list is omitted. -->
+            <template v-if="isMultiInstance(plugin)">
+              <div v-if="pluginInstances[plugin.id]?.length > 0" class="plugin-instances-tree">
+                <draggable
+                  :model-value="pluginInstances[plugin.id]"
+                  :animation="200"
+                  handle=".instance-drag-handle"
+                  :group="`${type}-instances-${plugin.id}`"
+                  :data-plugin-id="plugin.id"
+                  item-key="id"
+                  @update:model-value="handleInstanceOrderChange(plugin.id, $event)"
+                  @start="handleInstanceDragStart(plugin.id)"
+                  @end="handleInstanceDragEnd(plugin.id)"
+                >
+                  <template #item="{ element: instance }">
+                    <div class="instance-tree-item">
+                      <div class="instance-tree-header">
+                        <button
+                          type="button"
+                          class="instance-drag-handle"
+                          :aria-label="`Drag to reorder ${instance.name}`"
+                          :title="`Drag to reorder ${instance.name}`"
+                        >
+                          <span aria-hidden="true">⋮⋮</span>
+                        </button>
+                        <span
+                          v-if="instance.running !== undefined"
+                          class="running-indicator"
+                          :class="{
+                            running: instance.running,
+                            stopped: !instance.running,
+                          }"
+                          role="img"
+                          :aria-label="instance.running ? 'Working' : 'Off'"
+                          :title="instance.running ? 'Working' : 'Off'"
+                        >
+                          <span aria-hidden="true">{{ instance.running ? "●" : "○" }}</span>
+                        </span>
+                        <span class="instance-name">{{ instance.name }}</span>
+                        <span
+                          v-if="instance.config && getInstanceSummary(plugin.id, instance.config)"
+                          class="instance-summary"
+                        >
+                          {{ getInstanceSummary(plugin.id, instance.config) }}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </template>
-              </draggable>
-            </div>
-            <div v-else class="no-instances-message">
-              <span class="help-text">No instances configured</span>
-            </div>
+                  </template>
+                </draggable>
+              </div>
+              <div v-else class="no-instances-message">
+                <span class="help-text">No sources yet</span>
+              </div>
+            </template>
           </div>
         </template>
       </draggable>
@@ -100,6 +118,7 @@
 
 <script setup>
 import draggable from "vuedraggable";
+import Tag from "@/components/ui/Tag.vue";
 
 defineProps({
   type: {
@@ -136,6 +155,10 @@ const emit = defineEmits([
   "instance-drag-end",
 ]);
 
+// Single-instance plugins (supports_multiple_instances === false) have nothing
+// to reorder, so we omit their instance sub-list entirely.
+const isMultiInstance = plugin => plugin.supports_multiple_instances !== false;
+
 const handlePluginOrderChange = newOrder => {
   emit("plugin-order-change", newOrder);
 };
@@ -162,27 +185,36 @@ const handleInstanceDragEnd = pluginId => {
 </script>
 
 <style scoped>
+/* Renders inside a shell SettingsSection panel (ContentSettings.vue), so it
+   supplies its own inner padding rather than panel chrome. */
 .ordering-manager {
   width: 100%;
+  padding: 0.875rem 1rem 1rem;
+}
+
+.ordering-manager > .setting-item {
+  margin-bottom: 0.875rem;
 }
 
 .ordering-tree {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.625rem;
 }
 
 .plugin-tree-item {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  transition:
+    border-color var(--dur-fast) ease,
+    box-shadow var(--dur-fast) ease;
   overflow: hidden;
 }
 
 .plugin-tree-item:hover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 2px 4px var(--shadow);
+  border-color: var(--focus);
+  box-shadow: 0 2px 6px var(--shadow);
 }
 
 .plugin-tree-header {
@@ -196,22 +228,43 @@ const handleInstanceDragEnd = pluginId => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: var(--text-secondary);
+  color: var(--ink-2);
 }
 
 .order-number {
-  font-weight: 600;
-  color: var(--accent-primary);
+  font-weight: var(--weight-title);
+  color: var(--focus-text);
   min-width: 1.5rem;
   text-align: center;
+  font-family: var(--font-data);
 }
 
 .plugin-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
   cursor: grab;
-  font-size: 1.2rem;
+  font-size: var(--fs-xl);
   line-height: 1;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   user-select: none;
+  touch-action: none;
+}
+
+.plugin-drag-handle:hover {
+  color: var(--ink-2);
+}
+
+.plugin-drag-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  color: var(--ink-2);
 }
 
 .plugin-drag-handle:active {
@@ -225,52 +278,63 @@ const handleInstanceDragEnd = pluginId => {
   gap: 0.75rem;
 }
 
-.instance-count-badge {
-  padding: 0.25rem 0.5rem;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-}
-
 .plugin-instances-tree {
   margin-left: 2rem;
   margin-right: 1rem;
   margin-bottom: 0.75rem;
   padding-left: 1rem;
-  border-left: 2px solid var(--border-color);
+  border-left: 2px solid var(--line);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
 .instance-tree-item {
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  transition: all 0.2s ease;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-fast) ease;
 }
 
 .instance-tree-item:hover {
-  border-color: var(--accent-primary);
-  background: var(--bg-secondary);
+  border-color: var(--focus);
 }
 
 .instance-tree-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.9rem;
+  font-size: var(--text-body);
 }
 
 .instance-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: transparent;
   cursor: grab;
-  font-size: 1rem;
+  font-size: var(--fs-base);
   line-height: 1;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   user-select: none;
+  touch-action: none;
   flex-shrink: 0;
+}
+
+.instance-drag-handle:hover {
+  color: var(--ink-2);
+}
+
+.instance-drag-handle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  color: var(--ink-2);
 }
 
 .instance-drag-handle:active {
@@ -278,27 +342,30 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .running-indicator {
-  font-size: 1rem;
+  display: inline-flex;
+  font-size: var(--fs-base);
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .running-indicator.running {
-  color: #4caf50;
+  color: var(--ok-text);
 }
 
 .running-indicator.stopped {
-  color: #f44336;
+  color: var(--err-text);
 }
 
 .instance-name {
-  font-weight: 500;
-  color: var(--text-primary);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
   flex: 0 0 auto;
+  font-family: var(--font-ui);
 }
 
 .instance-summary {
-  color: var(--text-secondary);
-  font-size: 0.85rem;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -315,8 +382,8 @@ const handleInstanceDragEnd = pluginId => {
 }
 
 .help-text {
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+  font-size: var(--fs-control);
+  color: var(--ink-2);
   margin: 0;
   line-height: 1.4;
 }
@@ -324,8 +391,15 @@ const handleInstanceDragEnd = pluginId => {
 .no-plugins-message {
   padding: 2rem;
   text-align: center;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plugin-tree-item,
+  .instance-tree-item {
+    transition: none;
+  }
 }
 </style>

@@ -12,6 +12,7 @@ from app.database import metadata
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
     KeyboardMappingDB,
+    KioskDB,
     PluginDB,
     PluginTypeDB,
 )

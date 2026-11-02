@@ -1,0 +1,97 @@
+import { describe, it, expect } from "vitest";
+import { getKioskId, configUrl, captureKioskIdentity, withViewport } from "@/utils/kioskId";
+
+function setLocation(search) {
+  Object.defineProperty(window, "location", {
+    value: { search, hostname: "pi-kitchen" },
+    writable: true,
+  });
+}
+
+describe("getKioskId", () => {
+  it("returns null when no kiosk param is present", () => {
+    setLocation("");
+    expect(getKioskId()).toBeNull();
+  });
+});
+
+describe("kiosk identity survives navigation (F1)", () => {
+  it("keeps the kiosk id after the URL loses its query string", () => {
+    setLocation("?kiosk=kitchen&khost=pi-k");
+    expect(getKioskId()).toBe("kitchen");
+    // Settings → Done pushes "/" without the query string
+    setLocation("");
+    expect(getKioskId()).toBe("kitchen");
+    expect(configUrl()).toBe("/api/kiosks/kitchen/config?khost=pi-k");
+  });
+
+  it("captures the id at boot via captureKioskIdentity", () => {
+    setLocation("?kiosk=hall");
+    captureKioskIdentity();
+    setLocation("");
+    expect(getKioskId()).toBe("hall");
+  });
+
+  it("marks <html> as a kiosk at boot, and only for a kiosk", () => {
+    sessionStorage.clear();
+    document.documentElement.classList.remove("calvin-kiosk");
+    setLocation("");
+    captureKioskIdentity();
+    expect(document.documentElement.classList.contains("calvin-kiosk")).toBe(false);
+    setLocation("?kiosk=hall");
+    captureKioskIdentity();
+    expect(document.documentElement.classList.contains("calvin-kiosk")).toBe(true);
+    document.documentElement.classList.remove("calvin-kiosk");
+  });
+
+  it("a new ?kiosk= in the URL replaces the stored id", () => {
+    setLocation("?kiosk=old");
+    getKioskId();
+    setLocation("?kiosk=new");
+    expect(getKioskId()).toBe("new");
+  });
+
+  it("is a plain browser (null) when no id was ever given", () => {
+    setLocation("");
+    expect(getKioskId()).toBeNull();
+  });
+});
+
+describe("configUrl", () => {
+  it("returns /api/config when no kiosk id", () => {
+    setLocation("");
+    expect(configUrl()).toBe("/api/config");
+  });
+
+  it("returns the kiosk effective-config URL with khost when scoped", () => {
+    setLocation("?kiosk=kitchen-3f9a2c&khost=pi-kitchen");
+    expect(configUrl()).toBe("/api/kiosks/kitchen-3f9a2c/config?khost=pi-kitchen");
+  });
+
+  it("falls back to location.hostname for khost when the param is absent", () => {
+    setLocation("?kiosk=kitchen-3f9a2c"); // window.location.hostname is set by setLocation
+    expect(configUrl()).toBe("/api/kiosks/kitchen-3f9a2c/config?khost=pi-kitchen");
+  });
+
+  it("appends the screen's viewport for a kiosk, and only for a kiosk", () => {
+    setLocation("");
+    expect(withViewport("/config")).toBe("/config");
+    setLocation("?kiosk=kitchen&khost=pi-k");
+    Object.defineProperty(window, "innerWidth", { value: 1080, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: 1920, configurable: true });
+    expect(withViewport("/kiosks/kitchen/config?khost=pi-k")).toBe(
+      "/kiosks/kitchen/config?khost=pi-k&vw=1080&vh=1920"
+    );
+  });
+
+  it("percent-encodes special characters in kiosk id and khost", () => {
+    setLocation("?kiosk=a%2Fb&khost=pi%20one");
+    const url = configUrl();
+    // The id "a/b" must be encoded as "a%2Fb" (not raw slash) and
+    // the host "pi one" must be encoded as "pi%20one" (not raw space).
+    expect(url).toContain("%2F");
+    expect(url).toContain("%20");
+    // Full URL shape check: would fail if encoding were removed
+    expect(url).toBe("/api/kiosks/a%2Fb/config?khost=pi%20one");
+  });
+});

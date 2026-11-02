@@ -1,10 +1,22 @@
 """Integration tests for system API endpoints."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from app.api.routes import system as system_routes
+from app.config import settings
+
+
+@pytest.fixture(autouse=True)
+def _host_control_on():
+    """These tests exercise the real host-command paths, so host control is on.
+
+    The disabled path is covered in test_api_system_host_control.py.
+    """
+    with patch.object(settings, "host_control", True):
+        yield
 
 
 class _SyncThread:
@@ -86,7 +98,9 @@ class TestSystemRestartEndpoints:
             pytest.skip("Restart backend route not available in test client")
 
         assert response.status_code == 500
-        assert "restart method" in response.json()["detail"].lower()
+        detail = response.json()["detail"]
+        assert detail["code"] == "restart_unavailable"
+        assert "restart method" in detail["message"].lower()
 
     @patch("app.api.routes.system.threading.Thread", _SyncThread)
     @patch("app.api.routes.system.time.sleep")
@@ -229,6 +243,8 @@ class TestSystemUpdateEndpoints:
         original_settings = system_routes.settings
 
         class _StubSettings:
+            deployment = "native"
+            host_control = True
             repo_dir = tmp_path
             system_path = original_settings.system_path
 
@@ -246,6 +262,34 @@ class TestSystemUpdateEndpoints:
         data = response.json()
         assert data["status"] == "started"
         assert "pid" in data
+        assert data["state_file"].endswith("calvin-update-state.json")
+
+        popen_env = mock_popen.call_args.kwargs["env"]
+        assert popen_env["UPDATE_STATE_FILE"].endswith("calvin-update-state.json")
+        assert popen_env["UPDATE_LOG_FILE"].endswith("calvin-update.log")
+
+    def test_update_stream_emits_structured_state(self, test_client, tmp_path):
+        """SSE stream emits terminal status from structured state even without log output."""
+        state_file = tmp_path / "backend" / "logs" / "calvin-update-state.json"
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        state_file.write_text(
+            json.dumps(
+                {
+                    "status": "success",
+                    "phase": "complete",
+                    "message": "Update completed successfully",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        with patch.object(system_routes.settings, "repo_dir", tmp_path):
+            response = test_client.get("/api/system/update/stream")
+
+        assert response.status_code == 200
+        assert '"type": "status"' in response.text
+        assert '"status": "complete"' in response.text
+        assert "Update completed successfully" in response.text
 
 
 @pytest.mark.integration
@@ -340,7 +384,8 @@ class TestSystemDisplayPowerEndpoints:
             pytest.skip("Display power route not available in test client")
 
         assert response.status_code == 500
-        assert "failed" in response.json()["detail"].lower()
+        assert response.json()["detail"]["code"] == "display_power_on_failed"
+        assert "Display control failed" not in response.text
 
     @patch("app.api.routes.system.display_power_service.get_display_state")
     def test_get_display_state_error(self, mock_get_state, test_client):
@@ -353,4 +398,38 @@ class TestSystemDisplayPowerEndpoints:
             pytest.skip("Display power route not available in test client")
 
         assert response.status_code == 500
-        assert "failed" in response.json()["detail"].lower()
+        assert response.json()["detail"]["code"] == "display_state_failed"
+        assert "State check failed" not in response.text
+
+
+@pytest.mark.integration
+class TestNetworkInfoEndpoint:
+    """GET /api/system/network tells a phone or new kiosk how to reach the server."""
+
+    @patch("app.api.routes.system._detect_lan_ips", return_value=["192.0.2.20"])
+    def test_lists_lan_urls_with_request_port(self, _mock_ips, test_client):
+        response = test_client.get("http://localhost:8000/api/system/network")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["lan_urls"] == ["http://192.0.2.20:8000"]
+        assert data["public_url"] is None
+        assert isinstance(data["hostname"], str)
+
+    @patch("app.api.routes.system._detect_lan_ips", return_value=["172.17.0.2"])
+    def test_public_url_setting_wins(self, _mock_ips, test_client, monkeypatch):
+        monkeypatch.setattr(system_routes.settings, "public_url", "http://calvin.lan:8000/")
+
+        data = test_client.get("/api/system/network").json()
+
+        assert data["public_url"] == "http://calvin.lan:8000"
+
+    def test_detect_lan_ips_skips_loopback(self, monkeypatch):
+        monkeypatch.setattr(system_routes, "_primary_ip", lambda: "10.0.0.5")
+        monkeypatch.setattr(
+            system_routes.socket,
+            "gethostbyname_ex",
+            lambda _h: ("pi", [], ["127.0.1.1", "10.0.0.5", "192.0.2.7"]),
+        )
+
+        assert system_routes._detect_lan_ips() == ["10.0.0.5", "192.0.2.7"]

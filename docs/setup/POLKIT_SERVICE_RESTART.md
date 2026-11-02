@@ -1,134 +1,57 @@
-# Polkit Rules for Service Restart
+# Privileged Restart Helpers
 
 ## Overview
 
-Polkit (PolicyKit) rules have been added to the installation scripts to allow the `calvin` user to restart the `calvin-backend` and `calvin-frontend` services without requiring sudo or password authentication.
+Calvin installs root-owned helper scripts so the `calvin` user can restart the compose runtime or reboot the device without receiving broad sudo access.
 
-## What Was Added
+## Restart Helper
 
-### Polkit Rule File: `50-calvin-restart.rules`
-
-This rule file is automatically created during installation in `/etc/polkit-1/rules.d/50-calvin-restart.rules` and grants the `calvin` user permission to manage (start, stop, restart) the Calvin services.
-
-**Rule Content:**
-```javascript
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        subject.user == "calvin") {
-        // Allow managing calvin-backend and calvin-frontend services
-        var unit = action.lookup("unit");
-        if (unit == "calvin-backend.service" || unit == "calvin-frontend.service") {
-            return polkit.Result.YES;
-        }
-    }
-});
-```
-
-## Installation
-
-The polkit rules are automatically configured during first-boot setup in both:
-- `rpi-image/first-boot/setup.sh` (production setup)
-- `rpi-image/first-boot/setup-dev.sh` (development setup)
-
-## Manual Setup (For Existing Installations)
-
-If you have an existing installation that doesn't have these rules, you can add them manually:
+The backend may run `/usr/local/bin/restart-calvin-services.sh` with `sudo` under a narrow sudoers rule:
 
 ```bash
-sudo mkdir -p /etc/polkit-1/rules.d
-sudo tee /etc/polkit-1/rules.d/50-calvin-restart.rules > /dev/null << 'EOF'
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.systemd1.manage-units" &&
-        subject.user == "calvin") {
-        // Allow managing calvin-backend and calvin-frontend services
-        var unit = action.lookup("unit");
-        if (unit == "calvin-backend.service" || unit == "calvin-frontend.service") {
-            return polkit.Result.YES;
-        }
-    }
-});
-EOF
-sudo chmod 644 /etc/polkit-1/rules.d/50-calvin-restart.rules
+calvin ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh
 ```
 
-After creating the file, the polkit daemon should automatically pick up the new rules. If needed, you can restart polkit:
+The helper restarts the compose app, X, and kiosk units:
 
 ```bash
-sudo systemctl restart polkit
+sudo /usr/local/bin/restart-calvin-services.sh
+sudo /usr/local/bin/restart-calvin-services.sh app
+sudo /usr/local/bin/restart-calvin-services.sh kiosk
+sudo /usr/local/bin/restart-calvin-services.sh x
 ```
 
-## Verification
+## Service Units
 
-To verify the rules are working, try restarting a service as the calvin user:
+The current Raspberry Pi runtime units are:
 
-```bash
-su - calvin
-systemctl restart calvin-backend
-systemctl restart calvin-frontend
-```
+- `calvin-app.service` - runs `docker compose -f /etc/calvin/docker-compose.yml up -d`
+- `calvin-x.service` - starts the X session
+- `calvin-kiosk.service` - starts Chromium at `http://localhost:8000`
 
-If the rules are working correctly, these commands should succeed without prompting for a password.
+Legacy native units such as `calvin-backend.service`, `calvin-frontend.service`, and `calvin-frontend-dev.service` are removed by setup.
 
-## Security Considerations
+## Security
 
-- The rules are **scoped** to only allow management of `calvin-backend.service` and `calvin-frontend.service`
-- Only the `calvin` user is granted these permissions
-- The rules do not grant permission to manage other systemd units or perform other privileged operations
+Helpers listed in sudoers must be immutable from the app's perspective:
 
-## Privileged helper scripts (`sudo` NOPASSWD)
+- Owner/group: `root:root`
+- Mode: `0755` or stricter
+- `/usr/local/bin` should remain root-owned and not writable by `calvin`
 
-The backend may run `/usr/local/bin/restart-calvin-services.sh` (and reboot via `/usr/local/bin/reboot-calvin.sh`) with `sudo` under a **narrow** sudoers rule, e.g.:
+If a helper were owned by `calvin`, code running as `calvin` could replace it and gain root the next time sudo executed that path.
 
-`calvin ALL=(root) NOPASSWD: /usr/local/bin/restart-calvin-services.sh`
-
-Those files must be **immutable from the app’s perspective**:
-
-- **Owner/group:** `root:root`
-- **Mode:** `0755` (or stricter; `sudo` runs them as root, so the app user does not need write access)
-- **`/usr/local/bin`** should remain root-owned and not writable by `calvin` (default on most systems)
-
-If the script were owned by `calvin`, anyone who could modify code running as `calvin` could replace the helper and gain root the next time `sudo` executed that path.
-
-Setup scripts install these helpers with `install_privileged_sudo_helper_script` in `scripts/setup-common.sh` (root-owned). **Existing systems** that still have `chown calvin:calvin` on those files should fix permissions once:
+Fix existing installs once:
 
 ```bash
 sudo chown root:root /usr/local/bin/restart-calvin-services.sh /usr/local/bin/reboot-calvin.sh
 sudo chmod 0755 /usr/local/bin/restart-calvin-services.sh /usr/local/bin/reboot-calvin.sh
 ```
 
-New installs use `ALL=(root)` in sudoers for these helpers; older systems may still have `ALL=(ALL)` until setup is re-run or `/etc/sudoers.d/calvin-*` is updated.
+## Reboot
 
-## Related Files
+Reboot permission still uses the existing polkit rule:
 
-- `/etc/polkit-1/rules.d/50-calvin-reboot.rules` - Allows calvin user to reboot the system
-- `/etc/polkit-1/rules.d/50-calvin-restart.rules` - Allows calvin user to restart services
+- `/etc/polkit-1/rules.d/50-calvin-reboot.rules`
 
-## Troubleshooting
-
-If service restarts still fail:
-
-1. **Check if the rule file exists:**
-   ```bash
-   ls -l /etc/polkit-1/rules.d/50-calvin-restart.rules
-   ```
-
-2. **Check polkit logs:**
-   ```bash
-   journalctl -u polkit -n 50
-   ```
-
-3. **Verify the rule syntax:**
-   ```bash
-   pkaction --version  # Should be 0.106+ for JavaScript rules
-   ```
-
-4. **Test with pkcheck:**
-   ```bash
-   pkcheck --action-id org.freedesktop.systemd1.manage-units --allow-user-interaction
-   ```
-
-5. **Restart polkit:**
-   ```bash
-   sudo systemctl restart polkit
-   ```
-
+Setup also installs `/usr/local/bin/reboot-calvin.sh` with a narrow sudoers rule.

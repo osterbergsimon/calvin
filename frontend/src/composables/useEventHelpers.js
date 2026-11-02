@@ -26,7 +26,7 @@ export function useEventHelpers() {
       }
     }
     // Default color
-    return "#2196f3";
+    return "var(--event-1)";
   };
 
   /**
@@ -46,6 +46,43 @@ export function useEventHelpers() {
     const startTime = start.toLocaleTimeString("en-US", timeOptions);
     const endTime = end.toLocaleTimeString("en-US", timeOptions);
     return `${startTime} - ${endTime}`;
+  };
+
+  /**
+   * Format just the start time (HH:MM) — used by the compact month-view
+   * timed-event rows where the end time would be noise.
+   */
+  const formatEventStartTime = event => {
+    if (event.all_day) {
+      return "";
+    }
+    const start = new Date(event.start);
+    const timeFormat = configStore.timeFormat || "24h";
+    const timeOptions =
+      timeFormat === "24h"
+        ? { hour: "2-digit", minute: "2-digit", hour12: false }
+        : { hour: "numeric", minute: "2-digit", hour12: true };
+    return start.toLocaleTimeString("en-US", timeOptions);
+  };
+
+  /**
+   * Ink for text drawn on an event chip.
+   *
+   * A chip is painted in the calendar's own colour, not in a theme surface, so
+   * the ink cannot come from the theme: pick the light or dark chip ink by the
+   * colour's luminance (WCAG threshold: white needs L <= 0.183). Both inks are
+   * theme tokens (`--on-event-ink`, `--on-event-ink-dark`) so this only decides
+   * which of the two applies.
+   */
+  const getEventInk = event => {
+    const hex = String(getEventColor(event) || "").replace("#", "");
+    if (!/^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(hex)) return "var(--on-event-ink)";
+    const full = hex.length === 3 ? [...hex].map(c => c + c).join("") : hex;
+    const [r, g, b] = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16) / 255);
+    const linear = channel =>
+      channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    const luminance = 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+    return luminance > 0.183 ? "var(--on-event-ink-dark)" : "var(--on-event-ink)";
   };
 
   /**
@@ -99,7 +136,9 @@ export function useEventHelpers() {
 
   return {
     getEventColor,
+    getEventInk,
     formatEventTime,
+    formatEventStartTime,
     getEventTitle,
     truncateEventTitle,
     getEventDisplayText,

@@ -4,11 +4,13 @@ import asyncio
 import logging
 import tempfile
 from collections.abc import AsyncGenerator, Generator
+from datetime import UTC, datetime
 from pathlib import Path
 
 import databases
 import pytest
 import pytest_asyncio
+from fastapi import Depends
 from fastapi.testclient import TestClient
 
 # Import all models so Ormar registers their tables with metadata.
@@ -16,9 +18,12 @@ from fastapi.testclient import TestClient
 from app.models.db_models import (  # noqa: F401
     ConfigDB,
     KeyboardMappingDB,
+    KioskDB,
     PluginDB,
     PluginTypeDB,
 )
+from app.security.install import install_security
+from app.security.route_policy import enforce_route_policy
 
 from ._support.db import (
     assert_models_registered,
@@ -118,7 +123,6 @@ def _reload_modules(*module_names: str) -> None:
 
 async def _seed_test_data(test_database: databases.Database) -> None:
     """Insert minimal plugin types, plugin instance, and config entries used by tests."""
-    from datetime import datetime
 
     import ormar
 
@@ -143,8 +147,8 @@ async def _seed_test_data(test_database: databases.Database) -> None:
                     description=description,
                     version=version,
                     enabled=enabled,
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(UTC),
+                    updated_at=datetime.now(UTC),
                 )
 
         await get_or_create_plugin_type(
@@ -188,8 +192,8 @@ async def _seed_test_data(test_database: databases.Database) -> None:
                 name="Local Images",
                 enabled=True,
                 display_order=0,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
+                updated_at=datetime.now(UTC),
             )
 
         async def get_or_create_config(key, value, value_type):
@@ -206,11 +210,23 @@ async def _seed_test_data(test_database: databases.Database) -> None:
 
 
 @pytest.fixture
-def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClient, None, None]:
-    """Create a TestClient bound to a fresh SQLite file with seeded test data."""
+def test_client(
+    request: pytest.FixtureRequest, temp_db_path: Path, temp_image_dir: Path, tmp_path: Path
+) -> Generator[TestClient, None, None]:
+    """Create a TestClient bound to a fresh SQLite file with seeded test data.
+
+    The admin store is configured with a known password and, unless the test is
+    marked ``no_admin_login``, the client is logged in before it is yielded.
+    """
     import os
 
     import app.config
+    from app.security.admin_auth import get_admin_store
+
+    original_admin_auth_path = app.config.settings.admin_auth_path
+    app.config.settings.admin_auth_path = tmp_path / "admin-auth.json"
+    admin_store = get_admin_store()
+    admin_store.set_password("test-admin-password")
 
     original_image_dir = os.environ.get("IMAGE_DIR")
     os.environ["IMAGE_DIR"] = str(temp_image_dir.resolve())
@@ -241,6 +257,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     _reload_modules(
         "app.services.config_service",
         "app.services.keyboard_mapping_service",
+        "app.services.kiosk_registry",
         "app.services.plugin_calendar_service",
         "app.services.plugin_image_service",
         "app.plugins.registry",
@@ -254,6 +271,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         "app.api.routes.calendar",
         "app.api.routes.images",
         "app.api.routes.keyboard",
+        "app.api.routes.kiosks",
         "app.api.routes.system",
         "app.api.routes.web_services",
     )
@@ -264,6 +282,16 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         loop_data.run_until_complete(_seed_test_data(test_database))
     finally:
         loop_data.close()
+
+    # Seed default keyboard mappings (mirrors production lifespan behaviour).
+    loop_kbd = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop_kbd)
+    try:
+        from app.main import _initialize_keyboard_mappings
+
+        loop_kbd.run_until_complete(_initialize_keyboard_mappings())
+    finally:
+        loop_kbd.close()
 
     # Load plugins into manager and register their instances from DB.
     loop = asyncio.new_event_loop()
@@ -281,16 +309,23 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     from fastapi.middleware.cors import CORSMiddleware
 
     from app.api.routes import (
+        backup,
         calendar,
         config,
         health,
         images,
         keyboard,
+        kiosks,
         plugins,
+        security,
+        share,
         system,
     )
 
-    test_app = FastAPI(title="Calvin Test API")
+    test_app = FastAPI(
+        title="Calvin Test API",
+        dependencies=[Depends(enforce_route_policy)],
+    )
     test_app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -300,11 +335,17 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     )
     test_app.include_router(health.router, prefix="/api", tags=["health"])
     test_app.include_router(config.router, prefix="/api", tags=["config"])
+    test_app.include_router(kiosks.router, prefix="/api", tags=["kiosks"])
     test_app.include_router(calendar.router, prefix="/api", tags=["calendar"])
     test_app.include_router(keyboard.router, prefix="/api", tags=["keyboard"])
     test_app.include_router(images.router, prefix="/api", tags=["images"])
     test_app.include_router(plugins.router, prefix="/api", tags=["plugins"])
     test_app.include_router(system.router, prefix="/api/system", tags=["system"])
+    test_app.include_router(security.router, prefix="/api", tags=["security"])
+    test_app.include_router(backup.router, prefix="/api", tags=["backup"])
+    test_app.include_router(share.router, prefix="/api", tags=["share"])
+    test_app.include_router(share.share_target_router)
+    install_security(test_app)
 
     @test_app.get("/")
     async def root():
@@ -314,6 +355,9 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
     assert_required_tables(test_db_path_abs, retries=5)
 
     with TestClient(test_app) as client:
+        if request.node.get_closest_marker("no_admin_login") is None:
+            response = client.post("/api/auth/login", json={"password": "test-admin-password"})
+            assert response.status_code == 200, response.text
         yield client
 
     # Cleanup: unregister plugins so the singleton plugin_manager doesn't
@@ -365,6 +409,7 @@ def test_client(temp_db_path: Path, temp_image_dir: Path) -> Generator[TestClien
         pass
 
     app.config.settings.database_url = original_db_url
+    app.config.settings.admin_auth_path = original_admin_auth_path
     db_module.database = original_database
     update_ormar_models_database(original_database)
 
@@ -398,14 +443,6 @@ def temp_plugins_dir(tmp_path):
 
 
 @pytest.fixture
-def temp_frontend_dir(tmp_path):
-    """Create a temporary frontend directory."""
-    frontend_dir = tmp_path / "frontend" / "src" / "components" / "plugins"
-    frontend_dir.mkdir(parents=True)
-    return frontend_dir
-
-
-@pytest.fixture
 def temp_themes_dir(tmp_path):
     """Create a temporary themes directory."""
     themes_dir = tmp_path / "themes"
@@ -414,23 +451,29 @@ def temp_themes_dir(tmp_path):
 
 
 @pytest.fixture(autouse=True)
-def patch_data_directories(
-    monkeypatch, tmp_path, temp_plugins_dir, temp_frontend_dir, temp_themes_dir
-):
+def patch_data_directories(monkeypatch, tmp_path, temp_plugins_dir, temp_themes_dir):
     """Patch plugin/theme installers to write under tmp_path so tests don't touch real data."""
+    from types import SimpleNamespace
+
+    from app.services import plugin_packages
     from app.services.plugin_installer import plugin_installer
     from app.services.theme_installer import theme_installer
 
     original_plugins_dir = plugin_installer.plugins_dir
-    original_frontend_dir = plugin_installer.frontend_plugins_dir
     original_themes_dir = theme_installer.themes_dir
+    original_package_settings = plugin_packages.settings
 
     plugin_installer.plugins_dir = temp_plugins_dir
-    plugin_installer.frontend_plugins_dir = temp_frontend_dir
     theme_installer.themes_dir = temp_themes_dir
+    # The persistent plugin package target lives under the data dir; keep a
+    # real plugin install in a test from writing site-packages into the repo
+    # (calvin-26c).
+    plugin_packages.settings = SimpleNamespace(
+        data_dir=tmp_path / "data", plugins_dir=temp_plugins_dir
+    )
 
     yield
 
     plugin_installer.plugins_dir = original_plugins_dir
-    plugin_installer.frontend_plugins_dir = original_frontend_dir
     theme_installer.themes_dir = original_themes_dir
+    plugin_packages.settings = original_package_settings

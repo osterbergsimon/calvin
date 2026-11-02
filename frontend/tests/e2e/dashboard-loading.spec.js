@@ -14,16 +14,13 @@ test.describe("Dashboard Loading", () => {
     await expect(page).toHaveTitle(/Calvin/i);
   });
 
-  test("should display dashboard header when UI is visible", async ({ page }) => {
+  test("should display the bar when UI is visible", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    // Check for dashboard header or title
-    const header = page
-      .locator('.dashboard-header, h1, [class*="header"]')
-      .filter({ hasText: /calvin|dashboard/i });
-    if ((await header.count()) > 0) {
-      await expect(header.first()).toBeVisible();
+    const bar = page.locator(".clock-bar-horizontal, .clock-bar-vertical");
+    if ((await bar.count()) > 0) {
+      await expect(bar.first()).toBeVisible();
     }
   });
 

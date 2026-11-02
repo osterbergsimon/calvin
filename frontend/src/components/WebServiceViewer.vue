@@ -1,82 +1,100 @@
 <template>
-  <div class="web-service-viewer" :class="{ fullscreen: isFullscreen }">
+  <div class="web-service-viewer" :class="{ fullscreen: isFullscreen }" :style="cardStyle">
     <!-- Fullscreen Close Button (only in fullscreen mode) -->
     <div v-if="isFullscreen" class="fullscreen-close-overlay">
-      <button
+      <IconButton
         class="btn-close-fullscreen"
+        size="lg"
+        shape="circle"
+        :icon="mdiClose"
+        data-action="exit-fullscreen"
+        label="Exit fullscreen"
         title="Close Fullscreen (ESC)"
         @click.stop="handleCloseFullscreen"
-      >
-        ×
-      </button>
-    </div>
-
-    <!-- Header (hidden in fullscreen mode) -->
-    <div v-if="showHeader && !isFullscreen" class="viewer-header">
-      <div class="header-left">
-        <h2>{{ currentService?.name || "Web Services" }}</h2>
-        <div v-if="services.length > 1" class="service-indicator">
-          Service {{ currentServiceIndex + 1 }} of {{ services.length }}
-        </div>
-      </div>
-      <div class="header-right">
-        <button
-          v-if="services.length > 1"
-          class="btn-nav"
-          title="Previous Service"
-          @click="previousService"
-        >
-          ‹
-        </button>
-        <button
-          v-if="services.length > 1"
-          class="btn-nav"
-          title="Next Service"
-          @click="nextService"
-        >
-          ›
-        </button>
-        <button
-          class="btn-fullscreen"
-          :title="isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'"
-          @click.stop="handleToggleFullscreen"
-        >
-          {{ isFullscreen ? "⤓" : "⤢" }}
-        </button>
-        <button class="btn-close" title="Close" @click.stop="handleClose">×</button>
-      </div>
-    </div>
-
-    <!-- Service Selection (if multiple services) -->
-    <div v-if="showHeader && !isFullscreen && services.length > 1" class="service-selector">
-      <button
-        v-for="(service, index) in services"
-        :key="service.id"
-        class="service-btn"
-        :class="{ active: index === currentServiceIndex }"
-        @click="setServiceIndex(index)"
-      >
-        {{ service.name }}
-      </button>
+      />
     </div>
 
     <!-- Viewer Content -->
     <div class="viewer-content">
-      <!-- Loading State -->
-      <div v-if="loading" class="loading-state">
-        <div class="spinner" />
-        <p>Loading service...</p>
-      </div>
-
-      <!-- No Services -->
-      <div v-else-if="services.length === 0" class="no-services">
-        <p>No web services configured</p>
-        <p class="help-text">Add web services in Settings</p>
-      </div>
+      <DashboardPanel
+        v-if="emptyState"
+        title="Web Services"
+        :show-title="false"
+        :header-visible="!isFullscreen"
+        :focused="focused"
+        :dim="dim"
+      >
+        <template #actions> </template>
+        <!-- Nothing to show yet: the region's loading light speaks (CLV-115) -->
+        <div v-if="emptyState.loading" :class="emptyState.className" />
+        <EmptyState
+          v-else
+          :class="emptyState.className"
+          :message="emptyState.message"
+          :help="emptyState.helpText"
+          :action-label="emptyState.actionLabel"
+          :setting-id="emptyState.settingId"
+          :setup="Boolean(emptyState.setup)"
+          :region-key="regionId || ''"
+          :phone-hint="emptyState.setup ? null : false"
+        />
+      </DashboardPanel>
 
       <!-- Service Content (uses ServiceViewer for routing) -->
       <div v-else-if="currentService" class="service-container">
-        <ServiceViewer :key="currentService.id" :service="currentService" />
+        <ServiceViewer
+          :key="currentService.id"
+          :service="currentService"
+          :subtitle="serviceSubtitle"
+          :header-visible="!isFullscreen"
+          :focused="focused"
+          :link-action="linkAction"
+          :region-id="regionId"
+        >
+          <template #actions>
+            <RegionHeaderControls v-if="hasPointer && (showControls || isFullscreen)">
+              <ServiceRegionViewOptions
+                v-if="showControls && hasPointer && isLinkCapable"
+                :region-id="regionId"
+                :view="view"
+              />
+              <IconButton
+                v-if="
+                  (showControls || isFullscreen) &&
+                  hasPointer &&
+                  canNavigateServices &&
+                  services.length > 1
+                "
+                size="custom"
+                :icon="mdiChevronLeft"
+                label="Previous Service"
+                title="Previous Service"
+                @click="previousService"
+              />
+              <IconButton
+                v-if="
+                  (showControls || isFullscreen) &&
+                  hasPointer &&
+                  canNavigateServices &&
+                  services.length > 1
+                "
+                size="custom"
+                :icon="mdiChevronRight"
+                label="Next Service"
+                title="Next Service"
+                @click="nextService"
+              />
+              <IconButton
+                v-if="showControls && hasPointer && !isFullscreen"
+                size="custom"
+                :icon="mdiFullscreen"
+                label="Enter Fullscreen"
+                title="Enter Fullscreen"
+                @click.stop="handleToggleFullscreen"
+              />
+            </RegionHeaderControls>
+          </template>
+        </ServiceViewer>
       </div>
     </div>
   </div>
@@ -84,41 +102,116 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from "vue";
-import { useConfigStore } from "../stores/config";
+import { mdiChevronLeft, mdiChevronRight, mdiClose, mdiFullscreen } from "@mdi/js";
 import { useWebServicesStore } from "../stores/webServices";
 import { useModeStore } from "../stores/mode";
+import { useProgressStore } from "../stores/progress";
+import DashboardPanel from "./DashboardPanel.vue";
+import IconButton from "@/components/ui/IconButton.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
 import ServiceViewer from "./service/ServiceViewer.vue";
-import { logDebug } from "../utils/logger";
+import ServiceRegionViewOptions from "./dashboard/ServiceRegionViewOptions.vue";
+import RegionHeaderControls from "./dashboard/RegionHeaderControls.vue";
+import { useTouchCapability } from "@/composables/useTouchCapability";
+import { cardSizeVars } from "@/styles/cardSizeScale.js";
 
 const props = defineProps({
+  focused: {
+    type: Boolean,
+    default: false,
+  },
+  // Service actions follow hide/show controls, not the focus light.
+  // null = fall back to `focused` (standalone use and older callers).
+  controlsVisible: {
+    type: Boolean,
+    default: null,
+  },
+  dim: {
+    type: Boolean,
+    default: false,
+  },
   isFullscreen: {
     type: Boolean,
     default: false,
   },
+  serviceId: {
+    type: String,
+    default: null,
+  },
+  regionId: {
+    type: String,
+    default: null,
+  },
+  view: {
+    type: Object,
+    default: null,
+  },
 });
 
-const configStore = useConfigStore();
+const showControls = computed(() => props.controlsVisible ?? props.focused);
+const { hasPointer } = useTouchCapability();
+
 const webServicesStore = useWebServicesStore();
 const modeStore = useModeStore();
 
-const showHeader = computed(() => configStore.shouldShowUI);
 const services = computed(() => webServicesStore.services);
 const currentServiceIndex = computed(() => webServicesStore.currentServiceIndex);
+const canNavigateServices = computed(() => !props.serviceId);
 const currentService = computed(() => {
-  const service = webServicesStore.getCurrentService();
-  if (service) {
-    logDebug("[WebServiceViewer]", "Current service:", {
-      id: service.id,
-      name: service.name,
-      url: service.url,
-      config: service.config,
-      display_schema: service.display_schema,
-      plugin_id: service.plugin_id,
-    });
-  }
-  return service;
+  if (props.serviceId) return webServicesStore.getServiceById(props.serviceId);
+  // No serviceId is only valid in fullscreen mode (cycling through services).
+  if (props.isFullscreen) return webServicesStore.getCurrentService();
+  return null;
 });
 const loading = computed(() => webServicesStore.loading);
+const serviceUnavailable = computed(
+  () =>
+    !loading.value &&
+    services.value.length > 0 &&
+    (Boolean(props.serviceId) || !props.isFullscreen) &&
+    !currentService.value
+);
+const serviceSubtitle = computed(() =>
+  canNavigateServices.value && services.value.length > 1
+    ? `Service ${currentServiceIndex.value + 1} of ${services.value.length}`
+    : ""
+);
+const emptyState = computed(() => {
+  // Still fetching with nothing to show: a quiet panel while the region's
+  // loading light speaks. A service already in hand keeps showing (CLV-115).
+  if (loading.value && !currentService.value) {
+    return { className: "loading-state", loading: true };
+  }
+  if (services.value.length === 0) {
+    return {
+      className: "no-services",
+      message: "No web pages yet",
+      helpText:
+        "Add a web page or dashboard with the built-in Iframe plugin in Settings › Content › Web pages & services.",
+      actionLabel: "Add a web page",
+      settingId: "content-services",
+      // Offline/stale data is not "nothing configured" (CLV-20).
+      setup: !webServicesStore.error && !webServicesStore.stale,
+    };
+  }
+  if (serviceUnavailable.value) {
+    return {
+      className: "no-services",
+      message: "Selected service is unavailable",
+      helpText:
+        "It may have been removed or disabled in Settings › Content › Web pages & services.",
+      actionLabel: "Open service settings",
+      settingId: "plugins-services",
+    };
+  }
+  return null;
+});
+
+const linkAction = computed(() => props.view?.linkAction || null);
+const cardStyle = computed(() => cardSizeVars(props.view?.cardSize));
+const isLinkCapable = computed(() =>
+  ["card-grid", "item-list"].includes(currentService.value?.display_schema?.kind)
+);
 
 // ServiceViewer now handles all service rendering logic
 
@@ -145,12 +238,6 @@ const close = () => {
   }, 300);
 };
 
-const handleClose = event => {
-  event.preventDefault();
-  event.stopPropagation();
-  close();
-};
-
 const handleCloseFullscreen = event => {
   event.preventDefault();
   event.stopPropagation();
@@ -166,8 +253,15 @@ const toggleFullscreen = () => {
     // This will preserve the web service in the side panel
     modeStore.exitFullscreen();
   } else {
-    // Enter fullscreen web services
-    modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES);
+    // Enter fullscreen web services, carrying THIS viewer's service so the
+    // maximized view shows the service whose ⤢ was pressed — not the globally
+    // "current" service (which may belong to another region/screen). When this
+    // viewer has no pinned service (the WEB_SERVICES carousel), pass null so
+    // fullscreen cycles from the current index.
+    modeStore.enterFullscreen(
+      modeStore.MODES.WEB_SERVICES,
+      props.serviceId ? { serviceId: props.serviceId } : null
+    );
   }
 
   // Reset flag after a short delay
@@ -183,15 +277,13 @@ const handleToggleFullscreen = event => {
 };
 
 const nextService = () => {
+  if (props.serviceId) return;
   webServicesStore.nextService();
 };
 
 const previousService = () => {
+  if (props.serviceId) return;
   webServicesStore.previousService();
-};
-
-const setServiceIndex = index => {
-  webServicesStore.setServiceIndex(index);
 };
 
 // ServiceViewer handles all service rendering logic
@@ -205,8 +297,15 @@ const handleKeydown = event => {
   }
 };
 
+const progressStore = useProgressStore();
+
 onMounted(async () => {
-  await webServicesStore.fetchServices();
+  // Plugin data fetches light this region's frame (the app frame in fullscreen).
+  await progressStore.track(
+    `plugin:services:${props.regionId || "fullscreen"}`,
+    () => webServicesStore.fetchServices(),
+    { regionId: props.regionId || null }
+  );
   // Add keyboard listener for Escape key
   window.addEventListener("keydown", handleKeydown);
 });
@@ -223,9 +322,9 @@ onUnmounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  overflow: hidden;
+  background: var(--bg-1);
+  border-radius: var(--radius-sm);
+  overflow: visible; /* let the focused panel glow bloom out */
 }
 
 .web-service-viewer.fullscreen {
@@ -235,105 +334,15 @@ onUnmounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1000;
-}
-
-.viewer-header {
-  padding: 1rem;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.viewer-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--text-primary);
-}
-
-.service-indicator {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  padding: 0.25rem 0.75rem;
-  background: var(--bg-tertiary);
-  border-radius: 12px;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-nav,
-.btn-fullscreen,
-.btn-close {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  width: 32px;
-  height: 32px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-primary);
-  transition: all 0.2s;
-}
-
-.btn-nav:hover,
-.btn-fullscreen:hover,
-.btn-close:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.service-selector {
-  padding: 0.75rem 1rem;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
-.service-btn {
-  padding: 0.5rem 1rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  color: var(--text-primary);
-}
-
-.service-btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-}
-
-.service-btn.active {
-  background: var(--accent-primary);
-  color: #fff; /* Keep white for contrast on accent background */
-  border-color: var(--accent-primary);
+  z-index: var(--z-dialog);
 }
 
 .viewer-content {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  /* visible so the focused panel's neon glow can bloom out — the iframe/content
+     is still clipped by the panel body's own overflow:hidden. */
+  overflow: visible;
   min-height: 0;
 }
 
@@ -344,31 +353,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--text-tertiary);
+  color: var(--ink-3);
   gap: 1rem;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid var(--border-color);
-  border-top: 4px solid var(--accent-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-.help-text {
-  font-size: 0.9rem;
-  font-style: italic;
 }
 
 .service-container {
@@ -377,344 +363,24 @@ onUnmounted(() => {
   position: relative;
 }
 
-.service-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  display: block;
-}
-
-.service-iframe.iframe-error {
-  opacity: 0.3;
-  pointer-events: none;
-}
-
-.iframe-error-message {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: var(--bg-primary);
-  opacity: 0.95;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  padding: 2rem;
-}
-
-.error-content {
-  max-width: 500px;
-  text-align: center;
-  background: var(--bg-primary);
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow-hover);
-}
-
-.error-content h3 {
-  margin: 0 0 1rem 0;
-  color: var(--accent-error);
-  font-size: 1.5rem;
-}
-
-.error-content p {
-  margin: 0.5rem 0;
-  color: var(--text-secondary);
-  line-height: 1.6;
-}
-
-.service-url {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: var(--text-tertiary);
-  word-break: break-all;
-  background: var(--bg-secondary);
-  padding: 0.5rem;
-  border-radius: 4px;
-  margin: 1rem 0;
-}
-
-.error-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-top: 1.5rem;
-}
-
-.btn-open-new,
-.btn-retry {
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  text-decoration: none;
-  display: inline-block;
-}
-
-.btn-open-new {
-  background: var(--accent-secondary);
-  color: #fff; /* Keep white for contrast on accent background */
-  border: none;
-}
-
-.btn-open-new:hover {
-  background: var(--accent-secondary);
-  opacity: 0.9;
-}
-
-.btn-retry {
-  background: var(--accent-primary);
-  color: #fff; /* Keep white for contrast on accent background */
-  border: none;
-}
-
-.btn-retry:hover {
-  background: var(--accent-primary);
-  opacity: 0.9;
-}
-
 .fullscreen-close-overlay {
   position: absolute;
   top: 1rem;
   right: 1rem;
-  z-index: 100;
+  /* Above everything the viewer draws, the embed fallback (--z-raised) included. */
+  z-index: var(--z-sticky);
   pointer-events: none;
 }
 
 .btn-close-fullscreen {
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  border-radius: 50%;
-  width: 48px;
-  height: 48px;
-  font-size: 2rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
   pointer-events: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px var(--shadow);
+  /* IconButton's transition covers background/border-color/color only, so
+     animate the overlay's own hover-scale here (was `all 0.2s` pre-migration). */
+  transition: transform var(--dur);
 }
 
 .btn-close-fullscreen:hover {
-  background: rgba(0, 0, 0, 0.9);
-  border-color: rgba(255, 255, 255, 0.8);
   transform: scale(1.1);
-}
-
-/* API-based Service Styles */
-.api-service-container {
-  padding: 1.5rem;
-  overflow-y: auto;
-}
-
-.service-data-content {
-  width: 100%;
-  height: 100%;
-}
-
-.meal-plan-content {
-  width: 100%;
-  height: 100%;
-  padding: 2rem;
-  overflow-y: auto;
-  max-height: 100%;
-  background: var(--bg-primary);
-}
-
-.meal-plan-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 2px solid var(--border-color);
-}
-
-.meal-plan-header h3 {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
-
-.meal-plan-dates {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.meal-plan-items {
-  display: grid;
-  gap: 1rem;
-}
-
-/* Card size variants */
-.meal-plan-content.card-size-small .meal-plan-items {
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-}
-
-.meal-plan-content.card-size-medium .meal-plan-items {
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-}
-
-.meal-plan-content.card-size-large .meal-plan-items {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
-/* Portrait mode: stack cards vertically */
-@media (orientation: portrait) {
-  .meal-plan-items {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem;
-  }
-
-  .meal-plan-item {
-    padding: 1rem;
-  }
-
-  .meal-plan-header {
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-  }
-}
-
-/* Smaller screens */
-@media (max-width: 768px) {
-  .meal-plan-items {
-    grid-template-columns: 1fr !important;
-    gap: 0.75rem;
-  }
-}
-
-.meal-plan-item {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.meal-plan-item:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-}
-
-.meal-plan-date {
-  font-weight: 700;
-  font-size: 0.9rem;
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.meal-plan-meals {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.meal-item {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.meal-item.clickable {
-  cursor: pointer;
-}
-
-.meal-item.clickable:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-primary);
-  transform: translateX(6px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.meal-item.clickable .meal-name {
-  color: var(--accent-primary);
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.meal-item.clickable:hover .meal-name {
-  color: var(--accent-primary);
-  font-weight: 600;
-}
-
-.meal-type {
-  font-weight: 700;
-  color: var(--accent-primary);
-  min-width: 90px;
-  text-transform: capitalize;
-  font-size: 0.85rem;
-  letter-spacing: 0.05em;
-  padding: 0.25rem 0.5rem;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  text-align: center;
-}
-
-.meal-name {
-  color: var(--text-primary);
-  flex: 1;
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-.no-meals {
-  text-align: center;
-  padding: 4rem 2rem;
-  color: var(--text-tertiary);
-  font-size: 1.1rem;
-}
-
-.no-meals-day {
-  text-align: center;
-  padding: 1rem;
-  color: var(--text-tertiary);
-  font-style: italic;
-  font-size: 0.95rem;
-  background: var(--bg-tertiary);
-  border-radius: 6px;
-  border: 1px dashed var(--border-color);
-}
-
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 2rem;
-  text-align: center;
-}
-
-.error-state h3 {
-  margin: 0 0 1rem 0;
-  color: var(--accent-error);
-}
-
-.error-state p {
-  margin: 0 0 1.5rem 0;
-  color: var(--text-secondary);
 }
 </style>

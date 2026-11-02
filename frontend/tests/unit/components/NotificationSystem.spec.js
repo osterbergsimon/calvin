@@ -1,16 +1,23 @@
 /**
- * Unit tests for NotificationSystem component
- * Tests functionality: displays notifications, keyboard feedback, and mode changes
+ * Unit tests for NotificationSystem — the input-echo HUD.
+ * Covers keypress feedback and mode-change echo. System-event toasts live on
+ * the StatusRail (see notifications store) and are tested separately.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
+import api from "@/services/api";
 import NotificationSystem from "@/components/NotificationSystem.vue";
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
 
-describe("NotificationSystem", () => {
+vi.mock("@/services/api", () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  LONG_REQUEST_TIMEOUT: 600000,
+}));
+
+describe("NotificationSystem (input-echo HUD)", () => {
   let configStore;
   let modeStore;
 
@@ -21,11 +28,12 @@ describe("NotificationSystem", () => {
     configStore = useConfigStore();
     modeStore = useModeStore();
 
-    // Reset to default state
     configStore.keyboardFeedbackEnabled = true;
     configStore.keyboardFeedbackMode = "normal";
     configStore.modeIndicatorTimeout = 5;
     configStore.showUI = false;
+    // Default to a booted app; the boot-hydration suite overrides this.
+    configStore.hydrated = true;
     modeStore.currentMode = modeStore.MODES.CALENDAR;
     modeStore.isFullscreen = false;
     modeStore.fullscreenMode = null;
@@ -38,75 +46,65 @@ describe("NotificationSystem", () => {
   describe("Visibility", () => {
     it("should not render when not visible", () => {
       const wrapper = mount(NotificationSystem);
-
-      expect(wrapper.find(".notification").exists()).toBe(false);
+      expect(wrapper.find(".hud").exists()).toBe(false);
     });
 
-    it("should render when shown via show method", async () => {
+    it("should render a keycap + label when shown", async () => {
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.show("info", "ℹ️", "Test message");
+      wrapper.vm.show("keyboard", "S", "Settings");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-      expect(wrapper.find(".notification-icon").text()).toBe("ℹ️");
-      expect(wrapper.find(".notification-message").text()).toBe("Test message");
+      expect(wrapper.find(".hud").exists()).toBe(true);
+      expect(wrapper.find(".hud__keycap").text()).toBe("S");
+      expect(wrapper.find(".hud__label").text()).toBe("Settings");
     });
 
-    it("should hide after default timeout", async () => {
+    it("should hide after the default keypress timeout (1500ms)", async () => {
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.show("info", "ℹ️", "Test message");
+      wrapper.vm.show("keyboard", "S", "Settings");
       await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(true);
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-
-      // Fast-forward past default timeout (1500ms for info)
       vi.advanceTimersByTime(1500);
       await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").exists()).toBe(false);
+      expect(wrapper.find(".hud").exists()).toBe(false);
     });
 
-    it("should hide after custom timeout", async () => {
+    it("should hide after a custom timeout", async () => {
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.show("info", "ℹ️", "Test message", 2000);
+      wrapper.vm.show("keyboard", "S", "Settings", 2000);
       await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(true);
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-
-      // Fast-forward past custom timeout
       vi.advanceTimersByTime(2000);
       await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").exists()).toBe(false);
+      expect(wrapper.find(".hud").exists()).toBe(false);
     });
   });
 
   describe("Keyboard Feedback", () => {
     it("should show keyboard feedback when enabled", async () => {
-      configStore.keyboardFeedbackEnabled = true;
-
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.showKeyboardFeedback("KEY_1", "mode_calendar");
+      wrapper.vm.showKeyboardFeedback("KEY_1", "screen_jump_calendar");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-      expect(wrapper.find(".notification-icon").text()).toBe("1");
-      expect(wrapper.find(".notification-message").text()).toBe("Calendar Mode");
+      expect(wrapper.find(".hud").exists()).toBe(true);
+      expect(wrapper.find(".hud__keycap").text()).toBe("1");
+      expect(wrapper.find(".hud__label").text()).toBe("Calendar Screen");
     });
 
     it("should not show keyboard feedback when disabled", async () => {
       configStore.keyboardFeedbackEnabled = false;
-
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.showKeyboardFeedback("KEY_1", "mode_calendar");
+      wrapper.vm.showKeyboardFeedback("KEY_1", "screen_jump_calendar");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(false);
+      expect(wrapper.find(".hud").exists()).toBe(false);
     });
 
     it("should map key codes to labels correctly", async () => {
@@ -115,8 +113,8 @@ describe("NotificationSystem", () => {
       wrapper.vm.showKeyboardFeedback("KEY_SPACE", "generic_next");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification-icon").text()).toBe("Space");
-      expect(wrapper.find(".notification-message").text()).toBe("Next");
+      expect(wrapper.find(".hud__keycap").text()).toBe("Space");
+      expect(wrapper.find(".hud__label").text()).toBe("Next");
     });
 
     it("should map action names to labels correctly", async () => {
@@ -125,204 +123,179 @@ describe("NotificationSystem", () => {
       wrapper.vm.showKeyboardFeedback("KEY_2", "images_next");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification-message").text()).toBe("Next Image");
+      expect(wrapper.find(".hud__label").text()).toBe("Next Image");
+    });
+
+    it("should say Button pressed when the action has no label", async () => {
+      const wrapper = mount(NotificationSystem);
+
+      wrapper.vm.showKeyboardFeedback("KEY_9", "");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".hud__label").text()).toBe("Button pressed");
     });
   });
 
-  describe("Mode Change Notifications", () => {
-    it("should show mode change when UI is hidden", async () => {
+  describe("Mode Change Echo", () => {
+    it("should show mode change (as a glyph) when UI is hidden", async () => {
       configStore.showUI = false;
-      modeStore.currentMode = modeStore.MODES.CALENDAR;
-
       const wrapper = mount(NotificationSystem);
       await wrapper.vm.$nextTick();
 
-      // Trigger mode change via exposed method
       modeStore.currentMode = modeStore.MODES.WEB_SERVICES;
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-      expect(wrapper.find(".notification-icon").text()).toBe("🌐");
-      expect(wrapper.find(".notification-message").text()).toBe("Web Services Mode");
+      expect(wrapper.find(".hud").exists()).toBe(true);
+      expect(wrapper.find(".hud__glyph").exists()).toBe(true);
+      expect(wrapper.find(".hud__label").text()).toBe("Web Services Mode");
     });
 
     it("should not show mode change when UI is visible", async () => {
       configStore.showUI = true;
-      modeStore.currentMode = modeStore.MODES.CALENDAR;
-
       const wrapper = mount(NotificationSystem);
       await wrapper.vm.$nextTick();
 
-      // Trigger mode change
       modeStore.currentMode = modeStore.MODES.PHOTOS;
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(false);
+      expect(wrapper.find(".hud").exists()).toBe(false);
     });
 
     it("should show fullscreen mode correctly", async () => {
       configStore.showUI = false;
-
       const wrapper = mount(NotificationSystem);
       await wrapper.vm.$nextTick();
 
-      // Set fullscreen mode
       modeStore.isFullscreen = true;
       modeStore.fullscreenMode = modeStore.MODES.PHOTOS;
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-      expect(wrapper.find(".notification-icon").text()).toBe("📷");
-      expect(wrapper.find(".notification-message").text()).toBe("Fullscreen Photos");
+      expect(wrapper.find(".hud").exists()).toBe(true);
+      expect(wrapper.find(".hud__glyph").exists()).toBe(true);
+      expect(wrapper.find(".hud__label").text()).toBe("Fullscreen Photos");
     });
   });
 
-  describe("Notification Types and Styling", () => {
-    it("should apply correct type class for mode notification", async () => {
-      configStore.showUI = false;
-      modeStore.currentMode = modeStore.MODES.CALENDAR;
-
-      const wrapper = mount(NotificationSystem);
-      await wrapper.vm.$nextTick();
-
-      // Trigger mode change to show notification
-      modeStore.currentMode = modeStore.MODES.PHOTOS;
-      await wrapper.vm.$nextTick();
-      vi.advanceTimersByTime(100);
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").classes()).toContain("notification-photos");
-    });
-
-    it("should apply correct size class based on feedback mode", async () => {
+  describe("Size and Position", () => {
+    it("should use the compact bottom variant in small mode", async () => {
       configStore.keyboardFeedbackMode = "small";
-
-      const wrapper = mount(NotificationSystem);
-
-      wrapper.vm.show("info", "ℹ️", "Test");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").classes()).toContain("notification-small");
-    });
-
-    it("should apply correct position class for small mode", async () => {
-      configStore.keyboardFeedbackMode = "small";
-
-      const wrapper = mount(NotificationSystem);
-
-      wrapper.vm.show("info", "ℹ️", "Test");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").classes()).toContain(
-        "notification-position-bottom-right"
-      );
-    });
-
-    it("should apply center position for normal mode", async () => {
-      configStore.keyboardFeedbackMode = "normal";
-
-      const wrapper = mount(NotificationSystem);
-
-      wrapper.vm.show("info", "ℹ️", "Test");
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").classes()).toContain("notification-position-center");
-    });
-  });
-
-  describe("Config Changes", () => {
-    it("should hide notification when keyboard feedback is disabled", async () => {
       const wrapper = mount(NotificationSystem);
 
       wrapper.vm.show("keyboard", "1", "Test");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-
-      // Disable keyboard feedback
-      configStore.keyboardFeedbackEnabled = false;
-      await wrapper.vm.$nextTick();
-
-      expect(wrapper.find(".notification").exists()).toBe(false);
+      expect(wrapper.find(".hud").classes()).toContain("hud--small");
+      expect(wrapper.find(".hud").classes()).toContain("hud--bottom");
     });
 
-    it("should not hide success notifications when keyboard feedback is disabled", async () => {
-      configStore.keyboardFeedbackEnabled = false;
-
+    it("should centre in normal mode", async () => {
+      configStore.keyboardFeedbackMode = "normal";
       const wrapper = mount(NotificationSystem);
 
-      wrapper.vm.show("success", "✓", "System rebooting…", 5000);
+      wrapper.vm.show("keyboard", "1", "Test");
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
-      expect(wrapper.find(".notification-message").text()).toContain("rebooting");
+      expect(wrapper.find(".hud").classes()).toContain("hud--center");
+    });
+  });
+
+  describe("Config Changes", () => {
+    it("should hide when keyboard feedback is disabled", async () => {
+      const wrapper = mount(NotificationSystem);
+
+      wrapper.vm.show("keyboard", "1", "Test");
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(true);
+
+      configStore.keyboardFeedbackEnabled = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(false);
     });
 
     it("should show mode indicator when UI becomes hidden", async () => {
       configStore.showUI = true;
-
       const wrapper = mount(NotificationSystem);
       await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(false);
 
-      expect(wrapper.find(".notification").exists()).toBe(false);
-
-      // Hide UI
       configStore.showUI = false;
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".notification").exists()).toBe(true);
+      expect(wrapper.find(".hud").exists()).toBe(true);
     });
 
     it("should hide mode indicator when UI becomes visible", async () => {
       configStore.showUI = false;
-      modeStore.currentMode = modeStore.MODES.CALENDAR;
-
       const wrapper = mount(NotificationSystem);
       await wrapper.vm.$nextTick();
 
-      // Trigger mode change to show notification
       modeStore.currentMode = modeStore.MODES.PHOTOS;
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(true);
 
-      // Should show mode indicator
-      expect(wrapper.find(".notification").exists()).toBe(true);
-
-      // Show UI
       configStore.showUI = true;
       await wrapper.vm.$nextTick();
       vi.advanceTimersByTime(100);
       await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(false);
+    });
+  });
 
-      expect(wrapper.find(".notification").exists()).toBe(false);
+  describe("Boot-time hydration (calvin-2ck)", () => {
+    it("does not flash the mode HUD when the initial config load hides the UI", async () => {
+      // Boot state: showUI sits at its default (true) and the app has not yet
+      // hydrated its persisted config. The mode HUD component is already mounted.
+      configStore.showUI = true;
+      configStore.hydrated = false;
+      modeStore.currentMode = modeStore.MODES.CALENDAR;
+
+      const wrapper = mount(NotificationSystem);
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".hud").exists()).toBe(false);
+
+      // The initial config load resolves with a kiosk config (showUI:false).
+      // That true->false settle must NOT be echoed as a user mode change —
+      // otherwise a stale "Calendar Mode" HUD flashes on every reload.
+      api.get.mockResolvedValue({ data: { showUI: false } });
+      await configStore.fetchConfig();
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".hud").exists()).toBe(false);
+    });
+
+    it("still echoes a genuine UI-hide toggle once hydrated", async () => {
+      configStore.hydrated = true;
+      configStore.showUI = true;
+      const wrapper = mount(NotificationSystem);
+      await wrapper.vm.$nextTick();
+
+      // User hides the chrome after boot — this SHOULD flash the mode HUD.
+      configStore.showUI = false;
+      await wrapper.vm.$nextTick();
+      vi.advanceTimersByTime(100);
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.find(".hud").exists()).toBe(true);
     });
   });
 
   describe("Exposed Methods", () => {
-    it("should expose show method", () => {
+    it("should expose show / showKeyboardFeedback / showModeChange", () => {
       const wrapper = mount(NotificationSystem);
-
       expect(typeof wrapper.vm.show).toBe("function");
-    });
-
-    it("should expose showKeyboardFeedback method", () => {
-      const wrapper = mount(NotificationSystem);
-
       expect(typeof wrapper.vm.showKeyboardFeedback).toBe("function");
-    });
-
-    it("should expose showModeChange method", () => {
-      const wrapper = mount(NotificationSystem);
-
       expect(typeof wrapper.vm.showModeChange).toBe("function");
     });
   });

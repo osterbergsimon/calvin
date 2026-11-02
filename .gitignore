@@ -56,6 +56,9 @@ dist-ssr/
 .env.test
 .env.production
 
+# Dev-compose data dir (docker/docker-compose.dev.yml)
+.calvin-dev-data/
+
 # IDE
 .vscode/*
 !.vscode/launch.json
@@ -97,8 +100,14 @@ backend/data/images/
 data/db/
 backend/data/db/
 backend/data/cache/
+backend/data/image_cache/
 backend/data/plugins/
-backend/data/themes/
+backend/data/themes/*
+!backend/data/themes/
+!backend/data/themes/builtin.json
+# Auto-generated kiosk manifest signing secret — never commit
+backend/data/kiosk-signing.key
+backend/data/setup-code.txt
 
 # Documentation
 docs/archive/
@@ -123,3 +132,26 @@ coverage/
 .coverage.*
 bandit-report.json
 
+
+# Claude Code local (per-user) settings
+.claude/settings.local.json
+
+# OpenCode local tooling (per-machine)
+.opencode/
+
+# superpowers brainstorming visual companion (local only)
+.superpowers/
+
+# Playwright MCP session snapshots (scratch)
+.playwright-mcp/
+
+# Git worktrees (project-local)
+.worktrees/
+
+# Beads / Dolt files (added by bd init)
+# The whole .beads/ dir stays local by policy: it holds the live Dolt DB and a
+# passive issues.jsonl export. A tracked export gets re-imported on pull and
+# reverts closed issues, so never track it.
+.beads/
+.dolt/
+.beads-credential-key

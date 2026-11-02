@@ -3,10 +3,12 @@
 import json
 import zipfile
 from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from app.plugins.base import PluginType
+from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION, PluginMetadata
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import BackendPlugin, ServicePlugin
 from app.services.plugin_installer import plugin_installer
@@ -88,17 +90,20 @@ class TestPluginInstallationAPI:
             "name": "Test API Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text(
             '''"""Test plugin."""
-from typing import Any
-from app.plugins.base import PluginType
-from app.plugins.hooks import hookimpl
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
 
-@hookimpl
-def register_plugin_types() -> list[dict[str, Any]]:
-    return [{"type_id": "test_api_plugin", "plugin_type": PluginType.SERVICE}]
+
+class TestApiPlugin(ServicePlugin):
+    metadata = PluginMetadata(type_id="test_api_plugin", name="Test API Plugin")
+
+    async def fetch(self, start_date=None, end_date=None):
+        return {"ok": True}
 '''
         )
 
@@ -145,6 +150,67 @@ def register_plugin_types() -> list[dict[str, Any]]:
             error_msg = f"Unexpected status code: {response.status_code}, response: {response.text}"
             assert False, error_msg
 
+    def test_install_plugin_rejects_invalid_display_schema(self, test_client, tmp_path):
+        """A plugin with display_schema.kind not in SUPPORTED_DISPLAY_KINDS must
+        be rejected at install time with a 400, AND the plugin files must be
+        rolled back so the user can fix and retry."""
+        try:
+            plugin_installer.uninstall_plugin("bad_kind_plugin")
+        except Exception:
+            pass
+
+        plugin_dir = tmp_path / "bad_kind_plugin"
+        plugin_dir.mkdir()
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps(
+                {
+                    "id": "bad_kind_plugin",
+                    "name": "Bad Kind Plugin",
+                    "version": "1.0.0",
+                    "type": "service",
+                    "api_version": CURRENT_PLUGIN_API_VERSION,
+                }
+            )
+        )
+        (plugin_dir / "plugin.py").write_text(
+            '''"""Plugin with an invalid display_schema kind."""
+from app.plugins.definitions import PluginMetadata
+from app.plugins.protocols import ServicePlugin
+
+
+class BadKindPlugin(ServicePlugin):
+    metadata = PluginMetadata(
+        type_id="bad_kind_plugin",
+        name="Bad Kind Plugin",
+        display_schema={"kind": "no-such-renderer"},
+    )
+'''
+        )
+
+        zip_path = tmp_path / "bad_kind_plugin.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            for file_path in plugin_dir.rglob("*"):
+                if file_path.is_file():
+                    zipf.write(file_path, file_path.relative_to(plugin_dir))
+
+        with open(zip_path, "rb") as zip_file:
+            response = test_client.post(
+                "/api/plugins/install",
+                files={"file": ("bad_kind_plugin.zip", zip_file, "application/zip")},
+            )
+
+        if response.status_code == 404:
+            pytest.skip("Plugin installation route not available in test client")
+
+        assert response.status_code == 400, response.text
+        detail = response.json()["detail"]
+        assert "bad_kind_plugin" in detail
+        assert "display_schema.kind" in detail
+        assert "no-such-renderer" in detail
+
+        # Roll-back: the plugin must NOT be installed.
+        assert not plugin_installer.get_plugin_path("bad_kind_plugin").exists()
+
     def test_install_plugin_invalid_zip(self, test_client, tmp_path):
         """Test installing an invalid plugin zip file."""
         # Create invalid zip (no plugin.json)
@@ -178,6 +244,7 @@ def register_plugin_types() -> list[dict[str, Any]]:
             "name": "Test Manifest Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -213,6 +280,7 @@ def register_plugin_types() -> list[dict[str, Any]]:
             "name": "Test Uninstall Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
@@ -262,8 +330,8 @@ def register_plugin_types() -> list[dict[str, Any]]:
         response = test_client.delete("/api/plugins/installed/nonexistent")
         assert response.status_code == 404
 
-    def test_install_plugin_with_frontend_components(self, test_client, tmp_path):
-        """Test installing a plugin with frontend components."""
+    def test_install_plugin_with_frontend_static_assets(self, test_client, tmp_path):
+        """Test installing a plugin with frontend static assets."""
         # Clean up first in case it exists
         try:
             plugin_installer.uninstall_plugin("test_frontend_plugin")
@@ -279,21 +347,65 @@ def register_plugin_types() -> list[dict[str, Any]]:
             "name": "Test Frontend Plugin",
             "version": "1.0.0",
             "type": "service",
+            "api_version": CURRENT_PLUGIN_API_VERSION,
         }
         (plugin_dir / "plugin.json").write_text(json.dumps(manifest))
         (plugin_dir / "plugin.py").write_text("# Plugin code")
 
         frontend_dir = plugin_dir / "frontend"
         frontend_dir.mkdir()
-        (frontend_dir / "TestComponent.vue").write_text("<template><div>Test</div></template>")
+        (frontend_dir / "dist.js").write_text(
+            "customElements.define('calvin-test-frontend-plugin', class extends HTMLElement {})"
+        )
+        (frontend_dir / "dist.css").write_text(":host { display: block; }")
 
         # Install plugin
         plugin_installer.install_plugin(plugin_dir)
 
-        # Verify frontend component was installed
-        frontend_path = plugin_installer.get_frontend_plugin_path("test_frontend_plugin")
-        assert frontend_path.exists()
-        assert (frontend_path / "TestComponent.vue").exists()
+        # Verify frontend assets are stored inside the plugin's data dir.
+        plugin_path = plugin_installer.get_plugin_path("test_frontend_plugin")
+        assert (plugin_path / "frontend" / "dist.js").exists()
+        assert (plugin_path / "frontend" / "dist.css").exists()
+
+    def test_plugin_static_asset_endpoint_serves_installed_frontend_asset(
+        self, test_client, temp_plugins_dir, monkeypatch
+    ):
+        """Test serving installed plugin frontend assets without a frontend rebuild."""
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "plugins_dir", temp_plugins_dir)
+
+        frontend_dir = temp_plugins_dir / "test_static_plugin" / "frontend"
+        frontend_dir.mkdir(parents=True)
+        (frontend_dir / "dist.js").write_text(
+            "customElements.define('calvin-static-test', class extends HTMLElement {})"
+        )
+
+        response = test_client.get("/api/plugins/test_static_plugin/static/dist.js")
+
+        assert response.status_code == 200
+        assert "calvin-static-test" in response.text
+
+    @pytest.mark.asyncio
+    async def test_plugin_static_asset_endpoint_rejects_path_traversal(
+        self, temp_plugins_dir, monkeypatch
+    ):
+        """Test plugin static asset paths cannot escape the plugin frontend directory."""
+        from fastapi import HTTPException
+
+        from app.api.routes.plugins.static_assets import get_plugin_static_asset
+        from app.config import settings
+
+        monkeypatch.setattr(settings, "plugins_dir", temp_plugins_dir)
+
+        frontend_dir = temp_plugins_dir / "test_static_plugin" / "frontend"
+        frontend_dir.mkdir(parents=True)
+        (temp_plugins_dir / "test_static_plugin" / "secret.txt").write_text("secret")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_plugin_static_asset("test_static_plugin", "../secret.txt")
+
+        assert exc_info.value.status_code == 400
 
 
 @pytest.mark.integration
@@ -470,11 +582,8 @@ class TestBackendPluginAPI:
     @pytest.mark.asyncio
     async def test_run_backend_plugin_task_not_backend_plugin(self, test_client):
         """Test running task for non-backend plugin (should return 400)."""
-        # Try with a non-backend plugin (local is an image plugin)
-        response = test_client.post("/api/plugins/local/backend/run-task")
-
-        if response.status_code == 404:
-            pytest.skip("Backend plugin endpoint not available in test client")
+        # The seeded local-images instance is an image plugin, not a backend one.
+        response = test_client.post("/api/plugins/local-images/backend/run-task")
 
         assert response.status_code == 400
         assert "not a backend plugin" in response.json()["detail"].lower()
@@ -582,10 +691,8 @@ class TestBackendPluginAPI:
     @pytest.mark.asyncio
     async def test_get_backend_plugin_status_not_backend(self, test_client):
         """Test getting status for non-backend plugin (should return 400)."""
-        response = test_client.get("/api/plugins/local/backend/status")
-
-        if response.status_code == 404:
-            pytest.skip("Backend plugin endpoint not available in test client")
+        # The seeded local-images instance is an image plugin, not a backend one.
+        response = test_client.get("/api/plugins/local-images/backend/status")
 
         assert response.status_code == 400
         assert "not a backend plugin" in response.json()["detail"].lower()
@@ -624,31 +731,22 @@ class TestServicePluginDataAPI:
     """Test service plugin data endpoint."""
 
     class MockServicePluginForAPI(ServicePlugin):
+        metadata = PluginMetadata(type_id="test-service", name="Test Service")
+
         def __init__(self, plugin_id: str, name: str, enabled: bool = True):
             super().__init__(plugin_id, name, enabled)
             self.initialize_calls = 0
-
-        @classmethod
-        def get_plugin_metadata(cls):
-            return {"type_id": "test-service", "plugin_type": PluginType.SERVICE}
-
-        @property
-        def plugin_type(self) -> PluginType:
-            return PluginType.SERVICE
+            # Number of upcoming initialize() calls that should fail, to model
+            # a boot where the network (or another dependency) isn't up yet.
+            self.fail_initialize_times = 0
 
         async def initialize(self) -> None:
             self.initialize_calls += 1
+            if self.fail_initialize_times:
+                self.fail_initialize_times -= 1
+                raise RuntimeError("dependency not available yet")
 
-        async def cleanup(self) -> None:
-            pass
-
-        async def get_content(self) -> dict[str, Any]:
-            return {"type": "api", "url": "/api/plugins/test-service-instance/data"}
-
-        async def validate_config(self, config: dict[str, Any]) -> bool:
-            return True
-
-        async def fetch_service_data(
+        async def fetch(
             self,
             start_date: str | None = None,
             end_date: str | None = None,
@@ -660,19 +758,187 @@ class TestServicePluginDataAPI:
                 "items": [{"label": "ok"}],
             }
 
-    @pytest.mark.asyncio
-    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+    async def _register(self, plugin_id: str, *, enabled: bool = True, running: bool = True):
         from app.models.db_models import PluginDB
 
         plugin = self.MockServicePluginForAPI(
-            plugin_id="test-service-instance",
-            name="Test Service Instance",
-            enabled=True,
+            plugin_id=plugin_id, name="Test Service Instance", enabled=enabled
         )
         await plugin_manager.register(plugin)
-
+        if running:
+            plugin.start()
         db_plugin = await PluginDB.objects.create(
-            id="test-service-instance",
+            id=plugin_id,
+            type_id="test-service",
+            plugin_type="service",
+            name="Test Service Instance",
+            enabled=enabled,
+            config={},
+        )
+        return plugin, db_plugin
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_uses_service_instance_method(self, test_client):
+        plugin, db_plugin = await self._register("test-service-instance")
+
+        try:
+            response = test_client.get(
+                "/api/plugins/test-service-instance/data",
+                params={"start_date": "2026-01-01", "end_date": "2026-01-07"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["start_date"] == "2026-01-01"
+            assert data["end_date"] == "2026-01-07"
+            assert data["items"] == [{"label": "ok"}]
+            # Serving data never (re)initializes the instance.
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-instance")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_stopped_instance_is_409_and_stays_stopped(self, test_client):
+        """A dashboard poll must not undo a manual stop (audit R5)."""
+        plugin, db_plugin = await self._register("test-service-stopped")
+        assert await plugin_manager.stop_plugin("test-service-stopped") is True
+
+        try:
+            response = test_client.get("/api/plugins/test-service-stopped/data")
+
+            assert response.status_code == 409
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-stopped")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_retries_instance_that_never_started(self, test_client):
+        """An enabled instance whose boot initialize() failed recovers on the next poll."""
+        plugin, db_plugin = await self._register("test-service-boot-failed", running=False)
+
+        try:
+            response = test_client.get("/api/plugins/test-service-boot-failed/data")
+
+            assert response.status_code == 200
+            assert plugin.is_running() is True
+            assert plugin.stopped_by_request is False
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-boot-failed")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_recovers_after_boot_initialize_raised(self, test_client):
+        """A Pi that boots without a network recovers without a manual restart."""
+        plugin, db_plugin = await self._register("test-service-boot-raised", running=False)
+        plugin.fail_initialize_times = 1
+
+        try:
+            # The boot loader's attempt fails, leaving the instance enabled but
+            # not running (the failure this finding is about).
+            with pytest.raises(RuntimeError):
+                await plugin.initialize()
+            assert plugin.is_running() is False
+
+            response = test_client.get("/api/plugins/test-service-boot-raised/data")
+
+            assert response.status_code == 200
+            assert plugin.is_running() is True
+            assert plugin.stopped_by_request is False
+            assert plugin.initialize_calls == 2
+        finally:
+            await plugin_manager.unregister("test-service-boot-raised")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_returns_503_when_retry_still_fails(self, test_client):
+        """A retry that fails again reports unreachable, not a false success."""
+        plugin, db_plugin = await self._register("test-service-never-starts", running=False)
+        plugin.fail_initialize_times = 99
+
+        try:
+            response = test_client.get("/api/plugins/test-service-never-starts/data")
+
+            assert response.status_code == 503
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 1
+        finally:
+            await plugin_manager.unregister("test-service-never-starts")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_stopping_instance_that_never_started_keeps_it_stopped(self, test_client):
+        """Stopping a boot-failed instance is deliberate: the next poll must not revive it."""
+        plugin, db_plugin = await self._register("test-service-stop-unstarted", running=False)
+
+        try:
+            response = test_client.post("/api/plugins/instances/test-service-stop-unstarted/stop")
+            assert response.status_code == 200
+            assert plugin.stopped_by_request is True
+
+            response = test_client.get("/api/plugins/test-service-stop-unstarted/data")
+
+            assert response.status_code == 409
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-stop-unstarted")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_restarted_after_stop_serves_again(self, test_client):
+        plugin, db_plugin = await self._register("test-service-restarted")
+        assert await plugin_manager.stop_plugin("test-service-restarted") is True
+        assert plugin.stopped_by_request is True
+        assert await plugin_manager.start_plugin("test-service-restarted") is True
+        # Starting clears the deliberate-stop marker, or the instance would stay
+        # stuck returning 409 after a stop/start cycle.
+        assert plugin.stopped_by_request is False
+
+        try:
+            response = test_client.get("/api/plugins/test-service-restarted/data")
+
+            assert response.status_code == 200
+        finally:
+            await plugin_manager.unregister("test-service-restarted")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_polls_retry_initialize_only_once(self, test_db):
+        """Two dashboard polls must not run initialize() in parallel (calvin-olsx)."""
+        import asyncio
+
+        from app.api.routes.plugins.management import get_plugin_data
+        from app.models.db_models import PluginDB
+
+        class SlowInitializePlugin(self.MockServicePluginForAPI):
+            def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+                super().__init__(plugin_id, name, enabled)
+                self.concurrent_initializes = 0
+                self.max_concurrent_initializes = 0
+
+            async def initialize(self) -> None:
+                self.initialize_calls += 1
+                self.concurrent_initializes += 1
+                self.max_concurrent_initializes = max(
+                    self.max_concurrent_initializes, self.concurrent_initializes
+                )
+                try:
+                    await asyncio.sleep(0.05)
+                finally:
+                    self.concurrent_initializes -= 1
+
+        plugin_id = "test-service-concurrent-boot"
+        plugin = SlowInitializePlugin(
+            plugin_id=plugin_id, name="Test Service Instance", enabled=True
+        )
+        await plugin_manager.register(plugin)
+        db_plugin = await PluginDB.objects.create(
+            id=plugin_id,
             type_id="test-service",
             plugin_type="service",
             name="Test Service Instance",
@@ -681,143 +947,63 @@ class TestServicePluginDataAPI:
         )
 
         try:
-            response = test_client.get(
-                "/api/plugins/test-service-instance/data",
-                params={"start_date": "2026-01-01", "end_date": "2026-01-07"},
+            results = await asyncio.gather(
+                get_plugin_data(plugin_id, start_date=None, end_date=None),
+                get_plugin_data(plugin_id, start_date=None, end_date=None),
             )
 
-            if response.status_code == 404:
-                pytest.skip("Service data endpoint not available in test client")
-
-            assert response.status_code == 200
-            data = response.json()
-            assert data["success"] is True
-            assert data["start_date"] == "2026-01-01"
-            assert data["end_date"] == "2026-01-07"
-            assert data["items"] == [{"label": "ok"}]
+            assert all(result["success"] is True for result in results)
+            assert plugin.max_concurrent_initializes == 1
             assert plugin.initialize_calls == 1
+            assert plugin.is_running() is True
         finally:
-            await plugin_manager.unregister("test-service-instance")
+            await plugin_manager.unregister(plugin_id)
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_get_plugin_data_disabled_instance_is_409(self, test_client):
+        plugin, db_plugin = await self._register(
+            "test-service-disabled", enabled=False, running=False
+        )
+
+        try:
+            response = test_client.get("/api/plugins/test-service-disabled/data")
+
+            assert response.status_code == 409
+            assert plugin.is_running() is False
+            assert plugin.initialize_calls == 0
+        finally:
+            await plugin_manager.unregister("test-service-disabled")
             await db_plugin.delete()
 
 
 @pytest.mark.integration
 class TestPluginTypeClassBasedActions:
-    """Test class-based type-level plugin actions."""
+    """Test class-based type-level plugin actions (test/scan/fetch verbs)."""
 
-    def test_get_plugins_strips_reserved_schema_fields(self, test_client, monkeypatch):
-        monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [
-                {
-                    "type_id": "reserved-schema-test",
-                    "plugin_type": PluginType.SERVICE,
-                    "name": "Reserved Schema Test",
-                    "description": "Test plugin",
-                    "common_config_schema": {
-                        "display_order": {"type": "integer"},
-                        "api_key": {"type": "password"},
-                    },
-                    "instance_config_schema": {
-                        "enabled": {"type": "boolean"},
-                        "location": {"type": "string"},
-                    },
-                    "supports_multiple_instances": True,
-                    "instance_label": "Location",
-                }
-            ],
+    @staticmethod
+    def _loader_for(plugin_class, type_id):
+        """Minimal plugin_loader stand-in exposing get_plugin_class."""
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            get_plugin_class=lambda pid: plugin_class if pid == type_id else None
         )
 
-        response = test_client.get("/api/plugins")
-
-        if response.status_code == 404:
-            pytest.skip("Plugin list endpoint not available in test client")
-
-        assert response.status_code == 200
-        plugin = next(p for p in response.json()["plugins"] if p["id"] == "reserved-schema-test")
-        assert plugin["common_config_schema"] == {"api_key": {"type": "password"}}
-        assert plugin["instance_config_schema"] == {"location": {"type": "string"}}
-        assert plugin["display_order"] == 0
-
-    @pytest.mark.asyncio
-    async def test_update_plugin_keeps_reserved_values_out_of_schema(
-        self, test_client, monkeypatch
-    ):
-        from app.models.db_models import PluginTypeDB
-
-        monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [
-                {
-                    "type_id": "reserved-update-test",
-                    "plugin_type": PluginType.SERVICE,
-                    "name": "Reserved Update Test",
-                    "description": "Test plugin",
-                    "common_config_schema": {
-                        "api_key": {"type": "password"},
-                    },
-                    "supports_multiple_instances": False,
-                }
-            ],
-        )
-
-        existing = await PluginTypeDB.objects.get_or_none(type_id="reserved-update-test")
-        if existing:
-            await existing.delete()
-
-        response = test_client.put(
-            "/api/plugins/reserved-update-test",
-            json={
-                "api_key": "secret",
-                "display_order": "4",
-                "instance_label": "Bad",
-                "supports_multiple_instances": False,
-            },
-        )
-
-        assert response.status_code == 200
-        db_type = await PluginTypeDB.objects.get(type_id="reserved-update-test")
-        assert db_type.display_order == 4
-        assert db_type.common_config_schema == {
-            "api_key": "secret",
-        }
-        assert "display_order" not in db_type.common_config_schema
-        assert "instance_label" not in db_type.common_config_schema
-        assert "supports_multiple_instances" not in db_type.common_config_schema
-
-    def test_test_plugin_connection_prefers_plugin_class(self, test_client, monkeypatch):
-        from app.plugins.base import BasePlugin
-
-        class ClassBasedTestPlugin(BasePlugin):
-            @property
-            def plugin_type(self) -> PluginType:
-                return PluginType.SERVICE
+    def test_test_plugin_connection_uses_class_test_connection(self, test_client, monkeypatch):
+        class ClassBasedTestPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="class-based-test", name="Class Based Test")
 
             @classmethod
-            def get_plugin_metadata(cls):
-                return {
-                    "type_id": "class-based-test",
-                    "plugin_type": PluginType.SERVICE,
-                    "name": "Class Based Test",
-                    "plugin_class": cls,
-                }
-
-            async def initialize(self) -> None:
-                pass
-
-            async def cleanup(self) -> None:
-                pass
-
-            @classmethod
-            async def test_type_config(cls, config: dict[str, Any]) -> dict[str, Any] | None:
+            async def test_connection(cls, config: dict[str, Any]) -> dict[str, Any] | None:
                 return {
                     "success": True,
                     "message": f"tested:{config.get('value', '')}",
                 }
 
         monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [ClassBasedTestPlugin.get_plugin_metadata()],
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(ClassBasedTestPlugin, "class-based-test"),
         )
 
         response = test_client.post(
@@ -833,38 +1019,38 @@ class TestPluginTypeClassBasedActions:
         assert data["success"] is True
         assert data["message"] == "tested:ok"
 
-    def test_scan_plugin_options_prefers_plugin_class(self, test_client, monkeypatch):
-        from app.plugins.base import BasePlugin
+    def test_test_plugin_connection_default_signals_unsupported(self, test_client, monkeypatch):
+        class NoTestPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="no-test-plugin", name="No Test Plugin")
 
-        class ClassBasedScanPlugin(BasePlugin):
-            @property
-            def plugin_type(self) -> PluginType:
-                return PluginType.SERVICE
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(NoTestPlugin, "no-test-plugin"),
+        )
+
+        response = test_client.post("/api/plugins/no-test-plugin/test", json={})
+
+        if response.status_code == 404:
+            pytest.skip("Plugin test endpoint not available in test client")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert "does not support connection testing" in data["message"]
+
+    def test_scan_plugin_options_uses_class_scan_options(self, test_client, monkeypatch):
+        class ClassBasedScanPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="class-based-scan", name="Class Based Scan")
 
             @classmethod
-            def get_plugin_metadata(cls):
-                return {
-                    "type_id": "class-based-scan",
-                    "plugin_type": PluginType.SERVICE,
-                    "name": "Class Based Scan",
-                    "plugin_class": cls,
-                }
-
-            async def initialize(self) -> None:
-                pass
-
-            async def cleanup(self) -> None:
-                pass
-
-            @classmethod
-            async def scan_type_options(cls, field_key: str) -> dict[str, Any] | None:
+            async def scan_options(cls, field_key: str) -> dict[str, Any] | None:
                 return {
                     "options": [{"value": field_key, "label": field_key.upper()}],
                 }
 
         monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [ClassBasedScanPlugin.get_plugin_metadata()],
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(ClassBasedScanPlugin, "class-based-scan"),
         )
 
         response = test_client.get("/api/plugins/class-based-scan/scan", params={"field": "device"})
@@ -876,49 +1062,189 @@ class TestPluginTypeClassBasedActions:
         data = response.json()
         assert data["options"] == [{"value": "device", "label": "DEVICE"}]
 
-    def test_fetch_plugin_prefers_plugin_class(self, test_client, monkeypatch):
-        from app.plugins.base import BasePlugin
+    @pytest.mark.asyncio
+    async def test_fetch_plugin_calls_enabled_instances(self, test_client, monkeypatch):
+        """POST /plugins/{type_id}/fetch calls fetch() on enabled instances."""
+        from app.models.db_models import PluginDB
 
-        class ClassBasedFetchPlugin(BasePlugin):
-            @property
-            def plugin_type(self) -> PluginType:
-                return PluginType.BACKEND
+        class ClassBasedFetchPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="class-based-fetch", name="Class Based Fetch")
 
-            @classmethod
-            def get_plugin_metadata(cls):
-                return {
-                    "type_id": "class-based-fetch",
-                    "plugin_type": PluginType.BACKEND,
-                    "name": "Class Based Fetch",
-                    "plugin_class": cls,
-                }
-
-            async def initialize(self) -> None:
-                pass
-
-            async def cleanup(self) -> None:
-                pass
-
-            @classmethod
-            async def fetch_type_data(cls, instance_id: str | None = None) -> dict[str, Any] | None:
-                return {
-                    "success": True,
-                    "message": "manual fetch completed",
-                    "instance_id": instance_id,
-                }
+            async def fetch(
+                self,
+                start_date: str | None = None,
+                end_date: str | None = None,
+            ) -> dict[str, Any] | None:
+                return {"success": True, "message": "manual fetch completed"}
 
         monkeypatch.setattr(
-            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
-            lambda: [ClassBasedFetchPlugin.get_plugin_metadata()],
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(ClassBasedFetchPlugin, "class-based-fetch"),
         )
 
-        response = test_client.post("/api/plugins/class-based-fetch/fetch")
+        instance = ClassBasedFetchPlugin(
+            plugin_id="class-based-fetch-1", name="Fetch Instance", enabled=True
+        )
+        await plugin_manager.register(instance)
+        db_plugin = await PluginDB.objects.create(
+            id="class-based-fetch-1",
+            type_id="class-based-fetch",
+            plugin_type="service",
+            name="Fetch Instance",
+            enabled=True,
+            config={},
+        )
+
+        try:
+            response = test_client.post("/api/plugins/class-based-fetch/fetch")
+
+            if response.status_code == 404:
+                pytest.skip("Plugin fetch endpoint not available in test client")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert data["message"] == "manual fetch completed"
+        finally:
+            await plugin_manager.unregister("class-based-fetch-1")
+            await db_plugin.delete()
+
+    @pytest.mark.asyncio
+    async def test_fetch_plugin_without_instances_reports_unsupported(
+        self, test_client, monkeypatch
+    ):
+        class NoInstancesPlugin(ServicePlugin):
+            metadata = PluginMetadata(type_id="no-instances-fetch", name="No Instances")
+
+        monkeypatch.setattr(
+            "app.api.routes.plugins.management.plugin_loader",
+            self._loader_for(NoInstancesPlugin, "no-instances-fetch"),
+        )
+
+        response = test_client.post("/api/plugins/no-instances-fetch/fetch")
 
         if response.status_code == 404:
             pytest.skip("Plugin fetch endpoint not available in test client")
 
         assert response.status_code == 200
         data = response.json()
+        assert data["success"] is False
+        assert "does not support manual fetch" in data["message"]
+
+
+@pytest.mark.integration
+class TestZipInstallRestartRequired:
+    """Verify requires_restart in ZIP upload install response mirrors the manifest."""
+
+    @pytest.fixture
+    def minimal_zip_path(self, tmp_path):
+        """Minimal zip containing a plugin.json so the package validation passes."""
+        zip_path = tmp_path / "minimal.zip"
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            zipf.writestr(
+                "plugin.json",
+                json.dumps(
+                    {
+                        "id": "myplugin",
+                        "name": "My Plugin",
+                        "version": "1.0.0",
+                        "type": "service",
+                    }
+                ),
+            )
+        return zip_path
+
+    @pytest.mark.parametrize(
+        "requirements,expected_restart",
+        [
+            ({"restart_required": True}, True),
+            ({"restart_required": False}, False),
+            ({}, False),  # no restart_required key — defaults to False
+        ],
+    )
+    @patch(
+        "app.api.routes.plugins.management.load_plugin_types_for_single",
+        new_callable=AsyncMock,
+    )
+    @patch("app.api.routes.plugins.management.event_system")
+    @patch(
+        "app.api.routes.plugins.management._check_plugin_in_child",
+        new_callable=AsyncMock,
+    )
+    @patch("app.api.routes.plugins.management._validate_just_installed_plugin")
+    @patch("app.api.routes.plugins.management.plugin_loader")
+    @patch("app.api.routes.plugins.management.plugin_installer")
+    def test_zip_install_restart_required(
+        self,
+        mock_plugin_installer,
+        mock_plugin_loader,
+        mock_validate,
+        mock_check_in_child,
+        mock_event_system,
+        mock_load_single,
+        requirements,
+        expected_restart,
+        test_client,
+        minimal_zip_path,
+    ):
+        """requires_restart in the ZIP upload response must reflect manifest.requirements.restart_required."""
+        manifest = {
+            "id": "myplugin",
+            "name": "My Plugin",
+            "version": "1.0.0",
+            "type": "service",
+        }
+        if requirements:
+            manifest["requirements"] = requirements
+        mock_plugin_installer.install_plugin.return_value = manifest
+        mock_validate.return_value = []
+        mock_event_system.emit_event = AsyncMock()
+
+        with open(minimal_zip_path, "rb") as zip_file:
+            response = test_client.post(
+                "/api/plugins/install",
+                files={"file": ("minimal.zip", zip_file, "application/zip")},
+            )
+
+        if response.status_code == 404:
+            pytest.skip("ZIP install route not available in test client")
+
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}: {response.json()}"
+        )
+        data = response.json()
         assert data["success"] is True
-        assert data["message"] == "manual fetch completed"
-        assert data["instance_id"] is None
+        assert data["requires_restart"] is expected_restart
+
+
+@pytest.mark.integration
+def test_get_plugins_passes_icon_through(test_client, monkeypatch):
+    """PluginMetadata.icon reaches the settings frontend (§6) so tiles can draw it.
+
+    Contract 1.0 plugins that never set an icon keep working: the field is
+    optional and serializes as null.
+    """
+    from app.api.routes.plugins import management
+
+    with_icon = PluginMetadata(
+        type_id="icon_plugin",
+        name="Icon Plugin",
+        icon="🖼",
+        plugin_type=PluginType.SERVICE,
+        display_schema={"kind": "status"},
+    )
+    without_icon = PluginMetadata(
+        type_id="plain_plugin",
+        name="Plain Plugin",
+        plugin_type=PluginType.SERVICE,
+        display_schema={"kind": "status"},
+    )
+    monkeypatch.setattr(
+        management.plugin_loader, "get_plugin_types", lambda: [with_icon, without_icon]
+    )
+
+    response = test_client.get("/api/plugins?plugin_type=service")
+    assert response.status_code == 200
+    by_id = {plugin["id"]: plugin for plugin in response.json()["plugins"]}
+    assert by_id["icon_plugin"]["icon"] == "🖼"
+    assert by_id["plain_plugin"]["icon"] is None

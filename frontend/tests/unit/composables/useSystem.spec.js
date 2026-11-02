@@ -67,8 +67,40 @@ describe("useSystem", () => {
       expect(system.displayTimeoutEnabled.value).toBe(false);
       expect(system.updating.value).toBe(false);
       expect(system.updateStatus.value).toBe(null);
+      expect(system.updateStatusLoading.value).toBe(false);
       expect(system.updateMessage.value).toBe("");
       expect(system.updateMessageClass.value).toBe("");
+      expect(system.backendHealth.value).toBe(null);
+      expect(system.backendHealthLoading.value).toBe(false);
+    });
+  });
+
+  describe("getBackendHealth", () => {
+    it("stores healthy backend status", async () => {
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+
+      const system = useSystem();
+      const health = await system.getBackendHealth();
+
+      expect(systemApi.getHealth).toHaveBeenCalled();
+      expect(health.status).toBe("healthy");
+      expect(system.backendHealth.value.status).toBe("healthy");
+      expect(system.backendHealthCheckedAt.value).toBeTruthy();
+    });
+
+    it("stores unhealthy backend status on health check failure", async () => {
+      systemApi.getHealth.mockRejectedValue(new Error("down"));
+
+      const system = useSystem();
+      const health = await system.getBackendHealth();
+
+      expect(health.status).toBe("unhealthy");
+      // Raw detail stays for the Settings › Details line; the readout is friendly.
+      expect(system.backendHealth.value.error).toBe("down");
+      expect(system.backendHealth.value.errorText).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
+      expect(system.backendHealthLoading.value).toBe(false);
     });
   });
 
@@ -192,13 +224,16 @@ describe("useSystem", () => {
 
     it("sets error message when restart returns an HTTP error response", async () => {
       const error = new Error("Failed to restart");
-      error.response = { data: { detail: "Service unavailable" } };
+      error.response = { status: 500, data: { detail: "Service unavailable" } };
       systemApi.restartBackend.mockRejectedValue(error);
 
       const system = useSystem();
       await system.restartBackend();
 
-      expect(system.updateMessage.value).toBe("Service unavailable");
+      // A 5xx detail is server text, not copy (CLV-63).
+      expect(system.updateMessage.value).toBe(
+        "Something went wrong on the Calvin server while trying to restart Calvin."
+      );
       expect(system.updateMessageClass.value).toBe("error");
       expect(systemApi.getHealth).not.toHaveBeenCalled();
     });
@@ -236,9 +271,9 @@ describe("useSystem", () => {
       expect(reloadSpy).toHaveBeenCalled();
     });
 
-    it("sets error message when restart returns an HTTP error response", async () => {
+    it("shows a validation detail written for people", async () => {
       const error = new Error("Failed to restart");
-      error.response = { data: { detail: "Service unavailable" } };
+      error.response = { status: 422, data: { detail: "Service unavailable" } };
       systemApi.restartFrontend.mockRejectedValue(error);
 
       const system = useSystem();
@@ -274,7 +309,7 @@ describe("useSystem", () => {
 
       expect(systemApi.triggerUpdate).toHaveBeenCalled();
       expect(system.updating.value).toBe(false);
-      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
       expect(system.updateMessageClass.value).toBe("success");
     });
 
@@ -285,7 +320,9 @@ describe("useSystem", () => {
       await system.triggerUpdate();
 
       expect(system.updating.value).toBe(false);
-      expect(system.updateMessage.value).toBe("Update failed");
+      expect(system.updateMessage.value).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
       expect(system.updateMessageClass.value).toBe("error");
     });
 
@@ -303,8 +340,39 @@ describe("useSystem", () => {
       });
       await promise;
 
-      expect(system.updateMessage.value).toBe("Update failed: Build failed");
+      expect(system.updateMessage.value).toBe(
+        "The update didn't finish. Calvin is still on the previous version."
+      );
       expect(system.updateMessageClass.value).toBe("error");
+    });
+
+    it("keeps streaming when the server sends a running state snapshot", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      vi.useRealTimers();
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+
+      await fireStreamEvent({
+        type: "status",
+        status: "running",
+        message: "Pulling latest code",
+        state: {
+          status: "running",
+          phase: "pulling_code",
+          message: "Pulling latest code",
+        },
+      });
+
+      expect(FakeEventSource.last.closed).toBe(false);
+      expect(system.updateStatus.value.phase).toBe("pulling_code");
+      expect(system.updateMessage.value).toBe("Pulling latest code");
+
+      await fireStreamEvent({ type: "status", status: "complete" });
+      await promise;
+
+      expect(system.updateMessageClass.value).toBe("success");
     });
   });
 
@@ -350,7 +418,7 @@ describe("useSystem", () => {
       // Test functionality: status was checked and stored
       expect(systemApi.getUpdateStatus).toHaveBeenCalled();
       expect(system.updateStatus.value).toEqual(mockStatus);
-      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
     });
 
     it("should handle in-progress status", async () => {
@@ -366,7 +434,7 @@ describe("useSystem", () => {
 
       // Test functionality: transitions from running -> idle
       expect(system.updateStatus.value?.status).toBe("idle");
-      expect(system.updateMessage.value).toContain("completed successfully");
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
       expect(systemApi.getUpdateStatus).toHaveBeenCalledTimes(2);
     });
 
@@ -381,8 +449,30 @@ describe("useSystem", () => {
 
       // Test functionality: error status is stored and message is set
       expect(system.updateStatus.value?.status).toBe("error");
-      expect(system.updateMessage.value).toContain("Update failed");
+      expect(system.updateMessage.value).toBe(
+        "The update didn't finish. Calvin is still on the previous version."
+      );
       expect(system.updateMessageClass.value).toBe("error");
+    });
+  });
+
+  describe("host control message", () => {
+    it("shows the structured 409 message instead of [object Object]", async () => {
+      const message =
+        "Restarting the backend is disabled on this deployment. Set CALVIN_HOST_CONTROL=1 if Calvin owns this machine.";
+      const error = new Error("conflict");
+      error.response = {
+        status: 409,
+        data: { detail: { code: "host_control_disabled", message } },
+      };
+      systemApi.restartBackend.mockRejectedValue(error);
+
+      const system = useSystem();
+      await system.restartBackend();
+
+      expect(system.updateMessage.value).toBe(message);
+      expect(system.updateMessageClass.value).toBe("error");
+      expect(systemApi.getHealth).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,92 +1,1183 @@
 /** Tests for layout utility functions. */
 
 import { describe, it, expect } from "vitest";
-import { getLayoutOrder } from "@/utils/layout";
+import {
+  DEFAULT_CALENDAR_VIEW,
+  MAX_TOP_REGIONS,
+  MAX_SPLIT_DEPTH,
+  addSubRegionAtPath,
+  addTopRegion,
+  applyDragSizesById,
+  canSplitAtPath,
+  clampCalendarView,
+  clampPhotosView,
+  clampServiceView,
+  computeClockBarModeUpdate,
+  computeClockBarPositionUpdate,
+  createDashboardLayoutFromPreset,
+  cycleActiveDashboardRegion,
+  cycleDashboardScreen,
+  getActiveDashboardRegion,
+  getActiveDashboardScreen,
+  getClockBarBetweenIndex,
+  getClockBarPlacementGap,
+  getContainerAtPath,
+  getGlobalClockBarSettings,
+  getLayoutDirection,
+  getLeafRegions,
+  getNodeAtPath,
+  getPathById,
+  getRegionAxisStyle,
+  getSplitDirection,
+  isClockBarBetweenPosition,
+  normalizeClockBarPosition,
+  normalizeDashboardLayout,
+  normalizeDashboardScreens,
+  normalizeScreenClockBar,
+  removeRegionAtPath,
+  resizeAdjacentRegions,
+  resizePairAtPath,
+  resolveClockBarForScreen,
+  setLayoutDirection,
+  setRegionContentAtPath,
+  setRegionView,
+  setSplitDirectionAtPath,
+  splitRegionAtPath,
+  unsplitRegionAtPath,
+  updateNodeAtPath,
+} from "@/utils/layout";
 
 describe("Layout Utilities", () => {
-  describe("getLayoutOrder", () => {
-    it("should return correct order for landscape with side view on left", () => {
-      const order = getLayoutOrder({
-        orientation: "landscape",
-        sideViewPosition: "left",
-        showVerticalBarLeft: true,
-        showVerticalBarRight: true,
-        showVerticalBarBetween: false,
-        showHorizontalBarBetween: false,
+  describe("dashboard region layouts", () => {
+    it("creates a legacy calendar and photos layout from old config", () => {
+      const layout = normalizeDashboardLayout(null, {
+        calendarSplit: 65,
+        lastSideViewMode: "photos",
       });
 
-      expect(order).toEqual(["verticalBarLeft", "secondary", "calendar", "verticalBarRight"]);
+      expect(layout).toEqual({
+        version: 1,
+        preset: "split_two",
+        direction: null,
+        regions: [
+          {
+            id: "region-1",
+            kind: "calendar",
+            serviceId: null,
+            instanceIds: [],
+            size: 65,
+            split: null,
+            view: DEFAULT_CALENDAR_VIEW,
+          },
+          {
+            id: "region-2",
+            kind: "photos",
+            serviceId: null,
+            instanceIds: [],
+            size: 35,
+            split: null,
+          },
+        ],
+      });
     });
 
-    it("should return correct order for landscape with side view on right", () => {
-      const order = getLayoutOrder({
-        orientation: "landscape",
-        sideViewPosition: "right",
-        showVerticalBarLeft: true,
-        showVerticalBarRight: true,
-        showVerticalBarBetween: false,
-        showHorizontalBarBetween: false,
+    it("creates a legacy calendar and service layout from old side view mode", () => {
+      const layout = normalizeDashboardLayout(null, {
+        calendarSplit: 60,
+        lastSideViewMode: "web_services",
       });
 
-      expect(order).toEqual(["verticalBarLeft", "calendar", "secondary", "verticalBarRight"]);
+      expect(layout.preset).toBe("split_two");
+      expect(layout.regions[0]).toMatchObject({ id: "region-1", kind: "calendar", size: 60 });
+      expect(layout.regions[1]).toMatchObject({ id: "region-2", kind: "service", size: 40 });
     });
 
-    it("should return correct order for portrait with side view on top", () => {
-      const order = getLayoutOrder({
-        orientation: "portrait",
-        sideViewPosition: "top",
-        showVerticalBarLeft: false,
-        showVerticalBarRight: false,
-        showVerticalBarBetween: false,
-        showHorizontalBarBetween: true,
+    it("keeps region content when changing to a two-region layout", () => {
+      const layout = createDashboardLayoutFromPreset("split_two", {
+        regions: [
+          { id: "region-1", kind: "service", serviceId: "weather", size: 70 },
+          { id: "region-2", kind: "service", serviceId: "meals", size: 30 },
+        ],
       });
 
-      expect(order).toEqual(["secondary", "horizontalBarBetween", "calendar"]);
-    });
-
-    it("should return correct order for portrait with side view on bottom", () => {
-      const order = getLayoutOrder({
-        orientation: "portrait",
-        sideViewPosition: "bottom",
-        showVerticalBarLeft: false,
-        showVerticalBarRight: false,
-        showVerticalBarBetween: false,
-        showHorizontalBarBetween: true,
-      });
-
-      expect(order).toEqual(["calendar", "horizontalBarBetween", "secondary"]);
-    });
-
-    it("should include vertical bar between in landscape", () => {
-      const order = getLayoutOrder({
-        orientation: "landscape",
-        sideViewPosition: "left",
-        showVerticalBarLeft: true,
-        showVerticalBarRight: true,
-        showVerticalBarBetween: true,
-        showHorizontalBarBetween: false,
-      });
-
-      expect(order).toEqual([
-        "verticalBarLeft",
-        "secondary",
-        "verticalBarBetween",
-        "calendar",
-        "verticalBarRight",
+      expect(layout.regions).toEqual([
+        {
+          id: "region-1",
+          kind: "service",
+          serviceId: "weather",
+          instanceIds: ["weather"],
+          size: 70,
+          split: null,
+          view: {},
+        },
+        {
+          id: "region-2",
+          kind: "service",
+          serviceId: "meals",
+          instanceIds: ["meals"],
+          size: 30,
+          split: null,
+          view: {},
+        },
       ]);
     });
 
-    it("should not include bars that are not shown", () => {
-      const order = getLayoutOrder({
-        orientation: "landscape",
-        sideViewPosition: "right",
-        showVerticalBarLeft: false,
-        showVerticalBarRight: false,
-        showVerticalBarBetween: false,
-        showHorizontalBarBetween: false,
+    it("uses width for landscape and height for portrait region sizing", () => {
+      const region = { id: "primary", kind: "calendar", size: 65 };
+
+      expect(getRegionAxisStyle(region, "landscape")).toEqual({ width: "65%", height: "100%" });
+      expect(getRegionAxisStyle(region, "portrait")).toEqual({ height: "65%", width: "100%" });
+    });
+
+    it("resizes adjacent regions while preserving a 100 percent total", () => {
+      const regions = [
+        { id: "region-1", kind: "calendar", size: 40 },
+        { id: "region-2", kind: "photos", size: 30 },
+        { id: "region-3", kind: "service", size: 30 },
+      ];
+
+      const resized = resizeAdjacentRegions(regions, 0, 60);
+
+      expect(resized.map(region => region.size)).toEqual([60, 10, 30]);
+      expect(resized.reduce((sum, region) => sum + region.size, 0)).toBe(100);
+    });
+
+    it("allows a single region to fill the dashboard", () => {
+      const layout = createDashboardLayoutFromPreset("single");
+
+      expect(layout.regions).toEqual([
+        {
+          id: "region-1",
+          kind: "calendar",
+          serviceId: null,
+          instanceIds: [],
+          size: 100,
+          split: null,
+          view: DEFAULT_CALENDAR_VIEW,
+        },
+      ]);
+      expect(getRegionAxisStyle(layout.regions[0], "landscape")).toEqual({
+        width: "100%",
+        height: "100%",
+      });
+    });
+  });
+
+  describe("dashboard screens", () => {
+    it("creates a default screen config when missing", () => {
+      const screens = normalizeDashboardScreens(null);
+
+      expect(screens.activeScreenId).toBe("screen-home");
+      expect(screens.screens).toHaveLength(1);
+      expect(screens.screens[0]).toMatchObject({
+        id: "screen-home",
+        name: "Home",
+        activeRegionId: "region-1",
+      });
+    });
+
+    it("returns the active screen and active region", () => {
+      const screens = normalizeDashboardScreens({
+        activeScreenId: "services",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: createDashboardLayoutFromPreset("split_two"),
+            activeRegionId: "region-1",
+          },
+          {
+            id: "services",
+            name: "Services",
+            layout: createDashboardLayoutFromPreset("split_two", {
+              regions: [
+                { id: "region-1", kind: "service", size: 50 },
+                { id: "region-2", kind: "service", size: 50 },
+              ],
+            }),
+            activeRegionId: "region-2",
+          },
+        ],
       });
 
-      expect(order).toEqual(["calendar", "secondary"]);
+      expect(getActiveDashboardScreen(screens).id).toBe("services");
+      expect(getActiveDashboardRegion(getActiveDashboardScreen(screens)).id).toBe("region-2");
+    });
+
+    it("cycles screens and active regions", () => {
+      const screens = normalizeDashboardScreens({
+        activeScreenId: "home",
+        screens: [
+          {
+            id: "home",
+            name: "Home",
+            layout: createDashboardLayoutFromPreset("split_two"),
+            activeRegionId: "region-1",
+          },
+          {
+            id: "services",
+            name: "Services",
+            layout: createDashboardLayoutFromPreset("split_two"),
+            activeRegionId: "region-1",
+          },
+        ],
+      });
+
+      const nextScreen = cycleDashboardScreen(screens, 1);
+      expect(nextScreen.activeScreenId).toBe("services");
+
+      const nextRegion = cycleActiveDashboardRegion(nextScreen, 1);
+      expect(getActiveDashboardScreen(nextRegion).activeRegionId).toBe("region-2");
+    });
+  });
+
+  describe("top-level regions: add", () => {
+    const baseLayout = () => createDashboardLayoutFromPreset("split_two");
+
+    it("adds a new top region and rebalances sizes to 100", () => {
+      const layout = addTopRegion(baseLayout());
+
+      expect(layout.regions).toHaveLength(3);
+      const total = layout.regions.reduce((sum, r) => sum + r.size, 0);
+      expect(total).toBe(100);
+    });
+
+    it("refuses to grow past MAX_TOP_REGIONS", () => {
+      let layout = baseLayout();
+      while (layout.regions.length < MAX_TOP_REGIONS) {
+        layout = addTopRegion(layout);
+      }
+      expect(layout.regions).toHaveLength(MAX_TOP_REGIONS);
+
+      const overflow = addTopRegion(layout);
+      expect(overflow.regions).toHaveLength(MAX_TOP_REGIONS);
+    });
+  });
+
+  describe("layout direction helpers", () => {
+    it("getLayoutDirection falls back to display orientation when unset", () => {
+      const layout = createDashboardLayoutFromPreset("split_two");
+      expect(getLayoutDirection(layout, "landscape")).toBe("row");
+      expect(getLayoutDirection(layout, "portrait")).toBe("column");
+    });
+
+    it("getLayoutDirection respects an explicit stored direction", () => {
+      const layout = setLayoutDirection(createDashboardLayoutFromPreset("split_two"), "column");
+      expect(getLayoutDirection(layout, "landscape")).toBe("column");
+    });
+
+    it("getSplitDirection defaults to perpendicular to the parent", () => {
+      const layout = splitRegionAtPath(createDashboardLayoutFromPreset("single"), [0]);
+      expect(getSplitDirection(layout.regions[0].split, "row")).toBe("column");
+      expect(getSplitDirection(layout.regions[0].split, "column")).toBe("row");
+    });
+  });
+
+  describe("getLeafRegions and active region resolution", () => {
+    it("flattens splits into leaves with parent ids", () => {
+      const layout = splitRegionAtPath(addTopRegion(createDashboardLayoutFromPreset("single")), [
+        0,
+      ]);
+      const leaves = getLeafRegions(layout);
+      expect(leaves.map(leaf => leaf.id)).toEqual(["region-1-a", "region-1-b", "region-2"]);
+      expect(leaves[0].parentId).toBe("region-1");
+      expect(leaves[2].parentId).toBeUndefined();
+    });
+
+    it("normalizeDashboardScreens accepts a sub-region id as the active leaf", () => {
+      const layout = splitRegionAtPath(createDashboardLayoutFromPreset("single"), [0]);
+      const screens = normalizeDashboardScreens({
+        activeScreenId: "screen-home",
+        screens: [
+          {
+            id: "screen-home",
+            name: "Home",
+            layout,
+            activeRegionId: "region-1-b",
+          },
+        ],
+      });
+      expect(screens.screens[0].activeRegionId).toBe("region-1-b");
+    });
+
+    it("cycling regions walks across split leaves", () => {
+      const layout = splitRegionAtPath(addTopRegion(createDashboardLayoutFromPreset("single")), [
+        0,
+      ]);
+      const screens = normalizeDashboardScreens({
+        activeScreenId: "screen-home",
+        screens: [
+          {
+            id: "screen-home",
+            name: "Home",
+            layout,
+            activeRegionId: "region-1-a",
+          },
+        ],
+      });
+
+      let cycled = cycleActiveDashboardRegion(screens, 1);
+      expect(cycled.screens[0].activeRegionId).toBe("region-1-b");
+      cycled = cycleActiveDashboardRegion(cycled, 1);
+      expect(cycled.screens[0].activeRegionId).toBe("region-2");
+      cycled = cycleActiveDashboardRegion(cycled, 1);
+      expect(cycled.screens[0].activeRegionId).toBe("region-1-a");
+    });
+  });
+
+  describe("clock bar per-screen settings", () => {
+    const screenWith = (regionsCount, clockBar) => ({
+      id: "screen-1",
+      name: "Test",
+      layout: {
+        version: 1,
+        preset: "split_two",
+        direction: null,
+        regions: Array.from({ length: regionsCount }, (_, i) => ({
+          id: `region-${i + 1}`,
+          kind: "calendar",
+          instanceIds: [],
+          size: Math.floor(100 / regionsCount),
+          split: null,
+        })),
+      },
+      activeRegionId: "region-1",
+      clockBar: clockBar ?? null,
+    });
+
+    describe("normalizeClockBarPosition", () => {
+      it("returns perimeter values unchanged", () => {
+        expect(normalizeClockBarPosition("top", 2)).toBe("top");
+        expect(normalizeClockBarPosition("bottom", 2)).toBe("bottom");
+        expect(normalizeClockBarPosition("left", 2)).toBe("left");
+        expect(normalizeClockBarPosition("right", 2)).toBe("right");
+      });
+
+      it("normalizes 'between' to canonical first-gap form", () => {
+        expect(normalizeClockBarPosition("between", 3)).toBe("between");
+        expect(normalizeClockBarPosition("between:0", 3)).toBe("between");
+      });
+
+      it("preserves valid between:N for higher gaps", () => {
+        expect(normalizeClockBarPosition("between:1", 3)).toBe("between:1");
+        expect(normalizeClockBarPosition("between:2", 4)).toBe("between:2");
+      });
+
+      it("clamps between:N to the last available gap", () => {
+        expect(normalizeClockBarPosition("between:5", 3)).toBe("between:1");
+        expect(normalizeClockBarPosition("between:1", 2)).toBe("between");
+      });
+
+      it("rejects unknown values", () => {
+        expect(normalizeClockBarPosition("nope", 2)).toBeNull();
+        expect(normalizeClockBarPosition(null, 2)).toBeNull();
+        expect(normalizeClockBarPosition(undefined, 2)).toBeNull();
+      });
+    });
+
+    describe("getClockBarBetweenIndex / isClockBarBetweenPosition", () => {
+      it("returns 0 for 'between' and the parsed index for 'between:N'", () => {
+        expect(getClockBarBetweenIndex("between")).toBe(0);
+        expect(getClockBarBetweenIndex("between:2")).toBe(2);
+      });
+
+      it("returns null for non-between positions", () => {
+        expect(getClockBarBetweenIndex("top")).toBeNull();
+        expect(getClockBarBetweenIndex("right")).toBeNull();
+        expect(getClockBarBetweenIndex(null)).toBeNull();
+      });
+
+      it("isClockBarBetweenPosition mirrors the index check", () => {
+        expect(isClockBarBetweenPosition("between")).toBe(true);
+        expect(isClockBarBetweenPosition("between:3")).toBe(true);
+        expect(isClockBarBetweenPosition("top")).toBe(false);
+      });
+    });
+
+    describe("normalizeScreenClockBar", () => {
+      it("returns null for empty/invalid input", () => {
+        expect(normalizeScreenClockBar(null, 2)).toBeNull();
+        expect(normalizeScreenClockBar({}, 2)).toBeNull();
+        expect(normalizeScreenClockBar({ enabled: "yes" }, 2)).toBeNull();
+      });
+
+      it("keeps recognized fields and drops unknown ones", () => {
+        expect(
+          normalizeScreenClockBar(
+            { enabled: false, mode: "vertical", position: "left", junk: 42 },
+            2
+          )
+        ).toEqual({ enabled: false, mode: "vertical", position: "left" });
+      });
+
+      it("clamps stale between indices", () => {
+        expect(normalizeScreenClockBar({ position: "between:5" }, 3)).toEqual({
+          position: "between:1",
+        });
+      });
+    });
+
+    describe("normalizeDashboardScreen with clockBar", () => {
+      it("populates clockBar=null when no override provided", () => {
+        const screens = normalizeDashboardScreens({
+          version: 2,
+          activeScreenId: "screen-1",
+          screens: [{ id: "screen-1", name: "Home" }],
+        });
+        expect(screens.screens[0].clockBar).toBeNull();
+      });
+
+      it("preserves a valid override", () => {
+        const screens = normalizeDashboardScreens({
+          version: 2,
+          activeScreenId: "screen-1",
+          screens: [
+            {
+              id: "screen-1",
+              name: "Home",
+              clockBar: { enabled: false, mode: "vertical", position: "right" },
+            },
+          ],
+        });
+        expect(screens.screens[0].clockBar).toEqual({
+          enabled: false,
+          mode: "vertical",
+          position: "right",
+        });
+      });
+    });
+
+    describe("resolveClockBarForScreen", () => {
+      const globals = { enabled: true, mode: "horizontal", position: "top" };
+
+      it("falls back to globals when no override exists", () => {
+        const screen = screenWith(2, null);
+        expect(resolveClockBarForScreen(screen, globals)).toEqual({
+          enabled: true,
+          mode: "horizontal",
+          position: "top",
+        });
+      });
+
+      it("merges per-screen overrides on top of globals", () => {
+        const screen = screenWith(2, { mode: "vertical", position: "left" });
+        expect(resolveClockBarForScreen(screen, globals)).toEqual({
+          enabled: true,
+          mode: "vertical",
+          position: "left",
+        });
+      });
+
+      it("coerces an inconsistent (mode, position) pair to a sane perimeter", () => {
+        const screen = screenWith(2, { mode: "horizontal", position: "left" });
+        expect(resolveClockBarForScreen(screen, globals).position).toBe("top");
+      });
+
+      it("falls back to a perimeter when 'between' is requested with <2 regions", () => {
+        const screen = screenWith(1, { position: "between" });
+        const resolved = resolveClockBarForScreen(screen, globals);
+        expect(resolved.position).toBe("top");
+      });
+
+      it("clamps a stale between index against the screen's region count", () => {
+        const screen = screenWith(3, { position: "between:9" });
+        expect(resolveClockBarForScreen(screen, globals).position).toBe("between:1");
+      });
+
+      it("honors per-screen enabled=false override", () => {
+        const screen = screenWith(2, { enabled: false });
+        expect(resolveClockBarForScreen(screen, globals).enabled).toBe(false);
+      });
+    });
+
+    describe("getGlobalClockBarSettings", () => {
+      it("defaults to enabled horizontal/top when config is empty", () => {
+        expect(getGlobalClockBarSettings({})).toEqual({
+          enabled: true,
+          mode: "horizontal",
+          position: "top",
+        });
+      });
+
+      it("reads mode and position from config", () => {
+        expect(
+          getGlobalClockBarSettings({ clockBarMode: "vertical", clockBarPosition: "right" })
+        ).toEqual({ enabled: true, mode: "vertical", position: "right" });
+      });
+
+      it("coerces unknown mode to horizontal", () => {
+        expect(getGlobalClockBarSettings({ clockBarMode: "diagonal" }).mode).toBe("horizontal");
+      });
+    });
+
+    describe("getClockBarPlacementGap", () => {
+      it("returns null for non-between positions", () => {
+        expect(getClockBarPlacementGap("top", 3)).toBeNull();
+        expect(getClockBarPlacementGap("right", 3)).toBeNull();
+        expect(getClockBarPlacementGap(null, 3)).toBeNull();
+      });
+
+      it("returns null when there are fewer than 2 regions", () => {
+        expect(getClockBarPlacementGap("between", 0)).toBeNull();
+        expect(getClockBarPlacementGap("between", 1)).toBeNull();
+        expect(getClockBarPlacementGap("between:2", 1)).toBeNull();
+      });
+
+      it("returns the parsed gap index for valid between:N", () => {
+        expect(getClockBarPlacementGap("between", 3)).toBe(0);
+        expect(getClockBarPlacementGap("between:1", 3)).toBe(1);
+        expect(getClockBarPlacementGap("between:2", 4)).toBe(2);
+      });
+
+      it("clamps stale between:N to the last available gap (regression for #34)", () => {
+        // 3 regions => gaps 0..1; between:9 should fall to gap 1.
+        expect(getClockBarPlacementGap("between:9", 3)).toBe(1);
+        // 2 regions => only gap 0.
+        expect(getClockBarPlacementGap("between:5", 2)).toBe(0);
+      });
+
+      it("clamps negative-ish indices to 0", () => {
+        expect(getClockBarPlacementGap("between:0", 5)).toBe(0);
+      });
+    });
+
+    describe("computeClockBarPositionUpdate", () => {
+      const globals = { enabled: true, mode: "horizontal", position: "top" };
+
+      it("returns null for an invalid position", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarPositionUpdate(screen, "nope", globals)).toBeNull();
+      });
+
+      it("clears the override when the new position matches global on every dimension", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarPositionUpdate(screen, "top", globals)).toEqual({ clear: true });
+      });
+
+      it("does NOT clear when the inferred mode differs from global mode", () => {
+        // Global is vertical/right; user drops onto 'top'. Position 'top' implies
+        // horizontal mode, so we must keep an override that pins mode=horizontal —
+        // otherwise resolution would coerce back to a vertical perimeter.
+        const verticalGlobals = { enabled: true, mode: "vertical", position: "top" };
+        const screen = screenWith(2, null);
+        const result = computeClockBarPositionUpdate(screen, "top", verticalGlobals);
+        expect(result).toEqual({ patch: { position: "top", mode: "horizontal" } });
+      });
+
+      it("does NOT clear when the screen has an enabled override", () => {
+        const screen = screenWith(2, { enabled: false });
+        const result = computeClockBarPositionUpdate(screen, "top", globals);
+        expect(result).toEqual({ patch: { position: "top", mode: "horizontal" } });
+      });
+
+      it("does NOT clear when the screen has a mode override", () => {
+        const screen = screenWith(2, { mode: "vertical" });
+        const result = computeClockBarPositionUpdate(screen, "top", globals);
+        expect(result).toEqual({ patch: { position: "top", mode: "horizontal" } });
+      });
+
+      it("pins mode for perimeter positions so screen owns its orientation", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarPositionUpdate(screen, "left", globals)).toEqual({
+          patch: { position: "left", mode: "vertical" },
+        });
+        expect(computeClockBarPositionUpdate(screen, "bottom", globals)).toEqual({
+          patch: { position: "bottom", mode: "horizontal" },
+        });
+      });
+
+      it("does not pin mode for between positions (mode-agnostic)", () => {
+        const screen = screenWith(3, null);
+        expect(computeClockBarPositionUpdate(screen, "between:1", globals)).toEqual({
+          patch: { position: "between:1" },
+        });
+      });
+
+      it("clamps stale between:N before patching", () => {
+        const screen = screenWith(3, null);
+        expect(computeClockBarPositionUpdate(screen, "between:9", globals)).toEqual({
+          patch: { position: "between:1" },
+        });
+      });
+    });
+
+    describe("computeClockBarModeUpdate", () => {
+      const globals = { enabled: true, mode: "horizontal", position: "top" };
+
+      it("returns null for an invalid mode", () => {
+        const screen = screenWith(2, null);
+        expect(computeClockBarModeUpdate(screen, "diagonal", globals)).toBeNull();
+      });
+
+      it("flips position to a default perimeter when the new mode invalidates it", () => {
+        // Resolved is vertical/left, switching to horizontal -> default 'top'.
+        const screen = screenWith(2, { mode: "vertical", position: "left" });
+        expect(computeClockBarModeUpdate(screen, "horizontal", globals)).toEqual({
+          patch: { mode: "horizontal", position: "top" },
+        });
+      });
+
+      it("keeps a between position untouched (mode-agnostic)", () => {
+        const screen = screenWith(3, { position: "between:1" });
+        expect(computeClockBarModeUpdate(screen, "vertical", globals)).toEqual({
+          patch: { mode: "vertical" },
+        });
+      });
+
+      it("only patches mode when the resolved perimeter already matches", () => {
+        const screen = screenWith(2, { position: "bottom" });
+        expect(computeClockBarModeUpdate(screen, "horizontal", globals)).toEqual({
+          patch: { mode: "horizontal" },
+        });
+      });
+    });
+  });
+});
+
+describe("calendar region view", () => {
+  const screenWith = region => ({
+    activeScreenId: "s1",
+    screens: [{ id: "s1", layout: { regions: [region] } }],
+  });
+
+  it("backfills the default view on a calendar region with none", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "region-1", kind: "calendar", instanceIds: [], size: 100 })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual(DEFAULT_CALENDAR_VIEW);
+  });
+
+  it("preserves and clamps an explicit view", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "region-1",
+        kind: "calendar",
+        instanceIds: [],
+        size: 100,
+        view: { mode: "week", rolling: true, weeks: 99, days: 99, extraWeeks: 99 },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual({
+      mode: "week",
+      rolling: true,
+      weeks: 12,
+      days: 14,
+      extraWeeks: 8,
+    });
+  });
+
+  it("does not add a view block to non-calendar regions", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "region-1", kind: "photos", instanceIds: [], size: 100 })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+
+  it("keeps a photos region's fit and maps the retired crop to fill", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "region-1",
+        kind: "photos",
+        instanceIds: [],
+        size: 100,
+        view: { fit: "crop" },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view).toEqual({ fit: "fill" });
+  });
+
+  it("clampPhotosView accepts the four fit options and drops unknown values", () => {
+    expect(clampPhotosView({ fit: "smart" })).toEqual({ fit: "smart" });
+    expect(clampPhotosView({ fit: "fit" })).toEqual({ fit: "fit" });
+    expect(clampPhotosView({ fit: "fill" })).toEqual({ fit: "fill" });
+    expect(clampPhotosView({ fit: "center" })).toEqual({ fit: "center" });
+    expect(clampPhotosView({ fit: "crop" })).toEqual({ fit: "fill" });
+    expect(clampPhotosView({ fit: "nonsense" })).toEqual({});
+  });
+
+  it("clampCalendarView coerces bad values to the valid range", () => {
+    expect(
+      clampCalendarView({ mode: "bogus", rolling: 1, weeks: 0, days: 50, extraWeeks: -3 })
+    ).toEqual({
+      mode: "month",
+      rolling: true,
+      weeks: 1,
+      days: 14,
+      extraWeeks: 0,
+    });
+  });
+
+  it("omits the optional display-override fields when absent (inherit from global)", () => {
+    const v = clampCalendarView({ mode: "month", rolling: false, weeks: 4, days: 7 });
+    expect("weekNumbers" in v).toBe(false);
+    expect("maxVisibleEvents" in v).toBe(false);
+  });
+
+  it("preserves a weekNumbers override (true/false) and clamps maxVisibleEvents 1-20", () => {
+    expect(clampCalendarView({ weekNumbers: true, maxVisibleEvents: 6 })).toMatchObject({
+      weekNumbers: true,
+      maxVisibleEvents: 6,
+    });
+    expect(clampCalendarView({ weekNumbers: false })).toMatchObject({ weekNumbers: false });
+    expect(clampCalendarView({ maxVisibleEvents: 99 }).maxVisibleEvents).toBe(20);
+    expect(clampCalendarView({ maxVisibleEvents: 0 }).maxVisibleEvents).toBe(1);
+  });
+
+  it("drops invalid override values back to inherit (omitted)", () => {
+    const v = clampCalendarView({ weekNumbers: "yes", maxVisibleEvents: "lots" });
+    expect("weekNumbers" in v).toBe(false);
+    expect("maxVisibleEvents" in v).toBe(false);
+  });
+
+  it("setRegionView clears an override when patched with undefined", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({
+        id: "r1",
+        kind: "calendar",
+        instanceIds: [],
+        size: 100,
+        view: { mode: "month", rolling: false, weeks: 4, days: 7, weekNumbers: true },
+      })
+    );
+    expect(screens.screens[0].layout.regions[0].view.weekNumbers).toBe(true);
+    const next = setRegionView(screens, "r1", { weekNumbers: undefined });
+    expect("weekNumbers" in next.screens[0].layout.regions[0].view).toBe(false);
+  });
+
+  it("setRegionView merges + clamps a region's view on the active screen without mutating input", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "r1", kind: "calendar", instanceIds: [], size: 100 })
+    );
+    const next = setRegionView(screens, "r1", { mode: "week", rolling: true });
+    expect(next.screens[0].layout.regions[0].view).toEqual({
+      mode: "week",
+      rolling: true,
+      weeks: 4,
+      days: 7,
+      extraWeeks: 0,
+    });
+    // input is not mutated
+    expect(screens.screens[0].layout.regions[0].view.mode).toBe("month");
+  });
+
+  it("setRegionView finds a calendar region nested in a split", () => {
+    const screens = normalizeDashboardScreens({
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          layout: {
+            regions: [
+              {
+                id: "r1",
+                kind: "calendar",
+                size: 100,
+                split: {
+                  regions: [
+                    { id: "r1-a", kind: "calendar", size: 50 },
+                    { id: "r1-b", kind: "photos", size: 50 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const next = setRegionView(screens, "r1-a", { mode: "day" });
+    expect(next.screens[0].layout.regions[0].split.regions[0].view.mode).toBe("day");
+  });
+
+  it("setRegionView writes a photos region's fit", () => {
+    const screens = normalizeDashboardScreens(
+      screenWith({ id: "r1", kind: "photos", instanceIds: [], size: 100 })
+    );
+    const next = setRegionView(screens, "r1", { fit: "fit" });
+    expect(next.screens[0].layout.regions[0].view).toEqual({ fit: "fit" });
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+});
+
+describe("clampServiceView", () => {
+  it("keeps a valid linkAction override", () => {
+    expect(clampServiceView({ linkAction: "embed" })).toEqual({ linkAction: "embed" });
+    expect(clampServiceView({ linkAction: "handoff" })).toEqual({ linkAction: "handoff" });
+    expect(clampServiceView({ linkAction: "off" })).toEqual({ linkAction: "off" });
+  });
+
+  it("omits an invalid or absent linkAction (inherit)", () => {
+    expect(clampServiceView({})).toEqual({});
+    expect(clampServiceView({ linkAction: "nope" })).toEqual({});
+    expect("linkAction" in clampServiceView({ linkAction: undefined })).toBe(false);
+  });
+});
+
+describe("clampServiceView — cardSize (calvin-fub)", () => {
+  it("preserves a valid cardSize", () => {
+    expect(clampServiceView({ cardSize: "large" })).toEqual({ cardSize: "large" });
+  });
+
+  it("keeps cardSize alongside a valid linkAction", () => {
+    expect(clampServiceView({ linkAction: "embed", cardSize: "xsmall" })).toEqual({
+      linkAction: "embed",
+      cardSize: "xsmall",
+    });
+  });
+
+  it("drops an invalid or absent cardSize", () => {
+    expect(clampServiceView({ cardSize: "gigantic" })).toEqual({});
+    expect(clampServiceView({})).toEqual({});
+  });
+});
+
+describe("setRegionView — cardSize round-trips (calvin-fub)", () => {
+  it("persists cardSize onto a service region's view", () => {
+    const screens = {
+      activeScreenId: "s1",
+      screens: [
+        {
+          id: "s1",
+          layout: {
+            regions: [{ id: "r1", kind: "service", view: {} }],
+          },
+        },
+      ],
+    };
+    const next = setRegionView(screens, "r1", { cardSize: "xlarge" });
+    expect(next.screens[0].layout.regions[0].view.cardSize).toBe("xlarge");
+  });
+});
+
+describe("setRegionView on a service region", () => {
+  const screens = {
+    activeScreenId: "s1",
+    screens: [
+      {
+        id: "s1",
+        layout: { regions: [{ id: "svc-1", kind: "service", instanceIds: ["mealie-1"] }] },
+      },
+    ],
+  };
+
+  it("applies a linkAction patch to a service region", () => {
+    const next = setRegionView(screens, "svc-1", { linkAction: "embed" });
+    expect(next.screens[0].layout.regions[0].view).toEqual({ linkAction: "embed" });
+  });
+
+  it("clears the override when linkAction is undefined", () => {
+    const withOverride = setRegionView(screens, "svc-1", { linkAction: "embed" });
+    const cleared = setRegionView(withOverride, "svc-1", { linkAction: undefined });
+    expect(cleared.screens[0].layout.regions[0].view).toEqual({});
+  });
+
+  it("does not mutate the input", () => {
+    setRegionView(screens, "svc-1", { linkAction: "off" });
+    expect(screens.screens[0].layout.regions[0].view).toBeUndefined();
+  });
+});
+
+describe("path addressing", () => {
+  // region-1 split into [a, b]; b split again into [b-a, b-b] (3 levels).
+  const deep = () => ({
+    version: 1,
+    preset: "single",
+    direction: null,
+    regions: [
+      {
+        id: "region-1",
+        kind: "calendar",
+        size: 100,
+        instanceIds: [],
+        split: {
+          direction: null,
+          regions: [
+            { id: "region-1-a", kind: "photos", size: 50, instanceIds: [] },
+            {
+              id: "region-1-b",
+              kind: "calendar",
+              size: 50,
+              instanceIds: [],
+              split: {
+                direction: null,
+                regions: [
+                  { id: "region-1-b-a", kind: "photos", size: 50, instanceIds: [] },
+                  { id: "region-1-b-b", kind: "service", size: 50, instanceIds: [] },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ],
+  });
+
+  it("getNodeAtPath walks indices to the node", () => {
+    const layout = deep();
+    expect(getNodeAtPath(layout, [0]).id).toBe("region-1");
+    expect(getNodeAtPath(layout, [0, 0]).id).toBe("region-1-a");
+    expect(getNodeAtPath(layout, [0, 1, 0]).id).toBe("region-1-b-a");
+    expect(getNodeAtPath(layout, [9])).toBeNull();
+    expect(getNodeAtPath(layout, [])).toBeNull();
+  });
+
+  it("getPathById round-trips with getNodeAtPath", () => {
+    const layout = deep();
+    expect(getPathById(layout, "region-1-b-b")).toEqual([0, 1, 1]);
+    expect(getNodeAtPath(layout, getPathById(layout, "region-1-a")).id).toBe("region-1-a");
+    expect(getPathById(layout, "nope")).toBeNull();
+  });
+
+  it("updateNodeAtPath immutably replaces a nested node", () => {
+    const layout = deep();
+    const next = updateNodeAtPath(layout, [0, 1, 0], n => ({ ...n, size: 77 }));
+    expect(getNodeAtPath(next, [0, 1, 0]).size).toBe(77);
+    expect(getNodeAtPath(layout, [0, 1, 0]).size).not.toBe(77); // original untouched
+  });
+
+  it("canSplitAtPath enforces MAX_SPLIT_DEPTH", () => {
+    expect(canSplitAtPath([0])).toBe(true);
+    expect(canSplitAtPath([0, 1])).toBe(true);
+    expect(canSplitAtPath([0, 1, 0])).toBe(false);
+    expect(canSplitAtPath([])).toBe(false);
+    expect(MAX_SPLIT_DEPTH).toBe(3);
+  });
+
+  it("getContainerAtPath returns the addressed regions array", () => {
+    const layout = deep();
+    expect(getContainerAtPath(layout, [])).toBe(layout.regions); // root container
+    expect(getContainerAtPath(layout, [0]).map(r => r.id)).toEqual(["region-1-a", "region-1-b"]);
+    expect(getContainerAtPath(layout, [0, 1]).map(r => r.id)).toEqual([
+      "region-1-b-a",
+      "region-1-b-b",
+    ]);
+    expect(getContainerAtPath(layout, [0, 0])).toBeNull(); // leaf node has no split container
+    expect(getContainerAtPath(layout, [9])).toBeNull(); // out of range
+  });
+
+  it("normalizeRegionSplit preserves nesting up to 3 levels and drops deeper", () => {
+    const raw = {
+      version: 1,
+      preset: "single",
+      regions: [
+        {
+          id: "r1",
+          kind: "calendar",
+          size: 100,
+          split: {
+            regions: [
+              { id: "r1-a", kind: "photos", size: 50 },
+              {
+                id: "r1-b",
+                kind: "calendar",
+                size: 50,
+                split: {
+                  regions: [
+                    { id: "r1-b-a", kind: "photos", size: 50 },
+                    // 4th level must be stripped:
+                    {
+                      id: "r1-b-b",
+                      kind: "service",
+                      size: 50,
+                      split: {
+                        regions: [
+                          { id: "x", kind: "photos", size: 50 },
+                          { id: "y", kind: "photos", size: 50 },
+                        ],
+                      },
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    };
+    const layout = normalizeDashboardLayout(raw);
+    expect(getNodeAtPath(layout, [0, 1]).split).toBeTruthy(); // level-2 split kept
+    expect(getNodeAtPath(layout, [0, 1, 0]).split).toBeNull(); // level-3 leaf, no split
+    expect(getNodeAtPath(layout, [0, 1, 1]).split).toBeNull(); // level-3: deeper split dropped
+  });
+
+  it("getLeafRegions recurses to the deepest leaves", () => {
+    const layout = normalizeDashboardLayout({
+      version: 1,
+      preset: "single",
+      regions: [
+        {
+          id: "r1",
+          kind: "calendar",
+          size: 100,
+          split: {
+            regions: [
+              { id: "r1-a", kind: "photos", size: 50 },
+              {
+                id: "r1-b",
+                kind: "calendar",
+                size: 50,
+                split: {
+                  regions: [
+                    { id: "r1-b-a", kind: "photos", size: 50 },
+                    { id: "r1-b-b", kind: "service", size: 50 },
+                  ],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    expect(getLeafRegions(layout).map(l => l.id)).toEqual(["r1-a", "r1-b-a", "r1-b-b"]);
+    const leaves = getLeafRegions(layout);
+    expect(leaves.find(l => l.id === "r1-a").parentId).toBe("r1");
+    expect(leaves.find(l => l.id === "r1-b-a").parentId).toBe("r1-b");
+    expect(leaves.find(l => l.id === "r1-b-b").parentId).toBe("r1-b");
+  });
+
+  describe("path mutations", () => {
+    const twoTop = () => addTopRegion(createDashboardLayoutFromPreset("single")); // [region-1, region-2]
+
+    it("splitRegionAtPath splits a nested cell but refuses at depth 3", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b (level 2)
+      l = splitRegionAtPath(l, [0, 1]); // region-1-b -> b-a,b-b (level 3)
+      expect(getNodeAtPath(l, [0, 1, 0]).id).toBe("region-1-b-a");
+      const refused = splitRegionAtPath(l, [0, 1, 0]); // level 3 -> no-op
+      expect(refused).toBe(l);
+    });
+
+    it("addSubRegionAtPath adds a sub to a nested split", () => {
+      let l = splitRegionAtPath(twoTop(), [0]);
+      l = addSubRegionAtPath(l, [0]);
+      expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(3);
+    });
+
+    it("removeRegionAtPath collapses a 2-child split, preserving the survivor's subtree", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      l = splitRegionAtPath(l, [0, 1]); // region-1-b -> b-a,b-b
+      l = removeRegionAtPath(l, [0, 0]); // remove region-1-a; survivor region-1-b (split) adopts slot
+      expect(getNodeAtPath(l, [0]).split.regions.map(r => r.id)).toEqual([
+        "region-1-b-a",
+        "region-1-b-b",
+      ]);
+    });
+
+    it("addSubRegionAtPath grows a split up to MAX_TOP_REGIONS and refuses past the cap", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      while (getNodeAtPath(l, [0]).split.regions.length < MAX_TOP_REGIONS) {
+        const before = getNodeAtPath(l, [0]).split.regions.length;
+        l = addSubRegionAtPath(l, [0]);
+        expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(before + 1);
+      }
+      expect(getNodeAtPath(l, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
+
+      const overflow = addSubRegionAtPath(l, [0]);
+      expect(overflow).toBe(l);
+      expect(getNodeAtPath(overflow, [0]).split.regions).toHaveLength(MAX_TOP_REGIONS);
+    });
+
+    it("addSubRegionAtPath keeps sub-region sizes summing to 100 for every count (calvin-20gu)", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      const sumOf = layout =>
+        getNodeAtPath(layout, [0]).split.regions.reduce((sum, r) => sum + r.size, 0);
+      expect(sumOf(l)).toBe(100);
+      while (getNodeAtPath(l, [0]).split.regions.length < MAX_TOP_REGIONS) {
+        l = addSubRegionAtPath(l, [0]);
+        const count = getNodeAtPath(l, [0]).split.regions.length;
+        expect({ count, sum: sumOf(l) }).toEqual({ count, sum: 100 });
+      }
+    });
+
+    it("normalizes drifted sub-region sizes from a saved layout on read (calvin-20gu)", () => {
+      const saved = {
+        preset: "split_two",
+        regions: [
+          {
+            id: "region-1",
+            kind: "photos",
+            size: 50,
+            split: {
+              direction: "row",
+              regions: [
+                { id: "region-1-a", kind: "photos", size: 34 },
+                { id: "region-1-b", kind: "photos", size: 34 },
+                { id: "region-1-c", kind: "photos", size: 33 },
+              ],
+            },
+          },
+          { id: "region-2", kind: "photos", size: 50 },
+        ],
+      };
+      const subs = normalizeDashboardLayout(saved).regions[0].split.regions;
+      expect(subs).toHaveLength(3);
+      expect(subs.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
+    it("removeRegionAtPath on one of 3+ top-level siblings rebalances to 100", () => {
+      const three = addTopRegion(createDashboardLayoutFromPreset("split_two"));
+      expect(three.regions).toHaveLength(3);
+
+      const out = removeRegionAtPath(three, [1]);
+      expect(out.regions).toHaveLength(2);
+      expect(out.regions.map(r => r.id)).toEqual([three.regions[0].id, three.regions[2].id]);
+      expect(out.regions.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
+    it("removeRegionAtPath on one of 3+ nested siblings rebalances to 100", () => {
+      let l = splitRegionAtPath(twoTop(), [0]); // region-1 -> a,b
+      l = addSubRegionAtPath(l, [0]); // a,b,c
+      const out = removeRegionAtPath(l, [0, 1]);
+      const subs = getNodeAtPath(out, [0]).split.regions;
+      expect(subs.map(r => r.id)).toEqual(["region-1-a", "region-1-c"]);
+      expect(subs.reduce((sum, r) => sum + r.size, 0)).toBe(100);
+    });
+
+    it("removeRegionAtPath keeps a min of one top-level region", () => {
+      const single = createDashboardLayoutFromPreset("single");
+      expect(removeRegionAtPath(single, [0])).toBe(single);
+    });
+
+    it("resizePairAtPath rescales a nested container to 100%", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const resized = resizePairAtPath(l, [0], 0, 70); // container = region-1.split
+      const subs = getNodeAtPath(resized, [0]).split.regions;
+      expect(subs[0].size + subs[1].size).toBe(100);
+      expect(subs[0].size).toBe(70);
+    });
+
+    it("applyDragSizesById overrides sizes by id at any depth", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = applyDragSizesById(l, { "region-1-a": 80, "region-1-b": 20 });
+      expect(getNodeAtPath(out, [0, 0]).size).toBe(80);
+      expect(getNodeAtPath(out, [0, 1]).size).toBe(20);
+    });
+
+    it("unsplitRegionAtPath collapses a split back to the first sub's content", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = unsplitRegionAtPath(l, [0]);
+      const node = getNodeAtPath(out, [0]);
+      expect(node.split).toBeNull();
+      expect(node.kind).toBe("calendar"); // adopts first sub (inherits parent kind)
+      expect(node.id).toBe("region-1"); // keeps the slot id
+    });
+
+    it("unsplitRegionAtPath no-ops on an unsplit node", () => {
+      const l = twoTop();
+      expect(unsplitRegionAtPath(l, [0])).toBe(l);
+    });
+
+    it("setSplitDirectionAtPath sets an explicit sub direction", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = setSplitDirectionAtPath(l, [0], "column");
+      expect(getNodeAtPath(out, [0]).split.direction).toBe("column");
+    });
+
+    it("setRegionContentAtPath changes a cell's kind and instance ids", () => {
+      const l = splitRegionAtPath(twoTop(), [0]);
+      const out = setRegionContentAtPath(l, [0, 0], { kind: "service", instanceIds: ["svc-1"] });
+      const node = getNodeAtPath(out, [0, 0]);
+      expect(node.kind).toBe("service");
+      expect(node.serviceId).toBe("svc-1");
+      expect(node.instanceIds).toEqual(["svc-1"]);
     });
   });
 });

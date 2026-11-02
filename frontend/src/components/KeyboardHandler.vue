@@ -12,12 +12,18 @@ import { useKeyboardStore } from "../stores/keyboard";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { usePhotoFrameMode } from "../composables/usePhotoFrameMode";
 import { useConfigStore } from "../stores/config";
+import { useNotificationsStore } from "../stores/notifications";
 import NotificationSystem from "./NotificationSystem.vue";
-import { showSystemRebootScheduled } from "../utils/systemNotifications";
+import { showSystemRebootFailed, showSystemRebootScheduled } from "../utils/systemNotifications";
+import { detailMessage } from "../utils/apiErrors";
 import { useSystem } from "../composables/useSystem";
+import { normalizeKeyCode } from "@/utils/keyCode";
+import { configUrl } from "@/utils/kioskId";
+import api from "@/services/api";
 
 const keyboardStore = useKeyboardStore();
 const configStore = useConfigStore();
+const notificationsStore = useNotificationsStore();
 const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
 const notificationRef = ref(null);
@@ -28,29 +34,6 @@ let rebootComboStartTime = null;
 let rebootComboKeys = ["KEY_1", "KEY_7"]; // Will be loaded from config
 let rebootComboDuration = 10000; // Will be loaded from config (10 seconds default)
 let rebootComboCheckInterval = null;
-
-// Map browser key codes to our key codes
-const keyCodeMap = {
-  ArrowRight: "KEY_RIGHT",
-  ArrowLeft: "KEY_LEFT",
-  ArrowUp: "KEY_UP",
-  ArrowDown: "KEY_DOWN",
-  Space: "KEY_SPACE",
-  Enter: "KEY_ENTER",
-  Escape: "KEY_ESCAPE",
-  Home: "KEY_HOME",
-  End: "KEY_END",
-  PageUp: "KEY_PAGEUP",
-  PageDown: "KEY_PAGEDOWN",
-  Digit1: "KEY_1",
-  Digit2: "KEY_2",
-  Digit3: "KEY_3",
-  Digit4: "KEY_4",
-  Digit5: "KEY_5",
-  Digit6: "KEY_6",
-  Digit7: "KEY_7",
-  KeyS: "KEY_S",
-};
 
 const checkRebootCombo = () => {
   // Check if both reboot combo keys are pressed
@@ -85,16 +68,19 @@ const checkRebootCombo = () => {
 
 const triggerReboot = async () => {
   try {
-    const response = await fetch("/api/system/reboot", {
-      method: "POST",
-    });
-    if (response.ok) {
-      showSystemRebootScheduled(notificationRef);
-    } else {
-      console.error("Failed to trigger reboot:", await response.text());
-    }
+    // The shared client is required: a 401 admin_required opens the in-place
+    // sign-in dialog here (CLV-9 §7), which a bare fetch() would bypass.
+    await api.post("/system/reboot");
+    showSystemRebootScheduled(notificationsStore);
   } catch (error) {
-    console.error("Error triggering reboot:", error);
+    // A 401 admin_required has already opened the in-place sign-in dialog via
+    // the shared client's interceptor; don't also report a failure.
+    if (error?.adminRequired) return;
+    // A refused reboot (e.g. 409 host_control_disabled) carries the reason the
+    // user needs; a generic "failed" would hide it.
+    const detail = error?.response?.data?.detail;
+    showSystemRebootFailed(notificationsStore, detailMessage(detail, ""));
+    console.error("Failed to trigger reboot:", detail ?? error?.message ?? error);
   }
 };
 
@@ -108,21 +94,21 @@ const onKeyDown = async event => {
     return;
   }
 
-  // Map browser key to our key code
-  const keyCode = keyCodeMap[event.code] || event.code;
+  const keyCode = normalizeKeyCode(event);
+
+  // Capture mode (settings remap): swallow the key, bind it, dispatch nothing.
+  if (keyboardStore.captureActive) {
+    event.preventDefault();
+    keyboardStore.handleCaptureKey(keyCode);
+    return;
+  }
 
   // Track pressed keys for reboot combo
   pressedKeys.add(keyCode);
   checkRebootCombo();
 
-  // Get keyboard type from store
-  const keyboardType = keyboardStore.keyboardType || "7-button";
-
-  // Get mappings for current keyboard type
-  // Mappings structure: { "7-button": { "KEY_1": "action" }, "standard": { ... } }
-  const mappings = keyboardStore.mappings[keyboardType] || {};
-
-  // Find action for this key
+  // Find action for this key (single unified map)
+  const mappings = keyboardStore.mappings || {};
   const action = mappings[keyCode];
 
   if (action && action !== "none") {
@@ -141,8 +127,7 @@ const onKeyDown = async event => {
 };
 
 const onKeyUp = event => {
-  // Map browser key to our key code
-  const keyCode = keyCodeMap[event.code] || event.code;
+  const keyCode = normalizeKeyCode(event);
 
   // Remove from pressed keys
   pressedKeys.delete(keyCode);
@@ -156,13 +141,10 @@ const onKeyUp = event => {
 const loadKeyboardConfig = async () => {
   try {
     await keyboardStore.fetchMappings();
-    // Load keyboard type from config API
-    const response = await fetch("/api/config");
+    // Load reboot-combo settings from config API (the kiosk's effective config on a kiosk)
+    const response = await fetch(configUrl());
     if (response.ok) {
       const config = await response.json();
-      if (config.keyboardType || config.keyboard_type) {
-        keyboardStore.setKeyboardType(config.keyboardType || config.keyboard_type);
-      }
       // Load reboot combo settings
       if (config.rebootComboKey1 || config.reboot_combo_key1) {
         const key1 = config.rebootComboKey1 || config.reboot_combo_key1;
@@ -205,31 +187,18 @@ watch(
   }
 );
 
-// Surface restart/update status as a toast so it's visible outside Settings
+// Surface restart/update status on the status rail so it's visible outside Settings
 const { updateMessage, updateMessageClass } = useSystem();
-const _msgClassToNotifType = {
+const _msgClassToSeverity = {
   info: "info",
   success: "success",
   error: "error",
   warning: "warning",
 };
-const _msgClassToDuration = {
-  info: 5000,
-  success: 4000,
-  error: 8000,
-  warning: 8000,
-};
-const _msgClassToIcon = { info: "🔄", success: "✓", error: "✗", warning: "⚠" };
 watch(updateMessage, msg => {
   if (!msg) return;
-  const cls = updateMessageClass.value || "info";
-  const type = _msgClassToNotifType[cls] ?? "info";
-  notificationRef.value?.show(
-    type,
-    _msgClassToIcon[cls] ?? "🔄",
-    msg,
-    _msgClassToDuration[cls] ?? 5000
-  );
+  const severity = _msgClassToSeverity[updateMessageClass.value] ?? "info";
+  notificationsStore.notify({ severity, eyebrow: "System", message: msg });
 });
 
 onMounted(async () => {
