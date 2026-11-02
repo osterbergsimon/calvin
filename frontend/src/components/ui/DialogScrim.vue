@@ -1,11 +1,8 @@
 <template>
-  <div class="dialog-scrim" :class="{ 'is-blurred': blur }" @click="$emit('dismiss')" />
+  <div class="dialog-scrim" @click="$emit('dismiss')" />
 </template>
 
 <script setup>
-defineProps({
-  blur: { type: Boolean, default: false },
-});
 defineEmits(["dismiss"]);
 </script>
 
@@ -16,13 +13,10 @@ defineEmits(["dismiss"]);
   /* On the dialog layer; every caller renders the scrim before its panel, so
      the panel (same layer, later in the DOM) paints above it. */
   z-index: var(--z-dialog);
-  background: color-mix(in srgb, var(--bg-0) 72%, transparent);
+  /* The dim is the whole effect: a backdrop blur re-runs over the full screen
+     on every fade frame, which crawls on the Pi kiosk (cog / WPE WebKit). */
+  background: color-mix(in srgb, var(--bg-0) 78%, transparent);
   animation: scrim-in var(--dur) var(--ease);
-}
-.dialog-scrim.is-blurred {
-  /* Progressive enhancement — Raspberry Pi GPUs may ignore/struggle with
-     backdrop-filter; the dim above is the reliable baseline. */
-  backdrop-filter: blur(6px);
 }
 @keyframes scrim-in {
   from {
