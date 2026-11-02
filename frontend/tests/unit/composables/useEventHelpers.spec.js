@@ -214,6 +214,20 @@ describe("useEventHelpers", () => {
       expect(formatSpy).toHaveBeenCalledTimes(2); // only the first event
       formatSpy.mockRestore();
     });
+
+    it("keys the cache by timezone as well as time format", () => {
+      const event = { ...timedEvent(), id: "cache-timezone" };
+      const formatSpy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+
+      mockConfigStore.timezone = "Europe/Stockholm";
+      eventHelpers.formatEventTime(event);
+      expect(formatSpy).toHaveBeenCalledTimes(2);
+
+      mockConfigStore.timezone = "America/New_York";
+      eventHelpers.formatEventTime(event);
+      expect(formatSpy).toHaveBeenCalledTimes(4);
+      formatSpy.mockRestore();
+    });
   });
 
   describe("getEventTitle", () => {

@@ -10,11 +10,15 @@ import { useConfigStore } from "../stores/config";
 const formattedTimeCache = new WeakMap();
 const formattedTimeCacheById = new Map();
 const FORMATTED_TIME_CACHE_MAX = 2000;
+const EVENT_TIME_LOCALE = "en-US";
 
 const stableCacheKey = (event, key) => {
   if (event?.id == null) return null;
   return `${event.id}\u0000${event.start ?? ""}\u0000${event.end ?? ""}\u0000${key}`;
 };
+
+const timeCacheKey = (kind, timeFormat, timezone) =>
+  `${kind}:${timeFormat}:${EVENT_TIME_LOCALE}:${timezone || "system"}`;
 
 const cachedFormattedTime = (event, key, format) => {
   const stableKey = stableCacheKey(event, key);
@@ -73,15 +77,16 @@ export function useEventHelpers() {
       return "All day";
     }
     const timeFormat = configStore.timeFormat || "24h";
-    return cachedFormattedTime(event, `range:${timeFormat}`, () => {
+    const timezone = configStore.timezone || "system";
+    return cachedFormattedTime(event, timeCacheKey("range", timeFormat, timezone), () => {
       const start = new Date(event.start);
       const end = new Date(event.end);
       const timeOptions =
         timeFormat === "24h"
           ? { hour: "2-digit", minute: "2-digit", hour12: false }
           : { hour: "numeric", minute: "2-digit", hour12: true };
-      const startTime = start.toLocaleTimeString("en-US", timeOptions);
-      const endTime = end.toLocaleTimeString("en-US", timeOptions);
+      const startTime = start.toLocaleTimeString(EVENT_TIME_LOCALE, timeOptions);
+      const endTime = end.toLocaleTimeString(EVENT_TIME_LOCALE, timeOptions);
       return `${startTime} - ${endTime}`;
     });
   };
@@ -95,13 +100,14 @@ export function useEventHelpers() {
       return "";
     }
     const timeFormat = configStore.timeFormat || "24h";
-    return cachedFormattedTime(event, `start:${timeFormat}`, () => {
+    const timezone = configStore.timezone || "system";
+    return cachedFormattedTime(event, timeCacheKey("start", timeFormat, timezone), () => {
       const start = new Date(event.start);
       const timeOptions =
         timeFormat === "24h"
           ? { hour: "2-digit", minute: "2-digit", hour12: false }
           : { hour: "numeric", minute: "2-digit", hour12: true };
-      return start.toLocaleTimeString("en-US", timeOptions);
+      return start.toLocaleTimeString(EVENT_TIME_LOCALE, timeOptions);
     });
   };
 
