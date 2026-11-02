@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 # Publishes ghcr.io/<owner>/calvin. develop is the deploy branch:
 #   push to develop  -> :develop + :sha-<commit>   (what Unraid / Pi run)
-#   push of a v* tag -> :X.Y.Z + :X.Y + :latest + :sha-<commit>
+#   push of a v* tag -> :X.Y.Z + :X.Y + :latest + :sha-<commit> (a prerelease tag such as v0.1.0-rc.1 gets :0.1.0-rc.1 and :sha-<commit> only)
 #   release please   -> release-please.yml dispatches this workflow at the new
 #                       tag with push_image=true, because a tag created with
 #                       GITHUB_TOKEN does not fire the push trigger below.
@@ -130,7 +130,7 @@ jobs:
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, '-') }}
 
       - name: Build and push runtime image
         id: build

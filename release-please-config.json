@@ -8,6 +8,10 @@
     ".": {
       "release-type": "simple",
       "package-name": "calvin",
+      "release-as": "0.1.0-rc.1",
+      "prerelease": true,
+      "versioning": "prerelease",
+      "prerelease-type": "rc",
       "changelog-path": "CHANGELOG.md",
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
