@@ -55,6 +55,75 @@ describe("kiosks store", () => {
     }
   });
 
+  it("refreshKiosks merges presence and software fields without replacing overrides", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [
+      {
+        id: "k1",
+        hostname: "pi",
+        lastSeen: "2026-07-12T00:00:00Z",
+        agentVersion: "old",
+        overrides: { displayName: "Draft name", orientation: "portrait" },
+      },
+    ];
+    api.get.mockResolvedValueOnce({
+      data: {
+        kiosks: [
+          {
+            id: "k1",
+            hostname: "pi",
+            lastSeen: "2026-07-12T00:00:30Z",
+            agentVersion: "new",
+            agentUpdateStatus: "ok",
+            overrides: { displayName: "Server name" },
+          },
+        ],
+      },
+    });
+
+    await store.refreshKiosks();
+
+    expect(store.kiosks[0]).toMatchObject({
+      lastSeen: "2026-07-12T00:00:30Z",
+      agentVersion: "new",
+      agentUpdateStatus: "ok",
+    });
+    expect(store.kiosks[0].overrides).toEqual({
+      displayName: "Draft name",
+      orientation: "portrait",
+    });
+  });
+
+  it("refreshKiosks ignores an older response that arrives after the latest refresh", async () => {
+    const store = useKiosksStore();
+    let resolveFirst;
+    let resolveSecond;
+    api.get
+      .mockReturnValueOnce(new Promise(resolve => (resolveFirst = resolve)))
+      .mockReturnValueOnce(new Promise(resolve => (resolveSecond = resolve)));
+
+    const first = store.refreshKiosks();
+    const second = store.refreshKiosks();
+    resolveSecond({ data: { kiosks: [{ id: "k1", lastSeen: "newest" }] } });
+    await second;
+    resolveFirst({ data: { kiosks: [{ id: "k1", lastSeen: "stale" }] } });
+    await first;
+
+    expect(store.kiosks[0].lastSeen).toBe("newest");
+  });
+
+  it("refreshKiosks quietly keeps the current list when the request fails", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", lastSeen: "2026-07-12T00:00:00Z" }];
+    const current = store.kiosks;
+    api.get.mockRejectedValueOnce(new Error("offline"));
+
+    await store.refreshKiosks();
+
+    expect(store.kiosks).toBe(current);
+    expect(store.kiosks[0].lastSeen).toBe("2026-07-12T00:00:00Z");
+  });
+
   it("fetchOverrides returns the layer, maps 404 to empty", async () => {
     const store = useKiosksStore();
     api.get.mockResolvedValueOnce({ data: { id: "k1", overrides: { orientation: "portrait" } } });
