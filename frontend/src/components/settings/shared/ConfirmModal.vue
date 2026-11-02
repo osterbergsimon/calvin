@@ -1,25 +1,44 @@
 <template>
-  <Dialog :model-value="show" :title="title" size="sm" @update:model-value="onDialogUpdate">
+  <Dialog
+    :model-value="show"
+    :title="title"
+    :size="alternativeText ? 'md' : 'sm'"
+    @update:model-value="onDialogUpdate"
+  >
     <p class="confirm-modal__message">{{ message }}</p>
     <!-- Optional extra body under the message, e.g. a SettingRow with a ToggleSwitch. -->
     <slot />
     <template #actions>
-      <Button variant="secondary" data-test="confirm-cancel" @click="handleCancel">Cancel</Button>
-      <Button
-        v-if="alternativeText"
-        variant="secondary"
-        data-test="confirm-alternative"
-        @click="handleAlternative"
+      <div
+        class="confirm-modal__actions"
+        :class="{ 'confirm-modal__actions--stacked': alternativeText }"
       >
-        {{ alternativeText }}
-      </Button>
-      <Button
-        :variant="danger ? 'danger' : 'primary'"
-        data-test="confirm-accept"
-        @click="handleConfirm"
-      >
-        {{ confirmText }}
-      </Button>
+        <Button
+          class="confirm-modal__action"
+          variant="secondary"
+          data-test="confirm-cancel"
+          @click="handleCancel"
+        >
+          Cancel
+        </Button>
+        <Button
+          v-if="alternativeText"
+          class="confirm-modal__action confirm-modal__alternative"
+          variant="secondary"
+          data-test="confirm-alternative"
+          @click="handleAlternative"
+        >
+          {{ alternativeText }}
+        </Button>
+        <Button
+          class="confirm-modal__action"
+          :variant="danger ? 'danger' : 'primary'"
+          data-test="confirm-accept"
+          @click="handleConfirm"
+        >
+          {{ confirmText }}
+        </Button>
+      </div>
     </template>
   </Dialog>
 </template>
@@ -87,5 +106,35 @@ const onDialogUpdate = value => {
   margin: 0;
   color: var(--ink);
   line-height: 1.5;
+}
+
+/* Let the actions stay Dialog's flex items on a roomy screen. */
+.confirm-modal__actions {
+  display: contents;
+}
+
+/* The alternative names a screen ("Hide on …"), and that name can be long:
+   wrap it inside its button rather than pushing the row past the dialog. */
+.confirm-modal__actions .confirm-modal__alternative {
+  max-width: 100%;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Three actions on a phone stack full-width, in Dialog's order: cancel and the
+   alternative sit above the filled danger action. A two-button confirm keeps
+   the old inline row. */
+@media (--bp-phone) {
+  .confirm-modal__actions--stacked {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .confirm-modal__actions--stacked :deep(.confirm-modal__action) {
+    width: 100%;
+  }
 }
 </style>
