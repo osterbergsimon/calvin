@@ -76,6 +76,15 @@ cannot find it as its predecessor.
   Docker build stamps the same release version (`CALVIN_VERSION`) and the
   commit (`CALVIN_GIT_SHA`) into the image; a git checkout reads the revision
   from git instead.
+- **Release candidates.** `release-please-config.json` has `prerelease: true`,
+  `versioning: prerelease` and `prerelease-type: rc`, so a release is marked as a
+  GitHub prerelease and the next one normally bumps the rc number (`0.1.0-rc.1` →
+  `0.1.0-rc.2`). An rc image is tagged `:0.1.0-rc.N` and `:sha-…` only; it never
+  becomes `:latest` or `:0.1`. The first candidate is pinned with
+  `release-as: 0.1.0-rc.1`. **Remove `release-as` in a PR to `develop` right after
+  the rc.1 release PR merges**, or the next release PR proposes `0.1.0-rc.1`
+  again. For the final `0.1.0`, set `release-as: 0.1.0` and remove the three
+  prerelease keys, then remove `release-as` once more after that release.
 - After `1.0.0`, normal semver applies: breaking → major, `feat` → minor.
 
 ## Images a release publishes
