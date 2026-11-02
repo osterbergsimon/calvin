@@ -154,6 +154,17 @@ describe("LoadingLight (CLV-115)", () => {
       expect(indicator(r1).classes()).not.toContain("is-active");
       expect(indicator(r2).classes()).not.toContain("is-active");
     });
+
+    it("region frames use the static comet edge; the app frame draws the train (calvin-c3jz)", () => {
+      const region = mount(LoadingLight, { props: { regionId: "r1" } });
+      const app = mount(LoadingLight);
+
+      expect(region.find(".comet__edge").exists()).toBe(true);
+      expect(region.findAll(".comet__bead")).toHaveLength(0);
+
+      expect(app.find(".comet__edge").exists()).toBe(false);
+      expect(app.findAll(".comet__bead").length).toBeGreaterThan(0);
+    });
   });
 
   it("Off still lets the connection pill speak when a load fails", async () => {

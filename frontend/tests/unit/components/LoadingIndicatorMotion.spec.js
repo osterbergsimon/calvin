@@ -20,7 +20,8 @@ const read = path => readFileSync(resolve(__dirname, "../../../src", path), "utf
 const styleOf = sfc => sfc.slice(sfc.indexOf("<style"), sfc.indexOf("</style>"));
 const PULSE_SFC = read("components/indicators/PulseIndicator.vue");
 const PULSE = styleOf(PULSE_SFC);
-const COMET = styleOf(read("components/indicators/CometIndicator.vue"));
+const COMET_SFC = read("components/indicators/CometIndicator.vue");
+const COMET = styleOf(COMET_SFC);
 const BASE = read("styles/base.css");
 
 const block = (css, at) => {
@@ -88,4 +89,27 @@ describe("idle indicators do not animate (CLV-115)", () => {
 
   it("Pulse ring is paused unless .is-active", () => pausedUnlessActive(PULSE, ".pulse__ring"));
   it("Comet beads are paused unless .is-active", () => pausedUnlessActive(COMET, ".comet__bead"));
+});
+
+describe("the comet is a short, cheap train (calvin-c3jz)", () => {
+  it("uses a handful of beads, not 22", () => {
+    const match = COMET_SFC.match(/const beadCount = (\d+)/);
+    expect(Number(match?.[1])).toBeLessThanOrEqual(8);
+    expect(Number(match?.[1])).toBeGreaterThan(0);
+  });
+
+  it("paints one shadow layer per bead", () => {
+    const bead = block(COMET, ".comet__bead");
+    const shadow = bead.match(/box-shadow:\s*([^;]+);/)?.[1] || "";
+    // No commas at the top level: a single shadow layer.
+    expect(shadow).not.toMatch(/,/);
+  });
+
+  it("region frames draw a static edge, never an offset-path bead train", () => {
+    expect(COMET).not.toMatch(/\.loading-indicator--region\s+\.comet__bead/);
+    expect(COMET).toMatch(/\.comet__edge\s*\{[^}]*box-shadow/);
+    // The edge has no animation of its own; only the container fades.
+    const edge = block(COMET, ".comet__edge");
+    expect(edge).not.toMatch(/animation|offset-path/);
+  });
 });
