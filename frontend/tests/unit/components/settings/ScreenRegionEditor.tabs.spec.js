@@ -49,7 +49,7 @@ class FakeResizeObserver {
 }
 
 const region = (over = {}) => ({ size: 50, instanceIds: [], ...over });
-const config = () => ({
+const config = (over = {}) => ({
   orientation: "landscape",
   clockBarEnabled: true,
   clockBarPosition: "top",
@@ -73,14 +73,15 @@ const config = () => ({
       },
     ],
   },
+  ...over,
 });
 
-const mountEditor = async (kiosks = []) => {
+const mountEditor = async (kiosks = [], overrides = {}) => {
   const store = useKiosksStore();
   store.kiosks = kiosks;
   store.loadKiosks = vi.fn();
   const w = mount(ScreenRegionEditor, {
-    props: { config: config(), open: true },
+    props: { config: config(overrides), open: true },
     global: { stubs: { teleport: true } },
   });
   await flushPromises();
@@ -130,7 +131,7 @@ describe("ScreenRegionEditor page tabs", () => {
     ]);
     const tab = w.findAll(".tabs__tab")[0];
     expect(tab.find(".tabs__label").text()).toBe("Home");
-    expect(tab.find(".tabs__meta").text()).toBe("Kitchen");
+    expect(tab.find(".tabs__meta").text()).toBe("Kitchen · browsers");
     // The name and the screens text are siblings on one row, not a stacked body.
     expect(tab.find(".tabs__body").exists()).toBe(false);
     expect(tab.findAll(".tabs__label, .tabs__meta")).toHaveLength(2);
@@ -155,8 +156,8 @@ describe("ScreenRegionEditor page tabs", () => {
     ]);
     const tab = w.findAll(".tabs__tab")[0];
     const screens = tab.find(".tabs__meta");
-    expect(screens.text()).toBe("Kitchen, Hallway");
-    expect(tab.attributes("title")).toContain("Kitchen, Hallway");
+    expect(screens.text()).toBe("Kitchen, Hallway · browsers");
+    expect(tab.attributes("title")).toContain("Kitchen, Hallway · browsers");
     // No aria-label override: the visible text (including the full screens
     // line, not just the truncated meta) is the accessible name.
     expect(tab.attributes("aria-label")).toBeUndefined();
@@ -166,10 +167,12 @@ describe("ScreenRegionEditor page tabs", () => {
     expect(meta).toContain("text-overflow: ellipsis");
   });
 
-  it("says Not shown in warn ink instead of the old wording", async () => {
-    const w = await mountEditor([{ id: "hall", overrides: { availableScreens: [] } }]);
+  it("says Not shown anywhere in warn ink instead of the old wording", async () => {
+    const w = await mountEditor([{ id: "hall", overrides: { availableScreens: [] } }], {
+      availableScreens: [],
+    });
     const screens = w.findAll(".tabs__meta")[0];
-    expect(screens.text()).toBe("Not shown");
+    expect(screens.text()).toBe("Not shown anywhere");
     expect(screens.classes()).toContain("tabs__meta--warn");
     expect(ruleBody(TABS_STYLE, ".tabs__meta--warn")).toContain("var(--warn)");
   });

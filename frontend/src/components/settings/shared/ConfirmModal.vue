@@ -6,6 +6,14 @@
     <template #actions>
       <Button variant="secondary" data-test="confirm-cancel" @click="handleCancel">Cancel</Button>
       <Button
+        v-if="alternativeText"
+        variant="secondary"
+        data-test="confirm-alternative"
+        @click="handleAlternative"
+      >
+        {{ alternativeText }}
+      </Button>
+      <Button
         :variant="danger ? 'danger' : 'primary'"
         data-test="confirm-accept"
         @click="handleConfirm"
@@ -49,9 +57,12 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  // An optional less-destructive choice beside Cancel (e.g. "Hide on Kitchen"
+  // in the delete-everywhere confirm).
+  alternativeText: { type: String, default: "" },
 });
 
-const emit = defineEmits(["confirm", "cancel"]);
+const emit = defineEmits(["confirm", "cancel", "alternative"]);
 
 const handleConfirm = () => {
   emit("confirm");
@@ -59,6 +70,10 @@ const handleConfirm = () => {
 
 const handleCancel = () => {
   emit("cancel");
+};
+
+const handleAlternative = () => {
+  emit("alternative");
 };
 
 // Closing from Escape, the scrim or the × is a cancel.
