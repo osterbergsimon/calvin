@@ -575,6 +575,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
+import { useIntervalWhenVisible } from "@/composables/useIntervalWhenVisible";
 import {
   hasUpdateError,
   isUpdateBlocked,
@@ -946,7 +947,9 @@ const effSchedule = computed(() =>
 const powerTimeZone = computed(() => effectiveTimeZone(props.config));
 const nowTick = ref(Date.now());
 const now = () => new Date(nowTick.value);
-let nowTimer = null;
+useIntervalWhenVisible(() => {
+  nowTick.value = Date.now();
+}, 15000);
 const activeOverride = computed(() =>
   activePowerOverride(overrides.value.screenNow, {
     enabled: effScheduleEnabled.value,
@@ -1351,17 +1354,21 @@ async function updateAll() {
 // --- presence + versions ------------------------------------------------
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
+useIntervalWhenVisible(() => {
+  store.refreshKiosks();
+}, 30000);
+
 function isPending(k) {
   const desired = desiredVersions.value[k.id];
   return !isOnline(k) && !!desired && k.lastAppliedVersion !== desired;
 }
 function isOnline(k) {
   if (!k.lastSeen) return false;
-  return Date.now() - Date.parse(k.lastSeen) < ONLINE_WINDOW_MS;
+  return nowTick.value - Date.parse(k.lastSeen) < ONLINE_WINDOW_MS;
 }
 function relativeTime(iso) {
   if (!iso) return "never";
-  const secs = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  const secs = Math.max(0, Math.round((nowTick.value - Date.parse(iso)) / 1000));
   if (secs < 60) return `${secs}s ago`;
   if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
   if (secs < 86400) return `${Math.round(secs / 3600)}h ago`;
@@ -1373,9 +1380,6 @@ async function refreshDesiredVersion(id) {
 }
 
 onMounted(async () => {
-  nowTimer = window.setInterval(() => {
-    nowTick.value = Date.now();
-  }, 30000);
   refreshBrowserCount();
   await store.loadKiosks();
   if (kiosks.value.length === 0) addOpen.value = true;
@@ -1392,7 +1396,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (nowTimer !== null) window.clearInterval(nowTimer);
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
     narrowMql.removeEventListener("change", onNarrowChange);
