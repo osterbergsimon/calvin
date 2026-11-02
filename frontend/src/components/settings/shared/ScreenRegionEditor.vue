@@ -680,10 +680,16 @@ const setAnyBrowserOrientation = next => {
   // Preview-only: never emitted, never saved.
   anyBrowserOrientation.value = next;
 };
-// The shared orientation can hydrate after the editor mounts.
-watch(orientationConfig, next => {
-  if (previewScreenId.value === ANY_BROWSER) anyBrowserOrientation.value = next;
-});
+// The shared orientation can hydrate after the editor mounts. `immediate` also
+// seeds the Any-browser preview from a config that is already loaded, so the
+// first render is in the configured orientation rather than landscape.
+watch(
+  orientationConfig,
+  next => {
+    if (previewScreenId.value === ANY_BROWSER) anyBrowserOrientation.value = next;
+  },
+  { immediate: true }
+);
 
 /* --- layout direction + clock bar --- */
 const layoutDir = computed(() => getLayoutDirection(activeScreen.value.layout, orientation.value));
@@ -712,7 +718,18 @@ const clockSelected = ref(false);
 
 const deviceBox = computed(() => {
   const vp = previewViewport.value;
-  const aspect = vp ? vp.w / vp.h : orientation.value === "portrait" ? 9 / 16 : 16 / 9;
+  const portrait = orientation.value === "portrait";
+  // A kiosk reports the raw browser viewport, which can disagree with the
+  // orientation it is configured for (a rotated display still reports a
+  // landscape window). Trust the orientation in that case and swap the aspect.
+  let aspect;
+  if (vp) {
+    const reported = vp.w / vp.h;
+    const agrees = portrait ? vp.w <= vp.h : vp.h <= vp.w;
+    aspect = agrees ? reported : vp.h / vp.w;
+  } else {
+    aspect = portrait ? 9 / 16 : 16 / 9;
+  }
   const stageW = stageSize.value.width;
   const stageH = stageSize.value.height;
   let width;
