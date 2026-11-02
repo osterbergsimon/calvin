@@ -167,7 +167,7 @@ defineProps({
 }
 
 .btn--link {
-  min-height: 0;
+  min-height: var(--touch-target);
   padding: 0;
   font-weight: var(--weight-body);
   color: var(--ink);

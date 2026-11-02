@@ -124,6 +124,12 @@ describe("Button doctrine contract", () => {
     );
   });
 
+  it("keeps a text link at the touch target", () => {
+    // Links are real controls too: a 44px box in the flow (not an overlay)
+    // keeps the target without reaching the row beside it.
+    expect(STYLE).toMatch(/\.btn--link\s*\{[^}]*min-height:\s*var\(--touch-target\)/s);
+  });
+
   it("halves opacity and blocks the cursor when disabled", () => {
     expect(STYLE).toMatch(/\.btn:disabled\s*\{[^}]*opacity:\s*0\.5/s);
     expect(STYLE).toMatch(/\.btn:disabled\s*\{[^}]*cursor:\s*not-allowed/s);
