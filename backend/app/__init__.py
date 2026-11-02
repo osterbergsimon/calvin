@@ -1,3 +1,3 @@
 """Calvin Dashboard Backend"""
 
-__version__ = "0.1.0-rc.1"  # x-release-please-version
+__version__ = "0.1.0-rc.2"  # x-release-please-version
