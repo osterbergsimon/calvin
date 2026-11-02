@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia, setActivePinia } from "pinia";
 import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
@@ -80,6 +80,7 @@ function mountScreens({
   store.loadKiosks = vi.fn(async () => {
     store.kiosks = kiosks;
   });
+  store.refreshKiosks = vi.fn(async () => {});
   store.fetchOverrides = vi.fn(async () => overrides);
   store.saveOverrides = vi.fn(async () => {});
   store.setKioskOverrides = vi.fn((id, next) => {
@@ -314,6 +315,139 @@ describe("ScreensSettings — screen list", () => {
     expect(wrapper.find("[data-test='screen-summary']").text()).toBe(
       "2 pages · landscape · off 23:00–06:30"
     );
+  });
+});
+
+describe("ScreensSettings — live kiosk presence", () => {
+  const mounted = [];
+
+  function mountPresence(options) {
+    const result = mountScreens(options);
+    mounted.push(result.wrapper);
+    return result;
+  }
+
+  function setVisibility(value) {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  });
+
+  afterEach(() => {
+    mounted.splice(0).forEach(wrapper => wrapper.unmount());
+    delete document.visibilityState;
+    vi.useRealTimers();
+  });
+
+  it("refreshes every 30 seconds while visible, pauses while hidden, and resumes immediately", async () => {
+    const { store } = mountPresence();
+    await flushPromises();
+    expect(store.loadKiosks).toHaveBeenCalledTimes(1);
+    expect(store.refreshKiosks).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(90000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+
+    setVisibility("visible");
+    await flushPromises();
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(3);
+  });
+
+  it("clears the refresh interval on unmount", async () => {
+    const { wrapper, store } = mountPresence();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+
+    wrapper.unmount();
+    await vi.advanceTimersByTimeAsync(60000);
+    setVisibility("visible");
+    await flushPromises();
+
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a refreshed kiosk Online past the two-minute presence window", async () => {
+    const { wrapper, store } = mountPresence({
+      kiosks: [kiosk({ lastSeen: new Date().toISOString() })],
+    });
+    await flushPromises();
+    store.refreshKiosks.mockImplementation(async () => {
+      store.kiosks = [kiosk({ lastSeen: new Date().toISOString() })];
+    });
+
+    await vi.advanceTimersByTimeAsync(125000);
+
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(4);
+    expect(wrapper.find("[data-test='screen-status']").text()).toBe("Online");
+  });
+
+  it("re-renders relative last-seen time and the Online tag on the 15-second clock", async () => {
+    const { wrapper } = mountPresence({
+      kiosks: [kiosk({ lastSeen: new Date(Date.now() - 12000).toISOString() })],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    let header = wrapper.findComponent(KioskStatusHeader);
+    expect(header.props("lastSeenLabel")).toBe("12s ago");
+    expect(header.props("online")).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(15000);
+    header = wrapper.findComponent(KioskStatusHeader);
+    expect(header.props("lastSeenLabel")).toBe("27s ago");
+    expect(header.props("online")).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(105000);
+    header = wrapper.findComponent(KioskStatusHeader);
+    expect(header.props("lastSeenLabel")).toBe("2m ago");
+    expect(header.props("online")).toBe(false);
+    expect(wrapper.find("[data-test='screen-status']").text()).toBe("Offline");
+  });
+
+  it("does not reset selected overrides, an unsaved name, or an open editor on refresh", async () => {
+    const original = { displayName: "Original", orientation: "portrait" };
+    const { wrapper, store } = mountPresence({
+      kiosks: [kiosk({ overrides: original })],
+      overrides: original,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    const nameInput = wrapper.find("[data-test='screen-name-input']");
+    await nameInput.setValue("Saved name");
+    await nameInput.trigger("blur");
+    await flushPromises();
+    const savedMessage = wrapper.find("#section-screen-name .screens-saved").text();
+    await nameInput.setValue("Unsaved draft");
+    await wrapper.find("[data-test='edit-pages-btn']").trigger("click");
+    store.refreshKiosks.mockImplementation(async () => {
+      store.kiosks = store.kiosks.map(k => ({
+        ...k,
+        lastSeen: new Date().toISOString(),
+        agentVersion: "new-version",
+      }));
+    });
+
+    await vi.advanceTimersByTimeAsync(30000);
+
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+    expect(store.fetchOverrides).toHaveBeenCalledTimes(1);
+    expect(wrapper.find("[data-test='screen-name-input']").element.value).toBe("Unsaved draft");
+    expect(wrapper.find("#section-screen-name .screens-saved").text()).toBe(savedMessage);
+    expect(wrapper.findComponent(ScreenRegionEditor).props("open")).toBe(true);
+    expect(store.kiosks[0].overrides).toEqual({ ...original, displayName: "Saved name" });
   });
 });
 

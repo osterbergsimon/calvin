@@ -9,6 +9,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const useKiosksStore = defineStore("kiosks", () => {
   const kiosks = ref([]);
+  let refreshSequence = 0;
 
   async function loadKiosks() {
     try {
@@ -19,6 +20,25 @@ export const useKiosksStore = defineStore("kiosks", () => {
       logError("[kiosks]", "Failed to load kiosks, using cache:", err);
       const cached = getCachedData(CACHE_KEY, CACHE_TTL, { allowStale: true });
       if (cached) kiosks.value = cached;
+    }
+  }
+
+  // Background presence refreshes must not replace configuration currently
+  // being edited. Merge each kiosk's live fields but retain its list overrides.
+  async function refreshKiosks() {
+    const sequence = ++refreshSequence;
+    try {
+      const response = await api.get("/kiosks");
+      if (sequence !== refreshSequence) return;
+      const currentById = new Map(kiosks.value.map(k => [k.id, k]));
+      const fresh = response.data?.kiosks ?? [];
+      kiosks.value = fresh.map(k => {
+        const current = currentById.get(k.id);
+        return current ? { ...k, overrides: current.overrides ?? k.overrides } : k;
+      });
+      setCachedData(CACHE_KEY, kiosks.value);
+    } catch {
+      // Quietly keep the last good data; the next visible interval can retry.
     }
   }
 
@@ -71,6 +91,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
   return {
     kiosks,
     loadKiosks,
+    refreshKiosks,
     fetchOverrides,
     saveOverrides,
     setKioskOverrides,
