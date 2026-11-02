@@ -159,4 +159,28 @@ describe("pageTogglePlan", () => {
       })
     ).toEqual({ error: "Pick at least one page." });
   });
+
+  it("ignores ghost ids when refusing the last real page on a screen", () => {
+    expect(
+      pageTogglePlan({
+        pageId: "home",
+        checked: false,
+        targetOverrides: { availableScreens: ["ghost", "home"] },
+        defaultList: null,
+        pages,
+      })
+    ).toEqual({ error: "Pick at least one page." });
+  });
+
+  it("ignores ghost ids when refusing the last real page on Default", () => {
+    expect(
+      pageTogglePlan({
+        pageId: "home",
+        checked: false,
+        targetIsDefault: true,
+        defaultList: ["ghost", "home"],
+        pages,
+      })
+    ).toEqual({ error: "Pick at least one page." });
+  });
 });
