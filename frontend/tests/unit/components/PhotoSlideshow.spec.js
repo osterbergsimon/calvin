@@ -262,7 +262,7 @@ describe("PhotoSlideshow", () => {
       expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
     });
 
-    it("shows a portrait photo whole over a blurred backdrop in a full-width region", async () => {
+    it("shows a portrait photo whole over a soft backdrop in a full-width region", async () => {
       imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
       const wrapper = createWrapper({ fit: "smart" });
       await setContainer(wrapper, 1600, 900);
