@@ -232,6 +232,16 @@ describe("ScreenRegionEditor size classes", () => {
     expect(w.find(".dialog-overlay").classes()).toContain("dialog-above-osk");
   });
 
+  it("previews the orientation the config already has when it opens", async () => {
+    // The editor normally mounts with the shared config already loaded: the
+    // Any-browser preview must start from that orientation, not landscape.
+    const w = await mountEditor({ config: { ...baseConfig(), orientation: "portrait" } });
+    await resize(w, ".dialog-overlay", 800, 480);
+    const { width, height } = deviceBox(w);
+    expect(height).toBeGreaterThan(width);
+    expect(w.find('[data-test="orientation-caption"]').text()).toBe("Portrait");
+  });
+
   it("moves the orientation badge under the device in Compact", async () => {
     const w = await mountEditor();
     await resize(w, ".dialog-overlay", 800, 480);
