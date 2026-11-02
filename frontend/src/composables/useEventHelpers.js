@@ -2,6 +2,42 @@
 import { useCalendarStore } from "../stores/calendar";
 import { useConfigStore } from "../stores/config";
 
+// Formatted strings are render-only: cache them per event and time format so
+// a calendar re-render does not call toLocaleTimeString again for every chip
+// (22 events x start/end on each page switch). The event-id index also keeps
+// the strings when a region remount replaces the event objects with an
+// identical fetch result.
+const formattedTimeCache = new WeakMap();
+const formattedTimeCacheById = new Map();
+const FORMATTED_TIME_CACHE_MAX = 2000;
+
+const stableCacheKey = (event, key) => {
+  if (event?.id == null) return null;
+  return `${event.id}\u0000${event.start ?? ""}\u0000${event.end ?? ""}\u0000${key}`;
+};
+
+const cachedFormattedTime = (event, key, format) => {
+  const stableKey = stableCacheKey(event, key);
+  if (stableKey && formattedTimeCacheById.has(stableKey)) {
+    return formattedTimeCacheById.get(stableKey);
+  }
+  let entries = formattedTimeCache.get(event);
+  if (!entries) {
+    entries = new Map();
+    formattedTimeCache.set(event, entries);
+  }
+  if (entries.has(key)) return entries.get(key);
+  const value = format();
+  entries.set(key, value);
+  if (stableKey) {
+    if (formattedTimeCacheById.size >= FORMATTED_TIME_CACHE_MAX) {
+      formattedTimeCacheById.clear();
+    }
+    formattedTimeCacheById.set(stableKey, value);
+  }
+  return value;
+};
+
 /**
  * Composable for event-related helper functions
  */
@@ -36,16 +72,18 @@ export function useEventHelpers() {
     if (event.all_day) {
       return "All day";
     }
-    const start = new Date(event.start);
-    const end = new Date(event.end);
     const timeFormat = configStore.timeFormat || "24h";
-    const timeOptions =
-      timeFormat === "24h"
-        ? { hour: "2-digit", minute: "2-digit", hour12: false }
-        : { hour: "numeric", minute: "2-digit", hour12: true };
-    const startTime = start.toLocaleTimeString("en-US", timeOptions);
-    const endTime = end.toLocaleTimeString("en-US", timeOptions);
-    return `${startTime} - ${endTime}`;
+    return cachedFormattedTime(event, `range:${timeFormat}`, () => {
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      const timeOptions =
+        timeFormat === "24h"
+          ? { hour: "2-digit", minute: "2-digit", hour12: false }
+          : { hour: "numeric", minute: "2-digit", hour12: true };
+      const startTime = start.toLocaleTimeString("en-US", timeOptions);
+      const endTime = end.toLocaleTimeString("en-US", timeOptions);
+      return `${startTime} - ${endTime}`;
+    });
   };
 
   /**
@@ -56,13 +94,15 @@ export function useEventHelpers() {
     if (event.all_day) {
       return "";
     }
-    const start = new Date(event.start);
     const timeFormat = configStore.timeFormat || "24h";
-    const timeOptions =
-      timeFormat === "24h"
-        ? { hour: "2-digit", minute: "2-digit", hour12: false }
-        : { hour: "numeric", minute: "2-digit", hour12: true };
-    return start.toLocaleTimeString("en-US", timeOptions);
+    return cachedFormattedTime(event, `start:${timeFormat}`, () => {
+      const start = new Date(event.start);
+      const timeOptions =
+        timeFormat === "24h"
+          ? { hour: "2-digit", minute: "2-digit", hour12: false }
+          : { hour: "numeric", minute: "2-digit", hour12: true };
+      return start.toLocaleTimeString("en-US", timeOptions);
+    });
   };
 
   /**

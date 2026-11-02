@@ -162,6 +162,60 @@ describe("useEventHelpers", () => {
     });
   });
 
+  describe("formatted event time cache", () => {
+    const timedEvent = () => ({
+      id: "cache-1",
+      title: "Cached",
+      all_day: false,
+      start: "2024-01-15T10:00:00Z",
+      end: "2024-01-15T11:30:00Z",
+    });
+
+    it("formats the same event once per time format", () => {
+      const event = timedEvent();
+      const formatSpy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+
+      const first = eventHelpers.formatEventTime(event);
+      const second = eventHelpers.formatEventTime(event);
+      expect(second).toBe(first);
+      expect(formatSpy).toHaveBeenCalledTimes(2); // start + end, once
+
+      formatSpy.mockClear();
+      eventHelpers.formatEventTime(event);
+      expect(formatSpy).not.toHaveBeenCalled();
+
+      mockConfigStore.timeFormat = "12h";
+      eventHelpers.formatEventTime(event);
+      expect(formatSpy).toHaveBeenCalledTimes(2); // a new format is a new entry
+      formatSpy.mockRestore();
+    });
+
+    it("caches the compact start time too", () => {
+      const event = timedEvent();
+      const formatSpy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+
+      const first = eventHelpers.formatEventStartTime(event);
+      const second = eventHelpers.formatEventStartTime(event);
+
+      expect(second).toBe(first);
+      expect(formatSpy).toHaveBeenCalledTimes(1);
+      formatSpy.mockRestore();
+    });
+
+    it("reuses the formatted string for an identical event after a refetch", () => {
+      const event = { ...timedEvent(), id: "cache-refetch" };
+      const formatSpy = vi.spyOn(Date.prototype, "toLocaleTimeString");
+
+      const first = eventHelpers.formatEventTime(event);
+      const refetched = { ...event };
+      const second = eventHelpers.formatEventTime(refetched);
+
+      expect(second).toBe(first);
+      expect(formatSpy).toHaveBeenCalledTimes(2); // only the first event
+      formatSpy.mockRestore();
+    });
+  });
+
   describe("getEventTitle", () => {
     it("should return event title with time", () => {
       mockConfigStore.timeFormat = "24h";
