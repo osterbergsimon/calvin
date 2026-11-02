@@ -4,6 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import { mdiChevronLeft, mdiChevronRight, mdiFullscreen } from "@mdi/js";
@@ -260,7 +262,7 @@ describe("PhotoSlideshow", () => {
       expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
     });
 
-    it("shows a portrait photo whole over a blurred backdrop in a full-width region", async () => {
+    it("shows a portrait photo whole over a soft backdrop in a full-width region", async () => {
       imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
       const wrapper = createWrapper({ fit: "smart" });
       await setContainer(wrapper, 1600, 900);
@@ -269,8 +271,22 @@ describe("PhotoSlideshow", () => {
       expect(img.attributes("style")).toContain("object-fit: contain");
       const backdrop = wrapper.find(".photo-backdrop");
       expect(backdrop.exists()).toBe(true);
-      expect(backdrop.attributes("src")).toBe("/api/images/1?w=1920");
+      expect(backdrop.find(".photo-backdrop__image").attributes("src")).toBe("/api/images/1?w=640");
       expect(backdrop.attributes("aria-hidden")).toBe("true");
+    });
+
+    it("uses the smallest backend image for the backdrop and never a CSS blur", async () => {
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      const backdrop = wrapper.find(".photo-backdrop");
+      const image = backdrop.find("img.photo-backdrop__image");
+      // Smallest width variant: upscaling it is naturally soft, so the kiosk
+      // never runs a full-region filter.
+      expect(image.attributes("src")).toBe("/api/images/1?w=640");
+      expect(backdrop.attributes("style") || "").not.toMatch(/filter/);
+      expect(image.attributes("style") || "").not.toMatch(/filter/);
     });
 
     it("shows a landscape photo whole in a 9:16 region", async () => {
@@ -481,6 +497,27 @@ describe("PhotoSlideshow", () => {
   });
 
   // CLV-115: loading the photo source lights the region; rotation does not.
+  describe("backdrop CSS (kiosk GPU)", () => {
+    const SOURCE = readFileSync(
+      resolve(__dirname, "../../../src/components/PhotoSlideshow.vue"),
+      "utf-8"
+    );
+    const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
+
+    it("covers the letterbox with the upscaled thumbnail and a plain dark overlay", () => {
+      expect(STYLE).toMatch(/\.photo-backdrop\s*\{[^}]*overflow:\s*hidden/);
+      expect(STYLE).toMatch(/\.photo-backdrop__image\s*\{[^}]*object-fit:\s*cover/);
+      expect(STYLE).toMatch(
+        /\.photo-backdrop::after\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--scrim-solid\) 45%, transparent\)/
+      );
+    });
+
+    it("never runs a filter on the photo backdrop", () => {
+      expect(STYLE).not.toMatch(/filter\s*:/);
+      expect(STYLE).not.toMatch(/backdrop-filter/);
+    });
+  });
+
   describe("loading light", () => {
     it("fetching the photo source lights this region's frame", async () => {
       let resolve;
@@ -581,7 +618,8 @@ describe("PhotoSlideshow", () => {
 
       // 700 CSS px x 2 DPR = 1400 -> the 1920 bucket.
       expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=1920");
-      expect(wrapper.find(".photo-backdrop").attributes("src")).toBe("/api/images/1?w=1920");
+      // The backdrop is deliberately the smallest bucket, never the display one.
+      expect(wrapper.find(".photo-backdrop__image").attributes("src")).toBe("/api/images/1?w=640");
     });
 
     it("only re-requests when the region grows into a bigger bucket", async () => {

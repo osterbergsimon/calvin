@@ -66,17 +66,17 @@
           <!-- The container exists before the first request so the observer
                can measure it; no src is set until that measurement exists. -->
           <template v-if="currentImageUrl">
-            <!-- Blurred copy of the same photo, so a whole photo never sits on
-                 black bars. aria-hidden: it is decoration. -->
-            <img
-              v-if="fitDecision.backdrop"
-              :src="currentImageUrl"
-              class="photo-backdrop"
-              alt=""
-              aria-hidden="true"
-              decoding="async"
-              loading="eager"
-            />
+            <!-- A tiny upscaled copy of the same photo, so a whole photo never
+                 sits on black bars. aria-hidden: it is decoration. -->
+            <div v-if="fitDecision.backdrop" class="photo-backdrop" aria-hidden="true">
+              <img
+                :src="backdropImageUrl"
+                class="photo-backdrop__image"
+                alt=""
+                decoding="async"
+                loading="eager"
+              />
+            </div>
             <img
               :src="currentImageUrl"
               :alt="currentImage?.filename || 'Photo'"
@@ -201,6 +201,13 @@ const currentImageUrl = computed(() => {
   if (!url || !requestedWidth.value) return null;
   return withImageWidth(url, requestedWidth.value);
 });
+
+// The backdrop is the smallest width bucket the backend serves (640), not the
+// full-size display variant. Upscaling it is naturally soft, so the kiosk never
+// runs a full-region CSS blur on every photo change.
+const backdropImageUrl = computed(() =>
+  withImageWidth(imagesStore.getCurrentImageUrlForSource(props.sourceIds), 640)
+);
 
 // Get display mode from the region. Photo frame / fullscreen always belongs to
 // a different shape than any region, so it is deliberately Smart.
@@ -498,17 +505,30 @@ watch(sourceKey, async () => {
   overflow: hidden;
 }
 
-/* Blurred, dimmed copy of the current photo: fills the letterbox behind a
-   whole photo so there are no black bars. Scaled slightly to hide edges. */
+/* Tiny (200px) copy of the current photo, upscaled to cover the letterbox so
+   there are no black bars. Scaling up is naturally soft; the dark overlay does
+   the rest. Never put a CSS blur on this surface: on the Pi kiosk it re-runs
+   over the whole region on every photo change. */
 .photo-backdrop {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.photo-backdrop__image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(28px) brightness(0.55);
-  transform: scale(1.1);
-  pointer-events: none;
+  image-rendering: auto;
+}
+
+.photo-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* ~45% black: --scrim-solid is the non-themed photo backdrop token. */
+  background: color-mix(in srgb, var(--scrim-solid) 45%, transparent);
 }
 
 .photo-image {

@@ -264,30 +264,29 @@ onUnmounted(() => {
 @keyframes lamp-arrive {
   from {
     opacity: 0;
-    filter: brightness(2.2);
   }
   to {
     opacity: 1;
-    filter: brightness(1);
   }
 }
 
-/* Warning-annunciator double-blink on arrival. */
+/* Warning-annunciator double-blink on arrival. A blink of opacity keeps the
+   compositor busy only; animating filter: brightness repaints the glow. */
 @keyframes lamp-alert {
   0% {
-    filter: brightness(2.4);
+    opacity: 1;
   }
   20% {
-    filter: brightness(1);
+    opacity: 0.35;
   }
   40% {
-    filter: brightness(2.4);
+    opacity: 1;
   }
   70% {
-    filter: brightness(1);
+    opacity: 0.35;
   }
   100% {
-    filter: brightness(1);
+    opacity: 1;
   }
 }
 
