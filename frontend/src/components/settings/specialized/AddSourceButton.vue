@@ -37,7 +37,7 @@ import { useConfigStore } from "@/stores/config";
 import { mdiUpload } from "@mdi/js";
 import InstanceModal from "./InstanceModal.vue";
 import ProviderPicker from "./ProviderPicker.vue";
-import ConfirmModal from "../shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { pickerCatalogRepo, isCatalogEntry, isTestPlugin } from "@/utils/pluginCatalog";
 
 // The single "Add …" entry point for every Content section (§3.2). It picks a

@@ -203,7 +203,7 @@ import SettingGroup from "@/components/ui/SettingGroup.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 
 // Settings › Content › Photos: share links for guest photo upload (calvin-mwqo).

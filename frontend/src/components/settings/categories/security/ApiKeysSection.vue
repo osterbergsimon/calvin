@@ -192,7 +192,7 @@ import ListRow from "@/components/ui/ListRow.vue";
 import TextField from "@/components/ui/TextField.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 
 const HOST_UNAVAILABLE = "Not available: this Calvin doesn't control its machine.";
 const scopeOptions = [

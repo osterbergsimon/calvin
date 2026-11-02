@@ -47,7 +47,7 @@ import { normalizeHotCornerPosition } from "../../utils/hotCorner";
 import Button from "../ui/Button.vue";
 import Menu from "../ui/Menu.vue";
 import Popover from "../ui/Popover.vue";
-import ConfirmModal from "../settings/shared/ConfirmModal.vue";
+import ConfirmModal from "../ui/ConfirmModal.vue";
 
 const configStore = useConfigStore();
 const modeStore = useModeStore();

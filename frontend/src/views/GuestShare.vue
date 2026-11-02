@@ -140,7 +140,7 @@ import EmptyState from "@/components/ui/EmptyState.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ProgressBar from "@/components/ui/ProgressBar.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import {
   claimGuestUploads,
   getGuest,
