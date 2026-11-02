@@ -107,7 +107,11 @@ const handleFocus = () => {
   overflow: hidden;
   overflow-x: clip; /* Prevent horizontal overflow from long event names */
   cursor: pointer;
-  transition: all var(--dur);
+  /* Only opacity and transform animate: the hover lift is compositor work,
+     while `all` also repainted border, shadow and background on the Pi. */
+  transition:
+    opacity var(--dur),
+    transform var(--dur);
   border: 2px solid transparent;
   outline: none;
   position: relative;
