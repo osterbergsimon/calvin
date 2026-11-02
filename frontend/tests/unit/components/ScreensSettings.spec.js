@@ -495,6 +495,73 @@ describe("ScreensSettings — Pages", () => {
     });
   });
 
+  it("a screen that follows Default shows only Default's pages", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({ availableScreens: ["home"] }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const rows = wrapper.findAll("[data-test='screen-page-row']");
+    expect(rows[0].find('[role="switch"]').attributes("aria-checked")).toBe("true");
+    expect(rows[1].find('[role="switch"]').attributes("aria-checked")).toBe("false");
+    expect(rows[1].text()).toContain("Not shown here");
+  });
+
+  it("checking a page Default hides writes an explicit allowlist", async () => {
+    const { wrapper, store } = mountScreens({
+      cfg: config({ availableScreens: ["home"] }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const row = wrapper.findAll("[data-test='screen-page-row']")[1];
+    await row.find('[role="switch"]').trigger("click");
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      availableScreens: ["home", "photos"],
+    });
+  });
+
+  it("says pages are shared and marks a page only this screen shows", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({ availableScreens: ["photos"] }),
+      overrides: { availableScreens: ["home"] },
+      kiosks: [
+        kiosk({ id: "kitchen", hostname: "kitchen-pi", overrides: { availableScreens: ["home"] } }),
+        kiosk({
+          id: "hall",
+          hostname: "hall-pi",
+          overrides: { displayName: "Hallway", availableScreens: ["photos"] },
+        }),
+      ],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(wrapper.text()).toContain(
+      "Pages are shared by all screens. Choose which ones this screen shows."
+    );
+    const rows = wrapper.findAll("[data-test='screen-page-row']");
+    expect(rows[0].text()).toContain("Only here");
+    expect(rows[1].text()).toContain("Not shown here");
+  });
+
+  it("says Also on the other screens that show a page", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [
+        kiosk({ id: "kitchen", hostname: "kitchen-pi", overrides: {} }),
+        kiosk({ id: "hall", hostname: "hall-pi", overrides: { displayName: "Hallway" } }),
+      ],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const rows = wrapper.findAll("[data-test='screen-page-row']");
+    expect(rows[0].text()).toContain("Also on Hallway");
+    expect(rows[1].text()).toContain("Also on Hallway");
+  });
+
   it("checking every page again removes the allowlist override", async () => {
     const { wrapper, store } = mountScreens({ overrides: { availableScreens: ["home"] } });
     await flushPromises();
@@ -1243,6 +1310,15 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     expect(wrapper.find("#section-screen-software").exists()).toBe(false);
     expect(wrapper.find("[data-test='reset-orientation-row']").exists()).toBe(false);
     expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+  });
+
+  it("says Default's pages are shared and followed", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await openDefault(wrapper);
+    expect(wrapper.text()).toContain(
+      "The pages browsers and screens that follow Default show. Pages are shared by all screens."
+    );
   });
 
   it("marks the default-only rows Applies to every screen", async () => {

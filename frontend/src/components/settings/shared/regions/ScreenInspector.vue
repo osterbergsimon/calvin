@@ -10,12 +10,53 @@
         data-test="page-name"
         :model-value="draftName"
         label="Page name"
+        :hint="shownOn.moreThanOne ? 'Every screen that shows this page uses this name.' : ''"
         @update:model-value="draftName = $event"
         @focus="keepInView"
         @blur="commitName"
         @keydown.enter.prevent="commitName"
       />
     </div>
+
+    <SettingRow label="Shown on" data-test="shown-on-row">
+      <template #description>
+        <InlineNote :tone="shownOn.tone" data-test="shown-on-summary">
+          {{ shownOn.summary }}
+        </InlineNote>
+        <InlineNote v-if="shownOnNotice" tone="ok" data-test="shown-on-notice">
+          {{ shownOnNotice }}
+          <template #action>
+            <Button variant="link" size="sm" data-test="also-show-on" @click="changeOpen = true">
+              Also show on…
+            </Button>
+          </template>
+        </InlineNote>
+        <InlineNote v-if="shownOnError" tone="err" role="alert" data-test="shown-on-error">
+          {{ shownOnError }}
+        </InlineNote>
+      </template>
+      <Popover v-model="changeOpen" label="Screens showing this page" role="group">
+        <template #trigger="{ attrs }">
+          <Button v-bind="attrs" size="sm" data-test="change-shown-on">Change…</Button>
+        </template>
+        <div class="ins-targets" role="group" aria-label="Screens showing this page">
+          <SettingRow
+            v-for="target in shownOn.targets"
+            :key="target.id"
+            class="ins-target-row"
+            :label="target.label"
+            :description="target.meta"
+            flush
+          >
+            <ToggleSwitch
+              :model-value="target.shows"
+              :aria-label="`Show this page on ${target.label}`"
+              @update:model-value="$emit('toggle-target', target.id, $event)"
+            />
+          </SettingRow>
+        </div>
+      </Popover>
+    </SettingRow>
 
     <SettingRow label="Layout" stacked>
       <template #label-extra>
@@ -92,6 +133,9 @@
           Add region
         </Button>
         <Button size="sm" @click="$emit('duplicate')">Duplicate</Button>
+        <Button v-if="hideLabel" size="sm" data-test="hide-page-btn" @click="$emit('hide')">
+          {{ hideLabel }}
+        </Button>
         <Button size="sm" variant="danger" :disabled="!canDelete" @click="$emit('delete')">
           Delete page
         </Button>
@@ -105,6 +149,7 @@ import { computed, ref, watch } from "vue";
 import { mdiPlus } from "@mdi/js";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
+import Popover from "@/components/ui/Popover.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
@@ -123,6 +168,17 @@ const props = defineProps({
   canDelete: { type: Boolean, default: true },
   // The phone sheet bar already names the selection, so it hides this heading.
   hideHeading: { type: Boolean, default: false },
+  // Which targets show this page (Default and each screen), plus the summary
+  // copy for the Shown on row.
+  shownOn: {
+    type: Object,
+    default: () => ({ summary: "All screens", tone: "neutral", targets: [], moreThanOne: false }),
+  },
+  // "Shown on Kitchen only." after adding a page from a screen.
+  shownOnNotice: { type: String, default: "" },
+  shownOnError: { type: String, default: "" },
+  // Empty when the page cannot be hidden from the current scope.
+  hideLabel: { type: String, default: "" },
 });
 const emit = defineEmits([
   "rename",
@@ -134,7 +190,10 @@ const emit = defineEmits([
   "clock-inherit",
   "duplicate",
   "delete",
+  "hide",
+  "toggle-target",
 ]);
+const changeOpen = ref(false);
 
 const presets = [
   { value: "single", label: "Single" },
@@ -235,5 +294,12 @@ const positionOptions = computed(() => {
   flex-wrap: wrap;
   gap: var(--gap-2);
   padding: var(--panel-pad-y) var(--panel-pad-x) var(--gap-5);
+}
+.ins-targets {
+  min-width: 16rem;
+  padding: var(--gap-1) 0;
+}
+.ins-target-row + .ins-target-row {
+  border-top: 1px solid var(--line-soft);
 }
 </style>
