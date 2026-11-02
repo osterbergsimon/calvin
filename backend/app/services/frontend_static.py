@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import mimetypes
 import re
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -22,12 +22,58 @@ from app import __version__
 IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
 NO_CACHE_CONTROL = "no-cache"
 
-# Vite emits the content hash as the last dash-separated segment before the
-# extension, e.g. ``index-B51Nxhm5.js`` or ``Dashboard-XjzAyQU3.js``.
-_HASHED_FILENAME = re.compile(r"-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$")
+# Vite emits an 8+ character base64url content hash as the last segment
+# before the extension, e.g. ``index-B51Nxhm5.js`` or
+# ``RegionHeaderControls-jKZQ0Ij-.css``. Requiring an uppercase letter or digit
+# in that segment keeps human-readable names such as ``my-long-name.js`` from
+# being treated as immutable.
+_HASHED_FILENAME = re.compile(
+    r"-(?=[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$)(?=[A-Za-z0-9_-]*[A-Z0-9])"
+    r"[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$"
+)
 
 # Preference order also breaks a q-value tie: brotli first.
 _ENCODING_SUFFIX = {"br": ".br", "gzip": ".gz"}
+
+# Compressed siblings are only reachable through content negotiation.
+_COMPRESSED_SUFFIXES = (".br", ".gz")
+
+# Percent-encoded dots/slashes arrive decoded by Starlette; reject them before
+# resolving so a double-encoded path cannot smuggle a traversal through.
+_FORBIDDEN_PATH_FRAGMENTS = ("%2e", "%2f", "%5c")
+
+
+def _is_safe_relative_path(relative_path: str) -> bool:
+    """Reject absolute, NUL, backslash and encoded-traversal path input."""
+    if not relative_path or "\x00" in relative_path or "\\" in relative_path:
+        return False
+    lowered = relative_path.lower()
+    if any(fragment in lowered for fragment in _FORBIDDEN_PATH_FRAGMENTS):
+        return False
+    if PurePosixPath(relative_path).is_absolute() or PureWindowsPath(relative_path).is_absolute():
+        return False
+    return ".." not in PurePosixPath(relative_path).parts
+
+
+def _resolve_inside(root: Path, relative_path: str) -> Path | None:
+    """Resolve a request path and require it to stay inside the dist root."""
+    if not _is_safe_relative_path(relative_path):
+        return None
+    resolved = (root / relative_path).resolve()
+    if not resolved.is_relative_to(root):
+        return None
+    return resolved
+
+
+def _safe_sibling(path: Path, suffix: str, root: Path) -> Path | None:
+    """Return a compressed sibling only when it resolves inside the dist root."""
+    sibling = Path(f"{path}{suffix}")
+    if not sibling.exists() and not sibling.is_symlink():
+        return None
+    resolved = sibling.resolve()
+    if not resolved.is_relative_to(root):
+        raise HTTPException(status_code=404, detail="Not found")
+    return resolved if resolved.is_file() else None
 
 
 def _parse_accept_encoding(header: str | None) -> dict[str, float]:
@@ -78,12 +124,17 @@ def cache_control_for(relative_path: str) -> str:
     return NO_CACHE_CONTROL
 
 
-def _static_response(path: Path, request: Request, relative_path: str) -> FileResponse:
-    available = {
-        coding for coding, suffix in _ENCODING_SUFFIX.items() if Path(f"{path}{suffix}").is_file()
-    }
+def _static_response(path: Path, request: Request, relative_path: str, root: Path) -> FileResponse:
+    available: set[str] = set()
+    siblings: dict[str, Path] = {}
+    for coding, suffix in _ENCODING_SUFFIX.items():
+        sibling = _safe_sibling(path, suffix, root)
+        if sibling is not None:
+            available.add(coding)
+            siblings[coding] = sibling
+
     encoding = select_encoding(request.headers.get("accept-encoding"), available)
-    served_path = Path(f"{path}{_ENCODING_SUFFIX[encoding]}") if encoding else path
+    served_path = siblings[encoding] if encoding else path
 
     headers = {
         "Cache-Control": cache_control_for(relative_path),
@@ -97,27 +148,34 @@ def _static_response(path: Path, request: Request, relative_path: str) -> FileRe
     return FileResponse(str(served_path), media_type=media_type, headers=headers)
 
 
+def _serve_static_file(root: Path, relative_path: str, request: Request) -> FileResponse:
+    """Resolve, validate and serve one file from the dist root."""
+    if relative_path.lower().endswith(_COMPRESSED_SUFFIXES):
+        raise HTTPException(status_code=404, detail="Not found")
+    resolved = _resolve_inside(root, relative_path)
+    if resolved is None or not resolved.is_file():
+        raise HTTPException(status_code=404, detail="Not found")
+    return _static_response(resolved, request, relative_path, root)
+
+
 def register_frontend_static_routes(app: FastAPI, dist_dir: Path) -> None:
     """Wire up assets, public files, share pages and the SPA fallback."""
     dist_dir = Path(dist_dir)
-    assets_dir = dist_dir / "assets"
-    index_path = dist_dir / "index.html"
+    root = dist_dir.resolve()
+    assets_dir = root / "assets"
+    index_path = root / "index.html"
 
     def _public_file_response(file_name: str, request: Request) -> FileResponse:
-        public_path = dist_dir / file_name
-        if public_path.is_file():
-            return _static_response(public_path, request, file_name)
-        raise HTTPException(status_code=404, detail="Not found")
+        return _serve_static_file(root, file_name, request)
 
     if assets_dir.is_dir():
 
-        @app.get("/assets/{file_path:path}", include_in_schema=False)
+        @app.api_route("/assets/{file_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def serve_asset(file_path: str, request: Request) -> FileResponse:
             """Serve a build asset, preferring its pre-compressed sibling."""
-            asset_path = assets_dir / file_path
-            if asset_path.is_file():
-                return _static_response(asset_path, request, f"assets/{file_path}")
-            raise HTTPException(status_code=404, detail="Asset not found")
+            if not _is_safe_relative_path(file_path):
+                raise HTTPException(status_code=404, detail="Not found")
+            return _serve_static_file(root, f"assets/{file_path}", request)
 
         logger.info(f"Serving frontend assets from: {assets_dir}")
     else:
@@ -172,7 +230,7 @@ def register_frontend_static_routes(app: FastAPI, dist_dir: Path) -> None:
     async def serve_frontend_root(request: Request):
         """Root endpoint."""
         if index_path.is_file():
-            return _static_response(index_path, request, "index.html")
+            return _static_response(index_path, request, "index.html", root)
         return {"message": "Calvin Dashboard API", "version": __version__}
 
     # Serve index.html for all other non-API routes (SPA routing)
@@ -187,10 +245,11 @@ def register_frontend_static_routes(app: FastAPI, dist_dir: Path) -> None:
             or full_path.startswith("docs")
             or full_path.startswith("openapi.json")
             or full_path.startswith("assets/")
+            or full_path.lower().endswith(_COMPRESSED_SUFFIXES)
         ):
             # Return 404 for API routes that don't exist (let routers handle it)
             raise HTTPException(status_code=404, detail="Not found")
 
         if index_path.is_file():
-            return _static_response(index_path, request, "index.html")
+            return _static_response(index_path, request, "index.html", root)
         return {"message": "Calvin Dashboard API", "version": __version__}
