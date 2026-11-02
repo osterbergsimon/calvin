@@ -4,7 +4,12 @@
     :class="[`loading-indicator--${frameKind}`, { 'is-active': active }]"
     aria-hidden="true"
   >
-    <span v-for="i in beadCount" :key="i" class="comet__bead" :style="beadStyle(i)" />
+    <template v-if="frameKind === 'app'">
+      <span v-for="i in beadCount" :key="i" class="comet__bead" :style="beadStyle(i)" />
+    </template>
+    <!-- Region frames get a static edge: an offset-path animation on every
+         region frame repainted each region during loads (calvin-c3jz). -->
+    <span v-else class="comet__edge" />
   </div>
 </template>
 
@@ -13,9 +18,9 @@ import { computed } from "vue";
 
 /**
  * Comet loading indicator: a train of focus-light beads orbiting the frame's
- * border box. On the app frame it rides the clock bar's seam where one exists;
- * on a region frame it follows the panel's focus-glow path, on top of the glow
- * when the region is focused. Decorative only.
+ * border box. On the app frame it rides the clock bar's seam where one exists.
+ * Region frames draw a single static edge instead: a handful of orbiting beads
+ * per region was the expensive part of a page switch on the Pi.
  *
  * The container's opacity gates visibility on `active`, so revealing the
  * comet is a cheap fade with no layout churn. The orbit is paused while idle
@@ -33,10 +38,10 @@ const props = defineProps({
 
 const frameKind = computed(() => (props.frame === "app" ? "app" : "region"));
 
-// A dense train of beads packed close enough that their glows fuse into one
-// continuous line: a bright leading edge with a soft tail streaming out behind.
-const beadCount = 22;
-const step = 0.0028; // spacing between beads, as a fraction of the loop
+// A short train is enough to read as a comet: 22 beads each painted three
+// shadow layers and dominated the loading paint cost (calvin-c3jz).
+const beadCount = 8;
+const step = 0.008; // spacing between beads, as a fraction of the loop
 
 const beadStyle = index => {
   const i = index - 1; // 0 = head
@@ -78,12 +83,8 @@ const beadStyle = index => {
   height: var(--bead-size);
   border-radius: 50%;
   background: var(--focus);
-  /* Same neon vocabulary as the focus glow: bright core, tight halo, soft
-     bloom. Overlapping beads fuse into one bright line with one halo. */
-  box-shadow:
-    0 0 4px 0 var(--focus),
-    0 0 12px 1px var(--focus-edge),
-    0 0 24px 4px var(--focus-glow);
+  /* One halo layer per bead; overlapping beads still fuse into a line. */
+  box-shadow: 0 0 8px 0 var(--focus-edge);
   /* The bead's centre rides the border box of the containing block: the
      perimeter of the framed area. */
   offset-path: border-box;
@@ -99,12 +100,16 @@ const beadStyle = index => {
   animation-play-state: running;
 }
 
-/* A region frame follows the panel radius, like its focus glow. */
+/* A region frame follows the panel radius, like its focus glow. It draws one
+   static edge instead of an orbiting bead train (calvin-c3jz). */
 .loading-indicator--region {
   border-radius: var(--radius-frame);
 }
-.loading-indicator--region .comet__bead {
-  offset-path: inset(0 round var(--radius-frame));
+.comet__edge {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-frame);
+  box-shadow: inset 0 0 0 2px var(--focus);
 }
 
 @keyframes comet-orbit {

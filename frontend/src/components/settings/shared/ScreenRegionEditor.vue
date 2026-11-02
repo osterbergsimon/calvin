@@ -422,7 +422,7 @@ import Tag from "@/components/ui/Tag.vue";
 import { mdiPlus } from "@mdi/js";
 import { getKioskId } from "@/utils/kioskId";
 import { screenLabel } from "@/utils/screenLabel";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";

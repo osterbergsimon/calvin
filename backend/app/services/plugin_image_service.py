@@ -10,6 +10,7 @@ from app.plugins.base import BasePlugin, PluginType
 from app.plugins.manager import plugin_manager
 from app.plugins.protocols import ImagePlugin
 from app.services.event_system import event_system
+from app.services.image_variant_cache import image_variant_cache
 
 # Loguru automatically includes module/function info in logs
 
@@ -450,6 +451,10 @@ class PluginImageService:
                     # Delete from the plugin
                     result = await plugin.delete_image(image_id)
                     if result:
+                        # Privacy: the display variants are copies of the photo
+                        # too, so remove them with the original (also covers
+                        # share-link revoke with remove_photos).
+                        await image_variant_cache.delete_image_variants(image_id)
                         # Invalidate cache and refresh images list
                         self.invalidate_cache()
                         await self.get_images()

@@ -51,7 +51,7 @@
         <div v-if="imagesStore.loading" class="loading">
           <p>Loading images...</p>
         </div>
-        <div v-else-if="!currentImageUrl" class="photo-placeholder">
+        <div v-else-if="!currentImage" class="photo-placeholder">
           <EmptyState
             message="No photos yet"
             help="Upload photos in Settings › Content › Image sources."
@@ -63,31 +63,34 @@
           />
         </div>
         <div v-else ref="containerEl" class="photo-container">
-          <!-- A tiny upscaled copy of the same photo, so a whole photo never
-               sits on black bars. aria-hidden: it is decoration. -->
-          <div
-            v-if="fitDecision.backdrop && currentImageUrl"
-            class="photo-backdrop"
-            aria-hidden="true"
-          >
+          <!-- The container exists before the first request so the observer
+               can measure it; no src is set until that measurement exists. -->
+          <template v-if="currentImageUrl">
+            <!-- A tiny upscaled copy of the same photo, so a whole photo never
+                 sits on black bars. aria-hidden: it is decoration. -->
+            <div v-if="fitDecision.backdrop" class="photo-backdrop" aria-hidden="true">
+              <img
+                :src="backdropImageUrl"
+                class="photo-backdrop__image"
+                alt=""
+                decoding="async"
+                loading="eager"
+              />
+            </div>
             <img
-              :src="backdropImageUrl"
-              class="photo-backdrop__image"
-              alt=""
+              :src="currentImageUrl"
+              :alt="currentImage?.filename || 'Photo'"
+              :class="['photo-image', `photo-image-${displayMode}`]"
+              :style="imageStyle"
               decoding="async"
               loading="eager"
+              @load="onImageLoad"
+              @error="onImageError"
             />
+          </template>
+          <div v-else class="loading">
+            <p>Loading images...</p>
           </div>
-          <img
-            :src="currentImageUrl"
-            :alt="currentImage?.filename || 'Photo'"
-            :class="['photo-image', `photo-image-${displayMode}`]"
-            :style="imageStyle"
-            decoding="async"
-            loading="eager"
-            @load="onImageLoad"
-            @error="onImageError"
-          />
         </div>
       </div>
     </DashboardPanel>
@@ -105,6 +108,12 @@ import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
+import {
+  preloadAndDecodeImage,
+  upgradeImageWidth,
+  variantWidthForRegion,
+  withImageWidth,
+} from "@/utils/imageVariants";
 import { normalizePhotoFit, resolveImageAspect, resolvePhotoFit } from "@/utils/photoFit";
 
 const { handleAction } = useKeyboardActions();
@@ -181,16 +190,29 @@ const sourceKey = computed(() =>
 );
 const currentImage = computed(() => imagesStore.getCurrentImageForSource(props.sourceIds));
 const sourceImages = computed(() => imagesStore.getImagesForSource(props.sourceIds));
-const currentImageUrl = computed(() => imagesStore.getCurrentImageUrlForSource(props.sourceIds));
 
-// The backdrop is the smallest image the backend serves. On develop today that
-// is the 200px /thumbnail endpoint; when width variants (?w=) land it becomes
-// the 640px bucket. Upscaling a tiny image is naturally soft, so the kiosk
-// never runs a full-region CSS blur on every photo change.
-const backdropImageUrl = computed(() => {
-  const id = currentImage.value?.id;
-  return id ? `/api/images/${id}/thumbnail` : null;
+// Display width requested from the backend. The viewport (at DPR) is a safe
+// upper-bound fallback until the photo region is measured: a large kiosk never
+// probes 640 first, and a photo that arrives before the container exists can
+// still request a URL immediately. Measurement only upgrades the bucket.
+const viewportWidth = () => {
+  const dpr = typeof globalThis.devicePixelRatio === "number" ? globalThis.devicePixelRatio : 1;
+  const viewport = typeof window !== "undefined" && window.innerWidth ? window.innerWidth : 640;
+  return variantWidthForRegion(viewport, dpr);
+};
+const requestedWidth = ref(viewportWidth());
+const currentImageUrl = computed(() => {
+  const url = imagesStore.getCurrentImageUrlForSource(props.sourceIds);
+  if (!url || !requestedWidth.value) return null;
+  return withImageWidth(url, requestedWidth.value);
 });
+
+// The backdrop is the smallest width bucket the backend serves (640), not the
+// full-size display variant. Upscaling it is naturally soft, so the kiosk never
+// runs a full-region CSS blur on every photo change.
+const backdropImageUrl = computed(() =>
+  withImageWidth(imagesStore.getCurrentImageUrlForSource(props.sourceIds), 640)
+);
 
 // Get display mode from the region. Photo frame / fullscreen always belongs to
 // a different shape than any region, so it is deliberately Smart.
@@ -206,6 +228,15 @@ const containerAspect = ref(null);
 const naturalSize = ref(null);
 let containerObserver = null;
 
+// Request a variant only when the region needs a bigger bucket. A smaller
+// region keeps the already-loaded file, so resizing never re-downloads detail
+// the kiosk just decoded.
+const requestDisplayWidth = cssWidth => {
+  const dpr = typeof globalThis.devicePixelRatio === "number" ? globalThis.devicePixelRatio : 1;
+  const candidate = variantWidthForRegion(cssWidth, dpr);
+  requestedWidth.value = upgradeImageWidth(requestedWidth.value, candidate);
+};
+
 const measureContainer = () => {
   const el = containerEl.value;
   if (!el) return;
@@ -218,6 +249,7 @@ const measureContainer = () => {
   // Keep the last good shape: a hidden/zero-size element (or a test host with
   // no layout engine) must not erase a measurement the observer already gave.
   if (width > 0 && height > 0) containerAspect.value = width / height;
+  if (width > 0) requestDisplayWidth(width);
 };
 
 const observeContainer = () => {
@@ -227,10 +259,26 @@ const observeContainer = () => {
     const box = entries[0]?.contentRect;
     if (box && box.width > 0 && box.height > 0) {
       containerAspect.value = box.width / box.height;
+      requestDisplayWidth(box.width);
     }
   });
   containerObserver.observe(containerEl.value);
 };
+
+// The container is re-created by the loading/photo branches, not only on
+// fullscreen changes. Watch the element itself so a container that appears
+// after the first render is measured and observed too.
+watch(
+  containerEl,
+  el => {
+    containerObserver?.disconnect();
+    containerObserver = null;
+    if (!el) return;
+    measureContainer();
+    observeContainer();
+  },
+  { flush: "post" }
+);
 
 const imageAspect = computed(() => resolveImageAspect(currentImage.value, naturalSize.value));
 
@@ -254,6 +302,40 @@ const imageStyle = computed(() => {
   return { objectFit: "none", objectPosition: "center", width: "auto", height: "auto" };
 });
 
+// The photo the next advance will show, so it can be downloaded and decoded
+// while the current photo is still on screen.
+const nextImage = computed(() => {
+  const list = sourceImages.value;
+  if (!list.length) return null;
+  const index = currentImage.value ? list.findIndex(img => img.id === currentImage.value.id) : -1;
+  return list[(index + 1) % list.length] || null;
+});
+
+const preloadNextImage = () => {
+  const image = nextImage.value;
+  if (!image || !requestedWidth.value) return Promise.resolve(null);
+  return preloadAndDecodeImage(imagesStore.getImageUrlForWidth(image, requestedWidth.value));
+};
+
+let rotationPending = false;
+
+const advanceToNext = async generation => {
+  // No stacked ticks: a slow decode must not queue up a burst of advances.
+  if (rotationPending) return;
+  rotationPending = true;
+  try {
+    // A failed decode (corrupt file, unsupported format) must not stop
+    // rotation: preloadAndDecodeImage resolves null and the swap still happens.
+    await preloadNextImage();
+    // A stop, unmount or source change happened while we were decoding: the
+    // new chain owns rotation now, so this tick must not advance.
+    if (generation !== undefined && generation !== rotationGeneration) return;
+    await imagesStore.nextImage(props.sourceIds);
+  } finally {
+    rotationPending = false;
+  }
+};
+
 let rotationTimer = null;
 
 const onImageLoad = event => {
@@ -273,17 +355,34 @@ const onImageError = () => {
   console.error("Failed to load image:", currentImageUrl.value);
 };
 
+// Schedule the next tick only after the current one finished pre-decoding and
+// swapping. A pending preload therefore never leaves a queue of ticks behind.
+// Every stop/start/unmount bumps the generation, so a tick that was awaiting a
+// decode when its chain was replaced cannot schedule another one.
+let rotationGeneration = 0;
+
+const scheduleNextRotation = generation => {
+  if (!props.autoRotate || sourceImages.value.length <= 1) return;
+  rotationTimer = setTimeout(() => runRotation(generation), props.rotationInterval);
+};
+
+const runRotation = async generation => {
+  rotationTimer = null;
+  if (generation !== rotationGeneration || !props.autoRotate) return;
+  await advanceToNext(generation);
+  if (generation !== rotationGeneration) return;
+  scheduleNextRotation(generation);
+};
+
 const startAutoRotation = () => {
-  if (props.autoRotate && sourceImages.value.length > 1) {
-    rotationTimer = setInterval(() => {
-      imagesStore.nextImage(props.sourceIds);
-    }, props.rotationInterval);
-  }
+  stopAutoRotation();
+  scheduleNextRotation(rotationGeneration);
 };
 
 const stopAutoRotation = () => {
+  rotationGeneration += 1;
   if (rotationTimer) {
-    clearInterval(rotationTimer);
+    clearTimeout(rotationTimer);
     rotationTimer = null;
   }
 };
@@ -343,6 +442,17 @@ watch(
 watch(currentImageUrl, () => {
   naturalSize.value = null;
 });
+
+// Warm the next photo whenever the current one, the source list or the display
+// width changes. The rotation timer also awaits this before advancing, so a
+// user click and an automatic rotation both swap into a decoded image.
+watch(
+  [() => currentImage.value?.id, () => sourceImages.value.length, requestedWidth],
+  () => {
+    preloadNextImage();
+  },
+  { immediate: true }
+);
 
 watch(
   () => props.autoRotate,
