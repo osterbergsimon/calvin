@@ -36,6 +36,21 @@ describe("ConfirmModal", () => {
     });
   });
 
+  describe("Size", () => {
+    it("uses the larger sheet when an alternative action is offered", () => {
+      const wrapper = mountConfirm({
+        show: true,
+        alternativeText: "Hide on Kitchen",
+      });
+      expect(wrapper.findComponent(Dialog).props("size")).toBe("md");
+    });
+
+    it("keeps the small sheet for a two-button confirm", () => {
+      const wrapper = mountConfirm({ show: true });
+      expect(wrapper.findComponent(Dialog).props("size")).toBe("sm");
+    });
+  });
+
   describe("Body slot", () => {
     it("renders extra body content under the message (e.g. a ToggleSwitch row)", () => {
       const wrapper = mount(ConfirmModal, {
