@@ -1,12 +1,12 @@
 """Image variant endpoint: bucketing, disk cache, headers and invalidation."""
 
-import re
 from datetime import UTC, datetime
 from io import BytesIO
 
 import pytest
 from PIL import Image
 
+from app.config import settings
 from app.models.db_models import PluginDB
 
 
@@ -84,7 +84,7 @@ def test_variant_endpoint_buckets_and_sets_cache_headers(
     response = test_client.get(f"/api/images/{image_id}?w=1000")
 
     assert response.status_code == 200, response.text
-    assert response.headers["cache-control"].startswith("public")
+    assert response.headers["cache-control"] == "public, max-age=3600"
     assert response.headers["etag"]
     with Image.open(BytesIO(response.content)) as rendered:
         assert rendered.size == (1280, 853)
@@ -193,7 +193,10 @@ def test_variant_is_readable_wherever_the_original_route_is(
 
 
 @pytest.mark.integration
-def test_variant_access_mirrors_the_original_route(test_client, temp_image_dir, variant_cache):
+def test_variant_access_mirrors_the_original_route_including_api_key_scope(
+    test_client, temp_image_dir, variant_cache, monkeypatch
+):
+    monkeypatch.setattr(settings, "host_control", True)
     _enable_local_photos(test_client)
     _write_photo(temp_image_dir / "auth.jpg")
     image_id = _image_id(test_client, "auth.jpg")
@@ -202,8 +205,119 @@ def test_variant_access_mirrors_the_original_route(test_client, temp_image_dir, 
     variant = test_client.get(f"/api/images/{image_id}?w=640")
     assert original.status_code == variant.status_code == 200
 
+    for scope in ("read", "admin", "host"):
+        response = test_client.post(
+            "/api/auth/keys", json={"name": f"variant-{scope}", "scope": scope}
+        )
+        assert response.status_code == 201, response.text
+        headers = {"Authorization": f"Bearer {response.json()['secret']}"}
+        with_key_original = test_client.get(f"/api/images/{image_id}", headers=headers)
+        with_key_variant = test_client.get(f"/api/images/{image_id}?w=640", headers=headers)
+        assert with_key_variant.status_code == with_key_original.status_code == 200
+
+    invalid = {"Authorization": "Bearer not-a-real-key"}
+    assert (
+        test_client.get(f"/api/images/{image_id}", headers=invalid).status_code
+        == test_client.get(f"/api/images/{image_id}?w=640", headers=invalid).status_code
+        == 401
+    )
+
     assert test_client.get("/api/images/does-not-exist").status_code == 404
     assert test_client.get("/api/images/does-not-exist?w=640").status_code == 404
-    # Variants are not a second, separately-authenticated surface: they live on
-    # the original's own route.
-    assert re.match(r"^/api/images/[^/]+$", f"/api/images/{image_id}")
+
+
+@pytest.mark.integration
+def test_cache_hit_and_304_never_read_the_source(
+    test_client, temp_image_dir, variant_cache, monkeypatch
+):
+    _enable_local_photos(test_client)
+    _write_photo(temp_image_dir / "no-source-read.jpg")
+    image_id = _image_id(test_client, "no-source-read.jpg")
+
+    first = test_client.get(f"/api/images/{image_id}?w=640")
+    assert first.status_code == 200
+
+    import app.api.routes.images as images_routes
+
+    source_reads = 0
+    renders = 0
+
+    async def fail_source_read(image):
+        nonlocal source_reads
+        source_reads += 1
+        raise AssertionError("source read on a cache hit")
+
+    real_render = variant_cache.render
+
+    async def counting_render(data, width):
+        nonlocal renders
+        renders += 1
+        return await real_render(data, width)
+
+    monkeypatch.setattr(images_routes, "_source_bytes", fail_source_read)
+    monkeypatch.setattr(variant_cache, "render", counting_render)
+
+    hit = test_client.get(f"/api/images/{image_id}?w=640")
+    revalidated = test_client.get(
+        f"/api/images/{image_id}?w=640", headers={"If-None-Match": first.headers["etag"]}
+    )
+
+    assert hit.status_code == 200
+    assert hit.content == first.content
+    assert revalidated.status_code == 304
+    assert source_reads == 0
+    assert renders == 0
+
+
+@pytest.mark.integration
+def test_deleted_image_variant_returns_404(test_client, temp_image_dir, variant_cache):
+    _enable_local_photos(test_client)
+    _write_photo(temp_image_dir / "deleted.jpg")
+    image_id = _image_id(test_client, "deleted.jpg")
+
+    assert test_client.get(f"/api/images/{image_id}?w=640").status_code == 200
+    prefix = variant_cache._image_prefix(image_id)
+    assert list(variant_cache.cache_dir.glob(f"{prefix}-*"))
+
+    assert test_client.delete(f"/api/images/{image_id}").status_code == 200
+
+    assert test_client.get(f"/api/images/{image_id}").status_code == 404
+    assert test_client.get(f"/api/images/{image_id}?w=640").status_code == 404
+    # Privacy: the cached display copies are gone with the original.
+    assert not list(variant_cache.cache_dir.glob(f"{prefix}-*"))
+
+
+def _guest_photo() -> bytes:
+    buffer = BytesIO()
+    Image.new("RGB", (64, 48), (10, 120, 200)).save(buffer, "JPEG")
+    return buffer.getvalue()
+
+
+@pytest.mark.integration
+def test_share_revoke_with_remove_photos_deletes_the_variant(
+    test_client, temp_image_dir, variant_cache
+):
+    import re
+
+    _enable_local_photos(test_client)
+    response = test_client.post("/api/share/links", json={"name": "Guests", "folder": "Guests"})
+    assert response.status_code == 201, response.text
+    link = response.json()["link"]
+    token = re.match(r"^/share/([^/]+)/$", link["path"]).group(1)
+
+    upload = test_client.post(
+        f"/api/guest/{token}/uploads",
+        files=[("photos", ("variant.jpg", _guest_photo(), "image/jpeg"))],
+    )
+    assert upload.status_code == 200, upload.text
+    image_id = upload.json()["uploaded"][0]["imageId"]
+    assert test_client.get(f"/api/images/{image_id}?w=640").status_code == 200
+    prefix = variant_cache._image_prefix(image_id)
+    assert list(variant_cache.cache_dir.glob(f"{prefix}-*"))
+
+    revoked = test_client.delete(f"/api/share/links/{link['id']}", params={"remove_photos": "true"})
+    assert revoked.status_code == 204, revoked.text
+
+    assert test_client.get(f"/api/images/{image_id}?w=640").status_code == 404
+    # Revoking "remove my photos" also removes the display copies.
+    assert not list(variant_cache.cache_dir.glob(f"{prefix}-*"))

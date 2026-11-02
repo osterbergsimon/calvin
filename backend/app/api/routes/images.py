@@ -1,6 +1,7 @@
 """Image endpoints."""
 
 import asyncio
+import hashlib
 from pathlib import Path
 
 from fastapi import APIRouter, File, Query, Request, UploadFile
@@ -9,6 +10,7 @@ from loguru import logger
 
 from app.services import plugin_image_service
 from app.services.image_variant_cache import (
+    VariantTooLargeError,
     bucket_width,
     image_variant_cache,
     source_fingerprint,
@@ -134,34 +136,83 @@ async def _source_bytes(image: dict) -> bytes | None:
     return await plugin_image_service.get_image_data(image.get("id"))
 
 
+def _variant_headers(etag: str) -> dict[str, str]:
+    # Same lifetime as the original route, so a client never caches a variant
+    # longer than the photo it was made from.
+    return {"Cache-Control": "public, max-age=3600", "ETag": etag}
+
+
+def _variant_too_large(error: Exception) -> Exception:
+    return ErrorResponse.internal_error(
+        "This image is too large to make a display version of.",
+        error,
+        code="image_variant_too_large",
+        status_code=422,
+    )
+
+
 async def _variant_response(image: dict, image_id: str, width: int, request: Request) -> Response:
-    """Serve a width-bucketed, disk-cached variant of an image."""
+    """Serve a width-bucketed, disk-cached variant of an image.
+
+    Order matters: resolve the fingerprint from metadata first, answer a
+    revalidation or a cache hit from disk, and only then read the original.
+    """
     try:
         bucket = bucket_width(width)
     except ValueError:
         raise ErrorResponse.validation_error("w", "Width must be a positive integer.") from None
 
-    source = await _source_bytes(image)
-    if not source:
-        raise ErrorResponse.not_found("Image file", image_id)
+    fingerprint = source_fingerprint(image)
 
-    try:
-        content, ext, etag = await image_variant_cache.get_or_create(
-            image_id, source_fingerprint(image), bucket, source
-        )
-    except Exception as e:
-        raise ErrorResponse.internal_error(
-            "Could not generate the image variant. Check the server logs for details.",
-            e,
-            code="image_variant_failed",
-        ) from e
+    if fingerprint is None:
+        # No metadata to detect a replaced photo. Do not invent a stable key
+        # from the id (that would serve a stale variant forever): encode from
+        # the source on every request and validate against the source hash.
+        source = await _source_bytes(image)
+        if not source:
+            raise ErrorResponse.not_found("Image file", image_id)
+        etag = '"' + hashlib.sha256(source + str(bucket).encode()).hexdigest()[:32] + '"'
+        headers = _variant_headers(etag)
+        if _matches_etag(request, etag):
+            return Response(status_code=304, headers=headers)
+        try:
+            content, ext = await image_variant_cache.render(source, bucket)
+        except VariantTooLargeError as e:
+            raise _variant_too_large(e) from e
+        except Exception as e:
+            raise ErrorResponse.internal_error(
+                "Could not generate the image variant. Check the server logs for details.",
+                e,
+                code="image_variant_failed",
+            ) from e
+        media_type = "image/png" if ext == "png" else "image/jpeg"
+        return Response(content=content, media_type=media_type, headers=headers)
 
-    headers = {
-        "Cache-Control": "public, max-age=86400",
-        "ETag": etag,
-    }
+    etag = image_variant_cache.etag(image_id, fingerprint, bucket)
+    headers = _variant_headers(etag)
     if _matches_etag(request, etag):
         return Response(status_code=304, headers=headers)
+
+    cached = await image_variant_cache.read_cached(image_id, fingerprint, bucket)
+    if cached is not None:
+        content, ext = cached
+    else:
+        source = await _source_bytes(image)
+        if not source:
+            raise ErrorResponse.not_found("Image file", image_id)
+        try:
+            content, ext, _created_etag = await image_variant_cache.get_or_create(
+                image_id, fingerprint, bucket, source
+            )
+        except VariantTooLargeError as e:
+            raise _variant_too_large(e) from e
+        except Exception as e:
+            raise ErrorResponse.internal_error(
+                "Could not generate the image variant. Check the server logs for details.",
+                e,
+                code="image_variant_failed",
+            ) from e
+
     media_type = "image/png" if ext == "png" else "image/jpeg"
     return Response(content=content, media_type=media_type, headers=headers)
 

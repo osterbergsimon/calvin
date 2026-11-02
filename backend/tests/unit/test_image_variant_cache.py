@@ -1,17 +1,20 @@
 """Display variants: width buckets, EXIF handling, disk cache and LRU bound."""
 
+import asyncio
 import os
+import threading
 import time
 from io import BytesIO
 from pathlib import Path
 
 import pytest
-from PIL import Image
+from PIL import Image, JpegImagePlugin
 
 from app.services import image_variant_cache as variant_module
 from app.services.image_variant_cache import (
     VARIANT_WIDTHS,
     ImageVariantCache,
+    VariantTooLargeError,
     bucket_width,
     source_fingerprint,
 )
@@ -154,6 +157,7 @@ async def test_lru_eviction_drops_the_least_recently_used(tmp_path):
     await cache.get_or_create("img-new", "fp", 640, _image_bytes((640, 480), (1, 2, 3)))
 
     assert not oldest.exists()
+    assert not oldest.parent.exists()
     assert sum(p.stat().st_size for p in (tmp_path / "variants").glob("*/*")) <= cache.max_bytes
 
 
@@ -198,3 +202,147 @@ async def test_no_part_file_is_left_behind(tmp_path):
     await cache.get_or_create("img", "fp", 640, _image_bytes())
 
     assert list(Path(tmp_path).glob("**/*.part")) == []
+
+
+def test_source_fingerprint_without_metadata_is_none():
+    assert source_fingerprint({"id": "abc"}) is None
+    assert source_fingerprint({}) is None
+
+
+def test_etag_includes_the_source_fingerprint(tmp_path):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+
+    first = cache.etag("img", "fp-1", 640)
+    second = cache.etag("img", "fp-2", 640)
+
+    assert first != second
+    assert cache.etag("img", "fp-1", 640) == first
+
+
+@pytest.mark.asyncio
+async def test_read_cached_returns_none_when_the_file_disappeared(tmp_path):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+    await cache.get_or_create("img", "fp", 640, _image_bytes())
+
+    for path in tmp_path.glob("*/*"):
+        path.unlink()
+
+    assert await cache.read_cached("img", "fp", 640) is None
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_regenerates_when_the_cached_file_is_gone(tmp_path, monkeypatch):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+    source = _image_bytes((800, 600), (10, 200, 10))
+    await cache.get_or_create("img", "fp", 640, source)
+
+    real_read = cache._read
+    calls = 0
+
+    def flaky_read(path):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise FileNotFoundError(path)
+        return real_read(path)
+
+    monkeypatch.setattr(cache, "_read", flaky_read)
+
+    data, ext, _etag = await cache.get_or_create("img", "fp", 640, source)
+
+    assert ext == "jpg"
+    with _open(data) as rendered:
+        assert rendered.size == (640, 480)
+
+
+@pytest.mark.asyncio
+async def test_store_failure_still_returns_the_encoded_bytes(tmp_path):
+    cache = ImageVariantCache(cache_dir=tmp_path / "blocked", max_bytes=10_000_000)
+    # A file where the cache directory should be: mkdir/write fails, but the
+    # request must still get its variant.
+    cache.cache_dir.write_text("not a directory")
+
+    data, ext, etag = await cache.get_or_create("img", "fp", 640, _image_bytes((800, 600)))
+
+    assert ext == "jpg"
+    assert etag
+    with _open(data) as rendered:
+        assert rendered.size == (640, 480)
+    assert list(tmp_path.glob("**/*.part")) == []
+
+
+@pytest.mark.asyncio
+async def test_pixel_budget_rejects_a_huge_non_jpeg(tmp_path):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+    image = Image.new("L", (8000, 8000), 0)
+    buffer = BytesIO()
+    image.save(buffer, "PNG")
+
+    with pytest.raises(VariantTooLargeError):
+        await cache.render(buffer.getvalue(), 640)
+
+
+@pytest.mark.asyncio
+async def test_large_jpeg_uses_draft_to_decode_smaller(tmp_path, monkeypatch):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+    calls = []
+    real_draft = JpegImagePlugin.JpegImageFile.draft
+
+    def spy_draft(self, mode, size):
+        calls.append(size)
+        return real_draft(self, mode, size)
+
+    monkeypatch.setattr(JpegImagePlugin.JpegImageFile, "draft", spy_draft)
+
+    data, _ext, _etag = await cache.get_or_create("img", "fp", 640, _image_bytes((4000, 3000)))
+
+    assert calls
+    with _open(data) as rendered:
+        assert rendered.size == (640, 480)
+
+
+@pytest.mark.asyncio
+async def test_icc_profile_is_kept_on_jpeg_save(tmp_path):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+    icc = b"fake-icc-profile"
+    source = BytesIO()
+    Image.new("RGB", (1200, 800), (30, 60, 90)).save(source, "JPEG", icc_profile=icc)
+
+    data, _ext, _etag = await cache.get_or_create("img", "fp", 640, source.getvalue())
+
+    with _open(data) as rendered:
+        assert rendered.info.get("icc_profile") == icc
+
+
+@pytest.mark.asyncio
+async def test_variant_generation_concurrency_is_capped(tmp_path, monkeypatch):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+    active = 0
+    max_active = 0
+    guard = threading.Lock()
+
+    def slow_encode(data, width):
+        nonlocal active, max_active
+        with guard:
+            active += 1
+            max_active = max(max_active, active)
+        time.sleep(0.08)
+        with guard:
+            active -= 1
+        return b"encoded", "jpg"
+
+    monkeypatch.setattr(variant_module, "_encode_variant", slow_encode)
+
+    await asyncio.gather(*(cache.render(_image_bytes(), 640) for _ in range(6)))
+
+    assert max_active <= 2
+
+
+@pytest.mark.asyncio
+async def test_key_locks_are_not_kept_after_use(tmp_path):
+    cache = ImageVariantCache(cache_dir=tmp_path, max_bytes=10_000_000)
+
+    for index in range(8):
+        await cache.get_or_create(f"img-{index}", "fp", 640, _image_bytes())
+
+    assert len(cache._key_locks) <= 1
