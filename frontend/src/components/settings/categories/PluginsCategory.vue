@@ -134,7 +134,7 @@ import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
-import ConfirmModal from "../shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { pluginKindKey } from "@/utils/pluginKind";
 import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
 import { errorDetailMessage } from "@/utils/apiErrors";

@@ -14,12 +14,27 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from "vue";
+import { computed, defineAsyncComponent, defineComponent, h, onMounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { useProgressStore } from "../stores/progress";
-import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
+
+// The plugin renderer set (SchemaStatusbarItem -> SchemaRenderer ->
+// rendererRegistry) is its own async chunk. It is requested only when a
+// service actually declares a statusbar_schema, so a dashboard with none never
+// downloads it (calvin-0fm6).
+const StatusbarItemPlaceholder = defineComponent({
+  name: "StatusbarItemPlaceholder",
+  setup: () => () =>
+    h("span", { class: "plugin-statusbar-items__placeholder", "aria-hidden": "true" }),
+});
+
+const SchemaStatusbarItem = defineAsyncComponent({
+  loader: () => import("./plugins/SchemaStatusbarItem.vue"),
+  loadingComponent: StatusbarItemPlaceholder,
+  delay: 0,
+});
 
 const props = defineProps({
   ghost: {
@@ -86,5 +101,13 @@ onMounted(() => {
   visibility: hidden;
   pointer-events: none;
   user-select: none;
+}
+
+/* While the async plugin chunk loads, hold a slot so the clock bar's layout
+   does not jump when the real item appears. */
+.plugin-statusbar-items__placeholder {
+  display: inline-block;
+  width: 4rem;
+  height: 1.25em;
 }
 </style>

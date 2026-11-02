@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     image_cache_max_mb: int = Field(default=500, ge=1)
     # A single remote image larger than this is refused, not read into memory.
     image_cache_max_item_mb: int = Field(default=25, ge=1)
+    # Display variants generated for the slideshow (app.services.image_variant_cache):
+    # width-bucketed copies so a kiosk never downloads a full original. Bounded
+    # the same way (LRU by access time).
+    image_variant_cache_max_mb: int = Field(default=512, ge=1)
 
     # Plugin Storage.
     # Deploy configs (docker compose, deploy/calvin.env.example) set the

@@ -81,11 +81,40 @@ function serviceWorkerBuildId() {
   };
 }
 
+// Record which modules each emitted chunk contains and which chunks it imports
+// statically. scripts/check-bundle-budget.mjs walks that from the entry to keep
+// Settings, plugin renderers and simple-keyboard off the first dashboard paint.
+function bundleGraph() {
+  return {
+    name: "calvin-bundle-graph",
+    apply: "build",
+    generateBundle(_options, bundle) {
+      const files = {};
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (output.type !== "chunk") continue;
+        files[fileName] = {
+          isEntry: output.isEntry,
+          isDynamicEntry: output.isDynamicEntry,
+          imports: output.imports,
+          dynamicImports: output.dynamicImports,
+          modules: Object.keys(output.modules),
+        };
+      }
+      this.emitFile({
+        type: "asset",
+        fileName: "bundle-graph.json",
+        source: `${JSON.stringify({ files }, null, 2)}\n`,
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
     serviceWorkerBuildId(),
+    bundleGraph(),
     {
       name: "inject-build-timestamp",
       transformIndexHtml(html) {
@@ -119,6 +148,9 @@ export default defineConfig({
         manualChunks: id => {
           // Split vendor chunks
           if (id.includes("node_modules")) {
+            // simple-keyboard is loaded only with the on-screen keyboard, so it
+            // must stay in that async chunk instead of the initial vendor bundle.
+            if (id.includes("simple-keyboard")) return;
             // Vue ecosystem
             if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
               return "vendor-vue";
@@ -131,21 +163,18 @@ export default defineConfig({
             if (id.includes("@vueuse")) {
               return "vendor-vueuse";
             }
-            // Other large dependencies
-            if (id.includes("axios") || id.includes("vuedraggable")) {
+            // Other large dependencies (vuedraggable is Settings-only and stays
+            // with the settings route chunk)
+            if (id.includes("axios")) {
               return "vendor-utils";
             }
             // All other node_modules
             return "vendor";
           }
-          // Split plugin components into separate chunks
-          if (id.includes("/components/plugins/")) {
-            return "plugins";
-          }
-          // Split settings components into separate chunks
-          if (id.includes("/components/settings/")) {
-            return "settings";
-          }
+          // Settings and plugin components are deliberately not grouped into
+          // manual chunks: both are reached through dynamic imports, so Rollup
+          // keeps them in async chunks and the dashboard entry never preloads
+          // them (calvin-0fm6).
         },
         // Optimize chunk file names for caching
         chunkFileNames: "assets/js/[name]-[hash].js",

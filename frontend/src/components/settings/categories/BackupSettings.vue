@@ -246,7 +246,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 
 const props = defineProps({
   // Injectable for tests; default to the browser's download and reload.

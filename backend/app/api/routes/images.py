@@ -1,12 +1,20 @@
 """Image endpoints."""
 
+import asyncio
+import hashlib
 from pathlib import Path
 
-from fastapi import APIRouter, File, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, File, Query, Request, UploadFile
+from fastapi.responses import FileResponse, Response
 from loguru import logger
 
 from app.services import plugin_image_service
+from app.services.image_variant_cache import (
+    VariantTooLargeError,
+    bucket_width,
+    image_variant_cache,
+    source_fingerprint,
+)
 from app.utils.errors import ErrorResponse
 
 router = APIRouter()
@@ -93,10 +101,137 @@ async def get_current_image(
     return {"image": image}
 
 
+def _matches_etag(request: Request, etag: str) -> bool:
+    """Whether the request's ``If-None-Match`` already has this variant."""
+    header = request.headers.get("if-none-match")
+    if not header:
+        return False
+    tags = [tag.strip() for tag in header.split(",")]
+    if "*" in tags:
+        return True
+    wanted = etag.strip()
+    return any(tag.removeprefix("W/") == wanted for tag in tags)
+
+
+async def _source_bytes(image: dict) -> bytes | None:
+    """Read exactly what the original route would serve, as bytes.
+
+    Local files are read from disk, remote images come through the same
+    stale-on-error cache, and plugin-provided images fall back to their data
+    method. Access rules stay on the route: this helper sees only an image the
+    handler already resolved.
+    """
+    image_path = image.get("path")
+    if image_path:
+        path = Path(str(image_path))
+        if path.is_file():
+            return await asyncio.to_thread(path.read_bytes)
+
+    image_url = image.get("url") or image.get("raw_url")
+    if image_url and str(image_url).startswith("http"):
+        from app.services.remote_image_cache import remote_image_cache
+
+        return await remote_image_cache.get_or_fetch(image_url)
+
+    return await plugin_image_service.get_image_data(image.get("id"))
+
+
+def _variant_headers(etag: str) -> dict[str, str]:
+    # Same lifetime as the original route, so a client never caches a variant
+    # longer than the photo it was made from.
+    return {"Cache-Control": "public, max-age=3600", "ETag": etag}
+
+
+def _variant_too_large(error: Exception) -> Exception:
+    return ErrorResponse.internal_error(
+        "This image is too large to make a display version of.",
+        error,
+        code="image_variant_too_large",
+        status_code=422,
+    )
+
+
+async def _variant_response(image: dict, image_id: str, width: int, request: Request) -> Response:
+    """Serve a width-bucketed, disk-cached variant of an image.
+
+    Order matters: resolve the fingerprint from metadata first, answer a
+    revalidation or a cache hit from disk, and only then read the original.
+    """
+    try:
+        bucket = bucket_width(width)
+    except ValueError:
+        raise ErrorResponse.validation_error("w", "Width must be a positive integer.") from None
+
+    fingerprint = source_fingerprint(image)
+
+    if fingerprint is None:
+        # No metadata to detect a replaced photo. Do not invent a stable key
+        # from the id (that would serve a stale variant forever): encode from
+        # the source on every request and validate against the source hash.
+        source = await _source_bytes(image)
+        if not source:
+            raise ErrorResponse.not_found("Image file", image_id)
+        etag = '"' + hashlib.sha256(source + str(bucket).encode()).hexdigest()[:32] + '"'
+        headers = _variant_headers(etag)
+        if _matches_etag(request, etag):
+            return Response(status_code=304, headers=headers)
+        try:
+            content, ext = await image_variant_cache.render(source, bucket)
+        except VariantTooLargeError as e:
+            raise _variant_too_large(e) from e
+        except Exception as e:
+            raise ErrorResponse.internal_error(
+                "Could not generate the image variant. Check the server logs for details.",
+                e,
+                code="image_variant_failed",
+            ) from e
+        media_type = "image/png" if ext == "png" else "image/jpeg"
+        return Response(content=content, media_type=media_type, headers=headers)
+
+    etag = image_variant_cache.etag(image_id, fingerprint, bucket)
+    headers = _variant_headers(etag)
+    if _matches_etag(request, etag):
+        return Response(status_code=304, headers=headers)
+
+    cached = await image_variant_cache.read_cached(image_id, fingerprint, bucket)
+    if cached is not None:
+        content, ext = cached
+    else:
+        source = await _source_bytes(image)
+        if not source:
+            raise ErrorResponse.not_found("Image file", image_id)
+        try:
+            content, ext, _created_etag = await image_variant_cache.get_or_create(
+                image_id, fingerprint, bucket, source
+            )
+        except VariantTooLargeError as e:
+            raise _variant_too_large(e) from e
+        except Exception as e:
+            raise ErrorResponse.internal_error(
+                "Could not generate the image variant. Check the server logs for details.",
+                e,
+                code="image_variant_failed",
+            ) from e
+
+    media_type = "image/png" if ext == "png" else "image/jpeg"
+    return Response(content=content, media_type=media_type, headers=headers)
+
+
 @router.get("/images/{image_id}")
-async def get_image_file(image_id: str):
+async def get_image_file(
+    image_id: str,
+    request: Request,
+    w: int | None = Query(
+        None,
+        description="Optional display width; rounded up to 640/960/1280/1920/2560.",
+    ),
+):
     """
     Get image file by ID from plugin service.
+
+    With ``?w=``, serve a width-bucketed, disk-cached display variant (never
+    upscaled) so kiosks don't download full originals. Without it, the original
+    file is returned unchanged for downloads and the Local photos browser.
 
     For remote images, downloads and serves via the local cache (avoids rate limits,
     enables stale-on-error). For local images, serves the file directly.
@@ -111,6 +246,9 @@ async def get_image_file(image_id: str):
     image = await plugin_image_service.get_image_by_id(image_id)
     if not image:
         raise ErrorResponse.not_found("Image", image_id)
+
+    if w is not None:
+        return await _variant_response(image, image_id, w, request)
 
     # Check if this is a remote image (has URL but no local path)
     # For remote images, redirect to the URL instead of downloading
@@ -131,8 +269,6 @@ async def get_image_file(image_id: str):
     # For remote URLs, download and cache locally rather than redirecting.
     # This avoids rate limits hitting the browser directly and enables stale-on-error.
     if image_url and image_url.startswith("http"):
-        from fastapi.responses import Response
-
         from app.services.remote_image_cache import remote_image_cache
 
         image_data = await remote_image_cache.get_or_fetch(image_url)
@@ -148,8 +284,6 @@ async def get_image_file(image_id: str):
     image_data = await plugin_image_service.get_image_data(image_id)
     if not image_data:
         raise ErrorResponse.not_found("Image file", image_id)
-
-    from fastapi.responses import Response
 
     return Response(
         content=image_data,
@@ -230,8 +364,6 @@ async def get_image_thumbnail(image_id: str):
         thumbnail_bytes = BytesIO()
         img.save(thumbnail_bytes, "JPEG", quality=85, optimize=True)
         thumbnail_bytes.seek(0)
-
-        from fastapi.responses import Response
 
         return Response(
             content=thumbnail_bytes.read(),

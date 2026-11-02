@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createPinia } from "pinia";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { h } from "vue";
+import { h, nextTick } from "vue";
 
 const { keyboard, initialize, cleanup, loadTheme, syncWithConfig } = vi.hoisted(() => ({
   // Mutable so one test can simulate the broken constructor and another a
@@ -105,6 +105,21 @@ const mountApp = async () => {
   return wrapper;
 };
 
+/** Focus an editable field, the signal that loads the on-screen keyboard. */
+const focusTextField = async () => {
+  const input = document.createElement("input");
+  input.type = "text";
+  document.body.appendChild(input);
+  input.focus();
+  // The OSK is an async chunk: let the import and the component's mounted
+  // hook (which constructs simple-keyboard) settle.
+  await nextTick();
+  await vi.dynamicImportSettled();
+  await flushPromises();
+  await nextTick();
+  return input;
+};
+
 describe("App shell", () => {
   beforeEach(() => {
     keyboard.throws = true;
@@ -112,6 +127,21 @@ describe("App shell", () => {
     cleanup.mockClear();
     loadTheme.mockClear();
     syncWithConfig.mockClear();
+  });
+
+  it("does not load the on-screen keyboard until an editable field is focused", async () => {
+    keyboard.throws = false;
+    const wrapper = await mountApp();
+
+    // simple-keyboard and its panel belong to the async OSK chunk: the
+    // dashboard's first paint must not pay for them (calvin-0fm6).
+    expect(document.body.querySelector(".osk")).toBeNull();
+
+    const input = await focusTextField();
+    expect(document.body.querySelector(".osk")).not.toBeNull();
+    input.remove();
+
+    wrapper.unmount();
   });
 
   it("finishes App's mounted setup when simple-keyboard throws", async () => {
@@ -126,7 +156,9 @@ describe("App shell", () => {
 
     // The failed keyboard renders nothing at all (it teleports to <body>, so
     // query the document rather than the wrapper).
+    const input = await focusTextField();
     expect(document.body.querySelector(".osk")).toBeNull();
+    input.remove();
 
     wrapper.unmount();
   });
@@ -137,7 +169,9 @@ describe("App shell", () => {
 
     expect(initialize).toHaveBeenCalledTimes(1);
     // A named import of the real constructor is what makes this mount succeed.
+    const input = await focusTextField();
     expect(document.body.querySelector(".osk")).not.toBeNull();
+    input.remove();
     expect(wrapper.find('[data-test="phone-setup"]').exists()).toBe(true);
 
     const qr = wrapper.find('[data-test="phone-setup"] img');

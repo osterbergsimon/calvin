@@ -156,7 +156,7 @@ import EmptyState from "@/components/ui/EmptyState.vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 
 // Settings › Content › Photos › Local photos: the owner's own library
 // (calvin-n2my). It is the source's own sub-view, so it starts from the shared

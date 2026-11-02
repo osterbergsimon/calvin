@@ -116,7 +116,7 @@ import ListRow from "@/components/ui/ListRow.vue";
 import Menu from "@/components/ui/Menu.vue";
 import Popover from "@/components/ui/Popover.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { providerLine } from "@/utils/instanceSummary";
 
 // The one list every Content section uses (§3.1). It knows nothing about
