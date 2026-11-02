@@ -88,6 +88,84 @@ test.describe("settings density at 1280", () => {
   });
 });
 
+// calvin-y14e: on Screens › Default the long descriptions squeezed a
+// SegmentedControl below its content width, so the card clipped its right
+// edge. The control must keep its intrinsic width and stay inside the card.
+for (const [name, viewport] of [
+  ["1280x720", { width: 1280, height: 720 }],
+  ["1024x768", { width: 1024, height: 768 }],
+]) {
+  test.describe(`segmented controls fit their card at ${name}`, () => {
+    test.use({ viewport, hasTouch: false, isMobile: false });
+
+    test("every radiogroup in a SettingRow stays inside its card", async ({ page }) => {
+      const api = await openSettings(page, "Screens");
+      await page.locator("[data-test='screen-default-card']").click();
+      await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+      await expect(page.locator("#section-device-keyboard .setting-row").first()).toBeVisible();
+
+      await page.evaluate(() => document.fonts.ready);
+      const groups = await page.$$eval(".setting-row [role='radiogroup']", elements =>
+        elements
+          .filter(group => group.offsetParent !== null)
+          .map(group => {
+            const card = group.closest(".settings-section__panel");
+            const row = group.closest(".setting-row");
+            const cardStyle = getComputedStyle(card);
+            const rowStyle = getComputedStyle(row);
+            const cardRight =
+              card.getBoundingClientRect().right - (parseFloat(cardStyle.paddingRight) || 0);
+            const rowRight =
+              row.getBoundingClientRect().right - (parseFloat(rowStyle.paddingRight) || 0);
+            const box = group.getBoundingClientRect();
+            // The buttons can shrink to their padding in this engine, so the
+            // group's scrollWidth stays clean while every label is crushed.
+            // Measure the width the group needs to show its segments, then
+            // require the row to give it at least that much.
+            const probe = group.cloneNode(true);
+            probe.style.cssText = "position: absolute; left: -9999px; top: 0; width: max-content;";
+            probe.querySelectorAll(".seg__btn").forEach(button => {
+              button.style.flex = "0 0 auto";
+            });
+            document.body.appendChild(probe);
+            const neededWidth = probe.getBoundingClientRect().width;
+            probe.remove();
+            return {
+              label: group.getAttribute("aria-label") || "(unnamed)",
+              right: box.right,
+              width: box.width,
+              neededWidth,
+              cardRight,
+              rowRight,
+              scrollWidth: group.scrollWidth,
+              clientWidth: group.clientWidth,
+            };
+          })
+      );
+
+      expect(groups.length).toBeGreaterThanOrEqual(6);
+      for (const group of groups) {
+        expect(group.right, `${group.label} overflows its card`).toBeLessThanOrEqual(
+          group.cardRight + 0.5
+        );
+        expect(group.right, `${group.label} overflows its row`).toBeLessThanOrEqual(
+          group.rowRight + 0.5
+        );
+        expect(group.width, `${group.label} is narrower than its segments`).toBeGreaterThanOrEqual(
+          group.neededWidth - 0.5
+        );
+        expect(group.scrollWidth, `${group.label} clips a radio button`).toBeLessThanOrEqual(
+          group.clientWidth
+        );
+      }
+
+      // This spec only runs against the mocked harness: no host route fired.
+      expect(api.hostActions).toEqual([]);
+      expect(api.unmatched).toEqual([]);
+    });
+  });
+}
+
 for (const [name, viewport] of [
   ["1280", { width: 1280, height: 900 }],
   ["390", PHONE],
