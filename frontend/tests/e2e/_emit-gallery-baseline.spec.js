@@ -1,10 +1,8 @@
 /**
- * TEMPORARY (calvin-ip3l): report the gallery layout from CI so the local
- * renderer can be matched before regenerating the visual baselines.
+ * TEMPORARY (calvin-ip3l): report the gallery layout + platform font from CI.
  * Delete this file before merging.
  */
 import { test, expect } from "@playwright/test";
-import { writeFileSync } from "node:fs";
 
 test.skip(({ browserName }) => browserName !== "chromium", "baselines are chromium-only");
 
@@ -21,29 +19,28 @@ test("report ui gallery 390 layout", async ({ page }) => {
 
   const report = await page.evaluate(() => {
     const top = el => Math.round(el.getBoundingClientRect().top + window.scrollY);
-    const size = el => {
-      const r = el.getBoundingClientRect();
-      return [Math.round(r.width), Math.round(r.height)];
-    };
     const sections = [...document.querySelectorAll(".ui-gallery__heading")].map(el => ({
       name: el.textContent.trim(),
       top: top(el),
-      size: size(el.parentElement),
+      size: [Math.round(el.parentElement.getBoundingClientRect().width), Math.round(el.parentElement.getBoundingClientRect().height)],
     }));
-    const root = document.querySelector('[data-test="ui-gallery"]');
-    const children = [...root.children].map(el => ({
-      top: top(el),
-      size: size(el),
-      cls: typeof el.className === "string" ? el.className : "",
-    }));
-    return {
-      scrollHeight: document.documentElement.scrollHeight,
-      innerWidth: window.innerWidth,
-      sections,
-      children,
-      emoji: document.fonts.check('16px "Noto Color Emoji"'),
-    };
+    const note = [...document.querySelectorAll(".ui-gallery__note")].find(n =>
+      n.textContent.includes("Lead · body")
+    );
+    return { scrollHeight: document.documentElement.scrollHeight, sections, noteHeight: note.getBoundingClientRect().height };
   });
-  writeFileSync("/tmp/gallery-layout.json", JSON.stringify(report, null, 2));
-  throw new Error("REPORT:" + JSON.stringify(report));
+
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("DOM.enable");
+  await cdp.send("CSS.enable");
+  const { root } = await cdp.send("DOM.getDocument");
+  const { nodeId } = await cdp.send("DOM.querySelector", {
+    nodeId: root.nodeId,
+    selector: ".ui-gallery__note",
+  });
+  const fonts = await cdp.send("CSS.getPlatformFontsForNode", { nodeId });
+
+  throw new Error(
+    "REPORT:" + JSON.stringify({ report, fonts: fonts.fonts.map(f => f.familyName) })
+  );
 });
