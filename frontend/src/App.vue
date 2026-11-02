@@ -7,7 +7,7 @@
     <ConnectionStatus v-if="!clockBarVisible" floating />
     <StatusRail />
     <ReloadLight />
-    <OnScreenKeyboard />
+    <OnScreenKeyboardLoader />
     <AdminSignInDialog />
   </div>
 </template>
@@ -19,7 +19,7 @@ import { isGuestPath } from "./utils/guestPath";
 import KeyboardHandler from "./components/KeyboardHandler.vue";
 import StatusRail from "./components/StatusRail.vue";
 import ReloadLight from "./components/ReloadLight.vue";
-import OnScreenKeyboard from "./components/ui/OnScreenKeyboard.vue";
+import OnScreenKeyboardLoader from "./components/ui/OnScreenKeyboardLoader.vue";
 import AdminSignInDialog from "./components/auth/AdminSignInDialog.vue";
 import ConnectionStatus from "./components/ConnectionStatus.vue";
 import { useClockBarVisible } from "./composables/useClockBarVisible";
