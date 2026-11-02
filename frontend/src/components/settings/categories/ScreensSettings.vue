@@ -220,6 +220,7 @@
       <SettingsSection id="screen-pages" title="Pages">
         <SettingRow label="Pages shown">
           <template #description>
+            <span>Pages are shared by all screens. Choose which ones this screen shows.</span>
             <InlineNote v-if="pages.length === 1" data-test="only-one-page">
               Only one page so far.
             </InlineNote>
@@ -249,6 +250,7 @@
           </template>
           <template #meta>
             <InlineNote v-if="!showsPage(page.id)">Not shown here</InlineNote>
+            <InlineNote v-else>{{ alsoOnLabel(selectedKiosk, page.id) }}</InlineNote>
           </template>
           <template #actions>
             <ToggleSwitch
@@ -583,8 +585,10 @@ import {
   shortVersion,
 } from "@/utils/kioskSoftware";
 import { normalizeDashboardScreens } from "@/utils/layout";
+import { effectiveAvailablePages } from "@/utils/availablePages";
 import { getKioskId } from "@/utils/kioskId";
 import { screenLabel, screenLabelFallback } from "@/utils/screenLabel";
+import { joinNames } from "@/utils/screenOverrides";
 import {
   activePowerOverride,
   buildPowerOverride,
@@ -729,11 +733,9 @@ const updatingCopy = computed(() =>
 const catalog = computed(() => normalizeDashboardScreens(props.config.dashboardScreens));
 const pages = computed(() => catalog.value.screens);
 
-// A screen shows every page unless it has an explicit allowlist.
+// A screen shows Default's pages unless it has an explicit allowlist.
 function availableIds(k) {
-  const list = k?.overrides?.availableScreens;
-  if (Array.isArray(list)) return list;
-  return pages.value.map(page => page.id);
+  return effectiveAvailablePages(k?.overrides, props.config, pages.value);
 }
 function startPageId(k) {
   const ids = availableIds(k);
@@ -867,12 +869,26 @@ const namePlaceholder = computed(() =>
 function showsPage(pageId) {
   return effAvailable.value.includes(pageId);
 }
+// "Also on Hallway" / "Only here" for a page this screen shows. Browsers count
+// as another target, but the Shown on row in the editor names each screen.
+function alsoOnLabel(k, pageId) {
+  const others = kiosks.value
+    .filter(
+      other =>
+        other.id !== k?.id &&
+        effectiveAvailablePages(other.overrides, props.config, pages.value).includes(pageId)
+    )
+    .map(other => screenLabel(other));
+  if (others.length) return `Also on ${joinNames(others)}`;
+  if (effectiveAvailablePages(null, props.config, pages.value).includes(pageId)) {
+    return "Also on browsers";
+  }
+  return "Only here";
+}
 
 const availableOverridden = computed(() => "availableScreens" in overrides.value);
 const effAvailable = computed(() =>
-  Array.isArray(overrides.value.availableScreens)
-    ? overrides.value.availableScreens
-    : pages.value.map(page => page.id)
+  effectiveAvailablePages(overrides.value, props.config, pages.value)
 );
 
 const defaultOverridden = computed(() => "defaultScreenId" in overrides.value);
@@ -1068,9 +1084,11 @@ function togglePage(pageId, checked) {
   }
   const next = { ...overrides.value };
   const allIds = pages.value.map(page => page.id);
-  if (ids.size === allIds.length) delete next.availableScreens;
+  const defaultIds = effectiveAvailablePages(null, props.config, pages.value);
+  const followsDefault = ids.size === defaultIds.length && defaultIds.every(id => ids.has(id));
+  if (followsDefault) delete next.availableScreens;
   else next.availableScreens = allIds.filter(id => ids.has(id));
-  const effective = "availableScreens" in next ? next.availableScreens : allIds;
+  const effective = followsDefault ? defaultIds : next.availableScreens;
   if ("defaultScreenId" in next && !effective.includes(next.defaultScreenId)) {
     delete next.defaultScreenId;
   }

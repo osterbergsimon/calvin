@@ -88,7 +88,16 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent } from "vue";
+import {
+  computed,
+  ref,
+  watch,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  provide,
+  defineAsyncComponent,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useModeStore } from "@/stores/mode";
@@ -426,6 +435,10 @@ watch(
 const handleConfigUpdate = async updates => {
   await updateConfig(updates);
 };
+
+// The pages editor saves a new page to the catalog before the per-screen list
+// that points at it (docs/design/2026-11-02-shared-pages.md §6).
+provide("saveConfig", handleConfigUpdate);
 
 const handleGitRepoUrlUpdate = async url => {
   await updateConfig({ gitRepoUrl: url });

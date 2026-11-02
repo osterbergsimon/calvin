@@ -87,9 +87,9 @@ describe("ScreenRegionEditor preview on a screen", () => {
     expect(w.find(".pill__label").text()).toBe("Hallway");
   });
 
-  it("otherwise starts on Any browser", async () => {
+  it("otherwise starts on Browsers & new screens", async () => {
     const { w } = await mountEditor({ kiosks: [{ id: "hall", hostname: "pi-hall" }] });
-    expect(w.find(".pill__label").text()).toBe("Any browser");
+    expect(w.find(".pill__label").text()).toBe("Browsers & new screens");
     expect(w.find(".sre-orient-toggle").exists()).toBe(true);
     expect(w.find('[data-test="orientation-badge"]').exists()).toBe(false);
   });
@@ -234,7 +234,7 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
       ],
     });
     const lines = w.findAll(".tabs__meta").map(n => n.text());
-    expect(lines).toEqual(["Kitchen, Hallway", "Office"]);
+    expect(lines).toEqual(["Kitchen, Hallway · browsers", "Office · browsers"]);
   });
 
   it("says All screens when every screen shows the page", async () => {
@@ -249,11 +249,17 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
     expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual(["All screens", "All screens"]);
   });
 
-  it("says Not on any screen when no screen shows the page", async () => {
+  it("says Not shown anywhere when neither a screen nor Default shows the page", async () => {
+    const restricted = JSON.parse(JSON.stringify(config));
+    restricted.availableScreens = [];
     const { w } = await mountEditor({
       kiosks: [{ id: "hall", overrides: { availableScreens: [] } }],
+      props: { config: restricted },
     });
-    expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual(["Not shown", "Not shown"]);
+    expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual([
+      "Not shown anywhere",
+      "Not shown anywhere",
+    ]);
   });
 
   it("dims the tabs a previewed screen does not show", async () => {
@@ -264,6 +270,32 @@ describe("ScreenRegionEditor page tabs know their screens", () => {
     const tabs = w.findAll(".tabs__tab");
     expect(tabs[0].classes()).toContain("is-dimmed"); // Home
     expect(tabs[1].classes()).not.toContain("is-dimmed"); // Photos
+  });
+
+  it("dims a page Default hides when a screen follows Default", async () => {
+    const restricted = JSON.parse(JSON.stringify(config));
+    restricted.availableScreens = ["photos"];
+    const { w } = await mountEditor({
+      kiosks: [{ id: "hall", overrides: { displayName: "Hallway" } }],
+      props: { config: restricted },
+    });
+    await selectPreview(w, "hall");
+    const tabs = w.findAll(".tabs__tab");
+    expect(tabs[0].classes()).toContain("is-dimmed"); // Home
+    expect(tabs[1].classes()).not.toContain("is-dimmed"); // Photos
+  });
+
+  it("says Not shown for a page Default hides, even when every screen follows Default", async () => {
+    const restricted = JSON.parse(JSON.stringify(config));
+    restricted.availableScreens = ["photos"];
+    const { w } = await mountEditor({
+      kiosks: [{ id: "hall", hostname: "pi-h", overrides: {} }],
+      props: { config: restricted },
+    });
+    expect(w.findAll(".tabs__meta").map(n => n.text())).toEqual([
+      "Not shown anywhere",
+      "All screens",
+    ]);
   });
 });
 
@@ -300,5 +332,34 @@ describe("ScreenRegionEditor mismatch banner", () => {
     expect(w.find('[data-test="mismatch"]').text()).toContain(
       "Couldn't update Hallway. Try again."
     );
+  });
+
+  it("warns when a screen follows a restricted Default that does not show the page", async () => {
+    const restricted = JSON.parse(JSON.stringify(config));
+    restricted.availableScreens = ["photos"];
+    const { w } = await mountEditor({
+      kiosks: [{ id: "hall", hostname: "pi-hall", overrides: { displayName: "Hallway" } }],
+      props: { config: restricted },
+    });
+    await selectPreview(w, "hall");
+    expect(w.find('[data-test="mismatch"]').exists()).toBe(true);
+    expect(w.find('[data-test="mismatch"]').text()).toContain("doesn’t show “Home”");
+  });
+
+  it("Show it on adds the page to Default's restricted list", async () => {
+    const restricted = JSON.parse(JSON.stringify(config));
+    restricted.availableScreens = ["photos"];
+    const { w, store } = await mountEditor({
+      kiosks: [{ id: "hall", hostname: "pi-hall", overrides: { displayName: "Hallway" } }],
+      props: { config: restricted },
+    });
+    await selectPreview(w, "hall");
+    await w.find(".sre-mismatch__btn").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("hall", {
+      displayName: "Hallway",
+      availableScreens: ["photos", "home"],
+    });
+    expect(w.find('[data-test="mismatch"]').exists()).toBe(false);
   });
 });

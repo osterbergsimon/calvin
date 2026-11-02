@@ -2,8 +2,12 @@
 <template>
   <div class="default-screen-settings" data-test="default-screen-page">
     <SettingsSection id="default-pages" title="Pages">
-      <SettingRow label="Pages shown" description="The pages browsers and new screens show.">
+      <SettingRow label="Pages shown">
         <template #description>
+          <span
+            >The pages browsers and screens that follow Default show. Pages are shared by all
+            screens.</span
+          >
           <InlineNote v-if="pages.length === 1" data-test="only-one-page">
             Only one page so far.
           </InlineNote>

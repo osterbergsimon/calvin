@@ -10,8 +10,7 @@
   >
     <template #title>Pages &amp; regions</template>
     <template v-if="sizeClass === 'wide'" #subtitle>
-      Design the pages your screens display · drag dividers to resize, the clock bar to reposition ·
-      changes apply live
+      Pages are shared by your screens · changes apply live everywhere they show
     </template>
 
     <div
@@ -288,6 +287,9 @@
             >
               {{ orientationBadge }}
             </Tag>
+            <p v-if="sizeClass === 'wide'" class="sre-stage-caption" data-test="stage-caption">
+              Drag regions to swap them, dividers to resize, the clock bar to reposition
+            </p>
           </div>
 
           <Tag v-if="!mismatch && previewScreenId !== ANY_BROWSER" class="sre-preview-note">
@@ -357,6 +359,10 @@
               :clock-selected="clockSelected"
               :can-delete="screens.screens.length > 1"
               :hide-heading="isPhone"
+              :shown-on="shownOn"
+              :shown-on-notice="shownOnNotice"
+              :shown-on-error="shownOnError"
+              :hide-label="hideLabel"
               @rename="renameScreen"
               @preset="applyPreset"
               @add-region="addRegion"
@@ -365,7 +371,9 @@
               @clock-position="setClockPosition"
               @clock-inherit="clearClock"
               @duplicate="duplicateScreen"
-              @delete="deleteActiveScreen"
+              @delete="requestDeleteActiveScreen"
+              @hide="hideActivePage"
+              @toggle-target="toggleShownOn"
             />
           </div>
         </aside>
@@ -379,13 +387,25 @@
         @confirm="confirmReplace"
         @cancel="replaceTarget = null"
       />
+
+      <ConfirmModal
+        :show="!!deleteConfirm"
+        :title="deleteConfirm?.title || ''"
+        :message="deleteConfirm?.message || ''"
+        confirm-text="Delete page"
+        danger
+        :alternative-text="deleteConfirm?.alternativeText || ''"
+        @confirm="deletePage(deleteConfirm.pageId)"
+        @alternative="hideActivePage"
+        @cancel="deleteConfirm = null"
+      />
     </div>
   </Dialog>
 </template>
 
 <script setup>
 import { WIDE_MIN_WIDTH, isPhoneWidth } from "@/styles/breakpoints.js";
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { useKiosksStore } from "@/stores/kiosks";
@@ -434,6 +454,14 @@ import {
   unsplitRegionAtPath,
   addSubRegionAtPath,
 } from "@/utils/layout";
+import { effectiveAvailablePages } from "@/utils/availablePages";
+import {
+  addPagePlan,
+  pageDeletePlan,
+  pageTogglePlan,
+  removePageFromOverrides,
+} from "@/utils/sharedPages";
+import { joinNames } from "@/utils/screenOverrides";
 
 const props = defineProps({
   config: { type: Object, required: true, default: () => ({}) },
@@ -452,6 +480,9 @@ const props = defineProps({
 const emit = defineEmits(["update:config", "close", "placed", "place-cancel"]);
 
 const ANY_BROWSER = "__global";
+// Settings.vue provides the awaitable config save so adding a page can save
+// the catalog before the per-screen list that points at it.
+const saveConfig = inject("saveConfig", null);
 const webServicesStore = useWebServicesStore();
 const calendarStore = useCalendarStore();
 const kiosksStore = useKiosksStore();
@@ -585,7 +616,7 @@ const activeIndex = computed(() =>
 /* --- preview on a screen --- */
 const screenOptions = computed(() => {
   const options = [
-    { value: ANY_BROWSER, label: "Any browser" },
+    { value: ANY_BROWSER, label: "Browsers & new screens" },
     ...kiosksStore.kiosks.map(k => ({ value: k.id, label: screenLabel(k) })),
   ];
   // A kiosk preselected before the list loaded (or one that is not registered
@@ -606,6 +637,76 @@ const previewKiosk = computed(
 // still gets an option so the picker shows its id.
 const previewOverrides = computed(() => previewKiosk.value?.overrides || {});
 const previewScreenName = computed(() => screenLabel(previewKiosk.value) || previewScreenId.value);
+// The Preview on target is also the editor's scope: the screen (or Default)
+// that new pages are added to and that Hide acts on.
+const scopeIsDefault = computed(() => previewScreenId.value === ANY_BROWSER);
+const scopeLabel = computed(() =>
+  scopeIsDefault.value ? "browsers & new screens" : previewScreenName.value
+);
+const pageList = computed(() => screens.value.screens);
+const catalogPageIds = computed(() => pageList.value.map(page => page.id));
+const defaultPageIds = computed(() =>
+  effectiveAvailablePages(null, configValue.value, pageList.value)
+);
+const scopePageIds = computed(() => {
+  const ids = scopeIsDefault.value
+    ? defaultPageIds.value
+    : effectiveAvailablePages(previewOverrides.value, configValue.value, pageList.value);
+  // Ignore ghost ids left by an older delete: only real catalog pages count
+  // when deciding whether this is the last page a target can hide.
+  return ids.filter(id => catalogPageIds.value.includes(id));
+});
+const hideLabel = computed(() => {
+  if (!scopePageIds.value.includes(activeScreenId.value)) return "";
+  if (scopePageIds.value.length < 2) return "";
+  return scopeIsDefault.value ? "Hide from browsers & new screens" : `Hide on ${scopeLabel.value}`;
+});
+const shownOnError = ref("");
+const addedNotice = ref(null);
+const shownOnForPage = pageId => {
+  const defaultShows = defaultPageIds.value.includes(pageId);
+  const kiosks = kiosksStore.kiosks.map(kiosk => ({
+    id: kiosk.id,
+    label: screenLabel(kiosk),
+    shows: effectiveAvailablePages(kiosk.overrides, configValue.value, pageList.value).includes(
+      pageId
+    ),
+    meta: Object.prototype.hasOwnProperty.call(kiosk.overrides || {}, "availableScreens")
+      ? "Changed here"
+      : "Same as Default",
+  }));
+  const showing = kiosks.filter(kiosk => kiosk.shows);
+  const everyKioskShows = kiosks.every(kiosk => kiosk.shows);
+  const noKioskShows = kiosks.every(kiosk => !kiosk.shows);
+  const names = showing.map(kiosk => kiosk.label);
+  const summary = defaultShows
+    ? everyKioskShows
+      ? "All screens"
+      : names.length
+        ? `${names.join(", ")} · browsers`
+        : "browsers"
+    : noKioskShows
+      ? "Not shown anywhere"
+      : names.join(", ");
+  return {
+    summary,
+    tone: !defaultShows && noKioskShows ? "warn" : "neutral",
+    moreThanOne: (defaultShows ? 1 : 0) + showing.length > 1,
+    targets: [
+      { id: ANY_BROWSER, label: "Browsers & new screens", shows: defaultShows, meta: "" },
+      ...kiosks,
+    ],
+  };
+};
+const shownOn = computed(() => shownOnForPage(activeScreenId.value));
+const shownOnNotice = computed(() =>
+  addedNotice.value?.pageId === activeScreenId.value
+    ? `Shown on ${addedNotice.value.label} only.`
+    : ""
+);
+watch(activeScreenId, pageId => {
+  if (addedNotice.value?.pageId !== pageId) addedNotice.value = null;
+});
 const orientation = computed(() =>
   previewScreenId.value === ANY_BROWSER
     ? anyBrowserOrientation.value
@@ -628,22 +729,14 @@ const orientationBadge = computed(() =>
     .filter(Boolean)
     .join(" · ")
 );
-// A kiosk shows every page unless it has an explicit allowlist; an empty
-// allowlist means it shows none.
-const kioskShowsPage = (kiosk, pageId) => {
-  const avail = kiosk?.overrides?.availableScreens;
-  return !Array.isArray(avail) || avail.includes(pageId);
-};
-const screensShowingPage = pageId => kiosksStore.kiosks.filter(k => kioskShowsPage(k, pageId));
-const NOT_SHOWN = "Not shown";
-const screensLine = pageId => {
-  const all = kiosksStore.kiosks;
-  if (all.length === 0) return "All screens";
-  const showing = screensShowingPage(pageId);
-  if (showing.length === all.length) return "All screens";
-  if (showing.length === 0) return NOT_SHOWN;
-  return showing.map(screenLabel).join(", ");
-};
+// A kiosk follows Default's allowlist unless it has its own; an empty list
+// means it shows none.
+const kioskShowsPage = (kiosk, pageId) =>
+  effectiveAvailablePages(kiosk?.overrides, configValue.value, screens.value.screens).includes(
+    pageId
+  );
+const NOT_SHOWN = "Not shown anywhere";
+const screensLine = pageId => shownOnForPage(pageId).summary;
 // The title carries the full screens text (the meta line is truncated visually
 // at 16ch but its DOM text stays complete for screen readers too).
 const pageTabTitle = page => `${page.name} · ${screensLine(page.id)}`;
@@ -668,8 +761,7 @@ const pageTabItems = computed(() =>
 const mismatch = computed(
   () =>
     previewScreenId.value !== ANY_BROWSER &&
-    Array.isArray(previewOverrides.value.availableScreens) &&
-    !previewOverrides.value.availableScreens.includes(activeScreenId.value)
+    !kioskShowsPage(previewKiosk.value, activeScreenId.value)
 );
 const stageTag = computed(() =>
   previewScreenId.value === ANY_BROWSER
@@ -855,6 +947,7 @@ const selectScreen = id => {
   selectedRegionId.value = null;
   clockSelected.value = false;
   sheetOpen.value = false;
+  shownOnError.value = "";
   emitScreens({ ...screens.value, activeScreenId: id });
 };
 
@@ -882,6 +975,13 @@ const sourceOptionsFor = kind => {
 /* --- emit helpers --- */
 const emitScreens = next =>
   emit("update:config", { dashboardScreens: normalizeDashboardScreens(next) });
+// The host provides an awaitable save (Settings.vue). A bare mount in a unit
+// test falls back to the event, which is what every other edit uses.
+const applyConfigPatch = async patch => {
+  if (typeof saveConfig === "function") return saveConfig(patch);
+  emit("update:config", patch);
+};
+const sameList = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 const cloneLayout = () => JSON.parse(JSON.stringify(activeScreen.value.layout));
 const updateActiveLayout = layout => {
   const next = JSON.parse(JSON.stringify(screens.value));
@@ -976,34 +1076,299 @@ watch(
 );
 
 /* --- screen ops --- */
-const addScreen = () => {
-  const next = JSON.parse(JSON.stringify(screens.value));
-  const screen = createDashboardScreenFromPreset("split_two", {
-    name: `Page ${next.screens.length + 1}`,
+// Save the catalog first, then the scope's page list that points at the new
+// page. If the list write fails the page still exists and Shown on tells the
+// truth (docs/design/2026-11-02-shared-pages.md §6).
+const saveScopePage = async (pageId, pagesBefore) => {
+  if (scopeIsDefault.value) {
+    addedNotice.value = { pageId, label: "browsers & new screens" };
+    shownOnError.value = "";
+    return;
+  }
+  const kioskId = previewScreenId.value;
+  try {
+    const fresh = await kiosksStore.fetchOverrides(kioskId);
+    const list = [...effectiveAvailablePages(fresh, configValue.value, pagesBefore), pageId];
+    const next = { ...fresh, availableScreens: list };
+    await kiosksStore.saveOverrides(kioskId, next);
+    kiosksStore.setKioskOverrides(kioskId, next);
+    addedNotice.value = { pageId, label: previewScreenName.value };
+    shownOnError.value = "";
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to add the page to this screen:", err);
+    shownOnError.value = `Couldn't update ${previewScreenName.value}. Try again.`;
+    addedNotice.value = null;
+  }
+};
+
+const addPageFromScope = async screen => {
+  const pagesBefore = screens.value.screens;
+  const plan = addPagePlan({
+    scopeId: scopeIsDefault.value ? null : previewScreenId.value,
+    defaultList: configValue.value.availableScreens,
+    pages: pagesBefore,
+    screenOverrides: previewOverrides.value,
+    pageId: screen.id,
   });
+  const next = JSON.parse(JSON.stringify(screens.value));
   next.screens.push(screen);
   next.activeScreenId = screen.id;
   selectedRegionId.value = null;
-  emitScreens(next);
+  addedNotice.value = null;
+  shownOnError.value = "";
+  const patch = { dashboardScreens: normalizeDashboardScreens(next) };
+  if (!sameList(plan.defaultList, configValue.value.availableScreens)) {
+    patch.availableScreens = plan.defaultList;
+  }
+  try {
+    await applyConfigPatch(patch);
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to save the new page:", err);
+    shownOnError.value = "Couldn't create the page. Try again.";
+    return;
+  }
+  await saveScopePage(screen.id, pagesBefore);
 };
-const duplicateScreen = () => {
-  const next = JSON.parse(JSON.stringify(screens.value));
-  const copy = JSON.parse(JSON.stringify(next.screens[activeIndex.value]));
+
+const addScreen = async () => {
+  const screen = createDashboardScreenFromPreset("split_two", {
+    name: `Page ${screens.value.screens.length + 1}`,
+  });
+  await addPageFromScope(screen);
+};
+
+const duplicateScreen = async () => {
+  const copy = JSON.parse(JSON.stringify(activeScreen.value));
   copy.id = `screen-${Math.random().toString(36).slice(2, 8)}`;
   copy.name = `${activeScreen.value.name} copy`;
+  const pagesBefore = screens.value.screens;
+  const plan = addPagePlan({
+    scopeId: scopeIsDefault.value ? null : previewScreenId.value,
+    defaultList: configValue.value.availableScreens,
+    pages: pagesBefore,
+    screenOverrides: previewOverrides.value,
+    pageId: copy.id,
+  });
+  const next = JSON.parse(JSON.stringify(screens.value));
   next.screens.splice(activeIndex.value + 1, 0, copy);
   next.activeScreenId = copy.id;
-  emitScreens(next);
-};
-const deleteActiveScreen = () => {
-  if (screens.value.screens.length <= 1) return;
-  const next = JSON.parse(JSON.stringify(screens.value));
-  const idx = activeIndex.value;
-  next.screens.splice(idx, 1);
-  next.activeScreenId = next.screens[Math.min(idx, next.screens.length - 1)].id;
   selectedRegionId.value = null;
-  emitScreens(next);
+  addedNotice.value = null;
+  shownOnError.value = "";
+  const patch = { dashboardScreens: normalizeDashboardScreens(next) };
+  if (!sameList(plan.defaultList, configValue.value.availableScreens)) {
+    patch.availableScreens = plan.defaultList;
+  }
+  try {
+    await applyConfigPatch(patch);
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to save the duplicated page:", err);
+    shownOnError.value = "Couldn't create the page. Try again.";
+    return;
+  }
+  await saveScopePage(copy.id, pagesBefore);
 };
+
+const deleteConfirm = ref(null);
+const deletePage = async pageId => {
+  const plan = pageDeletePlan({
+    pageId,
+    defaultList: configValue.value.availableScreens,
+  });
+  const next = JSON.parse(JSON.stringify(screens.value));
+  const idx = next.screens.findIndex(screen => screen.id === pageId);
+  if (idx < 0) return;
+  next.screens.splice(idx, 1);
+  if (next.activeScreenId === pageId) {
+    next.activeScreenId = next.screens[Math.min(idx, next.screens.length - 1)].id;
+  }
+  const patch = { dashboardScreens: normalizeDashboardScreens(next) };
+  if (!sameList(plan.defaultList, configValue.value.availableScreens)) {
+    patch.availableScreens = plan.defaultList;
+  }
+  if (configValue.value.defaultScreenId === pageId) patch.defaultScreenId = null;
+  selectedRegionId.value = null;
+  addedNotice.value = null;
+  deleteConfirm.value = null;
+  shownOnError.value = "";
+  try {
+    await applyConfigPatch(patch);
+  } catch {
+    return;
+  }
+  const failures = [];
+  for (const kiosk of kiosksStore.kiosks) {
+    try {
+      // Read the layer from the server, not the cached list: an offline screen
+      // may have changed since this page was loaded.
+      const fresh = await kiosksStore.fetchOverrides(kiosk.id);
+      const cleaned = removePageFromOverrides(fresh, pageId);
+      if (!cleaned.changed) continue;
+      await kiosksStore.saveOverrides(kiosk.id, cleaned.overrides);
+      kiosksStore.setKioskOverrides(kiosk.id, cleaned.overrides);
+    } catch (err) {
+      logError("[ScreenRegionEditor]", "Failed to clean up a screen's page list:", err);
+      failures.push(screenLabel(kiosk));
+    }
+  }
+  if (failures.length) {
+    shownOnError.value = `Couldn't update ${joinNames(failures)}. Try again.`;
+  }
+};
+
+const requestDeleteActiveScreen = () => {
+  const page = activeScreen.value;
+  if (screens.value.screens.length <= 1) return;
+  const pageId = page.id;
+  const affected = [];
+  for (const kiosk of kiosksStore.kiosks) {
+    if (!scopeIsDefault.value && kiosk.id === previewScreenId.value) continue;
+    if (
+      effectiveAvailablePages(kiosk.overrides, configValue.value, screens.value.screens).includes(
+        pageId
+      )
+    ) {
+      affected.push(screenLabel(kiosk));
+    }
+  }
+  if (!scopeIsDefault.value && defaultPageIds.value.includes(pageId)) affected.push("browsers");
+  if (affected.length === 0) {
+    deletePage(pageId);
+    return;
+  }
+  const also = `${joinNames(affected)} ${affected.length === 1 ? "also shows" : "also show"} it.`;
+  const message = hideLabel.value
+    ? `${also} To take it off ${scopeLabel.value} only, use ${hideLabel.value}.`
+    : also;
+  deleteConfirm.value = {
+    pageId,
+    title: `Delete "${page.name}" everywhere?`,
+    message,
+    alternativeText: hideLabel.value,
+  };
+};
+
+// A screen that follows Default now hides the page too, so its own start page
+// must stop pointing at it. Re-read each layer first: the cached list can be
+// stale, and the override is replaced wholesale on save.
+const clearFollowingStartPage = async pageId => {
+  const failures = [];
+  for (const kiosk of kiosksStore.kiosks) {
+    try {
+      const fresh = await kiosksStore.fetchOverrides(kiosk.id);
+      const followsDefault = fresh.availableScreens == null;
+      if (!followsDefault || fresh.defaultScreenId !== pageId) continue;
+      const cleaned = removePageFromOverrides(fresh, pageId);
+      await kiosksStore.saveOverrides(kiosk.id, cleaned.overrides);
+      kiosksStore.setKioskOverrides(kiosk.id, cleaned.overrides);
+    } catch (err) {
+      logError("[ScreenRegionEditor]", "Failed to clear a screen's start page:", err);
+      failures.push(screenLabel(kiosk));
+    }
+  }
+  if (failures.length) {
+    shownOnError.value = `Couldn't update ${joinNames(failures)}. Try again.`;
+  }
+};
+
+const hideActivePage = async () => {
+  const pageId = activeScreenId.value;
+  if (!hideLabel.value) return;
+  shownOnError.value = "";
+  if (scopeIsDefault.value) {
+    const plan = pageTogglePlan({
+      pageId,
+      checked: false,
+      targetIsDefault: true,
+      defaultList: configValue.value.availableScreens,
+      pages: screens.value.screens,
+    });
+    if (plan.error) {
+      shownOnError.value = plan.error;
+      return;
+    }
+    const patch = { availableScreens: plan.availableScreens };
+    if (configValue.value.defaultScreenId === pageId) patch.defaultScreenId = null;
+    deleteConfirm.value = null;
+    try {
+      await applyConfigPatch(patch);
+    } catch {
+      /* the host shows the save error */
+      return;
+    }
+    await clearFollowingStartPage(pageId);
+    return;
+  }
+  try {
+    const fresh = await kiosksStore.fetchOverrides(previewScreenId.value);
+    const plan = pageTogglePlan({
+      pageId,
+      checked: false,
+      targetOverrides: fresh,
+      defaultList: configValue.value.availableScreens,
+      pages: screens.value.screens,
+    });
+    if (plan.error) {
+      shownOnError.value = plan.error;
+      return;
+    }
+    await kiosksStore.saveOverrides(previewScreenId.value, plan.overrides);
+    kiosksStore.setKioskOverrides(previewScreenId.value, plan.overrides);
+    deleteConfirm.value = null;
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to hide the page on this screen:", err);
+    shownOnError.value = `Couldn't update ${previewScreenName.value}. Try again.`;
+  }
+};
+
+const toggleShownOn = async (targetId, checked) => {
+  const pageId = activeScreenId.value;
+  shownOnError.value = "";
+  if (targetId === ANY_BROWSER) {
+    const plan = pageTogglePlan({
+      pageId,
+      checked,
+      targetIsDefault: true,
+      defaultList: configValue.value.availableScreens,
+      pages: screens.value.screens,
+    });
+    if (plan.error) {
+      shownOnError.value = plan.error;
+      return;
+    }
+    const patch = { availableScreens: plan.availableScreens };
+    if (!checked && configValue.value.defaultScreenId === pageId) patch.defaultScreenId = null;
+    try {
+      await applyConfigPatch(patch);
+    } catch {
+      /* the host shows the save error */
+      return;
+    }
+    if (!checked) await clearFollowingStartPage(pageId);
+    return;
+  }
+  const kiosk = kiosksStore.kiosks.find(item => item.id === targetId);
+  try {
+    const fresh = await kiosksStore.fetchOverrides(targetId);
+    const plan = pageTogglePlan({
+      pageId,
+      checked,
+      targetOverrides: fresh,
+      defaultList: configValue.value.availableScreens,
+      pages: screens.value.screens,
+    });
+    if (plan.error) {
+      shownOnError.value = plan.error;
+      return;
+    }
+    await kiosksStore.saveOverrides(targetId, plan.overrides);
+    kiosksStore.setKioskOverrides(targetId, plan.overrides);
+  } catch (err) {
+    logError("[ScreenRegionEditor]", "Failed to update a screen's page list:", err);
+    shownOnError.value = `Couldn't update ${screenLabel(kiosk)}. Try again.`;
+  }
+};
+
 const renameScreen = name => patchActiveScreen({ name: name || "Screen" });
 const applyPreset = preset => {
   const layout = createDashboardLayoutFromPreset(preset, activeScreen.value.layout);
@@ -1187,6 +1552,8 @@ const stopResize = () => {
 const setPreviewScreen = id => {
   previewScreenId.value = id;
   showItError.value = "";
+  shownOnError.value = "";
+  addedNotice.value = null;
   if (id === ANY_BROWSER) anyBrowserOrientation.value = orientationConfig.value;
 };
 // Add the active page to the previewed screen's allowlist (GET, merge, PUT).
@@ -1199,15 +1566,13 @@ const showItOnScreen = async () => {
   try {
     const fresh = await kiosksStore.fetchOverrides(kiosk.id);
     const next = { ...fresh };
-    if (
-      !Array.isArray(fresh.availableScreens) ||
-      fresh.availableScreens.includes(activeScreenId.value)
-    ) {
-      // It already shows every page (or this one): only the local copy was stale.
+    const available = effectiveAvailablePages(fresh, configValue.value, screens.value.screens);
+    if (available.includes(activeScreenId.value)) {
+      // It already shows this page: only the local copy was stale.
       kiosksStore.setKioskOverrides(kiosk.id, next);
       return;
     }
-    next.availableScreens = [...fresh.availableScreens, activeScreenId.value];
+    next.availableScreens = [...available, activeScreenId.value];
     await kiosksStore.saveOverrides(kiosk.id, next);
     kiosksStore.setKioskOverrides(kiosk.id, next);
   } catch (err) {
@@ -1654,6 +2019,13 @@ onUnmounted(() => {
 .sre-orient-caption {
   margin-top: var(--gap-3);
   font-variant-numeric: tabular-nums;
+}
+.sre-stage-caption {
+  margin: var(--gap-2) 0 0;
+  max-width: 44rem;
+  font-size: var(--text-caption);
+  color: var(--ink-3);
+  text-align: center;
 }
 
 /* Phone: one column, the inspector becomes a bottom sheet (§3). */
