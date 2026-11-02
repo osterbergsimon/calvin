@@ -135,6 +135,11 @@ export const useConfigStore = defineStore("config", () => {
   // Set after the first successful load: from then on the in-memory config is
   // newer than the cached copy, so a failed poll keeps it instead.
   let loadedFromServer = false;
+  // Signature of the last payload written into the config refs. The 30 s poll
+  // returns the same payload most of the time; re-applying it replaces every
+  // reactive object and re-renders all dashboard regions for nothing.
+  let lastAppliedPayloadSignature = null;
+  const payloadSignature = payload => JSON.stringify(payload ?? null);
   // Latches true once the initial config load has settled. Consumers use this
   // to ignore the boot-time hydration, where refs flip from their defaults to
   // the persisted values (e.g. showUI true->false) and would otherwise look
@@ -344,18 +349,24 @@ export const useConfigStore = defineStore("config", () => {
     const path = withViewport(configPath());
     const cacheKey = `config_${path}`;
     const applyFetched = data => {
+      const signature = payloadSignature(data);
+      if (signature === lastAppliedPayloadSignature) return false;
       applyConfigPayload(data, configRefs, { useDefaults: true });
       if (getKioskId()) {
         availableScreens.value = data?.availableScreens ?? null;
         defaultScreenId.value = data?.defaultScreenId ?? null;
         seedKioskActiveScreen();
       }
+      lastAppliedPayloadSignature = signature;
+      return true;
     };
     try {
       const response = await api.get(path);
-      applyFetched(response.data);
-      await migrateDisplaySettingsOnce(response.data);
-      setCachedData(cacheKey, response.data);
+      const applied = applyFetched(response.data);
+      if (applied) {
+        await migrateDisplaySettingsOnce(response.data);
+        setCachedData(cacheKey, response.data);
+      }
       loadedFromServer = true;
       stale.value = false;
       return response.data;
@@ -364,8 +375,8 @@ export const useConfigStore = defineStore("config", () => {
         const cached = getCachedData(cacheKey, CONFIG_CACHE_TTL, { allowStale: true });
         if (cached) {
           logInfo("[ConfigStore]", "Backend unreachable, using cached config");
-          applyFetched(cached);
-          await migrateDisplaySettingsOnce(cached);
+          const applied = applyFetched(cached);
+          if (applied) await migrateDisplaySettingsOnce(cached);
           stale.value = true;
           return cached;
         }
@@ -390,7 +401,9 @@ export const useConfigStore = defineStore("config", () => {
     try {
       const response = await api.post("/config", config);
       applyConfigPayload(config, configRefs);
-      applyConfigPayload(response.data || {}, configRefs);
+      const responseData = response.data || {};
+      applyConfigPayload(responseData, configRefs);
+      lastAppliedPayloadSignature = payloadSignature(responseData);
       return response.data;
     } catch (err) {
       captureError(err, "save your settings", "Failed to update config:");

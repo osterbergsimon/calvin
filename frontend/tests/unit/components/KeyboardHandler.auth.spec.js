@@ -89,6 +89,55 @@ describe("KeyboardHandler reboot combo (CLV-9 §7)", () => {
     wrapper.unmount();
   });
 
+  it("arms one timeout only while both keys are held and cancels on release", async () => {
+    vi.useFakeTimers();
+    api.post.mockClear();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          rebootComboKey1: "KEY_1",
+          rebootComboKey2: "KEY_7",
+          rebootComboDuration: 1000,
+        }),
+      })
+    );
+    const intervalSpy = vi.spyOn(globalThis, "setInterval");
+
+    const wrapper = mount(KeyboardHandler, {
+      global: { stubs: { NotificationSystem: true } },
+    });
+    await flushPromises();
+    expect(intervalSpy.mock.calls.map(call => call[1])).not.toContain(100);
+
+    press("Digit1");
+    press("Digit7");
+    vi.advanceTimersByTime(999);
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+
+    release("Digit1");
+    vi.advanceTimersByTime(5000);
+    await flushPromises();
+    expect(api.post).not.toHaveBeenCalled();
+
+    press("Digit1");
+    press("Digit7");
+    vi.advanceTimersByTime(1000);
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(5000);
+    await flushPromises();
+    expect(api.post).toHaveBeenCalledTimes(1);
+
+    release("Digit1");
+    release("Digit7");
+    intervalSpy.mockRestore();
+    wrapper.unmount();
+  });
+
   it("surfaces the server's reason when the host refuses the reboot", async () => {
     vi.useFakeTimers();
     vi.stubGlobal(
