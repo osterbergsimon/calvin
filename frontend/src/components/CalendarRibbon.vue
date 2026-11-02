@@ -116,9 +116,7 @@ const handleFocus = () => emit("focus", props.ribbon);
   border: 1px solid color-mix(in srgb, var(--ribbon-hue) 55%, transparent);
   border-left: 2px solid var(--ribbon-hue);
   border-radius: var(--radius-xs);
-  transition:
-    background var(--dur-fast),
-    box-shadow var(--dur-fast);
+  transition: background var(--dur-fast);
 }
 
 /* Endcaps carry the story: a squared, edge-bleeding end means the event runs

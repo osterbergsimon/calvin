@@ -30,11 +30,12 @@ const stateClass = computed(() => {
   background: var(--bg-1);
   border: 1px solid var(--line);
   border-radius: var(--radius-xs);
+  /* Only compositor-friendly properties animate. The focus halo (box-shadow)
+     and the dim filter snap to their new value instead of repainting a whole
+     region frame for 200ms — that crawl is very visible on the Pi kiosk. */
   transition:
     transform var(--dur) cubic-bezier(0.2, 0.7, 0.2, 1),
-    box-shadow var(--dur),
-    opacity var(--dur),
-    filter var(--dur);
+    opacity var(--dur);
 }
 .focus-panel.is-focused {
   background:
