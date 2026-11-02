@@ -629,6 +629,7 @@ import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
+import { createDebouncedSave } from "@/utils/debouncedSave";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -1033,23 +1034,60 @@ const effOsk = computed(() =>
 );
 
 // --- writes --------------------------------------------------------------
-async function persist(next, messageRef, onlineCopy, offlineCopy) {
-  // Optimistic set with snapshot revert so a failed save doesn't leave the UI
-  // showing apparently-applied values under the error banner (calvin-dd9.13).
-  const kioskIdToSave = selectedId.value;
-  const prior = overrides.value;
-  overrides.value = next;
-  messageRef.value = "";
+// One coalesced save per screen and quiet period. The override object is
+// applied first so the row shows the new value on tap; the previous object is
+// restored with the error message if that save fails.
+const persistSavers = new Map();
+
+function saverFor(kioskId) {
+  let entry = persistSavers.get(kioskId);
+  if (!entry) {
+    entry = { edit: null, saver: null };
+    entry.saver = createDebouncedSave({ save: edit => performPersist(entry, edit) });
+    persistSavers.set(kioskId, entry);
+  }
+  return entry;
+}
+
+async function performPersist(entry, edit) {
+  if (entry.edit === edit) entry.edit = null;
+  const { kioskId, next, prior, messageRef, onlineCopy, offlineCopy } = edit;
   try {
-    await store.saveOverrides(kioskIdToSave, next);
-    store.setKioskOverrides(kioskIdToSave, next);
+    await store.saveOverrides(kioskId, next);
+    store.setKioskOverrides(kioskId, next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
     messageRef.value = online ? onlineCopy : offlineCopy;
-    await refreshDesiredVersion(kioskIdToSave);
-  } catch {
-    if (selectedId.value === kioskIdToSave) overrides.value = prior;
+    await refreshDesiredVersion(kioskId);
+  } catch (err) {
+    if (selectedId.value === kioskId) overrides.value = prior;
     messageRef.value = "Couldn't save to the server. Check the connection and try again.";
+    throw err;
   }
+}
+
+function persist(next, messageRef, onlineCopy, offlineCopy) {
+  const kioskId = selectedId.value;
+  const entry = saverFor(kioskId);
+  if (entry.edit) {
+    entry.edit.next = next;
+    entry.edit.messageRef = messageRef;
+    entry.edit.onlineCopy = onlineCopy;
+    entry.edit.offlineCopy = offlineCopy;
+  } else {
+    entry.edit = {
+      kioskId,
+      next,
+      prior: overrides.value,
+      messageRef,
+      onlineCopy,
+      offlineCopy,
+    };
+  }
+  overrides.value = next;
+  messageRef.value = "";
+  // performPersist shows the failure itself; the returned promise settles
+  // after the coalesced save so a caller can await the real write.
+  return entry.saver.schedule(entry.edit).catch(() => {});
 }
 
 const OFFLINE_COPY = "Saved. Changes apply when this screen reconnects.";

@@ -9,6 +9,7 @@ import { logError } from "../utils/logger";
 import { friendlyError } from "../utils/friendlyError";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
+import { createDebouncedSave } from "../utils/debouncedSave";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
@@ -212,29 +213,40 @@ export function useConfigForm(initialConfig = {}) {
     }
   };
 
-  // Update a single config value
-  const updateConfigValue = async (key, value) => {
+  // Update a single config value. The form value changes first; the save is
+  // coalesced with any other quick edits and rolls the value back if it fails.
+  const updateConfigValue = (key, value) => {
+    const prior = { [key]: localConfig.value[key] };
     localConfig.value[key] = value;
-    await saveConfig({ [key]: value });
+    return queueSave({ [key]: value }, prior);
   };
 
   // Update multiple config values
-  const updateConfig = async updates => {
+  const updateConfig = updates => {
+    const prior = {};
+    for (const key of Object.keys(updates)) prior[key] = localConfig.value[key];
     Object.assign(localConfig.value, updates);
-    await saveConfig(updates);
+    return queueSave(updates, prior);
   };
 
-  // Save config to backend
+  // Save config to backend. This is the shared write path: a control has
+  // already applied its value locally by the time it gets here.
   const saveConfig = async (updates = null) => {
+    return queueSave(updates || localConfig.value, {});
+  };
+
+  let pendingWindow = null;
+
+  const performSave = async ({ updates, prior }) => {
+    if (pendingWindow?.updates === updates) pendingWindow = null;
     saving.value = true;
     error.value = "";
     saveSuccess.value = false;
 
     try {
-      const configToSave = updates || localConfig.value;
       // The store POSTs to the backend and applies the result; one request per save.
-      await configStore.updateConfig(configToSave);
-      lastSavedKeys.value = updates ? Object.keys(updates) : [];
+      await configStore.updateConfig(updates);
+      lastSavedKeys.value = Object.keys(updates);
       saveSuccess.value = true;
       if (saveSuccessTimer) {
         clearTimeout(saveSuccessTimer);
@@ -245,11 +257,31 @@ export function useConfigForm(initialConfig = {}) {
       }, 2500);
     } catch (err) {
       logError("[useConfigForm]", "Failed to save config:", err);
+      // Restore only keys the user has not changed again while the save was
+      // in flight.
+      for (const [key, previous] of Object.entries(prior || {})) {
+        if (Object.is(localConfig.value[key], updates[key])) {
+          localConfig.value[key] = previous;
+        }
+      }
       error.value = friendlyError(err, "save your settings");
       throw err;
     } finally {
-      saving.value = false;
+      // A newer edit may already be queued behind this save.
+      saving.value = pendingWindow !== null;
     }
+  };
+
+  const saver = createDebouncedSave({ save: performSave });
+
+  const queueSave = (updates, prior) => {
+    if (!pendingWindow) pendingWindow = { updates: {}, prior: {} };
+    Object.assign(pendingWindow.updates, updates);
+    for (const [key, previous] of Object.entries(prior || {})) {
+      if (!(key in pendingWindow.prior)) pendingWindow.prior[key] = previous;
+    }
+    saving.value = true;
+    return saver.schedule(pendingWindow);
   };
 
   // Reset to store values

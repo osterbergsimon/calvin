@@ -370,9 +370,9 @@ const uiSizeSetting = useScreenSetting("uiSize", {
 const uiSize = computed(() => uiSizeSetting.value.value || "default");
 const { applyUiScale } = useUiScale();
 const setUiSize = async value => {
-  await uiSizeSetting.set(value);
-  // Apply immediately, without waiting for the config store to round-trip.
+  // Apply immediately, without waiting for the save round-trip.
   applyUiScale(value);
+  await uiSizeSetting.set(value);
 };
 
 // --- Controls: per screen (calvin-hi6w) ------------------------------------

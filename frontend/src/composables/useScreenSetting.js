@@ -1,9 +1,10 @@
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
 import { useNotificationsStore } from "../stores/notifications";
 import { getKioskId } from "../utils/kioskId";
 import { logError } from "../utils/logger";
+import { createDebouncedSave } from "../utils/debouncedSave";
 import {
   decodeScreenValue,
   readScreenStorage,
@@ -50,7 +51,16 @@ export function useScreenSetting(
     readServerValue ? readServerValue() : (configStore[key] ?? null)
   );
 
+  // A kiosk write is shown on this page straight away, not after a round-trip
+  // (and not after the next merged-config poll). The server value clears it
+  // once it catches up; a failed save restores the value from before the tap.
+  const optimistic = ref(null);
+  watch(serverValue, next => {
+    if (optimistic.value && Object.is(next, optimistic.value.value)) optimistic.value = null;
+  });
+
   const value = computed(() => {
+    if (optimistic.value) return optimistic.value.value;
     if (scope === "kiosk") return serverValue.value;
     return decodeScreenValue(stored.value, serverValue.value) ?? serverValue.value;
   });
@@ -60,13 +70,16 @@ export function useScreenSetting(
   // override on the server and is reported by the screens page instead.
   const overridden = computed(() => scope === "browser" && stored.value !== null);
 
-  const set = async next => {
+  let pendingWindow = null;
+
+  const performKioskSave = async window => {
+    if (pendingWindow === window) pendingWindow = null;
     try {
       await writeScreenSetting({
         kioskId,
         key,
         storageKey,
-        next,
+        next: window.next,
         raw: stored,
         kiosksStore,
         // The override replaces the whole object; keep this page in step
@@ -77,10 +90,48 @@ export function useScreenSetting(
       });
     } catch (err) {
       logError("[useScreenSetting]", `Failed to save ${key}:`, err);
+      optimistic.value = { value: window.prior };
       notifications.notify({
         severity: "error",
         message: "Couldn't save this screen's setting. The stored value is unchanged.",
       });
+      throw err;
+    }
+  };
+
+  const kioskSaver = createDebouncedSave({ save: performKioskSave });
+
+  const set = async next => {
+    if (scope !== "kiosk") {
+      try {
+        await writeScreenSetting({
+          kioskId,
+          key,
+          storageKey,
+          next,
+          raw: stored,
+          kiosksStore,
+        });
+      } catch (err) {
+        logError("[useScreenSetting]", `Failed to save ${key}:`, err);
+        notifications.notify({
+          severity: "error",
+          message: "Couldn't save this screen's setting. The stored value is unchanged.",
+        });
+      }
+      return;
+    }
+
+    // Apply first, save later. Quick taps share one window so only the value
+    // the user finally chose is sent.
+    if (!pendingWindow) pendingWindow = { next, prior: value.value };
+    else pendingWindow.next = next;
+    optimistic.value = { value: pendingWindow.next };
+
+    try {
+      await kioskSaver.schedule(pendingWindow);
+    } catch {
+      // performKioskSave already restored the value and raised the message.
     }
   };
 
@@ -88,11 +139,17 @@ export function useScreenSetting(
   // override) so the Default value applies again.
   const reset = async () => {
     if (scope === "kiosk") {
+      if (pendingWindow) {
+        kioskSaver.cancel();
+        pendingWindow = null;
+        optimistic.value = null;
+      }
       const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
       if (!(key in overrides)) return;
       const merged = { ...overrides };
       delete merged[key];
       await kiosksStore.saveOverrides(kioskId, merged);
+      optimistic.value = null;
       return;
     }
 
