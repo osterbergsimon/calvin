@@ -51,7 +51,7 @@
         <div v-if="imagesStore.loading" class="loading">
           <p>Loading images...</p>
         </div>
-        <div v-else-if="!currentImageUrl" class="photo-placeholder">
+        <div v-else-if="!currentImage" class="photo-placeholder">
           <EmptyState
             message="No photos yet"
             help="Upload photos in Settings › Content › Image sources."
@@ -63,27 +63,34 @@
           />
         </div>
         <div v-else ref="containerEl" class="photo-container">
-          <!-- Blurred copy of the same photo, so a whole photo never sits on
-               black bars. aria-hidden: it is decoration. -->
-          <img
-            v-if="fitDecision.backdrop && currentImageUrl"
-            :src="currentImageUrl"
-            class="photo-backdrop"
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-            loading="eager"
-          />
-          <img
-            :src="currentImageUrl"
-            :alt="currentImage?.filename || 'Photo'"
-            :class="['photo-image', `photo-image-${displayMode}`]"
-            :style="imageStyle"
-            decoding="async"
-            loading="eager"
-            @load="onImageLoad"
-            @error="onImageError"
-          />
+          <!-- The container exists before the first request so the observer
+               can measure it; no src is set until that measurement exists. -->
+          <template v-if="currentImageUrl">
+            <!-- Blurred copy of the same photo, so a whole photo never sits on
+                 black bars. aria-hidden: it is decoration. -->
+            <img
+              v-if="fitDecision.backdrop"
+              :src="currentImageUrl"
+              class="photo-backdrop"
+              alt=""
+              aria-hidden="true"
+              decoding="async"
+              loading="eager"
+            />
+            <img
+              :src="currentImageUrl"
+              :alt="currentImage?.filename || 'Photo'"
+              :class="['photo-image', `photo-image-${displayMode}`]"
+              :style="imageStyle"
+              decoding="async"
+              loading="eager"
+              @load="onImageLoad"
+              @error="onImageError"
+            />
+          </template>
+          <div v-else class="loading">
+            <p>Loading images...</p>
+          </div>
         </div>
       </div>
     </DashboardPanel>
@@ -184,13 +191,16 @@ const sourceKey = computed(() =>
 const currentImage = computed(() => imagesStore.getCurrentImageForSource(props.sourceIds));
 const sourceImages = computed(() => imagesStore.getImagesForSource(props.sourceIds));
 
-// Display width requested from the backend. Start at the smallest bucket so
-// the first paint never asks for a full-size original before the region is
-// measured; the ResizeObserver then upgrades it (1000 -> 1280, etc.).
-const requestedWidth = ref(640);
-const currentImageUrl = computed(() =>
-  withImageWidth(imagesStore.getCurrentImageUrlForSource(props.sourceIds), requestedWidth.value)
-);
+// Display width requested from the backend. Until the region is measured there
+// is deliberately no src at all: a large kiosk must not probe 640 first. Test
+// hosts without ResizeObserver get the smallest bucket so layoutless mounts
+// still render something.
+const requestedWidth = ref(typeof ResizeObserver === "undefined" ? 640 : null);
+const currentImageUrl = computed(() => {
+  const url = imagesStore.getCurrentImageUrlForSource(props.sourceIds);
+  if (!url || !requestedWidth.value) return null;
+  return withImageWidth(url, requestedWidth.value);
+});
 
 // Get display mode from the region. Photo frame / fullscreen always belongs to
 // a different shape than any region, so it is deliberately Smart.
@@ -276,15 +286,24 @@ const nextImage = computed(() => {
 
 const preloadNextImage = () => {
   const image = nextImage.value;
-  if (!image) return Promise.resolve(null);
+  if (!image || !requestedWidth.value) return Promise.resolve(null);
   return preloadAndDecodeImage(imagesStore.getImageUrlForWidth(image, requestedWidth.value));
 };
 
+let rotationPending = false;
+
 const advanceToNext = async () => {
-  // A failed decode (corrupt file, unsupported format) must not stop rotation:
-  // preloadAndDecodeImage resolves null and the swap still happens.
-  await preloadNextImage();
-  await imagesStore.nextImage(props.sourceIds);
+  // No stacked ticks: a slow decode must not queue up a burst of advances.
+  if (rotationPending) return;
+  rotationPending = true;
+  try {
+    // A failed decode (corrupt file, unsupported format) must not stop
+    // rotation: preloadAndDecodeImage resolves null and the swap still happens.
+    await preloadNextImage();
+    await imagesStore.nextImage(props.sourceIds);
+  } finally {
+    rotationPending = false;
+  }
 };
 
 let rotationTimer = null;
@@ -306,17 +325,28 @@ const onImageError = () => {
   console.error("Failed to load image:", currentImageUrl.value);
 };
 
+// Schedule the next tick only after the current one finished pre-decoding and
+// swapping. A pending preload therefore never leaves a queue of ticks behind.
+const scheduleNextRotation = () => {
+  if (!props.autoRotate || sourceImages.value.length <= 1) return;
+  rotationTimer = setTimeout(runRotation, props.rotationInterval);
+};
+
+const runRotation = async () => {
+  rotationTimer = null;
+  if (!props.autoRotate) return;
+  await advanceToNext();
+  scheduleNextRotation();
+};
+
 const startAutoRotation = () => {
-  if (props.autoRotate && sourceImages.value.length > 1) {
-    rotationTimer = setInterval(() => {
-      advanceToNext();
-    }, props.rotationInterval);
-  }
+  stopAutoRotation();
+  scheduleNextRotation();
 };
 
 const stopAutoRotation = () => {
   if (rotationTimer) {
-    clearInterval(rotationTimer);
+    clearTimeout(rotationTimer);
     rotationTimer = null;
   }
 };
@@ -380,9 +410,13 @@ watch(currentImageUrl, () => {
 // Warm the next photo whenever the current one, the source list or the display
 // width changes. The rotation timer also awaits this before advancing, so a
 // user click and an automatic rotation both swap into a decoded image.
-watch([() => currentImage.value?.id, () => sourceImages.value.length, requestedWidth], () => {
-  preloadNextImage();
-});
+watch(
+  [() => currentImage.value?.id, () => sourceImages.value.length, requestedWidth],
+  () => {
+    preloadNextImage();
+  },
+  { immediate: true }
+);
 
 watch(
   () => props.autoRotate,

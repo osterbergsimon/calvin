@@ -314,6 +314,7 @@ describe("PhotoSlideshow", () => {
     it("Whole photo renders the backdrop", async () => {
       imagesStore.currentImage = createImage({ width: 1500, height: 1000 });
       const wrapper = createWrapper({ fit: "fit" });
+      await setContainer(wrapper, 1600, 1000);
 
       expect(wrapper.find(".photo-image").attributes("style")).toContain("object-fit: contain");
       expect(wrapper.find(".photo-backdrop").exists()).toBe(true);
@@ -559,6 +560,19 @@ describe("PhotoSlideshow", () => {
       await wrapper.vm.$nextTick();
     };
 
+    it("does not request an image before the region has been measured", async () => {
+      imagesStore.currentImage = createImage();
+      const wrapper = createWrapper();
+      await flushPromises();
+
+      // No 640-first probe: the first src the browser sees is the measured one.
+      expect(wrapper.find(".photo-image").exists()).toBe(false);
+      expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
+
+      await resize(wrapper, 1600, 900);
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=1920");
+    });
+
     it("requests the bucket for the measured region and devicePixelRatio", async () => {
       setDpr(2);
       imagesStore.currentImage = createImage({ width: 4000, height: 3000 });
@@ -622,19 +636,58 @@ describe("PhotoSlideshow", () => {
         });
 
         const wrapper = createWrapper({ autoRotate: true, rotationInterval: 5000 });
+        await resize(wrapper, 800, 600);
         await flushPromises();
 
         decode.mockClear();
         decoded.length = 0;
         await vi.advanceTimersByTimeAsync(5000);
+        // A second tick while the first preload is still pending must not stack.
+        await vi.advanceTimersByTimeAsync(5000);
 
-        expect(decoded.some(url => url.startsWith("/api/images/2?w=640"))).toBe(true);
+        expect(decoded.some(url => url.startsWith("/api/images/2?w=960"))).toBe(true);
         expect(imagesStore.nextImage).not.toHaveBeenCalled();
 
         resolveDecode();
         await flushPromises();
 
-        expect(imagesStore.nextImage).toHaveBeenCalled();
+        expect(imagesStore.nextImage).toHaveBeenCalledTimes(1);
+        wrapper.unmount();
+      } finally {
+        delete globalThis.Image;
+      }
+    });
+
+    it("preloads the next image in the randomized order", async () => {
+      const decoded = [];
+      globalThis.Image = class {
+        constructor() {
+          this.decode = vi.fn(() => Promise.resolve());
+        }
+        set src(value) {
+          this._src = value;
+          decoded.push(value);
+        }
+        get src() {
+          return this._src;
+        }
+      };
+
+      try {
+        const image1 = createImage({ id: "1" });
+        const image2 = createImage({ id: "2" });
+        // The backend shuffled the list: 2 then 1. The original `images`
+        // array keeps the unshuffled order on purpose.
+        imagesStore.currentImage = image2;
+        imagesStore.imagesBySourceKey["__all__"] = [image2, image1];
+        imagesStore.images = [image1, image2];
+        imagesStore.fetchImages = vi.fn().mockResolvedValue(undefined);
+
+        const wrapper = createWrapper();
+        await resize(wrapper, 800, 600);
+        await flushPromises();
+
+        expect(decoded.some(url => url.startsWith("/api/images/1?w=960"))).toBe(true);
         wrapper.unmount();
       } finally {
         delete globalThis.Image;
@@ -663,6 +716,7 @@ describe("PhotoSlideshow", () => {
         });
 
         const wrapper = createWrapper({ autoRotate: true, rotationInterval: 5000 });
+        await resize(wrapper, 800, 600);
         await flushPromises();
         await vi.advanceTimersByTimeAsync(5000);
         await flushPromises();
