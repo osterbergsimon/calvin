@@ -101,6 +101,12 @@ import IconButton from "@/components/ui/IconButton.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useTouchCapability } from "@/composables/useTouchCapability";
+import {
+  preloadAndDecodeImage,
+  upgradeImageWidth,
+  variantWidthForRegion,
+  withImageWidth,
+} from "@/utils/imageVariants";
 import { normalizePhotoFit, resolveImageAspect, resolvePhotoFit } from "@/utils/photoFit";
 
 const { handleAction } = useKeyboardActions();
@@ -177,7 +183,14 @@ const sourceKey = computed(() =>
 );
 const currentImage = computed(() => imagesStore.getCurrentImageForSource(props.sourceIds));
 const sourceImages = computed(() => imagesStore.getImagesForSource(props.sourceIds));
-const currentImageUrl = computed(() => imagesStore.getCurrentImageUrlForSource(props.sourceIds));
+
+// Display width requested from the backend. Start at the smallest bucket so
+// the first paint never asks for a full-size original before the region is
+// measured; the ResizeObserver then upgrades it (1000 -> 1280, etc.).
+const requestedWidth = ref(640);
+const currentImageUrl = computed(() =>
+  withImageWidth(imagesStore.getCurrentImageUrlForSource(props.sourceIds), requestedWidth.value)
+);
 
 // Get display mode from the region. Photo frame / fullscreen always belongs to
 // a different shape than any region, so it is deliberately Smart.
@@ -193,6 +206,15 @@ const containerAspect = ref(null);
 const naturalSize = ref(null);
 let containerObserver = null;
 
+// Request a variant only when the region needs a bigger bucket. A smaller
+// region keeps the already-loaded file, so resizing never re-downloads detail
+// the kiosk just decoded.
+const requestDisplayWidth = cssWidth => {
+  const dpr = typeof globalThis.devicePixelRatio === "number" ? globalThis.devicePixelRatio : 1;
+  const candidate = variantWidthForRegion(cssWidth, dpr);
+  requestedWidth.value = upgradeImageWidth(requestedWidth.value, candidate);
+};
+
 const measureContainer = () => {
   const el = containerEl.value;
   if (!el) return;
@@ -205,6 +227,7 @@ const measureContainer = () => {
   // Keep the last good shape: a hidden/zero-size element (or a test host with
   // no layout engine) must not erase a measurement the observer already gave.
   if (width > 0 && height > 0) containerAspect.value = width / height;
+  if (width > 0) requestDisplayWidth(width);
 };
 
 const observeContainer = () => {
@@ -214,6 +237,7 @@ const observeContainer = () => {
     const box = entries[0]?.contentRect;
     if (box && box.width > 0 && box.height > 0) {
       containerAspect.value = box.width / box.height;
+      requestDisplayWidth(box.width);
     }
   });
   containerObserver.observe(containerEl.value);
@@ -241,6 +265,28 @@ const imageStyle = computed(() => {
   return { objectFit: "none", objectPosition: "center", width: "auto", height: "auto" };
 });
 
+// The photo the next advance will show, so it can be downloaded and decoded
+// while the current photo is still on screen.
+const nextImage = computed(() => {
+  const list = sourceImages.value;
+  if (!list.length) return null;
+  const index = currentImage.value ? list.findIndex(img => img.id === currentImage.value.id) : -1;
+  return list[(index + 1) % list.length] || null;
+});
+
+const preloadNextImage = () => {
+  const image = nextImage.value;
+  if (!image) return Promise.resolve(null);
+  return preloadAndDecodeImage(imagesStore.getImageUrlForWidth(image, requestedWidth.value));
+};
+
+const advanceToNext = async () => {
+  // A failed decode (corrupt file, unsupported format) must not stop rotation:
+  // preloadAndDecodeImage resolves null and the swap still happens.
+  await preloadNextImage();
+  await imagesStore.nextImage(props.sourceIds);
+};
+
 let rotationTimer = null;
 
 const onImageLoad = event => {
@@ -263,7 +309,7 @@ const onImageError = () => {
 const startAutoRotation = () => {
   if (props.autoRotate && sourceImages.value.length > 1) {
     rotationTimer = setInterval(() => {
-      imagesStore.nextImage(props.sourceIds);
+      advanceToNext();
     }, props.rotationInterval);
   }
 };
@@ -329,6 +375,13 @@ watch(
 // A new photo may carry its own shape; forget the previous photo's natural size.
 watch(currentImageUrl, () => {
   naturalSize.value = null;
+});
+
+// Warm the next photo whenever the current one, the source list or the display
+// width changes. The rotation timer also awaits this before advancing, so a
+// user click and an automatic rotation both swap into a decoded image.
+watch([() => currentImage.value?.id, () => sourceImages.value.length, requestedWidth], () => {
+  preloadNextImage();
 });
 
 watch(

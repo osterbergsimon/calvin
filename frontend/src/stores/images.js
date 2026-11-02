@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import api, { LONG_REQUEST_TIMEOUT } from "../services/api";
 import { getCachedData, setCachedData } from "../utils/cache";
 import { friendlyError } from "../utils/friendlyError";
+import { withImageWidth } from "../utils/imageVariants";
 import { logError } from "../utils/logger";
 
 // Persist the wall-display feed so a kiosk refresh/reboot during a backend
@@ -168,7 +169,8 @@ export const useImagesStore = defineStore("images", () => {
       : imagesBySourceKey.value[sourceKey] || [];
   };
 
-  const getCurrentImageUrlForSource = sourceIds => getImageUrl(getCurrentImageForSource(sourceIds));
+  const getCurrentImageUrlForSource = (sourceIds, width) =>
+    getImageUrlForWidth(getCurrentImageForSource(sourceIds), width);
 
   const getImageUrl = image => {
     if (!image) return null;
@@ -178,6 +180,8 @@ export const useImagesStore = defineStore("images", () => {
     // See docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
     return `/api/images/${image.id}`;
   };
+
+  const getImageUrlForWidth = (image, width) => withImageWidth(getImageUrl(image), width);
 
   const uploadImage = async file => {
     loading.value = true;
@@ -236,6 +240,8 @@ export const useImagesStore = defineStore("images", () => {
     getCurrentImageForSource,
     getImagesForSource,
     getCurrentImageUrlForSource,
+    getImageUrl,
+    getImageUrlForWidth,
     uploadImage,
     deleteImage,
   };

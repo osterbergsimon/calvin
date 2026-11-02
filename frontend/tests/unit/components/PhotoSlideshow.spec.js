@@ -108,7 +108,7 @@ describe("PhotoSlideshow", () => {
 
       expect(wrapper.find(".photo-container").exists()).toBe(true);
       expect(wrapper.find(".photo-image").exists()).toBe(true);
-      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1");
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=640");
     });
 
     it("keeps raw error text off the wall (CLV-63)", () => {
@@ -269,7 +269,7 @@ describe("PhotoSlideshow", () => {
       expect(img.attributes("style")).toContain("object-fit: contain");
       const backdrop = wrapper.find(".photo-backdrop");
       expect(backdrop.exists()).toBe(true);
-      expect(backdrop.attributes("src")).toBe("/api/images/1");
+      expect(backdrop.attributes("src")).toBe("/api/images/1?w=1920");
       expect(backdrop.attributes("aria-hidden")).toBe("true");
     });
 
@@ -514,6 +514,164 @@ describe("PhotoSlideshow", () => {
       expect(imagesStore.nextImage).toHaveBeenCalled();
       expect(begin).not.toHaveBeenCalled();
       expect(track).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Display variants (calvin-ax77)", () => {
+    let observers;
+    let originalDpr;
+    let OriginalImage;
+
+    beforeEach(() => {
+      observers = [];
+      originalDpr = window.devicePixelRatio;
+      OriginalImage = globalThis.Image;
+      globalThis.ResizeObserver = class {
+        constructor(callback) {
+          this.callback = callback;
+          this.observe = vi.fn();
+          this.disconnect = vi.fn();
+          this.unobserve = vi.fn();
+          observers.push(this);
+        }
+      };
+    });
+
+    afterEach(() => {
+      delete globalThis.ResizeObserver;
+      globalThis.Image = OriginalImage;
+      Object.defineProperty(window, "devicePixelRatio", {
+        configurable: true,
+        value: originalDpr,
+      });
+    });
+
+    const setDpr = value => {
+      Object.defineProperty(window, "devicePixelRatio", { configurable: true, value });
+    };
+
+    const resize = async (wrapper, width, height) => {
+      for (let i = 0; i < 10 && observers.length === 0; i += 1) {
+        await Promise.resolve();
+      }
+      await wrapper.vm.$nextTick();
+      observers[observers.length - 1].callback([{ contentRect: { width, height } }]);
+      await wrapper.vm.$nextTick();
+    };
+
+    it("requests the bucket for the measured region and devicePixelRatio", async () => {
+      setDpr(2);
+      imagesStore.currentImage = createImage({ width: 4000, height: 3000 });
+      const wrapper = createWrapper();
+      await resize(wrapper, 700, 400);
+
+      // 700 CSS px x 2 DPR = 1400 -> the 1920 bucket.
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=1920");
+      expect(wrapper.find(".photo-backdrop").attributes("src")).toBe("/api/images/1?w=1920");
+    });
+
+    it("only re-requests when the region grows into a bigger bucket", async () => {
+      setDpr(1);
+      imagesStore.currentImage = createImage();
+      const wrapper = createWrapper();
+
+      await resize(wrapper, 900, 500);
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=960");
+
+      // Same bucket: no new URL.
+      await resize(wrapper, 800, 400);
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=960");
+
+      // Crosses into 1280.
+      await resize(wrapper, 1100, 600);
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=1280");
+
+      // Shrinking keeps the bigger file that is already decoded.
+      await resize(wrapper, 700, 400);
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=1280");
+    });
+
+    it("pre-decodes the next photo before the rotation swaps to it", async () => {
+      const decoded = [];
+      let resolveDecode;
+      const decode = vi.fn(
+        () =>
+          new Promise(resolve => {
+            resolveDecode = () => resolve();
+          })
+      );
+      globalThis.Image = class {
+        constructor() {
+          this.decode = decode;
+        }
+        set src(value) {
+          this._src = value;
+          decoded.push(value);
+        }
+        get src() {
+          return this._src;
+        }
+      };
+
+      try {
+        const image1 = createImage({ id: "1" });
+        const image2 = createImage({ id: "2" });
+        imagesStore.currentImage = image1;
+        imagesStore.fetchImages = vi.fn().mockImplementation(async () => {
+          imagesStore.images = [image1, image2];
+        });
+
+        const wrapper = createWrapper({ autoRotate: true, rotationInterval: 5000 });
+        await flushPromises();
+
+        decode.mockClear();
+        decoded.length = 0;
+        await vi.advanceTimersByTimeAsync(5000);
+
+        expect(decoded.some(url => url.startsWith("/api/images/2?w=640"))).toBe(true);
+        expect(imagesStore.nextImage).not.toHaveBeenCalled();
+
+        resolveDecode();
+        await flushPromises();
+
+        expect(imagesStore.nextImage).toHaveBeenCalled();
+        wrapper.unmount();
+      } finally {
+        delete globalThis.Image;
+      }
+    });
+
+    it("advances anyway when the pre-decode rejects", async () => {
+      globalThis.Image = class {
+        constructor() {
+          this.decode = vi.fn(() => Promise.reject(new Error("cannot decode")));
+        }
+        set src(value) {
+          this._src = value;
+        }
+        get src() {
+          return this._src;
+        }
+      };
+
+      try {
+        const image1 = createImage({ id: "1" });
+        const image2 = createImage({ id: "2" });
+        imagesStore.currentImage = image1;
+        imagesStore.fetchImages = vi.fn().mockImplementation(async () => {
+          imagesStore.images = [image1, image2];
+        });
+
+        const wrapper = createWrapper({ autoRotate: true, rotationInterval: 5000 });
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(5000);
+        await flushPromises();
+
+        expect(imagesStore.nextImage).toHaveBeenCalled();
+        wrapper.unmount();
+      } finally {
+        delete globalThis.Image;
+      }
     });
   });
 });
