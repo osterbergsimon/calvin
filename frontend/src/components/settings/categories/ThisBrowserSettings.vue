@@ -165,14 +165,14 @@ const uiSizeSetting = useScreenSetting("uiSize", {
 const uiSize = computed(() => uiSizeSetting.value.value || "default");
 const { applyUiScale } = useUiScale();
 const setUiSize = async value => {
-  await uiSizeSetting.set(value);
   // Apply immediately, without waiting for the config store to round-trip.
   applyUiScale(value);
+  await uiSizeSetting.set(value);
   emit("changed");
 };
 const resetUiSize = async () => {
-  await uiSizeSetting.reset();
   applyUiScale(props.config.uiSize || "default");
+  await uiSizeSetting.reset();
   emit("changed");
 };
 </script>

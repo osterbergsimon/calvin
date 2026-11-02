@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises as flushPromisesNow } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
 import { useKiosksStore } from "@/stores/kiosks";
@@ -12,6 +13,22 @@ import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGri
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
+
+// Settings writes are coalesced over a quiet period, so settle the queued save
+// before asserting (the production UI does not wait for it).
+async function flushPromises() {
+  await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+  await flushPromisesNow();
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const AVAILABLE = "e4f5a6b7c8d9e0f1";
 const OLD = "a1b2c3d4e5f6a7b8";
@@ -578,6 +595,7 @@ describe("ScreensSettings — Name", () => {
 
     await wrapper.find("[data-test='screen-name-input']").setValue("Hallway");
     await wrapper.find("[data-test='screen-name-input']").trigger("blur");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { displayName: "Hallway" });
   });
@@ -591,6 +609,7 @@ describe("ScreensSettings — Name", () => {
 
     await wrapper.find("[data-test='screen-name-input']").setValue("");
     await wrapper.find("[data-test='screen-name-input']").trigger("blur");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
   });
@@ -622,6 +641,7 @@ describe("ScreensSettings — Pages", () => {
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("true");
     await row.find('[role="switch"]').trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -651,6 +671,7 @@ describe("ScreensSettings — Pages", () => {
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     await row.find('[role="switch"]').trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       availableScreens: ["home", "photos"],
@@ -704,6 +725,7 @@ describe("ScreensSettings — Pages", () => {
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("false");
     await row.find('[role="switch"]').trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
   });
@@ -728,6 +750,7 @@ describe("ScreensSettings — Pages", () => {
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     await row.find("button[aria-pressed]").trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -1798,5 +1821,176 @@ describe("ScreensSettings — Behaviour (§4)", () => {
     await flushPromises();
     expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
     expect(wrapper.find("#section-device-behaviour").exists()).toBe(true);
+  });
+});
+
+describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows toggle, segmented and select values before the save resolves", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    let release;
+    store.saveOverrides = vi.fn(
+      () =>
+        new Promise(resolve => {
+          release = resolve;
+        })
+    );
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await nextTick();
+    expect(orientation.props("modelValue")).toBe("portrait");
+
+    const idle = wrapper
+      .findAllComponents(SelectPill)
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    idle.vm.$emit("update:modelValue", 900);
+    await nextTick();
+    expect(idle.props("modelValue")).toBe(900);
+
+    // None of the three taps is waiting on the save, and they share one write.
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientationFlipped: true,
+      orientation: "portrait",
+      displayTimeoutEnabled: true,
+      displayTimeout: 900,
+    });
+
+    release({ data: {} });
+  });
+
+  it("restores the previous value and shows the error when the save rejects", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { orientation: "portrait", orientationFlipped: false },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("offline");
+    });
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    await flushPromises();
+
+    expect(flip.props("modelValue")).toBe(false);
+    expect(wrapper.text()).toContain(
+      "Couldn't save to the server. Check the connection and try again."
+    );
+  });
+
+  it("sends one save with the final value for two quick taps on a select", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const idle = wrapper
+      .findAllComponents(SelectPill)
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    idle.vm.$emit("update:modelValue", 300);
+    idle.vm.$emit("update:modelValue", 900);
+    await nextTick();
+    expect(idle.props("modelValue")).toBe(900);
+
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      displayTimeoutEnabled: true,
+      displayTimeout: 900,
+    });
+  });
+
+  it("keeps a newer tap when an earlier in-flight save fails", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    let rejectFirst;
+    store.saveOverrides = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          })
+      )
+      .mockResolvedValueOnce({ data: {} });
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    rejectFirst(new Error("offline"));
+    await flushPromisesNow();
+    await nextTick();
+
+    // The failed orientation is gone; the newer flip is still shown.
+    expect(flip.props("modelValue")).toBe(true);
+    expect(
+      wrapper
+        .findAllComponents(SegmentedControl)
+        .find(c => c.props("ariaLabel") === "Orientation")
+        .props("modelValue")
+    ).toBe("landscape");
+    expect(wrapper.text()).toContain(
+      "Couldn't save to the server. Check the connection and try again."
+    );
+
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(2);
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      orientationFlipped: true,
+    });
+  });
+
+  it("flushes a pending save when the page unmounts", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await nextTick();
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+    await flushPromisesNow();
+    await flushPromisesNow();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
   });
 });

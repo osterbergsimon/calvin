@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import api from "@/services/api";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useConfigStore } from "@/stores/config";
 import { useNotificationsStore } from "@/stores/notifications";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
 
 vi.mock("@/services/api", () => ({
   default: {
@@ -164,5 +166,130 @@ describe("useScreenSetting", () => {
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ severity: "error", message: expect.stringContaining("unchanged") })
     );
+  });
+
+  describe("optimistic kiosk writes (calvin-g25v)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      window.sessionStorage.setItem(KIOSK_KEY, "hallway");
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows the chosen value while the save is still pending", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+      api.put.mockImplementation(() => new Promise(() => {}));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      setting.set("on");
+
+      expect(setting.value.value).toBe("on");
+      expect(api.put).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(setting.value.value).toBe("on");
+    });
+
+    it("sends one kiosk save with the final value for two quick taps", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+      api.put.mockResolvedValue({ data: {} });
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const first = setting.set("on");
+      const second = setting.set("off");
+      expect(setting.value.value).toBe("off");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(api.put).toHaveBeenCalledTimes(1);
+      expect(api.put).toHaveBeenCalledWith("/kiosks/hallway/overrides", {
+        overrides: { orientation: "portrait", onScreenKeyboard: "off" },
+      });
+
+      await Promise.all([first, second]);
+    });
+
+    it("restores the previous value before reporting a failed save", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+      api.put.mockRejectedValue(new Error("offline"));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const notifications = useNotificationsStore();
+      const notify = vi.spyOn(notifications, "notify");
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const pending = setting.set("on");
+      expect(setting.value.value).toBe("on");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await pending;
+
+      expect(setting.value.value).toBe("auto");
+      expect(config.onScreenKeyboard).toBe("auto");
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: "error",
+          message: expect.stringContaining("unchanged"),
+        })
+      );
+    });
+
+    it("shows a later server change after a failed save", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { onScreenKeyboard: "auto" } } });
+      api.put.mockRejectedValue(new Error("offline"));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const pending = setting.set("on");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await pending;
+      expect(setting.value.value).toBe("auto");
+
+      config.onScreenKeyboard = "off";
+      await nextTick();
+      expect(setting.value.value).toBe("off");
+    });
+
+    it("keeps another row's pending value when one row's save fails", async () => {
+      api.get.mockResolvedValue({ data: { overrides: {} } });
+      let rejectFirst;
+      api.put
+        .mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectFirst = reject;
+            })
+        )
+        .mockResolvedValueOnce({ data: {} });
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      config.touchControls = "auto";
+      const osk = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+      const touch = useScreenSetting("touchControls", { storageKey: "calvin-touch-controls" });
+
+      const first = osk.set("on");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      const second = touch.set("off");
+      expect(touch.value.value).toBe("off");
+
+      rejectFirst(new Error("offline"));
+      await first;
+      expect(osk.value.value).toBe("auto");
+      expect(touch.value.value).toBe("off");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await second;
+      expect(api.put).toHaveBeenLastCalledWith("/kiosks/hallway/overrides", {
+        overrides: { touchControls: "off" },
+      });
+    });
   });
 });

@@ -2,11 +2,12 @@
  * Unit tests for useConfigForm composable
  */
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigForm } from "@/composables/useConfigForm";
 import { useConfigStore } from "@/stores/config";
 import * as configApi from "@/services/configApi";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
 
 const { logErrorMock } = vi.hoisted(() => ({
   logErrorMock: vi.fn(),
@@ -383,6 +384,127 @@ describe("useConfigForm", () => {
       expect(form.localConfig.value.orientation).toBe("landscape");
       expect(form.localConfig.value.calendarSplit).toBe(70);
       expect(configApi.getConfig).toHaveBeenCalledTimes(1); // Once in resetConfig (loadConfig is called)
+    });
+  });
+
+  describe("optimistic control writes (calvin-g25v)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows the new value while the save promise is still pending", async () => {
+      let release;
+      mockConfigStore.updateConfig.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            release = resolve;
+          })
+      );
+      const form = useConfigForm({ orientation: "landscape" });
+
+      const pending = form.updateConfigValue("orientation", "portrait");
+
+      expect(form.localConfig.value.orientation).toBe("portrait");
+      expect(mockConfigStore.updateConfig).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(mockConfigStore.updateConfig).toHaveBeenCalledWith({ orientation: "portrait" });
+      // Still optimistic: the request has not resolved yet.
+      expect(form.localConfig.value.orientation).toBe("portrait");
+
+      release({});
+      await pending;
+      expect(form.localConfig.value.orientation).toBe("portrait");
+    });
+
+    it("sends one save with the final value for two quick taps", async () => {
+      mockConfigStore.updateConfig.mockResolvedValue({});
+      const form = useConfigForm({ orientation: "landscape" });
+
+      const first = form.updateConfigValue("orientation", "portrait");
+      const second = form.updateConfigValue("orientation", "landscape");
+
+      expect(form.localConfig.value.orientation).toBe("landscape");
+      expect(mockConfigStore.updateConfig).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(mockConfigStore.updateConfig).toHaveBeenCalledTimes(1);
+      expect(mockConfigStore.updateConfig).toHaveBeenCalledWith({ orientation: "landscape" });
+
+      await Promise.all([first, second]);
+    });
+
+    it("restores the previous value and shows the error when the save rejects", async () => {
+      const error = new Error("offline");
+      mockConfigStore.updateConfig.mockRejectedValue(error);
+      const form = useConfigForm({ orientation: "landscape" });
+
+      const pending = form.updateConfigValue("orientation", "portrait");
+      const rejected = expect(pending).rejects.toThrow("offline");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await rejected;
+
+      expect(form.localConfig.value.orientation).toBe("landscape");
+      expect(form.error.value).toBe(
+        "Couldn't reach Calvin. Check that it's running and on the same network."
+      );
+      expect(form.saveStatus.value.state).toBe("error");
+    });
+
+    it("rolls a double failure back to the last confirmed value", async () => {
+      mockConfigStore.updateConfig.mockResolvedValue({});
+      const form = useConfigForm({ orientation: "landscape", calendarSplit: 70 });
+
+      const firstSave = form.updateConfigValue("orientation", "portrait");
+      expect(form.localConfig.value.orientation).toBe("portrait");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await firstSave;
+
+      mockConfigStore.updateConfig.mockRejectedValue(new Error("offline"));
+      const first = form.updateConfigValue("calendarSplit", 75);
+      const firstFailure = expect(first).rejects.toThrow("offline");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await firstFailure;
+      expect(form.localConfig.value.calendarSplit).toBe(70);
+
+      const second = form.updateConfigValue("calendarSplit", 80);
+      const secondFailure = expect(second).rejects.toThrow("offline");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await secondFailure;
+
+      // Not 75: that value never reached the server.
+      expect(form.localConfig.value.calendarSplit).toBe(70);
+      expect(form.localConfig.value.orientation).toBe("portrait");
+    });
+
+    it("keeps a newer value that was applied while an earlier save failed", async () => {
+      let rejectFirst;
+      mockConfigStore.updateConfig
+        .mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectFirst = reject;
+            })
+        )
+        .mockResolvedValueOnce({});
+      const form = useConfigForm({ orientation: "landscape" });
+
+      const first = form.updateConfigValue("orientation", "portrait");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      const second = form.updateConfigValue("orientation", "landscape");
+
+      const firstRejected = expect(first).rejects.toThrow("offline");
+      rejectFirst(new Error("offline"));
+      await firstRejected;
+      expect(form.localConfig.value.orientation).toBe("landscape");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await second;
+      expect(form.localConfig.value.orientation).toBe("landscape");
     });
   });
 });

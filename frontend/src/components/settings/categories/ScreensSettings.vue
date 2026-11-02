@@ -629,6 +629,7 @@ import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
+import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -692,7 +693,11 @@ const powerMsg = ref("");
 const touchMsg = ref("");
 const behaviourMsg = ref("");
 const footerMsg = ref("");
-const overrides = ref({});
+const overridesQueue = computed(() =>
+  selectedId.value ? kioskOverridesQueue(selectedId.value) : null
+);
+// Confirmed overrides with this screen's still-pending taps on top.
+const overrides = computed(() => overridesQueue.value?.display.value ?? {});
 
 // Browser-only choices that make up "{n} settings just for this browser".
 const BROWSER_STORAGE_KEYS = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
@@ -828,14 +833,12 @@ function clearMessages() {
 
 function openDefault() {
   selection.value = { kind: "default" };
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
 }
 
 function openBrowser() {
   selection.value = { kind: "browser" };
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
@@ -848,13 +851,12 @@ async function select(id) {
   // Guard the stale-selection race: clicking screen A then B before A's fetch
   // resolves must not land A's overrides under B's selection (calvin-vk3).
   if (selectedId.value !== id) return;
-  overrides.value = fetched;
+  kioskOverridesQueue(id).confirm(fetched);
   await refreshDesiredVersion(id);
 }
 
 function closeDetail() {
   selection.value = null;
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
@@ -1033,21 +1035,19 @@ const effOsk = computed(() =>
 );
 
 // --- writes --------------------------------------------------------------
+// Every control on a screen writes the same overrides target. The shared queue
+// shows the change at once, coalesces quick taps, and on failure reverts only
+// the keys whose value has not been tapped again since.
 async function persist(next, messageRef, onlineCopy, offlineCopy) {
-  // Optimistic set with snapshot revert so a failed save doesn't leave the UI
-  // showing apparently-applied values under the error banner (calvin-dd9.13).
-  const kioskIdToSave = selectedId.value;
-  const prior = overrides.value;
-  overrides.value = next;
+  const kioskId = selectedId.value;
+  if (!kioskId) return;
   messageRef.value = "";
   try {
-    await store.saveOverrides(kioskIdToSave, next);
-    store.setKioskOverrides(kioskIdToSave, next);
+    await kioskOverridesQueue(kioskId).replaceAll(next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
     messageRef.value = online ? onlineCopy : offlineCopy;
-    await refreshDesiredVersion(kioskIdToSave);
+    await refreshDesiredVersion(kioskId);
   } catch {
-    if (selectedId.value === kioskIdToSave) overrides.value = prior;
     messageRef.value = "Couldn't save to the server. Check the connection and try again.";
   }
 }
@@ -1379,6 +1379,15 @@ async function refreshDesiredVersion(id) {
   if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
 }
 
+// Never lose a queued override save on navigation or a page close.
+const flushQueuedOverrides = () => {
+  void flushKioskOverridesQueues();
+};
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", flushQueuedOverrides);
+  window.addEventListener("pagehide", flushQueuedOverrides);
+}
+
 onMounted(async () => {
   refreshBrowserCount();
   await store.loadKiosks();
@@ -1396,6 +1405,9 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("beforeunload", flushQueuedOverrides);
+  window.removeEventListener("pagehide", flushQueuedOverrides);
+  flushQueuedOverrides();
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
     narrowMql.removeEventListener("change", onNarrowChange);

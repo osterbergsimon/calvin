@@ -1,9 +1,10 @@
-import { computed } from "vue";
+import { computed, getCurrentInstance, onUnmounted } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
 import { useNotificationsStore } from "../stores/notifications";
 import { getKioskId } from "../utils/kioskId";
 import { logError } from "../utils/logger";
+import { kioskOverridesQueue } from "../utils/kioskOverridesQueue";
 import {
   decodeScreenValue,
   readScreenStorage,
@@ -50,8 +51,16 @@ export function useScreenSetting(
     readServerValue ? readServerValue() : (configStore[key] ?? null)
   );
 
+  // Kiosk writes go through the one queue for that kiosk's overrides object.
+  // The pending value is shown here while it waits, so another row's save can
+  // never overwrite it and a failure falls back to the server value.
+  const kioskQueue = scope === "kiosk" ? kioskOverridesQueue(kioskId) : null;
+
   const value = computed(() => {
-    if (scope === "kiosk") return serverValue.value;
+    if (scope === "kiosk") {
+      if (kioskQueue.hasPendingKey(key)) return kioskQueue.display.value[key];
+      return serverValue.value;
+    }
     return decodeScreenValue(stored.value, serverValue.value) ?? serverValue.value;
   });
 
@@ -60,27 +69,39 @@ export function useScreenSetting(
   // override on the server and is reported by the screens page instead.
   const overridden = computed(() => scope === "browser" && stored.value !== null);
 
+  const notifyFailure = err => {
+    logError("[useScreenSetting]", `Failed to save ${key}:`, err);
+    notifications.notify({
+      severity: "error",
+      message: "Couldn't save this screen's setting. The stored value is unchanged.",
+    });
+  };
+
   const set = async next => {
+    if (scope !== "kiosk") {
+      try {
+        await writeScreenSetting({
+          kioskId,
+          key,
+          storageKey,
+          next,
+          raw: stored,
+          kiosksStore,
+        });
+      } catch (err) {
+        notifyFailure(err);
+      }
+      return;
+    }
+
     try {
-      await writeScreenSetting({
-        kioskId,
-        key,
-        storageKey,
-        next,
-        raw: stored,
-        kiosksStore,
-        // The override replaces the whole object; keep this page in step
-        // without waiting for the next merged-config poll.
-        applyServerValue: value => {
-          configStore[key] = value;
-        },
-      });
+      await kioskQueue.setPartial({ [key]: next });
+      // Keep this page in step without waiting for the next merged-config
+      // poll, unless a newer tap for the same row is still pending.
+      if (!kioskQueue.hasPendingKey(key)) configStore[key] = next;
     } catch (err) {
-      logError("[useScreenSetting]", `Failed to save ${key}:`, err);
-      notifications.notify({
-        severity: "error",
-        message: "Couldn't save this screen's setting. The stored value is unchanged.",
-      });
+      // The queue has already reverted this key to its confirmed value.
+      notifyFailure(err);
     }
   };
 
@@ -88,11 +109,13 @@ export function useScreenSetting(
   // override) so the Default value applies again.
   const reset = async () => {
     if (scope === "kiosk") {
-      const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
-      if (!(key in overrides)) return;
-      const merged = { ...overrides };
-      delete merged[key];
-      await kiosksStore.saveOverrides(kioskId, merged);
+      try {
+        await kioskQueue.ensureLoaded();
+        if (!kioskQueue.hasConfirmedKey(key) && !kioskQueue.hasPendingKey(key)) return;
+        await kioskQueue.deleteKeys([key]);
+      } catch (err) {
+        notifyFailure(err);
+      }
       return;
     }
 
@@ -103,6 +126,20 @@ export function useScreenSetting(
       // Storage blocked: the fallback only lasted for this page load anyway.
     }
   };
+
+  // Never lose a queued kiosk value on navigation or a page close.
+  if (scope === "kiosk" && typeof window !== "undefined" && getCurrentInstance()) {
+    const flush = () => {
+      void kioskQueue.flush();
+    };
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    });
+  }
 
   return { value, set, reset, overridden, scope };
 }
