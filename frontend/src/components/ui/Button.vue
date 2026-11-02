@@ -72,6 +72,9 @@ defineProps({
   align-items: center;
   justify-content: center;
   gap: var(--gap-tight);
+  /* Short labels ("Edit") would otherwise render a box narrower than the
+     touch target; the kiosk engine does no touch adjustment. */
+  min-width: var(--touch-target);
   padding: 0 var(--gap-4);
   font-family: var(--font-ui);
   font-size: var(--text-body);

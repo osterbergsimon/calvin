@@ -130,6 +130,12 @@ describe("Button doctrine contract", () => {
     expect(STYLE).toMatch(/\.btn--link\s*\{[^}]*min-height:\s*var\(--touch-target\)/s);
   });
 
+  it("never renders narrower than the touch target", () => {
+    // A short label ("Edit") otherwise makes a 26px-wide box, which the kiosk
+    // engine does not widen for touch.
+    expect(STYLE).toMatch(/\.btn\s*\{[^}]*min-width:\s*var\(--touch-target\)/s);
+  });
+
   it("halves opacity and blocks the cursor when disabled", () => {
     expect(STYLE).toMatch(/\.btn:disabled\s*\{[^}]*opacity:\s*0\.5/s);
     expect(STYLE).toMatch(/\.btn:disabled\s*\{[^}]*cursor:\s*not-allowed/s);
