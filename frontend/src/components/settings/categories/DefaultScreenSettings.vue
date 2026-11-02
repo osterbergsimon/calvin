@@ -213,9 +213,9 @@
       />
       <SettingRow label="Keyboard layout" data-test="osk-layout-row">
         <template #description>
-          <InlineNote>
+          <span>
             The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.
-          </InlineNote>
+          </span>
           <DefaultOnlyNote />
         </template>
         <div data-test="osk-layout-control" :inert="oskOff ? '' : undefined">
@@ -236,7 +236,7 @@
       </SettingRow>
       <SettingRow label="Also switch to" stacked data-test="osk-extra-row">
         <template #description>
-          <InlineNote>{{ extraLayoutsDescription }}</InlineNote>
+          <span>{{ extraLayoutsDescription }}</span>
           <DefaultOnlyNote />
         </template>
         <div data-test="osk-extra-control" :inert="oskOff ? '' : undefined">
