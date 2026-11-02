@@ -1,0 +1,2355 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/design/2026-10-29-on-screen-keyboard/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>On-screen keyboard (OSK) for touch kiosks: UI spec - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#on-screen-keyboard-osk-for-touch-kiosks-ui-spec" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              On-screen keyboard (OSK) for touch kiosks: UI spec
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-why-and-why-this-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Why, and why this approach
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-pieces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Pieces
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-when-it-shows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. When it shows
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-layouts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Layouts
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Layouts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#keyboard-layouts-the-letter-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keyboard layouts (the letter layer)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-text-insertion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Text insertion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-layout-and-look" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Layout and look
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Layout and look">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#making-room-every-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Making room (every page)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#clv-9-lock-screen-and-dialog-while-the-keyboard-is-up-k1-k3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLV-9 lock screen and dialog while the keyboard is up (K1, K3)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-settings-device-keyboard-k7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Settings (Device › Keyboard, K7)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-accessibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Accessibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-tests-vitest-vuetest-utils" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Tests (vitest + @vue/test-utils)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="on-screen-keyboard-osk-for-touch-kiosks-ui-spec">On-screen keyboard (OSK) for touch kiosks: UI spec<a class="headerlink" href="#on-screen-keyboard-osk-for-touch-kiosks-ui-spec" title="Permanent link">&para;</a></h1>
+<p>Status: ready to build as its <strong>own issue</strong>. It goes with CLV-9 (admin auth) and should land with it or just
+after, because CLV-9's kiosk lock screen uses it. Mockups: <a href="../mocks/osk/osk.html">mocks/osk/osk.html</a>, with
+PNGs in <a href="mocks/osk/png/">mocks/osk/png/</a> (<code>k1.png</code> … <code>k7.png</code>). Real theme tokens. Where this doc and the
+mock disagree, this doc wins.</p>
+<h2 id="1-why-and-why-this-approach">1. Why, and why this approach<a class="headerlink" href="#1-why-and-why-this-approach" title="Permanent link">&para;</a></h2>
+<p>People must be able to use Settings on the kiosk itself, including signing in. Kiosks have a touchscreen
+and no keyboard.</p>
+<ul>
+<li><strong>System keyboard: rejected.</strong> Calvin kiosks run Chromium on X11 (<code>calvin-x.service</code> → <code>startx</code>). The
+  Pi's own keyboard, squeekboard, is Wayland-only, and even there Chromium often doesn't show it
+  automatically. The X11 keyboards (onboard, matchbox-keyboard) are unreliable with Chromium. All of them
+  would mean changes to the Pi image, and Calvin couldn't control them.</li>
+<li><strong>Still true after the Wayland research</strong> (<code>docs/research/2026-10-29-kiosk-wayland.md</code> on develop,
+  calvin-98dq): that plan moves Pi 4/5 to Wayland + labwc and keeps Pi 3 on X11. So the fleet will run both
+  stacks, and only an in-app keyboard behaves the same on both.</li>
+<li><strong>Chosen: an in-app keyboard built on <a href="https://github.com/hodgef/simple-keyboard"><code>simple-keyboard</code></a></strong>
+  (MIT, framework-agnostic, actively maintained, currently 3.8.x). Pin an exact version that is at least
+  two weeks old. Use it <strong>only as the renderer</strong> (layouts, layers, key events). Calvin owns when it shows,
+  how text is inserted, and how it looks. Frontend only: no backend or Pi changes.</li>
+</ul>
+<h2 id="2-pieces">2. Pieces<a class="headerlink" href="#2-pieces" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Path</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OnScreenKeyboard</code></td>
+<td><code>frontend/src/components/ui/OnScreenKeyboard.vue</code></td>
+<td>Teleported to <code>body</code>, mounted once in <code>App.vue</code>. Wraps <code>simple-keyboard</code>.</td>
+</tr>
+<tr>
+<td><code>useOnScreenKeyboard</code></td>
+<td><code>frontend/src/composables/useOnScreenKeyboard.js</code></td>
+<td>Global state: <code>enabled</code>, <code>visible</code>, <code>target</code> (the focused element), <code>layout</code>, <code>height</code>. Owns the focus listeners and text insertion.</td>
+</tr>
+<tr>
+<td><code>calvin-osk</code> theme</td>
+<td>inside <code>OnScreenKeyboard.vue</code> (scoped + <code>:deep</code>)</td>
+<td>Replaces <code>hg-theme-default</code>. Don't import simple-keyboard's default theme CSS beyond its base layout rules.</td>
+</tr>
+<tr>
+<td>Setting</td>
+<td>Device › Keyboard: <code>onScreenKeyboard</code> config key</td>
+<td><code>'auto' \| 'on' \| 'off'</code>, default <code>'auto'</code>.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-when-it-shows">3. When it shows<a class="headerlink" href="#3-when-it-shows" title="Permanent link">&para;</a></h2>
+<p><strong>Enabled</strong> when:
+- <code>onScreenKeyboard === 'on'</code>, or
+- <code>onScreenKeyboard === 'auto'</code> <strong>and</strong> <code>useTouchCapability().isTouch</code> <strong>and</strong> viewport width ≥ 720px.
+  Phones and tablets under 720px keep their own system keyboard.</p>
+<p><strong>Targets:</strong> a global <code>focusin</code> listener on <code>document</code>. The target is an <code>&lt;input&gt;</code> of type <code>text</code>, <code>search</code>,
+<code>url</code>, <code>email</code>, <code>password</code> or <code>number</code> (or one with no type), or a <code>&lt;textarea&gt;</code>, that is not <code>readonly</code> or
+<code>disabled</code> and has no <code>data-osk="off"</code> ancestor. Native pickers (<code>time</code>, <code>date</code>, <code>color</code>, <code>range</code>, checkboxes)
+never get it.</p>
+<p><strong>Show:</strong> on focus of a target. Also when an already-focused target is tapped again after the keyboard was
+hidden (a <code>click</code> on <code>target</code>). Never open on <code>pointerdown</code>: on touch the browser focuses the field with the
+mouse events it sends after <code>touchend</code>, and a keyboard that opened earlier has already moved the field out
+from under the finger, so it never gets focus (CLV-114).
+<strong>Hide:</strong>
+- the Hide key (calvin-q9m7): it records the dismissal for that field, so the rest of the same tap
+  (<code>touchend</code>, then WebKit's compatibility mouse events) and later focus churn cannot reopen it. A fresh tap
+  on the field, a refocus after the field has actually lost focus (Tab or programmatic focus), or the
+  ⌨ Keyboard button clears the dismissal. Hiding moves the button under the finger, so the click that ends
+  the Hide tap must not press it; that guard is the <strong>gesture that hid</strong> (a press is a new gesture), not a
+  time window, so the button works again immediately;
+- a tap outside both the keyboard and its field (calvin-q9m7): hides and blurs the field. WebKit leaves a
+  focused input focused when a non-focusable element is tapped, so no <code>focusout</code> arrives there; the tap is
+  not prevented, so a real control under the finger still receives its click. A <code>&lt;label&gt;</code> of the focused
+  field counts as that field, a drag or scroll is not a tap, and the tap's origin is kept long enough for
+  its delayed compatibility click (cog/WPE adds a tap delay) before a drag can discard it;
+- focus moving to a non-target element or to nothing (wait one <code>requestAnimationFrame</code> before deciding, so
+  focus jumping between two fields doesn't flicker);
+- route change;
+- Escape on a physical keyboard;
+- a <strong>trusted</strong> physical keypress in the target (<code>event.isTrusted</code> and not from the OSK). That means someone
+  has a real keyboard, so stay hidden until the next focus.</p>
+<p><strong>Never steal focus.</strong> Set simple-keyboard's <code>preventMouseDownDefault: true</code>, plus
+<code>@pointerdown.prevent</code> on the keyboard root, so the input keeps focus and caret while keys are tapped.</p>
+<p><strong>No autofocus</strong> anywhere on touch (CLV-9 §6 stands). The keyboard appears only when someone taps a field.</p>
+<h2 id="4-layouts">4. Layouts<a class="headerlink" href="#4-layouts" title="Permanent link">&para;</a></h2>
+<p>Five layouts. The layout is chosen from the target when it gets focus. Tokens in braces are function keys.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>default (text, search, password, textarea)
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>q w e r t y u i o p {bksp}
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>a s d f g h j k l {enter}
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>{shift} z x c v b n m , . {shift}
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>{numbers} {accents} {space} - {hide}
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>url (type=url) and email (type=email; &quot;@&quot; replaces &quot;/&quot; and &quot;:&quot; is dropped)
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>q w e r t y u i o p {bksp}
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>a s d f g h j k l {enter}
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>{shift} z x c v b n m - _ {shift}
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>{numbers} / : {space} . .com {hide}          email: {numbers} @ {space} . .com {hide}
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>symbols ({numbers} from any letter layout)
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>1 2 3 4 5 6 7 8 9 0 {bksp}
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>@ # $ % &amp; * - + ( ) {enter}
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>{abc} ! &quot; &#39; : ; / ? _ = {abc}
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>{abc} {space} . , {hide}
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>accents ({accents}; Shift gives capitals)
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>å ä ö æ ø é è ü ñ ß {bksp}
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>á à â ê ë í ï ó ô ú {enter}
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>{shift} ç õ œ ã &#39; ` ~ ^ ¨ {shift}
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>{abc} {space} . , {hide}
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>numeric (type=number, or inputmode=numeric/decimal), 4×4 grid, 440px wide, centred
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>1 2 3 {bksp}
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>4 5 6 -
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>7 8 9 .
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>{hide} 0 , {enter}
+</span></code></pre></div>
+<h3 id="keyboard-layouts-the-letter-layer">Keyboard layouts (the letter layer)<a class="headerlink" href="#keyboard-layouts-the-letter-layer" title="Permanent link">&para;</a></h3>
+<p><strong>The keyboard layout is independent of the app language.</strong> It is its own setting. It never follows,
+reads or changes the language Calvin's UI is shown in, and changing the UI language never touches it. The
+owner's own setup is an English UI with a Swedish keyboard, and that must take zero extra effort.
+Everywhere in UI copy and code it is called a <strong>layout</strong> (<code>oskLayout</code>), never a "language".</p>
+<p>Only the letter layer (and its Shift capitals) changes with the layout. The symbols, accents and numeric
+layers are shared. Each layout keeps its letters where people expect them:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>en  English   q w e r t y u i o p {bksp}        / a s d f g h j k l {enter}     / {shift} z x c v b n m , . {shift}
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>sv  Svenska   q w e r t y u i o p å {bksp}      / a s d f g h j k l ö ä {enter} / {shift} z x c v b n m , . - {shift}
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>fi  Suomi     same as sv
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>no  Norsk     q w e r t y u i o p å {bksp}      / a s d f g h j k l ø æ {enter} / {shift} z x c v b n m , . - {shift}
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>da  Dansk     q w e r t y u i o p å {bksp}      / a s d f g h j k l æ ø {enter} / {shift} z x c v b n m , . - {shift}
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>de  Deutsch   q w e r t z u i o p ü {bksp}      / a s d f g h j k l ö ä {enter} / {shift} y x c v b n m , . ß {shift}
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>fr  Français  a z e r t y u i o p {bksp}        / q s d f g h j k l m {enter}   / {shift} w x c v b n é è ç à {shift}
+</span></code></pre></div>
+<p>Bottom row: <code>{numbers} {layout} {accents} {space} {hide}</code>. For <code>en</code> it is
+<code>{numbers} {layout} {accents} {space} - {hide}</code>, and for <code>fr</code> it is
+<code>{numbers} {layout} {accents} , {space} . {hide}</code>. <strong>Amended by
+<a href="../2026-10-29-keyboard-layout-picker/">CLV-21</a>:</strong> <code>{layout}</code> and the space-bar layout name are always
+present, and the key opens a layout picker.
+The url and email layouts use the active layout's <strong>first two rows</strong> unchanged. Their <strong>third row</strong> is the
+active layout's row-3 letters a–z only (accented letters and punctuation dropped), followed by <code>- _</code>, because
+hyphens and underscores are common in addresses. Their bottom row is their own (above):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>en, sv, fi, no, da   {shift} z x c v b n m - _ {shift}
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>de                   {shift} y x c v b n m - _ {shift}
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>fr                   {shift} w x c v b n - _ {shift}
+</span></code></pre></div>
+<ul>
+<li><strong>Layout key <code>{layout}</code>:</strong> label = the active <strong>layout's</strong> code in capitals (<strong>EN</strong>, <strong>SV</strong>, <strong>FI</strong>, <strong>NO</strong>,
+  <strong>DA</strong>, <strong>DE</strong>, <strong>FR</strong>), width 1×, function-key style. <code>aria-label</code> = <strong>Switch keyboard layout, now {layout name}</strong>.
+  Each tap moves to the next layout in the order: main layout, then the extra layouts in list order.
+  <strong>Amended by <a href="../2026-10-29-keyboard-layout-picker/">CLV-21</a>:</strong> without extras a tap opens the layout
+  picker instead, and a long-press always does. The space bar always shows the active <strong>layout's</strong> name
+  (<code>--ink-3</code>, <code>--fs-sm</code>, as in K6); its label opens the picker. Neither ever shows the UI language.</li>
+<li>The active layout survives hiding and showing. An explicit choice is remembered per device in
+  <code>localStorage</code> (<code>calvin-osk-device-layout</code>, wrapped in try/catch) and resets to the main layout if that
+  entry stops being valid. <strong>Amended by <a href="../2026-10-29-keyboard-layout-picker/">CLV-21</a>:</strong> a device choice is
+  honoured even when it isn't the main or an extra layout, and the legacy <code>calvin-osk-layout</code> key is removed
+  on load because older builds wrote it on every device.</li>
+</ul>
+<h3 id="keys">Keys<a class="headerlink" href="#keys" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Shift</strong> is one-shot: tap, type one capital, back to lowercase. Tapping Shift twice within 400ms locks
+  caps until Shift is tapped again. Shift keys show <code>k--on</code> while active. Letter keys show capitals while
+  Shift is active.</li>
+<li><strong>Backspace</strong> repeats when held: after a 500ms delay, every 60ms.</li>
+<li><code>{numbers}</code> = <strong>?123</strong>, <code>{abc}</code> = <strong>abc</strong>, <code>{accents}</code> = <strong>åäö</strong>, <code>.com</code> types <code>.com</code>.</li>
+<li><strong>Space</strong> has no label.</li>
+<li><strong>Enter</strong> label: if the target is inside a <code>&lt;form&gt;</code> with a visible <code>button[type=submit]</code> (or the first
+  <code>.btn--primary</code> / <code>.security-btn--primary</code> in it), use that button's text (for example <strong>Sign in</strong>,
+  <strong>Set password</strong>). Otherwise <strong>Enter</strong>. On the numeric pad it is always <strong>Done</strong>.</li>
+<li><strong>Enter behaviour:</strong> dispatch <code>keydown</code> + <code>keyup</code> <code>Enter</code> on the target. If the keydown wasn't
+  <code>defaultPrevented</code> and the target has a <code>form</code>, call <code>form.requestSubmit()</code>. For a <code>&lt;textarea&gt;</code>, insert
+  <code>\n</code>. On numeric <strong>Done</strong>, also hide the keyboard. (Existing handlers like <code>@keyup.enter="add"</code> in
+  SecuritySettings keep working.)</li>
+</ul>
+<h2 id="5-text-insertion">5. Text insertion<a class="headerlink" href="#5-text-insertion" title="Permanent link">&para;</a></h2>
+<p>Don't use simple-keyboard's internal input buffer (it loses the caret on mid-string edits). Handle
+<code>onKeyPress(button)</code> yourself:
+- Character: replace <code>target.value.slice(selectionStart, selectionEnd)</code> with the character, put the caret
+  after it, then dispatch <code>new Event('input', { bubbles: true })</code> so <code>v-model</code> updates.
+- <code>{bksp}</code>: delete the selection, or the code point before the caret (<code>[...str]</code>-aware, so <code>å</code> and emoji
+  don't split).
+- <code>type=number</code> and <code>type=email</code> don't support <code>selectionStart</code>: treat them as append and delete-last.
+- Respect <code>maxlength</code>.
+- No key-preview bubbles (so keys aren't magnified over a password). The pressed state is the only feedback.</p>
+<h2 id="6-layout-and-look">6. Layout and look<a class="headerlink" href="#6-layout-and-look" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Position:</strong> <code>position: fixed; left: 0; right: 0; bottom: 0; z-index: 1100</code> (above dialogs at 1000 and
+  the scrim at 999). Teleported to <code>body</code>, so it is <strong>not</strong> affected by the Settings <code>--ui-scale</code> zoom and
+  is always the same physical size.</li>
+<li><strong>Height:</strong> <code>min(300px, 45dvh)</code>. 4 rows at 1280×720 is 300px; at 800×480 it is 216px. Publish the live
+  height as <code>--osk-height</code> on <code>:root</code> (<code>0px</code> when hidden).</li>
+<li><strong>Panel:</strong> <code>background: var(--bg-0)</code>, <code>border-top: 1px solid var(--line)</code>,
+  <code>box-shadow: 0 -10px 30px -18px var(--shadow-hover)</code>, <code>padding: 10px 12px 12px</code>, rows <code>gap: 8px</code>
+  (6px and 8px padding when height &lt; 260px).</li>
+<li><strong>Keys:</strong> <code>min-height: 44px</code>, rows share the height equally. <code>background: var(--bg-2)</code>,
+  <code>border: 1px solid var(--line)</code>, <code>border-radius: var(--radius-sm)</code>, <code>box-shadow: 0 1px 0 var(--line)</code>,
+  <code>font: 400 1.25rem var(--font-ui)</code> (1.05rem when height &lt; 260px), <code>color: var(--ink)</code>. In the light theme
+  <code>--bg-2</code> is white on a <code>--bg-0</code> panel, so the keys read clearly (white-on-white is the trap to avoid).</li>
+<li>Function keys: <code>background: color-mix(in srgb, var(--ink) 6%, var(--bg-0))</code>, <code>color: var(--ink-2)</code>,
+    <code>var(--fs-md)</code> weight 500. Width 1.5×. Icons for Backspace, Shift and Hide are 22px stroke SVGs, and
+    each has an <code>aria-label</code> (<strong>Backspace</strong>, <strong>Shift</strong>, <strong>Hide keyboard</strong>).</li>
+<li>Enter: 2× wide, <code>background: var(--focus)</code>, <code>color: var(--focus-ink)</code>, weight 600.</li>
+<li>Space: 6× wide.</li>
+<li>Pressed: <code>background: color-mix(in srgb, var(--focus) 22%, var(--bg-2))</code>, <code>translateY(1px)</code>, no shadow.</li>
+<li>Shift active / caps locked: <code>background: color-mix(in srgb, var(--focus) 16%, var(--bg-2))</code>,
+    <code>border-color: var(--focus)</code>.</li>
+<li><strong>Motion:</strong> slide up <code>transform: translateY(100%) → 0</code>, 180ms ease-out. Hide 120ms ease-in. Under
+  <code>prefers-reduced-motion</code>, no transition.</li>
+</ul>
+<h3 id="making-room-every-page">Making room (every page)<a class="headerlink" href="#making-room-every-page" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>.settings-content</code> (the scroll container) gets <code>padding-bottom: var(--osk-height)</code>. After showing,
+  scroll the target into view: <code>target.scrollIntoView({ block: 'center' })</code> within the visible area.</li>
+<li><strong>Fixed dialogs</strong> (AdminSignInDialog, ConfirmModal, InstanceModal, <code>.settings-phone</code>) centre within
+  <code>calc(100dvh - var(--osk-height))</code>. Put this rule in a shared class, for example
+  <code>top: calc((100dvh - var(--osk-height)) / 2)</code>, and apply it to each.</li>
+<li>Add nothing to the dashboard. It has no text fields, and dialogs over it follow the rule above.</li>
+</ul>
+<h3 id="clv-9-lock-screen-and-dialog-while-the-keyboard-is-up-k1-k3">CLV-9 lock screen and dialog while the keyboard is up (K1, K3)<a class="headerlink" href="#clv-9-lock-screen-and-dialog-while-the-keyboard-is-up-k1-k3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The "or" seam and <code>PhoneSetupCard</code> are hidden. The auth card centres in the area above the keyboard.</li>
+<li>When <code>100dvh - 64px - --osk-height &lt; 320px</code> (the 800×480 kiosk), the card also hides its icon, title,
+  lead, recovery block and primary button, and shows only the field (and any error or 429 banner). Enter
+  carries the submit label.</li>
+<li>In the sign-in dialog the phone half is hidden and the dialog shrinks to its narrow form.</li>
+</ul>
+<h2 id="7-settings-device-keyboard-k7">7. Settings (Device › Keyboard, K7)<a class="headerlink" href="#7-settings-device-keyboard-k7" title="Permanent link">&para;</a></h2>
+<p>Three new rows at the top of the Keyboard section, all <code>SettingRow</code>s built from existing primitives:</p>
+<ol>
+<li><strong>On-screen keyboard</strong> (<code>SegmentedControl</code>), config <code>onScreenKeyboard</code>: <code>'auto'</code> (default) / <code>'on'</code> / <code>'off'</code>.</li>
+<li>Description <strong>Shows a keyboard on the screen when you tap a text field. Auto turns it on for touch screens.</strong></li>
+<li>Options <strong>Auto</strong> / <strong>Always</strong> / <strong>Off</strong>.</li>
+<li><strong>Keyboard layout</strong> (<code>SelectPill</code>), config <code>oskLayout</code>: unset (default) | <code>en</code> | <code>sv</code> | <code>fi</code> | <code>no</code> | <code>da</code> |
+   <code>de</code> | <code>fr</code>.</li>
+<li>Description <strong>The letters the on-screen keyboard uses. Separate from the language Calvin is shown in.</strong></li>
+<li>Options <strong>English</strong>, <strong>Svenska</strong>, <strong>Suomi</strong>, <strong>Norsk</strong>, <strong>Dansk</strong>, <strong>Deutsch</strong>, <strong>Français</strong>, each named
+     in its own language, never translated.</li>
+<li><strong>Default (unset): a one-time browser hint, never the UI language.</strong> The first time a device needs a
+     layout, map <code>navigator.language</code> once (<code>sv*</code> → sv, <code>fi*</code> → fi, <code>nb*</code>/<code>nn*</code>/<code>no*</code> → no, <code>da*</code> → da,
+     <code>de*</code> → de, <code>fr*</code> → fr, anything else → en) and cache the result in <code>localStorage</code>
+     (<code>calvin-osk-layout-hint</code>), so it doesn't change later on that device. While unset, the pill shows that
+     layout with the suffix <strong>(suggested)</strong>, for example "Svenska (suggested)". Once someone picks a layout,
+     <code>oskLayout</code> is saved and the hint is never used again. Calvin's UI language setting, if one is ever
+     added, is <strong>never</strong> an input here.</li>
+<li><strong>Also switch to</strong> (<code>ChipMultiSelect</code>), config <code>oskExtraLayouts</code>: <code>string[]</code>, default <code>[]</code>.</li>
+<li>Description <strong>Adds a key to the keyboard that switches between these and {main layout name}.</strong></li>
+<li>Options: every layout except the current main one. When the main layout changes, drop it from the
+     extras.</li>
+<li>The chips save in list order, and that list order is the switching order, so the existing component
+     works unchanged.</li>
+<li>Rows 2 and 3 are dimmed and disabled while row 1 is <strong>Off</strong>. Settings remain editable from a phone either way.</li>
+<li>These are ordinary config keys, global like the other Device settings. Per-kiosk overrides are out of scope.</li>
+</ol>
+<p>Add registry keywords: keyboard, on-screen, typing, osk, layout, keyboard layout, language, svenska, åäö. ("language" stays a search keyword only, so people who think of it that way still find it.)</p>
+<p><strong>Not covered here:</strong> the layout of a <em>physical</em> USB keyboard plugged into a kiosk. That is an OS setting
+(xkb, through the display agent) and would be its own issue.</p>
+<h2 id="8-accessibility">8. Accessibility<a class="headerlink" href="#8-accessibility" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The keyboard root has <code>role="group"</code> and <code>aria-label="On-screen keyboard"</code>, and every key is a
+  <code>&lt;button type="button" tabindex="-1"&gt;</code> (it is a pointer input device, not a tab stop; a physical keyboard
+  hides it anyway).</li>
+<li>Typed characters reach the real input, so screen readers announce them the same way they would from a
+  hardware keyboard.</li>
+<li>Password fields: no previews, no logging of key presses (<code>logDebug</code> must not print key values).</li>
+<li>Contrast: key text <code>--ink</code> on <code>--bg-2</code> and Enter <code>--focus-ink</code> on <code>--focus</code> use the existing
+  token pairs, which already meet AA in both themes.</li>
+</ul>
+<h2 id="9-tests-vitest-vuetest-utils">9. Tests (vitest + @vue/test-utils)<a class="headerlink" href="#9-tests-vitest-vuetest-utils" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Focusing a text input when enabled shows the keyboard. A <code>time</code> input, a <code>readonly</code> input, or a
+  <code>data-osk="off"</code> area doesn't.</li>
+<li><code>auto</code> on a non-touch or &lt; 720px viewport → never shown. <code>off</code> → never shown. <code>on</code> → shown on desktop.</li>
+<li>Insertion at the caret in the middle of a string, Backspace over a selection, <code>å</code> as one code point,
+  <code>maxlength</code> respected, and <code>input</code> dispatched so <code>v-model</code> updates.</li>
+<li>One-shot Shift resets after one letter; a double tap locks.</li>
+<li>Enter: in a form → <code>requestSubmit</code> is called; with a <code>@keyup.enter</code> handler → the handler runs; the
+  Enter label takes the form's primary button text.</li>
+<li>A trusted physical keydown hides it. Blur to body hides it after rAF. Moving focus between two fields
+  keeps it visible.</li>
+<li><code>--osk-height</code> is set on show and reset to <code>0px</code> on hide.</li>
+<li>Layout: <code>sv</code> puts å/ö/ä on the letter layer; Shift capitalises them. <code>{layout}</code> is absent with no extras,
+  and with extras it cycles main → extras → main. The key and space-bar labels show the layout code and name.
+  Unset <code>oskLayout</code> resolves once from <code>navigator.language</code> and caches it. Changing the UI language (or
+  <code>document.documentElement.lang</code>) never changes the layout. Removing the active layout from Settings falls
+  back to the main layout.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<style>
+  .wf { background:#14161a; border:1px solid #2a2f38; border-radius:8px; padding:14px; font-size:12px; color:#c9d1d9; }
+  .panehead { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; margin:2px 0 8px; }
+  .grid7 { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+  .tile { background:#191c22; border:1px solid #2a2f38; border-radius:8px; padding:10px 6px; text-align:center; }
+  .tile .n { font-family:monospace; font-weight:700; font-size:16px; color:#e6edf3; }
+  .tile .a { font-size:10px; color:#9db8d6; margin-top:4px; line-height:1.2; }
+  .otherwrap { margin-top:12px; }
+  .keychips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .kc { display:flex; align-items:center; gap:6px; background:#191c22; border:1px solid #2a2f38; border-radius:6px; padding:5px 8px; }
+  .kc .k { font-family:monospace; font-weight:700; background:#0d1117; border:1px solid #3a4150; border-radius:4px; padding:1px 6px; }
+  .kc .ka { color:#9db8d6; }
+  .kc.add { border-style:dashed; color:#6b7280; }
+
+  .pop { background:#0f1216; border:1px solid #313842; border-radius:10px; padding:0; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  .pop .ph { display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid #232a33; background:#141922; }
+  .pop .ph .kbig { font-family:monospace; font-weight:800; font-size:18px; background:#0d1117; border:1px solid #3a4150; border-radius:6px; padding:3px 12px; color:#e6edf3; }
+  .pop .ph .arrow { color:#6b7280; }
+  .pop .ph .lbl { color:#9db8d6; }
+  .pop .search { margin:10px 14px 6px; }
+  .pop .search input { width:100%; box-sizing:border-box; background:#0d1117; border:1px solid #313842; border-radius:6px; padding:7px 10px; color:#c9d1d9; font-size:12px; }
+  .grp { padding:4px 14px 8px; }
+  .grp .gh { font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; display:flex; align-items:center; gap:6px; margin:8px 0 5px; }
+  .grp .gh .star { color:#e0a458; }
+  .opt { display:flex; align-items:center; gap:8px; padding:7px 9px; border-radius:6px; margin-bottom:4px; }
+  .opt.reco { background:#16202b; border:1px solid #26425c; }
+  .opt.plain { background:#151a20; border:1px solid #232a33; }
+  .opt .oi { width:16px; text-align:center; opacity:.7; }
+  .opt .od { flex:1; }
+  .opt .os { font-size:10px; color:#6b7280; }
+  .collapsed { color:#6b7280; padding:7px 9px; border:1px solid #232a33; border-radius:6px; margin-bottom:4px; display:flex; justify-content:space-between; }
+  .split2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  @media (max-width:720px){ .split2{ grid-template-columns:1fr; } }
+</style>
+
+<h2>Binding any key + picking its action</h2>
+<p class="subtitle">Left: the board reflects whatever you've bound — 1–7 are prime tiles, everything else sits in "Other keys." Right: the picker that pops up the moment you press a key (or hit a tile's ✎).</p>
+
+<div class="split2">
+
+  <div>
+    <div class="wf">
+      <div class="panehead">Your buttons</div>
+      <div class="grid7">
+        <div class="tile"><div class="n">1</div><div class="a">Previous</div></div>
+        <div class="tile"><div class="n">2</div><div class="a">Expand/Close</div></div>
+        <div class="tile"><div class="n">3</div><div class="a">Next</div></div>
+        <div class="tile"><div class="n">4</div><div class="a">Region Next</div></div>
+        <div class="tile"><div class="n">5</div><div class="a">Screen Prev</div></div>
+        <div class="tile"><div class="n">6</div><div class="a">Screen Next</div></div>
+        <div class="tile"><div class="n">7</div><div class="a">Settings</div></div>
+        <div class="tile" style="border-style:dashed;color:#6b7280"><div class="n">＋</div><div class="a">press</div></div>
+      </div>
+
+      <div class="otherwrap">
+        <div class="panehead">Other keys · 3</div>
+        <div class="keychips">
+          <div class="kc"><span class="k">S</span><span class="ka">Open Settings</span><span style="opacity:.5">✎ ✕</span></div>
+          <div class="kc"><span class="k">→</span><span class="ka">Next</span><span style="opacity:.5">✎ ✕</span></div>
+          <div class="kc"><span class="k">F5</span><span class="ka">Refresh</span><span style="opacity:.5">✎ ✕</span></div>
+          <div class="kc add"><span class="k">＋</span><span>press any key</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top:10px">So yes — press <b>S</b>, <b>→</b>, <b>*</b>, <b>F5</b>, anything. Digits 1–7 fill the remote tiles; the rest live here. Same edit/remove on both.</p>
+  </div>
+
+  <div>
+    <div class="pop">
+      <div class="ph">
+        <span class="kbig">S</span>
+        <span class="arrow">→</span>
+        <span class="lbl">choose an action</span>
+      </div>
+      <div class="search"><input placeholder="🔍  Search actions…" /></div>
+
+      <div class="grp">
+        <div class="gh"><span class="star">★</span> Generic · context-aware &nbsp;<span style="color:#4a5568">(recommended)</span></div>
+        <div class="opt reco"><span class="oi">↔</span><span class="od">Next</span><span class="os">adapts to calendar / photos / services</span></div>
+        <div class="opt reco"><span class="oi">↔</span><span class="od">Previous</span><span class="os">adapts to focused region</span></div>
+        <div class="opt reco"><span class="oi">⤢</span><span class="od">Expand / Close</span><span class="os">expand event · enter/exit fullscreen</span></div>
+        <div class="opt reco"><span class="oi">⟳</span><span class="od">Refresh</span><span class="os">refresh focused region</span></div>
+
+        <div class="gh">Modes</div>
+        <div class="opt plain"><span class="oi">▦</span><span class="od">Calendar · Photos · Web Services · Settings</span></div>
+
+        <div class="gh">Navigation</div>
+        <div class="opt plain"><span class="oi">⇆</span><span class="od">Screen Next / Prev · Region Next / Prev · Screen 1–7</span></div>
+
+        <div class="collapsed"><span>▸ Per-mode actions — Calendar / Photos / Web Services</span><span>18</span></div>
+        <div class="collapsed"><span>▸ Legacy / advanced</span><span>7</span></div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top:10px">Generic sits on top, pre-expanded and highlighted. Modes + Navigation one tap away. The 18 mode-specific + 7 legacy actions stay collapsed so the frozen 45-action set is fully reachable but never in your face.</p>
+  </div>
+
+</div>

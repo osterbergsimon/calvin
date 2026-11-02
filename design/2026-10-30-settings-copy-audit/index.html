@@ -1,0 +1,2539 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/design/2026-10-30-settings-copy-audit/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Settings copy and knobs audit - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#settings-copy-and-knobs-audit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Settings copy and knobs audit
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-findings-worst-first" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Findings, worst first
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-scope-say-where-a-setting-applies-owner-decision" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Scope: say where a setting applies (owner decision)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-copy-changes-by-category" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Copy changes, by category
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Copy changes, by category">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-content" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Content
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Dashboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-screen-keyboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Screen &amp; keyboard
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 System
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-kiosks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Kiosks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-advanced-disclosure" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Advanced disclosure
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-copy-rules-for-every-future-row" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Copy rules (for every future row)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-tests-vitest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Tests (vitest)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="settings-copy-and-knobs-audit">Settings copy and knobs audit<a class="headerlink" href="#settings-copy-and-knobs-audit" title="Permanent link">&para;</a></h1>
+<p>Status: spec. Mockup: <a href="../mocks/settings-copy/settings-copy.html">mocks/settings-copy/settings-copy.html</a>, PNGs
+<code>mocks/settings-copy/png/c1.png</code>, <code>c2.png</code>. Frontend only, except §2 (scope), which needs an owner decision.</p>
+<p>Every <code>SettingRow</code>, section and option label in Settings was read against what the code actually does.
+Category structure (CLV-17) stays. This is about the words and the knobs inside it.</p>
+<h2 id="1-findings-worst-first">1. Findings, worst first<a class="headerlink" href="#1-findings-worst-first" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>You can't tell which screens a setting changes.</strong> Almost every knob is saved on the server and applies to
+   every screen, but several say "this device", "this Pi" or "the Pi's timezone". <em>Touchscreen</em> says "Whether this
+   device is treated as a touchscreen" and then forces touch on every kiosk, phone and laptop. <em>Settings UI size</em>
+   scales Settings on the phone and the wall alike. This is what caused the photos-fullscreen trap (PR #149).</li>
+<li><strong>Some descriptions are wrong.</strong></li>
+<li><em>Photo-frame timeout</em>: "Seconds before the photo frame advances." It is actually the idle time before photo-frame
+     mode starts (<code>usePhotoFrameMode.js</code>). The slider also defaults to 60 while the store defaults to 300.</li>
+<li><em>Display name</em>: "shown in the title bar". It's shown in the clock bar.</li>
+<li><em>Auto-hide delay</em>: "the mode indicator". The section is about key-press feedback.</li>
+<li><strong>Engineer words.</strong> "Origins", "statusbar items", "Config polling interval", "Backend/Frontend version",
+   "Horizontal/Vertical layout" (meaning top/bottom vs side bars), "Apply display rotation … OS display output",
+   "‹inherited from global›".</li>
+<li><strong>Redundant or half-knobs.</strong></li>
+<li><em>Screen timeout</em> toggle + <em>Timeout</em> "(0 = never)": two ways to say off.</li>
+<li><em>Theme mode</em> "Auto" vs "Time": you can't tell which one follows the clock.</li>
+<li><em>Dark mode start/end (hour)</em>: number inputs taking 0–23.</li>
+<li><strong>Things a family member should never meet sit next to things they use daily.</strong> Repository, Branch, Log level,
+   Config polling interval and Console logging sit in the open in System.</li>
+<li><strong>Similar names for different things.</strong> "Keyboard" (on-screen keyboard) vs "Button bindings" (remote) vs
+   "Key-press feedback". "Photo-frame mode" vs photos "Fullscreen". "Power schedule" (Screen &amp; keyboard) vs
+   "Display schedule" (Kiosks).</li>
+</ol>
+<h2 id="2-scope-say-where-a-setting-applies-owner-decision">2. Scope: say where a setting applies (owner decision)<a class="headerlink" href="#2-scope-say-where-a-setting-applies-owner-decision" title="Permanent link">&para;</a></h2>
+<p><strong>Every row says who it affects</strong>, using one rule, not ad-hoc copy:</p>
+<ul>
+<li>Default (no marker): <strong>all screens</strong>. That's most settings, so no noise.</li>
+<li>A row that applies only to the browser you're holding gets a scope chip after the label: <strong>This screen</strong>
+  (<code>--fs-xs</code>, <code>--ink-2</code>, 1px <code>--line</code> border, <code>--radius-sm</code>, padding 0 6px). Its description never repeats "this
+  device".</li>
+<li>A row a kiosk can override keeps the Kiosks pattern, with new copy (§3.5).</li>
+</ul>
+<p><strong>Decision needed (gate):</strong> move the two settings that are obviously per-screen from server config to the
+browser (<code>localStorage</code>, try/catch, same pattern as <code>calvin-osk-layout</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Today</th>
+<th>Proposed</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Touchscreen (<code>touchControls</code>)</td>
+<td>server, all screens</td>
+<td><strong>This screen</strong> (<code>calvin-touch-controls</code>)</td>
+<td>A mouse PC and a wall panel need opposite answers</td>
+</tr>
+<tr>
+<td>Settings text size (<code>uiSize</code>)</td>
+<td>server, all screens</td>
+<td><strong>This screen</strong> (<code>calvin-ui-size</code>)</td>
+<td>A phone and a 7" panel need opposite answers</td>
+</tr>
+</tbody>
+</table>
+<p>On first load after the change, a browser with no local value starts from the old server value, so nothing
+visibly changes on upgrade. The server key is then only that seed. Everything else stays server-wide.</p>
+<p><strong>Recommendation: yes.</strong> Without it, the copy in §3 has to keep warning "applies to every screen", which is the
+problem we're fixing.</p>
+<h2 id="3-copy-changes-by-category">3. Copy changes, by category<a class="headerlink" href="#3-copy-changes-by-category" title="Permanent link">&para;</a></h2>
+<p>Verbatim. Unlisted rows stay as they are. "—" = no description.</p>
+<h3 id="31-content">3.1 Content<a class="headerlink" href="#31-content" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Label now → new</th>
+<th>Description new</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Max visible events</td>
+<td><strong>Events per day</strong></td>
+<td>How many events fit in one day before it shows "+N more".</td>
+</tr>
+<tr>
+<td>Highlight holidays</td>
+<td>(same)</td>
+<td>Marks public holidays on the calendar.</td>
+</tr>
+<tr>
+<td>Show week numbers</td>
+<td>(same)</td>
+<td>Shows the week number at the start of each week.</td>
+</tr>
+<tr>
+<td>Rotation interval</td>
+<td><strong>Show each photo for</strong></td>
+<td>— (the slider shows the unit, e.g. "30 s")</td>
+</tr>
+<tr>
+<td>Image display mode</td>
+<td><strong>Fit photos</strong></td>
+<td>How a photo fills its space.</td>
+</tr>
+<tr>
+<td></td>
+<td>options <strong>Smart · Whole photo · Fill · Crop · Centre</strong></td>
+<td>Smart picks Whole photo or Fill per photo. (shown as hint only when Smart is selected)</td>
+</tr>
+<tr>
+<td>Randomize image order</td>
+<td><strong>Shuffle photos</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Photo-frame mode</td>
+<td><strong>Photo frame when idle</strong></td>
+<td>After a while with no touches or key presses, photos go full screen. Any touch brings the dashboard back.</td>
+</tr>
+<tr>
+<td>Photo-frame timeout</td>
+<td><strong>Start after</strong></td>
+<td>— . SelectPill: 1, 2, 5, 10, 15, 30 min. Default <strong>5 min</strong> (matches the store's 300 s; fix the <code>|| 60</code> fallback).</td>
+</tr>
+<tr>
+<td>Refresh interval (calendars)</td>
+<td><strong>Check for new events every</strong></td>
+<td>— (5–120 min on the control)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-dashboard">3.2 Dashboard<a class="headerlink" href="#32-dashboard" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Label now → new</th>
+<th>Description new</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Theme</td>
+<td>(same)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Theme mode</td>
+<td><strong>Light or dark</strong></td>
+<td>options <strong>Light · Dark · Follow device · On a schedule</strong></td>
+</tr>
+<tr>
+<td>Dark mode start/end (hour)</td>
+<td>one row <strong>Dark from</strong> with two time pickers "{20:00} to {07:00}" (<code>&lt;input type="time" step="3600"&gt;</code>, whole hours)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Typeface</td>
+<td><strong>Font</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Settings UI size</td>
+<td><strong>Settings text size</strong> + <strong>This screen</strong> chip (§2)</td>
+<td>Only changes Settings. The dashboard has its own size below.</td>
+</tr>
+<tr>
+<td>Display name</td>
+<td><strong>Room name</strong></td>
+<td>Shown in the clock bar, e.g. "Kitchen".</td>
+</tr>
+<tr>
+<td>Hide controls in kiosk mode</td>
+<td><strong>Hide controls</strong></td>
+<td>Hides the ⋯ menu and region headers for a calm wall display.</td>
+</tr>
+<tr>
+<td>Keep clock bar visible</td>
+<td><strong>Keep the clock bar when hidden</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Focus light</td>
+<td>(same)</td>
+<td>Outlines the region the remote or arrow keys will act on.</td>
+</tr>
+<tr>
+<td></td>
+<td>options <strong>Always · Only while controls show · Off</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Dim other regions</td>
+<td>(same)</td>
+<td>Dims the rest while the focus light is on.</td>
+</tr>
+<tr>
+<td>Reveal corner</td>
+<td><strong>Show-controls corner</strong></td>
+<td>Press and hold this corner to bring hidden controls back.</td>
+</tr>
+<tr>
+<td>Reveal corner opacity</td>
+<td><strong>Corner visibility</strong></td>
+<td>At 0 it's invisible but still works.</td>
+</tr>
+<tr>
+<td>Reveal corner size</td>
+<td><strong>Corner size</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Reveal hold time</td>
+<td><strong>Hold for</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Tap anywhere to show controls</td>
+<td>(same)</td>
+<td>A tap on calendar or photos brings controls back.</td>
+</tr>
+<tr>
+<td>Touchscreen</td>
+<td>(same) + <strong>This screen</strong> chip (§2)</td>
+<td>Shows touch buttons: arrows, screen dots, the ✕ in fullscreen. Auto works for most screens; choose On if a touch panel acts like a mouse.</td>
+</tr>
+<tr>
+<td></td>
+<td>options <strong>Auto · On · Off</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>Dashboard size</td>
+<td>(same)</td>
+<td>Size of labels and touch buttons on the dashboard.</td>
+</tr>
+</tbody>
+</table>
+<p>Section <strong>Touch &amp; controls</strong> is split in two (mock C1):
+- <strong>Controls</strong>: Hide controls, Keep the clock bar when hidden, Show-controls corner, Corner visibility, Corner size,
+  Hold for, Tap anywhere. The four corner rows show only while <strong>Hide controls</strong> is on (today they show always).
+- <strong>Touch &amp; focus</strong>: Touchscreen, Dashboard size, Focus light, Dim other regions.</p>
+<p>Clock bar:</p>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Label now → new</th>
+<th>Description new</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Show seconds</td>
+<td>(same)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Show Calvin logo</td>
+<td>(same)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Show plugin items</td>
+<td><strong>Show plugin info</strong></td>
+<td>Weather and other plugin readouts. Turn each on in its own settings.</td>
+</tr>
+<tr>
+<td>Horizontal layout / sizing</td>
+<td><strong>Top or bottom bar</strong> / <strong>Top or bottom bar size</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Vertical layout / sizing</td>
+<td><strong>Side bar</strong> / <strong>Side bar size</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<h3 id="33-screen-keyboard">3.3 Screen &amp; keyboard<a class="headerlink" href="#33-screen-keyboard" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Label now → new</th>
+<th>Description new</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Orientation</td>
+<td>(same)</td>
+<td>Which way the screen is mounted. Screens &amp; regions decides how regions stack.</td>
+</tr>
+<tr>
+<td>Flip 180°</td>
+<td><strong>Upside down</strong></td>
+<td>For screens mounted with the cable on top.</td>
+</tr>
+<tr>
+<td>Apply display rotation</td>
+<td><strong>Rotate the screen output</strong></td>
+<td>On: Calvin turns the Pi's picture itself. Off: leave it to the OS or the screen.</td>
+</tr>
+<tr>
+<td>Power schedule</td>
+<td><strong>Screen on/off schedule</strong></td>
+<td>Turns the screen off and on at set times.</td>
+</tr>
+<tr>
+<td>Timezone</td>
+<td>(same)</td>
+<td>Used by the schedule. <strong>Server's timezone</strong> (option renamed from "System default").</td>
+</tr>
+<tr>
+<td>Screen timeout + Timeout</td>
+<td>one row <strong>Turn off when idle</strong> with SelectPill <strong>Never · 5 min · 15 min · 30 min · 1 hour · 2 hours</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Manual control</td>
+<td><strong>Screen now</strong> with buttons <strong>Turn on now · Turn off now</strong> and <strong>Follow schedule</strong> while overridden</td>
+<td>—</td>
+</tr>
+<tr>
+<td>section Keyboard</td>
+<td><strong>On-screen keyboard</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>On-screen keyboard</td>
+<td><strong>Show it</strong></td>
+<td>When you tap a text field. Auto shows it on touchscreens.</td>
+</tr>
+<tr>
+<td></td>
+<td>options <strong>Auto · Always · Never</strong></td>
+<td></td>
+</tr>
+<tr>
+<td>section Key-press feedback</td>
+<td>moved into <strong>Remote &amp; buttons</strong> (below)</td>
+<td></td>
+</tr>
+<tr>
+<td>Enable feedback</td>
+<td><strong>Show button presses</strong></td>
+<td>A short label appears when a remote or keyboard button does something.</td>
+</tr>
+<tr>
+<td>Feedback style</td>
+<td><strong>Label size</strong>, options <strong>Normal · Small</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Auto-hide delay (s)</td>
+<td><strong>Hide label after</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Button bindings</td>
+<td>(same), section renamed <strong>Remote &amp; buttons</strong></td>
+<td>(same)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="34-system">3.4 System<a class="headerlink" href="#34-system" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>Label now → new</th>
+<th>Description new</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backend version / Frontend version</td>
+<td>one row <strong>Version</strong> showing "{backend}" and, only if they differ, "(screen {frontend})"</td>
+<td>—</td>
+</tr>
+<tr>
+<td>System status</td>
+<td>(same)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Reload UI</td>
+<td><strong>Reload this screen</strong></td>
+<td>— (Docker hint unchanged)</td>
+</tr>
+<tr>
+<td>Every / Keep (backups)</td>
+<td><strong>Back up every</strong> / <strong>Keep the last</strong></td>
+<td>— . Units on the control: "{n} hours", "{n} backups".</td>
+</tr>
+<tr>
+<td>Repository, Branch</td>
+<td>moved into <strong>Advanced</strong> (§4)</td>
+<td></td>
+</tr>
+<tr>
+<td>Console logging, Log level, Config polling interval</td>
+<td>moved into <strong>Advanced</strong></td>
+<td>Config polling: label <strong>Check for setting changes every</strong>, description <strong>How fast other screens pick up a change.</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="35-kiosks">3.5 Kiosks<a class="headerlink" href="#35-kiosks" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>‹inherited from global›</td>
+<td><strong>Same as all screens</strong> (<code>--ink-3</code>)</td>
+</tr>
+<tr>
+<td>‹set for this kiosk›</td>
+<td><strong>Only this kiosk</strong> (<code>--ink</code>, 600; orange text fails contrast) + text button <strong>Use the shared setting</strong></td>
+</tr>
+<tr>
+<td><code>{id} — Display schedule</code></td>
+<td><code>{name} · Screen on/off schedule</code></td>
+</tr>
+<tr>
+<td>Apply rotation</td>
+<td><strong>Rotate the screen output</strong> (match §3.3)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="36-security">3.6 Security<a class="headerlink" href="#36-security" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Row</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>section Allowed origins</td>
+<td><strong>Allowed sites</strong></td>
+</tr>
+<tr>
+<td>intro</td>
+<td><strong>Sites this dashboard may show or load from. Everything else is blocked. Use a domain like grafana.lab or *.lab.example.com, or a full address.</strong> (CIDR line moves to the input's validation error)</td>
+</tr>
+<tr>
+<td>Sealed mode description</td>
+<td><strong>Only this Calvin server is reachable: no outside embeds, sites or plugins that go online. Calendars, photos and local plugins keep working.</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-advanced-disclosure">4. Advanced disclosure<a class="headerlink" href="#4-advanced-disclosure" title="Permanent link">&para;</a></h2>
+<p>System gets one <code>CollapsibleSection</code> <strong>Advanced</strong>, closed by default, last in the category. It holds: Repository,
+Branch, Console logging, Log level, Check for setting changes every. Search (<code>settingsRegistry.js</code>) still finds
+them and opens the section. No other category gets one: hiding more would make search the only way in.</p>
+<h2 id="5-copy-rules-for-every-future-row">5. Copy rules (for every future row)<a class="headerlink" href="#5-copy-rules-for-every-future-row" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Label = what you'd say out loud: a noun ("Font") or a short verb phrase ("Shuffle photos"). No "Enable".</li>
+<li>Description only when the label isn't enough. One sentence, ≤ 110 characters, no "this device" (that's the chip).
+   No "Controls whether …".</li>
+<li>Units go on the control ("30 s", "5 min"), never in the label "(s)" or the description.</li>
+<li>Never describe the code: no "statusbar", "origins", "polling", "backend", "OS output".</li>
+<li>Use the same word for the same thing everywhere: <strong>screen</strong> (not display), <strong>clock bar</strong>, <strong>plugin</strong>, <strong>web page</strong>.</li>
+<li>Options are short, parallel words; "Always on" is "Always" when the label already says what's on.</li>
+</ol>
+<p>This section is the reference until there is a design README.</p>
+<h2 id="6-tests-vitest">6. Tests (vitest)<a class="headerlink" href="#6-tests-vitest" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Snapshot-free text checks: each renamed label and description in §3 renders verbatim (one test per category
+  file, table-driven).</li>
+<li>Photo frame: description says idle; the slider default is 5 min when the config value is missing.</li>
+<li>Theme mode: "On a schedule" shows the <strong>Dark from</strong> time pickers; each picker writes a whole hour (0–23) to the
+  existing keys.</li>
+<li>Turn off when idle: "Never" writes <code>displayTimeoutEnabled: false</code>; any other option writes <code>true</code> plus <code>displayTimeout</code> in seconds. An existing value not in the list shows as its own option ("{n} min").</li>
+<li>The corner rows show only while <strong>Hide controls</strong> is on.</li>
+<li>Advanced: closed by default; a search hit for "branch" opens it and scrolls to the row.</li>
+<li>Kiosks: inherited rows read "Same as all screens"; <strong>Use the shared setting</strong> removes the override key.</li>
+<li>§2, if approved: Touchscreen and Settings text size read/write <code>localStorage</code>, seed once from the server value,
+  survive a storage exception (fall back to the server value), and show the <strong>This screen</strong> chip.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

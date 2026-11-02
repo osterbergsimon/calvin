@@ -1,0 +1,2642 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/setup/DEPLOYMENT_TOPOLOGIES/">
+      
+      
+        <link rel="prev" href="../GETTING_STARTED/">
+      
+      
+        <link rel="next" href="../SETUP_SCRIPTS/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Deployment Topologies - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#deployment-topologies" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Deployment Topologies
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mode-a-all-in-one-pi-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mode A — All-in-one Pi (default)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mode-b-remote-backend-kiosk-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mode B — Remote backend + kiosk Pi
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mode B — Remote backend + kiosk Pi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-no-proxy-on-the-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why no proxy on the Pi?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-stays-on-the-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stays on the Pi
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-moves-to-the-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What moves to the server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screen-scheduling-on-a-mode-b-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screen scheduling on a Mode-B kiosk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screen-rotation-on-a-mode-b-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screen rotation on a Mode-B kiosk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kiosk-agent-self-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kiosk agent self-update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kiosk-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kiosk identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-kiosk-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-kiosk configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changing-the-backend-url-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing the backend URL later
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-url-phone-setup-and-add-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public URL (phone setup and Add kiosk)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security note
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#picking-a-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Picking a mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#mode-a-all-in-one-pi-default" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mode A — All-in-one Pi (default)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mode-b-remote-backend-kiosk-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mode B — Remote backend + kiosk Pi
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Mode B — Remote backend + kiosk Pi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#why-no-proxy-on-the-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why no proxy on the Pi?
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-stays-on-the-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What stays on the Pi
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-moves-to-the-server" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What moves to the server
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screen-scheduling-on-a-mode-b-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screen scheduling on a Mode-B kiosk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screen-rotation-on-a-mode-b-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screen rotation on a Mode-B kiosk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kiosk-agent-self-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kiosk agent self-update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#kiosk-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kiosk identity
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#per-kiosk-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-kiosk configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changing-the-backend-url-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changing the backend URL later
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CORS
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#public-url-phone-setup-and-add-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Public URL (phone setup and Add kiosk)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-note" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security note
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#picking-a-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Picking a mode
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="deployment-topologies">Deployment Topologies<a class="headerlink" href="#deployment-topologies" title="Permanent link">&para;</a></h1>
+<p>Calvin's backend serves both the API (<code>/api/*</code>) and the built frontend
+(<code>/</code>) from a single FastAPI process. That gives you flexibility in how
+you split the work across hosts. Two shapes are officially supported.</p>
+<h2 id="mode-a-all-in-one-pi-default">Mode A — All-in-one Pi (default)<a class="headerlink" href="#mode-a-all-in-one-pi-default" title="Permanent link">&para;</a></h2>
+<p>The Pi runs everything: backend, frontend, and the kiosk browser.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>┌─────────────────────────── Raspberry Pi ───────────────────────────┐
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>│                                                                    │
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>│   cog (kiosk)      ──&gt; http://localhost:8000  ──&gt; Calvin backend   │
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>│                                                  │                 │
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>│                                                  └── SQLite, data  │
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>└────────────────────────────────────────────────────────────────────┘
+</span></code></pre></div>
+<p>Use when:
+- One Pi, simple setup.
+- You want the SD card / SSD to be the single source of truth.</p>
+<p>Setup:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>scripts/setup.sh<span class="w"> </span>--mode<span class="w"> </span>prod
+</span></code></pre></div>
+<p>See <a href="../SETUP_LINUX/">SETUP_LINUX.md</a> for the full walkthrough.</p>
+<p>The kiosk browser follows the same display-stack rule as a kiosk Pi (see
+<a href="../KIOSK_INSTALL/#display-stack-cog-default-everywhere-wayland-opt-in">Display stack</a>):</p>
+<ul>
+<li>A fresh install uses <strong>cog</strong> (WPE WebKit on DRM/KMS, <code>calvin-cog.service</code>),
+  on every board. It waits for the local backend before it opens the dashboard.</li>
+<li><code>--display-stack x11|wayland|cog</code> picks one explicitly:
+  <code>sudo bash scripts/setup.sh --mode prod --display-stack x11</code> gives the previous
+  X11 + Chromium kiosk (<code>calvin-x.service</code> + <code>calvin-kiosk.service</code>).</li>
+<li>A re-run (or <code>update-calvin.sh</code>) keeps the stack recorded in
+  <code>/etc/default/calvin-kiosk</code> as <code>CALVIN_DISPLAY_STACK</code>. An all-in-one Pi
+  installed before this setting existed is X11 and stays X11; it is never
+  migrated silently. Re-run setup with <code>--display-stack cog</code> to move it.</li>
+<li>X11 + Chromium stay installed on every stack, so switching back is one
+  re-run of setup with <code>--display-stack x11</code>, not a reimage.</li>
+<li><code>setup.sh --refresh</code> skips apt, except when the stack it applies needs a
+  package that is missing (<code>cog</code>, or <code>labwc</code> on Wayland): it installs that
+  first, and stops before changing any display unit if the install fails.</li>
+</ul>
+<p>The screen on/off schedule needs <code>vcgencmd</code>/<code>xset</code> (or, on cog, the panel
+helper) on the host, which the container does not have, so setup also installs
+the same <code>calvin-display-agent.service</code> the kiosk Pis use, pointed at
+<code>http://localhost:$CALVIN_PORT</code> (it reads the global config; it does not show
+up under Settings → Screens). Rotation and output settings go in
+<code>/etc/default/calvin-kiosk</code> exactly as on a kiosk Pi.</p>
+<h2 id="mode-b-remote-backend-kiosk-pi">Mode B — Remote backend + kiosk Pi<a class="headerlink" href="#mode-b-remote-backend-kiosk-pi" title="Permanent link">&para;</a></h2>
+<p>The backend (and its data) live on a home server. One or more Pis run
+<strong>only</strong> Chromium, pointed at the server's URL.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>┌─────── Home server ───────┐         ┌──── Raspberry Pi ────┐
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>│                           │         │                      │
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>│   Calvin backend          │ &lt;─────  │   Chromium (kiosk)   │
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>│   ├── SQLite, photos      │   LAN   │                      │
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>│   └── plugin data         │         │                      │
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>└───────────────────────────┘         └──────────────────────┘
+</span></code></pre></div>
+<p>Use when:
+- You already run a 24/7 server and don't want SQLite / photos / plugin
+  data on the Pi's SD card.
+- You want multiple kiosk Pis sharing one backend (each just runs
+  Chromium against the same URL).
+- Plugin syncs are heavy and you want them on a beefier host.</p>
+<h3 id="why-no-proxy-on-the-pi">Why no proxy on the Pi?<a class="headerlink" href="#why-no-proxy-on-the-pi" title="Permanent link">&para;</a></h3>
+<p>The kiosk Pi opens the server's URL directly in Chromium. From the
+browser's view it's same-origin: the server hosts both <code>/</code> and
+<code>/api/*</code>. No CORS, no reverse proxy on the Pi, no env vars baked into
+the frontend. The Pi is genuinely "dumb."</p>
+<h3 id="what-stays-on-the-pi">What stays on the Pi<a class="headerlink" href="#what-stays-on-the-pi" title="Permanent link">&para;</a></h3>
+<ul>
+<li>X server, openbox, Chromium — installed by <code>setup-kiosk.sh</code>.</li>
+<li>Display / cursor / screensaver tweaks.</li>
+<li>Anything OS-level you've added (e.g. a hardware reboot button script
+  driven by <code>evdev</code>). Calvin's app code does not handle hardware input
+  in the browser path; physical buttons are wired up at the OS level.</li>
+</ul>
+<h3 id="what-moves-to-the-server">What moves to the server<a class="headerlink" href="#what-moves-to-the-server" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The backend Docker container (or whatever you use to run it).</li>
+<li><code>/var/lib/calvin/</code> — SQLite database, photos, plugin install dirs,
+  kiosk signing key.</li>
+<li>Plugin installs, including their pip dependencies (live, no rebuild).</li>
+</ul>
+<h3 id="setup">Setup<a class="headerlink" href="#setup" title="Permanent link">&para;</a></h3>
+<p><strong>1. Server.</strong> Run the standard backend deployment, but bind the port
+to a LAN-reachable interface. On Unraid, use the Docker template in
+<a href="../UNRAID/">UNRAID.md</a>. On a regular Linux server, the simplest path is
+the same Docker compose used in Mode A:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># On the server (any Linux box with Docker):</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># v0.1.0 = the release you want; use develop only to test the next one.</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>git<span class="w"> </span>clone<span class="w"> </span>-b<span class="w"> </span>v0.1.0<span class="w"> </span>https://github.com/osterbergsimon/calvin.git
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">cd</span><span class="w"> </span>calvin
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>cp<span class="w"> </span>deploy/calvin.env.example<span class="w"> </span>docker/.env
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Edit docker/.env — set CALVIN_IMAGE_TAG=v0.1.0, CALVIN_PORT, DATABASE_URL, etc.</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>docker<span class="w"> </span>compose<span class="w"> </span>-f<span class="w"> </span>docker/docker-compose.yml<span class="w"> </span>up<span class="w"> </span>-d
+</span></code></pre></div>
+<p>Verify it answers from another host on the LAN:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>curl<span class="w"> </span>http://&lt;server-host&gt;:8000/api/health
+</span></code></pre></div>
+<p>Pin the server to a stable hostname (mDNS <code>homeserver.local</code>, a static
+DHCP lease, or a DNS entry) so the kiosk URL doesn't drift.</p>
+<p><strong>2. Pi.</strong> On a fresh Raspberry Pi OS Lite, run the installer the server serves:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>http://homeserver.local:8000/api/kiosks/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+</span></code></pre></div>
+<p><strong>Step-by-step guide, including the signed (SSH) variant, the signing key, and supported Pi models:
+<a href="../KIOSK_INSTALL/">KIOSK_INSTALL.md</a>.</strong> The installer downloads
+<code>setup-kiosk.sh</code> from the server and runs it. From a checkout,
+<code>sudo bash scripts/setup-kiosk.sh --backend-url http://homeserver.local:8000</code>
+does the same. <code>setup-kiosk.sh</code> installs <code>xserver-xorg</code>, <code>openbox</code>, <code>chromium</code>, and friends;
+writes <code>/etc/default/calvin-kiosk</code> with the backend URL; and installs the
+kiosk bundle:</p>
+<ul>
+<li><code>calvin-x.service</code> — starts the X server on tty1.</li>
+<li><code>calvin-kiosk-remote.service</code> — waits for the backend to answer,
+  then launches Chromium in kiosk mode against <code>CALVIN_BACKEND_URL</code>.</li>
+<li><code>calvin-display-agent.service</code> — applies rotation/resolution and the
+  screen on/off schedule (see below).</li>
+<li><code>calvin-kiosk-update.service</code> — a root oneshot used by the remote
+  display-agent update flow.</li>
+</ul>
+<p>The update bundle installed by <code>update-kiosk.sh --bootstrap</code> also includes the
+first-boot helper where the image uses it.</p>
+<p>The installer reboots when it finishes, and Chromium opens to the dashboard.</p>
+<blockquote>
+<p><strong>Zero-touch alternative:</strong> instead of SSHing in, you can bake the
+backend URL + wifi into the card before first boot so the Pi
+self-provisions. See <a href="../KIOSK_INSTALL/#option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi">KIOSK_INSTALL.md</a>.</p>
+</blockquote>
+<h3 id="screen-scheduling-on-a-mode-b-kiosk">Screen scheduling on a Mode-B kiosk<a class="headerlink" href="#screen-scheduling-on-a-mode-b-kiosk" title="Permanent link">&para;</a></h3>
+<p>Calvin's screen on/off schedule is authored in the dashboard UI, but the
+backend cannot reach a remote kiosk's display. <code>setup-kiosk.sh</code> therefore
+installs <strong><code>calvin-display-agent.service</code></strong>, a small local agent that reads the
+schedule from <code>${CALVIN_BACKEND_URL}/api/config</code> and powers the panel with
+<code>vcgencmd</code>/<code>xset</code>. It computes on/off boundaries locally and wakes exactly at
+the next one, and re-reads the config every <code>CALVIN_DISPLAY_REFRESH_SECONDS</code>
+(default 60, set in <code>/etc/default/calvin-kiosk</code> to override), so a schedule
+edit reaches the panel within about a minute. Set the schedule in the UI as
+usual; the kiosk follows it. Logs: <code>journalctl -u calvin-display-agent.service</code>.</p>
+<h3 id="screen-rotation-on-a-mode-b-kiosk">Screen rotation on a Mode-B kiosk<a class="headerlink" href="#screen-rotation-on-a-mode-b-kiosk" title="Permanent link">&para;</a></h3>
+<p>Screen rotation, output selection, and resolution are <strong>physical to each Pi</strong>, so they live in
+the device-local <code>/etc/default/calvin-kiosk</code>, not in the (global) server config. The display-agent
+applies them via <code>xrandr</code> at startup and whenever the per-kiosk device-config version changes:</p>
+<ul>
+<li><code>CALVIN_DISPLAY_ROTATION</code> — rotation mode: <code>normal</code>, <code>left</code>, <code>right</code>, or <code>inverted</code>.</li>
+<li><code>CALVIN_DISPLAY_OUTPUT</code> — the xrandr output name (e.g. <code>HDMI-1</code>) to select as <strong>primary</strong> and
+  target for resolution/rotation. Optional; when unset the agent auto-detects the first connected output.</li>
+<li><code>CALVIN_DISPLAY_RESOLUTION</code> — the mode to apply, as <code>WIDTHxHEIGHT</code> or <code>WIDTHxHEIGHT@RATE</code>
+  (e.g. <code>1920x1080</code> or <code>1920x1080@60</code>). Optional; when unset the current mode is left unchanged.</li>
+</ul>
+<p>Example:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>CALVIN_DISPLAY_ROTATION=left
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>CALVIN_DISPLAY_OUTPUT=HDMI-1
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>CALVIN_DISPLAY_RESOLUTION=1920x1080@60
+</span></code></pre></div>
+<p>These device-local env vars win over the equivalent server config (<code>displayOutput</code> / <code>displayResolution</code> / <code>displayRotation</code>);
+the display-agent applies them via <code>xrandr</code> at startup and whenever the per-kiosk device-config version
+changes. Then <code>sudo systemctl restart calvin-display-agent.service</code>. This replaces the
+old backend-side <code>display_orientation_service</code>, which cannot reach a remote kiosk's display. (Per-device settings are tracked under epic <code>calvin-dd9</code>.)</p>
+<h3 id="kiosk-agent-self-update">Kiosk agent self-update<a class="headerlink" href="#kiosk-agent-self-update" title="Permanent link">&para;</a></h3>
+<p>The small Python display-agent and its systemd units that <code>setup-kiosk.sh</code>
+installs can be updated remotely without re-running setup or SSHing into the Pi.</p>
+<p><strong>Flow:</strong> Settings → Screens → Kiosk software → <strong>Update all</strong> (or <strong>Update</strong> in one screen's
+<strong>Software</strong> section) → the backend sets a per-kiosk <code>agentUpdateRequested</code> flag → the
+kiosk picks it up on its next config poll → it fires the root oneshot
+<code>calvin-kiosk-update.service</code> →
+<code>update-kiosk.sh</code> fetches the bundle from
+<code>${CALVIN_BACKEND_URL}/api/kiosks/agent/*</code>, verifies sha256 (+ <code>py_compile</code>
+for Python files), backs up the current files, atomic-swaps only changed files,
+restarts only the affected units, and auto-rolls-back if the agent doesn't come
+up healthy within 30 seconds.</p>
+<p>The <strong>bundle source is the local Calvin server</strong> — the kiosk needs no internet
+access and carries no full repo checkout. Six files make up the bundle: the
+display-agent script, three systemd units, the updater script, and the oneshot
+update service unit.</p>
+<p>The Screens list summarises the fleet in a <strong>Kiosk software</strong> row: how many
+kiosks can be updated to the available bundle, with <strong>Update all</strong> in one click.
+Each kiosk card shows its running version and the outcome of its last update; a
+kiosk whose OS/Python is too old is marked "update needs a newer OS" and is
+never included in <strong>Update all</strong>. While at least one kiosk is behind, System ›
+Updates shows a pointer to that row.</p>
+<p><strong><code>min_python</code> floor:</strong> the manifest carries <code>"min_python": "3.9"</code>. If the
+kiosk's Python is below 3.9 the update is aborted (status: "device python &lt;
+3.9; keeping current agent") — the kiosk needs an OS upgrade before it can
+accept a newer bundle. The same floor is enforced at startup: the agent exits
+immediately on Python &lt; 3.9.</p>
+<p>For full details — health-check readiness marker, sudoers fragment, auto-clear
+of the flag, initial bundle install, and the <code>zipapp</code> future option — see the
+<a href="../KIOSK_PROVISIONING/#kiosk-agent-self-update">Kiosk agent self-update</a>
+section in <code>KIOSK_PROVISIONING.md</code>.</p>
+<h3 id="kiosk-identity">Kiosk identity<a class="headerlink" href="#kiosk-identity" title="Permanent link">&para;</a></h3>
+<p>Each kiosk Pi has a stable <strong><code>CALVIN_KIOSK_ID</code></strong> in <code>/etc/default/calvin-kiosk</code>,
+generated by <code>setup-kiosk.sh</code> as <code>&lt;hostname&gt;-&lt;machine-id suffix&gt;</code> (a stock Pi
+image defaults its hostname to <code>raspberrypi</code>, so the machine-id suffix keeps
+multiple Pis unique). Rename it to something friendly (<code>kitchen</code>, <code>hallway</code>) and
+<code>sudo systemctl restart calvin-kiosk-remote.service</code>.</p>
+<p>The kiosk's Chromium opens <code>${CALVIN_BACKEND_URL}/?kiosk=&lt;id&gt;</code>, so the server
+learns which kiosk is talking to it: every <code>/api/config?kiosk=&lt;id&gt;</code> request
+registers the kiosk (id, hostname, last-seen). List known kiosks with
+<code>curl http://&lt;server&gt;:8000/api/kiosks</code>. A request with <strong>no</strong> id behaves exactly
+as before — this is the foundation the per-kiosk config model builds on.</p>
+<h3 id="per-kiosk-configuration">Per-kiosk configuration<a class="headerlink" href="#per-kiosk-configuration" title="Permanent link">&para;</a></h3>
+<p>Each kiosk reads its <strong>effective config</strong> from <code>GET /api/kiosks/&lt;id&gt;/config</code> — the
+global config with that kiosk's overrides applied (device-physical values like
+rotation included; the browser ignores what it can't act on, the display-agent
+applies them). The response carries an <code>ETag</code>/<code>deviceConfigVersion</code> so a client can
+cheaply detect device-physical changes (<code>If-None-Match</code> → <code>304</code>).</p>
+<p>Per-kiosk overrides are edited via <code>GET/PUT /api/kiosks/&lt;id&gt;/overrides</code> (a sparse
+layer that replaces on PUT). <code>GET /api/config</code> is now <strong>global-only</strong> (Mode-A Pis and
+the template new kiosks inherit). List known kiosks with <code>curl http://&lt;server&gt;:8000/api/kiosks</code>.</p>
+<p><strong>Assigning content to a kiosk.</strong> Two override keys control which screens a kiosk shows:
+<code>availableScreens</code> (a list of screen ids the kiosk may switch between — omit for all) and
+<code>defaultScreenId</code> (the screen it boots into). Set them via
+<code>PUT /api/kiosks/&lt;id&gt;/overrides</code>. In this mode the active screen is <strong>local to each kiosk</strong> —
+switching screens on one kiosk (keyboard or on-screen dots) no longer changes the others, and
+a kiosk boots to its <code>defaultScreenId</code>. The screen catalog itself is authored once, globally.</p>
+<p><strong>Per-kiosk orientation from the server.</strong> When <code>CALVIN_KIOSK_ID</code> is set, the display-agent
+fetches the kiosk's effective config (<code>/api/kiosks/&lt;id&gt;/config</code>) and applies the server-configured
+<code>orientation</code> via <code>xrandr</code> — re-applying only when it changes (tracked by <code>deviceConfigVersion</code>).
+Set a kiosk's orientation with <code>PUT /api/kiosks/&lt;id&gt;/overrides</code>. The device-local
+<code>CALVIN_DISPLAY_ROTATION</code> env still <strong>wins</strong> as a break-glass override; the schedule is likewise
+now per-kiosk (each kiosk reads its own effective config).</p>
+<p><strong>Managing screens from the UI.</strong> Settings → <strong>Screens</strong> lists every screen that has connected
+(name, id, last-seen, Online/Offline). Select one to open its page: <strong>Name</strong> and <strong>Pages</strong> (which
+pages it shows and which one it starts on), <strong>Display</strong> (orientation, upside down, rotation),
+<strong>Power</strong>, <strong>Touch &amp; keyboard</strong> and <strong>Software</strong>. Every row says <strong>Same as all screens</strong> or <strong>Only
+this screen</strong>, and <strong>Use the shared setting</strong> clears that one override so the screen inherits again.
+The shared defaults live under the <strong>All screens</strong> card on the same page. Changes save immediately
+and the screen applies them at its next check-in (~30s).</p>
+<h3 id="changing-the-backend-url-later">Changing the backend URL later<a class="headerlink" href="#changing-the-backend-url-later" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>sudo<span class="w"> </span>nano<span class="w"> </span>/etc/default/calvin-kiosk
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>calvin-kiosk-remote.service
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># The display agent reads the same file for rotation/schedule:</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>calvin-display-agent.service
+</span></code></pre></div>
+<h3 id="cors">CORS<a class="headerlink" href="#cors" title="Permanent link">&para;</a></h3>
+<p>Mode B does <strong>not</strong> require any CORS configuration: the browser hits
+the server's URL directly, so requests to <code>/api/*</code> are same-origin.</p>
+<p>CORS only matters if you run <code>npm run dev</code> on a different host than
+the backend (e.g. hacking on the frontend from a laptop while pointing
+at the home server). For that case the backend already exposes
+<code>CORS_ORIGINS</code> and <code>CORS_ALLOW_ALL</code> env vars — see
+<a href="https://github.com/osterbergsimon/calvin/blob/develop/backend/app/config.py">backend/app/config.py</a>.</p>
+<h3 id="public-url-phone-setup-and-add-kiosk">Public URL (phone setup and Add kiosk)<a class="headerlink" href="#public-url-phone-setup-and-add-kiosk" title="Permanent link">&para;</a></h3>
+<p>Settings shows the server's address as a QR code ("set up from your phone"),
+and <strong>Screens › + Add a screen</strong> prints <code>curl -fsSL &lt;server&gt;/api/kiosks/install.sh | sudo bash</code>.
+The address comes from <code>PUBLIC_URL</code> when set, otherwise from the browser's own
+address, falling back to the LAN IP the backend detects for itself. That last
+guess is wrong in Docker (it sees the container IP), so on Docker/Unraid set
+<code>PUBLIC_URL=http://&lt;server-lan-ip&gt;:8000</code> in <code>.env</code> (passed through by
+<code>docker/docker-compose.yml</code>) or the template's <strong>Public URL</strong> field.</p>
+<p>The served installer (<code>GET /api/kiosks/install.sh</code>) bakes the same address in,
+so behind a TLS-terminating reverse proxy set <code>PUBLIC_URL=https://&lt;your-domain&gt;</code>.
+Without it the app only sees the proxy's plain-HTTP request: it can use
+<code>X-Forwarded-Proto</code>/<code>X-Forwarded-Host</code> instead, but only from a peer listed in
+<code>CALVIN_TRUSTED_PROXIES</code> (comma-separated IPs/CIDRs, <code>*</code> for any; empty by
+default). Forwarded headers from any other client are ignored, so a kiosk
+cannot be pointed at an attacker-chosen URL.</p>
+<h3 id="security-note">Security note<a class="headerlink" href="#security-note" title="Permanent link">&para;</a></h3>
+<p>Calvin's backend has no built-in authentication. Mode B exposes it on
+your LAN, so:</p>
+<ul>
+<li>Bind to the LAN interface, not <code>0.0.0.0</code> on a host that's reachable
+  from the internet.</li>
+<li>Don't port-forward it. If you need remote access, put it behind a
+  VPN or reverse proxy with auth.</li>
+</ul>
+<h2 id="picking-a-mode">Picking a mode<a class="headerlink" href="#picking-a-mode" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Mode A</th>
+<th>Mode B</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Single Pi, no other hardware</td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td>Already run a 24/7 home server</td>
+<td></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Multiple displays sharing one dashboard</td>
+<td></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Want SQLite + photos off the SD card</td>
+<td></td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Want everything reachable on first boot, no LAN</td>
+<td>✅</td>
+<td></td>
+</tr>
+<tr>
+<td>Plugin installs are heavy (image processing)</td>
+<td></td>
+<td>✅</td>
+</tr>
+</tbody>
+</table>
+<p>You can switch later — both modes use the same backend image and the
+same <code>/var/lib/calvin/</code> data layout. Migrating is mostly: stop the
+backend on the Pi, copy <code>/var/lib/calvin/</code> to the server, start it
+there, and reflash the Pi with <code>setup-kiosk.sh</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

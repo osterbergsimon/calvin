@@ -1,0 +1,2934 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/setup/KIOSK_INSTALL/">
+      
+      
+        <link rel="prev" href="../SETUP_LINUX/">
+      
+      
+        <link rel="next" href="../KIOSK_PROVISIONING/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Install a kiosk Pi: fresh SD card to Calvin on screen - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#install-a-kiosk-pi-fresh-sd-card-to-calvin-on-screen" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Install a kiosk Pi: fresh SD card to Calvin on screen
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-hardware-and-os" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported hardware and OS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-0-get-the-signing-key-from-the-server-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0: get the signing key from the server (recommended)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-a-install-over-ssh-on-a-running-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: install over SSH on a running Pi
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: bake the SD card (no SSH, no typing on the Pi)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin a release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-install-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the install does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pi-3-and-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pi 3 and GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pi 3 and GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#override-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Override it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-page-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash-page recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#display-stack-cog-default-everywhere-wayland-opt-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display stack (cog default everywhere, Wayland opt-in)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Display stack (cog default everywhere, Wayland opt-in)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-wayland-on-a-fresh-install-opt-in-experimental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose Wayland on a fresh install (opt-in, experimental)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cog-the-default-on-every-board" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cog (the default on every board)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#switch-an-existing-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Switch an existing kiosk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#roll-back-to-x11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roll back to X11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-without-a-flag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing without a flag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-limitations-in-phase-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations in phase 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-limitations-of-cog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations of cog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updating-a-kiosk-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating a kiosk later
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#supported-hardware-and-os" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Supported hardware and OS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-0-get-the-signing-key-from-the-server-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 0: get the signing key from the server (recommended)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-a-install-over-ssh-on-a-running-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: install over SSH on a running Pi
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: bake the SD card (no SSH, no typing on the Pi)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pin-a-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pin a release
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-install-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the install does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pi-3-and-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pi 3 and GPU
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Pi 3 and GPU">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#override-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Override it
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#crash-page-recovery" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Crash-page recovery
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#display-stack-cog-default-everywhere-wayland-opt-in" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Display stack (cog default everywhere, Wayland opt-in)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Display stack (cog default everywhere, Wayland opt-in)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#choose-wayland-on-a-fresh-install-opt-in-experimental" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choose Wayland on a fresh install (opt-in, experimental)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cog-the-default-on-every-board" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cog (the default on every board)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#switch-an-existing-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Switch an existing kiosk
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#roll-back-to-x11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Roll back to X11
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#choosing-without-a-flag" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing without a flag
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-limitations-in-phase-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations in phase 1
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-limitations-of-cog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitations of cog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#updating-a-kiosk-later" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating a kiosk later
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="install-a-kiosk-pi-fresh-sd-card-to-calvin-on-screen">Install a kiosk Pi: fresh SD card to Calvin on screen<a class="headerlink" href="#install-a-kiosk-pi-fresh-sd-card-to-calvin-on-screen" title="Permanent link">&para;</a></h1>
+<p>This is the short path for <strong>Mode B</strong>: the Calvin server runs elsewhere (Unraid, or any
+Docker host), and the Raspberry Pi is only a display. See
+<a href="../DEPLOYMENT_TOPOLOGIES/">DEPLOYMENT_TOPOLOGIES.md</a> for the background.</p>
+<p>Your Calvin server hands out everything the Pi needs. You don't need a repo checkout on
+the Pi, and nothing comes from GitHub, so the kiosk always matches the server's version.</p>
+<h2 id="supported-hardware-and-os">Supported hardware and OS<a class="headerlink" href="#supported-hardware-and-os" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Supported</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Pi model</strong></td>
+<td>Raspberry Pi 5, Pi 4 (2 GB+), Pi 400</td>
+<td>Recommended. cog (WPE WebKit) by default.</td>
+</tr>
+<tr>
+<td></td>
+<td>Pi 3B / 3B+</td>
+<td>Supported. cog by default; verified end to end on a 3B+ (2026-10-31).</td>
+</tr>
+<tr>
+<td></td>
+<td>Pi Zero 2 W</td>
+<td>Uses cog (WPE WebKit) by default; still unmeasured on 512 MB, so not recommended yet.</td>
+</tr>
+<tr>
+<td></td>
+<td>Older Pis (Pi 1/2, Zero)</td>
+<td>Not supported (too little RAM for the dashboard).</td>
+</tr>
+<tr>
+<td><strong>OS</strong></td>
+<td><strong>Raspberry Pi OS Lite (64-bit), Trixie</strong> (Debian 13)</td>
+<td>Verified with cog on a Pi 3B+ and a Pi 400 (boot/reboot, rotation, screen off/on, real sites, 60 min soak; 2026-10-31).</td>
+</tr>
+<tr>
+<td></td>
+<td>Raspberry Pi OS Lite (64-bit), Bookworm (Debian 12)</td>
+<td>Should work; 64-bit is preferred.</td>
+</tr>
+<tr>
+<td></td>
+<td>Raspberry Pi OS Lite 32-bit, Bookworm</td>
+<td>Should work; 64-bit is preferred.</td>
+</tr>
+<tr>
+<td></td>
+<td>Raspberry Pi OS <strong>Desktop</strong></td>
+<td>Not supported: Calvin starts its own X session on tty1, which conflicts with the desktop.</td>
+</tr>
+</tbody>
+</table>
+<p>You need a reachable Calvin server. Check from any machine on the LAN with
+<code>curl http://&lt;server&gt;:8000/api/health</code>. Use a stable hostname or IP for the server,
+such as a DHCP reservation or <code>tower.local</code>.</p>
+<h2 id="step-0-get-the-signing-key-from-the-server-recommended">Step 0: get the signing key from the server (recommended)<a class="headerlink" href="#step-0-get-the-signing-key-from-the-server-recommended" title="Permanent link">&para;</a></h2>
+<p>The server signs the kiosk software it serves. When you give the Pi the server's key,
+the Pi rejects anything another device on your network might try to slip in. That
+covers the setup scripts, the kiosk agent, and every later update. Copy the key
+<strong>over a trusted channel</strong> (your own SSH/terminal access to the server), never over
+plain HTTP. The server creates it on first start:</p>
+<table>
+<thead>
+<tr>
+<th>Server</th>
+<th>Where the key is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Unraid (template)</td>
+<td><code>/mnt/user/appdata/calvin/kiosk-signing.key</code> (Unraid web terminal or SSH as root)</td>
+</tr>
+<tr>
+<td>Docker compose</td>
+<td><code>${CALVIN_DATA_DIR:-/var/lib/calvin}/kiosk-signing.key</code> on the host, or <code>docker exec calvin cat /var/lib/calvin/kiosk-signing.key</code></td>
+</tr>
+<tr>
+<td>Source checkout</td>
+<td>the path logged at startup: <code>Kiosk manifest signing key: …</code></td>
+</tr>
+</tbody>
+</table>
+<p>The file is one line of 64 hex characters. It sits in the server's data volume, so it
+survives container updates.</p>
+<p>You can skip the key. The kiosk still works, but then it trusts whatever answers at the
+server's address on your LAN.</p>
+<h2 id="option-a-install-over-ssh-on-a-running-pi">Option A: install over SSH on a running Pi<a class="headerlink" href="#option-a-install-over-ssh-on-a-running-pi" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Flash.</strong> In Raspberry Pi Imager, pick <strong>Raspberry Pi OS Lite (64-bit)</strong>. Using
+   Imager's OS customisation is fine here: set a hostname (e.g. <code>kitchen</code>), a user,
+   Wi-Fi, and <strong>enable SSH</strong>. Boot the Pi.</li>
+<li><strong>Install</strong>, using one of these two ways:</li>
+</ol>
+<p><strong>Signed (recommended).</strong> Run this from your workstation. It copies the key <em>and</em> the
+   installer from the server to the Pi over SSH, so nothing that touches the key comes
+   over plain HTTP:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">SERVER</span><span class="o">=</span>tower<span class="w"> </span><span class="nv">PI</span><span class="o">=</span>&lt;user&gt;@kitchen.local
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>ssh<span class="w"> </span>root@<span class="nv">$SERVER</span><span class="w"> </span>cat<span class="w"> </span>/mnt/user/appdata/calvin/kiosk-signing.key<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span><span class="nv">$PI</span><span class="w"> </span><span class="s1">&#39;umask 077; cat &gt; calvin.key&#39;</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>ssh<span class="w"> </span>root@<span class="nv">$SERVER</span><span class="w"> </span>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>Calvin<span class="w"> </span>cat<span class="w"> </span>/app/kiosk-bundle/deploy/kiosk-agent/install-kiosk.sh<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>ssh<span class="w"> </span><span class="nv">$PI</span><span class="w"> </span><span class="s1">&#39;cat &gt; install-kiosk.sh&#39;</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>ssh<span class="w"> </span>-t<span class="w"> </span><span class="nv">$PI</span><span class="w"> </span><span class="s2">&quot;sudo bash install-kiosk.sh --backend-url http://</span><span class="nv">$SERVER</span><span class="s2">:8000 \</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="s2">  --signing-key-file calvin.key --no-reboot &amp;&amp; rm calvin.key &amp;&amp; sudo reboot&quot;</span>
+</span></code></pre></div>
+<p><code>Calvin</code> is the Unraid template's container name; with Docker compose it is
+   <code>calvin</code>, and the key path is the one from Step 0. You can also copy
+   <code>deploy/kiosk-agent/install-kiosk.sh</code> from a Calvin checkout. The installer stores
+   the key root-only in <code>/etc/default/calvin-kiosk-signing</code>, but only after the
+   server's signature has proved the key is correct.</p>
+<p><strong>Quick (trusts your LAN).</strong> On the Pi, run:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>http://tower:8000/api/kiosks/install.sh<span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash
+</span></code></pre></div>
+<p><strong>Do not add the signing key to this form.</strong> The script arrives over plain HTTP, and
+   a tampered copy could steal the key.</p>
+<p>Either way, the install takes a few minutes, mostly package installs, and the Pi
+   then reboots.
+3. <strong>Done.</strong> After the reboot the Pi starts the kiosk browser (cog by default) on the dashboard.
+   Within a minute it appears in <strong>Settings → Screens</strong> on the server.</p>
+<p>The quick form bakes in the URL the server saw the request on. Behind a reverse proxy
+that can be an internal or <code>http://</code> address. If the Pi should use a different URL, add
+<code>-s -- --backend-url http://&lt;server&gt;:8000</code>.</p>
+<h2 id="option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi">Option B: bake the SD card (no SSH, no typing on the Pi)<a class="headerlink" href="#option-b-bake-the-sd-card-no-ssh-no-typing-on-the-pi" title="Permanent link">&para;</a></h2>
+<p>Use this for several Pis, or for a Pi you hand to someone else. You need a Calvin
+checkout on your workstation (Linux/macOS) at the release you run on the server
+(a <code>vX.Y.Z</code> tag; <code>develop</code> is fine for testing).</p>
+<ol>
+<li>Flash <strong>Raspberry Pi OS Lite (64-bit)</strong> with Imager and <strong>do not</strong> use Imager's OS
+   customisation (it writes a competing first-boot hook).</li>
+<li>Re-insert the card, then copy the key to the workstation as above
+   (<code>ssh root@tower cat … &gt; calvin.key; chmod 600 calvin.key</code>). Then bake:</li>
+</ol>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>scripts/bake-kiosk-firstrun.sh<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--backend-url<span class="w"> </span>http://tower:8000<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>--boot-dir<span class="w"> </span>/media/<span class="nv">$USER</span>/bootfs<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>--hostname<span class="w"> </span>kitchen<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>--wifi-ssid<span class="w"> </span>HomeNet<span class="w"> </span>--wifi-psk<span class="w"> </span><span class="s1">&#39;s3cret&#39;</span><span class="w"> </span>--wifi-country<span class="w"> </span>SE<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span>--ssh-pubkey<span class="w"> </span>~/.ssh/id_ed25519.pub<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span>--signing-key-file<span class="w"> </span>calvin.key
+</span></code></pre></div>
+<p>Omit <code>--wifi-*</code> on Ethernet. <code>--ssh-pubkey</code> is optional and gives you recovery
+   access as <code>calvin-admin</code> (key-only, passwordless sudo; <code>--admin-user</code> renames it).
+3. Put the card in the Pi and power on. It reboots twice by itself and comes up on the
+   dashboard. Boot 1 applies the hostname, Wi-Fi and SSH. Boot 2 waits for the server,
+   then installs, showing its progress on the screen. Boot 3 is the kiosk.</p>
+<p>Details and troubleshooting: <a href="../KIOSK_PROVISIONING/">KIOSK_PROVISIONING.md</a>.</p>
+<h2 id="pin-a-release">Pin a release<a class="headerlink" href="#pin-a-release" title="Permanent link">&para;</a></h2>
+<p>A kiosk installs the software its <strong>server</strong> serves, so the way to pin a kiosk
+to a release is to run the server on that release (see
+<a href="../SETUP_SCRIPTS/#installing-a-release-versus-develop">SETUP_SCRIPTS.md</a>). The
+Pi then matches the backend exactly, and <strong>Settings → Screens → Update</strong> moves
+with the server.</p>
+<p>The install scripts themselves also accept a release tag, which is what you
+want when the card is baked from a checkout or <code>setup-kiosk.sh</code> is fetched
+directly:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Kiosk-only install from a release tag (the fallback common script is</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># fetched from the same tag)</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>https://raw.githubusercontent.com/osterbergsimon/calvin/v0.1.0/scripts/setup-kiosk.sh<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span><span class="nv">GIT_BRANCH</span><span class="o">=</span>v0.1.0<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--backend-url<span class="w"> </span>http://tower:8000
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Bake a card from a release checkout</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span>v0.1.0<span class="w"> </span>https://github.com/osterbergsimon/calvin.git
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="nb">cd</span><span class="w"> </span>calvin
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>sudo<span class="w"> </span>bash<span class="w"> </span>scripts/bake-kiosk-firstrun.sh<span class="w"> </span>--backend-url<span class="w"> </span>http://tower:8000<span class="w"> </span>...
+</span></code></pre></div>
+<p><code>GIT_BRANCH=v0.1.0</code> pins the scripts and the checkout the server side uses; it
+never selects an image for the Pi (a kiosk runs a browser, not Calvin). The
+server container's image tag (<code>CALVIN_IMAGE_TAG</code>) is the version that matters,
+and <code>setup.sh</code> sets it from the same tag.</p>
+<h2 id="what-the-install-does">What the install does<a class="headerlink" href="#what-the-install-does" title="Permanent link">&para;</a></h2>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Pi                                         Calvin server
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>──                                         ─────────────
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>install-kiosk.sh (over SSH, piped  ◀──── GET /api/kiosks/install.sh  (server URL baked in)
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  from the server, or on the card)
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  ├─ store key → /etc/default/calvin-kiosk-signing (0600)
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  ├─ fetch manifest, verify HMAC     ◀──── GET /api/kiosks/agent/manifest (signed)
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  ├─ fetch setup scripts, check sha  ◀──── GET /api/kiosks/installer/setup-{kiosk,common}.sh
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>  └─ setup-kiosk.sh
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>       ├─ apt: cog (WPE WebKit) + the X11/Chromium fallback packages, sudo
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>       │       (+ labwc, wlr-randr, wlopm on the opt-in Wayland stack)
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>       ├─ /etc/default/calvin-kiosk (server URL, kiosk id, hostname,
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>       │                            display stack; other keys kept)
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>       └─ update-kiosk.sh --bootstrap ◀─── GET /api/kiosks/agent/files/*  (verified)
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>            └─ display agent + calvin-cog (or calvin-x / calvin-wayland) + calvin-display-agent units
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>reboot → cog shows Calvin; the agent polls /api/kiosks/&lt;id&gt;/config → listed in Settings → Screens
+</span></code></pre></div>
+<p><strong>Trust boundary:</strong> with a key, every file after the installer is verified against the
+server's signature: the setup scripts, the kiosk agent, and every later update. The
+installer itself must come over a trusted channel: SSH from the server (Option A,
+signed), or your own checkout (Option B). The quick <code>curl | bash</code> form trusts whatever
+answers on your LAN, so use it without a key.</p>
+<h2 id="pi-3-and-gpu">Pi 3 and GPU<a class="headerlink" href="#pi-3-and-gpu" title="Permanent link">&para;</a></h2>
+<p>Pi 3-class boards (Broadcom <strong>VC4</strong>, OpenGL ES 2.0 through Mesa) cannot run
+Chromium's GPU path: the dashboard's renderer crashes within seconds with
+<strong>"Aw, Snap! error 11"</strong> and the tab reloads forever. <code>--disable-gpu</code> makes the
+same page load and stay up, so the installers add that flag on those boards — and
+only there. Pi 4/5 have a working GPU path and keep it. This covers both
+deployment shapes: the remote kiosk installer (<code>setup-kiosk.sh</code>) and the
+all-in-one install (<code>setup.sh</code>). It only matters when a kiosk runs Chromium (the
+X11/Wayland fallback); the cog default does not run Chromium at all.</p>
+<table>
+<thead>
+<tr>
+<th>Board (<code>/proc/device-tree/model</code>)</th>
+<th><code>CALVIN_CHROMIUM_GPU=auto</code> (the default)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Raspberry Pi 3 / 3B / 3B+, Zero 2 W, Compute Module 3</td>
+<td><code>--disable-gpu</code></td>
+</tr>
+<tr>
+<td>Raspberry Pi 4, Pi 5, Compute Module 4/5</td>
+<td>GPU path on, no extra flag</td>
+</tr>
+<tr>
+<td>anything else (unknown board, no device tree)</td>
+<td>GPU path on, no extra flag</td>
+</tr>
+</tbody>
+</table>
+<p>The flag lands in <code>CALVIN_CHROMIUM_DISPLAY_FLAGS</code> in
+<code>/etc/default/calvin-kiosk-display</code>, which both kiosk units pass to Chromium
+(<code>calvin-kiosk-remote.service</code> on a kiosk, <code>calvin-kiosk.service</code> on an
+all-in-one install), so it applies to both stacks (Wayland keeps
+<code>--ozone-platform=wayland</code> and the GPU flag follows it). The installer and an
+update (a kiosk <strong>Update</strong> on a remote kiosk, <code>update-calvin.sh</code> on an all-in-one
+install) recompute that line from the board instead of appending to it, so
+re-running never duplicates it.</p>
+<h3 id="override-it">Override it<a class="headerlink" href="#override-it" title="Permanent link">&para;</a></h3>
+<p>Set <code>CALVIN_CHROMIUM_GPU</code> in the file the other kiosk settings live in:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>sudo<span class="w"> </span>nano<span class="w"> </span>/etc/default/calvin-kiosk
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># CALVIN_CHROMIUM_GPU=auto   # default: decide from the board</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># CALVIN_CHROMIUM_GPU=on     # never add --disable-gpu</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># CALVIN_CHROMIUM_GPU=off    # always add --disable-gpu</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>restart<span class="w"> </span>calvin-kiosk-remote<span class="w">   </span><span class="c1"># or calvin-kiosk on an all-in-one install</span>
+</span></code></pre></div>
+<p>The installer and the updater read it on their next run; an exported
+<code>CALVIN_CHROMIUM_GPU</code> at install time wins over the file. Use <code>off</code> on a board
+that is not detected and still crashes, and <code>on</code> only to test a newer
+Chromium/Mesa that may have fixed it. Narrower flags that keep compositing (for
+example <code>--disable-gpu-rasterization</code>) are being measured on hardware in bead
+<code>calvin-8by7</code>.</p>
+<h3 id="crash-page-recovery">Crash-page recovery<a class="headerlink" href="#crash-page-recovery" title="Permanent link">&para;</a></h3>
+<p>The GPU flag removes the common cause, but a renderer can still die (memory
+pressure, an OOM kill). When only the renderer dies, Chromium's browser process
+stays up, so the kiosk unit's <code>Restart=always</code> never fires and the screen keeps
+showing "Aw, Snap!". Nothing inside that page can reload itself.</p>
+<p><code>calvin-display-agent.service</code> (already installed on every kiosk) therefore acts
+as a watchdog: every 30 s it asks Chromium, over the Chrome DevTools Protocol on
+<code>127.0.0.1:9222</code>, whether the dashboard page answers a trivial script. After
+three consecutive failures it restarts the kiosk unit — the browser start-up
+path the kiosk already has: a fresh browser, a fresh page, the same backend.
+This covers the X11 and Wayland stacks (it talks to Chromium, not to X11 or
+Wayland); on cog, recovery is cog's own <code>--webprocess-failure=restart</code>.</p>
+<p>Chromium runs with its <strong>own profile</strong>, not the account's default one:
+<code>--user-data-dir=/home/calvin/.config/calvin-kiosk-chromium</code>. That is required —
+Chromium 136 and later (Raspberry Pi OS Trixie ships 156) ignore the debugging
+port when it runs on the default profile, which would silently disable recovery.
+The profile holds only Chromium state and its cache (the unit clears <code>Cache</code> and
+<code>Code Cache</code> there at start-up); Calvin's own data comes from the server. FULL
+(all-in-one) installs are covered too: <code>calvin-kiosk.service</code> passes the same
+flags, and the same agent watches it.</p>
+<p>It fails safe. If nothing that is Chromium answers on the port — recovery
+disabled, an older unit file without the flag, or a Chromium that ignores it —
+the agent logs <code>crash recovery is idle</code> once and restarts nothing: an
+<code>unreachable</code> probe never triggers a restart. Once the endpoint answers as
+Chromium, however, a page that probes dead counts as crashed <strong>even if it was
+never seen alive</strong> (the renderer can die during the first load, leaving an empty
+target list), and a probe or two of endpoint flapping does not discard that
+evidence. Repeated restarts back off (300 s, 600 s, 900 s …) up to
+<code>CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX</code> (15 min by default), each restart after the
+first is logged as a <code>crash loop</code>, and a healthy page resets that.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>calvin-display-agent<span class="w"> </span>-f<span class="w">            </span><span class="c1"># watchdog lines</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>curl<span class="w"> </span>-s<span class="w"> </span>http://127.0.0.1:9222/json/list<span class="w">          </span><span class="c1"># what the agent probes</span>
+</span></code></pre></div>
+<p>The debugging port is loopback-only (<code>--remote-debugging-address=127.0.0.1</code>) and
+exists only for this probe. Settings live in <code>/etc/default/calvin-kiosk</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CALVIN_KIOSK_WATCHDOG</code></td>
+<td><code>1</code></td>
+<td><code>0</code>/<code>off</code> turns recovery off (the browser is then left alone)</td>
+</tr>
+<tr>
+<td><code>CALVIN_KIOSK_CDP_PORT</code></td>
+<td><code>9222</code></td>
+<td>loopback DevTools port; the unit and the agent must agree</td>
+</tr>
+<tr>
+<td><code>CALVIN_KIOSK_WATCHDOG_SECONDS</code></td>
+<td><code>30</code></td>
+<td>seconds between probes (minimum 5)</td>
+</tr>
+<tr>
+<td><code>CALVIN_KIOSK_WATCHDOG_FAILURES</code></td>
+<td><code>3</code></td>
+<td>consecutive failed probes before a restart</td>
+</tr>
+<tr>
+<td><code>CALVIN_KIOSK_WATCHDOG_COOLDOWN</code></td>
+<td><code>300</code></td>
+<td>seconds before the first, and after a recovered, restart</td>
+</tr>
+<tr>
+<td><code>CALVIN_KIOSK_WATCHDOG_BACKOFF_MAX</code></td>
+<td><code>900</code></td>
+<td>cap for the doubling wait between repeated restarts (15 min)</td>
+</tr>
+</tbody>
+</table>
+<p><code>sudo systemctl restart calvin-display-agent</code> applies a change. Two guards keep
+the watchdog out of the way: it never touches a unit that is not running (systemd
+owns that case) or one that started less than two minutes ago.</p>
+<h2 id="display-stack-cog-default-everywhere-wayland-opt-in">Display stack (cog default everywhere, Wayland opt-in)<a class="headerlink" href="#display-stack-cog-default-everywhere-wayland-opt-in" title="Permanent link">&para;</a></h2>
+<p>A kiosk installs <strong>cog</strong> (WPE WebKit directly on DRM/KMS) by default on <strong>every
+board</strong> — no X server, no compositor, no Chromium. This is the owner decision of
+2026-10-31 after cog passed boot/reboot, rotation, screen off/on, real sites and a
+60 minute soak on both a Pi 3B+ and a Pi 400 (cog ~67 MB + WPE ~273 MB, CPU ~94 %
+idle). See <a href="../../research/2026-10-29-kiosk-cog/">../research/2026-10-29-kiosk-cog.md</a>.</p>
+<p><strong>X11 + Chromium stays available as the fallback</strong> for a site WPE cannot show
+(native <code>&lt;select&gt;</code> dropdowns are the known one, see the limitations below);
+<strong>Wayland + labwc</strong> is opt-in and still experimental. Both alternate stacks stay
+installed, so switching is an installer re-run — <strong>not</strong> a re-flash. Your server
+URL, kiosk id, hostname, signing key and display settings are kept.</p>
+<p>Every board follows the same rule: a fresh install selects cog. An existing
+kiosk keeps the stack recorded in <code>/etc/default/calvin-kiosk</code> — the default does
+not silently migrate an X11 kiosk — and you switch it with an explicit
+<code>--display-stack</code> (see <a href="#switch-an-existing-kiosk">Switch an existing kiosk</a>).
+FULL (all-in-one) installs (<code>scripts/setup.sh</code>, which also runs the server)
+follow the same rule: a fresh install selects cog, <code>--display-stack</code> wins, and a
+re-run keeps the recorded stack (an all-in-one Pi from before the setting
+existed stays X11). Switch one with <code>sudo bash setup.sh --display-stack &lt;stack&gt;</code>.</p>
+<h3 id="choose-wayland-on-a-fresh-install-opt-in-experimental">Choose Wayland on a fresh install (opt-in, experimental)<a class="headerlink" href="#choose-wayland-on-a-fresh-install-opt-in-experimental" title="Permanent link">&para;</a></h3>
+<p>Wayland is a phase-1 pilot tracked in bead <code>calvin-8by7</code>; see the design notes in
+<a href="../../research/2026-10-29-kiosk-wayland/">../research/2026-10-29-kiosk-wayland.md</a>.
+It is not the default on any board.</p>
+<p>Add <code>--display-stack wayland</code> to the installer:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>http://tower:8000/api/kiosks/install.sh<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--display-stack<span class="w"> </span>wayland
+</span></code></pre></div>
+<p>For a signed install, add the flag to the SSH form from Option A:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>ssh<span class="w"> </span>-t<span class="w"> </span><span class="nv">$PI</span><span class="w"> </span><span class="s2">&quot;sudo bash install-kiosk.sh --backend-url http://</span><span class="nv">$SERVER</span><span class="s2">:8000 \</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="s2">  --signing-key-file calvin.key --display-stack wayland --no-reboot \</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="s2">  &amp;&amp; rm calvin.key &amp;&amp; sudo reboot&quot;</span>
+</span></code></pre></div>
+<p>Wayland installs <code>labwc</code>, <code>wlr-randr</code>, <code>wlopm</code> and <code>wtype</code> <strong>in addition to</strong> the X11
+packages, writes <code>~/.config/labwc/autostart</code> and <code>rc.xml</code>, and enables
+<code>calvin-wayland.service</code> instead of <code>calvin-x.service</code>. Chromium runs with the same
+kiosk flags plus <code>--ozone-platform=wayland</code>.</p>
+<h3 id="cog-the-default-on-every-board">cog (the default on every board)<a class="headerlink" href="#cog-the-default-on-every-board" title="Permanent link">&para;</a></h3>
+<p>A fresh install reads <code>/proc/device-tree/model</code> only for the Chromium GPU flags;
+the stack itself is <strong>cog on every board</strong> — no flag needed. To be explicit, or
+to move an existing kiosk, add <code>--display-stack cog</code>:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>http://tower:8000/api/kiosks/install.sh<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>bash<span class="w"> </span>-s<span class="w"> </span>--<span class="w"> </span>--display-stack<span class="w"> </span>cog
+</span></code></pre></div>
+<p>It installs the <code>cog</code> package (WPE WebKit; Debian's <code>libwpewebkit-2.0-1</code> on
+Trixie) <strong>in addition to</strong> the X11 packages, writes
+<code>/etc/default/calvin-kiosk-display</code> and <code>/etc/default/calvin-kiosk-cog</code>, and
+enables <code>calvin-cog.service</code> instead of <code>calvin-x.service</code> /
+<code>calvin-wayland.service</code>. Chromium (<code>calvin-kiosk-remote.service</code>) is disabled on
+this stack: there is no X or Wayland session for it, and it would fight cog for
+the panel.</p>
+<p>cog runs as the <code>calvin</code> user with <code>video</code>, <code>render</code> and <code>input</code> groups, on tty1
+like <code>calvin-x.service</code> but <strong>without</strong> a PAM/logind session (<code>PAMName=login</code>
+makes cog trap with SIGTRAP on the Pi 3B+). As the first DRM client it becomes
+DRM master by opening <code>/dev/dri/card0</code>, and systemd gives the unit its own
+<code>XDG_RUNTIME_DIR</code> (<code>/run/calvin-cog</code>). It is launched as:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>cog<span class="w"> </span>--platform<span class="o">=</span>drm<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">    </span>--platform-params<span class="o">=</span><span class="nv">renderer</span><span class="o">=</span>gles,rotation<span class="o">=</span>N<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">    </span>--webprocess-failure<span class="o">=</span>restart<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="s2">&quot;http://tower:8000/?kiosk=...&quot;</span>
+</span></code></pre></div>
+<ul>
+<li><strong>Rotation</strong> comes from the Screens display setting. The display agent maps
+  Calvin's xrandr names to cog's counter-clockwise quarter turns:
+  <code>normal</code> → <code>0</code>, <code>left</code> (90° CCW) → <code>1</code>, <code>inverted</code> → <code>2</code>, <code>right</code> → <code>3</code>.
+  It persists the value in <code>/etc/default/calvin-kiosk-cog</code> and restarts
+  <code>calvin-cog.service</code> when it changes (rotation is a cog startup property).
+  The <code>renderer=gles</code> part is required: cog's default <code>modeset</code> renderer cannot
+  rotate.</li>
+<li><strong>Screen power</strong> (display schedule) works: cog is the only DRM client, so the
+  agent's root helper stops <code>calvin-cog.service</code>, waits up to 5 s for its
+  <code>MainPID</code> to disappear (the kernel restores the console mode when the last DRM
+  client closes, which would otherwise turn DPMS back on), clears tty1, then
+  writes <code>0</code> and <code>4</code> to <code>/sys/class/graphics/fb0/blank</code> (DPMS off), verifies the
+  connected connectors report <code>dpms=Off</code> and retries the <code>0</code>/<code>4</code> pair once
+  before failing, so the agent retries on its next poll. On wake it clears tty1,
+  writes <code>0</code> and starts the unit again (the dashboard is back in ~5 s).
+  Starting is idempotent, and a
+  kiosk that boots inside its off window recovers at the next on boundary: the
+  agent retries a panel command that failed (for example while the unit was
+  still transitioning) on its next poll instead of waiting for the next schedule
+  change. The agent polls its config every <code>CALVIN_DISPLAY_REFRESH_SECONDS</code>
+  (default 60, override in <code>/etc/default/calvin-kiosk</code>) and also wakes at each
+  schedule boundary, so a schedule edit made in Settings reaches the panel
+  within about a minute. cog aborts on SIGTERM
+  (SIGSEGV as root, SIGABRT as <code>calvin</code>), so the unit lists both in
+  <code>SuccessExitStatus</code> and a scheduled screen-off does not leave it <code>failed</code>. The
+  helper (<code>/usr/local/bin/calvin-cog-panel.sh</code>) is the only thing <code>calvin</code> may
+  run through a sudoers drop-in.</li>
+<li><strong>Crash recovery</strong> is cog's own <code>--webprocess-failure=restart</code>; the Chromium
+  DevTools watchdog does not run on this stack. A hung page still recovers through
+  <code>Restart=always</code> when cog exits.</li>
+</ul>
+<h3 id="switch-an-existing-kiosk">Switch an existing kiosk<a class="headerlink" href="#switch-an-existing-kiosk" title="Permanent link">&para;</a></h3>
+<p>Re-run the installer on the Pi with the other stack. Everything else is preserved.
+An existing kiosk is <strong>not</strong> migrated by the new default: it keeps the stack in
+<code>/etc/default/calvin-kiosk</code> until you pass a flag.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># X11 -&gt; cog (what the default does on a fresh install)</span>
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>curl<span class="w"> </span>-fsSL<span class="w"> </span>http://tower:8000/api/kiosks/install.sh<span class="w"> </span>-o<span class="w"> </span>/tmp/install-kiosk.sh
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>sudo<span class="w"> </span>bash<span class="w"> </span>/tmp/install-kiosk.sh<span class="w"> </span>--display-stack<span class="w"> </span>cog
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="c1"># cog -&gt; X11/Chromium, or -&gt; Wayland</span>
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>sudo<span class="w"> </span>bash<span class="w"> </span>/tmp/install-kiosk.sh<span class="w"> </span>--display-stack<span class="w"> </span>x11
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>sudo<span class="w"> </span>bash<span class="w"> </span>/tmp/install-kiosk.sh<span class="w"> </span>--display-stack<span class="w"> </span>wayland
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>
+</span><span id="__span-11-9"><a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="c1"># From a server checkout over SSH (signed installs use the stored key)</span>
+</span><span id="__span-11-10"><a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>ssh<span class="w"> </span>-t<span class="w"> </span><span class="nv">$PI</span><span class="w"> </span><span class="s2">&quot;sudo bash /tmp/install-kiosk.sh --display-stack cog&quot;</span>
+</span></code></pre></div>
+<p>The installer disables the other display units, enables the chosen one (and
+disables Chromium on cog), rewrites <code>/etc/default/calvin-kiosk-display</code> for the
+new session, and reboots. Re-running it twice is harmless.</p>
+<h3 id="roll-back-to-x11">Roll back to X11<a class="headerlink" href="#roll-back-to-x11" title="Permanent link">&para;</a></h3>
+<p>The same command with <code>x11</code> — every package set is still on the Pi:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>/tmp/install-kiosk.sh<span class="w"> </span>--display-stack<span class="w"> </span>x11
+</span></code></pre></div>
+<p>This re-enables <code>calvin-x.service</code> and Chromium and disables <code>calvin-cog.service</code>
+(and the Wayland compositor). Chromium and cog were both left installed, so it is
+a service switch, not a re-image; <code>sudo apt remove cog</code> only frees space.</p>
+<h3 id="choosing-without-a-flag">Choosing without a flag<a class="headerlink" href="#choosing-without-a-flag" title="Permanent link">&para;</a></h3>
+<p>The stack comes from, in order: the <code>--display-stack</code> flag, an exported
+<code>CALVIN_DISPLAY_STACK</code>, the value already in <code>/etc/default/calvin-kiosk</code>
+(<code>auto</code>, <code>x11</code>, <code>wayland</code>, <code>cog</code>), then <code>auto</code>. <code>auto</code> means <strong>cog on every
+board</strong>; only an explicit <code>x11</code> selects Chromium and only an explicit <code>wayland</code>
+selects labwc.</p>
+<p>The installer records the resolved stack in <code>/etc/default/calvin-kiosk</code>, so a
+re-run with no flag keeps the stack an existing kiosk already has — an existing
+X11 kiosk does not jump to cog. Kiosks installed before the setting existed have
+no stored stack; they also stay on X11 and only move with an explicit flag. To
+switch, pass it (<code>--display-stack x11</code> to go back to Chromium, <code>cog</code> or
+<code>wayland</code> to move).</p>
+<h3 id="known-limitations-in-phase-1">Known limitations in phase 1<a class="headerlink" href="#known-limitations-in-phase-1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>OS:</strong> validated on <strong>Raspberry Pi OS Trixie (Lite, 64-bit)</strong> only. Bookworm
+  ships an older labwc and no <code>wlopm</code>, so the installer warns and panel power will
+  not work there.</li>
+<li><strong>Hardware:</strong> cog is the default on every board. It was verified end to end on
+  the owner's Pi 3B+ and Pi 400 (install, rotation via the agent, screen off/on,
+  reboot, real sites, 60 min soak). If anything misbehaves,
+  <code>--display-stack x11</code> switches back to Chromium in place.</li>
+<li><strong>Cursor:</strong> labwc has no idle-hide. <code>rc.xml</code> binds <code>HideCursor</code> + <code>WarpCursor</code> and
+  the autostart fires it once; the pointer reappears on pointer/touch input.</li>
+<li><strong>Rotation:</strong> on Wayland the agent uses <code>wlr-randr --transform</code>, which counts
+  counter-clockwise (<code>left</code> -&gt; <code>90</code>, <code>inverted</code> -&gt; <code>180</code>, <code>right</code> -&gt; <code>270</code>). Verify
+  it on the panel.</li>
+<li><strong>Panel power:</strong> on Wayland, <code>wlopm --off/--on</code>, with <code>wlr-randr --on</code> as the wake
+  fallback. A monitor that fakes a hotplug can still wake; <code>autoEnableOutputs</code> is
+  off in <code>rc.xml</code>. On cog, the framebuffer-blank path below is used.</li>
+<li><strong>Fullscreen/mode:</strong> output names differ (<code>HDMI-1</code> -&gt; <code>HDMI-A-1</code>); the agent accepts
+  both and auto-detects the first connected output.</li>
+<li><strong>Remote update:</strong> a bundle update installs the Wayland unit and labwc config but
+  never switches the stack or enables the other compositor. Switching is always an
+  explicit installer run.</li>
+<li>FULL installs (<code>scripts/setup.sh</code>) take the same <code>--display-stack</code> values and the
+  same default (cog); the backend display services are unchanged.</li>
+</ul>
+<h3 id="known-limitations-of-cog">Known limitations of cog<a class="headerlink" href="#known-limitations-of-cog" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>OS/hardware:</strong> validated on <strong>Raspberry Pi OS Trixie (Lite, 64-bit)</strong> with a
+  <strong>Pi 3B+</strong> and a <strong>Pi 400</strong> (boot/reboot, rotation, screen off/on, real sites,
+  60 min soak). Debian's <code>cog</code>/WPE packaging is older than Trixie's on Bookworm, so
+  the installer warns there.</li>
+<li><strong>Native <code>&lt;select&gt;</code> dropdowns do not open</strong> under cog's DRM backend (upstream
+  issues #793/#503). Configure such settings from a phone/desktop; the rest of the
+  dashboard and Settings work.</li>
+<li><strong>Rotation needs a restart</strong> (cog has no runtime rotation API) — the agent
+  restarts the unit, so the screen blanks for a few seconds.</li>
+<li><strong>Screen power</strong> is the framebuffer-blank path; HDMI-CEC (<code>cec-ctl</code>) is not used
+  by the agent. A monitor that ignores DPMS stays lit.</li>
+<li><strong>Touch capability</strong> may not reach the page under cog; set <code>touchControls</code> and
+  <code>onScreenKeyboard</code> to <code>on</code> for the kiosk if the on-screen keyboard does not
+  appear automatically.</li>
+<li><strong>Security horizon:</strong> Debian's <code>wpewebkit</code> on Trixie lags Chromium's patches (see
+  the research doc §1.3). Keep Pi 3-class kiosks on trusted networks; an explicit
+  <code>--display-stack x11</code> returns that board to Chromium.</li>
+</ul>
+<h2 id="updating-a-kiosk-later">Updating a kiosk later<a class="headerlink" href="#updating-a-kiosk-later" title="Permanent link">&para;</a></h2>
+<p>Use <strong>Settings → Screens → Update</strong> for that kiosk. The Pi pulls the new agent from the
+server, verifies it, swaps it in, and rolls back if it doesn't come up healthy. See
+<a href="../KIOSK_PROVISIONING/#kiosk-agent-self-update">Kiosk agent self-update</a>. To pick up a new
+Calvin version, update the server container; the kiosk follows when you press Update.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The installer can't reach the server:</strong> check the URL from the Pi with
+  <code>curl http://&lt;server&gt;:8000/api/health</code>.</li>
+<li><strong>"manifest signature invalid":</strong> the key doesn't match this server. Re-copy
+  <code>kiosk-signing.key</code>. A server that lost its data volume generates a new key, and then
+  every kiosk needs the new one.</li>
+<li><strong>"server manifest lists no installer files":</strong> the server is older than this installer.
+  Update the server container.</li>
+<li><strong>Install log:</strong> <code>/var/log/calvin-setup.log</code>. For a baked card, run
+  <code>journalctl -u calvin-kiosk-firstboot</code> (<code>ssh calvin-admin@&lt;kiosk&gt;</code> with the baked key).</li>
+<li><strong>Kiosk missing from Settings → Screens:</strong> <code>systemctl status calvin-display-agent</code> on the Pi.</li>
+<li><strong>Wrong server later:</strong> edit <code>CALVIN_BACKEND_URL</code> in <code>/etc/default/calvin-kiosk</code>, then
+  <code>sudo systemctl restart calvin-kiosk-remote calvin-display-agent</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

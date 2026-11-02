@@ -1,0 +1,3115 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/research/2026-10-29-kiosk-cog/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>WPE WebKit + cog as the Pi 3 kiosk browser - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wpe-webkit-cog-as-the-pi-3-kiosk-browser" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              WPE WebKit + cog as the Pi 3 kiosk browser
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Packaging
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Packaging">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-what-is-in-debian-13-trixie-arm64" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 What is in Debian 13 (trixie) arm64
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-what-is-in-the-raspberry-pi-archive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 What is in the Raspberry Pi archive
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-version-and-security-horizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Version and security horizon
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-platforms-drmkms-vs-wayland" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Platforms: DRM/KMS vs Wayland
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Platforms: DRM/KMS vs Wayland">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-drmkms-no-compositor-the-interesting-variant" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 DRM/KMS, no compositor (the interesting variant)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-wayland-labwc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Wayland (labwc)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-which-needs-what-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Which needs what — summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-kiosk-needs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Kiosk needs
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-calvin-frontend-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Calvin frontend compatibility
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Calvin frontend compatibility">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Results
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-webkit-specific-issues-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 WebKit-specific issues found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-what-this-run-does-and-does-not-prove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 What this run does and does not prove
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-memory-measured-and-why-it-is-not-a-pi-number" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Memory, measured — and why it is not a Pi number
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-on-pi-test-plan-coordinator-over-ssh" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. On-Pi test plan (coordinator, over SSH)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. On-Pi test plan (coordinator, over SSH)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-baseline-first-chromium-current-stack" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 Baseline first (Chromium, current stack)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-install-cog-chromium-untouched" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 Install cog (Chromium untouched)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-first-run-by-hand-drm-no-unit-yet" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 First run by hand (DRM, no unit yet)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-variant-a-drmkms-unit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.4 Variant A — DRM/KMS unit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-variant-b-cog-on-labwc-keeps-wlopm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.5 Variant B — cog on labwc (keeps wlopm)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#56-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.6 Measurements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#57-panel-checks-someone-at-the-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.7 Panel checks (someone at the screen)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#58-soak-and-acceptance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.8 Soak and acceptance
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#59-rollback" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.9 Rollback
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-open-questions-explicitly-unverified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Open questions / explicitly UNVERIFIED
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="wpe-webkit-cog-as-the-pi-3-kiosk-browser">WPE WebKit + cog as the Pi 3 kiosk browser<a class="headerlink" href="#wpe-webkit-cog-as-the-pi-3-kiosk-browser" title="Permanent link">&para;</a></h1>
+<p><strong>Research date:</strong> 2026-10-29
+<strong>Bead:</strong> <code>calvin-8by7</code> (test matrix; not closed by this document)
+<strong>Scope:</strong> desk research plus an on-host WebKit compatibility run. No product
+code, scripts, units or services were changed. Nothing was installed on, or
+measured against, a real Raspberry Pi.</p>
+<p><strong>Status (2026-10-31): implemented as the kiosk default on EVERY board.</strong>
+<code>auto</code> in the kiosk installer now resolves to <code>cog</code> everywhere; only an explicit
+<code>--display-stack x11</code> selects Chromium and only an explicit <code>wayland</code> selects
+labwc. An explicit <code>--display-stack x11|wayland|cog</code> always wins over <code>auto</code>, and
+a re-run keeps an existing kiosk's recorded stack (existing X11 kiosks are not
+migrated silently). Owner decision after on-hardware verification on a <strong>Pi 3B+</strong>
+and a <strong>Pi 400</strong>: install, boot/reboot, rotation via the display agent, screen
+off/on, real sites in WPE and a <strong>60 min soak</strong> (cog ~67 MB + WPE ~273 MB, CPU
+~94 % idle). The A/B numbers in §5 are still unmeasured, and the caveats below
+(native <code>&lt;select&gt;</code>, WPE security horizon, no runtime rotation API) still apply.</p>
+<h2 id="recommendation">Recommendation<a class="headerlink" href="#recommendation" title="Permanent link">&para;</a></h2>
+<p><strong>Superseded 2026-10-31 by the status above.</strong> This section records the original
+2026-10-29 conclusion and the evidence it rested on; the decision to make cog the
+default on every board was taken later after hardware verification. <strong>Do not
+replace Chromium on the Pi 3B+ yet. Run the A/B in §5 first, and keep Chromium
+as the default until it produces numbers.</strong></p>
+<p>The case for cog is real and better than for any compositor swap: one
+<code>apt install</code> on Trixie Lite gives a DRM/KMS browser with <strong>no X, no Wayland
+compositor, and no Chromium GPU stack</strong> — exactly the three layers that are
+either heavy or broken on the Pi 3 today (<code>calvin-scuh</code>: Chromium 156 must run
+with <code>--disable-gpu</code> because its GPU path crashes the VC4 renderer). WPE's own
+hardware table lists <strong>Raspberry Pi 3 / VideoCore IV / Mesa vc4 / cog <code>drm</code> and
+<code>wl</code></strong> as a validated configuration, Debian trixie ships everything you need,
+and Calvin's frontend boots, renders, opens Settings, registers its service
+worker and types through the on-screen keyboard in a WebKit engine with <strong>zero
+console errors</strong> (§4).</p>
+<p>What holds it back is not compatibility, it is evidence:</p>
+<ol>
+<li><strong>No memory win is proven, and there is a warning sign.</strong> Nobody has
+   published a Pi 3-class cog memory figure. The only number this research
+   produced (§4.5) is from x86_64 and shows <strong>WebKit <em>above</em> Chromium</strong> for the
+   same page (981 MB vs 536 MB summed RSS). Different engine build, different
+   architecture — but it is enough to say "cog is lighter" is an assumption,
+   not a fact.</li>
+<li><strong>Calvin loses two runtime controls.</strong> Under cog-DRM there is no
+   <code>xrandr</code>/<code>wlr-randr</code> and no <code>wlopm</code>: rotation is fixed at cog start
+   (<code>renderer=gles,rotation=N</code>, needs a restart to change) and panel power has
+   no supported path (test <code>vcgencmd display_power</code>; otherwise CEC or the
+   monitor's own schedule). Today's display agent assumes one of those tools.</li>
+<li><strong>A real UI gap upstream:</strong> native <code>&lt;select&gt;</code> dropdowns do not open under
+   cog's DRM backend (upstream issues #793 and #503, both open). Calvin uses
+   <code>&lt;select&gt;</code> in plugin config, the calendar-source form and the update tab
+   (§4.3). The kiosk can still be configured from a phone ("Use your phone"),
+   but Settings-on-the-panel is degraded.</li>
+<li><strong>Maintenance:</strong> Debian trixie's <code>wpewebkit</code> is 2.48.3, and Debian's
+   security tracker currently lists many WebKit CVEs for trixie as
+   <em>vulnerable (no DSA, ignored)</em>, while Raspberry Pi ships a current Chromium.
+   Upstream calls cog a legacy launcher (pre-2.54 API) that new projects should
+   replace with a small WPEPlatform launcher.</li>
+</ol>
+<p><strong>The decision rule:</strong> adopt cog for Pi 3B+ SPLIT only if the §5 A/B shows
+<strong>≥150 MB lower steady-state memory after one hour</strong>, <strong>first paint no worse
+than Chromium's baseline</strong>, and <strong>24 h without an unplanned restart</strong> — and if
+we accept that orientation/panel-power become a restart/<code>vcgencmd</code>/CEC story or
+we move that kiosk to the labwc variant (<code>cog -P wl</code> under labwc keeps
+<code>wlopm</code>). Otherwise stay on Chromium and revisit when Debian 14 ships WPE 2.54
+with the built-in DRM platform.</p>
+<p>For Pi 4/5 this question is much less interesting: they can afford Chromium and
+a compositor, and the Wayland research
+(<a href="../2026-10-29-kiosk-wayland/">2026-10-29-kiosk-wayland.md</a>) already covers
+them.</p>
+<hr />
+<h2 id="1-packaging">1. Packaging<a class="headerlink" href="#1-packaging" title="Permanent link">&para;</a></h2>
+<h3 id="11-what-is-in-debian-13-trixie-arm64">1.1 What is in Debian 13 (trixie) arm64<a class="headerlink" href="#11-what-is-in-debian-13-trixie-arm64" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>trixie arm64</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cog</code></td>
+<td><strong>0.18.4-1+b1</strong> (source 0.18.4-1)</td>
+<td>launcher; ships <code>cog</code>, <code>cogctl</code> and the platform modules</td>
+</tr>
+<tr>
+<td><code>libwpewebkit-2.0-1</code></td>
+<td><strong>2.48.3-1</strong></td>
+<td>the WPE WebKit engine (shared library + web/network processes)</td>
+</tr>
+<tr>
+<td><code>libwpe-1.0-1</code></td>
+<td><strong>1.16.2-1</strong></td>
+<td>legacy embedding library</td>
+</tr>
+<tr>
+<td><code>libwpebackend-fdo-1.0-1</code></td>
+<td><strong>1.16.0-1</strong></td>
+<td>legacy FreeDesktop backend (EGL/GBM buffer export)</td>
+</tr>
+<tr>
+<td><code>wpewebkit-driver</code></td>
+<td><strong>2.48.3-1</strong> (arch <code>all</code>)</td>
+<td>WebDriver, for automated testing</td>
+</tr>
+</tbody>
+</table>
+<p>Versions from Debian <a href="https://api.ftp-master.debian.org/madison?package=cog&amp;table=all">madison</a>
+and <a href="https://packages.debian.org/trixie/cog">packages.debian.org/trixie/cog</a>
+(checked 2026-10-29).</p>
+<p><strong>The DRM/KMS platform plugin is included.</strong> The arm64 file list is:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>/usr/bin/cog
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>/usr/bin/cogctl
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>/usr/lib/aarch64-linux-gnu/cog/modules/libcogplatform-drm.so
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>/usr/lib/aarch64-linux-gnu/cog/modules/libcogplatform-headless.so
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>/usr/lib/aarch64-linux-gnu/cog/modules/libcogplatform-wl.so
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>/usr/lib/aarch64-linux-gnu/libcogcore.so.9.2.7
+</span></code></pre></div>
+<p>(<a href="https://packages.debian.org/trixie/arm64/cog/filelist">file list</a>). That is
+cog's default build set (<code>drm</code>, <code>headless</code>, <code>wayland</code>). There is <strong>no X11
+platform module</strong>, so "cog inside the current X11/openbox kiosk" is not an
+option with Debian's package — cog would need to run on DRM or under Wayland.</p>
+<p>Debian's build of the engine is <code>-DPORT=WPE</code> with the Bubblewrap sandbox on
+(<code>ENABLE_BUBBLEWRAP_SANDBOX=ON</code>) and Skia left at its default per
+<a href="https://sources.debian.org/src/wpewebkit/2.48.3-1/debian/rules/">wpewebkit 2.48.3-1 debian/rules</a>.
+<code>cog</code> itself has only <code>Depends:</code> (no Recommends), so nothing pulls GStreamer
+plugins or fonts for you.</p>
+<h3 id="12-what-is-in-the-raspberry-pi-archive">1.2 What is in the Raspberry Pi archive<a class="headerlink" href="#12-what-is-in-the-raspberry-pi-archive" title="Permanent link">&para;</a></h3>
+<p><strong>Nothing.</strong> <code>http://archive.raspberrypi.com/debian/dists/trixie/main/binary-arm64/Packages.gz</code>
+(1,477 binary packages, fetched 2026-10-29) contains <strong>no <code>cog</code>, <code>wpewebkit</code>,
+<code>libwpe</code> or <code>libwpewebkit</code> package</strong>. The only WPE-named packages are
+<code>gstreamer1.0-wpe</code> and its <code>-dbgsym</code>, which are GStreamer's WPE sink/source
+plugin, not a browser engine — do not confuse the two.</p>
+<p>So on Raspberry Pi OS Trixie the packages come from <strong>Debian's</strong> trixie/arm64
+archive (Debian 13 is what Pi OS Trixie is built on), and Raspberry Pi does not
+test or patch them. Practical consequence: <strong>the Pi gets Debian's 2.48.3, not
+the Raspberry Pi-patched Chromium it gets today</strong>, including Debian's security
+posture (§1.3) and Debian's feature set.</p>
+<h3 id="13-version-and-security-horizon">1.3 Version and security horizon<a class="headerlink" href="#13-version-and-security-horizon" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>cog</code> 0.18.4 is upstream's May 2024 release; trixie's <code>cog</code> saw one binary
+  rebuild (<code>+b1</code>) and nothing else. Debian 14 (forky) and sid carry 0.18.5 with
+  WPE 2.54 — i.e. <strong>cog stays at 0.18.x for trixie's whole life</strong>.</li>
+<li>WPE 2.48's last upstream point release is 2.48.6; trixie has 2.48.3, so any
+  later security fixes have to come from Debian.</li>
+<li>Debian's <a href="https://security-tracker.debian.org/tracker/source-package/wpewebkit">security tracker for wpewebkit</a>
+  shows, for trixie, a large number of WebKit CVEs marked
+  <strong><code>vulnerable (no DSA, ignored)</code></strong> at the time of checking (forky/sid show
+  <code>fixed</code>). That is not a bug in our plan, it is a property of the package; it
+  is the strongest non-technical argument for keeping Chromium, which Raspberry
+  Pi rebuilds regularly.</li>
+<li>Upstream <a href="https://wpewebkit.org/about/faq.html">WPE FAQ</a> calls cog the
+  <em>legacy</em> launcher: "kept for existing deployments, but new projects do not
+  need it". Since 2.54 the DRM/Wayland/headless platforms live inside WPE
+  WebKit itself (<code>WPE_PLATFORM=drm</code>) and a launcher is ~30 lines of C. A future
+  Pi OS (Debian 14) migration will be a small custom launcher, not cog.</li>
+</ul>
+<hr />
+<h2 id="2-platforms-drmkms-vs-wayland">2. Platforms: DRM/KMS vs Wayland<a class="headerlink" href="#2-platforms-drmkms-vs-wayland" title="Permanent link">&para;</a></h2>
+<h3 id="21-drmkms-no-compositor-the-interesting-variant">2.1 DRM/KMS, no compositor (the interesting variant)<a class="headerlink" href="#21-drmkms-no-compositor-the-interesting-variant" title="Permanent link">&para;</a></h3>
+<p><strong>Yes, and it is a supported configuration.</strong> WPE's
+<a href="https://wpewebkit.org/about/supported-hardware.html">supported-hardware table</a>
+lists exactly our target:</p>
+<blockquote>
+<p>Raspberry Pi 3 · VideoCore IV · Mesa vc4 · backend <code>fdo</code> · Cog platforms
+<code>wl, drm, headless</code></p>
+</blockquote>
+<p>The <a href="https://github.com/Igalia/cog/blob/0.18.4/docs/platform-drm.md">DRM platform docs</a>
+add the requirements (WPEBackend-fdo, Wayland <strong>client</strong> libs, GLESv2, libdrm,
+libgbm, libinput, libudev — all pulled in by the package) and the knobs:</p>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>How</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Select the platform</td>
+<td><code>cog --platform=drm</code> (or <code>COG_PLATFORM_NAME=drm</code>)</td>
+</tr>
+<tr>
+<td>Resolution / refresh</td>
+<td><code>COG_PLATFORM_DRM_VIDEO_MODE=1920x1080</code>, <code>COG_PLATFORM_DRM_MODE_MAX=1920x1080@60</code>; default = preferred mode of the first connected output</td>
+</tr>
+<tr>
+<td>Fullscreen</td>
+<td>inherent — there is no window, just a CRTC</td>
+</tr>
+<tr>
+<td>Rotation</td>
+<td><strong>only</strong> with <code>--platform-params=renderer=gles,rotation=1</code> (1 = 90° CCW, 3 = 270°). The default <code>renderer=modeset</code> attaches frames directly and <strong>cannot rotate</strong></td>
+</tr>
+<tr>
+<td>Cursor</td>
+<td><strong>hidden by default</strong>; <code>COG_PLATFORM_DRM_CURSOR=1</code> draws a hardware cursor sprite (and implies pointer events)</td>
+</tr>
+<tr>
+<td>Pointer</td>
+<td>off by default; <code>COG_PLATFORM_DRM_POINTER=1</code> forwards motion/buttons/scroll</td>
+</tr>
+<tr>
+<td>Touch + keyboard</td>
+<td>always forwarded (libinput), independent of the pointer options</td>
+</tr>
+</tbody>
+</table>
+<p>Operational requirements that are easy to miss:</p>
+<ul>
+<li><strong>DRM master + input access.</strong> cog opens the KMS device and calls
+  <code>drmModeSetCrtc</code> (<code>platform/drm/cog-drm-modeset-renderer.c</code>), so it needs to
+  be DRM master; and libinput needs to read <code>/dev/input/event*</code>. On Pi OS Lite
+  the reliable recipe is running the unit as <strong>root</strong>; the alternative (user in
+  <code>video</code> + <code>input</code> groups) depends on no other master existing and on udev
+  <code>/dev/input</code> permissions — <strong>UNVERIFIED on this image</strong>, check with
+  <code>ls -l /dev/dri/card0 /dev/input/event*</code> and <code>id</code>.</li>
+<li><strong>The seat is hard-coded to <code>seat0</code></strong> in 0.18.4
+  (<code>libinput_udev_assign_seat(..., "seat0")</code>, <code>platform/drm/cog-platform-drm.c:1259</code>).
+  Fine on a Pi; would break on a multi-seat setup.</li>
+<li><strong>The kernel console is on the same CRTC.</strong> Stop <code>getty@tty1</code> in the unit
+  (<code>Conflicts=getty@tty1.service</code>) so boot messages and the getty do not flash
+  over/under the page.</li>
+<li><strong>Rotation and touch.</strong> 0.18.1 fixed touch-region dimensions for 90°/270°
+  (<a href="https://github.com/Igalia/cog/blob/0.18.4/NEWS">NEWS</a>) and 0.18.4 tries to
+  set libinput's per-device rotation to match
+  (<code>libinput_device_config_rotation_set_angle</code>, <code>cog-platform-drm.c:1019</code>).
+  Many touch drivers do not support device rotation, in which case the call is
+  skipped; finger positions then have to be checked on the actual panel. On the
+  Pi 3 that means: <strong>test all four orientations with a tap target, not just the
+  picture.</strong></li>
+<li><strong>Rotation is a startup property.</strong> It can be changed at runtime through the
+  <code>CogDrmPlatform:rotation</code> GObject property, but cog exposes no D-Bus action
+  for it, so in practice changing orientation = rewrite the unit's
+  <code>platform-params</code> and <code>systemctl restart</code>. (Calvin's display agent currently
+  rotates with <code>xrandr</code>/<code>wlr-randr</code> at runtime.)</li>
+<li><strong>Known upstream DRM bugs in this release line:</strong> #748 (0.18.4 + DRM + GLES:
+  "Cannot create framebuffer (Bad file descriptor)", fd exhaustion after a few
+  seconds), #794 (open PR: DRM cold start / SHM robustness / cursor fixes for
+  compositor-less boots, i.e. released 0.18 is known to be fragile exactly on
+  "boot straight into cog"). Neither is confirmed on VC4, but both are the same
+  shape of failure we must watch for in the first ten boots.</li>
+</ul>
+<h3 id="22-wayland-labwc">2.2 Wayland (labwc)<a class="headerlink" href="#22-wayland-labwc" title="Permanent link">&para;</a></h3>
+<p>Also supported (<code>-P wl</code>, module present). Requirements from the
+<a href="https://github.com/Igalia/cog/blob/0.18.4/docs/platform-wl.md">wl platform docs</a>:</p>
+<ul>
+<li>compositor running first, with <code>WAYLAND_DISPLAY</code> and <code>XDG_RUNTIME_DIR</code> in the
+  service environment, and access to <code>/dev/dri</code> (render node is enough here);</li>
+<li><code>COG_PLATFORM_WL_VIEW_FULLSCREEN=1</code> for a real fullscreen surface (it is a
+  <em>request</em>; labwc honours it);</li>
+<li>F11 toggles fullscreen — with a USB keyboard attached that can un-fullscreen
+  the kiosk. On a touch-only wall there is no way to press it.</li>
+<li>input, touch and cursor belong to labwc. <strong>Cursor hiding is the same problem
+  as Chromium today</strong> (one-shot <code>HideCursor</code> + <code>WarpCursor</code>, reappears on
+  touch), i.e. worse than cog-DRM, which never draws one.</li>
+<li>rotation is the compositor's job (<code>wlr-randr --transform</code>), so the existing
+  agent code path and <strong><code>wlopm</code> panel power keep working</strong>. That is the main
+  reason to prefer this variant if the panel-power schedule matters.</li>
+<li>cog's own D-Bus control is on the <strong>session</strong> bus by default
+  (<code>cog_dbus_control=user</code>, upstream default; Debian does not flip it, and the
+  package ships no system-bus policy), so <code>cogctl</code> only works when cog runs
+  inside a user session with a session bus — under labwc, if <code>dbus-user-session</code>
+  is installed. <strong>UNVERIFIED on Pi OS Lite</strong>; do not build a watchdog on it.</li>
+</ul>
+<h3 id="23-which-needs-what-summary">2.3 Which needs what — summary<a class="headerlink" href="#23-which-needs-what-summary" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>DRM/KMS (<code>-P drm</code>)</th>
+<th>Wayland (<code>-P wl</code>, labwc)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Compositor</td>
+<td>none</td>
+<td>labwc (existing <code>calvin-wayland.service</code>)</td>
+</tr>
+<tr>
+<td>Extra packages</td>
+<td><code>cog</code> only</td>
+<td><code>cog</code> + labwc stack (already used by the opt-in Wayland install)</td>
+</tr>
+<tr>
+<td>Permissions</td>
+<td>DRM master + <code>/dev/input</code> (root on Lite)</td>
+<td><code>/dev/dri</code> render node; input via compositor</td>
+</tr>
+<tr>
+<td>Seat</td>
+<td>libinput <code>seat0</code>, hard-coded</td>
+<td>compositor's</td>
+</tr>
+<tr>
+<td>Fullscreen</td>
+<td>inherent</td>
+<td><code>COG_PLATFORM_WL_VIEW_FULLSCREEN=1</code></td>
+</tr>
+<tr>
+<td>Cursor</td>
+<td>never drawn (unless enabled)</td>
+<td>compositor cursor; needs the labwc hide hack</td>
+</tr>
+<tr>
+<td>Touch</td>
+<td>libinput → page; rotation via libinput device rotation (driver-dependent)</td>
+<td>wlroots maps touch to output and follows the transform</td>
+</tr>
+<tr>
+<td>Rotation</td>
+<td>start-up only, <code>renderer=gles</code> only</td>
+<td>runtime, <code>wlr-randr</code>, follows compositor</td>
+</tr>
+<tr>
+<td>Panel power</td>
+<td>no supported path (test <code>vcgencmd</code>, CEC)</td>
+<td><code>wlopm</code> (existing agent path)</td>
+</tr>
+<tr>
+<td>Escape hatch used by today's agent</td>
+<td>none</td>
+<td>none (agent is xrandr/wlopm-based, still works)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-kiosk-needs">3. Kiosk needs<a class="headerlink" href="#3-kiosk-needs" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>cog behaviour</th>
+<th>Verdict for Calvin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Fullscreen</strong></td>
+<td>DRM: yes by construction. Wayland: <code>COG_PLATFORM_WL_VIEW_FULLSCREEN=1</code>.</td>
+<td>Good. F11 un-fullscreens on Wayland with a keyboard.</td>
+</tr>
+<tr>
+<td><strong>Fixed URL</strong></td>
+<td>URL argument or <code>COG_URL</code>; no address bar, tabs, or navigation UI. The URL can only be changed at runtime through the session-bus <code>cogctl open</code> (or by restarting).</td>
+<td>Good; also simpler than Chromium's kiosk flags.</td>
+</tr>
+<tr>
+<td><strong>Auto-restart on a crashed page</strong></td>
+<td><code>--webprocess-failure=restart</code>: retries the web process <strong>up to 5 times inside a 1 s window</strong>, then renders cog's built-in "Crash!" / "Out of memory!" page (<code>launcher/cog-launcher.c:350</code>, <code>core/cog-webkit-utils.c</code>). Default is <code>error-page</code>; <code>exit</code>/<code>exit-ok</code> also exist.</td>
+<td>Good <strong>with a watchdog</strong>: the fallback error page has no reload path, so a hung/crashed renderer can sit there forever. Run the unit with <code>Restart=always</code> and add an HTTP health watchdog.</td>
+</tr>
+<tr>
+<td><strong>Cursor hiding</strong></td>
+<td>DRM: no cursor at all unless <code>COG_PLATFORM_DRM_CURSOR</code> is set. Wayland: compositor cursor.</td>
+<td>DRM is better than anything we have today.</td>
+</tr>
+<tr>
+<td><strong>Autoplay video</strong></td>
+<td>WPE 2.48's <code>WebKitSettings:media-playback-requires-user-gesture</code> default is <em>off</em> ("media playback could start automatically", <a href="https://github.com/WebKit/WebKit/blob/webkitglib/2.48/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp">WebKitSettings.cpp, 2.48 branch</a>). It can be pinned with <code>[websettings]</code> in a <code>--config</code> file. Audible-audio policy is a separate WebKit preference; <strong>UNVERIFIED</strong> whether unmuted video autoplays.</td>
+<td>Probably fine for muted loops; test the actual plugin. <strong>Install GStreamer plugins</strong> (<code>gstreamer1.0-plugins-good/bad/libav</code>) — Pi OS Lite has none, and cog's package does not recommend them. VC4 gives no hardware H.264 to GStreamer anyway, so expect software decode.</td>
+</tr>
+<tr>
+<td><strong>Crash reporting</strong></td>
+<td>Everything goes to stderr → journal: platform init, web-process termination reason (<code>CRASHED</code> / <code>EXCEEDED_MEMORY_LIMIT</code>), retry attempts, then the error page. No metrics, no HTTP status. <code>WEBKIT_INSPECTOR_SERVER=0.0.0.0:2999</code> exposes the remote Web Inspector for live console/network checks.</td>
+<td>Adequate if we add a systemd watchdog (cogctl is not reachable from a system unit; use the backend's <code>/api/health</code>).</td>
+</tr>
+<tr>
+<td><strong>Memory on Pi 3-class hardware</strong></td>
+<td><strong>No published measurement found.</strong> What exists: cog issue #65 (2018, Snapdragon 410) shows the three-process model — <code>cog</code> + <code>WPEWebProcess</code> + <code>WPENetworkProcess</code> — and a ~25 MB/hour leak in a canvas page; that issue is still open and is not evidence about 2.48. WPE marketing says "small footprint" but gives no number. §4.5 has this host's measurement and the reason it is not a Pi answer.</td>
+<td><strong>Unknown — this is the go/no-go gate.</strong> Measure in §5.</td>
+</tr>
+</tbody>
+</table>
+<p>Chromium today uses ~600 MB of the Pi's 905 MB (given). If cog lands under
+~450 MB steady-state, the A/B is a win worth taking; if it lands at 600 MB too,
+cog buys nothing but risk.</p>
+<hr />
+<h2 id="4-calvin-frontend-compatibility">4. Calvin frontend compatibility<a class="headerlink" href="#4-calvin-frontend-compatibility" title="Permanent link">&para;</a></h2>
+<h3 id="41-method">4.1 Method<a class="headerlink" href="#41-method" title="Permanent link">&para;</a></h3>
+<p>Built the real frontend and drove it in a WebKit engine on this machine:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">cd</span><span class="w"> </span>frontend
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>npm<span class="w"> </span>ci
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>npm<span class="w"> </span>run<span class="w"> </span>build<span class="w">                     </span><span class="c1"># dist/, 2.06 s, no errors</span>
+</span></code></pre></div>
+<p>Engine: <strong>Playwright 1.59.1's WebKit</strong>, which on Linux is the <strong>WPE MiniBrowser</strong>
+(<code>webkit-2272</code>, <code>navigator.userAgent … Version/26.4 Safari/605.1.15</code>) — i.e. the
+same engine family as cog, one architecture away and <strong>many versions newer than
+Debian trixie's 2.48.3</strong>. It was launched from NixOS' Playwright browser bundle
+(<code>PLAYWRIGHT_BROWSERS_PATH=/nix/store/…-playwright-browsers</code>, via
+<code>playwright-core</code> 1.59.1), so no <code>playwright install</code>/FHS download was needed.</p>
+<p>Serving: a local static server on <code>127.0.0.1:8731</code> for <code>frontend/dist</code> (not
+8000/5173). <strong>No backend was started.</strong> Every <code>/api/**</code> answer is a stub:
+pass A used <code>page.route</code> with service workers blocked; pass B enabled the
+service worker and served the same stub JSON from the local server (a service
+worker's own fetches bypass <code>page.route</code>). Stubs included <code>/api/config</code>
+(<code>onScreenKeyboard: "on"</code>), <code>/api/auth/status</code> (authenticated), empty
+<code>/api/plugins</code>, <code>/api/calendar/*</code>, <code>/api/images/list</code>, <code>/api/kiosks</code>,
+<code>/api/keyboard/mappings</code>.</p>
+<p>A Chromium run through the identical harness was used as the control.</p>
+<h3 id="42-results">4.2 Results<a class="headerlink" href="#42-results" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>WebKit (WPE MiniBrowser 26.4)</th>
+<th>Chromium control</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>App boots, dashboard renders (calendar, photo pane, QR cards)</td>
+<td>✅ 882 ms (local, stub API)</td>
+<td>✅ 719 ms</td>
+</tr>
+<tr>
+<td>Settings opens, all 8 categories, authenticated</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>On-screen keyboard opens on field focus</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>OSK keys type into the field (<code>"" → "abc"</code>, focus retained)</td>
+<td>✅</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Service worker registers, activates, scopes <code>/</code>, caches created</td>
+<td>✅ <code>calvin-shell-*</code>, <code>calvin-assets-*</code>, <code>calvin-api-*</code>; page reloads controlled and boots again</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>Console errors</td>
+<td><strong>none</strong></td>
+<td>none</td>
+</tr>
+<tr>
+<td>Failed requests</td>
+<td><strong>none</strong></td>
+<td>one aborted <code>/api/health</code> on reload (harness)</td>
+</tr>
+<tr>
+<td>Uncaught page errors</td>
+<td>one: <code>ResizeObserver loop completed with undelivered notifications.</code></td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<p>Screenshots (committed with this document):</p>
+<ul>
+<li><a href="../images/webkit-dashboard.png">webkit-dashboard.png</a></li>
+<li><a href="../images/webkit-settings.png">webkit-settings.png</a></li>
+<li><a href="../images/webkit-osk-typed.png">webkit-osk-typed.png</a> — Display name field
+  showing <code>abc</code> typed on the on-screen keyboard</li>
+</ul>
+<p>CSS/JS feature probe (all <code>true</code> unless noted): <code>color-mix()</code>, <code>:has()</code>,
+container queries, <code>dvh</code>, unprefixed <code>backdrop-filter</code>, <code>aspect-ratio</code>,
+<code>subgrid</code>, CSS nesting, <code>oklch()</code>, <code>text-wrap: balance</code>,
+<code>scrollbar-gutter</code>, View Transitions, Popover API, <code>&lt;dialog&gt;</code>,
+<code>navigator.mediaSession</code>, <code>navigator.clipboard</code>, <code>structuredClone</code>,
+<code>crypto.randomUUID</code>, <code>Array.findLast</code>, <code>ResizeObserver</code>,
+<code>IntersectionObserver</code>, <code>PointerEvent</code>, touch events.
+<code>navigator.share</code> is <strong>false</strong> (WPE has no Web Share); the frontend does not use
+it. All of these except Web Share shipped in Safari/WebKit 15.4–18.x, i.e.
+before 2.48 — so 2.48.3 <em>should</em> have them, but that is an inference, not a
+measurement (<strong>UNVERIFIED on 2.48</strong>).</p>
+<h3 id="43-webkit-specific-issues-found">4.3 WebKit-specific issues found<a class="headerlink" href="#43-webkit-specific-issues-found" title="Permanent link">&para;</a></h3>
+<p><strong>A. Native <code>&lt;select&gt;</code> dropdowns do not open under cog's DRM backend.</strong>
+Upstream, open: <a href="https://github.com/Igalia/cog/issues/793">cog #793</a> ("cog with
+DRM backend doesn't support dropdowns", 0.18.5/2.50, reported on a Pi-class
+board) and <a href="https://github.com/Igalia/cog/issues/503">cog #503</a> ("Popup menu not
+opened when selecting HTML select element"). Calvin uses native selects in:</p>
+<ul>
+<li><code>frontend/src/components/PluginFieldRenderer.vue:50</code> and <code>:64</code> — plugin
+  <code>select</code> config fields (any plugin with a choice field),</li>
+<li><code>frontend/src/components/settings/tabs/content/CalendarSourcesTab.vue:15</code> —
+  calendar source type,</li>
+<li><code>frontend/src/components/settings/tabs/system/UpdatesTab.vue:30</code> — update
+  branch.</li>
+</ul>
+<p>Not visible in the Playwright run (that engine renders popups); it is a
+known cog-DRM limitation. On a cog kiosk, those three settings would have to be
+changed from a phone/desktop (Calvin already offers "Use your phone" with a QR
+code) unless we replace native selects with an in-DOM picker.</p>
+<p><strong>B. Touch auto-detection may not fire under cog.</strong> The on-screen keyboard's
+<code>auto</code> mode depends on <code>(any-pointer: coarse)</code> or
+<code>navigator.maxTouchPoints &gt; 0</code> (<code>frontend/src/composables/useTouchCapability.js:32-45</code>,
+and the same signals gate <code>useOnScreenKeyboard</code>). In this headless WPE run
+<code>maxTouchPoints</code> was <strong>0</strong> and <code>any-pointer: coarse</code> did not match even with
+<code>hasTouch: true</code>; the OSK only appeared because the stub config sets
+<code>onScreenKeyboard: "on"</code>. cog's DRM platform forwards libinput touch events but
+what WPE reports to the page is <strong>UNVERIFIED</strong>. <strong>Mitigation:</strong> set
+<code>touchControls: "on"</code> and <code>onScreenKeyboard: "on"</code> (per-kiosk overrides exist)
+for any cog kiosk before trusting touch chrome.</p>
+<p><strong>C. <code>ResizeObserver loop completed with undelivered notifications.</code></strong> is
+raised as a page <em>error</em> in WebKit (Chromium suppresses it). It appeared on
+both passes and only on Settings. Candidates:
+<code>frontend/src/components/settings/shell/CategoryRail.vue:51-52</code> (measure on
+observe; the rail's contents change when a category is selected),
+<code>frontend/src/components/ui/OnScreenKeyboard.vue:135-136</code> (height measurement),
+and <code>frontend/src/composables/useFitClamp.js:90</code>. It is benign — layout settles
+and the screenshots are correct — but it is the one non-clean console signal,
+and on a Pi it would also fire. No action needed unless it ever loops.</p>
+<p><strong>D. Service worker + <code>page.route</code> interaction (harness, not product).</strong> An
+early run produced <code>SyntaxError: The string did not match the expected pattern</code>
+on <code>/api/keyboard/mappings</code> and <code>/api/auth/status</code>. Cause: the page registered
+its service worker, and Playwright routing does not intercept fetches made by a
+service worker, so the worker's network-first fallback got <code>index.html</code> from the
+static server and WebKit's <code>JSON.parse</code> produced that message. Not a WebKit bug
+and not a cog issue; but it is a useful reminder for anyone testing Calvin with
+Playwright WebKit: <strong>block service workers, or serve API stubs from the server,
+not only from <code>page.route</code>.</strong></p>
+<p><strong>E. No other engine-specific problems.</strong> Dialogs, the QR code (canvas),
+the clock bar, the calendar grid, the photo pane, <code>backdrop-filter</code> surfaces,
+the settings search, the keyboard's <code>inert</code>/<code>aria-hidden</code> handling and
+<code>Teleport</code> to <code>body</code> all rendered correctly.</p>
+<p><strong>F. Not exercised (no backend, by design):</strong> SSE (only used for the update log
+stream, <code>frontend/src/composables/useSystem.js:210</code>), plugin iframes, full-size
+photo decoding, video playback, admin sign-in round-trip, and anything that
+touches <code>/api/system/*</code> (stubbed out and never called on a live backend).</p>
+<h3 id="44-what-this-run-does-and-does-not-prove">4.4 What this run does and does not prove<a class="headerlink" href="#44-what-this-run-does-and-does-not-prove" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Proves: the built frontend is engine-portable to WebKit's layout/JS stack; the
+  OSK, router, Pinia stores, service worker and CSS feature set all work without
+  a Chromium-only API.</li>
+<li>Does <strong>not</strong> prove: behaviour on WPE <strong>2.48.3</strong> (⅓ of the version gap in the
+  other direction), VC4 GLES paths, cog's popup handling, libinput touch
+  semantics, JIT/heap behaviour on Cortex-A53, or memory on 1 GB.</li>
+</ul>
+<h3 id="45-memory-measured-and-why-it-is-not-a-pi-number">4.5 Memory, measured — and why it is not a Pi number<a class="headerlink" href="#45-memory-measured-and-why-it-is-not-a-pi-number" title="Permanent link">&para;</a></h3>
+<p>Same built page, same 1280×800 viewport, same stubs, this host (x86_64,
+NixOS), 12 s after load, summing all browser processes:</p>
+<table>
+<thead>
+<tr>
+<th>Engine</th>
+<th>Sum RSS</th>
+<th>Sum PSS</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WPE MiniBrowser (WebKit <strong>26.4</strong>, Skia, headless)</td>
+<td><strong>981 MB</strong></td>
+<td><strong>696 MB</strong></td>
+<td>4 processes; one web/content process at 679 MB RSS / 585 MB PSS</td>
+</tr>
+<tr>
+<td>Chromium (headless shell, same page)</td>
+<td><strong>536 MB</strong></td>
+<td><strong>281 MB</strong></td>
+<td>11 processes</td>
+</tr>
+</tbody>
+</table>
+<p>Blank-page control: WPE 489 MB RSS, Chromium 378 MB. So the engine baseline is
+already heavier here, and the dashboard adds more.</p>
+<p><strong>Do not read this as "cog will use 1 GB on a Pi".</strong> It is a different build of
+a newer engine on a different architecture with different raster settings, and
+PSS on x86 shares a lot of mapped library pages. What it does establish is the
+absence of any evidence that WPE is automatically the leaner engine — which is
+why the Pi measurement in §5 is the actual decision, not this table.</p>
+<hr />
+<h2 id="5-on-pi-test-plan-coordinator-over-ssh">5. On-Pi test plan (coordinator, over SSH)<a class="headerlink" href="#5-on-pi-test-plan-coordinator-over-ssh" title="Permanent link">&para;</a></h2>
+<p>Preconditions: Pi 3B+ on Raspberry Pi OS <strong>Trixie Lite 64-bit</strong>, SPLIT topology,
+working Chromium kiosk, SSH access, panel attached, and a way to see the screen
+(photo is fine). Run as the kiosk user with sudo. Nothing here calls
+<code>/api/system/*</code>; the horizontal checks use <code>curl /api/health</code> only.</p>
+<h3 id="51-baseline-first-chromium-current-stack">5.1 Baseline first (Chromium, current stack)<a class="headerlink" href="#51-baseline-first-chromium-current-stack" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># what is running now</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>systemctl<span class="w"> </span>list-units<span class="w"> </span><span class="s1">&#39;calvin-*&#39;</span><span class="w"> </span>--no-pager
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>free<span class="w"> </span>-m<span class="p">;</span><span class="w"> </span>vcgencmd<span class="w"> </span>measure_temp<span class="p">;</span><span class="w"> </span>vcgencmd<span class="w"> </span>get_throttled
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># memory of the current stack, 10 samples over 5 min</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">10</span><span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s &#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>-Is<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span>free<span class="w"> </span>-m<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;NR==2{printf &quot;used=%sMB avail=%sMB &quot;, $3, $7}&#39;</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span>ps<span class="w"> </span>-eo<span class="w"> </span><span class="nv">rss</span><span class="o">=</span>,comm<span class="o">=</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;/chromium/{s+=$1} END{printf &quot;chromium_rss=%dMB\n&quot;, s/1024}&#39;</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span>sleep<span class="w"> </span><span class="m">30</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>~/baseline-chromium.log
+</span></code></pre></div>
+<p>Also note "cold boot to dashboard" three times (<code>systemd-analyze</code> plus a
+stopwatch on the panel) and <code>curl -s -o /dev/null -w '%{time_starttransfer}\n'
+https://calvin.example.com/api/health</code> for the network baseline.</p>
+<h3 id="52-install-cog-chromium-untouched">5.2 Install cog (Chromium untouched)<a class="headerlink" href="#52-install-cog-chromium-untouched" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sudo<span class="w"> </span>apt<span class="w"> </span>update
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>apt-cache<span class="w"> </span>policy<span class="w"> </span>cog<span class="w"> </span>libwpewebkit-2.0-1
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>sudo<span class="w"> </span>apt-get<span class="w"> </span>-s<span class="w"> </span>install<span class="w"> </span>--no-install-recommends<span class="w"> </span>cog<span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-5<span class="w">   </span><span class="c1"># size preview</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>--no-install-recommends<span class="w"> </span>cog
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="c1"># only if a plugin plays video; Pi OS Lite ships no GStreamer plugins</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>gstreamer1.0-plugins-good<span class="w"> </span>gstreamer1.0-plugins-bad<span class="w"> </span>gstreamer1.0-libav
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>cog<span class="w"> </span>--version<span class="w">                       </span><span class="c1"># expect: cog 0.18.4 (WPE WebKit 2.48.3)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>ls<span class="w"> </span>/usr/lib/*/cog/modules/<span class="w">          </span><span class="c1"># expect: libcogplatform-{drm,headless,wl}.so</span>
+</span></code></pre></div>
+<h3 id="53-first-run-by-hand-drm-no-unit-yet">5.3 First run by hand (DRM, no unit yet)<a class="headerlink" href="#53-first-run-by-hand-drm-no-unit-yet" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>calvin-x.service<span class="w"> </span>calvin-kiosk-remote.service<span class="w"> </span>calvin-display-agent.service
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>stop<span class="w"> </span>getty@tty1.service
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>sudo<span class="w"> </span>cog<span class="w"> </span>--platform<span class="o">=</span>drm<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">     </span>--platform-params<span class="o">=</span><span class="nv">renderer</span><span class="o">=</span>modeset<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">     </span>--webprocess-failure<span class="o">=</span>restart<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">     </span><span class="s1">&#39;https://calvin.example.com/&#39;</span>
+</span></code></pre></div>
+<p>Watch the console for the first 2 minutes. Success = dashboard in &lt;15 s, no
+<code>Cannot create framebuffer</code>, no repeated <code>Renderer process terminated</code>. Then
+<code>Ctrl+C</code> and repeat from a cold boot once you have the unit.</p>
+<h3 id="54-variant-a-drmkms-unit">5.4 Variant A — DRM/KMS unit<a class="headerlink" href="#54-variant-a-drmkms-unit" title="Permanent link">&para;</a></h3>
+<p><code>/etc/systemd/system/calvin-cog.service</code>:</p>
+<div class="language-ini highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[Unit]</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="na">Description</span><span class="o">=</span><span class="s">Calvin kiosk (cog + WPE WebKit, DRM/KMS)</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="na">Wants</span><span class="o">=</span><span class="s">network-online.target</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="na">After</span><span class="o">=</span><span class="s">network-online.target systemd-udev-settle.service</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="na">Conflicts</span><span class="o">=</span><span class="s">getty@tty1.service</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">[Service]</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="na">Type</span><span class="o">=</span><span class="s">simple</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="c1"># Root gives DRM master and /dev/input access on a Lite image.</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="c1"># Alternative: User=calvin, SupplementaryGroups=video input, with no other DRM master.</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="na">Environment</span><span class="o">=</span><span class="s">COG_PLATFORM_DRM_VIDEO_MODE=1920x1080</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a><span class="na">Environment</span><span class="o">=</span><span class="s">COG_PLATFORM_DRM_MODE_MAX=1920x1080@60</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="na">ExecStart</span><span class="o">=</span><span class="s">/usr/bin/cog --platform=drm --platform-params=renderer=modeset </span>\
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="w">          </span><span class="s">--webprocess-failure=restart https://calvin.example.com/</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="na">Restart</span><span class="o">=</span><span class="s">always</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="na">RestartSec</span><span class="o">=</span><span class="s">5</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="na">StandardOutput</span><span class="o">=</span><span class="s">journal</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="na">StandardError</span><span class="o">=</span><span class="s">journal</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a><span class="k">[Install]</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a><span class="na">WantedBy</span><span class="o">=</span><span class="s">graphical.target</span>
+</span></code></pre></div>
+<p>Portrait/180°: replace <code>renderer=modeset</code> with
+<code>renderer=gles,rotation=1</code> (90° CCW) or <code>rotation=3</code> (270°), or <code>rotation=2</code>
+for 180°. Changing orientation needs a unit edit + restart; note that in the
+result.</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>daemon-reload
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>disable<span class="w"> </span>--now<span class="w"> </span>calvin-kiosk-remote.service<span class="w"> </span>calvin-x.service
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>calvin-cog.service
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>calvin-cog<span class="w"> </span>-f
+</span></code></pre></div>
+<h3 id="55-variant-b-cog-on-labwc-keeps-wlopm">5.5 Variant B — cog on labwc (keeps <code>wlopm</code>)<a class="headerlink" href="#55-variant-b-cog-on-labwc-keeps-wlopm" title="Permanent link">&para;</a></h3>
+<p>Use the existing Wayland install (<code>--display-stack wayland</code>, KIOSK_INSTALL.md),
+then replace the Chromium line in <code>~/.config/labwc/autostart</code> with:</p>
+<div class="language-sh highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="nv">COG_PLATFORM_WL_VIEW_FULLSCREEN</span><span class="o">=</span><span class="m">1</span><span class="w"> </span>cog<span class="w"> </span><span class="s1">&#39;https://calvin.example.com/&#39;</span>
+</span></code></pre></div>
+<p>(or a user unit with <code>Environment=WAYLAND_DISPLAY=wayland-0</code>,
+<code>XDG_RUNTIME_DIR=/run/user/1000</code>, <code>COG_PLATFORM_WL_VIEW_FULLSCREEN=1</code>).
+Rotation stays <code>wlr-randr</code>, panel power stays <code>wlopm</code> — the existing agent keeps
+working.</p>
+<h3 id="56-measurements">5.6 Measurements<a class="headerlink" href="#56-measurements" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># memory: PSS of each cog process + system available, every minute for an hour</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">for</span><span class="w"> </span>i<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>seq<span class="w"> </span><span class="m">60</span><span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s &#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>-Is<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span><span class="k">for</span><span class="w"> </span>p<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="k">$(</span>pgrep<span class="w"> </span>-x<span class="w"> </span>cog<span class="k">)</span><span class="w"> </span><span class="k">$(</span>pgrep<span class="w"> </span>-f<span class="w"> </span>WebKitWebProcess<span class="k">)</span><span class="w"> </span><span class="k">$(</span>pgrep<span class="w"> </span>-f<span class="w"> </span>WebKitNetworkProcess<span class="k">)</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span><span class="nb">printf</span><span class="w"> </span><span class="s1">&#39;%s=%sMB &#39;</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>cat<span class="w"> </span>/proc/<span class="nv">$p</span>/comm<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">      </span><span class="s2">&quot;</span><span class="k">$((</span><span class="w"> </span><span class="k">$(</span>awk<span class="w"> </span><span class="s1">&#39;/^Pss:/{print $2}&#39;</span><span class="w"> </span>/proc/<span class="nv">$p</span>/smaps_rollup<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="k">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="m">1024</span><span class="w"> </span><span class="k">))</span><span class="s2">&quot;</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span><span class="k">done</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span>free<span class="w"> </span>-m<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;NR==2{printf &quot;used=%sMB avail=%sMB\n&quot;, $3, $7}&#39;</span>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span>sleep<span class="w"> </span><span class="m">60</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="k">done</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tee<span class="w"> </span>~/cog-mem.log
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="c1"># CPU / temperature / throttling</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>sysstat
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>pidstat<span class="w"> </span>-h<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>pgrep<span class="w"> </span>-x<span class="w"> </span>cog<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">12</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>vmstat<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="m">12</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>vcgencmd<span class="w"> </span>measure_temp<span class="p">;</span><span class="w"> </span>vcgencmd<span class="w"> </span>get_throttled
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>calvin-cog<span class="w"> </span>-p<span class="w"> </span>warning<span class="w"> </span>--since<span class="w"> </span><span class="s1">&#39;-1h&#39;</span><span class="w"> </span>--no-pager
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a><span class="c1"># load time: unit start → first backend request (the server side is the honest clock)</span>
+</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>systemd-analyze<span class="w"> </span>blame<span class="w"> </span><span class="p">|</span><span class="w"> </span>head
+</span><span id="__span-8-21"><a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>systemd-analyze<span class="w"> </span>critical-chain<span class="w"> </span>calvin-cog.service
+</span><span id="__span-8-22"><a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>journalctl<span class="w"> </span>-u<span class="w"> </span>calvin-cog<span class="w"> </span>-o<span class="w"> </span>short-precise<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-20
+</span><span id="__span-8-23"><a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a><span class="c1"># on the Calvin server, at the same moment:</span>
+</span><span id="__span-8-24"><a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a><span class="c1">#   docker logs --since 5m calvin 2&gt;&amp;1 | grep -E &quot;GET /api/(config|health)&quot;</span>
+</span><span id="__span-8-25"><a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>
+</span><span id="__span-8-26"><a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a><span class="c1"># crash drill: kill the renderer and watch recovery</span>
+</span><span id="__span-8-27"><a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>sudo<span class="w"> </span><span class="nb">kill</span><span class="w"> </span>-9<span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>pgrep<span class="w"> </span>-f<span class="w"> </span>WebKitWebProcess<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-1<span class="k">)</span><span class="s2">&quot;</span>
+</span><span id="__span-8-28"><a id="__codelineno-8-28" name="__codelineno-8-28" href="#__codelineno-8-28"></a>sleep<span class="w"> </span><span class="m">5</span><span class="p">;</span><span class="w"> </span>journalctl<span class="w"> </span>-u<span class="w"> </span>calvin-cog<span class="w"> </span>-n<span class="w"> </span><span class="m">20</span><span class="w"> </span>--no-pager
+</span></code></pre></div>
+<h3 id="57-panel-checks-someone-at-the-screen">5.7 Panel checks (someone at the screen)<a class="headerlink" href="#57-panel-checks-someone-at-the-screen" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Dashboard renders; photos rotate; clock bar is right.</li>
+<li>Touch: every region, the hot corner, and a swipe/drag.</li>
+<li>Settings → Display → "Display name": tap the field, type with the on-screen
+   keyboard, confirm the field updates and stays focused.</li>
+<li>Settings → Content Sources → Calendars → "type" dropdown: <strong>expected to fail</strong>
+   under cog DRM (issue #793) — record what happens.</li>
+<li>Rotation: all four orientations, and re-tap the same target after each.</li>
+<li>Cursor: no arrow at rest, none after a tap.</li>
+<li>Panel power: <code>sudo vcgencmd display_power 0</code> then <code>1</code>. If that does nothing
+   under KMS, record it — it means the schedule needs CEC or the monitor's own
+   timer, or this kiosk should use variant B.</li>
+<li>Cold boot 10×: no boot text left on screen, no blank frame that stays.</li>
+</ol>
+<h3 id="58-soak-and-acceptance">5.8 Soak and acceptance<a class="headerlink" href="#58-soak-and-acceptance" title="Permanent link">&para;</a></h3>
+<p>24 h at the dashboard with a 5-minute memory sample (<code>sleep 300</code>), plus
+<code>journalctl -u calvin-cog -p warning</code> and <code>dmesg | grep -iE 'vc4|drm'</code> at the
+end.</p>
+<p><strong>Adopt cog</strong> if all of these hold:</p>
+<ul>
+<li>steady-state PSS (cog + web + network) <strong>&lt; 450 MB</strong> after 1 h, and at least
+  <strong>150 MB below</strong> the Chromium baseline;</li>
+<li>first dashboard paint <strong>no worse than Chromium +10 %</strong>;</li>
+<li>24 h with <strong>no unplanned restart</strong>, no <code>Renderer process terminated</code> storm;</li>
+<li>touch, OSK and rotation verified physically;</li>
+<li>the <code>&lt;select&gt;</code> workaround is acceptable (configure from a phone) or a fix is
+  scheduled;</li>
+<li>panel power has a working path, or that kiosk's schedule is disabled;</li>
+<li>rollback (§5.9) tested once.</li>
+</ul>
+<p><strong>Reject / keep Chromium</strong> on any failed gate, or if memory comes out within
+noise of Chromium — in that case cog costs a second engine, a stale CVE set and
+a lost display-control path for nothing.</p>
+<h3 id="59-rollback">5.9 Rollback<a class="headerlink" href="#59-rollback" title="Permanent link">&para;</a></h3>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span>disable<span class="w"> </span>--now<span class="w"> </span>calvin-cog.service
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>getty@tty1.service
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># X11 stack</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>sudo<span class="w"> </span>systemctl<span class="w"> </span><span class="nb">enable</span><span class="w"> </span>--now<span class="w"> </span>calvin-x.service<span class="w"> </span>calvin-kiosk-remote.service<span class="w"> </span>calvin-display-agent.service
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># or the Wayland stack, if that is what the kiosk had</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="c1"># sudo systemctl enable --now calvin-wayland.service</span>
+</span></code></pre></div>
+<p>Chromium and the X11/labwc packages were never removed, so this is a service
+switch, not a reflash. <code>sudo apt remove cog</code> is optional and only frees space.</p>
+<hr />
+<h2 id="6-risks">6. Risks<a class="headerlink" href="#6-risks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>cog uses as much RAM as Chromium (or more)</td>
+<td>Medium</td>
+<td>No reason to switch</td>
+<td>Measure first (§5); accept/reject on the number</td>
+</tr>
+<tr>
+<td>DRM+GLES hits a VC4 bug similar to Chromium's</td>
+<td>Low–medium</td>
+<td>Black screen / framebuffer errors</td>
+<td>Variant B (Wayland) as fallback; journal the first boot; issue #748 is the signature to watch for</td>
+</tr>
+<tr>
+<td>Touch unreliable (upstream #737/#456)</td>
+<td>Medium</td>
+<td>Kiosk unusable by finger</td>
+<td>Variant A/B test on the real panel; fall back to Chromium</td>
+</tr>
+<tr>
+<td>Rotation needs restart; touch mapping wrong after rotation</td>
+<td>Medium</td>
+<td>Portrait kiosk wrong</td>
+<td><code>renderer=gles,rotation=N</code>; physical tap test in all four orientations</td>
+</tr>
+<tr>
+<td>No panel-power path under DRM</td>
+<td>High</td>
+<td>Night schedule stops working</td>
+<td><code>vcgencmd</code> test; CEC; monitor timer; or variant B with <code>wlopm</code></td>
+</tr>
+<tr>
+<td><code>&lt;select&gt;</code> dropdowns dead on the kiosk</td>
+<td>High (DRM)</td>
+<td>Settings degraded</td>
+<td>Configure from phone; or replace native selects</td>
+</tr>
+<tr>
+<td>Trixie's wpewebkit gets no security updates (tracker: "vulnerable, ignored")</td>
+<td>High</td>
+<td>Long-lived unpatched browser</td>
+<td>cog is the default since 2026-10-31; restrict kiosk network reach, re-check the tracker each Pi OS point release, and switch a kiosk to <code>--display-stack x11</code> if that risk is unacceptable</td>
+</tr>
+<tr>
+<td>cog 0.18 is legacy; Debian 14 moves to WPE 2.54</td>
+<td>Certain eventually</td>
+<td>Launcher rewrite</td>
+<td>Treat cog as a stop-gap; plan a ~30-line WPEPlatform launcher at the next OS cycle</td>
+</tr>
+<tr>
+<td>Second browser engine on the image (+deps)</td>
+<td>Certain</td>
+<td>Disk/SD wear, update surface</td>
+<td><code>--no-install-recommends</code>, remove cog if rejected</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-open-questions-explicitly-unverified">7. Open questions / explicitly UNVERIFIED<a class="headerlink" href="#7-open-questions-explicitly-unverified" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>UNVERIFIED:</strong> cog's memory on a Pi 3B+ (the whole point of §5).</li>
+<li><strong>UNVERIFIED:</strong> whether WPE 2.48.3 in Debian behaves like the 26.4 engine used
+  in §4 for CSS features, service workers and the OSK (near-certain, not proven).</li>
+<li><strong>UNVERIFIED:</strong> whether cog's DRM platform reports touch capability to the
+  page such that <code>(any-pointer: coarse)</code> / <code>maxTouchPoints</code> become non-zero.
+  Assume not; force <code>touchControls</code>/<code>onScreenKeyboard</code> to <code>on</code>.</li>
+<li><strong>UNVERIFIED:</strong> audible autoplay; the WebKit default allows media playback
+  without a gesture, but audio has a separate policy.</li>
+<li><strong>UNVERIFIED:</strong> whether <code>vcgencmd display_power</code> still controls HDMI once cog
+  owns the KMS CRTC on a Pi 3.</li>
+<li><strong>UNVERIFIED:</strong> whether Pi OS Lite's PAM/logind session provides a session bus
+  for <code>cogctl</code> under <code>calvin-wayland.service</code>.</li>
+<li><strong>UNVERIFIED:</strong> the exact installed/download size of <code>cog</code> + <code>libwpewebkit</code>
+  (use <code>apt-get -s install cog</code>).</li>
+<li><strong>UNVERIFIED:</strong> whether <code>cog</code> survives a 24 h VC4 soak; no public report found
+  either way, on any Pi model.</li>
+</ul>
+<hr />
+<h2 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<p>Debian / Raspberry Pi packaging and build:</p>
+<ul>
+<li><a href="https://packages.debian.org/trixie/cog">cog in trixie</a> · <a href="https://packages.debian.org/trixie/arm64/cog/filelist">arm64 file list</a> · <a href="https://api.ftp-master.debian.org/madison?package=cog&amp;table=all">madison versions</a></li>
+<li><a href="https://packages.debian.org/trixie/arm64/libwpewebkit-2.0-1">libwpewebkit-2.0-1 in trixie</a></li>
+<li><a href="https://sources.debian.org/src/wpewebkit/2.48.3-1/debian/rules/">wpewebkit 2.48.3-1 debian/rules</a></li>
+<li><a href="https://security-tracker.debian.org/tracker/source-package/wpewebkit">wpewebkit security tracker</a></li>
+<li><a href="http://archive.raspberrypi.com/debian/dists/trixie/main/binary-arm64/Packages.gz">Raspberry Pi Trixie archive Packages.gz</a> (checked 2026-10-29: no cog/WPE)</li>
+<li><a href="https://www.raspberrypi.com/news/trixie-the-new-version-of-raspberry-pi-os/">Raspberry Pi OS Trixie announcement</a></li>
+</ul>
+<p>cog / WPE upstream:</p>
+<ul>
+<li><a href="https://github.com/Igalia/cog/blob/0.18.4/docs/platform-drm.md">cog 0.18.4 DRM platform docs</a> · <a href="https://github.com/Igalia/cog/blob/0.18.4/docs/platform-wl.md">Wayland platform docs</a> · <a href="https://github.com/Igalia/cog/blob/0.18.4/NEWS">NEWS</a> · <a href="https://github.com/Igalia/cog/blob/0.18.4/meson_options.txt">meson options (default platforms)</a></li>
+<li><a href="https://manpages.debian.org/trixie/cog/cog.1.en.html">cog(1) in trixie</a> · <a href="https://manpages.debian.org/trixie/cog/cogctl.1.en.html">cogctl(1)</a></li>
+<li><a href="https://wpewebkit.org/about/supported-hardware.html">WPE supported hardware (Pi 3 / VC4 / drm, wl, headless)</a></li>
+<li><a href="https://wpewebkit.org/about/faq.html">WPE FAQ — what cog is, KMS/DRM, WPEPlatform since 2.54</a></li>
+<li><a href="https://wpewebkit.org/blog/2025-04-11-wpewebkit-2.48.html">WPE WebKit 2.48 highlights</a> · <a href="https://wpewebkit.org/release/wpewebkit-2.48.3.html">2.48.3 release</a></li>
+<li><a href="https://github.com/WebKit/WebKit/blob/webkitglib/2.48/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp">WebKitSettings 2.48 (autoplay defaults)</a></li>
+</ul>
+<p>cog source references used above:</p>
+<ul>
+<li><code>launcher/cog-launcher.c:350</code> — <code>cog_web_view_connect_web_process_terminated_restart_handler(web_view, 5, 1000)</code></li>
+<li><code>core/cog-webkit-utils.c</code> — error page text for <code>CRASHED</code> / <code>EXCEEDED_MEMORY_LIMIT</code>, retry-then-error-page</li>
+<li><code>platform/drm/cog-platform-drm.c:1019,1259</code> — libinput rotation, hard-coded <code>seat0</code></li>
+<li><code>launcher/cog-launcher.c:1261</code> — system-bus name only when built with <code>cog_dbus_control=system</code> (Debian builds <code>user</code>)</li>
+</ul>
+<p>Upstream issues (all open unless noted):</p>
+<ul>
+<li><a href="https://github.com/Igalia/cog/issues/793">#793 cog DRM backend doesn't support dropdowns</a> (2026-07-15)</li>
+<li><a href="https://github.com/Igalia/cog/issues/503">#503 popup menu not opened for <code>&lt;select&gt;</code></a></li>
+<li><a href="https://github.com/Igalia/cog/pull/794">#794 DRM compositor-less fixes (cold start, SHM, cursor) — open PR</a></li>
+<li><a href="https://github.com/Igalia/cog/issues/748">#748 0.18.4 DRM+GLES framebuffer failure</a></li>
+<li><a href="https://github.com/Igalia/cog/issues/737">#737 single-finger touch unreliable in 0.18.4</a></li>
+<li><a href="https://github.com/Igalia/cog/issues/456">#456 touch doesn't work (qemux86_64)</a></li>
+<li><a href="https://github.com/Igalia/cog/issues/65">#65 cog memory leak (2018, three-process model)</a></li>
+<li><a href="https://github.com/Igalia/cog/issues/321">#321 no HW acceleration on Pi 4</a></li>
+</ul>
+<p>Calvin files cited:</p>
+<ul>
+<li><code>frontend/src/components/PluginFieldRenderer.vue:50,64</code> · <code>frontend/src/components/settings/tabs/content/CalendarSourcesTab.vue:15</code> · <code>frontend/src/components/settings/tabs/system/UpdatesTab.vue:30</code> (native selects)</li>
+<li><code>frontend/src/composables/useTouchCapability.js:32-45</code> (touch detection)</li>
+<li><code>frontend/src/components/settings/shell/CategoryRail.vue:51-52</code>, <code>frontend/src/components/ui/OnScreenKeyboard.vue:135-136</code>, <code>frontend/src/composables/useFitClamp.js:90</code> (ResizeObserver)</li>
+<li><code>frontend/src/main.js:53-76</code> (service worker registration)</li>
+<li><code>docs/research/2026-10-29-kiosk-wayland.md</code> (compositor comparison, display-agent paths)</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
