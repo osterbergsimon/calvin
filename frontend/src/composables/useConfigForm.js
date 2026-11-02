@@ -2,23 +2,59 @@
  * Composable for managing configuration form state and updates.
  */
 
-import { computed, ref } from "vue";
+import { computed, getCurrentInstance, onUnmounted, ref } from "vue";
 import { useConfigStore } from "../stores/config";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
 import { friendlyError } from "../utils/friendlyError";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
-import { createDebouncedSave } from "../utils/debouncedSave";
+import { createOptimisticQueue } from "../utils/optimisticQueue";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
-  const localConfig = ref({ ...initialConfig });
-  const saving = ref(false);
   const error = ref("");
   const saveSuccess = ref(false);
   const lastSavedKeys = ref([]);
   let saveSuccessTimer = null;
+
+  // The form is one target: confirmed is the last config the server accepted,
+  // and pending holds the keys the user has changed since. The displayed form
+  // is pending over confirmed, so a tap shows at once and a failure only
+  // reverts the values that actually failed.
+  const queue = createOptimisticQueue({
+    initial: initialConfig,
+    save: async ({ changes }) => {
+      error.value = "";
+      saveSuccess.value = false;
+      // The store POSTs to the backend and applies the result; one request per save.
+      await configStore.updateConfig(changes);
+      lastSavedKeys.value = Object.keys(changes);
+      saveSuccess.value = true;
+      if (saveSuccessTimer) {
+        clearTimeout(saveSuccessTimer);
+      }
+      saveSuccessTimer = setTimeout(() => {
+        saveSuccess.value = false;
+        saveSuccessTimer = null;
+      }, 2500);
+    },
+    onError: err => {
+      logError("[useConfigForm]", "Failed to save config:", err);
+      error.value = friendlyError(err, "save your settings");
+    },
+  });
+
+  const saving = queue.saving;
+  // A test or a reset may replace the whole form; that also drops anything
+  // still queued so it cannot be written after the replacement.
+  const localConfig = computed({
+    get: () => queue.display.value,
+    set: next => {
+      queue.discardPending();
+      queue.confirm(next);
+    },
+  });
 
   const saveStatus = computed(() => {
     if (saving.value) {
@@ -215,79 +251,35 @@ export function useConfigForm(initialConfig = {}) {
 
   // Update a single config value. The form value changes first; the save is
   // coalesced with any other quick edits and rolls the value back if it fails.
-  const updateConfigValue = (key, value) => {
-    const prior = { [key]: localConfig.value[key] };
-    localConfig.value[key] = value;
-    return queueSave({ [key]: value }, prior);
-  };
+  const updateConfigValue = (key, value) => queue.setPartial({ [key]: value });
 
   // Update multiple config values
-  const updateConfig = updates => {
-    const prior = {};
-    for (const key of Object.keys(updates)) prior[key] = localConfig.value[key];
-    Object.assign(localConfig.value, updates);
-    return queueSave(updates, prior);
-  };
+  const updateConfig = updates => queue.setPartial(updates);
 
   // Save config to backend. This is the shared write path: a control has
   // already applied its value locally by the time it gets here.
   const saveConfig = async (updates = null) => {
-    return queueSave(updates || localConfig.value, {});
-  };
-
-  let pendingWindow = null;
-
-  const performSave = async ({ updates, prior }) => {
-    if (pendingWindow?.updates === updates) pendingWindow = null;
-    saving.value = true;
-    error.value = "";
-    saveSuccess.value = false;
-
-    try {
-      // The store POSTs to the backend and applies the result; one request per save.
-      await configStore.updateConfig(updates);
-      lastSavedKeys.value = Object.keys(updates);
-      saveSuccess.value = true;
-      if (saveSuccessTimer) {
-        clearTimeout(saveSuccessTimer);
-      }
-      saveSuccessTimer = setTimeout(() => {
-        saveSuccess.value = false;
-        saveSuccessTimer = null;
-      }, 2500);
-    } catch (err) {
-      logError("[useConfigForm]", "Failed to save config:", err);
-      // Restore only keys the user has not changed again while the save was
-      // in flight.
-      for (const [key, previous] of Object.entries(prior || {})) {
-        if (Object.is(localConfig.value[key], updates[key])) {
-          localConfig.value[key] = previous;
-        }
-      }
-      error.value = friendlyError(err, "save your settings");
-      throw err;
-    } finally {
-      // A newer edit may already be queued behind this save.
-      saving.value = pendingWindow !== null;
-    }
-  };
-
-  const saver = createDebouncedSave({ save: performSave });
-
-  const queueSave = (updates, prior) => {
-    if (!pendingWindow) pendingWindow = { updates: {}, prior: {} };
-    Object.assign(pendingWindow.updates, updates);
-    for (const [key, previous] of Object.entries(prior || {})) {
-      if (!(key in pendingWindow.prior)) pendingWindow.prior[key] = previous;
-    }
-    saving.value = true;
-    return saver.schedule(pendingWindow);
+    return queue.setPartial(updates || queue.display.value);
   };
 
   // Reset to store values
   const resetConfig = async () => {
     await loadConfig();
   };
+
+  // Never lose a queued value on navigation or a page close.
+  const flush = () => {
+    void queue.flush();
+  };
+  if (typeof window !== "undefined" && getCurrentInstance()) {
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    });
+  }
 
   return {
     localConfig,

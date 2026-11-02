@@ -629,7 +629,7 @@ import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
-import { createDebouncedSave } from "@/utils/debouncedSave";
+import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -693,7 +693,11 @@ const powerMsg = ref("");
 const touchMsg = ref("");
 const behaviourMsg = ref("");
 const footerMsg = ref("");
-const overrides = ref({});
+const overridesQueue = computed(() =>
+  selectedId.value ? kioskOverridesQueue(selectedId.value) : null
+);
+// Confirmed overrides with this screen's still-pending taps on top.
+const overrides = computed(() => overridesQueue.value?.display.value ?? {});
 
 // Browser-only choices that make up "{n} settings just for this browser".
 const BROWSER_STORAGE_KEYS = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
@@ -829,14 +833,12 @@ function clearMessages() {
 
 function openDefault() {
   selection.value = { kind: "default" };
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
 }
 
 function openBrowser() {
   selection.value = { kind: "browser" };
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
@@ -849,13 +851,12 @@ async function select(id) {
   // Guard the stale-selection race: clicking screen A then B before A's fetch
   // resolves must not land A's overrides under B's selection (calvin-vk3).
   if (selectedId.value !== id) return;
-  overrides.value = fetched;
+  kioskOverridesQueue(id).confirm(fetched);
   await refreshDesiredVersion(id);
 }
 
 function closeDetail() {
   selection.value = null;
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
@@ -1034,60 +1035,21 @@ const effOsk = computed(() =>
 );
 
 // --- writes --------------------------------------------------------------
-// One coalesced save per screen and quiet period. The override object is
-// applied first so the row shows the new value on tap; the previous object is
-// restored with the error message if that save fails.
-const persistSavers = new Map();
-
-function saverFor(kioskId) {
-  let entry = persistSavers.get(kioskId);
-  if (!entry) {
-    entry = { edit: null, saver: null };
-    entry.saver = createDebouncedSave({ save: edit => performPersist(entry, edit) });
-    persistSavers.set(kioskId, entry);
-  }
-  return entry;
-}
-
-async function performPersist(entry, edit) {
-  if (entry.edit === edit) entry.edit = null;
-  const { kioskId, next, prior, messageRef, onlineCopy, offlineCopy } = edit;
+// Every control on a screen writes the same overrides target. The shared queue
+// shows the change at once, coalesces quick taps, and on failure reverts only
+// the keys whose value has not been tapped again since.
+async function persist(next, messageRef, onlineCopy, offlineCopy) {
+  const kioskId = selectedId.value;
+  if (!kioskId) return;
+  messageRef.value = "";
   try {
-    await store.saveOverrides(kioskId, next);
-    store.setKioskOverrides(kioskId, next);
+    await kioskOverridesQueue(kioskId).replaceAll(next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
     messageRef.value = online ? onlineCopy : offlineCopy;
     await refreshDesiredVersion(kioskId);
-  } catch (err) {
-    if (selectedId.value === kioskId) overrides.value = prior;
+  } catch {
     messageRef.value = "Couldn't save to the server. Check the connection and try again.";
-    throw err;
   }
-}
-
-function persist(next, messageRef, onlineCopy, offlineCopy) {
-  const kioskId = selectedId.value;
-  const entry = saverFor(kioskId);
-  if (entry.edit) {
-    entry.edit.next = next;
-    entry.edit.messageRef = messageRef;
-    entry.edit.onlineCopy = onlineCopy;
-    entry.edit.offlineCopy = offlineCopy;
-  } else {
-    entry.edit = {
-      kioskId,
-      next,
-      prior: overrides.value,
-      messageRef,
-      onlineCopy,
-      offlineCopy,
-    };
-  }
-  overrides.value = next;
-  messageRef.value = "";
-  // performPersist shows the failure itself; the returned promise settles
-  // after the coalesced save so a caller can await the real write.
-  return entry.saver.schedule(entry.edit).catch(() => {});
 }
 
 const OFFLINE_COPY = "Saved. Changes apply when this screen reconnects.";
@@ -1417,6 +1379,15 @@ async function refreshDesiredVersion(id) {
   if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
 }
 
+// Never lose a queued override save on navigation or a page close.
+const flushQueuedOverrides = () => {
+  void flushKioskOverridesQueues();
+};
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", flushQueuedOverrides);
+  window.addEventListener("pagehide", flushQueuedOverrides);
+}
+
 onMounted(async () => {
   refreshBrowserCount();
   await store.loadKiosks();
@@ -1434,6 +1405,9 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener("beforeunload", flushQueuedOverrides);
+  window.removeEventListener("pagehide", flushQueuedOverrides);
+  flushQueuedOverrides();
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
     narrowMql.removeEventListener("change", onNarrowChange);

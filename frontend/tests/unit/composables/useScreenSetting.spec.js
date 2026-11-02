@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import api from "@/services/api";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useConfigStore } from "@/stores/config";
 import { useNotificationsStore } from "@/stores/notifications";
-import { SAVE_DEBOUNCE_MS } from "@/utils/debouncedSave";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
 
 vi.mock("@/services/api", () => ({
   default: {
@@ -238,6 +239,57 @@ describe("useScreenSetting", () => {
           message: expect.stringContaining("unchanged"),
         })
       );
+    });
+
+    it("shows a later server change after a failed save", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { onScreenKeyboard: "auto" } } });
+      api.put.mockRejectedValue(new Error("offline"));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const pending = setting.set("on");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await pending;
+      expect(setting.value.value).toBe("auto");
+
+      config.onScreenKeyboard = "off";
+      await nextTick();
+      expect(setting.value.value).toBe("off");
+    });
+
+    it("keeps another row's pending value when one row's save fails", async () => {
+      api.get.mockResolvedValue({ data: { overrides: {} } });
+      let rejectFirst;
+      api.put
+        .mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectFirst = reject;
+            })
+        )
+        .mockResolvedValueOnce({ data: {} });
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      config.touchControls = "auto";
+      const osk = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+      const touch = useScreenSetting("touchControls", { storageKey: "calvin-touch-controls" });
+
+      const first = osk.set("on");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      const second = touch.set("off");
+      expect(touch.value.value).toBe("off");
+
+      rejectFirst(new Error("offline"));
+      await first;
+      expect(osk.value.value).toBe("auto");
+      expect(touch.value.value).toBe("off");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await second;
+      expect(api.put).toHaveBeenLastCalledWith("/kiosks/hallway/overrides", {
+        overrides: { touchControls: "off" },
+      });
     });
   });
 });

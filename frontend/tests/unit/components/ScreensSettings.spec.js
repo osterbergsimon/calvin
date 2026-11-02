@@ -13,7 +13,7 @@ import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGri
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import { SAVE_DEBOUNCE_MS } from "@/utils/debouncedSave";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
 
 // Settings writes are coalesced over a quiet period, so settle the queued save
 // before asserting (the production UI does not wait for it).
@@ -1920,5 +1920,77 @@ describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
       displayTimeoutEnabled: true,
       displayTimeout: 900,
     });
+  });
+
+  it("keeps a newer tap when an earlier in-flight save fails", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    let rejectFirst;
+    store.saveOverrides = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          })
+      )
+      .mockResolvedValueOnce({ data: {} });
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    rejectFirst(new Error("offline"));
+    await flushPromisesNow();
+    await nextTick();
+
+    // The failed orientation is gone; the newer flip is still shown.
+    expect(flip.props("modelValue")).toBe(true);
+    expect(
+      wrapper
+        .findAllComponents(SegmentedControl)
+        .find(c => c.props("ariaLabel") === "Orientation")
+        .props("modelValue")
+    ).toBe("landscape");
+    expect(wrapper.text()).toContain(
+      "Couldn't save to the server. Check the connection and try again."
+    );
+
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(2);
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      orientationFlipped: true,
+    });
+  });
+
+  it("flushes a pending save when the page unmounts", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await nextTick();
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+    await flushPromisesNow();
+    await flushPromisesNow();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
   });
 });
