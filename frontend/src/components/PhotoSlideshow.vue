@@ -191,11 +191,16 @@ const sourceKey = computed(() =>
 const currentImage = computed(() => imagesStore.getCurrentImageForSource(props.sourceIds));
 const sourceImages = computed(() => imagesStore.getImagesForSource(props.sourceIds));
 
-// Display width requested from the backend. Until the region is measured there
-// is deliberately no src at all: a large kiosk must not probe 640 first. Test
-// hosts without ResizeObserver get the smallest bucket so layoutless mounts
-// still render something.
-const requestedWidth = ref(typeof ResizeObserver === "undefined" ? 640 : null);
+// Display width requested from the backend. The viewport (at DPR) is a safe
+// upper-bound fallback until the photo region is measured: a large kiosk never
+// probes 640 first, and a photo that arrives before the container exists can
+// still request a URL immediately. Measurement only upgrades the bucket.
+const viewportWidth = () => {
+  const dpr = typeof globalThis.devicePixelRatio === "number" ? globalThis.devicePixelRatio : 1;
+  const viewport = typeof window !== "undefined" && window.innerWidth ? window.innerWidth : 640;
+  return variantWidthForRegion(viewport, dpr);
+};
+const requestedWidth = ref(viewportWidth());
 const currentImageUrl = computed(() => {
   const url = imagesStore.getCurrentImageUrlForSource(props.sourceIds);
   if (!url || !requestedWidth.value) return null;
@@ -260,6 +265,21 @@ const observeContainer = () => {
   containerObserver.observe(containerEl.value);
 };
 
+// The container is re-created by the loading/photo branches, not only on
+// fullscreen changes. Watch the element itself so a container that appears
+// after the first render is measured and observed too.
+watch(
+  containerEl,
+  el => {
+    containerObserver?.disconnect();
+    containerObserver = null;
+    if (!el) return;
+    measureContainer();
+    observeContainer();
+  },
+  { flush: "post" }
+);
+
 const imageAspect = computed(() => resolveImageAspect(currentImage.value, naturalSize.value));
 
 const fitDecision = computed(() =>
@@ -299,7 +319,7 @@ const preloadNextImage = () => {
 
 let rotationPending = false;
 
-const advanceToNext = async () => {
+const advanceToNext = async generation => {
   // No stacked ticks: a slow decode must not queue up a burst of advances.
   if (rotationPending) return;
   rotationPending = true;
@@ -307,6 +327,9 @@ const advanceToNext = async () => {
     // A failed decode (corrupt file, unsupported format) must not stop
     // rotation: preloadAndDecodeImage resolves null and the swap still happens.
     await preloadNextImage();
+    // A stop, unmount or source change happened while we were decoding: the
+    // new chain owns rotation now, so this tick must not advance.
+    if (generation !== undefined && generation !== rotationGeneration) return;
     await imagesStore.nextImage(props.sourceIds);
   } finally {
     rotationPending = false;
@@ -334,24 +357,30 @@ const onImageError = () => {
 
 // Schedule the next tick only after the current one finished pre-decoding and
 // swapping. A pending preload therefore never leaves a queue of ticks behind.
-const scheduleNextRotation = () => {
+// Every stop/start/unmount bumps the generation, so a tick that was awaiting a
+// decode when its chain was replaced cannot schedule another one.
+let rotationGeneration = 0;
+
+const scheduleNextRotation = generation => {
   if (!props.autoRotate || sourceImages.value.length <= 1) return;
-  rotationTimer = setTimeout(runRotation, props.rotationInterval);
+  rotationTimer = setTimeout(() => runRotation(generation), props.rotationInterval);
 };
 
-const runRotation = async () => {
+const runRotation = async generation => {
   rotationTimer = null;
-  if (!props.autoRotate) return;
-  await advanceToNext();
-  scheduleNextRotation();
+  if (generation !== rotationGeneration || !props.autoRotate) return;
+  await advanceToNext(generation);
+  if (generation !== rotationGeneration) return;
+  scheduleNextRotation(generation);
 };
 
 const startAutoRotation = () => {
   stopAutoRotation();
-  scheduleNextRotation();
+  scheduleNextRotation(rotationGeneration);
 };
 
 const stopAutoRotation = () => {
+  rotationGeneration += 1;
   if (rotationTimer) {
     clearTimeout(rotationTimer);
     rotationTimer = null;

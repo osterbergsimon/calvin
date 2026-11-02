@@ -18,11 +18,14 @@ describe("PhotoSlideshow", () => {
   let imagesStore;
   let configStore;
   let pinia;
+  let originalInnerWidth;
 
   beforeEach(() => {
     pinia = createPinia();
     setActivePinia(pinia);
     vi.useFakeTimers();
+    originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 640 });
 
     imagesStore = useImagesStore();
     configStore = useConfigStore();
@@ -43,6 +46,10 @@ describe("PhotoSlideshow", () => {
   });
 
   afterEach(() => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: originalInnerWidth,
+    });
     vi.useRealTimers();
   });
 
@@ -597,17 +604,56 @@ describe("PhotoSlideshow", () => {
       await wrapper.vm.$nextTick();
     };
 
-    it("does not request an image before the region has been measured", async () => {
+    it("requests the viewport bucket until the region can be measured", async () => {
+      setDpr(2);
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 700 });
       imagesStore.currentImage = createImage();
       const wrapper = createWrapper();
       await flushPromises();
 
-      // No 640-first probe: the first src the browser sees is the measured one.
-      expect(wrapper.find(".photo-image").exists()).toBe(false);
-      expect(wrapper.find(".photo-backdrop").exists()).toBe(false);
-
-      await resize(wrapper, 1600, 900);
+      // 700 CSS px x 2 DPR = 1400 -> 1920, not a 640-first probe.
       expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=1920");
+
+      // The measured region can still grow the request.
+      await resize(wrapper, 1600, 900);
+      expect(wrapper.find(".photo-image").attributes("src")).toBe("/api/images/1?w=2560");
+    });
+
+    it("renders and observes a photo that arrives after the empty state", async () => {
+      imagesStore.currentImage = null;
+      const wrapper = createWrapper();
+      await flushPromises();
+      expect(wrapper.find(".photo-container").exists()).toBe(false);
+
+      imagesStore.currentImage = createImage();
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      // The image is not blocked on measurement, and the new container has an
+      // observer rather than only the one onMounted would have created.
+      expect(wrapper.find(".photo-image").attributes("src")).toMatch(/^\/api\/images\/1\?w=\d+$/);
+      const observer = observers[observers.length - 1];
+      expect(observer.observe).toHaveBeenCalledWith(wrapper.find(".photo-container").element);
+    });
+
+    it("re-observes the container after a loading branch replaces it", async () => {
+      imagesStore.currentImage = createImage();
+      const wrapper = createWrapper();
+      await flushPromises();
+      const first = observers[observers.length - 1];
+      expect(first.observe).toHaveBeenCalled();
+
+      imagesStore.loading = true;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.find(".photo-container").exists()).toBe(false);
+
+      imagesStore.loading = false;
+      await wrapper.vm.$nextTick();
+      await flushPromises();
+
+      const latest = observers[observers.length - 1];
+      expect(latest).not.toBe(first);
+      expect(latest.observe).toHaveBeenCalledWith(wrapper.find(".photo-container").element);
     });
 
     it("requests the bucket for the measured region and devicePixelRatio", async () => {
@@ -760,6 +806,104 @@ describe("PhotoSlideshow", () => {
         await flushPromises();
 
         expect(imagesStore.nextImage).toHaveBeenCalled();
+        wrapper.unmount();
+      } finally {
+        delete globalThis.Image;
+      }
+    });
+
+    it("stops rotation after unmount while a preload is pending", async () => {
+      const pending = [];
+      globalThis.Image = class {
+        constructor() {
+          this.decode = vi.fn(
+            () =>
+              new Promise(resolve => {
+                pending.push(resolve);
+              })
+          );
+        }
+        set src(value) {
+          this._src = value;
+        }
+        get src() {
+          return this._src;
+        }
+      };
+
+      try {
+        const image1 = createImage({ id: "1" });
+        const image2 = createImage({ id: "2" });
+        imagesStore.currentImage = image1;
+        imagesStore.fetchImages = vi.fn().mockImplementation(async () => {
+          imagesStore.images = [image1, image2];
+        });
+
+        const wrapper = createWrapper({ autoRotate: true, rotationInterval: 5000 });
+        await resize(wrapper, 800, 600);
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(5000); // tick is awaiting the preload
+
+        wrapper.unmount();
+        pending.splice(0).forEach(resolve => resolve());
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(30000);
+
+        expect(imagesStore.nextImage).not.toHaveBeenCalled();
+      } finally {
+        delete globalThis.Image;
+      }
+    });
+
+    it("keeps a single rotation chain after a source change mid-tick", async () => {
+      const pending = [];
+      let block = true;
+      globalThis.Image = class {
+        constructor() {
+          this.decode = vi.fn(() => {
+            if (!block) return Promise.resolve();
+            return new Promise(resolve => {
+              pending.push(resolve);
+            });
+          });
+        }
+        set src(value) {
+          this._src = value;
+        }
+        get src() {
+          return this._src;
+        }
+      };
+
+      try {
+        const a1 = createImage({ id: "a1" });
+        const a2 = createImage({ id: "a2" });
+        const b1 = createImage({ id: "b1" });
+        const b2 = createImage({ id: "b2" });
+        imagesStore.imagesBySourceKey.a = [a1, a2];
+        imagesStore.currentImagesBySourceKey.a = a1;
+        imagesStore.imagesBySourceKey.b = [b1, b2];
+        imagesStore.currentImagesBySourceKey.b = b1;
+        imagesStore.fetchImages = vi.fn().mockResolvedValue(undefined);
+
+        const wrapper = createWrapper({
+          sourceIds: ["a"],
+          autoRotate: true,
+          rotationInterval: 5000,
+        });
+        await resize(wrapper, 800, 600);
+        await flushPromises();
+        await vi.advanceTimersByTimeAsync(5000); // old chain awaiting preload
+
+        await wrapper.setProps({ sourceIds: ["b"] });
+        await flushPromises();
+        block = false;
+        pending.splice(0).forEach(resolve => resolve());
+        await flushPromises();
+
+        // Three intervals, one live chain: the stale tick must not double it.
+        await vi.advanceTimersByTimeAsync(15000);
+        expect(imagesStore.nextImage).toHaveBeenCalledTimes(3);
         wrapper.unmount();
       } finally {
         delete globalThis.Image;
