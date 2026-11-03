@@ -9,8 +9,35 @@
 
 import { EFFECTS_LEVEL_OPTIONS, normalizeEffectsLevel } from "./effectsLevel";
 import { normalizeLayoutMode } from "./layoutMode";
+import { TYPE_THEMES } from "../styles/typeThemes";
+import { UI_SIZE_OPTIONS } from "../styles/uiScale";
 
 const PHOTO_FRAME_MINUTES = [1, 2, 5, 10, 15, 30];
+
+const THEME_MODE_OPTIONS = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "auto", label: "Follow device" },
+  { value: "time", label: "On a schedule" },
+];
+
+const TYPE_THEME_OPTIONS = Object.keys(TYPE_THEMES).map(id => ({
+  value: id,
+  label: id.charAt(0).toUpperCase() + id.slice(1),
+}));
+
+const DASHBOARD_SIZE_OPTIONS = [
+  { value: "xsmall", label: "X-Small" },
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+  { value: "xlarge", label: "X-Large" },
+];
+
+const hourValue = value => {
+  const hour = parseInt(String(value).split(":")[0], 10);
+  return Number.isNaN(hour) ? 0 : Math.max(0, Math.min(23, hour));
+};
 
 const minutesLabel = seconds => {
   if (seconds % 60 !== 0) return `${seconds} s`;
@@ -265,6 +292,116 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     keywords: ["hold for", "hot corner", "corner", "long press", "controls", "dashboard"],
   },
   {
+    // Look moved in from Dashboard › Appearance (settings-scope §7 item 6).
+    // Theme and font are per screen; theming a screen never touches the
+    // household config, and a plain browser editing another screen keeps its
+    // own look.
+    key: "selectedTheme",
+    label: "Theme",
+    section: "look",
+    control: { kind: "theme" },
+    defaultValue: null,
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-theme",
+    keywords: [
+      "theme",
+      "appearance",
+      "look",
+      "palette",
+      "colour scheme",
+      "color scheme",
+      "selected theme",
+      "dashboard",
+    ],
+  },
+  {
+    key: "themeMode",
+    label: "Light or dark",
+    section: "look",
+    control: { kind: "select", options: THEME_MODE_OPTIONS },
+    defaultValue: "auto",
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-theme-mode",
+    keywords: [
+      "light or dark",
+      "dark mode",
+      "light mode",
+      "theme",
+      "appearance",
+      "look",
+      "auto",
+      "schedule",
+      "dashboard",
+    ],
+  },
+  {
+    key: "darkModeStart",
+    label: "Dark from",
+    section: "look",
+    control: { kind: "time" },
+    defaultValue: 18,
+    parse: hourValue,
+    browserLayer: false,
+    copyable: true,
+    showWhen: { key: "themeMode", equals: "time" },
+    resetTest: "reset-dark-from",
+    keywords: [
+      "dark from",
+      "dark hours",
+      "dark mode",
+      "schedule",
+      "light or dark",
+      "theme",
+      "appearance",
+      "look",
+    ],
+  },
+  {
+    key: "darkModeEnd",
+    label: "Dark to",
+    section: "look",
+    control: { kind: "time" },
+    defaultValue: 6,
+    parse: hourValue,
+    browserLayer: false,
+    copyable: true,
+    showWhen: { key: "themeMode", equals: "time" },
+    resetTest: "reset-dark-to",
+    keywords: [
+      "dark to",
+      "dark hours",
+      "dark mode",
+      "schedule",
+      "light or dark",
+      "theme",
+      "appearance",
+      "look",
+    ],
+  },
+  {
+    key: "typeTheme",
+    label: "Font",
+    section: "look",
+    control: { kind: "select", options: TYPE_THEME_OPTIONS },
+    defaultValue: "instrument",
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-font",
+    keywords: [
+      "font",
+      "typeface",
+      "type theme",
+      "appearance",
+      "look",
+      "instrument",
+      "marquee",
+      "station",
+      "dashboard",
+    ],
+  },
+  {
     key: "orientation",
     label: "Orientation",
     section: "display",
@@ -305,6 +442,49 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     copyable: true,
     resetTest: "reset-apply-rotation",
     keywords: ["display", "rotation", "rotate", "orientation", "pi", "output"],
+  },
+  {
+    key: "touchControlSize",
+    label: "Dashboard size",
+    section: "display",
+    description: "Size of labels and touch buttons on the dashboard.",
+    control: { kind: "select", options: DASHBOARD_SIZE_OPTIONS },
+    defaultValue: "medium",
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-dashboard-size",
+    keywords: [
+      "dashboard size",
+      "size",
+      "touch controls",
+      "buttons",
+      "labels",
+      "display",
+      "dashboard",
+      "appearance",
+    ],
+  },
+  {
+    key: "uiSize",
+    label: "Settings text size",
+    section: "display",
+    description: "Only changes Settings. The dashboard has its own Dashboard size.",
+    control: { kind: "segmented", options: UI_SIZE_OPTIONS },
+    defaultValue: "default",
+    // Settings text size keeps the plain-browser layer it had in Dashboard:
+    // ThisBrowserSettings and useUiScale still read calvin-ui-size.
+    browserLayer: true,
+    copyable: true,
+    resetTest: "reset-settings-size",
+    keywords: [
+      "settings text size",
+      "text size",
+      "ui size",
+      "size",
+      "display",
+      "appearance",
+      "dashboard",
+    ],
   },
   {
     key: "displayScheduleEnabled",

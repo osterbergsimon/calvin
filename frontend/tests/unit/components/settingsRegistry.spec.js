@@ -129,6 +129,13 @@ describe("settings registry", () => {
       section: "layout",
       path: "Screens / Default · Display",
     });
+    // Look moved from Dashboard › Appearance to Screens (§7 item 6); the old
+    // deep link and words still land on the new section.
+    expect(getSettingDestinationById("dashboard-ui")).toMatchObject({
+      category: "screens",
+      section: "screen-look",
+      path: "Screens / Default · Look",
+    });
     expect(getSettingDestinationById("dashboard-regions")).toMatchObject({
       category: "dashboard",
       path: "Dashboard / Pages & regions",
@@ -183,6 +190,21 @@ describe("settings registry", () => {
       section: "device-keyboard",
       path: "Screens / Default · Touch & keyboard",
     });
+  });
+
+  it("finds Look with the old appearance, theme, dark mode and font words", () => {
+    for (const word of ["appearance", "theme", "dark mode", "font", "typeface"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("dashboard-ui");
+    }
+    expect(filterSettingsDestinations("dashboard size").map(item => item.id)).toContain(
+      "dashboard-layout"
+    );
+    expect(filterSettingsDestinations("settings text size").map(item => item.id)).toContain(
+      "dashboard-layout"
+    );
   });
 
   it("finds the moved Controls and Effects rows with their old words", () => {

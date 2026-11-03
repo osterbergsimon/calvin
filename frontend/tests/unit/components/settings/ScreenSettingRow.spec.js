@@ -135,6 +135,57 @@ describe("ScreenSettingRow — descriptor kinds", () => {
     expect(wrapper.emitted("set")).toEqual([[25]]);
   });
 
+  it("renders the theme picker and emits the chosen theme id", () => {
+    const wrapper = mount(ScreenSettingRow, {
+      props: {
+        descriptor: descriptor({
+          key: "selectedTheme",
+          label: "Theme",
+          section: "look",
+          control: { kind: "theme" },
+        }),
+        value: null,
+        showScope: true,
+      },
+      global: {
+        stubs: {
+          ThemePicker: {
+            name: "ThemePicker",
+            props: ["selectedThemeId"],
+            emits: ["select"],
+            template: '<div class="theme-picker-stub" />',
+          },
+        },
+      },
+    });
+
+    const picker = wrapper.findComponent({ name: "ThemePicker" });
+    expect(picker.exists()).toBe(true);
+    expect(picker.props("selectedThemeId")).toBeNull();
+    picker.vm.$emit("select", "ocean");
+    expect(wrapper.emitted("set")).toEqual([["ocean"]]);
+  });
+
+  it("renders dark hours as a whole-hour time field and emits the hour", async () => {
+    const wrapper = mountRow({
+      descriptor: descriptor({
+        key: "darkModeStart",
+        label: "Dark from",
+        section: "look",
+        control: { kind: "time" },
+        showWhen: { key: "themeMode", equals: "time" },
+      }),
+      value: 18,
+    });
+
+    const input = wrapper.find('input[type="time"]');
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("step")).toBe("3600");
+    expect(input.element.value).toBe("18:00");
+    await input.setValue("20:00");
+    expect(wrapper.emitted("set")).toEqual([[20]]);
+  });
+
   it("renders the photo-source picker for the photos-from row", () => {
     const wrapper = mountRow({
       descriptor: descriptor({
@@ -217,5 +268,12 @@ describe("ScreenSettingRow — notes", () => {
       autoNote: "Auto (Standard on this screen)",
     });
     expect(explicit.text()).not.toContain("Auto (Standard on this screen)");
+  });
+
+  it("shows a one-off row note, such as when the screen will pick a change up", () => {
+    const wrapper = mountRow({ note: "Kitchen will switch on its next check (about 30 s)" });
+    expect(wrapper.find("[data-test='demo-note']").text()).toBe(
+      "Kitchen will switch on its next check (about 30 s)"
+    );
   });
 });

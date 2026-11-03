@@ -26,7 +26,7 @@
     <div v-else class="pm-list">
       <!-- Theme install hint -->
       <InlineNote v-if="activeTab === 'theme' && showThemeInfo" class="pm-note">
-        Themes are plugins too: install them here, then choose one in Dashboard › Appearance.
+        Themes are plugins too: install them here, then choose one in Screens › Look.
       </InlineNote>
 
       <PluginCard

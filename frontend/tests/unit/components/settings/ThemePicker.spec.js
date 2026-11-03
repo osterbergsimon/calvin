@@ -13,7 +13,7 @@ const stubs = {
   teleport: true,
   ThemeSelector: {
     name: "ThemeSelector",
-    props: ["themes", "selectedThemeId", "loading", "dark"],
+    props: ["themes", "selectedThemeId", "loading", "dark", "showBothModes"],
     emits: ["select"],
     template: '<div class="theme-selector-stub" @click="$emit(\'select\', themes[1]?.id)" />',
   },
@@ -27,6 +27,8 @@ describe("ThemePicker", () => {
     const selector = w.findComponent({ name: "ThemeSelector" });
     expect(selector.props("themes").map(theme => theme.name)).toEqual(["Calvin", "Midnight"]);
     expect(selector.props("selectedThemeId")).toBe("calvin");
+    // A remote screen's preview must show both modes, not just this viewer's.
+    expect(selector.props("showBothModes")).toBe(true);
     w.unmount();
   });
 
@@ -38,7 +40,7 @@ describe("ThemePicker", () => {
           ...stubs,
           ThemeSelector: {
             name: "ThemeSelector",
-            props: ["themes", "selectedThemeId", "loading", "dark"],
+            props: ["themes", "selectedThemeId", "loading", "dark", "showBothModes"],
             emits: ["select"],
             template: "<div class=\"calvin-stub\" @click=\"$emit('select', 'calvin')\" />",
           },

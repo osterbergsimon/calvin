@@ -22,7 +22,7 @@ export const settingsCategories = [
     id: "dashboard",
     label: "Dashboard",
     icon: mdiViewDashboardOutline,
-    subtitle: "Pages · clock bar · theme",
+    subtitle: "Pages · clock bar",
   },
   {
     id: "screens",
@@ -67,11 +67,23 @@ export const settingsDestinations = [
   },
   {
     id: "dashboard-layout",
-    label: "Screen orientation",
+    label: "Display: orientation and sizes",
     path: "Screens / Default · Display",
     category: "screens",
     section: "layout",
-    keywords: ["display", "orientation", "flip", "rotation", "landscape", "portrait"],
+    keywords: [
+      "display",
+      "orientation",
+      "flip",
+      "rotation",
+      "landscape",
+      "portrait",
+      "dashboard size",
+      "settings text size",
+      "text size",
+      "ui size",
+      "size",
+    ],
   },
   {
     id: "dashboard-regions",
@@ -93,13 +105,29 @@ export const settingsDestinations = [
     ],
   },
   {
+    // Look moved from Dashboard › Appearance (settings-scope §7 item 6). The
+    // old id and words stay, so a search from habit and an old deep link still
+    // land; Themes themselves are still installed in Plugins.
     id: "dashboard-ui",
-    label: "Appearance",
-    path: "Dashboard / Appearance",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "appearance",
-    keywords: ["ui", "display", "theme", "appearance", "typeface", "font", "dark mode"],
+    label: "Look: theme, light or dark and font",
+    path: "Screens / Default · Look",
+    category: "screens",
+    section: "screen-look",
+    keywords: [
+      "ui",
+      "display",
+      "look",
+      "theme",
+      "appearance",
+      "typeface",
+      "font",
+      "dark mode",
+      "light or dark",
+      "dark hours",
+      "selected theme",
+      "theme picker",
+      "dashboard",
+    ],
   },
   {
     // Moved from Dashboard › Controls (settings-scope §7 item 4). The old id

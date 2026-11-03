@@ -132,6 +132,7 @@ describe("Settings ?setting= deep links after the category reorg", () => {
   it.each([
     ["dashboard-kiosk", "screen-controls"],
     ["dashboard-kiosk-focus", "screen-effects"],
+    ["dashboard-ui", "screen-look"],
   ])("redirects the old %s deep link to its Screens section", async (settingId, sectionId) => {
     route.query = { setting: settingId };
     const w = mount(Settings, {
