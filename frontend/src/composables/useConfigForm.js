@@ -138,6 +138,7 @@ export function useConfigForm(initialConfig = {}) {
         focusLightMode: response.focusLightMode ?? response.focus_light_mode ?? "interaction",
         focusLightDimOthers:
           response.focusLightDimOthers ?? response.focus_light_dim_others ?? true,
+        effectsLevel: response.effectsLevel ?? response.effects_level ?? "auto",
         loadingLight: response.loadingLight ?? response.loading_light ?? "comet",
         touchControls: response.touchControls ?? response.touch_controls ?? "auto",
         touchControlSize: response.touchControlSize ?? response.touch_control_size ?? "medium",

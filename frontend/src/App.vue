@@ -31,6 +31,8 @@ import { useTheme } from "./composables/useTheme";
 import { useUiScale } from "./composables/useUiScale";
 // Force this screen's desktop/phone layout, if it has one
 import { useLayoutOverride } from "./composables/useLayoutOverride";
+// Apply this screen's effects level (full or standard) to <html>
+import { useEffectsLevel } from "./composables/useEffectsLevel";
 // Initialize connection store
 import { useConnectionStore } from "./stores/connection";
 
@@ -45,6 +47,8 @@ if (!guest) {
   const uiScale = useUiScale();
   // Applies the layout class before mount; keeps it in step with Settings.
   useLayoutOverride().syncWithConfig();
+  // Applies data-effects before mount and follows the merged config (calvin-uudb).
+  useEffectsLevel().syncWithConfig();
   const connectionStore = useConnectionStore();
 
   // Ensure theme is initialized immediately

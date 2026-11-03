@@ -251,6 +251,14 @@ describe("DashboardSettings per-screen settings (§2)", () => {
     expect(chips.every(chip => chip.text() === "This screen")).toBe(true);
   });
 
+  it("no longer has a This-screen focus light style row (moved to Screens, calvin-uudb)", () => {
+    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
+    expect(w.text()).not.toContain("Focus light style");
+    expect(w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"))).not.toContain(
+      "Focus light style"
+    );
+  });
+
   it("stores Settings text size in this browser, not on the server", async () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const size = w

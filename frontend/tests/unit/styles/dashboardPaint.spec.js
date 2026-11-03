@@ -49,8 +49,16 @@ const valueLayers = value => {
   return layers.filter(Boolean);
 };
 
+// The opt-in "full" effects level (calvin-uudb) restores the original glow for
+// fast screens. It only applies under [data-effects="full"] on <html>, so the
+// budget below covers the default standard level and leaves those rules alone.
+const isFullStyle = rule =>
+  rule.selector.includes('[data-effects="full"]') ||
+  rule.selector.includes("[data-effects='full']");
+
 const declarationsOf = (file, prop) =>
   styleRules(file)
+    .filter(rule => !isFullStyle(rule))
     .flatMap(rule => rule.declarations.map(declaration => ({ rule, ...declaration })))
     .filter(declaration => declaration.prop === prop);
 
@@ -76,8 +84,42 @@ describe("dashboard paint budget (calvin-c3jz)", () => {
     expect(valueLayers(focused?.value || "")).toHaveLength(1);
   });
 
-  it("dims regions with an opacity overlay, never a filter", () => {
+  it("does not lift the focused region in the standard level", () => {
+    const focused = styleRules("components/ui/FocusPanel.vue").find(
+      rule => rule.selector === ".focus-panel.is-focused"
+    );
+    const transform = focused.declarations.find(d => d.prop === "transform");
+    expect(transform?.value ?? "none").toBe("none");
+  });
+
+  it('allows the costly paint rules only under [data-effects="full"]', () => {
     const rules = styleRules("components/ui/FocusPanel.vue");
+    const costly = rules.filter(rule =>
+      rule.declarations.some(
+        declaration =>
+          declaration.prop === "filter" ||
+          (declaration.prop === "transition" && declaration.value !== "none") ||
+          declaration.prop === "transform"
+      )
+    );
+    expect(costly.length).toBeGreaterThan(0);
+    expect(costly.filter(rule => !isFullStyle(rule)).map(rule => rule.selector)).toEqual([]);
+  });
+
+  it("keeps the original glow and dim available as the full level", () => {
+    const rules = styleRules("components/ui/FocusPanel.vue").filter(isFullStyle);
+    const focused = rules.find(rule => rule.selector.includes(".is-focused"));
+    const shadow = focused?.declarations.find(d => d.prop === "box-shadow")?.value || "";
+    expect(valueLayers(shadow)).toHaveLength(4);
+    expect(focused.declarations.find(d => d.prop === "transform")?.value).toBe("translateY(-2px)");
+    const dim = rules.find(
+      rule => rule.selector.includes(".is-dim") && !rule.selector.includes("::after")
+    );
+    expect(dim?.declarations.find(d => d.prop === "filter")?.value).toMatch(/saturate/);
+  });
+
+  it("dims regions with an opacity overlay, never a filter", () => {
+    const rules = styleRules("components/ui/FocusPanel.vue").filter(rule => !isFullStyle(rule));
     const dim = rules.filter(rule => rule.selector.includes(".is-dim"));
 
     expect(dim.some(rule => rule.declarations.some(d => d.prop === "filter"))).toBe(false);
@@ -85,7 +127,6 @@ describe("dashboard paint budget (calvin-c3jz)", () => {
     const overlay = rules.find(rule => rule.selector.includes("::after"));
     expect(overlay, "a translucent dim overlay pseudo-element").toBeTruthy();
     expect(overlay.declarations.find(d => d.prop === "background")?.value).toMatch(/var\(--/);
-    expect(overlay.declarations.find(d => d.prop === "transition")?.value).toMatch(/opacity/);
   });
 
   it("no dashboard paint surface declares a filter", () => {

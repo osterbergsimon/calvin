@@ -1,6 +1,7 @@
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 import { normalizeLayoutMode } from "../utils/layoutMode";
+import { normalizeEffectsLevel } from "../utils/effectsLevel";
 
 export const createDefaultDisplaySchedule = () => [
   { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
@@ -254,6 +255,14 @@ export const CONFIG_FIELD_DEFINITIONS = [
     name: "focusLightDimOthers",
     keys: ["focusLightDimOthers", "focus_light_dim_others"],
     defaultValue: true,
+  },
+  {
+    // Per screen (kiosk override + household default): "auto" | "full" | "standard"
+    // (calvin-uudb). Auto resolves on the client until a kiosk model report exists.
+    name: "effectsLevel",
+    keys: ["effectsLevel", "effects_level"],
+    defaultValue: "auto",
+    parse: normalizeEffectsLevel,
   },
   {
     name: "loadingLight",

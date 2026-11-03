@@ -489,6 +489,7 @@ describe("ScreensSettings — one screen's page", () => {
       "section-screen-name",
       "section-screen-pages",
       "section-screen-display",
+      "section-screen-effects",
       "section-screen-power",
       "section-screen-touch",
       "section-screen-behaviour",
@@ -1459,6 +1460,7 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     expect(ids).toEqual([
       "section-default-pages",
       "section-layout",
+      "section-default-effects",
       "section-device-power",
       "section-device-keyboard",
       "section-device-behaviour",
@@ -1750,6 +1752,67 @@ describe("ScreensSettings — This browser page (§6)", () => {
     await wrapper.find("[data-test='screens-back']").trigger("click");
     await flushPromises();
     expect(wrapper.find("[data-test='browser-summary']").text()).toBe("Same as Default");
+  });
+});
+
+// calvin-uudb: Effects & focus on a screen's page.
+describe("ScreensSettings — Effects & focus (calvin-uudb)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const effectsControl = wrapper =>
+    wrapper.findAllComponents(SegmentedControl).find(c => c.props("ariaLabel") === "Effects");
+
+  it("shows the Effects row with Auto, Full and Standard, and what Auto picked", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const section = wrapper.find("#section-screen-effects");
+    expect(section.exists()).toBe(true);
+    expect(
+      effectsControl(wrapper)
+        .props("options")
+        .map(o => o.label)
+    ).toEqual(["Auto", "Full", "Standard"]);
+    expect(effectsControl(wrapper).props("modelValue")).toBe("auto");
+    expect(section.text()).toContain("Auto (Standard on this screen)");
+    expect(rowByLabel(wrapper, "Effects").text()).toContain("Same as Default");
+  });
+
+  it("writes the chosen level to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    effectsControl(wrapper).vm.$emit("update:modelValue", "full");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      effectsLevel: "full",
+    });
+    expect(rowByLabel(wrapper, "Effects").text()).toContain("Changed here");
+  });
+
+  it("reads a screen's stored level and resets it to Default", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { effectsLevel: "standard" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(effectsControl(wrapper).props("modelValue")).toBe("standard");
+    expect(rowByLabel(wrapper, "Effects").text()).toContain("Changed here");
+
+    await wrapper.find('[data-test="reset-effects-level"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
+  });
+
+  it("reads a stray stored 'performance' as Standard", async () => {
+    const { wrapper } = mountScreens({ overrides: { effectsLevel: "performance" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(effectsControl(wrapper).props("modelValue")).toBe("standard");
   });
 });
 

@@ -6,6 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { styleRules } from "./lint-helpers.js";
 
 const read = path => readFileSync(resolve(__dirname, "../../../src", path), "utf8");
 const styleOf = file => {
@@ -14,19 +15,29 @@ const styleOf = file => {
   return style.replace(/\/\*[\s\S]*?\*\//g, "");
 };
 
-const transitionProps = (style, selector) => {
-  const match = style.match(new RegExp(`${selector}\\s*\\{[^}]*transition:\\s*([^;]+);`, "s"));
-  return match ? match[1] : "";
-};
+const isFullStyle = selector =>
+  selector.includes('[data-effects="full"]') || selector.includes("[data-effects='full']");
 
 describe("dashboard motion stays on the compositor", () => {
-  it("the region focus frame transitions only transform and opacity", () => {
+  it("the standard focus frame does not animate at all (calvin-fufd)", () => {
+    // Measured on the Pi 3B+: the 2px lift and its 0.2s transitions were about
+    // half of a region swap's cost. The ring and glow just snap.
+    const rules = styleRules("components/ui/FocusPanel.vue");
+    const transitions = rules.filter(rule =>
+      rule.declarations.some(declaration => declaration.prop === "transition")
+    );
+    expect(transitions.length).toBeGreaterThan(0);
+    expect(transitions.filter(rule => !isFullStyle(rule.selector)).map(r => r.selector)).toEqual(
+      []
+    );
+  });
+
+  it('allows the original focus-frame motion only under [data-effects="full"]', () => {
     const style = styleOf("components/ui/FocusPanel.vue");
-    const props = transitionProps(style, "\\.focus-panel");
-    expect(props).toMatch(/transform/);
-    expect(props).toMatch(/opacity/);
-    expect(props).not.toMatch(/box-shadow/);
-    expect(props).not.toMatch(/filter/);
+    const full = style.match(
+      /\[data-effects="full"\]\s+\.focus-panel\s*\{[^}]*transition:\s*([^;]+);/s
+    );
+    expect(full?.[1]).toMatch(/transform/);
   });
 
   it("the status lamp keyframes animate opacity, never filter", () => {
