@@ -8,12 +8,14 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
+from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, is_admin
 from app.services import kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
     agent_update_requested,
     device_config_version,
     get_overrides,
+    merge_into_overrides,
     merge_overrides,
     set_overrides,
 )
@@ -54,17 +56,52 @@ async def get_kiosk_overrides(kiosk_id: str):
 async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     """Replace a kiosk's override layer (upsert). Validated + size-capped."""
     _valid_id_or_400(kiosk_id)
-    if len(json.dumps(body.overrides)) > _MAX_OVERRIDES_BYTES:
+    _checked_overrides(body.overrides)
+    await set_overrides(kiosk_id, body.overrides)
+    return {"id": kiosk_id, "overrides": body.overrides}
+
+
+def _checked_overrides(overrides: dict) -> None:
+    """Refuse an oversized or wrongly typed layer before anything is written."""
+    if len(json.dumps(overrides)) > _MAX_OVERRIDES_BYTES:
         raise HTTPException(status_code=400, detail="Overrides payload too large")
     # Type-check declared config keys via the shared update schema. Unknown keys
     # are still allowed (plugin and future settings), but a declared key with a
     # bad value is a 400 here instead of a stored value that breaks the screen.
     try:
-        ConfigUpdate(**body.overrides)
+        ConfigUpdate(**overrides)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail="Invalid overrides") from exc
-    await set_overrides(kiosk_id, body.overrides)
-    return {"id": kiosk_id, "overrides": body.overrides}
+
+
+@router.patch("/kiosks/{kiosk_id}/overrides")
+async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Request):
+    """Merge keys into a kiosk's override layer (a screen's own write, F2).
+
+    Additive and partial: keys already in the layer stay, nothing is removed.
+    Without an admin session only :data:`KIOSK_SELF_WRITE_KEYS` may be written,
+    so the dashboard's ⋯ Hide controls toggle works on a kiosk that was never
+    signed in. Any other key is a 403 for that caller.
+    """
+    _valid_id_or_400(kiosk_id)
+    if not is_admin(request):
+        refused = sorted(set(body.overrides) - KIOSK_SELF_WRITE_KEYS)
+        if refused:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "code": "override_needs_admin",
+                    "message": (
+                        f"Changing {', '.join(refused)} on a screen needs an admin "
+                        "sign-in. This screen can only change its own controls."
+                    ),
+                },
+            )
+    _checked_overrides(body.overrides)
+    merged = await merge_into_overrides(kiosk_id, body.overrides)
+    if merged is None:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    return {"id": kiosk_id, "overrides": merged}
 
 
 @router.post("/kiosks/{kiosk_id}/update")

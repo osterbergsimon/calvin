@@ -4133,6 +4133,55 @@
           "kiosks"
         ]
       },
+      "patch": {
+        "description": "Merge keys into a kiosk's override layer (a screen's own write, F2).\n\nAdditive and partial: keys already in the layer stay, nothing is removed.\nWithout an admin session only :data:`KIOSK_SELF_WRITE_KEYS` may be written,\nso the dashboard's \u22ef Hide controls toggle works on a kiosk that was never\nsigned in. Any other key is a 403 for that caller.",
+        "operationId": "patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverridesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      },
       "put": {
         "description": "Replace a kiosk's override layer (upsert). Validated + size-capped.",
         "operationId": "put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put",
