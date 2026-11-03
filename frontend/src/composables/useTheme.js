@@ -1,6 +1,7 @@
 import { ref, watch, onMounted, onUnmounted } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useThemesStore } from "../stores/themes";
+import { kioskOverridesQueue } from "../utils/kioskOverridesQueue";
 
 /**
  * Normalize a selected-theme id to `null` when there is no custom theme.
@@ -48,6 +49,11 @@ const THEME_COLOUR_VALUE = /^(#[0-9a-f]{3,8}|(?:rgb|rgba|hsl|hsla)\([0-9.,%\s/+-
 // D1: a theme is a palette family; light/dark is the mode. These two ids were
 // themes in 0.1.0 and are migrated away on load, once.
 const LEGACY_MODE_THEMES = { light: null, dark: "dark" };
+
+// Where an explicit change goes. The household value is the default; a
+// per-screen Look row can pass { kioskId } so the same save writes that
+// screen's overrides instead (settings-scope §7 item 5, rows come in item 6).
+const HOUSEHOLD_THEME_TARGET = Object.freeze({ scope: "household" });
 
 const appliedCustomThemeKeys = new Set();
 
@@ -170,19 +176,21 @@ export function useTheme() {
     }
   };
 
-  // Set theme mode
+  // Set theme mode (an explicit user change, so this is what saves).
   const setThemeMode = async mode => {
     themeMode.value = mode;
     await updateTheme();
+    await saveTheme({ themeMode: mode });
   };
 
-  // Set dark mode time range
-  const setDarkModeTime = (start, end) => {
+  // Set dark mode time range (an explicit user change, so this is what saves).
+  const setDarkModeTime = async (start, end) => {
     darkModeStart.value = start;
     darkModeEnd.value = end;
     if (themeMode.value === "time") {
-      updateTheme();
+      await updateTheme();
     }
+    await saveTheme({ darkModeStart: start, darkModeEnd: end });
   };
 
   // Watch for system theme changes (for 'auto' mode)
@@ -222,12 +230,12 @@ export function useTheme() {
     }
   };
 
-  // Set selected theme
+  // Set selected theme (an explicit user change, so this is what saves).
   const setSelectedTheme = async themeId => {
     selectedThemeId.value = themeId;
     themesStore.setSelectedTheme(themeId);
     await updateTheme();
-    await saveTheme();
+    await saveTheme({ selectedTheme: themeId });
   };
 
   // D1 migration: a config saved by 0.1.0 may point at the retired Light or
@@ -272,17 +280,31 @@ export function useTheme() {
     startTimeCheck();
   };
 
-  // Save theme to config
-  const saveTheme = async () => {
-    await configStore.updateConfig({
+  // Save theme. `changes` is the explicit user change; `target` decides where
+  // it lands: the household config by default, or a screen's kiosk overrides.
+  const saveTheme = async (changes = {}, target = HOUSEHOLD_THEME_TARGET) => {
+    const payload = {
       themeMode: themeMode.value,
       selectedTheme: selectedThemeId.value,
       darkModeStart: darkModeStart.value,
       darkModeEnd: darkModeEnd.value,
-    });
+      ...changes,
+    };
+
+    if (target?.save) {
+      await target.save(payload);
+      return;
+    }
+    if (target?.kioskId) {
+      await kioskOverridesQueue(target.kioskId).setPartial(payload);
+      return;
+    }
+    await configStore.updateConfig(payload);
   };
 
-  // Watch theme mode changes
+  // Apply changes locally. Watching the refs (rather than saving in them) keeps
+  // a config poll, a boot load or a legacy migration from writing the household
+  // config: only the setters above and saveTheme() persist anything (H2).
   watch(themeMode, async newMode => {
     await updateTheme();
     if (newMode === "time") {
@@ -290,70 +312,59 @@ export function useTheme() {
     } else {
       stopTimeCheck();
     }
-    await saveTheme();
   });
 
-  // Watch selected theme changes
   watch(selectedThemeId, async newThemeId => {
     if (newThemeId) {
       await applyCustomTheme(newThemeId);
     } else {
       await applyTheme(isDark.value);
     }
-    await saveTheme();
   });
 
-  // Watch dark mode time changes
   watch([darkModeStart, darkModeEnd], async () => {
     if (themeMode.value === "time") {
       await updateTheme();
     }
-    await saveTheme();
   });
 
-  // Watch config store for theme changes (so changes from Settings page apply immediately)
+  // Watch the config store so a change from Settings or the next config poll
+  // applies on this screen without a reload (H3). These only move the local
+  // refs; the watches above apply them and persist nothing.
   watch(
     () => configStore.themeMode,
-    async newMode => {
+    newMode => {
       if (newMode !== undefined && newMode !== themeMode.value) {
         themeMode.value = newMode;
-        await updateTheme();
       }
     }
   );
 
   watch(
     () => configStore.selectedTheme,
-    async newTheme => {
+    newTheme => {
       const normalized = normalizeThemeId(newTheme);
       if (newTheme !== undefined && normalized !== selectedThemeId.value) {
         selectedThemeId.value = normalized;
         themesStore.setSelectedTheme(normalized);
-        await applyCustomTheme(normalized);
       }
     }
   );
 
   watch(
     () => configStore.darkModeStart,
-    async newStart => {
+    newStart => {
       if (newStart !== undefined && newStart !== darkModeStart.value) {
         darkModeStart.value = newStart;
-        if (themeMode.value === "time") {
-          await updateTheme();
-        }
       }
     }
   );
 
   watch(
     () => configStore.darkModeEnd,
-    async newEnd => {
+    newEnd => {
       if (newEnd !== undefined && newEnd !== darkModeEnd.value) {
         darkModeEnd.value = newEnd;
-        if (themeMode.value === "time") {
-          await updateTheme();
-        }
       }
     }
   );
@@ -387,5 +398,6 @@ export function useTheme() {
     setDarkModeTime,
     updateTheme,
     loadTheme,
+    saveTheme,
   };
 }

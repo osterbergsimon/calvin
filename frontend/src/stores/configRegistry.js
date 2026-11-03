@@ -2,6 +2,7 @@ import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/la
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 import { normalizeLayoutMode } from "../utils/layoutMode";
 import { normalizeEffectsLevel } from "../utils/effectsLevel";
+import { isTypeTheme } from "../styles/typeThemes";
 
 export const createDefaultDisplaySchedule = () => [
   { day: 0, enabled: true, onTime: "06:00", offTime: "22:00" },
@@ -118,6 +119,14 @@ export const CONFIG_FIELD_DEFINITIONS = [
   { name: "selectedTheme", keys: ["selectedTheme", "selected_theme"], defaultValue: null },
   { name: "darkModeStart", keys: ["darkModeStart", "dark_mode_start"], defaultValue: 18 },
   { name: "darkModeEnd", keys: ["darkModeEnd", "dark_mode_end"], defaultValue: 6 },
+  {
+    // Household font (H4). Null means no household choice yet: the frontend
+    // migrates an old browser-local font once, then this holds the value.
+    name: "typeTheme",
+    keys: ["typeTheme", "type_theme"],
+    defaultValue: null,
+    parse: value => (isTypeTheme(value) ? value : null),
+  },
   {
     name: "displayScheduleEnabled",
     keys: ["displayScheduleEnabled", "display_schedule_enabled"],
