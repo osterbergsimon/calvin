@@ -1,6 +1,9 @@
 <!-- frontend/src/components/settings/categories/DefaultScreenSettings.vue -->
 <template>
   <div class="default-screen-settings" data-test="default-screen-page">
+    <ScreensWithOwnSettings :screens="store.kiosks" @open="id => emit('open-screen', id)" />
+    <ScreenSectionIndex :sections="sectionIndex" />
+
     <SettingsSection id="default-pages" title="Pages">
       <SettingRow label="Pages shown">
         <template #description>
@@ -366,6 +369,8 @@ import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import ScreenSectionIndex from "@/components/settings/shared/ScreenSectionIndex.vue";
+import ScreensWithOwnSettings from "@/components/settings/shared/ScreensWithOwnSettings.vue";
 import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
 import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
@@ -389,7 +394,19 @@ import {
 const props = defineProps({
   config: { type: Object, required: true },
 });
-const emit = defineEmits(["update:config"]);
+const emit = defineEmits(["update:config", "open-screen"]);
+
+// The section index uses the same `section-<id>` anchors the deep links use.
+const sectionIndex = [
+  { id: "default-pages", label: "Pages" },
+  { id: "screen-look", label: "Look" },
+  { id: "layout", label: "Display" },
+  { id: "screen-effects", label: "Effects & focus" },
+  { id: "screen-controls", label: "Controls" },
+  { id: "device-power", label: "Power" },
+  { id: "device-keyboard", label: "Touch & keyboard" },
+  { id: "device-behaviour", label: "Behaviour" },
+];
 
 // The household Effects row: Auto means Standard on the screens the home has
 // set up, and Full in a plain browser.
