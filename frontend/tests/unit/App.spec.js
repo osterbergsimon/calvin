@@ -54,6 +54,10 @@ vi.mock("@/composables/useTheme", () => ({
   useTheme: () => ({ loadTheme }),
 }));
 
+vi.mock("@/composables/useTypeTheme", () => ({
+  useTypeTheme: () => ({ syncWithConfig: vi.fn() }),
+}));
+
 vi.mock("@/composables/useUiScale", () => ({
   useUiScale: () => ({ syncWithConfig }),
 }));

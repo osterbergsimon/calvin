@@ -11,7 +11,7 @@
 
 import { test, expect } from "@playwright/test";
 import { installApiMock } from "./phone/fixtures/api-mock.js";
-import { gotoSettings } from "./phone/fixtures/navigation.js";
+import { gotoDashboard, gotoSettings } from "./phone/fixtures/navigation.js";
 
 const THEME_CONTROL = /^Light or dark:/;
 
@@ -67,5 +67,53 @@ test.describe("Theme Switching", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.locator("html")).toHaveClass(/dark/);
+  });
+});
+
+test.describe("Theme scope regressions (settings-scope §7 item 5)", () => {
+  test("a kiosk loading its own dark config does not write the household theme", async ({
+    page,
+  }) => {
+    const api = await installApiMock(page, {
+      config: { themeMode: "dark", selectedTheme: null, typeTheme: null },
+    });
+
+    await page.goto("/?kiosk=hallway");
+    await expect(page.locator("#app")).toBeVisible();
+    await page.waitForLoadState("networkidle");
+
+    // The kiosk shows its merged theme...
+    await expect(page.locator("html")).toHaveClass(/dark/);
+    // ...but loading it is not a change to the household.
+    expect(api.configPosts).toEqual([]);
+    expect(api.config.themeMode).toBe("dark");
+  });
+
+  test("applies a household theme change on the next config poll", async ({ page }) => {
+    const api = await installApiMock(page, {
+      config: { themeMode: "auto", configPollInterval: 1 },
+    });
+
+    await page.goto("/");
+    await expect(page.locator("#app")).toBeVisible();
+    await expect(page.locator("html")).toHaveClass(/light/);
+
+    api.config.themeMode = "dark";
+
+    await expect(page.locator("html")).toHaveClass(/dark/, { timeout: 6000 });
+    // A value that arrived from the server is applied, never echoed back.
+    expect(api.configPosts).toEqual([]);
+  });
+
+  test("the household font comes from config", async ({ page }) => {
+    const api = await installApiMock(page, { config: { typeTheme: "marquee" } });
+
+    await gotoDashboard(page);
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.style.getPropertyValue("--font-display"))
+      )
+      .toContain("Space Grotesk");
+    expect(api.configPosts).toEqual([]);
   });
 });

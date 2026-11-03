@@ -9,6 +9,26 @@ describe("configRegistry — pluginRepositoryUrl", () => {
   });
 });
 
+describe("configRegistry — typeTheme", () => {
+  it("defaults typeTheme to None so a browser can migrate its old font once", () => {
+    const refs = { typeTheme: { value: "marquee" } };
+    applyConfigPayload({}, refs, { useDefaults: true });
+    expect(refs.typeTheme.value).toBeNull();
+  });
+
+  it("maps the snake_case type_theme key onto typeTheme", () => {
+    const refs = { typeTheme: { value: null } };
+    applyConfigPayload({ type_theme: "station" }, refs, { useDefaults: true });
+    expect(refs.typeTheme.value).toBe("station");
+  });
+
+  it("rejects an unknown font id from the config", () => {
+    const refs = { typeTheme: { value: null } };
+    applyConfigPayload({ typeTheme: "comic-sans" }, refs, { useDefaults: true });
+    expect(refs.typeTheme.value).toBeNull();
+  });
+});
+
 describe("configRegistry — uiSize", () => {
   it("defaults uiSize to 'default' when absent", () => {
     const refs = { uiSize: { value: null } };

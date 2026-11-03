@@ -61,6 +61,8 @@ export const sampleConfig = {
   availableScreens: ["page-home", "page-kitchen"],
   defaultScreenId: "page-home",
   showWebServices: true,
+  // One-time display migration already done: boot must not POST on its own.
+  displaySettingsMigrated: true,
   photoFrameEnabled: false,
   photoFrameTimeout: 300,
   photoRotationInterval: 30,
@@ -87,6 +89,7 @@ export const sampleConfig = {
   selectedTheme: null,
   darkModeStart: 18,
   darkModeEnd: 6,
+  typeTheme: null,
   displayScheduleEnabled: false,
   displayTimeoutEnabled: false,
   displayTimeout: 0,
@@ -365,6 +368,8 @@ export async function installApiMock(page, options = {}) {
     // Flip to true to simulate a server that stopped answering every route.
     down: false,
     requests: [],
+    // Bodies of POST /api/config, so a test can prove which keys were written.
+    configPosts: [],
     unmatched: [],
     // Local photos (calvin-n2my): the browser's own mutable library.
     images: JSON.parse(JSON.stringify(sampleImages)),
@@ -442,7 +447,9 @@ export async function installApiMock(page, options = {}) {
 
     if (path === "/api/config" && method === "GET") return json(route, state.config);
     if (path === "/api/config" && method === "POST") {
-      state.config = { ...state.config, ...request.postDataJSON() };
+      const body = request.postDataJSON();
+      state.configPosts.push(body);
+      state.config = { ...state.config, ...body };
       return json(route, state.config);
     }
     if (path === "/api/config/git/branches") return json(route, { branches: ["main", "develop"] });
@@ -547,7 +554,10 @@ export async function installApiMock(page, options = {}) {
       return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
-      return json(route, { deviceConfigVersion: "3" });
+      // The real endpoint returns the household config with the kiosk's
+      // overrides merged in. Mirroring that lets e2e cover per-screen values
+      // (e.g. a dark theme) arriving without a reload.
+      return json(route, { ...state.config, deviceConfigVersion: "3" });
     }
 
     if (path === "/api/security/sealed-mode") {
