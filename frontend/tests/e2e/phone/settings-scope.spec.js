@@ -42,10 +42,6 @@ test.describe("settings scope — screens write only that screen", () => {
     await page.getByRole("option", { name: "Dark", exact: true }).click();
     await expect.poll(() => api.overridesByKiosk.hallway?.themeMode).toBe("dark");
 
-    await page
-      .locator("#section-screen-display")
-      .getByText("Dashboard size")
-      .scrollIntoViewIfNeeded();
     await page.getByRole("button", { name: /^Dashboard size:/ }).click();
     await page.getByRole("option", { name: "Large", exact: true }).click();
     await expect.poll(() => api.overridesByKiosk.hallway?.touchControlSize).toBe("large");
@@ -238,6 +234,24 @@ test.describe("settings scope — the dashboard Hide controls toggle (F2)", () =
   }) => {
     const api = await installApiMock(page, {
       auth: { configured: true, authenticated: false },
+      // The real kiosk config endpoint merges this screen's overrides. Use it
+      // here so the reload proves the PATCH was persisted server-side; other
+      // specs keep the fixture's plain household config.
+      overrides: [
+        [
+          /^\/api\/kiosks\/hallway\/config$/,
+          (route, { state }) =>
+            route.fulfill({
+              status: 200,
+              contentType: "application/json",
+              body: JSON.stringify({
+                ...state.config,
+                ...(state.overridesByKiosk.hallway || {}),
+                deviceConfigVersion: "3",
+              }),
+            }),
+        ],
+      ],
     });
 
     await page.goto("/?kiosk=hallway");

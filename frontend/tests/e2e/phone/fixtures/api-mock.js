@@ -567,17 +567,11 @@ export async function installApiMock(page, options = {}) {
       }
       return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
     }
-    const kioskConfig = path.match(/^\/api\/kiosks\/([^/]+)\/config$/);
-    if (kioskConfig) {
+    if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
       // The real endpoint returns the household config with the kiosk's
-      // overrides merged in. Mirroring that lets e2e cover per-screen values
-      // (e.g. a dark theme, or hidden controls after a reload).
-      const id = decodeURIComponent(kioskConfig[1]);
-      return json(route, {
-        ...state.config,
-        ...(state.overridesByKiosk[id] || {}),
-        deviceConfigVersion: "3",
-      });
+      // overrides merged in. A spec that needs that merge adds a route of its
+      // own (see settings-scope.spec.js) so other specs keep the plain config.
+      return json(route, { ...state.config, deviceConfigVersion: "3" });
     }
 
     if (path === "/api/security/sealed-mode") {
