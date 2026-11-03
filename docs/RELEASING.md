@@ -115,6 +115,11 @@ These are repository settings, not code. Check them once:
 - **`main` protection**: allow PRs from `develop` (the promotion PR) and the
   `autorelease: pending` release PR to be merged by a maintainer. Do not let
   anyone push tags directly.
+- **`develop` branch protection**: include the **Commit Attribution** check from
+  `pr-checks.yml` in the required status checks. It rejects commits carrying AI
+  co-author or `Claude-Session` trailers, generated-by lines, or
+  `@anthropic.com` / `@openai.com` author emails; the rule is documented in
+  [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Installing a release
 
