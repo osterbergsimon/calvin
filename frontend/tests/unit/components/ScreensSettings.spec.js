@@ -489,6 +489,7 @@ describe("ScreensSettings — one screen's page", () => {
     expect(ids).toEqual([
       "section-screen-name",
       "section-screen-pages",
+      "section-screen-look",
       "section-screen-display",
       "section-screen-effects",
       "section-screen-controls",
@@ -1462,6 +1463,7 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
       .filter(id => id !== "section-screens-list");
     expect(ids).toEqual([
       "section-default-pages",
+      "section-screen-look",
       "section-layout",
       "section-screen-effects",
       "section-screen-controls",
@@ -2006,6 +2008,236 @@ describe("ScreensSettings — moved Controls and Effects & focus (§7 item 4)", 
       await flushPromises();
       expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
       expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+});
+
+// §7 item 6: Look moved from Dashboard › Appearance, and the two sizes moved
+// into Display. A screen page writes every one to that screen's overrides and
+// never to the household config or this browser's own look.
+describe("ScreensSettings — Look and Display sizes (§7 item 6)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const themePicker = wrapper => wrapper.findComponent({ name: "ThemePicker" });
+  const control = (wrapper, kind, label) =>
+    wrapper.findAllComponents(kind).find(c => c.props("ariaLabel") === label);
+
+  it("puts Look after Pages, with Theme, Light or dark and Font", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const look = wrapper.find("#section-screen-look");
+    expect(look.exists()).toBe(true);
+    expect(look.find(".settings-section__eyebrow").text()).toBe("Look");
+    for (const label of ["Theme", "Light or dark", "Font"]) {
+      expect(rowByLabel(wrapper, label), label).toBeTruthy();
+    }
+    // The dark hours only matter on a schedule.
+    expect(rowByLabel(wrapper, "Dark from")).toBeUndefined();
+    expect(rowByLabel(wrapper, "Dark to")).toBeUndefined();
+  });
+
+  it("writes Theme to this screen's overrides, not the household config", async () => {
+    const original = { displayName: "Kitchen", orientation: "portrait" };
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides: original })],
+      overrides: original,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    themePicker(wrapper).vm.$emit("select", "ocean");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      ...original,
+      selectedTheme: "ocean",
+    });
+    expect(wrapper.emitted("update:config")).toBeUndefined();
+    expect(wrapper.find("#section-screen-look").text()).toContain(
+      "Kitchen will switch on its next check (about 30 s)"
+    );
+  });
+
+  it("writes the font to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Font").vm.$emit("update:modelValue", "marquee");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      typeTheme: "marquee",
+    });
+    expect(rowByLabel(wrapper, "Font").text()).toContain("Changed here");
+  });
+
+  it("writes Light or dark and the dark hours to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { themeMode: "time", darkModeStart: 18, darkModeEnd: 6 },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Light or dark").vm.$emit("update:modelValue", "dark");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      themeMode: "dark",
+      darkModeStart: 18,
+      darkModeEnd: 6,
+    });
+
+    control(wrapper, SelectPill, "Light or dark").vm.$emit("update:modelValue", "time");
+    await flushPromises();
+    const pickers = wrapper.find("#section-screen-look").findAll('input[type="time"]');
+    expect(pickers).toHaveLength(2);
+    await pickers[0].setValue("20:00");
+    await flushPromises();
+    expect(store.saveOverrides.mock.calls.at(-1)?.[1]).toMatchObject({ darkModeStart: 20 });
+    await wrapper.find("#section-screen-look").findAll('input[type="time"]')[1].setValue("07:00");
+    await flushPromises();
+    expect(store.saveOverrides.mock.calls.at(-1)?.[1]).toMatchObject({ darkModeEnd: 7 });
+  });
+
+  it("does not change this browser's own look when editing a screen", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+    document.documentElement.classList.add("light");
+
+    themePicker(wrapper).vm.$emit("select", "ocean");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { selectedTheme: "ocean" });
+    expect(document.documentElement.classList.contains("light")).toBe(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(document.documentElement.style.getPropertyValue("--bg-0")).toBe("");
+    expect(wrapper.emitted("update:config")).toBeUndefined();
+    document.documentElement.classList.remove("light", "dark");
+  });
+
+  it("writes Dashboard size and Settings text size to that screen", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Dashboard size").vm.$emit("update:modelValue", "large");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      touchControlSize: "large",
+    });
+
+    control(wrapper, SegmentedControl, "Settings text size").vm.$emit(
+      "update:modelValue",
+      "compact"
+    );
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      touchControlSize: "large",
+      uiSize: "compact",
+    });
+    // The override, not this browser's own calvin-ui-size layer.
+    expect(window.localStorage.getItem("calvin-ui-size")).toBeNull();
+  });
+
+  it("resets one Look row without touching the others", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { selectedTheme: "ocean", typeTheme: "marquee", orientation: "portrait" },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find('[data-test="reset-theme"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      typeTheme: "marquee",
+      orientation: "portrait",
+    });
+  });
+
+  it("Reset everything and Use these as the default cover the new rows", async () => {
+    const overrides = {
+      displayName: "Kitchen",
+      selectedTheme: "ocean",
+      themeMode: "dark",
+      typeTheme: "marquee",
+      touchControlSize: "large",
+      uiSize: "compact",
+    };
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides })],
+      overrides,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='use-as-default']").trigger("click");
+    const modal = wrapper.findComponent({ name: "ConfirmModal" });
+    expect(modal.props("message")).toContain("Theme");
+    expect(modal.props("message")).toContain("Light or dark");
+    expect(modal.props("message")).toContain("Font");
+    expect(modal.props("message")).toContain("Dashboard size");
+    expect(modal.props("message")).toContain("Settings text size");
+    modal.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(wrapper.emitted("update:config")).toContainEqual([
+      {
+        selectedTheme: "ocean",
+        themeMode: "dark",
+        typeTheme: "marquee",
+        touchControlSize: "large",
+        uiSize: "compact",
+      },
+    ]);
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { displayName: "Kitchen" });
+  });
+
+  it("Reset everything drops the new rows and keeps the name", async () => {
+    const overrides = {
+      displayName: "Kitchen",
+      selectedTheme: "ocean",
+      themeMode: "dark",
+      typeTheme: "marquee",
+      touchControlSize: "large",
+      uiSize: "compact",
+    };
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides })],
+      overrides,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='reset-everything']").trigger("click");
+    const modal = wrapper.findComponent({ name: "ConfirmModal" });
+    expect(modal.props("message")).toBe(
+      "Its 5 changed settings go back to the default. Its name stays."
+    );
+    modal.vm.$emit("confirm");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { displayName: "Kitchen" });
+  });
+
+  it("opens the Default Look section from the old Appearance deep link", async () => {
+    const { wrapper } = mountScreens({ initialSection: "screen-look" });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+    expect(wrapper.find("#section-screen-look").exists()).toBe(true);
+  });
+
+  it("opens this screen's own Look section from the old Appearance deep link on a kiosk", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({ initialSection: "screen-look" });
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-look").exists()).toBe(true);
     } finally {
       window.sessionStorage.clear();
     }

@@ -19,22 +19,38 @@
         @click="handleThemeSelect(theme)"
         @keydown.enter.prevent="handleThemeSelect(theme)"
       >
-        <div class="theme-selection-preview">
-          <img
-            v-if="theme.preview_image"
-            class="theme-preview-image"
-            :src="`/api/plugins/${theme.id}/preview`"
-            alt=""
-          />
-          <div v-else class="theme-preview-mini" :style="pageStyle(theme)">
-            <div class="mini-panel" :style="panelStyle(theme)">
-              <span class="mini-heading" :style="{ background: paletteFor(theme).ink }" />
-              <span class="mini-line" :style="{ background: paletteFor(theme)['ink-3'] }" />
-              <span class="mini-actions">
-                <span class="mini-primary" :style="buttonStyle(theme)">Aa</span>
-                <span class="mini-tag" :style="tagStyle(theme)">Tag</span>
-              </span>
+        <div
+          class="theme-selection-preview"
+          :class="{ 'theme-selection-preview--pair': showBothModes }"
+        >
+          <div
+            v-for="mode in previewModes"
+            :key="mode.label || 'single'"
+            class="theme-preview-mode"
+          >
+            <img
+              v-if="theme.preview_image && !showBothModes"
+              class="theme-preview-image"
+              :src="`/api/plugins/${theme.id}/preview`"
+              alt=""
+            />
+            <div v-else class="theme-preview-mini" :style="pageStyle(theme, mode.dark)">
+              <div class="mini-panel" :style="panelStyle(theme, mode.dark)">
+                <span
+                  class="mini-heading"
+                  :style="{ background: paletteFor(theme, mode.dark).ink }"
+                />
+                <span
+                  class="mini-line"
+                  :style="{ background: paletteFor(theme, mode.dark)['ink-3'] }"
+                />
+                <span class="mini-actions">
+                  <span class="mini-primary" :style="buttonStyle(theme, mode.dark)">Aa</span>
+                  <span class="mini-tag" :style="tagStyle(theme, mode.dark)">Tag</span>
+                </span>
+              </div>
             </div>
+            <span v-if="mode.label" class="theme-preview-caption">{{ mode.label }}</span>
           </div>
           <span v-if="selectedThemeId === theme.id" class="theme-selected-badge">
             <svg class="theme-selected-badge__glyph" viewBox="0 0 24 24" aria-hidden="true">
@@ -62,6 +78,7 @@
 </template>
 
 <script setup>
+import { computed } from "vue";
 import { mdiCheck } from "@mdi/js";
 import Tag from "@/components/ui/Tag.vue";
 import { themePalette } from "@/utils/themePalettes";
@@ -89,9 +106,24 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Show each theme as a light thumbnail and a dark one side by side, so a
+  // remote screen's preview is readable whichever mode the viewer is in.
+  showBothModes: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 const emit = defineEmits(["select"]);
+
+const previewModes = computed(() =>
+  props.showBothModes
+    ? [
+        { label: "Light", dark: false },
+        { label: "Dark", dark: true },
+      ]
+    : [{ label: null, dark: props.dark }]
+);
 
 const handleThemeSelect = theme => {
   // A theme that fails the load check stays visible but cannot be selected.
@@ -99,25 +131,25 @@ const handleThemeSelect = theme => {
   emit("select", theme.id);
 };
 
-const paletteFor = theme => themePalette(theme, props.dark);
+const paletteFor = (theme, dark) => themePalette(theme, dark);
 
-const pageStyle = theme => {
-  const palette = paletteFor(theme);
+const pageStyle = (theme, dark) => {
+  const palette = paletteFor(theme, dark);
   return { background: palette["bg-0"], borderColor: palette.line };
 };
 
-const panelStyle = theme => {
-  const palette = paletteFor(theme);
+const panelStyle = (theme, dark) => {
+  const palette = paletteFor(theme, dark);
   return { background: palette["bg-1"], borderColor: palette.line };
 };
 
-const buttonStyle = theme => {
-  const palette = paletteFor(theme);
+const buttonStyle = (theme, dark) => {
+  const palette = paletteFor(theme, dark);
   return { background: palette.focus, color: palette["focus-ink"] };
 };
 
-const tagStyle = theme => {
-  const palette = paletteFor(theme);
+const tagStyle = (theme, dark) => {
+  const palette = paletteFor(theme, dark);
   // A tinted status tag, the same recipe Tag.vue uses.
   return {
     background: `color-mix(in srgb, ${palette.ok} 15%, ${palette["bg-1"]})`,
@@ -191,6 +223,7 @@ const hasHueWarning = theme =>
 
 .theme-selection-preview {
   position: relative;
+  display: grid;
   width: 100%;
   aspect-ratio: 16 / 9;
   border-radius: var(--radius-xs);
@@ -200,15 +233,40 @@ const hasHueWarning = theme =>
   border: 1px solid var(--line);
 }
 
+.theme-selection-preview--pair {
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap-1);
+  padding: var(--gap-1);
+  box-sizing: border-box;
+}
+
+.theme-preview-mode {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.theme-preview-caption {
+  font-size: var(--fs-2xs);
+  line-height: 1.1;
+  text-align: center;
+  color: var(--ink-3);
+}
+
 .theme-preview-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  flex: 1;
+  min-height: 0;
 }
 
 .theme-preview-mini {
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 0;
   padding: 8%;
   border: 1px solid transparent;
   box-sizing: border-box;

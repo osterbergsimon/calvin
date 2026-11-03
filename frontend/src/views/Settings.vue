@@ -321,7 +321,6 @@ const SECTION_BY_CATEGORY_TAB = {
     regions: "regions",
     clock: "clock-bar-clock",
     "bar-items": "clock-bar-items",
-    appearance: "appearance",
     "kiosk-touch-focus": "kiosk-touch-focus",
   },
   content: {

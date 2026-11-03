@@ -53,6 +53,7 @@ describe("DefaultScreenSettings", () => {
     const wrapper = mountDefault();
     expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
       "section-default-pages",
+      "section-screen-look",
       "section-layout",
       "section-screen-effects",
       "section-screen-controls",
@@ -899,5 +900,101 @@ describe("DefaultScreenSettings F1 regression", () => {
     expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBeNull();
     expect(localStorage.getItem("calvin-screen-loadingLight")).toBeNull();
     expect(localStorage.getItem("calvin-layout-mode")).toBeNull();
+  });
+});
+
+// §7 item 6: Look moved from Dashboard › Appearance, and the two sizes moved
+// into Display. On Default they are the household values, so they write
+// update:config and never this browser's or this kiosk's own choice.
+describe("DefaultScreenSettings Look and Display sizes (§7 item 6)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  const control = (w, kind, label) =>
+    w.findAllComponents({ name: kind }).find(c => c.props("ariaLabel") === label);
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+  const lastPatch = w => (w.emitted("update:config") || []).at(-1)?.[0];
+
+  it("puts Look after Pages with Theme, Light or dark and Font", () => {
+    const w = mountDefault();
+    const section = w.find("#section-screen-look");
+    expect(section.exists()).toBe(true);
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Look");
+    for (const label of ["Theme", "Light or dark", "Font"]) {
+      expect(row(w, label), label).toBeTruthy();
+    }
+    // Default has no per-row scope line.
+    expect(section.text()).not.toContain("Same as Default");
+    expect(section.text()).not.toContain("Changed here");
+  });
+
+  it("writes Theme, Light or dark and Font to the household config", async () => {
+    const w = mountDefault({ selectedTheme: "ocean", themeMode: "auto", typeTheme: "instrument" });
+
+    w.findComponent({ name: "ThemePicker" }).vm.$emit("select", "midnight");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ selectedTheme: "midnight" });
+
+    control(w, "SelectPill", "Light or dark").vm.$emit("update:modelValue", "dark");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ themeMode: "dark" });
+
+    control(w, "SelectPill", "Font").vm.$emit("update:modelValue", "station");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ typeTheme: "station" });
+
+    expect(localStorage.getItem("calvin-type-theme")).toBeNull();
+  });
+
+  it("writes the dark hours to the household config on a schedule", async () => {
+    const w = mountDefault({ themeMode: "time", darkModeStart: 18, darkModeEnd: 6 });
+    const pickers = w.find("#section-screen-look").findAll('input[type="time"]');
+    expect(pickers).toHaveLength(2);
+
+    await pickers[0].setValue("20:00");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ darkModeStart: 20 });
+
+    await w.find("#section-screen-look").findAll('input[type="time"]')[1].setValue("07:00");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ darkModeEnd: 7 });
+  });
+
+  it("names a screen that keeps its own Theme when Default's theme changes", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [
+      kiosk({
+        id: "hallway",
+        overrides: { displayName: "Hallway", selectedTheme: "midnight" },
+      }),
+    ];
+    const w = mountDefault();
+    w.findComponent({ name: "ThemePicker" }).vm.$emit("select", "ocean");
+    await flushPromises();
+
+    const note = w.find("[data-test='default-override-note']");
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain("Hallway keeps its own Theme.");
+  });
+
+  it("writes Dashboard size and Settings text size to the household config", async () => {
+    const w = mountDefault({ touchControlSize: "medium", uiSize: "default" });
+
+    control(w, "SelectPill", "Dashboard size").vm.$emit("update:modelValue", "large");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ touchControlSize: "large" });
+
+    control(w, "SegmentedControl", "Settings text size").vm.$emit("update:modelValue", "compact");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ uiSize: "compact" });
+
+    // Default writes the household value; the plain-browser layer stays in
+    // This browser (ThisBrowserSettings / useUiScale) and is not touched here.
+    expect(localStorage.getItem("calvin-ui-size")).toBeNull();
+    expect(localStorage.getItem("calvin-screen-uiSize")).toBeNull();
   });
 });

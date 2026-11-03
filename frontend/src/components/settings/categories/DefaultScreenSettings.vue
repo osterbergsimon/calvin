@@ -52,6 +52,23 @@
       </InlineNote>
     </SettingsSection>
 
+    <SettingsSection id="screen-look" title="Look">
+      <template v-for="descriptor in visibleLookDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="look[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
+    </SettingsSection>
+
     <SettingsSection id="layout" title="Display">
       <SettingRow
         label="Orientation"
@@ -102,6 +119,20 @@
         @change-them-too="changeThemToo"
         @dismiss="dismissNote"
       />
+      <template v-for="descriptor in displaySizeDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="displaySizes[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <SettingsSection id="screen-effects" title="Effects & focus">
@@ -549,6 +580,36 @@ onMounted(() => window.addEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLa
 onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDeviceLayout));
 
 const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezone));
+
+// --- Look: theme, light or dark and font (settings-scope §7 item 6) --------
+// Default is the household value. A screen page writes the same keys into that
+// screen's overrides instead, so choosing a look here reaches every screen that
+// follows Default and no screen that has its own.
+const lookDescriptors = descriptorsForSection("look");
+const look = computed(() =>
+  Object.fromEntries(
+    lookDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleLookDescriptors = computed(() => visibleDescriptors(lookDescriptors, look.value));
+
+// Display sizes moved in from Dashboard (§7 item 6). The other Display rows
+// are older hand-written rows above; these two are descriptor-driven.
+const DISPLAY_SIZE_KEYS = ["touchControlSize", "uiSize"];
+const displaySizeDescriptors = descriptorsForSection("display").filter(descriptor =>
+  DISPLAY_SIZE_KEYS.includes(descriptor.key)
+);
+const displaySizes = computed(() =>
+  Object.fromEntries(
+    displaySizeDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
 
 // --- Behaviour: household values (settings-scope §7 items 2–3) --------------
 // Default is the household value for these rows. They used to reuse

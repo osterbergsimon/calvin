@@ -291,6 +291,28 @@
         </InlineNote>
       </SettingsSection>
 
+      <SettingsSection id="screen-look" title="Look">
+        <template v-for="descriptor in visibleLookDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :value="look[descriptor.key]"
+            :overridden="Boolean(lookOverridden[descriptor.key])"
+            :note="lookNote.key === descriptor.key ? lookNote.text : ''"
+            @set="value => setLook(descriptor.key, value)"
+            @reset="() => resetLook(descriptor.key)"
+          />
+        </template>
+        <InlineNote
+          v-if="lookMsg"
+          class="screens-saved"
+          :tone="toneFor(lookMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ lookMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-display" title="Display">
         <SettingRow label="Orientation">
           <template #description>
@@ -334,6 +356,15 @@
             @update:model-value="setApply"
           />
         </SettingRow>
+        <template v-for="descriptor in displaySizeDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :value="displaySizes[descriptor.key]"
+            :overridden="Boolean(displaySizesOverridden[descriptor.key])"
+            @set="value => setDisplaySize(descriptor.key, value)"
+            @reset="() => resetDisplaySize(descriptor.key)"
+          />
+        </template>
         <Card data-test="screen-live-preview">
           <PageThumbnail
             :page="selectedStartPage"
@@ -701,12 +732,13 @@ const editorOpen = ref(false);
 // These sections exist on both the Default page and a screen's own page, so a
 // deep link can open the right one for the device: a kiosk opens its own page,
 // any other browser opens Default.
-const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-effects", "screen-controls"]);
+const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-look", "screen-effects", "screen-controls"]);
 const DEFAULT_SECTION_IDS = new Set([
   "layout",
   "device-power",
   "device-keyboard",
   "device-behaviour",
+  "screen-look",
   "screen-effects",
   "screen-controls",
 ]);
@@ -747,6 +779,8 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
 
 const nameMsg = ref("");
 const pagesMsg = ref("");
+const lookMsg = ref("");
+const lookNote = ref({ key: "", text: "" });
 const displayMsg = ref("");
 const effectsMsg = ref("");
 const controlsMsg = ref("");
@@ -885,6 +919,8 @@ const footerCopy = computed(() => {
 function clearMessages() {
   nameMsg.value = "";
   pagesMsg.value = "";
+  lookMsg.value = "";
+  clearLookNote();
   displayMsg.value = "";
   effectsMsg.value = "";
   controlsMsg.value = "";
@@ -1103,15 +1139,19 @@ const effOsk = computed(() =>
 // the keys whose value has not been tapped again since.
 async function persist(next, messageRef, onlineCopy, offlineCopy) {
   const kioskId = selectedId.value;
-  if (!kioskId) return;
-  messageRef.value = "";
+  if (!kioskId) return false;
+  if (messageRef) messageRef.value = "";
   try {
     await kioskOverridesQueue(kioskId).replaceAll(next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
-    messageRef.value = online ? onlineCopy : offlineCopy;
+    if (messageRef) messageRef.value = online ? onlineCopy : offlineCopy;
     await refreshDesiredVersion(kioskId);
+    return true;
   } catch {
-    messageRef.value = "Couldn't save to the server. Check the connection and try again.";
+    if (messageRef) {
+      messageRef.value = "Couldn't save to the server. Check the connection and try again.";
+    }
+    return false;
   }
 }
 
@@ -1176,6 +1216,92 @@ function resetDefaultScreen() {
   const next = { ...overrides.value };
   delete next.defaultScreenId;
   persistPages(next);
+}
+
+// --- Look: theme, light or dark and font (§7 item 6) ----------------------
+// These rows write this screen's overrides from any browser, so editing the
+// kitchen's theme from a desktop never changes the desktop's own look. The
+// kiosk applies the merged config on its next poll (~30 s).
+const lookDescriptors = descriptorsForSection("look");
+const lookOverridden = computed(() =>
+  Object.fromEntries(
+    lookDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const look = computed(() =>
+  Object.fromEntries(
+    lookDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleLookDescriptors = computed(() => visibleDescriptors(lookDescriptors, look.value));
+
+const LOOK_NOTE_MS = 10000;
+let lookNoteTimer = null;
+function clearLookNote() {
+  if (lookNoteTimer !== null) {
+    clearTimeout(lookNoteTimer);
+    lookNoteTimer = null;
+  }
+  lookNote.value = { key: "", text: "" };
+}
+function showLookNote(key) {
+  clearLookNote();
+  lookNote.value = {
+    key,
+    text: `${selectedName.value} will switch on its next check (about 30 s)`,
+  };
+  lookNoteTimer = setTimeout(clearLookNote, LOOK_NOTE_MS);
+}
+function persistLook(next, key) {
+  return persist(next, lookMsg, APPLIED_BY_AGENT, OFFLINE_COPY).then(ok => {
+    if (ok) showLookNote(key);
+    return ok;
+  });
+}
+function setLook(key, value) {
+  persistLook({ ...overrides.value, [key]: value }, key);
+}
+function resetLook(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistLook(next, key);
+}
+
+// --- Display sizes moved in from Dashboard (§7 item 6) --------------------
+const DISPLAY_SIZE_KEYS = ["touchControlSize", "uiSize"];
+const displaySizeDescriptors = descriptorsForSection("display").filter(descriptor =>
+  DISPLAY_SIZE_KEYS.includes(descriptor.key)
+);
+const displaySizesOverridden = computed(() =>
+  Object.fromEntries(
+    displaySizeDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const displaySizes = computed(() =>
+  Object.fromEntries(
+    displaySizeDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+function persistDisplaySize(next) {
+  persist(next, displayMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+}
+function setDisplaySize(key, value) {
+  persistDisplaySize({ ...overrides.value, [key]: value });
+}
+function resetDisplaySize(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistDisplaySize(next);
 }
 
 function persistDisplay(next) {
@@ -1545,6 +1671,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  clearLookNote();
   window.removeEventListener("beforeunload", flushQueuedOverrides);
   window.removeEventListener("pagehide", flushQueuedOverrides);
   flushQueuedOverrides();

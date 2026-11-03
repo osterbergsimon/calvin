@@ -1,8 +1,9 @@
 /**
  * CLV-66 — Dashboard and Screens settings on a phone.
  *
- * Dashboard: pages & regions launcher, clock bar, appearance, controls.
- * Screens: the Default page, one screen's own page, and per-screen overrides.
+ * Dashboard: pages & regions launcher, clock bar and remote buttons.
+ * Screens: the Default page, one screen's own page, and per-screen overrides
+ * (including the Look group that used to be Dashboard › Appearance).
  */
 
 import { expect } from "@playwright/test";
@@ -22,28 +23,34 @@ test.describe("phone: Dashboard", () => {
     const dashboard = page.locator(".dashboard-settings");
     await expect(dashboard.getByText("Pages & regions")).toBeVisible();
     await expect(dashboard.getByRole("button", { name: "Open editor" })).toBeVisible();
-    for (const section of ["Clock", "Clock bar layout", "Appearance"]) {
+    for (const section of ["Clock", "Clock bar layout", "Remote buttons"]) {
       await expect(
         dashboard.locator(".settings-section__eyebrow", { hasText: section }).first()
       ).toBeVisible();
     }
+    // Appearance moved to Screens › Look, so Dashboard has no theme row.
+    await expect(dashboard.locator("#section-appearance")).toHaveCount(0);
+    await expect(dashboard.locator(".theme-picker__trigger")).toHaveCount(0);
     await expectPhoneLayout(page, "Dashboard settings");
-
-    // The theme chooser is the widest popover in the category.
-    await dashboard.locator(".theme-picker__trigger").click();
-    await expect(page.locator(".theme-picker__panel")).toBeVisible();
-    await expectPhoneLayout(page, "theme chooser", { scope: ".theme-picker__panel" });
-    await page.keyboard.press("Escape");
 
     // The moved per-screen groups leave a signpost behind (§4). It opens
     // Screens › Default on a plain browser, where the household values live.
     const signpost = dashboard.locator('[data-test="dashboard-screen-signpost"]');
-    await expect(signpost).toContainText("Focus light and controls are set per screen.");
+    await expect(signpost).toContainText("Look, focus light and controls are set per screen.");
     await dashboard.getByRole("button", { name: "Open Screens" }).click();
     await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
     const controls = page.locator("#section-screen-controls");
     await expect(controls).toBeVisible();
     await expect(page.locator("#section-screen-effects")).toBeVisible();
+    await expect(page.locator("#section-screen-look")).toBeVisible();
+
+    // The theme chooser is the widest popover in Screens now.
+    await page.locator(".theme-picker__trigger").click();
+    await expect(page.locator(".theme-picker__panel")).toBeVisible();
+    await expect(page.locator(".theme-preview-caption").first()).toHaveText("Light");
+    await expect(page.locator(".theme-preview-caption").nth(1)).toHaveText("Dark");
+    await expectPhoneLayout(page, "theme chooser", { scope: ".theme-picker__panel" });
+    await page.keyboard.press("Escape");
 
     // On Default the Controls rows write the household config.
     await controls.getByLabel("Hide controls").click();
@@ -87,7 +94,12 @@ test.describe("phone: Screens", () => {
     await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
     await expect(page.locator('[data-test="screen-name-input"]')).toBeVisible();
     await expect(page.locator('[data-test="screen-page-row"]')).toHaveCount(2);
+    await expect(page.locator("#section-screen-look")).toBeVisible();
+    await expect(page.getByText("Theme", { exact: true })).toBeVisible();
+    await expect(page.getByText("Font", { exact: true })).toBeVisible();
     await expect(page.getByText("Display", { exact: true })).toBeVisible();
+    await expect(page.getByText("Dashboard size", { exact: true })).toBeVisible();
+    await expect(page.getByText("Settings text size", { exact: true })).toBeVisible();
     await expect(page.getByText("Effects & focus", { exact: true })).toBeVisible();
     await expect(page.getByText("Controls", { exact: true })).toBeVisible();
     await expect(page.getByText("Power", { exact: true })).toBeVisible();

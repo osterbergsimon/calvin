@@ -1,9 +1,10 @@
 /**
  * E2E tests for light/dark theme switching.
  *
- * A theme mode lives in Settings › Dashboard › Appearance as a "Light or dark"
+ * A theme mode lives in Settings › Screens › Default › Look as a "Light or dark"
  * pill (it stopped being a <select> when the Settings shell was redesigned), and
- * it is applied to <html> as the `.light` / `.dark` class.
+ * it is applied to <html> as the `.light` / `.dark` class. On a screen's own
+ * page the same row writes that screen's overrides instead.
  *
  * Everything is answered by the mocked backend, so the suite runs without a
  * Calvin server and never reaches a real one.
@@ -15,9 +16,11 @@ import { gotoDashboard, gotoSettings } from "./phone/fixtures/navigation.js";
 
 const THEME_CONTROL = /^Light or dark:/;
 
-/** Open Settings › Dashboard and bring the Appearance section into view. */
-async function openAppearance(page) {
-  await gotoSettings(page, "Dashboard");
+/** Open Settings › Screens › Default and bring the Look section into view. */
+async function openLook(page) {
+  await gotoSettings(page, "Screens");
+  await page.locator('[data-test="screen-default-card"]').click();
+  await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
   const control = page.getByRole("button", { name: THEME_CONTROL });
   await control.scrollIntoViewIfNeeded();
   await expect(control).toBeVisible();
@@ -34,7 +37,7 @@ test.describe("Theme Switching", () => {
   test("should apply dark theme class to HTML element", async ({ page }) => {
     await installApiMock(page, { config: { themeMode: "auto" } });
 
-    await openAppearance(page);
+    await openLook(page);
     await chooseThemeMode(page, "Dark");
 
     const html = page.locator("html");
@@ -45,7 +48,7 @@ test.describe("Theme Switching", () => {
   test("should apply light theme class to HTML element", async ({ page }) => {
     await installApiMock(page, { config: { themeMode: "dark" } });
 
-    await openAppearance(page);
+    await openLook(page);
     await chooseThemeMode(page, "Light");
 
     const html = page.locator("html");
@@ -56,7 +59,7 @@ test.describe("Theme Switching", () => {
   test("should persist theme selection", async ({ page }) => {
     const mock = await installApiMock(page, { config: { themeMode: "auto" } });
 
-    await openAppearance(page);
+    await openLook(page);
     await chooseThemeMode(page, "Dark");
     await expect(page.locator("html")).toHaveClass(/dark/);
 
@@ -67,6 +70,20 @@ test.describe("Theme Switching", () => {
     await page.waitForLoadState("networkidle");
 
     await expect(page.locator("html")).toHaveClass(/dark/);
+  });
+
+  test("shows every theme as a light and a dark thumbnail", async ({ page }) => {
+    await installApiMock(page);
+
+    await openLook(page);
+    await page.locator(".theme-picker__trigger").click();
+    const panel = page.locator(".theme-picker__panel");
+    await expect(panel).toBeVisible();
+    await expect(panel.locator(".theme-preview-caption").first()).toHaveText("Light");
+    await expect(panel.locator(".theme-preview-caption").nth(1)).toHaveText("Dark");
+    await expect(
+      panel.locator("[data-theme-id]").first().locator(".theme-preview-mini")
+    ).toHaveCount(2);
   });
 });
 
@@ -115,5 +132,30 @@ test.describe("Theme scope regressions (settings-scope §7 item 5)", () => {
       )
       .toContain("Space Grotesk");
     expect(api.configPosts).toEqual([]);
+  });
+
+  test("a screen page writes that screen's Look and never the household config", async ({
+    page,
+  }) => {
+    const api = await installApiMock(page, { config: { themeMode: "auto" } });
+
+    await gotoSettings(page, "Screens");
+    await page.locator('[data-test="screen-card"]').first().click();
+    await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+    await expect(page.locator("html")).toHaveClass(/light/);
+    const control = page.getByRole("button", { name: THEME_CONTROL });
+    await control.scrollIntoViewIfNeeded();
+    await control.click();
+    await page.getByRole("option", { name: "Dark", exact: true }).click();
+    await page.waitForLoadState("networkidle");
+
+    await expect.poll(() => api.overridesByKiosk.hallway?.themeMode).toBe("dark");
+    // Editing Hallway's look from this browser changes neither the household
+    // nor this browser's own theme.
+    expect(api.configPosts).toEqual([]);
+    await expect(page.locator("html")).toHaveClass(/light/);
+    await expect(page.locator("#section-screen-look")).toContainText(
+      "will switch on its next check (about 30 s)"
+    );
   });
 });

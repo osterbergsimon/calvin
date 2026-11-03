@@ -23,6 +23,8 @@ const CONTROL_KINDS = [
   "range",
   "photoSources",
   "schedule",
+  "theme",
+  "time",
 ];
 
 describe("screen setting descriptors", () => {
@@ -58,6 +60,13 @@ describe("screen setting descriptors", () => {
       "hotCornerOpacity",
       "hotCornerSize",
       "hotCornerLongPressMs",
+      "selectedTheme",
+      "themeMode",
+      "darkModeStart",
+      "darkModeEnd",
+      "typeTheme",
+      "touchControlSize",
+      "uiSize",
       ...DEFAULT_COPYABLE_KEYS,
     ]) {
       expect(keys, key).toContain(key);
@@ -87,6 +96,9 @@ describe("screen setting descriptors", () => {
       "showUI",
       "clockBarShowInKiosk",
       "tapAnywhereReveal",
+      // Settings text size keeps its plain-browser layer (ThisBrowserSettings
+      // and useUiScale still read calvin-ui-size).
+      "uiSize",
     ]) {
       expect(descriptorFor(key).browserLayer, key).toBe(true);
     }
@@ -112,9 +124,59 @@ describe("screen setting descriptors", () => {
       "hotCornerOpacity",
       "hotCornerSize",
       "hotCornerLongPressMs",
+      "selectedTheme",
+      "themeMode",
+      "darkModeStart",
+      "darkModeEnd",
+      "typeTheme",
+      "touchControlSize",
     ]) {
       expect(descriptorFor(key).browserLayer, key).toBe(false);
     }
+  });
+
+  it("puts Look after Pages and moves the two sizes into Display", () => {
+    expect(descriptorsForSection("look").map(descriptor => descriptor.key)).toEqual([
+      "selectedTheme",
+      "themeMode",
+      "darkModeStart",
+      "darkModeEnd",
+      "typeTheme",
+    ]);
+    expect(descriptorsForSection("look").map(descriptor => descriptor.label)).toEqual([
+      "Theme",
+      "Light or dark",
+      "Dark from",
+      "Dark to",
+      "Font",
+    ]);
+    const display = descriptorsForSection("display").map(descriptor => descriptor.key);
+    expect(display.slice(-2)).toEqual(["touchControlSize", "uiSize"]);
+    expect(descriptorFor("touchControlSize").label).toBe("Dashboard size");
+    expect(descriptorFor("uiSize").label).toBe("Settings text size");
+  });
+
+  it("keeps the old appearance, theme and font words on the Look rows", () => {
+    const words = new Set(descriptorsForSection("look").flatMap(d => d.keywords));
+    for (const word of ["appearance", "theme", "dark mode", "font", "typeface"]) {
+      expect(words.has(word), word).toBe(true);
+    }
+  });
+
+  it("shows the dark-hour rows only on a schedule", () => {
+    const look = descriptorsForSection("look");
+    expect(visibleDescriptors(look, { themeMode: "auto" }).map(d => d.key)).toEqual([
+      "selectedTheme",
+      "themeMode",
+      "typeTheme",
+    ]);
+    expect(visibleDescriptors(look, { themeMode: "time" }).map(d => d.key)).toEqual([
+      "selectedTheme",
+      "themeMode",
+      "darkModeStart",
+      "darkModeEnd",
+      "typeTheme",
+    ]);
   });
 
   it("finds descriptors by key and section", () => {

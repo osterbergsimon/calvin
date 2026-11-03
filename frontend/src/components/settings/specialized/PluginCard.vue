@@ -12,7 +12,7 @@
             <template v-else-if="isTheme">
               Choose it in
               <Button variant="link" size="sm" class="pc-link" @click="$emit('open-appearance')">
-                Dashboard › Appearance
+                Screens › Look
               </Button>
             </template>
             <template v-else-if="isBackground">
