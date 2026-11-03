@@ -20,13 +20,12 @@ const transitionProps = (style, selector) => {
 };
 
 describe("dashboard motion stays on the compositor", () => {
-  it("the region focus frame transitions only transform and opacity", () => {
+  it("the performance focus frame does not animate at all (calvin-fufd)", () => {
+    // Measured on the Pi 3B+: the 2px lift and its 0.2s transitions were about
+    // half of a region swap's cost. The ring and glow just snap.
     const style = styleOf("components/ui/FocusPanel.vue");
-    const props = transitionProps(style, "\\.focus-panel");
-    expect(props).toMatch(/transform/);
-    expect(props).toMatch(/opacity/);
-    expect(props).not.toMatch(/box-shadow/);
-    expect(props).not.toMatch(/filter/);
+    expect(transitionProps(style, "\\.focus-panel")).toBe("");
+    expect(transitionProps(style, "\\.focus-panel::after")).toBe("");
   });
 
   it("the status lamp keyframes animate opacity, never filter", () => {

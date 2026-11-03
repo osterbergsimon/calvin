@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import FocusPanel from "@/components/ui/FocusPanel.vue";
+import { ref } from "vue";
+import FocusPanel, { FOCUS_LIGHT_STYLE_KEY } from "@/components/ui/FocusPanel.vue";
 
 describe("FocusPanel", () => {
   it("is lit when focused", () => {
@@ -32,5 +33,22 @@ describe("FocusPanel", () => {
   it("dims by default when not focused (back-compat)", () => {
     const wrapper = mount(FocusPanel, { props: { focused: false } });
     expect(wrapper.find(".focus-panel").classes()).toContain("is-dim");
+  });
+
+  it("uses the cheap performance style unless a full style is provided", () => {
+    const w = mount(FocusPanel, { props: { focused: true } });
+    expect(w.classes()).not.toContain("is-full");
+  });
+
+  it("switches to the full glow when the dashboard provides it", async () => {
+    const style = ref("full");
+    const w = mount(FocusPanel, {
+      props: { focused: true },
+      global: { provide: { [FOCUS_LIGHT_STYLE_KEY]: style } },
+    });
+    expect(w.classes()).toContain("is-full");
+    style.value = "performance";
+    await w.vm.$nextTick();
+    expect(w.classes()).not.toContain("is-full");
   });
 });

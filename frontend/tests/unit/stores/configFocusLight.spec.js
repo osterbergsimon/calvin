@@ -9,6 +9,7 @@ describe("config store — Cycle B focus-light keys", () => {
     const store = useConfigStore();
     expect(store.focusLightMode).toBe("interaction");
     expect(store.focusLightDimOthers).toBe(true);
+    expect(store.focusLightStyle).toBe("performance");
   });
 
   it("setters update state", () => {
@@ -24,7 +25,9 @@ describe("config store — Cycle B focus-light keys", () => {
     await store.updateConfig({
       focusLightMode: "off",
       focusLightDimOthers: false,
+      focusLightStyle: "full",
     });
+    expect(store.focusLightStyle).toBe("full");
     expect(store.focusLightMode).toBe("off");
     expect(store.focusLightDimOthers).toBe(false);
   });
