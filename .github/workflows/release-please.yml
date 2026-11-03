@@ -1,7 +1,7 @@
 name: Release Please
 
 # Releases are cut on main only. develop integrates through
-# promote-develop-to-main.yml, which opens (and keeps updating) the
+# promote-develop-to-main.yml, run by hand when releasing, which opens the
 # develop -> main PR; merging it runs this workflow, which maintains a
 # "chore(main): release X.Y.Z" PR from the conventional commits.
 # Merging *that* PR is what writes CHANGELOG.md, creates the vX.Y.Z tag and
