@@ -256,6 +256,12 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    // Per screen (kiosk override / this browser): "performance" | "full" (calvin-fufd).
+    name: "focusLightStyle",
+    keys: ["focusLightStyle", "focus_light_style"],
+    defaultValue: "performance",
+  },
+  {
     name: "loadingLight",
     keys: ["loadingLight", "loading_light"],
     defaultValue: "comet",

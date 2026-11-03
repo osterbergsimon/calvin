@@ -196,6 +196,8 @@ import { useFirstLoadLight } from "../composables/useFirstLoadLight";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { useFocusLight } from "../composables/useFocusLight";
+import { useFocusLightStyle } from "../composables/useFocusLightStyle";
+import { FOCUS_LIGHT_STYLE_KEY } from "../components/ui/FocusPanel.vue";
 import { useHotCornerReveal } from "../composables/useHotCornerReveal";
 import { useSetupPrompt } from "../composables/useSetupPrompt";
 import {
@@ -381,6 +383,9 @@ let resizeState = null; // { containerPath, firstIndex, rect, direction }
 
 // Provide the resize context so nested DashboardRegion components can
 // render their own handles and report drag-start events.
+// Performance (default) or the original full glow, per screen (calvin-fufd).
+provide(FOCUS_LIGHT_STYLE_KEY, useFocusLightStyle().style);
+
 provide("dashboardResize", {
   dragSizes,
   regionsLocked: computed(() => configStore.regionsLocked),
