@@ -4,7 +4,7 @@ import api from "@/services/api";
 import { useKiosksStore } from "@/stores/kiosks";
 
 vi.mock("@/services/api", () => ({
-  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   LONG_REQUEST_TIMEOUT: 600000,
 }));
 
@@ -138,6 +138,33 @@ describe("kiosks store", () => {
     await store.saveOverrides("a b", { orientation: "portrait" });
     expect(api.put).toHaveBeenCalledWith("/kiosks/a%20b/overrides", {
       overrides: { orientation: "portrait" },
+    });
+  });
+
+  it("mergeOverrides PATCHes only the changed keys and returns the merged layer", async () => {
+    // A screen without admin may only send the keys it is changing (F2); the
+    // server merges them into the layer it already has.
+    api.patch.mockResolvedValue({
+      data: { id: "k1", overrides: { orientation: "portrait", showUI: false } },
+    });
+    const store = useKiosksStore();
+
+    const merged = await store.mergeOverrides("k1", { showUI: false });
+
+    expect(api.patch).toHaveBeenCalledWith("/kiosks/k1/overrides", {
+      overrides: { showUI: false },
+    });
+    expect(api.put).not.toHaveBeenCalled();
+    expect(merged).toEqual({ orientation: "portrait", showUI: false });
+  });
+
+  it("mergeOverrides url-encodes the id and tolerates a bare response", async () => {
+    api.patch.mockResolvedValue({ data: {} });
+    const store = useKiosksStore();
+
+    expect(await store.mergeOverrides("a/b", { showUI: true })).toBeNull();
+    expect(api.patch).toHaveBeenCalledWith("/kiosks/a%2Fb/overrides", {
+      overrides: { showUI: true },
     });
   });
 });

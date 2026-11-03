@@ -94,8 +94,10 @@ export async function writeScreenSetting({
   applyServerValue,
 }) {
   if (kioskId) {
-    const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
-    await kiosksStore.saveOverrides(kioskId, { ...overrides, [key]: next });
+    // Merge just this key: a kiosk without admin may only write the allowlisted
+    // per-screen keys (showUI first), and the server keeps every other key
+    // (F2, settings-scope §7.9).
+    await kiosksStore.mergeOverrides(kioskId, { [key]: next });
     applyServerValue?.(next);
     return;
   }

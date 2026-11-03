@@ -32,7 +32,15 @@ export function kioskOverridesQueue(kioskId) {
     initial: kiosk?.overrides ?? {},
     loaded: Boolean(kiosk),
     load: async () => (await store.fetchOverrides(kioskId)) || {},
-    save: async ({ snapshot }) => {
+    save: async ({ changes, merge, snapshot }) => {
+      if (merge) {
+        // A per-screen row changed one key: merge it, so a screen without an
+        // admin session can save the keys it is allowed to change (F2). The
+        // whole-layer write below still needs admin.
+        const merged = await store.mergeOverrides(kioskId, changes);
+        if (merged) store.setKioskOverrides(kioskId, merged);
+        return;
+      }
       await store.saveOverrides(kioskId, snapshot);
       store.setKioskOverrides(kioskId, snapshot);
     },

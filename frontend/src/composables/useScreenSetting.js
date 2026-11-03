@@ -106,7 +106,9 @@ export function useScreenSetting(
     }
 
     try {
-      await kioskQueue.setPartial({ [key]: next });
+      // One key is one merge: a kiosk without admin may save the allowlisted
+      // keys it changes without replacing the whole layer (F2).
+      await kioskQueue.setPartial({ [key]: next }, { merge: true });
       // Keep this page in step without waiting for the next merged-config
       // poll, unless a newer tap for the same row is still pending.
       if (!kioskQueue.hasPendingKey(key)) configStore[key] = next;
