@@ -23,12 +23,31 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
 .tog {
   width: var(--toggle-w);
   height: var(--toggle-h);
+  /* The track must never be squeezed below the touch target by a flex row
+     (the source list's actions on a phone did exactly that). */
+  min-width: var(--toggle-w);
+  flex: 0 0 auto;
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--switch-track-off);
   position: relative;
   cursor: pointer;
   transition: background var(--dur);
+}
+/* The touch target: the visible track stays 44x24, but a transparent ::before
+   grows the tappable box to --touch-target in both directions, centred on the
+   track. It does not grow sideways (the track is already --toggle-w), so in a
+   tight row -- the schedule table's switch column sits --gap-inline from the
+   time fields -- it can only reach the row's own padding, never a neighbour. */
+.tog::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--touch-target);
+  min-height: var(--touch-target);
+  transform: translateY(-50%);
 }
 .tog::after {
   content: "";
