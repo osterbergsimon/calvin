@@ -33,7 +33,7 @@ import { EFFECTS_LEVEL_OPTIONS, normalizeEffectsLevel } from "@/utils/effectsLev
 // and a screen's page (writes that screen's overrides). It only says *how*
 // effects draw; the focus light and dimming rows still decide whether they show.
 const DESCRIPTION =
-  "How much glow, dimming and motion the focus light uses. Full is the richest; Standard keeps a slow screen such as a Pi 3B+ smooth.";
+  "Full is the richest look. Standard keeps a slow screen such as a Pi 3B+ smooth.";
 
 const props = defineProps({
   value: { type: String, default: "auto" },
