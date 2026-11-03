@@ -11,6 +11,7 @@ from loguru import logger
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
 from app.models.db_models import KioskDB
+from app.schemas.config_update import sanitize_overrides
 from app.utils.db_retry import retry_on_db_locked
 from app.utils.utc import as_utc, utcnow
 
@@ -62,11 +63,13 @@ def public_overrides(overrides: dict | None) -> dict:
     """Return an override layer safe to hand to the UI.
 
     Host-internal agent keys never belong in a device setting, so they are
-    stripped before the layer leaves the server (CLV-36). Returns a new dict.
+    stripped before the layer leaves the server (CLV-36). Values that no longer
+    validate are dropped too, so a stale layer cannot break a screen's config
+    load (settings-scope §7 item 8). Returns a new dict.
     """
     ov = dict(overrides or {})
     ov.pop(_UPDATE_FLAG_KEY, None)
-    return ov
+    return sanitize_overrides(ov)
 
 
 # The display stacks the kiosk agent can run (deploy/kiosk-agent/calvin_display_agent.py).
@@ -305,11 +308,15 @@ def device_config_version(merged: dict) -> str:
 
 
 async def get_overrides(kiosk_id: str) -> dict | None:
-    """Return a kiosk's raw override layer, or None if the kiosk is unknown."""
+    """Return a kiosk's raw override layer, or None if the kiosk is unknown.
+
+    Invalid values left in storage are dropped with a warning, so an old or
+    hand-edited layer cannot break a config load (settings-scope §7 item 8).
+    """
     row = await KioskDB.objects.get_or_none(id=kiosk_id)
     if row is None:
         return None
-    return row.overrides or {}
+    return sanitize_overrides(row.overrides, kiosk_id=kiosk_id)
 
 
 _GLOBAL_NAME_KEYS = ("displayName", "display_name")
