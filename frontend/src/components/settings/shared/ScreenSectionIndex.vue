@@ -104,6 +104,9 @@ onUnmounted(() => window.removeEventListener("resize", refreshPhone));
 }
 
 .section-index__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--toggle-h);
   color: var(--focus-text);
   text-decoration: none;
 }
