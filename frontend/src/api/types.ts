@@ -2547,6 +2547,8 @@ export interface components {
       timeFormat?: string | null;
       /** Timezone */
       timezone?: string | null;
+      /** Typetheme */
+      typeTheme?: string | null;
       /** Uisize */
       uiSize?: string | null;
       /** Weekstartday */

@@ -913,6 +913,17 @@
             ],
             "title": "Timezone"
           },
+          "typeTheme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typetheme"
+          },
           "uiSize": {
             "anyOf": [
               {

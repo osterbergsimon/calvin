@@ -95,6 +95,7 @@ CONFIG_DISPLAY_KEYS = frozenset(
         "selectedTheme",
         "darkModeStart",
         "darkModeEnd",
+        "typeTheme",
         "lastSideViewMode",
     }
 )

@@ -127,6 +127,9 @@ class ConfigUpdate(BaseModel):
     selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
     darkModeStart: int | None = None  # Dark mode start hour (0-23)
     darkModeEnd: int | None = None  # Dark mode end hour (0-23)
+    # Household font (H4): None means no household choice, so a browser may
+    # migrate its old localStorage font exactly once.
+    typeTheme: str | None = None
     displayScheduleEnabled: bool | None = None  # Enable display power schedule
     # Display schedule as JSON string or array:
     # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
@@ -352,6 +355,15 @@ async def build_global_config() -> dict:
         pass
     else:
         config["darkModeEnd"] = 6  # 6 AM default
+    # Household font (H4). None, not a default id: the frontend must be able to
+    # tell "no household choice" from "chose Instrument" to migrate once.
+    if "type_theme" in config:
+        config["typeTheme"] = config["type_theme"]
+    elif "typeTheme" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["typeTheme"] = None
     if "displayScheduleEnabled" not in config and "display_schedule_enabled" not in config:
         config["displayScheduleEnabled"] = False  # Disabled by default
     elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
@@ -649,6 +661,8 @@ async def update_config(config_update: ConfigUpdate, request: Request):
         update_dict["dark_mode_start"] = update_dict.pop("darkModeStart")
     if "darkModeEnd" in update_dict:
         update_dict["dark_mode_end"] = update_dict.pop("darkModeEnd")
+    if "typeTheme" in update_dict:
+        update_dict["type_theme"] = update_dict.pop("typeTheme")
     if "displayScheduleEnabled" in update_dict:
         update_dict["display_schedule_enabled"] = update_dict.pop("displayScheduleEnabled")
     if "displaySchedule" in update_dict:
