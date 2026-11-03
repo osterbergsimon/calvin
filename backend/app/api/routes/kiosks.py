@@ -1,5 +1,6 @@
 """Kiosk registry + per-kiosk config endpoints (per-device settings — dd9.2/dd9.3)."""
 
+import hashlib
 import json
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -176,15 +177,17 @@ async def get_kiosk_config(
     version = device_config_version(merged)
     update_requested = agent_update_requested(overrides)
 
-    etag = f"{version}.{available or ''}.{int(update_requested)}"
-    if request.headers.get("If-None-Match") == etag:
-        return Response(status_code=304, headers={"ETag": etag})
-
     merged["deviceConfigVersion"] = version
     merged["agentAvailableVersion"] = available
     merged["agentUpdateRequested"] = update_requested
-    return Response(
-        content=json.dumps(merged),
-        media_type="application/json",
-        headers={"ETag": etag},
-    )
+    content = json.dumps(merged)
+
+    # The ETag must cover the whole body, not just deviceConfigVersion: a
+    # browser kiosk revalidates with If-None-Match, and a 304 for a changed
+    # non-device setting (focus light, theme, ...) leaves it rendering its
+    # cached old config (calvin-fufd). The display agent reads
+    # deviceConfigVersion from the body and does not use the ETag.
+    etag = hashlib.sha256(content.encode("utf-8")).hexdigest()[:32]
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status_code=304, headers={"ETag": etag})
+    return Response(content=content, media_type="application/json", headers={"ETag": etag})
