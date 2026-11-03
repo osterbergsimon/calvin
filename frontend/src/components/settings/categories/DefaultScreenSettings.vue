@@ -104,6 +104,22 @@
       />
     </SettingsSection>
 
+    <SettingsSection id="default-effects" title="Effects & focus">
+      <EffectsLevelRow
+        :value="config.effectsLevel"
+        :show-scope="false"
+        :auto-copy="defaultEffectsAutoCopy"
+        @set="v => emitChange({ effectsLevel: v })"
+        @reset="emitChange({ effectsLevel: 'auto' })"
+      />
+      <DefaultEditNote
+        :note="editNote"
+        setting="effectsLevel"
+        @change-them-too="changeThemToo"
+        @dismiss="dismissNote"
+      />
+    </SettingsSection>
+
     <SettingsSection id="device-power" title="Power">
       <SettingRow
         label="Screen on/off schedule"
@@ -299,6 +315,8 @@ import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
+import EffectsLevelRow from "@/components/settings/shared/EffectsLevelRow.vue";
+import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
 import { LAYOUT_STORAGE_KEY } from "@/utils/layoutMode";
 import { getKioskId } from "@/utils/kioskId";
@@ -319,6 +337,12 @@ const props = defineProps({
   config: { type: Object, required: true },
 });
 const emit = defineEmits(["update:config"]);
+
+// The household Effects row: Auto means Standard on the screens the home has
+// set up, and Full in a plain browser.
+const defaultEffectsAutoCopy = `Auto (${effectsLevelLabel(
+  resolveEffectsLevel({ level: "auto", kiosk: true })
+)} on screens, Full in a browser)`;
 
 const store = useKiosksStore();
 const editorOpen = ref(false);

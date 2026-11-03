@@ -102,7 +102,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarShowLogo = ref(true);
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
-  const focusLightStyle = ref("performance"); // 'performance' | 'full', per screen (calvin-fufd)
+  const effectsLevel = ref("auto"); // 'auto' | 'full' | 'standard', per screen (calvin-uudb)
   const loadingLight = ref("comet"); // Loading light style: 'comet' | 'pulse' | 'off' (CLV-115)
   const layoutMode = ref("auto"); // Forced layout per screen: 'auto' | 'desktop' | 'phone' (calvin-tnkg)
   const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
@@ -207,7 +207,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarShowLogo,
     focusLightMode,
     focusLightDimOthers,
-    focusLightStyle,
+    effectsLevel,
     loadingLight,
     layoutMode,
     regionsLocked,
@@ -753,7 +753,7 @@ export const useConfigStore = defineStore("config", () => {
     pluginCatalogRepo,
     focusLightMode,
     focusLightDimOthers,
-    focusLightStyle,
+    effectsLevel,
     loadingLight,
     layoutMode,
     regionsLocked,

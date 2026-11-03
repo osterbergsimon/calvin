@@ -208,26 +208,6 @@
         />
       </SettingRow>
       <SettingRow
-        label="Focus light style"
-        description="Performance suits slow screens such as a Pi 3B+. Full is the original glow."
-      >
-        <template #label-extra><ScopeChip /></template>
-        <template #description>
-          <span>Performance suits slow screens such as a Pi 3B+. Full is the original glow.</span>
-          <ScopeLine
-            :overridden="focusLightStyleSetting.overridden.value"
-            reset-test="reset-focus-light-style"
-            @reset="focusLightStyleSetting.reset()"
-          />
-        </template>
-        <SegmentedControl
-          :model-value="focusLightStyleSetting.style.value"
-          :options="FOCUS_LIGHT_STYLE_OPTIONS"
-          aria-label="Focus light style"
-          @update:model-value="v => focusLightStyleSetting.set(v)"
-        />
-      </SettingRow>
-      <SettingRow
         label="Dim other regions"
         description="Dims the rest while the focus light is on."
       >
@@ -313,7 +293,6 @@ import { useRoute } from "vue-router";
 import { useConfigStore } from "@/stores/config";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import { useScreenSetting } from "@/composables/useScreenSetting";
-import { useFocusLightStyle } from "@/composables/useFocusLightStyle";
 import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
 import { useRegionEditorRequest } from "@/composables/useRegionEditorRequest";
@@ -396,12 +375,8 @@ const setUiSize = async value => {
   await uiSizeSetting.set(value);
 };
 
-// Focus light style, per screen (calvin-fufd).
-const focusLightStyleSetting = useFocusLightStyle();
-const FOCUS_LIGHT_STYLE_OPTIONS = [
-  { value: "performance", label: "Performance" },
-  { value: "full", label: "Full" },
-];
+// Focus light style moved to Screens › Effects & focus as the effects level
+// (calvin-uudb); this page no longer edits it.
 
 // --- Controls: per screen (calvin-hi6w) ------------------------------------
 // A wall panel hides its controls; a laptop showing the same dashboard keeps

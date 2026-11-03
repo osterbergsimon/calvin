@@ -54,6 +54,7 @@ describe("DefaultScreenSettings", () => {
     expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
       "section-default-pages",
       "section-layout",
+      "section-default-effects",
       "section-device-power",
       "section-device-keyboard",
       "section-device-behaviour",
@@ -496,6 +497,41 @@ describe("DefaultScreenSettings — override notes (§5)", () => {
 
     await w.find(".default-note__dismiss").trigger("click");
     expect(w.find("[data-test='default-override-note']").exists()).toBe(false);
+  });
+});
+
+// calvin-uudb: the Default page's Effects row writes the household config, not
+// this device's choice (the F1 bug the Behaviour rows still have).
+describe("DefaultScreenSettings effects (calvin-uudb)", () => {
+  const effectsControl = w =>
+    w.findAllComponents({ name: "SegmentedControl" }).find(c => c.props("ariaLabel") === "Effects");
+
+  it("shows the household level and writes the household config", async () => {
+    const w = mountDefault({ effectsLevel: "full" });
+    expect(w.find("#section-default-effects").exists()).toBe(true);
+    expect(effectsControl(w).props("modelValue")).toBe("full");
+    expect(
+      effectsControl(w)
+        .props("options")
+        .map(o => o.label)
+    ).toEqual(["Auto", "Full", "Standard"]);
+
+    effectsControl(w).vm.$emit("update:modelValue", "standard");
+    await flushPromises();
+
+    expect(w.emitted("update:config")).toContainEqual([{ effectsLevel: "standard" }]);
+    expect(localStorage.getItem("calvin-screen-effectsLevel")).toBeNull();
+  });
+
+  it("shows what Auto picks for the home and can go back to Auto", async () => {
+    const w = mountDefault({ effectsLevel: "auto" });
+    expect(w.find("#section-default-effects").text()).toContain(
+      "Auto (Standard on screens, Full in a browser)"
+    );
+
+    effectsControl(w).vm.$emit("update:modelValue", "standard");
+    await flushPromises();
+    expect(w.emitted("update:config")).toContainEqual([{ effectsLevel: "standard" }]);
   });
 });
 

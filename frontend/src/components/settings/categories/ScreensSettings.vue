@@ -354,6 +354,25 @@
         </InlineNote>
       </SettingsSection>
 
+      <SettingsSection id="screen-effects" title="Effects & focus">
+        <EffectsLevelRow
+          :value="effEffectsLevel"
+          :overridden="effectsLevelOverridden"
+          :auto-copy="effectsAutoCopy"
+          @set="setEffectsLevel"
+          @reset="resetEffectsLevel"
+        />
+        <InlineNote
+          v-if="effectsMsg"
+          class="screens-saved"
+          :tone="toneFor(effectsMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ effectsMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-power" title="Power">
         <SettingRow label="Screen on/off schedule">
           <template #description>
@@ -629,6 +648,12 @@ import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
+import EffectsLevelRow from "@/components/settings/shared/EffectsLevelRow.vue";
+import {
+  effectsLevelLabel,
+  normalizeEffectsLevel,
+  resolveEffectsLevel,
+} from "@/utils/effectsLevel";
 import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 
 const props = defineProps({
@@ -689,6 +714,7 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
 const nameMsg = ref("");
 const pagesMsg = ref("");
 const displayMsg = ref("");
+const effectsMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
 const behaviourMsg = ref("");
@@ -825,6 +851,7 @@ function clearMessages() {
   nameMsg.value = "";
   pagesMsg.value = "";
   displayMsg.value = "";
+  effectsMsg.value = "";
   powerMsg.value = "";
   touchMsg.value = "";
   behaviourMsg.value = "";
@@ -1198,6 +1225,31 @@ function resetOsk() {
   const next = { ...overrides.value };
   delete next.onScreenKeyboard;
   persistTouch(next);
+}
+
+// --- Effects & focus: how expensive effects draw (calvin-uudb) --------------
+// Split whether from how: the Focus light and Dim other regions rows keep
+// deciding whether something shows; this row only decides how it is drawn.
+const effectsLevelOverridden = computed(() => "effectsLevel" in overrides.value);
+const effEffectsLevel = computed(() =>
+  normalizeEffectsLevel(
+    effectsLevelOverridden.value ? overrides.value.effectsLevel : props.config.effectsLevel
+  )
+);
+const effectsAutoCopy = `Auto (${effectsLevelLabel(
+  resolveEffectsLevel({ level: "auto", kiosk: true })
+)} on this screen)`;
+
+function persistEffects(next) {
+  persist(next, effectsMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
+}
+function setEffectsLevel(value) {
+  persistEffects({ ...overrides.value, effectsLevel: value });
+}
+function resetEffectsLevel() {
+  const next = { ...overrides.value };
+  delete next.effectsLevel;
+  persistEffects(next);
 }
 
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------

@@ -247,21 +247,16 @@ describe("DashboardSettings per-screen settings (§2)", () => {
   it("chips the per-screen rows as This screen", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const chips = w.findAll(".setting-scope-chip");
-    expect(chips).toHaveLength(5);
+    expect(chips).toHaveLength(4);
     expect(chips.every(chip => chip.text() === "This screen")).toBe(true);
   });
 
-  it("stores the focus light style for this screen, not on the server (calvin-fufd)", async () => {
+  it("no longer has a This-screen focus light style row (moved to Screens, calvin-uudb)", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    const style = w
-      .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Focus light style");
-    expect(style.props("modelValue")).toBe("performance");
-    style.vm.$emit("update:modelValue", "full");
-    await flushPromises();
-
-    expect(window.localStorage.getItem("calvin-focus-light-style")).toBe("full");
-    expect(w.emitted("update:config") || []).not.toContainEqual([{ focusLightStyle: "full" }]);
+    expect(w.text()).not.toContain("Focus light style");
+    expect(w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"))).not.toContain(
+      "Focus light style"
+    );
   });
 
   it("stores Settings text size in this browser, not on the server", async () => {

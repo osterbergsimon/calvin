@@ -10,6 +10,7 @@
 // Settings a screen can take from Default, and that "Use these as the default"
 // copies into the global config.
 export const DEFAULT_COPYABLE_KEYS = [
+  "effectsLevel",
   "orientation",
   "orientationFlipped",
   "applyDisplayRotation",
@@ -27,6 +28,7 @@ export const PAGE_OVERRIDE_KEYS = ["availableScreens", "defaultScreenId"];
 
 // Human labels for the confirm copy and the "keeps its own …" note.
 export const SCREEN_SETTING_LABELS = {
+  effectsLevel: "Effects",
   orientation: "Orientation",
   orientationFlipped: "Upside down",
   applyDisplayRotation: "Rotate the screen output",
