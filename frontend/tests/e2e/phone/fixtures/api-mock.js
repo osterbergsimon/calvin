@@ -365,6 +365,9 @@ export async function installApiMock(page, options = {}) {
     // Per-kiosk override layer written by Settings (stateful so a second
     // selection reads back what the first save wrote).
     overridesByKiosk: {},
+    // Bodies of PUT/PATCH /api/kiosks/{id}/overrides, so a test can prove the
+    // exact keys a screen page or the dashboard toggle sent.
+    overridesRequests: [],
     // Flip to true to simulate a server that stopped answering every route.
     down: false,
     requests: [],
@@ -548,12 +551,14 @@ export async function installApiMock(page, options = {}) {
       const id = decodeURIComponent(kioskOverrides[1]);
       if (method === "PUT") {
         const body = request.postDataJSON() || {};
+        state.overridesRequests.push({ method, path, body });
         state.overridesByKiosk[id] = body.overrides || {};
         return json(route, { id, overrides: state.overridesByKiosk[id] });
       }
       if (method === "PATCH") {
         // A per-screen row merges the keys it changes (F2); every other key stays.
         const body = request.postDataJSON() || {};
+        state.overridesRequests.push({ method, path, body });
         state.overridesByKiosk[id] = {
           ...(state.overridesByKiosk[id] || {}),
           ...(body.overrides || {}),
@@ -562,11 +567,17 @@ export async function installApiMock(page, options = {}) {
       }
       return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
     }
-    if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
+    const kioskConfig = path.match(/^\/api\/kiosks\/([^/]+)\/config$/);
+    if (kioskConfig) {
       // The real endpoint returns the household config with the kiosk's
       // overrides merged in. Mirroring that lets e2e cover per-screen values
-      // (e.g. a dark theme) arriving without a reload.
-      return json(route, { ...state.config, deviceConfigVersion: "3" });
+      // (e.g. a dark theme, or hidden controls after a reload).
+      const id = decodeURIComponent(kioskConfig[1]);
+      return json(route, {
+        ...state.config,
+        ...(state.overridesByKiosk[id] || {}),
+        deviceConfigVersion: "3",
+      });
     }
 
     if (path === "/api/security/sealed-mode") {
