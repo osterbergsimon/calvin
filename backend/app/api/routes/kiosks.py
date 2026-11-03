@@ -56,7 +56,9 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     _valid_id_or_400(kiosk_id)
     if len(json.dumps(body.overrides)) > _MAX_OVERRIDES_BYTES:
         raise HTTPException(status_code=400, detail="Overrides payload too large")
-    # Type-check known config keys via the existing model (extra keys allowed).
+    # Type-check declared config keys via the shared update schema. Unknown keys
+    # are still allowed (plugin and future settings), but a declared key with a
+    # bad value is a 400 here instead of a stored value that breaks the screen.
     try:
         ConfigUpdate(**body.overrides)
     except ValidationError as exc:
