@@ -1,5 +1,6 @@
 """Integration tests for the kiosk registry."""
 
+import hashlib
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,9 +40,8 @@ def test_effective_config_merges_overrides_and_records(test_client: TestClient):
     assert body["orientation"] == "portrait"  # override applied
     assert "timeFormat" in body  # global defaults present
     assert "deviceConfigVersion" in body
-    # ETag now incorporates deviceConfigVersion + agentAvailableVersion + updateRequested flag.
-    # agentAvailableVersion may be null here (no repo_dir patch), so only check containment.
-    assert body["deviceConfigVersion"] in resp.headers.get("ETag", "")
+    # The ETag covers the whole body (calvin-fufd); see the etag tests below.
+    assert resp.headers.get("ETag")
 
     kiosks = test_client.get("/api/kiosks").json()["kiosks"]
     assert any(k["id"] == "hallway-3f9a2c" and k["hostname"] == "pi-hallway" for k in kiosks)
@@ -124,6 +124,25 @@ def test_effective_config_if_none_match_304(test_client: TestClient):
     again = test_client.get("/api/kiosks/etagtest-1/config", headers={"If-None-Match": etag})
     assert again.status_code == 304
     assert again.content == b""
+
+
+@pytest.mark.integration
+def test_effective_config_etag_changes_when_a_non_device_setting_changes(
+    test_client: TestClient,
+):
+    """A browser kiosk revalidates with If-None-Match. A non-device setting
+    (here the focus light) changing must not be answered with 304, or the
+    kiosk keeps rendering its cached old config (calvin-fufd)."""
+    first = test_client.get("/api/kiosks/etagtest-2/config")
+    etag = first.headers["ETag"]
+    test_client.put(
+        "/api/kiosks/etagtest-2/overrides",
+        json={"overrides": {"focusLightMode": "off"}},
+    )
+    again = test_client.get("/api/kiosks/etagtest-2/config", headers={"If-None-Match": etag})
+    assert again.status_code == 200
+    assert again.json()["focusLightMode"] == "off"
+    assert again.headers["ETag"] != etag
 
 
 @pytest.mark.integration
@@ -302,8 +321,9 @@ def test_config_reports_available_version_and_flag(test_client: TestClient):
     assert len(body["agentAvailableVersion"]) == 16
     assert body["agentUpdateRequested"] is True
     assert "_agentUpdateRequested" not in body  # internal key never leaks
-    # Full ETag assertion: ensures order, all three components, no reordering/omission bug.
-    expected_etag = f"{body['deviceConfigVersion']}.{body['agentAvailableVersion']}.{int(body['agentUpdateRequested'])}"
+    # The ETag is a digest of the exact body served, so the available version
+    # and the update flag (both in the body) change it too (calvin-fufd).
+    expected_etag = hashlib.sha256(resp.content).hexdigest()[:32]
     assert resp.headers.get("ETag") == expected_etag
 
 
