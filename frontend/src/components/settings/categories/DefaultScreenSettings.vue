@@ -105,10 +105,11 @@
     </SettingsSection>
 
     <SettingsSection id="default-effects" title="Effects & focus">
-      <EffectsLevelRow
+      <ScreenSettingRow
+        :descriptor="effectsLevelDescriptor"
         :value="config.effectsLevel"
         :show-scope="false"
-        :auto-copy="defaultEffectsAutoCopy"
+        :auto-note="defaultEffectsAutoCopy"
         @set="v => emitChange({ effectsLevel: v })"
         @reset="emitChange({ effectsLevel: 'auto' })"
       />
@@ -271,16 +272,20 @@
     </SettingsSection>
 
     <SettingsSection id="device-behaviour" title="Behaviour">
-      <ScreenBehaviourRows
-        :photo-frame-enabled="behaviour.photoFrameEnabled"
-        :photo-frame-timeout="behaviour.photoFrameTimeout"
-        :photo-frame-source-ids="behaviour.photoFrameSourceIds"
-        :loading-light="behaviour.loadingLight"
-        :layout-mode="behaviour.layoutMode"
-        :overridden="behaviourOverridden"
-        @set="setBehaviour"
-        @reset="resetBehaviour"
-      />
+      <template v-for="descriptor in visibleBehaviourDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="behaviour[descriptor.key]"
+          :show-scope="false"
+          @set="value => emitChange({ [descriptor.key]: value })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <ScreenRegionEditor
@@ -296,9 +301,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { mdiCheck } from "@mdi/js";
-import { useConfigStore } from "@/stores/config";
 import { useKiosksStore } from "@/stores/kiosks";
-import { useScreenSetting } from "@/composables/useScreenSetting";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
@@ -314,14 +317,16 @@ import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
-import EffectsLevelRow from "@/components/settings/shared/EffectsLevelRow.vue";
+import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
 import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
-import { LAYOUT_STORAGE_KEY } from "@/utils/layoutMode";
-import { getKioskId } from "@/utils/kioskId";
 import { normalizeDashboardScreens } from "@/utils/layout";
-import { screensOverriding } from "@/utils/screenOverrides";
+import {
+  descriptorFor,
+  descriptorsForSection,
+  screensOverriding,
+  visibleDescriptors,
+} from "@/utils/screenOverrides";
 import { screenLabel } from "@/utils/screenLabel";
 import {
   OSK_LAYOUT_CHANGE_EVENT,
@@ -528,53 +533,22 @@ onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDev
 
 const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezone));
 
-// --- Behaviour: per screen (moved out of Dashboard › Focus & remote, §4) ----
-// The rows keep their per-screen storage: on a kiosk this screen's overrides,
-// on any other browser localStorage, with the Default values underneath.
-const configStore = useConfigStore();
-// Existing per-screen rows keep following the Settings form value on a kiosk;
-// these want the kiosk's merged config instead (an override may already differ
-// from the global form value).
-const screenServerValue = (key, fallback) => () => (getKioskId() ? configStore[key] : fallback());
-
-const photoFrameSetting = useScreenSetting("photoFrameEnabled", {
-  serverValue: screenServerValue("photoFrameEnabled", () => props.config.photoFrameEnabled),
-});
-const photoFrameTimeoutSetting = useScreenSetting("photoFrameTimeout", {
-  serverValue: screenServerValue("photoFrameTimeout", () => props.config.photoFrameTimeout),
-});
-const photoFrameSourceSetting = useScreenSetting("photoFrameSourceIds", {
-  serverValue: screenServerValue("photoFrameSourceIds", () => props.config.photoFrameSourceIds),
-});
-const loadingLightSetting = useScreenSetting("loadingLight", {
-  serverValue: () => props.config.loadingLight,
-});
-const layoutSetting = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
-
-const behaviourSettings = {
-  photoFrameEnabled: photoFrameSetting,
-  photoFrameTimeout: photoFrameTimeoutSetting,
-  photoFrameSourceIds: photoFrameSourceSetting,
-  loadingLight: loadingLightSetting,
-  layoutMode: layoutSetting,
-};
-
+// --- Behaviour: household values (settings-scope §7 items 2–3) --------------
+// Default is the household value for these rows. They used to reuse
+// useScreenSetting, so a change here wrote this browser's localStorage (or this
+// kiosk's own override) and the Default page never changed the household at all
+// (F1). Descriptor rows write `update:config` instead; a screen page keeps
+// writing its own overrides.
+const effectsLevelDescriptor = descriptorFor("effectsLevel");
+const behaviourDescriptors = descriptorsForSection("behaviour");
 const behaviour = computed(() => ({
-  photoFrameEnabled: photoFrameSetting.value.value,
-  photoFrameTimeout: photoFrameTimeoutSetting.value.value,
-  photoFrameSourceIds: photoFrameSourceSetting.value.value,
-  loadingLight: loadingLightSetting.value.value,
-  layoutMode: layoutSetting.value.value,
+  photoFrameEnabled: props.config.photoFrameEnabled,
+  photoFrameTimeout: props.config.photoFrameTimeout,
+  photoFrameSourceIds: props.config.photoFrameSourceIds,
+  loadingLight: props.config.loadingLight,
+  layoutMode: props.config.layoutMode ?? "auto",
 }));
-
-const behaviourOverridden = computed(() => ({
-  photoFrameEnabled: photoFrameSetting.overridden.value,
-  photoFrameTimeout: photoFrameTimeoutSetting.overridden.value,
-  photoFrameSourceIds: photoFrameSourceSetting.overridden.value,
-  loadingLight: loadingLightSetting.overridden.value,
-  layoutMode: layoutSetting.overridden.value,
-}));
-
-const setBehaviour = (key, value) => behaviourSettings[key]?.set(value);
-const resetBehaviour = key => behaviourSettings[key]?.reset();
+const visibleBehaviourDescriptors = computed(() =>
+  visibleDescriptors(behaviourDescriptors, behaviour.value)
+);
 </script>

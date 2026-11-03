@@ -184,6 +184,27 @@ describe("App shell", () => {
     wrapper.unmount();
   });
 
+  it("removes the retired per-screen browser values on start-up", async () => {
+    const retired = [
+      "calvin-layout-mode",
+      "calvin-screen-loadingLight",
+      "calvin-screen-photoFrameEnabled",
+      "calvin-screen-photoFrameTimeout",
+      "calvin-screen-photoFrameSourceIds",
+    ];
+    const browserOnly = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
+    for (const key of retired) window.localStorage.setItem(key, "stale");
+    for (const key of browserOnly) window.localStorage.setItem(key, "kept");
+
+    const wrapper = await mountApp();
+
+    for (const key of retired) expect(window.localStorage.getItem(key), key).toBeNull();
+    for (const key of browserOnly) expect(window.localStorage.getItem(key), key).toBe("kept");
+
+    wrapper.unmount();
+    window.localStorage.clear();
+  });
+
   it("renders only the guest page on a share link, without the dashboard shell", async () => {
     window.history.replaceState({}, "", "/share/abc.TOKEN/");
     try {

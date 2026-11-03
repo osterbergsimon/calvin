@@ -6,25 +6,26 @@
  * the JS breakpoints and the `--bp-phone` custom media read. The screens and
  * CSS therefore never disagree about which layout is in force.
  *
- * Where the choice lives: on a kiosk it is that screen's override
- * (composables/useScreenSetting.js, key `layoutMode`); any other browser keeps
- * its own choice in localStorage. `resolveLayoutMode` is the one place that
- * says which source wins.
+ * Where the choice lives: on a kiosk it is that screen's override, and in a
+ * plain browser it is the household config (composables/useScreenSetting.js,
+ * key `layoutMode`). `resolveLayoutMode` is the one place that says which
+ * source wins.
  */
 import { LAYOUT_DESKTOP_CLASS, LAYOUT_PHONE_CLASS } from "../styles/breakpoints.js";
 
 /** The three choices, in the order the Settings row shows them. */
 export const LAYOUT_MODES = Object.freeze(["auto", "desktop", "phone"]);
 
-/** localStorage key for a browser's own choice (not a kiosk's). */
+/** The retired localStorage key; app start removes it (utils/screenSetting.js). */
 export const LAYOUT_STORAGE_KEY = "calvin-layout-mode";
 
 /** A stored/served value that is not one of the choices means Auto. */
 export const normalizeLayoutMode = value => (LAYOUT_MODES.includes(value) ? value : "auto");
 
 /**
- * The effective choice: a kiosk's screen setting wins there, otherwise this
- * browser's own choice. Auto when neither has one.
+ * The effective choice: a kiosk's screen setting wins there, otherwise the
+ * plain-browser value (the household config, since layoutMode has no browser
+ * layer). Auto when neither has one.
  *
  * @param {{ kiosk?: boolean, screenValue?: string|null, browserValue?: string|null }} sources
  */

@@ -33,6 +33,7 @@ describe("LoadingLight (CLV-115)", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    sessionStorage.clear();
     setActivePinia(createPinia());
     progress = useProgressStore();
     config = useConfigStore();
@@ -88,11 +89,20 @@ describe("LoadingLight (CLV-115)", () => {
     expect(wrapper.attributes("data-loading-light")).toBe("comet");
   });
 
-  it("this screen's own choice wins over the Default value", () => {
+  it("ignores a stale browser choice and follows the household value", () => {
     config.loadingLight = "comet";
     localStorage.setItem("calvin-screen-loadingLight", "pulse");
     const wrapper = mount(LoadingLight);
-    expect(wrapper.attributes("data-loading-light")).toBe("pulse");
+    expect(wrapper.attributes("data-loading-light")).toBe("comet");
+  });
+
+  it("a kiosk follows its merged config, not a stale browser choice", () => {
+    sessionStorage.setItem("calvin_kiosk_id", "hallway");
+    config.loadingLight = "off";
+    localStorage.setItem("calvin-screen-loadingLight", "pulse");
+    const wrapper = mount(LoadingLight);
+    expect(wrapper.find(".pulse").exists()).toBe(false);
+    expect(indicator(wrapper).exists()).toBe(false);
   });
 
   describe("reduced motion", () => {

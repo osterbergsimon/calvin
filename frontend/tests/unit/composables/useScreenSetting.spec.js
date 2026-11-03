@@ -59,6 +59,20 @@ describe("useScreenSetting", () => {
     expect(setting.value.value).toBe("off");
   });
 
+  it("ignores and never writes localStorage when the key has no browser layer", async () => {
+    window.localStorage.setItem("calvin-screen-loadingLight", "pulse");
+    const config = useConfigStore();
+    config.loadingLight = "comet";
+    const setting = useScreenSetting("loadingLight");
+
+    expect(setting.value.value).toBe("comet");
+    expect(setting.overridden.value).toBe(false);
+
+    await setting.set("off");
+    expect(window.localStorage.getItem("calvin-screen-loadingLight")).toBe("pulse");
+    expect(setting.value.value).toBe("comet");
+  });
+
   it("falls back to the server value when storage throws", () => {
     const getItem = vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
       throw new Error("blocked");
@@ -117,16 +131,12 @@ describe("useScreenSetting", () => {
     expect(setting.value.value).toBe(false);
   });
 
-  it("round-trips an array choice (photo-frame sources)", async () => {
-    const config = useConfigStore();
-    config.photoFrameSourceIds = [];
-    const setting = useScreenSetting("photoFrameSourceIds");
+  it("round-trips an array choice for a key that keeps a browser layer", async () => {
+    const setting = useScreenSetting("demoSourceIds", { serverValue: () => [] });
 
     await setting.set(["src-a", "src-b"]);
 
-    expect(window.localStorage.getItem("calvin-screen-photoFrameSourceIds")).toBe(
-      '["src-a","src-b"]'
-    );
+    expect(window.localStorage.getItem("calvin-screen-demoSourceIds")).toBe('["src-a","src-b"]');
     expect(setting.value.value).toEqual(["src-a", "src-b"]);
   });
 
