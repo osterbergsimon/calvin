@@ -128,6 +128,9 @@ export function useConfigForm(initialConfig = {}) {
         )
           ? (response.photoFrameSourceIds ?? response.photo_frame_source_ids)
           : [],
+        // Per-screen layout (calvin-tnkg): the household default lives here now
+        // that Screens › Default writes it; a screen's own value is an override.
+        layoutMode: response.layoutMode ?? response.layout_mode ?? "auto",
         photoRotationInterval:
           response.photoRotationInterval ?? response.photo_rotation_interval ?? 30,
         imageDisplayMode: response.imageDisplayMode ?? response.image_display_mode ?? "smart",

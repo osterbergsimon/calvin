@@ -535,23 +535,31 @@ describe("DefaultScreenSettings effects (calvin-uudb)", () => {
   });
 });
 
-// §4: Photo frame, Loading light and Layout moved here from Dashboard › Focus
-// & remote; they keep their per-screen storage.
-describe("DefaultScreenSettings behaviour (§4)", () => {
+// §4 + F1: Photo frame, Loading light and Layout moved here from Dashboard ›
+// Focus & remote. On Default they are the household values, so they write
+// `update:config` (settings-scope §7 items 2–3).
+describe("DefaultScreenSettings behaviour (§4, F1)", () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
     setActivePinia(createPinia());
     window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
     window.matchMedia = originalMatchMedia;
+    window.localStorage.clear();
     window.sessionStorage.clear();
   });
 
   const row = (w, label) =>
     w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+  const control = (w, label) =>
+    w.findAllComponents({ name: "SegmentedControl" }).find(c => c.props("ariaLabel") === label);
+  // Default is a controlled household form: the Settings page applies the
+  // change to its local config, which comes back down as the prop.
+  const applyConfig = (w, patch) => w.setProps({ config: { ...w.props("config"), ...patch } });
 
   it("puts Photo frame, Start after and Photos from under Behaviour", async () => {
     const w = mountDefault();
@@ -560,10 +568,9 @@ describe("DefaultScreenSettings behaviour (§4)", () => {
     expect(row(w, "Start after")).toBeUndefined();
     expect(row(w, "Photos from")).toBeUndefined();
 
-    row(w, "Photo frame")
-      .findComponent({ name: "SegmentedControl" })
-      .vm.$emit("update:modelValue", true);
+    control(w, "Photo frame").vm.$emit("update:modelValue", true);
     await flushPromises();
+    await applyConfig(w, { photoFrameEnabled: true });
 
     expect(row(w, "Start after")).toBeTruthy();
     expect(row(w, "Photos from")).toBeTruthy();
@@ -573,10 +580,9 @@ describe("DefaultScreenSettings behaviour (§4)", () => {
 
   it("offers the shared 1–30 minute start-after choices, 5 min by default", async () => {
     const w = mountDefault();
-    row(w, "Photo frame")
-      .findComponent({ name: "SegmentedControl" })
-      .vm.$emit("update:modelValue", true);
+    control(w, "Photo frame").vm.$emit("update:modelValue", true);
     await flushPromises();
+    await applyConfig(w, { photoFrameEnabled: true });
     const start = w
       .findAllComponents({ name: "SelectPill" })
       .find(c => c.props("ariaLabel") === "Start the photo frame after");
@@ -591,84 +597,74 @@ describe("DefaultScreenSettings behaviour (§4)", () => {
     ]);
   });
 
-  it("stores the choice on this screen, not in the global config", async () => {
+  it("writes Photo frame, Loading light and Layout to the household config", async () => {
     const w = mountDefault();
-    row(w, "Photo frame")
-      .findComponent({ name: "SegmentedControl" })
-      .vm.$emit("update:modelValue", true);
+    control(w, "Photo frame").vm.$emit("update:modelValue", true);
+    control(w, "Loading light").vm.$emit("update:modelValue", "pulse");
+    control(w, "Layout").vm.$emit("update:modelValue", "desktop");
     await flushPromises();
 
-    expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBe("true");
-    expect((w.emitted("update:config") || []).some(c => "photoFrameEnabled" in c[0])).toBe(false);
-    expect(row(w, "Photo frame").text()).toContain("Changed here");
+    const patches = w.emitted("update:config").map(call => call[0]);
+    expect(patches).toContainEqual({ photoFrameEnabled: true });
+    expect(patches).toContainEqual({ loadingLight: "pulse" });
+    expect(patches).toContainEqual({ layoutMode: "desktop" });
 
-    await w.find('[data-test="reset-photo-frame"]').trigger("click");
-    await flushPromises();
+    // Not this browser's choice, and not this kiosk's override.
     expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBeNull();
-    expect(row(w, "Photo frame").text()).toContain("Same as Default");
+    expect(localStorage.getItem("calvin-screen-loadingLight")).toBeNull();
+    expect(localStorage.getItem("calvin-layout-mode")).toBeNull();
+    // Default rows never claim a per-screen scope.
+    expect(w.find("#section-device-behaviour").text()).not.toContain("Changed here");
+    expect(w.find("#section-device-behaviour").text()).not.toContain("Same as Default");
   });
 
-  it("stores the chosen photo sources as a list for this screen", async () => {
+  it("stores the chosen photo sources in the household config", async () => {
     const w = mountDefault();
-    row(w, "Photo frame")
-      .findComponent({ name: "SegmentedControl" })
-      .vm.$emit("update:modelValue", true);
+    control(w, "Photo frame").vm.$emit("update:modelValue", true);
     await flushPromises();
+    await applyConfig(w, { photoFrameEnabled: true });
 
     const picker = w.findComponent({ name: "PhotoSourcePicker" });
     expect(picker.props("modelValue")).toEqual([]);
     picker.vm.$emit("update:modelValue", ["image-1"]);
     await flushPromises();
 
-    expect(JSON.parse(localStorage.getItem("calvin-screen-photoFrameSourceIds"))).toEqual([
-      "image-1",
-    ]);
+    expect(w.emitted("update:config")).toContainEqual([{ photoFrameSourceIds: ["image-1"] }]);
+    expect(localStorage.getItem("calvin-screen-photoFrameSourceIds")).toBeNull();
   });
 
-  it("reads the kiosk's merged photo frame but leaves the form value for global rows", () => {
+  it("shows the household value even on a kiosk with its own merged value", () => {
     window.sessionStorage.setItem("calvin_kiosk_id", "hallway");
     useConfigStore().photoFrameEnabled = true;
-    const w = mountDefault();
-    expect(
-      row(w, "Photo frame").findComponent({ name: "SegmentedControl" }).props("modelValue")
-    ).toBe(true);
+    const w = mountDefault({ photoFrameEnabled: false });
+    expect(control(w, "Photo frame").props("modelValue")).toBe(false);
   });
 
   it("falls back to the old global value until this screen chooses", () => {
     const w = mountDefault({ photoFrameEnabled: true, photoFrameTimeout: 600 });
-    const frame = row(w, "Photo frame").findComponent({ name: "SegmentedControl" });
-    expect(frame.props("modelValue")).toBe(true);
+    expect(control(w, "Photo frame").props("modelValue")).toBe(true);
     const start = w
       .findAllComponents({ name: "SelectPill" })
       .find(c => c.props("ariaLabel") === "Start the photo frame after");
     expect(start.props("modelValue")).toBe(600);
   });
 
-  const loadingControl = w =>
-    w
-      .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Loading light");
-
   it("offers Comet · Pulse · Off under Behaviour, Comet by default", () => {
     const w = mountDefault();
-    const control = loadingControl(w);
-    expect(control.props("options").map(o => o.label)).toEqual(["Comet", "Pulse", "Off"]);
-    expect(control.props("modelValue")).toBe("comet");
-    expect(row(w, "Loading light").text()).toContain("Same as Default");
+    const loading = control(w, "Loading light");
+    expect(loading.props("options").map(o => o.label)).toEqual(["Comet", "Pulse", "Off"]);
+    expect(loading.props("modelValue")).toBe("comet");
+    expect(row(w, "Loading light").text()).not.toContain("Same as Default");
   });
 
-  it("saves the loading light for this screen, then resets to the Default", async () => {
+  it("saves the loading light to the household config", async () => {
     const w = mountDefault();
-    loadingControl(w).vm.$emit("update:modelValue", "pulse");
+    control(w, "Loading light").vm.$emit("update:modelValue", "pulse");
     await flushPromises();
-    expect(localStorage.getItem("calvin-screen-loadingLight")).toBe("pulse");
-    expect(loadingControl(w).props("modelValue")).toBe("pulse");
-    expect(row(w, "Loading light").text()).toContain("Changed here");
 
-    await w.find('[data-test="reset-loading-light"]').trigger("click");
-    await flushPromises();
+    expect(w.emitted("update:config")).toContainEqual([{ loadingLight: "pulse" }]);
     expect(localStorage.getItem("calvin-screen-loadingLight")).toBeNull();
-    expect(loadingControl(w).props("modelValue")).toBe("comet");
+    expect(row(w, "Loading light").text()).not.toContain("Changed here");
   });
 
   it("explains the pulse when the device prefers less motion", () => {
@@ -686,14 +682,66 @@ describe("DefaultScreenSettings behaviour (§4)", () => {
     );
   });
 
-  it("saves the layout for this screen", async () => {
+  it("saves the layout to the household config", async () => {
     const w = mountDefault();
-    const layout = w
-      .findAllComponents({ name: "SegmentedControl" })
-      .find(c => c.props("ariaLabel") === "Layout");
-    layout.vm.$emit("update:modelValue", "phone");
+    control(w, "Layout").vm.$emit("update:modelValue", "phone");
     await flushPromises();
-    expect(localStorage.getItem("calvin-layout-mode")).toBe("phone");
-    expect(row(w, "Layout").text()).toContain("Changed here");
+    expect(w.emitted("update:config")).toContainEqual([{ layoutMode: "phone" }]);
+    expect(localStorage.getItem("calvin-layout-mode")).toBeNull();
+  });
+});
+
+// F1 regression (settings-scope §7 item 3): changing the Behaviour rows on
+// Default from a kiosk or a plain browser changes the household config, and
+// touches neither the kiosk's override nor localStorage.
+describe("DefaultScreenSettings F1 regression", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    window.matchMedia = originalMatchMedia;
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  const control = (w, label) =>
+    w.findAllComponents({ name: "SegmentedControl" }).find(c => c.props("ariaLabel") === label);
+
+  it.each([
+    ["a plain browser", false],
+    ["a kiosk", true],
+  ])("from %s, writes the household config and not the device", async (_name, kioskMode) => {
+    const store = useKiosksStore();
+    const overrides = {
+      photoFrameEnabled: false,
+      loadingLight: "off",
+      layoutMode: "phone",
+    };
+    store.kiosks = [kiosk({ id: "hallway", overrides: { ...overrides } })];
+    store.saveOverrides = vi.fn(async () => {});
+    if (kioskMode) window.sessionStorage.setItem("calvin_kiosk_id", "hallway");
+
+    const w = mountDefault({ photoFrameEnabled: false, loadingLight: "comet", layoutMode: "auto" });
+    control(w, "Photo frame").vm.$emit("update:modelValue", true);
+    control(w, "Loading light").vm.$emit("update:modelValue", "pulse");
+    control(w, "Layout").vm.$emit("update:modelValue", "desktop");
+    await flushPromises();
+
+    const patches = w.emitted("update:config").map(call => call[0]);
+    expect(patches).toContainEqual({ photoFrameEnabled: true });
+    expect(patches).toContainEqual({ loadingLight: "pulse" });
+    expect(patches).toContainEqual({ layoutMode: "desktop" });
+
+    // The kiosk's own override and this browser's stored choice stay untouched.
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+    expect(store.kiosks[0].overrides).toEqual(overrides);
+    expect(localStorage.getItem("calvin-screen-photoFrameEnabled")).toBeNull();
+    expect(localStorage.getItem("calvin-screen-loadingLight")).toBeNull();
+    expect(localStorage.getItem("calvin-layout-mode")).toBeNull();
   });
 });

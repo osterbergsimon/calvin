@@ -355,10 +355,11 @@
       </SettingsSection>
 
       <SettingsSection id="screen-effects" title="Effects & focus">
-        <EffectsLevelRow
+        <ScreenSettingRow
+          :descriptor="effectsLevelDescriptor"
           :value="effEffectsLevel"
           :overridden="effectsLevelOverridden"
-          :auto-copy="effectsAutoCopy"
+          :auto-note="effectsAutoCopy"
           @set="setEffectsLevel"
           @reset="resetEffectsLevel"
         />
@@ -496,15 +497,14 @@
       </SettingsSection>
 
       <SettingsSection id="screen-behaviour" title="Behaviour">
-        <ScreenBehaviourRows
-          :photo-frame-enabled="behaviour.photoFrameEnabled"
-          :photo-frame-timeout="behaviour.photoFrameTimeout"
-          :photo-frame-source-ids="behaviour.photoFrameSourceIds"
-          :loading-light="behaviour.loadingLight"
-          :layout-mode="behaviour.layoutMode"
-          :overridden="behaviourOverridden"
-          @set="setBehaviour"
-          @reset="resetBehaviour"
+        <ScreenSettingRow
+          v-for="descriptor in visibleBehaviourDescriptors"
+          :key="descriptor.key"
+          :descriptor="descriptor"
+          :value="behaviour[descriptor.key]"
+          :overridden="Boolean(behaviourOverridden[descriptor.key])"
+          @set="value => setBehaviour(descriptor.key, value)"
+          @reset="() => resetBehaviour(descriptor.key)"
         />
         <InlineNote
           v-if="behaviourMsg"
@@ -618,9 +618,12 @@ import {
 } from "@/utils/screenPower";
 import {
   changedSettingCount,
+  descriptorFor,
+  descriptorsForSection,
   formatSettingList,
   hasOwnSettings,
   useAsDefaultPatch,
+  visibleDescriptors,
   withoutAllOverrides,
   withoutPromotedSettings,
 } from "@/utils/screenOverrides";
@@ -647,8 +650,7 @@ import ScreensLayout from "@/components/settings/shared/ScreensLayout.vue";
 import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
-import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
-import EffectsLevelRow from "@/components/settings/shared/EffectsLevelRow.vue";
+import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
 import {
   effectsLevelLabel,
   normalizeEffectsLevel,
@@ -1230,6 +1232,7 @@ function resetOsk() {
 // --- Effects & focus: how expensive effects draw (calvin-uudb) --------------
 // Split whether from how: the Focus light and Dim other regions rows keep
 // deciding whether something shows; this row only decides how it is drawn.
+const effectsLevelDescriptor = descriptorFor("effectsLevel");
 const effectsLevelOverridden = computed(() => "effectsLevel" in overrides.value);
 const effEffectsLevel = computed(() =>
   normalizeEffectsLevel(
@@ -1255,33 +1258,35 @@ function resetEffectsLevel() {
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------
 // These rows moved here from Dashboard › Focus & remote; the keys stay the
 // same, so a screen's existing override (or this browser's stored choice) is
-// untouched.
-const behaviourOverridden = computed(() => ({
-  photoFrameEnabled: "photoFrameEnabled" in overrides.value,
-  photoFrameTimeout: "photoFrameTimeout" in overrides.value,
-  photoFrameSourceIds: "photoFrameSourceIds" in overrides.value,
-  loadingLight: "loadingLight" in overrides.value,
-  layoutMode: "layoutMode" in overrides.value,
-}));
+// untouched. The row itself is descriptor-driven; this page hands it the
+// screen's overrides and the household value underneath.
+const behaviourDescriptors = descriptorsForSection("behaviour");
 
-const behaviour = computed(() => ({
-  photoFrameEnabled:
-    "photoFrameEnabled" in overrides.value
-      ? overrides.value.photoFrameEnabled
-      : props.config.photoFrameEnabled,
-  photoFrameTimeout:
-    "photoFrameTimeout" in overrides.value
-      ? overrides.value.photoFrameTimeout
-      : props.config.photoFrameTimeout,
-  photoFrameSourceIds:
-    "photoFrameSourceIds" in overrides.value
-      ? overrides.value.photoFrameSourceIds
-      : props.config.photoFrameSourceIds,
-  loadingLight:
-    "loadingLight" in overrides.value ? overrides.value.loadingLight : props.config.loadingLight,
-  // The global config has no layout mode: Auto is the default.
-  layoutMode: "layoutMode" in overrides.value ? overrides.value.layoutMode : "auto",
-}));
+const behaviourOverridden = computed(() =>
+  Object.fromEntries(
+    behaviourDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+
+const defaultBehaviourValue = key => {
+  if (key === "layoutMode") return props.config.layoutMode ?? "auto";
+  return props.config[key];
+};
+
+const behaviour = computed(() =>
+  Object.fromEntries(
+    behaviourDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : defaultBehaviourValue(descriptor.key),
+    ])
+  )
+);
+
+const visibleBehaviourDescriptors = computed(() =>
+  visibleDescriptors(behaviourDescriptors, behaviour.value)
+);
 
 function persistBehaviour(next) {
   persist(
