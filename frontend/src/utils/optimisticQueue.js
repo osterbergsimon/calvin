@@ -27,6 +27,7 @@ const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
  *     changes: object,
  *     deleted: string[],
  *     snapshot: object,
+ *     merge: boolean,
  *   }) => Promise<any>,
  *   onError?: (err: any, batch: object) => void,
  *   delay?: number,
@@ -46,6 +47,10 @@ export function createOptimisticQueue({
   const saving = ref(false);
 
   const versions = new Map();
+  // Keys whose pending value came from a partial write (`setPartial` with
+  // `merge: true`). A batch made only of those can be sent as a merge instead
+  // of a whole-target replace; a whole-target write or a deletion is not.
+  const mergeable = new Set();
   let isLoaded = loaded;
   let timer = null;
   let running = false;
@@ -120,7 +125,15 @@ export function createOptimisticQueue({
       for (const key of sentKeys) {
         if (!has(sentDeleted, key)) changes[key] = sentPending[key];
       }
-      const batch = { changes, deleted: Object.keys(sentDeleted), snapshot: sentSnapshot };
+      const batch = {
+        changes,
+        deleted: Object.keys(sentDeleted),
+        snapshot: sentSnapshot,
+        merge:
+          sentKeys.length > 0 &&
+          sentKeys.every(key => mergeable.has(key)) &&
+          Object.keys(sentDeleted).length === 0,
+      };
       await save(batch);
 
       // Only the sent keys become confirmed; a server change that arrived
@@ -138,6 +151,7 @@ export function createOptimisticQueue({
         if (versionOf(key) === sentVersions.get(key)) {
           delete nextPending[key];
           delete nextDeleted[key];
+          mergeable.delete(key);
         }
       }
       pending.value = nextPending;
@@ -151,6 +165,7 @@ export function createOptimisticQueue({
         if (versionOf(key) === sentVersions.get(key)) {
           delete nextPending[key];
           delete nextDeleted[key];
+          mergeable.delete(key);
         }
       }
       pending.value = nextPending;
@@ -195,13 +210,15 @@ export function createOptimisticQueue({
   };
 
   /** Apply changed keys optimistically; the save follows after the debounce. */
-  const setPartial = values => {
+  const setPartial = (values, { merge = false } = {}) => {
     const keys = Object.keys(values);
     const nextPending = clone(pending.value);
     const nextDeleted = clone(deleted.value);
     for (const key of keys) {
       nextPending[key] = values[key];
       delete nextDeleted[key];
+      if (merge) mergeable.add(key);
+      else mergeable.delete(key);
       bump(key);
     }
     pending.value = nextPending;
@@ -217,6 +234,7 @@ export function createOptimisticQueue({
     for (const key of keys) {
       delete nextPending[key];
       nextDeleted[key] = true;
+      mergeable.delete(key);
       bump(key);
     }
     pending.value = nextPending;
@@ -248,6 +266,7 @@ export function createOptimisticQueue({
         nextDeleted[key] = true;
       }
       keys.push(key);
+      mergeable.delete(key);
       bump(key);
     }
 
@@ -301,6 +320,7 @@ export function createOptimisticQueue({
     }
     pending.value = {};
     deleted.value = {};
+    mergeable.clear();
     saving.value = running;
     const waiting = waiters;
     waiters = [];

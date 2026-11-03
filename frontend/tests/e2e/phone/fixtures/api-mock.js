@@ -551,6 +551,15 @@ export async function installApiMock(page, options = {}) {
         state.overridesByKiosk[id] = body.overrides || {};
         return json(route, { id, overrides: state.overridesByKiosk[id] });
       }
+      if (method === "PATCH") {
+        // A per-screen row merges the keys it changes (F2); every other key stays.
+        const body = request.postDataJSON() || {};
+        state.overridesByKiosk[id] = {
+          ...(state.overridesByKiosk[id] || {}),
+          ...(body.overrides || {}),
+        };
+        return json(route, { id, overrides: state.overridesByKiosk[id] });
+      }
       return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {

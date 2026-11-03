@@ -155,8 +155,28 @@ describe("createOptimisticQueue", () => {
       changes: {},
       deleted: ["y"],
       snapshot: { x: 1 },
+      merge: false,
     });
     expect(queue.display.value).toEqual({ x: 1 });
+  });
+
+  it("marks a batch as mergeable only when every pending key is a partial write", async () => {
+    const save = vi.fn(async () => {});
+    const queue = createOptimisticQueue({ initial: { x: 1, y: 2 }, save });
+
+    queue.setPartial({ x: 10 }, { merge: true });
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(save.mock.calls[0][0].merge).toBe(true);
+
+    // A whole-target write (or a deletion) is not a partial write.
+    queue.replaceAll({ x: 1, y: 2 });
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(save.mock.calls[1][0].merge).toBe(false);
+
+    queue.setPartial({ y: 3 }, { merge: true });
+    queue.deleteKeys(["x"]);
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+    expect(save.mock.calls[2][0].merge).toBe(false);
   });
 
   it("moves only the successfully sent keys onto confirmed", async () => {

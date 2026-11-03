@@ -574,3 +574,27 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
                 return
     existing.overrides = overrides
     await existing.update()
+
+
+@retry_on_db_locked()
+async def merge_into_overrides(kiosk_id: str, partial: dict) -> dict | None:
+    """Merge ``partial`` into a known kiosk's override layer and return it.
+
+    Additive only: keys already in the layer survive and nothing is removed, so
+    a partial write can never wipe a screen's settings. ``None`` means the
+    kiosk is unknown (or its id is malformed); callers answer 404 rather than
+    creating a row from a partial write.
+    """
+    if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
+        return None
+    existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if existing is None:
+        return None
+    merged = dict(existing.overrides or {})
+    merged.update(partial)
+    if merged != (existing.overrides or {}):
+        existing.overrides = merged
+        # Only this column: a concurrent heartbeat (last_seen, agent_*) must not
+        # be overwritten by this snapshot.
+        await existing.update(_columns=["overrides"])
+    return merged

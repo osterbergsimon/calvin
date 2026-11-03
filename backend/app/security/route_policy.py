@@ -25,6 +25,10 @@ PUBLIC_WRITES = frozenset(
         ("POST", "/api/system/display/power/off"),
         # Body keys are restricted to CONFIG_DISPLAY_KEYS in the route itself.
         ("POST", "/api/config"),
+        # A screen's own layer, merged and restricted to KIOSK_SELF_WRITE_KEYS
+        # in the route itself (F2, settings-scope §7 item 9). Replacing a layer
+        # stays admin-only.
+        ("PATCH", "/api/kiosks/{kiosk_id}/overrides"),
         ("POST", "/api/auth/setup"),
         ("POST", "/api/auth/login"),
         ("POST", "/api/auth/logout"),
@@ -97,6 +101,21 @@ CONFIG_DISPLAY_KEYS = frozenset(
         "darkModeEnd",
         "typeTheme",
         "lastSideViewMode",
+    }
+)
+
+# Override keys a screen may write into its OWN layer without an admin session
+# (F2, settings-scope §7 item 9). Only purely presentational keys: a kiosk id is
+# not a secret, so the worst a caller on the LAN can do with this list is hide a
+# screen's controls - which any caller can already do to every screen through
+# the household ``showUI`` in CONFIG_DISPLAY_KEYS.
+#
+# NEVER add a device-physical key here (``DEVICE_PHYSICAL_KEYS`` in
+# kiosk_registry: rotation, display schedule, timeout, output) or anything
+# else host-acting: those act on the machine, not on the picture.
+KIOSK_SELF_WRITE_KEYS = frozenset(
+    {
+        "showUI",  # the dashboard's ⋯ Hide controls toggle
     }
 )
 

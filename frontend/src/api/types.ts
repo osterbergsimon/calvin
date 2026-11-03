@@ -1142,7 +1142,16 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    patch?: never;
+    /**
+     * Patch Kiosk Overrides
+     * @description Merge keys into a kiosk's override layer (a screen's own write, F2).
+     *
+     *     Additive and partial: keys already in the layer stay, nothing is removed.
+     *     Without an admin session only :data:`KIOSK_SELF_WRITE_KEYS` may be written,
+     *     so the dashboard's ⋯ Hide controls toggle works on a kiosk that was never
+     *     signed in. Any other key is a 403 for that caller.
+     */
+    patch: operations["patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch"];
     trace?: never;
   };
   "/api/kiosks/{kiosk_id}/update": {
@@ -4558,6 +4567,41 @@ export interface operations {
     };
   };
   put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OverridesBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch: {
     parameters: {
       query?: never;
       header?: never;
