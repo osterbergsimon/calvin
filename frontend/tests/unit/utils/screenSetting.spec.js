@@ -20,6 +20,9 @@ describe("retired per-screen browser storage", () => {
         screenStorageKey("photoFrameEnabled"),
         screenStorageKey("photoFrameTimeout"),
         screenStorageKey("photoFrameSourceIds"),
+        screenStorageKey("showUI"),
+        screenStorageKey("clockBarShowInKiosk"),
+        screenStorageKey("tapAnywhereReveal"),
       ])
     );
   });

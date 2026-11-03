@@ -23,7 +23,33 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
   page,
   consoleErrors,
 }) => {
-  const api = await installApiMock(page);
+  // The kiosk is one of the screens the server knows, so the old Controls link
+  // can open its own page. The shared phone fixture only lists two other screens.
+  const api = await installApiMock(page, {
+    overrides: [
+      [
+        /^\/api\/kiosks$/,
+        route =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              kiosks: [
+                {
+                  id: KIOSK_ID,
+                  name: "Pi panel",
+                  lastSeen: new Date().toISOString(),
+                  lastAppliedVersion: "1.6.0",
+                  agentVersion: "1.6.0",
+                  overrides: {},
+                  hostname: "pi-panel",
+                },
+              ],
+            }),
+          }),
+      ],
+    ],
+  });
   await gotoSettings(page, null, { kiosk: KIOSK_ID });
   await expectSettingsReady(page);
   // The kiosk identity marks <html>; that is what keeps 800x480 off the phone layout.
@@ -35,13 +61,18 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
     await expectPhoneLayout(page, `kiosk ${category} category`);
   }
 
-  // On a kiosk Hide controls writes that screen's overrides, not the global
-  // config (calvin-hi6w).
+  // The old Controls deep link takes a kiosk to its own page, and Hide controls
+  // writes that screen's overrides, not the global config (calvin-hi6w, §7 item 4).
   await selectCategory(page, "Dashboard");
   const configPosts = () => api.requests.filter(r => r === "POST /api/config").length;
   const postsBeforeHiding = configPosts();
-  await page.getByLabel("Hide controls").click();
+  await page.getByRole("button", { name: "Open Screens" }).click();
+  await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+  const controls = page.locator("#section-screen-controls");
+  await expect(controls).toBeVisible();
+  await controls.getByLabel("Hide controls").click();
   await expect.poll(() => api.requests).toContain(`PUT /api/kiosks/${KIOSK_ID}/overrides`);
+  await expect.poll(() => api.overridesByKiosk[KIOSK_ID]?.showUI).toBe(false);
   expect(configPosts()).toBe(postsBeforeHiding);
 
   // A touch kiosk offers the same settings on a phone.

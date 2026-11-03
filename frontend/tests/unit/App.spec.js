@@ -191,6 +191,9 @@ describe("App shell", () => {
       "calvin-screen-photoFrameEnabled",
       "calvin-screen-photoFrameTimeout",
       "calvin-screen-photoFrameSourceIds",
+      "calvin-screen-showUI",
+      "calvin-screen-clockBarShowInKiosk",
+      "calvin-screen-tapAnywhereReveal",
     ];
     const browserOnly = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
     for (const key of retired) window.localStorage.setItem(key, "stale");

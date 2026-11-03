@@ -7,6 +7,7 @@ import { useKiosksStore } from "@/stores/kiosks";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import RangeSlider from "@/components/ui/RangeSlider.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
@@ -490,6 +491,7 @@ describe("ScreensSettings — one screen's page", () => {
       "section-screen-pages",
       "section-screen-display",
       "section-screen-effects",
+      "section-screen-controls",
       "section-screen-power",
       "section-screen-touch",
       "section-screen-behaviour",
@@ -1423,8 +1425,9 @@ describe("ScreensSettings — decision C placement", () => {
     expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
     expect(wrapper.find("#section-device-power").text()).toContain("Power");
 
-    // Remote & buttons and key-press feedback are not here any more.
-    expect(rowByLabel(wrapper, "Show button presses")).toBeUndefined();
+    // Button bindings stay in Dashboard; the moved Effects & focus rows live
+    // with the other screen settings now (§7 item 4).
+    expect(rowByLabel(wrapper, "Show button presses")).toBeTruthy();
     expect(rowByLabel(wrapper, "Button bindings")).toBeUndefined();
   });
 });
@@ -1460,7 +1463,8 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     expect(ids).toEqual([
       "section-default-pages",
       "section-layout",
-      "section-default-effects",
+      "section-screen-effects",
+      "section-screen-controls",
       "section-device-power",
       "section-device-keyboard",
       "section-device-behaviour",
@@ -1813,6 +1817,198 @@ describe("ScreensSettings — Effects & focus (calvin-uudb)", () => {
     await selectFirst(wrapper);
 
     expect(effectsControl(wrapper).props("modelValue")).toBe("standard");
+  });
+});
+
+// §7 item 4: the whole Controls section and the rest of Effects & focus moved
+// from Dashboard. A screen page writes each row to that screen's overrides.
+describe("ScreensSettings — moved Controls and Effects & focus (§7 item 4)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const control = (wrapper, kind, label) =>
+    wrapper.findAllComponents(kind).find(c => c.props("ariaLabel") === label);
+
+  it("shows the whole Effects & focus group and Controls on a screen page", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const effects = wrapper.find("#section-screen-effects");
+    expect(effects.exists()).toBe(true);
+    expect(effects.find(".settings-section__eyebrow").text()).toBe("Effects & focus");
+    for (const label of [
+      "Effects",
+      "Focus light",
+      "Dim other regions",
+      "Show button presses",
+      "Label size",
+    ]) {
+      expect(rowByLabel(wrapper, label), label).toBeTruthy();
+    }
+
+    const controls = wrapper.find("#section-screen-controls");
+    expect(controls.exists()).toBe(true);
+    expect(controls.find(".settings-section__eyebrow").text()).toBe("Controls");
+    for (const label of [
+      "Hide controls",
+      "Keep the clock bar when hidden",
+      "Tap anywhere to show controls",
+    ]) {
+      expect(rowByLabel(wrapper, label), label).toBeTruthy();
+    }
+    // The corner rows only matter while the controls are hidden.
+    expect(rowByLabel(wrapper, "Show-controls corner")).toBeUndefined();
+  });
+
+  it("reads the household value for each moved row until this screen overrides it", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        focusLightMode: "off",
+        focusLightDimOthers: false,
+        keyboardFeedbackEnabled: false,
+        keyboardFeedbackMode: "small",
+        showUI: false,
+        clockBarShowInKiosk: true,
+        tapAnywhereReveal: true,
+        hotCornerPosition: "top-right",
+      }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(control(wrapper, SelectPill, "Focus light").props("modelValue")).toBe("off");
+    expect(control(wrapper, ToggleSwitch, "Dim other regions").props("modelValue")).toBe(false);
+    expect(control(wrapper, ToggleSwitch, "Show button presses").props("modelValue")).toBe(false);
+    expect(control(wrapper, SegmentedControl, "Label size").props("modelValue")).toBe("small");
+    // showUI false means the controls are hidden, so Hide controls is on.
+    expect(control(wrapper, ToggleSwitch, "Hide controls").props("modelValue")).toBe(true);
+    expect(
+      control(wrapper, ToggleSwitch, "Keep the clock bar when hidden").props("modelValue")
+    ).toBe(true);
+    expect(
+      control(wrapper, ToggleSwitch, "Tap anywhere to show controls").props("modelValue")
+    ).toBe(true);
+    expect(control(wrapper, SelectPill, "Show-controls corner").props("modelValue")).toBe(
+      "top-right"
+    );
+    expect(rowByLabel(wrapper, "Focus light").text()).toContain("Same as Default");
+  });
+
+  it("writes the Effects & focus rows to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Focus light").vm.$emit("update:modelValue", "always");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      focusLightMode: "always",
+    });
+
+    control(wrapper, ToggleSwitch, "Dim other regions").vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      orientation: "portrait",
+      focusLightMode: "always",
+      focusLightDimOthers: false,
+    });
+  });
+
+  it("writes Hide controls as showUI=false for this screen", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const hide = control(wrapper, ToggleSwitch, "Hide controls");
+    expect(hide.props("modelValue")).toBe(false);
+    hide.vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { showUI: false });
+    expect(rowByLabel(wrapper, "Hide controls").text()).toContain("Changed here");
+  });
+
+  it("writes keep-clock-bar, tap-anywhere and the corner rows to the override", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { showUI: false } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, ToggleSwitch, "Keep the clock bar when hidden").vm.$emit(
+      "update:modelValue",
+      true
+    );
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+    });
+
+    control(wrapper, ToggleSwitch, "Tap anywhere to show controls").vm.$emit(
+      "update:modelValue",
+      true
+    );
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+      tapAnywhereReveal: true,
+    });
+
+    control(wrapper, SelectPill, "Show-controls corner").vm.$emit("update:modelValue", "top-right");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+      tapAnywhereReveal: true,
+      hotCornerPosition: "top-right",
+    });
+
+    control(wrapper, RangeSlider, "Corner size in pixels").vm.$emit("update:modelValue", 80);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+      tapAnywhereReveal: true,
+      hotCornerPosition: "top-right",
+      hotCornerSize: 80,
+    });
+  });
+
+  it("resets one moved override without touching the others", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { focusLightMode: "off", hotCornerSize: 80, showUI: true },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    // showUI true means the controls show, so the corner rows are not listed.
+    expect(rowByLabel(wrapper, "Corner size")).toBeUndefined();
+    await wrapper.find('[data-test="reset-focus-light"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      hotCornerSize: 80,
+      showUI: true,
+    });
+  });
+
+  it("opens the Default page at Controls from a deep link on a plain browser", async () => {
+    const { wrapper } = mountScreens({ initialSection: "screen-controls" });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+    expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+  });
+
+  it("opens this screen's own page at Controls from a deep link on a kiosk", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({ initialSection: "screen-controls" });
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
   });
 });
 

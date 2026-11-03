@@ -23,20 +23,20 @@
       :model-value="controlValue"
       :options="descriptor.control.options"
       :aria-label="ariaLabel"
-      @update:model-value="value => emit('set', value)"
+      @update:model-value="emitSet"
     />
     <ToggleSwitch
       v-else-if="kind === 'toggle'"
       :model-value="controlValue"
       :aria-label="ariaLabel"
-      @update:model-value="value => emit('set', value)"
+      @update:model-value="emitSet"
     />
     <SelectPill
       v-else-if="kind === 'select'"
       :model-value="controlValue"
       :options="selectOptions"
       :aria-label="ariaLabel"
-      @update:model-value="value => emit('set', value)"
+      @update:model-value="emitSet"
     />
     <NumberStepper
       v-else-if="kind === 'number'"
@@ -46,14 +46,24 @@
       :step="descriptor.control.step"
       :unit="descriptor.control.unit || ''"
       :aria-label="ariaLabel"
-      @update:model-value="value => emit('set', value)"
+      @update:model-value="emitSet"
+    />
+    <RangeSlider
+      v-else-if="kind === 'range'"
+      :model-value="controlValue"
+      :min="descriptor.control.min"
+      :max="descriptor.control.max"
+      :step="descriptor.control.step"
+      :unit="descriptor.control.unit || ''"
+      :aria-label="ariaLabel"
+      @update:model-value="emitSet"
     />
     <PhotoSourcePicker
       v-else-if="kind === 'photoSources'"
       :model-value="photoSourceIds"
       :options="photoSources"
       :aria-label="ariaLabel"
-      @update:model-value="value => emit('set', value)"
+      @update:model-value="emitSet"
     />
   </SettingRow>
 </template>
@@ -62,6 +72,7 @@
 import { computed, onMounted } from "vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import RangeSlider from "@/components/ui/RangeSlider.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
@@ -89,7 +100,14 @@ const emit = defineEmits(["set", "reset"]);
 
 const kind = computed(() => props.descriptor?.control?.kind || "segmented");
 const ariaLabel = computed(() => props.descriptor?.ariaLabel || props.descriptor?.label);
-const controlValue = computed(() => normalizeSettingValue(props.descriptor, props.value));
+// A toggle can describe the opposite of its key: Hide controls is on while
+// showUI is off. The page still receives the key's own value.
+const inverted = computed(() => Boolean(props.descriptor?.control?.invert));
+const controlValue = computed(() => {
+  const value = normalizeSettingValue(props.descriptor, props.value);
+  return inverted.value ? !value : value;
+});
+const emitSet = value => emit("set", inverted.value ? !value : value);
 const isAuto = computed(() => controlValue.value === "auto");
 const selectOptions = computed(() => settingControlOptions(props.descriptor, props.value));
 

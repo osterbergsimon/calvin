@@ -112,7 +112,9 @@ describe("useScreenSetting", () => {
   it("round-trips a boolean choice without reading 'false' as true", async () => {
     const config = useConfigStore();
     config.showUI = true;
-    const setting = useScreenSetting("showUI");
+    // The composable still supports a browser layer for callers that declare
+    // one; the showUI settings row no longer does.
+    const setting = useScreenSetting("showUI", { browserLayer: true });
 
     expect(setting.value.value).toBe(true);
     await setting.set(false);
@@ -126,9 +128,23 @@ describe("useScreenSetting", () => {
     const config = useConfigStore();
     config.showUI = true;
 
-    const setting = useScreenSetting("showUI");
+    const setting = useScreenSetting("showUI", { browserLayer: true });
 
     expect(setting.value.value).toBe(false);
+  });
+
+  it("follows the household value for a setting without a browser layer", async () => {
+    window.localStorage.setItem("calvin-screen-showUI", "false");
+    const config = useConfigStore();
+    config.showUI = true;
+
+    const setting = useScreenSetting("showUI");
+
+    expect(setting.value.value).toBe(true);
+    await setting.set(false);
+    // The write is a no-op; the Settings rows now write the household config or
+    // the screen's overrides instead.
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBe("false");
   });
 
   it("round-trips an array choice for a key that keeps a browser layer", async () => {

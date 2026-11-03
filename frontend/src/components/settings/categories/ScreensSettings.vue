@@ -355,14 +355,16 @@
       </SettingsSection>
 
       <SettingsSection id="screen-effects" title="Effects & focus">
-        <ScreenSettingRow
-          :descriptor="effectsLevelDescriptor"
-          :value="effEffectsLevel"
-          :overridden="effectsLevelOverridden"
-          :auto-note="effectsAutoCopy"
-          @set="setEffectsLevel"
-          @reset="resetEffectsLevel"
-        />
+        <template v-for="descriptor in visibleEffectsDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :value="effects[descriptor.key]"
+            :overridden="Boolean(effectsOverridden[descriptor.key])"
+            :auto-note="descriptor.key === 'effectsLevel' ? effectsAutoCopy : ''"
+            @set="value => setEffects(descriptor.key, value)"
+            @reset="() => resetEffects(descriptor.key)"
+          />
+        </template>
         <InlineNote
           v-if="effectsMsg"
           class="screens-saved"
@@ -371,6 +373,27 @@
           aria-live="polite"
         >
           {{ effectsMsg }}
+        </InlineNote>
+      </SettingsSection>
+
+      <SettingsSection id="screen-controls" title="Controls">
+        <template v-for="descriptor in visibleControlDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :value="controls[descriptor.key]"
+            :overridden="Boolean(controlsOverridden[descriptor.key])"
+            @set="value => setControl(descriptor.key, value)"
+            @reset="() => resetControl(descriptor.key)"
+          />
+        </template>
+        <InlineNote
+          v-if="controlsMsg"
+          class="screens-saved"
+          :tone="toneFor(controlsMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ controlsMsg }}
         </InlineNote>
       </SettingsSection>
 
@@ -618,7 +641,6 @@ import {
 } from "@/utils/screenPower";
 import {
   changedSettingCount,
-  descriptorFor,
   descriptorsForSection,
   formatSettingList,
   hasOwnSettings,
@@ -651,11 +673,7 @@ import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
-import {
-  effectsLevelLabel,
-  normalizeEffectsLevel,
-  resolveEffectsLevel,
-} from "@/utils/effectsLevel";
+import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 
 const props = defineProps({
@@ -680,14 +698,28 @@ const editorOpen = ref(false);
 
 // --- which page is open ----------------------------------------------------
 // null (the list) · "default" · "browser" · a screen id on a kiosk selection.
+// These sections exist on both the Default page and a screen's own page, so a
+// deep link can open the right one for the device: a kiosk opens its own page,
+// any other browser opens Default.
+const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-effects", "screen-controls"]);
 const DEFAULT_SECTION_IDS = new Set([
   "layout",
   "device-power",
   "device-keyboard",
   "device-behaviour",
+  "screen-effects",
+  "screen-controls",
 ]);
+const initialOwnScreenId =
+  props.initialSection && INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) && kioskId
+    ? kioskId
+    : null;
 const selection = ref(
-  props.initialSection && DEFAULT_SECTION_IDS.has(props.initialSection) ? { kind: "default" } : null
+  initialOwnScreenId
+    ? { kind: "screen", id: initialOwnScreenId }
+    : props.initialSection && DEFAULT_SECTION_IDS.has(props.initialSection)
+      ? { kind: "default" }
+      : null
 );
 const defaultOpen = computed(() => selection.value?.kind === "default");
 const browserOpen = computed(() => selection.value?.kind === "browser");
@@ -717,6 +749,7 @@ const nameMsg = ref("");
 const pagesMsg = ref("");
 const displayMsg = ref("");
 const effectsMsg = ref("");
+const controlsMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
 const behaviourMsg = ref("");
@@ -854,6 +887,7 @@ function clearMessages() {
   pagesMsg.value = "";
   displayMsg.value = "";
   effectsMsg.value = "";
+  controlsMsg.value = "";
   powerMsg.value = "";
   touchMsg.value = "";
   behaviourMsg.value = "";
@@ -1229,15 +1263,28 @@ function resetOsk() {
   persistTouch(next);
 }
 
-// --- Effects & focus: how expensive effects draw (calvin-uudb) --------------
-// Split whether from how: the Focus light and Dim other regions rows keep
-// deciding whether something shows; this row only decides how it is drawn.
-const effectsLevelDescriptor = descriptorFor("effectsLevel");
-const effectsLevelOverridden = computed(() => "effectsLevel" in overrides.value);
-const effEffectsLevel = computed(() =>
-  normalizeEffectsLevel(
-    effectsLevelOverridden.value ? overrides.value.effectsLevel : props.config.effectsLevel
+// --- Effects & focus: the whole group moved here (§7 item 4) ----------------
+// Effects decides how expensive the look is; Focus light and Dim other regions
+// decide whether it shows at all (calvin-uudb). The rows read this screen's
+// overrides over the household values, like Behaviour.
+const effectsDescriptors = descriptorsForSection("effects");
+const effectsOverridden = computed(() =>
+  Object.fromEntries(
+    effectsDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
   )
+);
+const effects = computed(() =>
+  Object.fromEntries(
+    effectsDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleEffectsDescriptors = computed(() =>
+  visibleDescriptors(effectsDescriptors, effects.value)
 );
 const effectsAutoCopy = `Auto (${effectsLevelLabel(
   resolveEffectsLevel({ level: "auto", kiosk: true })
@@ -1246,13 +1293,48 @@ const effectsAutoCopy = `Auto (${effectsLevelLabel(
 function persistEffects(next) {
   persist(next, effectsMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
 }
-function setEffectsLevel(value) {
-  persistEffects({ ...overrides.value, effectsLevel: value });
+function setEffects(key, value) {
+  persistEffects({ ...overrides.value, [key]: value });
 }
-function resetEffectsLevel() {
+function resetEffects(key) {
   const next = { ...overrides.value };
-  delete next.effectsLevel;
+  delete next[key];
   persistEffects(next);
+}
+
+// --- Controls: the whole group moved here (§7 item 4) ----------------------
+// On a kiosk these used to edit only the device you were on (the bug behind
+// H1/G1); a screen page now writes that screen's overrides from any browser.
+const controlDescriptors = descriptorsForSection("controls");
+const controlsOverridden = computed(() =>
+  Object.fromEntries(
+    controlDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const controls = computed(() =>
+  Object.fromEntries(
+    controlDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleControlDescriptors = computed(() =>
+  visibleDescriptors(controlDescriptors, controls.value)
+);
+
+function persistControls(next) {
+  persist(next, controlsMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
+}
+function setControl(key, value) {
+  persistControls({ ...overrides.value, [key]: value });
+}
+function resetControl(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistControls(next);
 }
 
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------
@@ -1448,6 +1530,7 @@ if (typeof window !== "undefined") {
 onMounted(async () => {
   refreshBrowserCount();
   await store.loadKiosks();
+  if (initialOwnScreenId) await select(initialOwnScreenId);
   if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,

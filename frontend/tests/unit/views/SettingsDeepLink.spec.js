@@ -129,6 +129,34 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
+  it.each([
+    ["dashboard-kiosk", "screen-controls"],
+    ["dashboard-kiosk-focus", "screen-effects"],
+  ])("redirects the old %s deep link to its Screens section", async (settingId, sectionId) => {
+    route.query = { setting: settingId };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          ScreensSettings: {
+            props: ["initialSection"],
+            template: `<div><span data-test="screens-initial">{{ initialSection }}</span>${section(
+              sectionId,
+              "Moved"
+            )}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("screens");
+    expect(w.find("[data-test='screens-initial']").text()).toBe(sectionId);
+    expect(document.getElementById(`section-${sectionId}`).scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
   it("opens System › Versions & status for device-hardware", async () => {
     route.query = { setting: "device-hardware" };
     const w = mount(Settings, {
@@ -189,14 +217,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
-  it("opens Dashboard › Focus & remote for device-notifications", async () => {
+  it("opens Dashboard › Remote buttons for device-notifications", async () => {
     route.query = { setting: "device-notifications" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
           DashboardSettings: {
-            template: `<div>${section("kiosk-touch-focus", "Focus & remote")}</div>`,
+            template: `<div>${section("kiosk-touch-focus", "Remote buttons")}</div>`,
           },
         },
       },

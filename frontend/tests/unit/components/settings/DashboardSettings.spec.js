@@ -1,7 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import DashboardSettings from "@/components/settings/categories/DashboardSettings.vue";
+
+const push = vi.hoisted(() => vi.fn());
+vi.mock("vue-router", () => ({
+  useRoute: () => ({ query: {} }),
+  useRouter: () => ({ push }),
+}));
 
 const baseConfig = () => ({
   orientation: "landscape",
@@ -46,7 +52,6 @@ describe("DashboardSettings", () => {
       "section-clock-bar-layout",
       "section-clock-bar-items",
       "section-appearance",
-      "section-kiosk-touch",
       "section-kiosk-touch-focus",
     ]);
     // Screen orientation moved to Screen & keyboard.
@@ -64,75 +69,53 @@ describe("DashboardSettings", () => {
     expect(eyebrows).toContain("Clock bar items");
   });
 
-  it("emits update:config for the focus-light mode select", async () => {
+  it("emits update:config for the Dashboard size select", async () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    // drive the SelectPill bound to focusLightMode via its emitted model event
     const pills = w.findAllComponents({ name: "SelectPill" });
-    // find the one wired to focusLightMode by its options (contains 'always')
-    const focusPill = pills.find(p => (p.props("options") || []).some(o => o.value === "always"));
-    focusPill.vm.$emit("update:modelValue", "always");
-    expect(w.emitted("update:config").some(c => c[0].focusLightMode === "always")).toBe(true);
+    const sizePill = pills.find(p => p.props("ariaLabel") === "Dashboard size");
+    sizePill.vm.$emit("update:modelValue", "large");
+    expect(w.emitted("update:config").some(c => c[0].touchControlSize === "large")).toBe(true);
   });
 
-  it("stores Hide controls for this screen instead of the global config", async () => {
-    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    const row = w
-      .findAllComponents({ name: "SettingRow" })
-      .find(r => r.props("label") === "Hide controls");
-    // The row shows the inverse (hidden = on); turning it on means showUI false.
-    row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
-    await flushPromises();
-
-    expect(window.localStorage.getItem("calvin-screen-showUI")).toBe("false");
-    expect(w.emitted("update:config")).toBeUndefined();
-  });
-
-  it("splits the touch story into Controls and Focus & remote", () => {
+  it("leaves only the remote rows in Dashboard and points to Screens for the rest", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const labels = w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"));
-    // Controls: what the wall shows.
-    expect(labels).toContain("Hide controls");
-    expect(labels).toContain("Keep the clock bar when hidden");
-    expect(labels).toContain("Tap anywhere to show controls");
-    // Focus & remote: focus, dashboard size and the remote (decision C).
+    // Remote buttons: the size left behind for now, key-press labels and bindings.
     expect(labels).toContain("Dashboard size");
-    expect(labels).toContain("Focus light");
-    expect(labels).toContain("Dim other regions");
-    expect(labels).toContain("Show button presses");
-    expect(labels).toContain("Label size");
     expect(labels).toContain("Hide label after");
-    // Touchscreen moved to Screens › All screens · Touch & keyboard.
-    expect(labels).not.toContain("Touchscreen");
-    expect(labels).not.toContain("Touch controls");
-    expect(w.find("#section-kiosk-touch .settings-section__eyebrow").text()).toBe("Controls");
+    // The moved rows are gone (settings-scope §7 item 4).
+    for (const label of [
+      "Hide controls",
+      "Keep the clock bar when hidden",
+      "Tap anywhere to show controls",
+      "Focus light",
+      "Dim other regions",
+      "Show button presses",
+      "Label size",
+    ]) {
+      expect(labels, label).not.toContain(label);
+    }
+    expect(w.find("#section-kiosk-touch").exists()).toBe(false);
     expect(w.find("#section-kiosk-touch-focus .settings-section__eyebrow").text()).toBe(
-      "Focus & remote"
+      "Remote buttons"
     );
     expect(w.findComponent({ name: "KeyboardTab" }).exists()).toBe(true);
   });
 
-  it("stores keep-clock-bar for this screen instead of the global config", async () => {
+  it("leaves a signpost where the moved groups used to be", async () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    const row = w
-      .findAllComponents({ name: "SettingRow" })
-      .find(r => r.props("label") === "Keep the clock bar when hidden");
-    row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
-    await flushPromises();
+    const signpost = w.find("[data-test='dashboard-screen-signpost']");
+    expect(signpost.exists()).toBe(true);
+    expect(signpost.text()).toContain("Focus light and controls are set per screen.");
+    const open = signpost.find("[data-test='open-screens-settings']");
+    expect(open.exists()).toBe(true);
+    expect(open.text()).toBe("Open Screens");
 
-    expect(window.localStorage.getItem("calvin-screen-clockBarShowInKiosk")).toBe("true");
-    expect(w.emitted("update:config")).toBeUndefined();
-  });
-
-  it("stores tap-anywhere-reveal for this screen instead of the global config", async () => {
-    const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    const row = w
-      .findAllComponents({ name: "SettingRow" })
-      .find(r => r.props("label") === "Tap anywhere to show controls");
-    row.findComponent({ name: "ToggleSwitch" }).vm.$emit("update:modelValue", true);
-    await flushPromises();
-
-    expect(window.localStorage.getItem("calvin-screen-tapAnywhereReveal")).toBe("true");
-    expect(w.emitted("update:config")).toBeUndefined();
+    await open.trigger("click");
+    expect(push).toHaveBeenCalledWith({
+      path: "/settings",
+      query: { setting: "dashboard-kiosk" },
+    });
   });
 });
 
@@ -148,15 +131,7 @@ describe("DashboardSettings copy (§3.2)", () => {
 
   const COPY = [
     ["Settings text size", "Only changes Settings. The dashboard has its own size below."],
-    ["Hide controls", "Hides the ⋯ menu and region headers for a calm wall display."],
-    ["Tap anywhere to show controls", "A tap on calendar or photos brings controls back."],
     ["Dashboard size", "Size of labels and touch buttons on the dashboard."],
-    ["Focus light", "Outlines the region the remote or arrow keys will act on."],
-    ["Dim other regions", "Dims the rest while the focus light is on."],
-    [
-      "Show button presses",
-      "A short label appears when a remote or keyboard button does something.",
-    ],
   ];
 
   it.each(COPY)("%s says exactly what it does", (label, description) => {
@@ -172,7 +147,7 @@ describe("DashboardSettings copy (§3.2)", () => {
     expect(w.find("[aria-label='Room name']").exists()).toBe(false);
   });
 
-  const WITHOUT_DESCRIPTION = ["Theme", "Light or dark", "Font", "Keep the clock bar when hidden"];
+  const WITHOUT_DESCRIPTION = ["Theme", "Light or dark", "Font"];
 
   it.each(WITHOUT_DESCRIPTION)("%s carries no description", label => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
@@ -213,26 +188,6 @@ describe("DashboardSettings copy (§3.2)", () => {
     expect(patches.some(p => p.darkModeStart === 20)).toBe(true);
     expect(patches.some(p => p.darkModeEnd === 7)).toBe(true);
   });
-
-  it("keeps the four corner rows behind Hide controls", () => {
-    const shown = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
-    for (const label of ["Show-controls corner", "Corner visibility", "Corner size", "Hold for"]) {
-      expect(row(shown, label)).toBeUndefined();
-    }
-
-    const hidden = mount(DashboardSettings, {
-      props: { config: { ...baseConfig(), showUI: false } },
-      global: { stubs },
-    });
-    expect(row(hidden, "Show-controls corner").props("description")).toBe(
-      "Press and hold this corner to bring hidden controls back."
-    );
-    expect(row(hidden, "Corner visibility").props("description")).toBe(
-      "At 0 it's invisible but still works."
-    );
-    expect(row(hidden, "Corner size")).toBeTruthy();
-    expect(row(hidden, "Hold for")).toBeTruthy();
-  });
 });
 
 // Settings copy audit §2 — the per-screen Settings text size row stays here,
@@ -244,10 +199,10 @@ describe("DashboardSettings per-screen settings (§2)", () => {
     window.localStorage.clear();
   });
 
-  it("chips the per-screen rows as This screen", () => {
+  it("chips Settings text size as This screen", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const chips = w.findAll(".setting-scope-chip");
-    expect(chips).toHaveLength(4);
+    expect(chips).toHaveLength(1);
     expect(chips.every(chip => chip.text() === "This screen")).toBe(true);
   });
 

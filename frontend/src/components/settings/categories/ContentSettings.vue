@@ -95,10 +95,10 @@
       </SettingRow>
       <SettingRow
         label="Photo frame when idle"
-        description="Per screen now: choose Off/On, the idle wait and the photo sources in Dashboard › Focus & remote."
+        description="Per screen now: choose Off/On, the idle wait and the photo sources in Screens › Behaviour."
       >
         <Button data-test="open-photo-frame-settings" @click="openPhotoFrameSettings">
-          Open Focus &amp; remote
+          Open Screens
         </Button>
       </SettingRow>
       <ShareLinksSection />
@@ -152,6 +152,6 @@ const highlightId = computed(() =>
 // its new home instead of editing the global value here.
 const router = useRouter();
 const openPhotoFrameSettings = () => {
-  router.push({ path: "/settings", query: { setting: "dashboard-kiosk-focus" } });
+  router.push({ path: "/settings", query: { setting: "screen-behaviour" } });
 };
 </script>

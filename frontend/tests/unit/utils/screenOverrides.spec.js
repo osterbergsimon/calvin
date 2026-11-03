@@ -15,7 +15,15 @@ import {
 // descriptor is the one place that says a key is per screen with a household
 // default, which control edits it, and whether a plain browser has a local
 // layer of its own.
-const CONTROL_KINDS = ["segmented", "toggle", "select", "number", "photoSources", "schedule"];
+const CONTROL_KINDS = [
+  "segmented",
+  "toggle",
+  "select",
+  "number",
+  "range",
+  "photoSources",
+  "schedule",
+];
 
 describe("screen setting descriptors", () => {
   it("describes every per-screen setting with the fields the row needs", () => {
@@ -39,6 +47,17 @@ describe("screen setting descriptors", () => {
       "loadingLight",
       "layoutMode",
       "effectsLevel",
+      "focusLightMode",
+      "focusLightDimOthers",
+      "keyboardFeedbackEnabled",
+      "keyboardFeedbackMode",
+      "showUI",
+      "clockBarShowInKiosk",
+      "tapAnywhereReveal",
+      "hotCornerPosition",
+      "hotCornerOpacity",
+      "hotCornerSize",
+      "hotCornerLongPressMs",
       ...DEFAULT_COPYABLE_KEYS,
     ]) {
       expect(keys, key).toContain(key);
@@ -79,6 +98,17 @@ describe("screen setting descriptors", () => {
       "photoFrameSourceIds",
       "loadingLight",
       "layoutMode",
+      "focusLightMode",
+      "focusLightDimOthers",
+      "keyboardFeedbackEnabled",
+      "keyboardFeedbackMode",
+      "showUI",
+      "clockBarShowInKiosk",
+      "tapAnywhereReveal",
+      "hotCornerPosition",
+      "hotCornerOpacity",
+      "hotCornerSize",
+      "hotCornerLongPressMs",
     ]) {
       expect(descriptorFor(key).browserLayer, key).toBe(false);
     }
@@ -96,6 +126,19 @@ describe("screen setting descriptors", () => {
     ]);
     expect(descriptorsForSection("effects").map(descriptor => descriptor.key)).toEqual([
       "effectsLevel",
+      "focusLightMode",
+      "focusLightDimOthers",
+      "keyboardFeedbackEnabled",
+      "keyboardFeedbackMode",
+    ]);
+    expect(descriptorsForSection("controls").map(descriptor => descriptor.key)).toEqual([
+      "showUI",
+      "clockBarShowInKiosk",
+      "tapAnywhereReveal",
+      "hotCornerPosition",
+      "hotCornerOpacity",
+      "hotCornerSize",
+      "hotCornerLongPressMs",
     ]);
   });
 });
@@ -169,5 +212,23 @@ describe("descriptor values", () => {
       "layoutMode",
     ]);
     expect(isSettingVisible(descriptorFor("loadingLight"), {})).toBe(true);
+  });
+
+  it("shows the corner rows only while the controls are hidden", () => {
+    const controls = descriptorsForSection("controls");
+    expect(visibleDescriptors(controls, { showUI: true }).map(d => d.key)).toEqual([
+      "showUI",
+      "clockBarShowInKiosk",
+      "tapAnywhereReveal",
+    ]);
+    expect(visibleDescriptors(controls, { showUI: false }).map(d => d.key)).toEqual([
+      "showUI",
+      "clockBarShowInKiosk",
+      "tapAnywhereReveal",
+      "hotCornerPosition",
+      "hotCornerOpacity",
+      "hotCornerSize",
+      "hotCornerLongPressMs",
+    ]);
   });
 });

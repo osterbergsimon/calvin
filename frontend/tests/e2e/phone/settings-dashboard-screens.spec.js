@@ -22,7 +22,7 @@ test.describe("phone: Dashboard", () => {
     const dashboard = page.locator(".dashboard-settings");
     await expect(dashboard.getByText("Pages & regions")).toBeVisible();
     await expect(dashboard.getByRole("button", { name: "Open editor" })).toBeVisible();
-    for (const section of ["Clock", "Clock bar layout", "Appearance", "Controls"]) {
+    for (const section of ["Clock", "Clock bar layout", "Appearance"]) {
       await expect(
         dashboard.locator(".settings-section__eyebrow", { hasText: section }).first()
       ).toBeVisible();
@@ -35,25 +35,22 @@ test.describe("phone: Dashboard", () => {
     await expectPhoneLayout(page, "theme chooser", { scope: ".theme-picker__panel" });
     await page.keyboard.press("Escape");
 
-    // Hide controls is this screen's own choice (calvin-hi6w): it lands in
-    // localStorage instead of the household config, so no config POST happens
-    // for either click.
-    const configPosts = () => api.requests.filter(r => r === "POST /api/config").length;
-    const postsBeforeHiding = configPosts();
-    const hideControls = dashboard.getByLabel("Hide controls");
-    await hideControls.click();
-    await expect
-      .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
-      .toBe("false");
-    // The household config is untouched by this screen's choice.
-    expect(api.config.showUI).toBe(true);
-    await hideControls.click();
-    await expect
-      .poll(() => page.evaluate(() => localStorage.getItem("calvin-screen-showUI")))
-      .toBe("true");
-    expect(configPosts()).toBe(postsBeforeHiding);
+    // The moved per-screen groups leave a signpost behind (§4). It opens
+    // Screens › Default on a plain browser, where the household values live.
+    const signpost = dashboard.locator('[data-test="dashboard-screen-signpost"]');
+    await expect(signpost).toContainText("Focus light and controls are set per screen.");
+    await dashboard.getByRole("button", { name: "Open Screens" }).click();
+    await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
+    const controls = page.locator("#section-screen-controls");
+    await expect(controls).toBeVisible();
+    await expect(page.locator("#section-screen-effects")).toBeVisible();
 
-    await expectPhoneLayout(page, "Dashboard settings after saving");
+    // On Default the Controls rows write the household config.
+    await controls.getByLabel("Hide controls").click();
+    await expect.poll(() => api.config.showUI).toBe(false);
+    await expect.poll(() => api.requests).toContain("POST /api/config");
+
+    await expectPhoneLayout(page, "Screens / Default after saving");
     expect(api.unmatched).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });
@@ -91,6 +88,8 @@ test.describe("phone: Screens", () => {
     await expect(page.locator('[data-test="screen-name-input"]')).toBeVisible();
     await expect(page.locator('[data-test="screen-page-row"]')).toHaveCount(2);
     await expect(page.getByText("Display", { exact: true })).toBeVisible();
+    await expect(page.getByText("Effects & focus", { exact: true })).toBeVisible();
+    await expect(page.getByText("Controls", { exact: true })).toBeVisible();
     await expect(page.getByText("Power", { exact: true })).toBeVisible();
     await expectPhoneLayout(page, "Screens / one screen");
 
