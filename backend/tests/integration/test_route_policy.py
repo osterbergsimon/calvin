@@ -93,8 +93,9 @@ def test_unconfigured_says_setup_required(test_client):
     assert _error_code(response) == "setup_required"
 
 
-def test_config_display_key_without_admin(test_client):
-    response = test_client.post("/api/config", json={"themeMode": "dark"})
+@pytest.mark.parametrize("key,value", [("themeMode", "dark"), ("typeTheme", "marquee")])
+def test_config_display_key_without_admin(test_client, key, value):
+    response = test_client.post("/api/config", json={key: value})
     assert response.status_code == 200
 
 

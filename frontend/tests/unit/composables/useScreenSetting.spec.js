@@ -132,6 +132,20 @@ describe("useScreenSetting", () => {
     expect(setting.value.value).toBe(false);
   });
 
+  it("follows the household value for a setting without a browser layer", async () => {
+    window.localStorage.setItem("calvin-screen-hotCornerSize", "120");
+    const config = useConfigStore();
+    config.hotCornerSize = 64;
+
+    const setting = useScreenSetting("hotCornerSize");
+
+    expect(setting.value.value).toBe(64);
+    await setting.set(100);
+    // The write is a no-op; the Settings rows now write the household config or
+    // the screen's overrides instead.
+    expect(window.localStorage.getItem("calvin-screen-hotCornerSize")).toBe("120");
+  });
+
   it("round-trips an array choice for a key that keeps a browser layer", async () => {
     const setting = useScreenSetting("demoSourceIds", { serverValue: () => [] });
 

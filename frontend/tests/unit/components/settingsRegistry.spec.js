@@ -151,11 +151,22 @@ describe("settings registry", () => {
       tabKey: "settings_tab_maintenance",
       path: "System / Versions & status",
     });
-    // Remote & buttons and key-press feedback moved to Dashboard › Focus & remote.
+    // Remote buttons and Hide label after are what is left of Focus & remote.
     expect(getSettingDestinationById("device-notifications")).toMatchObject({
       category: "dashboard",
       section: "kiosk-touch-focus",
-      path: "Dashboard / Focus & remote",
+      path: "Dashboard / Remote buttons",
+    });
+    // The per-screen Controls and Effects & focus groups moved to Screens.
+    expect(getSettingDestinationById("dashboard-kiosk")).toMatchObject({
+      category: "screens",
+      section: "screen-controls",
+      path: "Screens / Default · Controls",
+    });
+    expect(getSettingDestinationById("dashboard-kiosk-focus")).toMatchObject({
+      category: "screens",
+      section: "screen-effects",
+      path: "Screens / Default · Effects & focus",
     });
     expect(getSettingDestinationById("device-power")).toMatchObject({
       category: "screens",
@@ -172,6 +183,25 @@ describe("settings registry", () => {
       section: "device-keyboard",
       path: "Screens / Default · Touch & keyboard",
     });
+  });
+
+  it("finds the moved Controls and Effects rows with their old words", () => {
+    for (const word of ["controls", "hot corner", "hide controls", "dashboard"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("dashboard-kiosk");
+    }
+    for (const word of ["focus", "focus light", "dim", "dashboard", "controls"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("dashboard-kiosk-focus");
+    }
+    // Remote buttons and Hide label after stayed in Dashboard.
+    expect(filterSettingsDestinations("hide label after").map(item => item.id)).toContain(
+      "device-notifications"
+    );
   });
 
   it("points the moved behaviour rows at Screens while the old words still find them", () => {

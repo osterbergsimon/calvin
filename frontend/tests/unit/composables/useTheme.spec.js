@@ -8,9 +8,13 @@ import { mount } from "@vue/test-utils";
 
 let config;
 let themes;
+const { setPartial } = vi.hoisted(() => ({ setPartial: vi.fn() }));
 
 vi.mock("@/stores/config", () => ({ useConfigStore: () => config }));
 vi.mock("@/stores/themes", () => ({ useThemesStore: () => themes }));
+vi.mock("@/utils/kioskOverridesQueue", () => ({
+  kioskOverridesQueue: () => ({ setPartial }),
+}));
 
 import { useTheme } from "@/composables/useTheme";
 
@@ -101,12 +105,99 @@ describe("D1: legacy Light/Dark theme migration", () => {
     themes.getTheme.mockResolvedValue({ id: "ocean", variables: { "bg-0": "#d9ecf3" } });
     const { wrapper } = await mountTheme();
 
-    // No save clears the selection (the initial selection save is unrelated).
-    expect(
-      config.updateConfig.mock.calls.some(
-        ([payload]) => "selectedTheme" in payload && payload.selectedTheme === null
-      )
-    ).toBe(false);
+    // Loading a selection is not a change: nothing is written back.
+    expect(config.updateConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+});
+
+describe("H2: loading never writes the household config", () => {
+  it("does not POST a kiosk's dark merged config on load", async () => {
+    config.themeMode = "dark";
+    config.selectedTheme = null;
+    config.darkModeStart = 18;
+    config.darkModeEnd = 6;
+
+    const { wrapper } = await mountTheme();
+
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(config.updateConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("keeps an explicit mode change as the only save", async () => {
+    const { theme, wrapper } = await mountTheme();
+    config.updateConfig.mockClear();
+
+    await theme.setThemeMode("dark");
+
+    expect(config.updateConfig).toHaveBeenCalledTimes(1);
+    expect(lastSave()).toMatchObject({ themeMode: "dark" });
+    wrapper.unmount();
+  });
+
+  it("writes a target screen's overrides instead of the household config", async () => {
+    const { theme, wrapper } = await mountTheme();
+
+    await theme.saveTheme({ themeMode: "dark" }, { kioskId: "hallway" });
+
+    expect(setPartial).toHaveBeenCalledWith(expect.objectContaining({ themeMode: "dark" }));
+    expect(config.updateConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+});
+
+describe("H3: a config change applies without a reload", () => {
+  it("re-applies the mode when the config poll changes it", async () => {
+    const { wrapper } = await mountTheme();
+    expect(document.documentElement.classList.contains("light")).toBe(true);
+
+    config.themeMode = "dark";
+    await flush();
+
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(config.updateConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("re-applies a theme selected remotely", async () => {
+    themes.getTheme.mockResolvedValue({
+      id: "ocean",
+      selectable: true,
+      variables: { "bg-0": "#d9ecf3" },
+      dark_mode: {},
+    });
+    const { wrapper } = await mountTheme();
+
+    config.selectedTheme = "ocean";
+    await flush();
+
+    expect(document.documentElement.style.getPropertyValue("--bg-0")).toBe("#d9ecf3");
+    expect(config.updateConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("takes new dark hours from the config poll", async () => {
+    const { theme, wrapper } = await mountTheme();
+
+    config.darkModeStart = 21;
+    config.darkModeEnd = 7;
+    await flush();
+
+    expect(theme.darkModeStart.value).toBe(21);
+    expect(theme.darkModeEnd.value).toBe(7);
+    expect(config.updateConfig).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("saves an explicit dark-hours change", async () => {
+    const { theme, wrapper } = await mountTheme();
+    config.updateConfig.mockClear();
+
+    await theme.setDarkModeTime(20, 8);
+
+    expect(config.updateConfig).toHaveBeenCalledTimes(1);
+    expect(lastSave()).toMatchObject({ darkModeStart: 20, darkModeEnd: 8 });
     wrapper.unmount();
   });
 });

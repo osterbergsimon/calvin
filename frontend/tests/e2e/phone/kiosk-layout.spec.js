@@ -23,7 +23,33 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
   page,
   consoleErrors,
 }) => {
-  const api = await installApiMock(page);
+  // The kiosk is one of the screens the server knows, so the old Controls link
+  // can open its own page. The shared phone fixture only lists two other screens.
+  const api = await installApiMock(page, {
+    overrides: [
+      [
+        /^\/api\/kiosks$/,
+        route =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              kiosks: [
+                {
+                  id: KIOSK_ID,
+                  name: "Pi panel",
+                  lastSeen: new Date().toISOString(),
+                  lastAppliedVersion: "1.6.0",
+                  agentVersion: "1.6.0",
+                  overrides: {},
+                  hostname: "pi-panel",
+                },
+              ],
+            }),
+          }),
+      ],
+    ],
+  });
   await gotoSettings(page, null, { kiosk: KIOSK_ID });
   await expectSettingsReady(page);
   // The kiosk identity marks <html>; that is what keeps 800x480 off the phone layout.
@@ -35,15 +61,19 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
     await expectPhoneLayout(page, `kiosk ${category} category`);
   }
 
-  // On a kiosk Hide controls writes that screen's overrides, not the global
-  // config (calvin-hi6w). It merges just showUI, so it needs no admin session
-  // and never replaces the layer (F2).
+  // The old Controls deep link takes a kiosk to its own page, and Hide controls
+  // writes that screen's overrides, not the global config (calvin-hi6w, §7 item 4).
+  // Those rows send the whole layer, which stays an admin PUT.
   await selectCategory(page, "Dashboard");
   const configPosts = () => api.requests.filter(r => r === "POST /api/config").length;
   const postsBeforeHiding = configPosts();
-  await page.getByLabel("Hide controls").click();
-  await expect.poll(() => api.requests).toContain(`PATCH /api/kiosks/${KIOSK_ID}/overrides`);
-  expect(api.requests).not.toContain(`PUT /api/kiosks/${KIOSK_ID}/overrides`);
+  await page.getByRole("button", { name: "Open Screens" }).click();
+  await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+  const controls = page.locator("#section-screen-controls");
+  await expect(controls).toBeVisible();
+  await controls.getByLabel("Hide controls").click();
+  await expect.poll(() => api.requests).toContain(`PUT /api/kiosks/${KIOSK_ID}/overrides`);
+  await expect.poll(() => api.overridesByKiosk[KIOSK_ID]?.showUI).toBe(false);
   expect(configPosts()).toBe(postsBeforeHiding);
 
   // A touch kiosk offers the same settings on a phone.
@@ -66,6 +96,17 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
   await expect(editor).toHaveClass(/size-compact/);
   await expectPhoneLayout(page, "pages editor at 800x480", { settleMs: 2000 });
   await page.getByRole("button", { name: "Close editor" }).click();
+
+  // The dashboard ⋯ toggle writes the same screen-scoped key as a merge, so a
+  // kiosk without an admin session can hide its own controls (F2).
+  await page.goto(`/?kiosk=${encodeURIComponent(KIOSK_ID)}`);
+  await page.getByRole("button", { name: "More controls" }).click();
+  await page.getByRole("menuitem", { name: "Hide controls" }).click();
+  await page
+    .getByRole("dialog", { name: "Hide controls?" })
+    .getByRole("button", { name: "Hide controls" })
+    .click();
+  await expect.poll(() => api.requests).toContain(`PATCH /api/kiosks/${KIOSK_ID}/overrides`);
 
   expect(api.unmatched).toEqual([]);
   expect(consoleErrors).toEqual([]);

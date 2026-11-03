@@ -119,7 +119,7 @@ describe("ContentSettings copy (§3.1)", () => {
     ["Highlight holidays", "Marks public holidays on the calendar."],
     [
       "Photo frame when idle",
-      "Per screen now: choose Off/On, the idle wait and the photo sources in Dashboard › Focus & remote.",
+      "Per screen now: choose Off/On, the idle wait and the photo sources in Screens › Behaviour.",
     ],
   ];
 

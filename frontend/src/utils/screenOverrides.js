@@ -76,6 +76,195 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     ],
   },
   {
+    key: "focusLightMode",
+    label: "Focus light",
+    section: "effects",
+    description: "Outlines the region the remote or arrow keys will act on.",
+    control: {
+      kind: "select",
+      options: [
+        { value: "always", label: "Always" },
+        { value: "interaction", label: "Only while controls show" },
+        { value: "off", label: "Off" },
+      ],
+    },
+    defaultValue: "interaction",
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-focus-light",
+    keywords: [
+      "focus light",
+      "focus",
+      "spotlight",
+      "remote",
+      "arrow keys",
+      "dim",
+      "controls",
+      "dashboard",
+    ],
+  },
+  {
+    key: "focusLightDimOthers",
+    label: "Dim other regions",
+    section: "effects",
+    description: "Dims the rest while the focus light is on.",
+    control: { kind: "toggle" },
+    defaultValue: true,
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-dim-others",
+    keywords: ["dim", "focus light", "focus", "regions", "spotlight", "dashboard"],
+  },
+  {
+    key: "keyboardFeedbackEnabled",
+    label: "Show button presses",
+    section: "effects",
+    description: "A short label appears when a remote or keyboard button does something.",
+    control: { kind: "toggle" },
+    defaultValue: true,
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-keyboard-feedback",
+    keywords: [
+      "button presses",
+      "key press",
+      "key-press",
+      "keyboard feedback",
+      "remote",
+      "notifications",
+      "focus & remote",
+      "dashboard",
+    ],
+  },
+  {
+    key: "keyboardFeedbackMode",
+    label: "Label size",
+    section: "effects",
+    control: {
+      kind: "segmented",
+      options: [
+        { value: "normal", label: "Normal" },
+        { value: "small", label: "Small" },
+      ],
+    },
+    defaultValue: "normal",
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-keyboard-feedback-mode",
+    keywords: [
+      "label size",
+      "button presses",
+      "keyboard feedback",
+      "remote",
+      "notifications",
+      "focus & remote",
+      "dashboard",
+    ],
+  },
+  {
+    key: "showUI",
+    label: "Hide controls",
+    section: "controls",
+    description: "Hides the ⋯ menu and region headers for a calm wall display.",
+    control: { kind: "toggle", invert: true },
+    defaultValue: true,
+    browserLayer: true,
+    copyable: true,
+    resetTest: "reset-hide-controls",
+    keywords: ["hide controls", "controls", "show controls", "kiosk", "wall", "calm", "dashboard"],
+  },
+  {
+    key: "clockBarShowInKiosk",
+    label: "Keep the clock bar when hidden",
+    section: "controls",
+    control: { kind: "toggle" },
+    defaultValue: false,
+    browserLayer: true,
+    copyable: true,
+    resetTest: "reset-clock-bar-in-kiosk",
+    keywords: ["clock bar", "keep clock bar", "controls", "hidden", "kiosk", "dashboard"],
+  },
+  {
+    key: "tapAnywhereReveal",
+    label: "Tap anywhere to show controls",
+    section: "controls",
+    description: "A tap on calendar or photos brings controls back.",
+    control: { kind: "toggle" },
+    defaultValue: false,
+    browserLayer: true,
+    copyable: true,
+    resetTest: "reset-tap-anywhere-reveal",
+    keywords: ["tap anywhere", "tap to reveal", "controls", "show controls", "kiosk", "dashboard"],
+  },
+  {
+    key: "hotCornerPosition",
+    label: "Show-controls corner",
+    section: "controls",
+    description: "Press and hold this corner to bring hidden controls back.",
+    control: {
+      kind: "select",
+      options: [
+        { value: "bottom-left", label: "Bottom left" },
+        { value: "bottom-right", label: "Bottom right" },
+        { value: "top-left", label: "Top left" },
+        { value: "top-right", label: "Top right" },
+      ],
+    },
+    defaultValue: "bottom-left",
+    browserLayer: false,
+    copyable: true,
+    showWhen: { key: "showUI", equals: false },
+    resetTest: "reset-hot-corner-position",
+    keywords: [
+      "hot corner",
+      "corner",
+      "show-controls corner",
+      "reveal corner",
+      "controls",
+      "dashboard",
+    ],
+  },
+  {
+    key: "hotCornerOpacity",
+    label: "Corner visibility",
+    ariaLabel: "Corner visibility percentage",
+    section: "controls",
+    description: "At 0 it's invisible but still works.",
+    control: { kind: "number", min: 0, max: 100, step: 5, unit: "%" },
+    defaultValue: 55,
+    browserLayer: false,
+    copyable: true,
+    showWhen: { key: "showUI", equals: false },
+    resetTest: "reset-hot-corner-opacity",
+    keywords: ["corner visibility", "hot corner", "corner", "opacity", "controls", "dashboard"],
+  },
+  {
+    key: "hotCornerSize",
+    label: "Corner size",
+    ariaLabel: "Corner size in pixels",
+    section: "controls",
+    control: { kind: "range", min: 40, max: 96, step: 4, unit: "px" },
+    defaultValue: 64,
+    browserLayer: false,
+    copyable: true,
+    showWhen: { key: "showUI", equals: false },
+    resetTest: "reset-hot-corner-size",
+    keywords: ["corner size", "hot corner", "corner", "controls", "dashboard"],
+  },
+  {
+    key: "hotCornerLongPressMs",
+    label: "Hold for",
+    ariaLabel: "Hold for, in milliseconds",
+    section: "controls",
+    control: { kind: "range", min: 200, max: 1200, step: 50, unit: "ms" },
+    defaultValue: 500,
+    browserLayer: false,
+    copyable: true,
+    showWhen: { key: "showUI", equals: false },
+    resetTest: "reset-hot-corner-long-press",
+    keywords: ["hold for", "hot corner", "corner", "long press", "controls", "dashboard"],
+  },
+  {
     key: "orientation",
     label: "Orientation",
     section: "display",
@@ -353,7 +542,7 @@ export const normalizeSettingValue = (descriptor, value) => {
         : (descriptor.defaultValue ?? options[0].value);
     }
   }
-  if (control.kind === "number") {
+  if (control.kind === "number" || control.kind === "range") {
     const number = Number(value);
     const base = Number.isFinite(number) ? number : Number(descriptor.defaultValue ?? 0);
     return Math.min(control.max ?? Infinity, Math.max(control.min ?? -Infinity, base));
@@ -381,11 +570,16 @@ export const settingControlOptions = (descriptor, value) => {
 /** Whether a row that depends on another setting is shown. */
 export const isSettingVisible = (descriptor, values) => {
   if (!descriptor?.showWhen) return true;
-  const shown = normalizeSettingValue(
-    descriptorFor(descriptor.showWhen),
-    values?.[descriptor.showWhen]
-  );
-  return shown === true || Boolean(shown);
+  // A string is the usual "show while this setting is on". An object names the
+  // value it takes, so a row can also show while a setting is off.
+  const condition =
+    typeof descriptor.showWhen === "string"
+      ? { key: descriptor.showWhen, equals: true }
+      : descriptor.showWhen;
+  const shown = normalizeSettingValue(descriptorFor(condition.key), values?.[condition.key]);
+  return condition.equals === undefined
+    ? shown === true || Boolean(shown)
+    : shown === condition.equals;
 };
 
 export const visibleDescriptors = (descriptors, values) =>

@@ -104,21 +104,39 @@
       />
     </SettingsSection>
 
-    <SettingsSection id="default-effects" title="Effects & focus">
-      <ScreenSettingRow
-        :descriptor="effectsLevelDescriptor"
-        :value="config.effectsLevel"
-        :show-scope="false"
-        :auto-note="defaultEffectsAutoCopy"
-        @set="v => emitChange({ effectsLevel: v })"
-        @reset="emitChange({ effectsLevel: 'auto' })"
-      />
-      <DefaultEditNote
-        :note="editNote"
-        setting="effectsLevel"
-        @change-them-too="changeThemToo"
-        @dismiss="dismissNote"
-      />
+    <SettingsSection id="screen-effects" title="Effects & focus">
+      <template v-for="descriptor in visibleEffectsDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="effects[descriptor.key]"
+          :show-scope="false"
+          :auto-note="descriptor.key === 'effectsLevel' ? defaultEffectsAutoCopy : ''"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
+    </SettingsSection>
+
+    <SettingsSection id="screen-controls" title="Controls">
+      <template v-for="descriptor in visibleControlDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="controls[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <SettingsSection id="device-power" title="Power">
@@ -322,7 +340,6 @@ import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
 import { normalizeDashboardScreens } from "@/utils/layout";
 import {
-  descriptorFor,
   descriptorsForSection,
   screensOverriding,
   visibleDescriptors,
@@ -539,7 +556,32 @@ const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezon
 // kiosk's own override) and the Default page never changed the household at all
 // (F1). Descriptor rows write `update:config` instead; a screen page keeps
 // writing its own overrides.
-const effectsLevelDescriptor = descriptorFor("effectsLevel");
+const effectsDescriptors = descriptorsForSection("effects");
+const effects = computed(() =>
+  Object.fromEntries(
+    effectsDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleEffectsDescriptors = computed(() =>
+  visibleDescriptors(effectsDescriptors, effects.value)
+);
+
+const controlDescriptors = descriptorsForSection("controls");
+const controls = computed(() =>
+  Object.fromEntries(
+    controlDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleControlDescriptors = computed(() =>
+  visibleDescriptors(controlDescriptors, controls.value)
+);
+
 const behaviourDescriptors = descriptorsForSection("behaviour");
 const behaviour = computed(() => ({
   photoFrameEnabled: props.config.photoFrameEnabled,

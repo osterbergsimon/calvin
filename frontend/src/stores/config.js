@@ -72,6 +72,7 @@ export const useConfigStore = defineStore("config", () => {
   const selectedTheme = ref(null); // Selected custom theme ID (null = use themeMode)
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
+  const typeTheme = ref(null); // Household font id (H4); null = no household choice yet
   const displayScheduleEnabled = ref(false); // Enable display power schedule
   const displaySchedule = ref(createDefaultDisplaySchedule()); // Display schedule per day of week
   const displayTimeoutEnabled = ref(false); // Enable display timeout (screensaver)
@@ -177,6 +178,7 @@ export const useConfigStore = defineStore("config", () => {
     selectedTheme,
     darkModeStart,
     darkModeEnd,
+    typeTheme,
     displayScheduleEnabled,
     displaySchedule,
     displayTimeoutEnabled,
@@ -717,6 +719,7 @@ export const useConfigStore = defineStore("config", () => {
     selectedTheme,
     darkModeStart,
     darkModeEnd,
+    typeTheme,
     displayScheduleEnabled,
     displaySchedule,
     displayTimeoutEnabled,

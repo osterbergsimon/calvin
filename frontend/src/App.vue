@@ -29,6 +29,8 @@ import { removeRetiredBrowserSettings } from "./utils/screenSetting";
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally
 import { useTheme } from "./composables/useTheme";
+// Keep the household font in sync with config (H4)
+import { useTypeTheme } from "./composables/useTypeTheme";
 // Keep the global UI scale in sync with config
 import { useUiScale } from "./composables/useUiScale";
 // Force this screen's desktop/phone layout, if it has one
@@ -50,6 +52,8 @@ const clockBarVisible = guest ? null : useClockBarVisible();
 if (!guest) {
   usePhotoFrameMode();
   const theme = useTheme();
+  // Applies the boot cache now, then the household font once config arrives.
+  useTypeTheme().syncWithConfig();
   const uiScale = useUiScale();
   // Applies the layout class before mount; keeps it in step with Settings.
   useLayoutOverride().syncWithConfig();

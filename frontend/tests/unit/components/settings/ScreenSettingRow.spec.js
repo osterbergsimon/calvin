@@ -6,6 +6,7 @@ import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
+import RangeSlider from "@/components/ui/RangeSlider.vue";
 import PhotoSourcePicker from "@/components/settings/shared/PhotoSourcePicker.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
 
@@ -61,6 +62,34 @@ describe("ScreenSettingRow — descriptor kinds", () => {
     expect(control.props("modelValue")).toBe(false);
     control.vm.$emit("update:modelValue", true);
     expect(wrapper.emitted("set")).toEqual([[true]]);
+  });
+
+  it("renders an inverted toggle, so Hide controls is on while showUI is off", () => {
+    const wrapper = mountRow({
+      descriptor: descriptor({ key: "showUI", control: { kind: "toggle", invert: true } }),
+      value: true,
+    });
+
+    const control = wrapper.findComponent(ToggleSwitch);
+    expect(control.props("modelValue")).toBe(false);
+    control.vm.$emit("update:modelValue", true);
+    expect(wrapper.emitted("set")).toEqual([[false]]);
+  });
+
+  it("renders a range control and emits its number", () => {
+    const wrapper = mountRow({
+      descriptor: descriptor({
+        control: { kind: "range", min: 40, max: 96, step: 4, unit: "px" },
+      }),
+      value: 64,
+    });
+
+    const control = wrapper.findComponent(RangeSlider);
+    expect(control.exists()).toBe(true);
+    expect(control.props("min")).toBe(40);
+    expect(control.props("max")).toBe(96);
+    control.vm.$emit("update:modelValue", 80);
+    expect(wrapper.emitted("set")).toEqual([[80]]);
   });
 
   it("renders a select with a value outside its list and emits it", () => {
