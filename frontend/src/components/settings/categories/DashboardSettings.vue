@@ -375,9 +375,6 @@ const setUiSize = async value => {
   await uiSizeSetting.set(value);
 };
 
-// Focus light style moved to Screens › Effects & focus as the effects level
-// (calvin-uudb); this page no longer edits it.
-
 // --- Controls: per screen (calvin-hi6w) ------------------------------------
 // A wall panel hides its controls; a laptop showing the same dashboard keeps
 // them. On a kiosk the choice is that screen's override; any other browser
