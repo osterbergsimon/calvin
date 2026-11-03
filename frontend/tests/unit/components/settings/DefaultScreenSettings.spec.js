@@ -498,6 +498,33 @@ describe("DefaultScreenSettings — override notes (§5)", () => {
     await w.find(".default-note__dismiss").trigger("click");
     expect(w.find("[data-test='default-override-note']").exists()).toBe(false);
   });
+
+  it("names the screens that keep their own Behaviour value", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [
+      kiosk({
+        id: "hallway",
+        hostname: "hall-pi",
+        overrides: { displayName: "Hallway", loadingLight: "off" },
+      }),
+    ];
+    store.saveOverrides = vi.fn(async () => {});
+    const w = mountDefault();
+    const loading = w
+      .findAllComponents({ name: "SegmentedControl" })
+      .find(c => c.props("ariaLabel") === "Loading light");
+
+    loading.vm.$emit("update:modelValue", "pulse");
+    await flushPromises();
+
+    const note = w.find("[data-test='default-override-note']");
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toContain("Hallway keeps its own Loading light.");
+
+    await w.find("[data-test='default-note-change']").trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("hallway", { displayName: "Hallway" });
+  });
 });
 
 // calvin-uudb: the Default page's Effects row writes the household config, not

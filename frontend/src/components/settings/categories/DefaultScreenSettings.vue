@@ -272,14 +272,20 @@
     </SettingsSection>
 
     <SettingsSection id="device-behaviour" title="Behaviour">
-      <ScreenSettingRow
-        v-for="descriptor in visibleBehaviourDescriptors"
-        :key="descriptor.key"
-        :descriptor="descriptor"
-        :value="behaviour[descriptor.key]"
-        :show-scope="false"
-        @set="value => emitChange({ [descriptor.key]: value })"
-      />
+      <template v-for="descriptor in visibleBehaviourDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="behaviour[descriptor.key]"
+          :show-scope="false"
+          @set="value => emitChange({ [descriptor.key]: value })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <ScreenRegionEditor

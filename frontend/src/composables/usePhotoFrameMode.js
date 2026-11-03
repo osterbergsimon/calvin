@@ -10,8 +10,10 @@ import { useRouter } from "vue-router";
  * Uses singleton pattern to ensure only one instance exists across the app.
  *
  * Photo frame is per screen (calvin-3xz9): Off/On, the idle wait and the photo
- * sources come from `useScreenSetting`, so a kiosk's override or this browser's
- * own choice applies while the old global config stays the fallback.
+ * sources come from `useScreenSetting`, so a kiosk's override applies on top of
+ * the household config and a plain browser follows the household config. These
+ * keys have no browser localStorage layer (settings-scope §4), so a value left
+ * by an older version cannot beat the household choice.
  */
 let photoFrameInstance = null;
 let globalInitialized = false; // Track initialization at module level
@@ -82,8 +84,9 @@ export function usePhotoFrameMode() {
   const modeStore = useModeStore();
   const router = useRouter();
 
-  // Per-screen settings. The shared screenSetting helpers keep booleans,
-  // numbers and lists intact in localStorage (`false` never comes back truthy).
+  // Per-screen settings. The descriptors mark these keys without a browser
+  // layer, so a plain browser follows the household config and a kiosk uses its
+  // merged config; the helpers keep booleans, numbers and lists intact.
   const enabledSetting = useScreenSetting("photoFrameEnabled", {
     serverValue: () => configStore.photoFrameEnabled,
   });

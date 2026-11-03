@@ -45,6 +45,7 @@ describe("usePhotoFrameMode", () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     window.localStorage.clear();
+    window.sessionStorage.clear();
 
     // Reset singleton instance between tests
     resetPhotoFrameInstance();
@@ -129,14 +130,27 @@ describe("usePhotoFrameMode", () => {
       });
     });
 
-    it("should use this browser's own per-screen choice over the global fallback", async () => {
-      enable({ enabled: false, timeout: 300 });
-      window.localStorage.setItem("calvin-screen-photoFrameEnabled", "true");
-      window.localStorage.setItem("calvin-screen-photoFrameTimeout", "2");
+    it("should use the household frame setting over a stale browser choice", async () => {
+      enable({ enabled: true, timeout: 5 });
+      window.localStorage.setItem("calvin-screen-photoFrameEnabled", "false");
+      window.localStorage.setItem("calvin-screen-photoFrameTimeout", "60");
 
       const photoFrame = usePhotoFrameMode();
       photoFrame.resetInactivityTimer();
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
+    });
+
+    it("should use a kiosk's merged frame setting over a stale browser choice", async () => {
+      window.sessionStorage.setItem("calvin_kiosk_id", "hallway");
+      enable({ enabled: true, timeout: 5 });
+      window.localStorage.setItem("calvin-screen-photoFrameEnabled", "false");
+      window.localStorage.setItem("calvin-screen-photoFrameTimeout", "60");
+
+      const photoFrame = usePhotoFrameMode();
+      photoFrame.resetInactivityTimer();
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(mockModeStore.enterFullscreen).toHaveBeenCalled();
     });

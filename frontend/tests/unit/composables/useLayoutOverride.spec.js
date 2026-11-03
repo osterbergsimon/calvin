@@ -1,14 +1,13 @@
 /**
  * calvin-tnkg — the effective layout choice, applied to <html>.
  *
- * A kiosk's screen setting wins there; any other browser uses its own stored
- * choice; Auto leaves the class off so the viewport decides (today's rule).
+ * A kiosk's screen setting wins there; any other browser follows the household
+ * config. Auto leaves the class off so the viewport decides (today's rule).
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
 import { useLayoutOverride } from "@/composables/useLayoutOverride";
-import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useConfigStore } from "@/stores/config";
 import { LAYOUT_DESKTOP_CLASS, LAYOUT_PHONE_CLASS } from "@/styles/breakpoints.js";
 
@@ -34,15 +33,18 @@ describe("useLayoutOverride", () => {
     expect(current.value).toBe("auto");
   });
 
-  it("boots from this browser's stored choice", async () => {
+  it("follows the household layout even when this browser has a stale value", async () => {
     localStorage.setItem("calvin-layout-mode", "phone");
-    const { syncWithConfig, current } = useLayoutOverride();
+    const config = useConfigStore();
+    config.layoutMode = "desktop";
 
+    const { syncWithConfig, current } = useLayoutOverride();
     syncWithConfig();
     await nextTick();
 
-    expect(current.value).toBe("phone");
-    expect(classes().contains(LAYOUT_PHONE_CLASS)).toBe(true);
+    expect(current.value).toBe("desktop");
+    expect(classes().contains(LAYOUT_DESKTOP_CLASS)).toBe(true);
+    expect(classes().contains(LAYOUT_PHONE_CLASS)).toBe(false);
   });
 
   it("leaves both classes off for Auto", async () => {
@@ -56,22 +58,22 @@ describe("useLayoutOverride", () => {
     expect(classes().contains(LAYOUT_PHONE_CLASS)).toBe(false);
   });
 
-  it("follows a choice made in Settings at once", async () => {
+  it("follows a household choice made in Settings at once", async () => {
     const { syncWithConfig, current } = useLayoutOverride();
     syncWithConfig();
     await nextTick();
 
-    // What the Settings row does.
-    const { set } = useScreenSetting("layoutMode", { storageKey: "calvin-layout-mode" });
-    await set("desktop");
+    // What a screen page writes; Default writes the same key to the household.
+    const config = useConfigStore();
+    config.layoutMode = "desktop";
     await nextTick();
 
     expect(current.value).toBe("desktop");
     expect(classes().contains(LAYOUT_DESKTOP_CLASS)).toBe(true);
-    expect(localStorage.getItem("calvin-layout-mode")).toBe("desktop");
+    expect(localStorage.getItem("calvin-layout-mode")).toBeNull();
   });
 
-  it("prefers the kiosk's screen setting over a browser choice left behind", async () => {
+  it("prefers the kiosk's screen setting over a stale browser choice", async () => {
     sessionStorage.setItem("calvin_kiosk_id", "hallway");
     localStorage.setItem("calvin-layout-mode", "phone");
     const config = useConfigStore();

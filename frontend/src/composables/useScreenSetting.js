@@ -5,6 +5,7 @@ import { useNotificationsStore } from "../stores/notifications";
 import { getKioskId } from "../utils/kioskId";
 import { logError } from "../utils/logger";
 import { kioskOverridesQueue } from "../utils/kioskOverridesQueue";
+import { descriptorFor } from "../utils/screenOverrides";
 import {
   decodeScreenValue,
   readScreenStorage,
@@ -18,34 +19,40 @@ import {
  *
  * On a kiosk the value lives in that kiosk's overrides: the kiosk already gets
  * merged config, so `value` reads the same config store as everywhere else.
- * On any other browser it is a local preference in `localStorage`, falling
- * back to the server value while unset or unreadable.
+ * On any other browser it is a local preference in `localStorage` only when the
+ * setting's descriptor says it has a browser layer; without one it follows the
+ * household value like a kiosk without an override does (settings-scope §4).
  *
  * Returns { value, set, scope } for the settings audit's "This screen" rows.
  */
 
 /**
  * @param {string} key config key, e.g. "onScreenKeyboard"
- * @param {{ storageKey?: string, serverValue?: () => any }} options
+ * @param {{ storageKey?: string, serverValue?: () => any, browserLayer?: boolean }} options
  *   storageKey: localStorage key for browser scope
  *   serverValue: where the seed comes from when this screen has no choice of
  *   its own (defaults to the config store; pass the Settings form's own value
  *   when the row must reflect what Settings loaded)
+ *   browserLayer: overrides the descriptor's flag; most callers should leave it
+ *   alone so the descriptor stays the one source of truth
  */
 export function useScreenSetting(
   key,
-  { storageKey = screenStorageKey(key), serverValue: readServerValue } = {}
+  { storageKey = screenStorageKey(key), serverValue: readServerValue, browserLayer } = {}
 ) {
   const configStore = useConfigStore();
   const kiosksStore = useKiosksStore();
   const notifications = useNotificationsStore();
   const kioskId = getKioskId();
   const scope = kioskId ? "kiosk" : "browser";
+  const hasBrowserLayer = browserLayer ?? descriptorFor(key)?.browserLayer ?? true;
 
   // Re-read on creation so a fresh caller sees the current value even if a
-  // previous instance left the shared ref behind (tests, remounts).
-  const stored = screenSettingRef(storageKey);
-  if (scope === "browser") stored.value = readScreenStorage(storageKey);
+  // previous instance left the shared ref behind (tests, remounts). A setting
+  // without a browser layer never touches localStorage at all: a value left by
+  // an older version must not beat the household value.
+  const stored = hasBrowserLayer ? screenSettingRef(storageKey) : null;
+  if (scope === "browser" && stored) stored.value = readScreenStorage(storageKey);
 
   const serverValue = computed(() =>
     readServerValue ? readServerValue() : (configStore[key] ?? null)
@@ -61,13 +68,16 @@ export function useScreenSetting(
       if (kioskQueue.hasPendingKey(key)) return kioskQueue.display.value[key];
       return serverValue.value;
     }
+    if (!hasBrowserLayer) return serverValue.value;
     return decodeScreenValue(stored.value, serverValue.value) ?? serverValue.value;
   });
 
   // A browser choice of its own, as opposed to falling back to the server
   // (Default) value. Only meaningful in browser scope; a kiosk's choice is an
   // override on the server and is reported by the screens page instead.
-  const overridden = computed(() => scope === "browser" && stored.value !== null);
+  const overridden = computed(
+    () => scope === "browser" && hasBrowserLayer && stored.value !== null
+  );
 
   const notifyFailure = err => {
     logError("[useScreenSetting]", `Failed to save ${key}:`, err);
@@ -79,6 +89,7 @@ export function useScreenSetting(
 
   const set = async next => {
     if (scope !== "kiosk") {
+      if (!hasBrowserLayer) return;
       try {
         await writeScreenSetting({
           kioskId,
@@ -119,6 +130,7 @@ export function useScreenSetting(
       return;
     }
 
+    if (!hasBrowserLayer) return;
     stored.value = null;
     try {
       window.localStorage.removeItem(storageKey);

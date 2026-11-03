@@ -62,15 +62,7 @@ describe("screen setting descriptors", () => {
   });
 
   it("marks the settings with a browser localStorage layer", () => {
-    for (const key of [
-      "photoFrameEnabled",
-      "photoFrameTimeout",
-      "photoFrameSourceIds",
-      "loadingLight",
-      "layoutMode",
-      "touchControls",
-      "onScreenKeyboard",
-    ]) {
+    for (const key of ["touchControls", "onScreenKeyboard"]) {
       expect(descriptorFor(key).browserLayer, key).toBe(true);
     }
     for (const key of [
@@ -82,6 +74,11 @@ describe("screen setting descriptors", () => {
       "displaySchedule",
       "displayTimeoutEnabled",
       "displayTimeout",
+      "photoFrameEnabled",
+      "photoFrameTimeout",
+      "photoFrameSourceIds",
+      "loadingLight",
+      "layoutMode",
     ]) {
       expect(descriptorFor(key).browserLayer, key).toBe(false);
     }
@@ -110,6 +107,15 @@ describe("descriptor values", () => {
     expect(normalizeSettingValue(descriptor, "true")).toBe(true);
     expect(normalizeSettingValue(descriptor, false)).toBe(false);
     expect(normalizeSettingValue(descriptor, "false")).toBe(false);
+  });
+
+  it("reads Photo frame as a boolean from either spelling", () => {
+    const descriptor = descriptorFor("photoFrameEnabled");
+    expect(normalizeSettingValue(descriptor, true)).toBe(true);
+    expect(normalizeSettingValue(descriptor, "true")).toBe(true);
+    expect(normalizeSettingValue(descriptor, false)).toBe(false);
+    expect(normalizeSettingValue(descriptor, "false")).toBe(false);
+    expect(normalizeSettingValue(descriptor, undefined)).toBe(false);
   });
 
   it("normalizes a segmented choice and falls back to its default", () => {

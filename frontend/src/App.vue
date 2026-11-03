@@ -23,6 +23,8 @@ import OnScreenKeyboardLoader from "./components/ui/OnScreenKeyboardLoader.vue";
 import AdminSignInDialog from "./components/auth/AdminSignInDialog.vue";
 import ConnectionStatus from "./components/ConnectionStatus.vue";
 import { useClockBarVisible } from "./composables/useClockBarVisible";
+// Drop retired per-browser values once, before anything reads the screen config
+import { removeRetiredBrowserSettings } from "./utils/screenSetting";
 // Initialize photo frame mode globally
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally
@@ -39,6 +41,10 @@ import { useConnectionStore } from "./stores/connection";
 // Decided once from the address the page loaded at: the guest page is a full
 // page load of its own, never reached by in-app navigation.
 const guest = isGuestPath(window.location.pathname);
+
+// One-time migration, before any composable reads a screen setting: the old
+// browser values for Behaviour must never beat the household value.
+removeRetiredBrowserSettings();
 
 const clockBarVisible = guest ? null : useClockBarVisible();
 if (!guest) {
