@@ -28,9 +28,14 @@ export const RETIRED_BROWSER_SETTING_KEYS = Object.freeze([
 ]);
 
 /** Drop the stale browser copies; returns the keys actually removed. */
-export function removeRetiredBrowserSettings(
-  storage = typeof window === "undefined" ? null : window.localStorage
-) {
+export function removeRetiredBrowserSettings(storage) {
+  if (storage === undefined) {
+    try {
+      storage = typeof window === "undefined" ? null : window.localStorage;
+    } catch {
+      return [];
+    }
+  }
   if (!storage) return [];
   const removed = [];
   for (const key of RETIRED_BROWSER_SETTING_KEYS) {
