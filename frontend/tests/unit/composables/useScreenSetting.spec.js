@@ -112,9 +112,7 @@ describe("useScreenSetting", () => {
   it("round-trips a boolean choice without reading 'false' as true", async () => {
     const config = useConfigStore();
     config.showUI = true;
-    // The composable still supports a browser layer for callers that declare
-    // one; the showUI settings row no longer does.
-    const setting = useScreenSetting("showUI", { browserLayer: true });
+    const setting = useScreenSetting("showUI");
 
     expect(setting.value.value).toBe(true);
     await setting.set(false);
@@ -128,23 +126,23 @@ describe("useScreenSetting", () => {
     const config = useConfigStore();
     config.showUI = true;
 
-    const setting = useScreenSetting("showUI", { browserLayer: true });
+    const setting = useScreenSetting("showUI");
 
     expect(setting.value.value).toBe(false);
   });
 
   it("follows the household value for a setting without a browser layer", async () => {
-    window.localStorage.setItem("calvin-screen-showUI", "false");
+    window.localStorage.setItem("calvin-screen-hotCornerSize", "120");
     const config = useConfigStore();
-    config.showUI = true;
+    config.hotCornerSize = 64;
 
-    const setting = useScreenSetting("showUI");
+    const setting = useScreenSetting("hotCornerSize");
 
-    expect(setting.value.value).toBe(true);
-    await setting.set(false);
+    expect(setting.value.value).toBe(64);
+    await setting.set(100);
     // The write is a no-op; the Settings rows now write the household config or
     // the screen's overrides instead.
-    expect(window.localStorage.getItem("calvin-screen-showUI")).toBe("false");
+    expect(window.localStorage.getItem("calvin-screen-hotCornerSize")).toBe("120");
   });
 
   it("round-trips an array choice for a key that keeps a browser layer", async () => {

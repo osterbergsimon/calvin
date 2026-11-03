@@ -81,7 +81,13 @@ describe("screen setting descriptors", () => {
   });
 
   it("marks the settings with a browser localStorage layer", () => {
-    for (const key of ["touchControls", "onScreenKeyboard"]) {
+    for (const key of [
+      "touchControls",
+      "onScreenKeyboard",
+      "showUI",
+      "clockBarShowInKiosk",
+      "tapAnywhereReveal",
+    ]) {
       expect(descriptorFor(key).browserLayer, key).toBe(true);
     }
     for (const key of [
@@ -102,9 +108,6 @@ describe("screen setting descriptors", () => {
       "focusLightDimOthers",
       "keyboardFeedbackEnabled",
       "keyboardFeedbackMode",
-      "showUI",
-      "clockBarShowInKiosk",
-      "tapAnywhereReveal",
       "hotCornerPosition",
       "hotCornerOpacity",
       "hotCornerSize",

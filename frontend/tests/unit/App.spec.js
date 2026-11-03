@@ -191,11 +191,17 @@ describe("App shell", () => {
       "calvin-screen-photoFrameEnabled",
       "calvin-screen-photoFrameTimeout",
       "calvin-screen-photoFrameSourceIds",
+    ];
+    const browserOnly = [
+      "calvin-touch-controls",
+      "calvin-osk-mode",
+      "calvin-ui-size",
+      // The hide-controls settings keep a per-browser layer: a laptop and a
+      // wall panel answer differently, so start-up must not drop them.
       "calvin-screen-showUI",
       "calvin-screen-clockBarShowInKiosk",
       "calvin-screen-tapAnywhereReveal",
     ];
-    const browserOnly = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
     for (const key of retired) window.localStorage.setItem(key, "stale");
     for (const key of browserOnly) window.localStorage.setItem(key, "kept");
 

@@ -25,9 +25,6 @@ export const RETIRED_BROWSER_SETTING_KEYS = Object.freeze([
   screenStorageKey("photoFrameEnabled"),
   screenStorageKey("photoFrameTimeout"),
   screenStorageKey("photoFrameSourceIds"),
-  screenStorageKey("showUI"),
-  screenStorageKey("clockBarShowInKiosk"),
-  screenStorageKey("tapAnywhereReveal"),
 ]);
 
 /** Drop the stale browser copies; returns the keys actually removed. */
