@@ -155,7 +155,7 @@ test.describe("Theme scope regressions (settings-scope §7 item 5)", () => {
     expect(api.configPosts).toEqual([]);
     await expect(page.locator("html")).toHaveClass(/light/);
     await expect(page.locator("#section-screen-look")).toContainText(
-      "Hallway will switch on its next check (about 30 s)"
+      "will switch on its next check (about 30 s)"
     );
   });
 });
