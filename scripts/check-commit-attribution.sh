@@ -11,7 +11,7 @@
 #   scripts/check-commit-attribution.sh [<commit-range>]
 #
 # The range defaults to origin/develop..HEAD (fetch the base branch first).
-# CI passes the pull request's base...head range.
+# CI passes the pull request's base..head range (only the PR's own commits).
 #
 # Exit status: 0 clean, 1 attribution found, 2 bad repository or range.
 set -u
