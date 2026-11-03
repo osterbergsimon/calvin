@@ -24,6 +24,22 @@ describe("retired per-screen browser storage", () => {
     );
   });
 
+  it("keeps the per-screen control visibility choices", () => {
+    // A laptop and a wall panel answer differently, so these three keep their
+    // browser layer: the ⋯ quick action must stick on the screen you are at.
+    const kept = [
+      screenStorageKey("showUI"),
+      screenStorageKey("clockBarShowInKiosk"),
+      screenStorageKey("tapAnywhereReveal"),
+    ];
+    for (const key of kept) window.localStorage.setItem(key, "false");
+
+    const removed = removeRetiredBrowserSettings();
+
+    expect(removed).not.toContain(screenStorageKey("showUI"));
+    for (const key of kept) expect(window.localStorage.getItem(key), key).toBe("false");
+  });
+
   it("removes the stale values and leaves the browser-only settings alone", () => {
     for (const key of RETIRED_BROWSER_SETTING_KEYS) {
       window.localStorage.setItem(key, "stale");

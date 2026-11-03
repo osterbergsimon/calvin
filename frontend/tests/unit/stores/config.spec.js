@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setActivePinia, createPinia } from "pinia";
 import { useConfigStore } from "@/stores/config";
 import { useNotificationsStore } from "@/stores/notifications";
+import { removeRetiredBrowserSettings } from "@/utils/screenSetting";
 import api from "@/services/api";
 
 vi.mock("@/services/api", () => ({
@@ -644,6 +645,24 @@ describe("config store — per-screen control visibility", () => {
     expect(store.shouldShowUI).toBe(false);
     expect(localStorage.getItem("calvin-screen-showUI")).toBe("false");
     expect(api.post).not.toHaveBeenCalled();
+  });
+
+  it("keeps the controls hidden after a reload's retired-setting cleanup", async () => {
+    const store = useConfigStore();
+    store.showUI = true;
+
+    await store.toggleUI();
+    expect(store.shouldShowUI).toBe(false);
+
+    // App start drops the old household browser copies; this screen's choice
+    // is not one of them, so a fresh store still hides the controls.
+    removeRetiredBrowserSettings();
+    setActivePinia(createPinia());
+    const reloaded = useConfigStore();
+    reloaded.showUI = true;
+
+    expect(reloaded.shouldShowUI).toBe(false);
+    expect(localStorage.getItem("calvin-screen-showUI")).toBe("false");
   });
 
   it("shows this browser's controls again from its own stored choice", async () => {

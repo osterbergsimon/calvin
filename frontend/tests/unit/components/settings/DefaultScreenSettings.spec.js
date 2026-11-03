@@ -54,7 +54,8 @@ describe("DefaultScreenSettings", () => {
     expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
       "section-default-pages",
       "section-layout",
-      "section-default-effects",
+      "section-screen-effects",
+      "section-screen-controls",
       "section-device-power",
       "section-device-keyboard",
       "section-device-behaviour",
@@ -535,7 +536,7 @@ describe("DefaultScreenSettings effects (calvin-uudb)", () => {
 
   it("shows the household level and writes the household config", async () => {
     const w = mountDefault({ effectsLevel: "full" });
-    expect(w.find("#section-default-effects").exists()).toBe(true);
+    expect(w.find("#section-screen-effects").exists()).toBe(true);
     expect(effectsControl(w).props("modelValue")).toBe("full");
     expect(
       effectsControl(w)
@@ -552,13 +553,141 @@ describe("DefaultScreenSettings effects (calvin-uudb)", () => {
 
   it("shows what Auto picks for the home and can go back to Auto", async () => {
     const w = mountDefault({ effectsLevel: "auto" });
-    expect(w.find("#section-default-effects").text()).toContain(
+    expect(w.find("#section-screen-effects").text()).toContain(
       "Auto (Standard on screens, Full in a browser)"
     );
 
     effectsControl(w).vm.$emit("update:modelValue", "standard");
     await flushPromises();
     expect(w.emitted("update:config")).toContainEqual([{ effectsLevel: "standard" }]);
+  });
+});
+
+// §7 item 4: Effects & focus and Controls moved from Dashboard. Default is the
+// household value, so each row writes update:config and never localStorage.
+describe("DefaultScreenSettings effects and controls (§7 item 4)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+
+  const row = (w, label) =>
+    w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
+  const control = (w, kind, label) =>
+    w.findAllComponents({ name: kind }).find(c => c.props("ariaLabel") === label);
+  const lastPatch = w => (w.emitted("update:config") || []).at(-1)?.[0];
+
+  it("puts the whole Effects & focus group under one section", () => {
+    const w = mountDefault();
+    const section = w.find("#section-screen-effects");
+    expect(section.exists()).toBe(true);
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Effects & focus");
+    for (const label of [
+      "Effects",
+      "Focus light",
+      "Dim other regions",
+      "Show button presses",
+      "Label size",
+    ]) {
+      expect(row(w, label), label).toBeTruthy();
+    }
+  });
+
+  it("writes each Effects & focus row to the household config", async () => {
+    const w = mountDefault({
+      effectsLevel: "auto",
+      focusLightMode: "interaction",
+      focusLightDimOthers: true,
+      keyboardFeedbackEnabled: true,
+      keyboardFeedbackMode: "normal",
+    });
+
+    control(w, "SelectPill", "Focus light").vm.$emit("update:modelValue", "always");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ focusLightMode: "always" });
+
+    control(w, "ToggleSwitch", "Dim other regions").vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ focusLightDimOthers: false });
+
+    control(w, "ToggleSwitch", "Show button presses").vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ keyboardFeedbackEnabled: false });
+
+    control(w, "SegmentedControl", "Label size").vm.$emit("update:modelValue", "small");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ keyboardFeedbackMode: "small" });
+
+    for (const key of [
+      "focusLightMode",
+      "focusLightDimOthers",
+      "keyboardFeedbackEnabled",
+      "keyboardFeedbackMode",
+    ]) {
+      expect(window.localStorage.getItem(`calvin-screen-${key}`)).toBeNull();
+    }
+  });
+
+  it("puts Controls on Default with Hide controls reading the household showUI", async () => {
+    const w = mountDefault({ showUI: true });
+    const section = w.find("#section-screen-controls");
+    expect(section.exists()).toBe(true);
+    expect(section.find(".settings-section__eyebrow").text()).toBe("Controls");
+
+    // The row says Hide controls, but the stored key is showUI.
+    const hide = control(w, "ToggleSwitch", "Hide controls");
+    expect(hide.props("modelValue")).toBe(false);
+    hide.vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ showUI: false });
+    expect(window.localStorage.getItem("calvin-screen-showUI")).toBeNull();
+  });
+
+  it("writes keep-clock-bar, tap-anywhere and the corner rows to the household config", async () => {
+    const w = mountDefault({ showUI: false, hotCornerPosition: "bottom-left" });
+
+    control(w, "ToggleSwitch", "Keep the clock bar when hidden").vm.$emit(
+      "update:modelValue",
+      true
+    );
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ clockBarShowInKiosk: true });
+
+    control(w, "ToggleSwitch", "Tap anywhere to show controls").vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ tapAnywhereReveal: true });
+
+    control(w, "SelectPill", "Show-controls corner").vm.$emit("update:modelValue", "top-right");
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ hotCornerPosition: "top-right" });
+
+    control(w, "NumberStepper", "Corner visibility percentage").vm.$emit("update:modelValue", 30);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ hotCornerOpacity: 30 });
+
+    control(w, "RangeSlider", "Corner size in pixels").vm.$emit("update:modelValue", 80);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ hotCornerSize: 80 });
+
+    control(w, "RangeSlider", "Hold for, in milliseconds").vm.$emit("update:modelValue", 700);
+    await flushPromises();
+    expect(lastPatch(w)).toEqual({ hotCornerLongPressMs: 700 });
+
+    expect(window.localStorage.getItem("calvin-screen-hotCornerSize")).toBeNull();
+  });
+
+  it("keeps the corner rows behind Hide controls, like Dashboard did", async () => {
+    const shown = mountDefault({ showUI: true });
+    for (const label of ["Show-controls corner", "Corner visibility", "Corner size", "Hold for"]) {
+      expect(row(shown, label), label).toBeUndefined();
+    }
+
+    const hidden = mountDefault({ showUI: false });
+    expect(row(hidden, "Show-controls corner")).toBeTruthy();
+    expect(row(hidden, "Corner visibility")).toBeTruthy();
+    expect(row(hidden, "Corner size")).toBeTruthy();
+    expect(row(hidden, "Hold for")).toBeTruthy();
   });
 });
 
