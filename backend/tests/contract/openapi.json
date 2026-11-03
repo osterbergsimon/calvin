@@ -464,6 +464,17 @@
             ],
             "title": "Clockbarpluginitemsize"
           },
+          "clockBarShowInKiosk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarshowinkiosk"
+          },
           "clockBarVerticalDateFontSize": {
             "anyOf": [
               {
@@ -533,6 +544,8 @@
           "darkModeEnd": {
             "anyOf": [
               {
+                "maximum": 23.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -544,6 +557,8 @@
           "darkModeStart": {
             "anyOf": [
               {
+                "maximum": 23.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -638,6 +653,49 @@
             ],
             "title": "Displaytimeoutenabled"
           },
+          "effectsLevel": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "full",
+                  "standard"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectslevel"
+          },
+          "focusLightDimOthers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focuslightdimothers"
+          },
+          "focusLightMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "always",
+                  "interaction",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focuslightmode"
+          },
           "gitBranch": {
             "anyOf": [
               {
@@ -659,6 +717,60 @@
               }
             ],
             "title": "Gitrepourl"
+          },
+          "hotCornerLongPressMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcornerlongpressms"
+          },
+          "hotCornerOpacity": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcorneropacity"
+          },
+          "hotCornerPosition": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bottom-left",
+                  "bottom-right",
+                  "top-left",
+                  "top-right"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcornerposition"
+          },
+          "hotCornerSize": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcornersize"
           },
           "imageDisplayMode": {
             "anyOf": [
@@ -685,6 +797,10 @@
           "keyboardFeedbackMode": {
             "anyOf": [
               {
+                "enum": [
+                  "normal",
+                  "small"
+                ],
                 "type": "string"
               },
               {
@@ -703,6 +819,38 @@
               }
             ],
             "title": "Lastsideviewmode"
+          },
+          "layoutMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "desktop",
+                  "phone"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layoutmode"
+          },
+          "loadingLight": {
+            "anyOf": [
+              {
+                "enum": [
+                  "comet",
+                  "pulse",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loadinglight"
           },
           "maxVisibleEvents": {
             "anyOf": [
@@ -726,9 +874,29 @@
             ],
             "title": "Modeindicatortimeout"
           },
+          "onScreenKeyboard": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "on",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onscreenkeyboard"
+          },
           "orientation": {
             "anyOf": [
               {
+                "enum": [
+                  "landscape",
+                  "portrait"
+                ],
                 "type": "string"
               },
               {
@@ -758,6 +926,20 @@
               }
             ],
             "title": "Photoframeenabled"
+          },
+          "photoFrameSourceIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photoframesourceids"
           },
           "photoFrameTimeout": {
             "anyOf": [
@@ -880,9 +1062,26 @@
             ],
             "title": "Showweeknumbers"
           },
+          "tapAnywhereReveal": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tapanywherereveal"
+          },
           "themeMode": {
             "anyOf": [
               {
+                "enum": [
+                  "light",
+                  "dark",
+                  "auto",
+                  "time"
+                ],
                 "type": "string"
               },
               {
@@ -913,9 +1112,44 @@
             ],
             "title": "Timezone"
           },
+          "touchControlSize": {
+            "anyOf": [
+              {
+                "enum": [
+                  "xsmall",
+                  "small",
+                  "medium",
+                  "large",
+                  "xlarge"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Touchcontrolsize"
+          },
+          "touchControls": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "on",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Touchcontrols"
+          },
           "typeTheme": {
             "anyOf": [
               {
+                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -927,6 +1161,13 @@
           "uiSize": {
             "anyOf": [
               {
+                "enum": [
+                  "extra-compact",
+                  "compact",
+                  "default",
+                  "large",
+                  "extra-large"
+                ],
                 "type": "string"
               },
               {

@@ -2458,6 +2458,8 @@ export interface components {
       calendarSplit?: number | null;
       /** Clockbarpluginitemsize */
       clockBarPluginItemSize?: number | null;
+      /** Clockbarshowinkiosk */
+      clockBarShowInKiosk?: boolean | null;
       /** Clockbarverticaldatefontsize */
       clockBarVerticalDateFontSize?: number | null;
       /** Clockbarverticalfontsize */
@@ -2497,28 +2499,50 @@ export interface components {
       displayTimeout?: number | null;
       /** Displaytimeoutenabled */
       displayTimeoutEnabled?: boolean | null;
+      /** Effectslevel */
+      effectsLevel?: ("auto" | "full" | "standard") | null;
+      /** Focuslightdimothers */
+      focusLightDimOthers?: boolean | null;
+      /** Focuslightmode */
+      focusLightMode?: ("always" | "interaction" | "off") | null;
       /** Gitbranch */
       gitBranch?: string | null;
       /** Gitrepourl */
       gitRepoUrl?: string | null;
+      /** Hotcornerlongpressms */
+      hotCornerLongPressMs?: number | null;
+      /** Hotcorneropacity */
+      hotCornerOpacity?: number | null;
+      /** Hotcornerposition */
+      hotCornerPosition?: ("bottom-left" | "bottom-right" | "top-left" | "top-right") | null;
+      /** Hotcornersize */
+      hotCornerSize?: number | null;
       /** Imagedisplaymode */
       imageDisplayMode?: string | null;
       /** Keyboardfeedbackenabled */
       keyboardFeedbackEnabled?: boolean | null;
       /** Keyboardfeedbackmode */
-      keyboardFeedbackMode?: string | null;
+      keyboardFeedbackMode?: ("normal" | "small") | null;
       /** Lastsideviewmode */
       lastSideViewMode?: string | null;
+      /** Layoutmode */
+      layoutMode?: ("auto" | "desktop" | "phone") | null;
+      /** Loadinglight */
+      loadingLight?: ("comet" | "pulse" | "off") | null;
       /** Maxvisibleevents */
       maxVisibleEvents?: number | null;
       /** Modeindicatortimeout */
       modeIndicatorTimeout?: number | null;
+      /** Onscreenkeyboard */
+      onScreenKeyboard?: ("auto" | "on" | "off") | null;
       /** Orientation */
-      orientation?: string | null;
+      orientation?: ("landscape" | "portrait") | null;
       /** Orientationflipped */
       orientationFlipped?: boolean | null;
       /** Photoframeenabled */
       photoFrameEnabled?: boolean | null;
+      /** Photoframesourceids */
+      photoFrameSourceIds?: string[] | null;
       /** Photoframetimeout */
       photoFrameTimeout?: number | null;
       /** Photorotationinterval */
@@ -2541,16 +2565,22 @@ export interface components {
       showUI?: boolean | null;
       /** Showweeknumbers */
       showWeekNumbers?: boolean | null;
+      /** Tapanywherereveal */
+      tapAnywhereReveal?: boolean | null;
       /** Thememode */
-      themeMode?: string | null;
+      themeMode?: ("light" | "dark" | "auto" | "time") | null;
       /** Timeformat */
       timeFormat?: string | null;
       /** Timezone */
       timezone?: string | null;
+      /** Touchcontrolsize */
+      touchControlSize?: ("xsmall" | "small" | "medium" | "large" | "xlarge") | null;
+      /** Touchcontrols */
+      touchControls?: ("auto" | "on" | "off") | null;
       /** Typetheme */
       typeTheme?: string | null;
       /** Uisize */
-      uiSize?: string | null;
+      uiSize?: ("extra-compact" | "compact" | "default" | "large" | "extra-large") | null;
       /** Weekstartday */
       weekStartDay?: number | null;
       /** Weekenddays */
