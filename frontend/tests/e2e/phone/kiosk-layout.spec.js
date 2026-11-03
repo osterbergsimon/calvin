@@ -36,12 +36,14 @@ test("kiosk: every settings category and the phone hand-off at 800x480", async (
   }
 
   // On a kiosk Hide controls writes that screen's overrides, not the global
-  // config (calvin-hi6w).
+  // config (calvin-hi6w). It merges just showUI, so it needs no admin session
+  // and never replaces the layer (F2).
   await selectCategory(page, "Dashboard");
   const configPosts = () => api.requests.filter(r => r === "POST /api/config").length;
   const postsBeforeHiding = configPosts();
   await page.getByLabel("Hide controls").click();
-  await expect.poll(() => api.requests).toContain(`PUT /api/kiosks/${KIOSK_ID}/overrides`);
+  await expect.poll(() => api.requests).toContain(`PATCH /api/kiosks/${KIOSK_ID}/overrides`);
+  expect(api.requests).not.toContain(`PUT /api/kiosks/${KIOSK_ID}/overrides`);
   expect(configPosts()).toBe(postsBeforeHiding);
 
   // A touch kiosk offers the same settings on a phone.
