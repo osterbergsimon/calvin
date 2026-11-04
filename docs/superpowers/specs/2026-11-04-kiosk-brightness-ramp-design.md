@@ -102,6 +102,23 @@ the wake gentle, and a helper lets someone find out what their panel supports an
   the panel itself** if it's onboarded.
 - UI/UX by the design lead; functionality as above.
 
+Answers to the design lead's review (owner, 2026-11-04, all as recommended):
+
+1. **The Brightness slider applies now** while the screen is awake: ramped at the same step to the new value, never
+   above the limit, with "Changing…" feedback. It's also re-applied after boot and every wake.
+2. **The limit-finding ramp test may crash or reboot the kiosk**, so it's offered **only from another device**
+   (phone or desktop), never from the kiosk panel itself. The panel offers the safe steps only (detect, writes,
+   conversion). Warn before starting that the screen may restart; the agent finishes a run safely on its own after
+   a reboot.
+3. **"Turn off now" dims first, then turns off** ("Dimming… then off" in the UI). At a schedule boundary the dim
+   **starts at the boundary**, not early.
+4. **Turning the ramp off while the screen sleeps** (at DDC 0): at the next wake the agent does one last careful
+   step-up to the chosen brightness, then stops touching brightness. This is the only exception to "never touch
+   brightness when the ramp is off".
+5. **With a conversion, the slider reads in the panel's own menu numbers** ("≈ 61 on the screen's menu", with the
+   DDC value in small text); storage stays DDC. Without a conversion it uses DDC units, with a pointer to the helper.
+   This replaces the first item in section 7.
+
 ## 7. My calls (marked; the owner can overturn them)
 
 - The slider is on the **DDC scale (0–100)**, because that's what Calvin controls. With a conversion, the UI also
