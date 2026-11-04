@@ -13,6 +13,7 @@ import PhotoSlideshow from "@/components/PhotoSlideshow.vue";
 import { useImagesStore } from "@/stores/images";
 import { useConfigStore } from "@/stores/config";
 import { useProgressStore } from "@/stores/progress";
+import { styleRules } from "../styles/lint-helpers.js";
 
 describe("PhotoSlideshow", () => {
   let imagesStore;
@@ -46,6 +47,7 @@ describe("PhotoSlideshow", () => {
   });
 
   afterEach(() => {
+    document.documentElement.removeAttribute("data-effects");
     Object.defineProperty(window, "innerWidth", {
       configurable: true,
       value: originalInnerWidth,
@@ -282,17 +284,34 @@ describe("PhotoSlideshow", () => {
       expect(backdrop.attributes("aria-hidden")).toBe("true");
     });
 
-    it("uses the smallest backend image for the backdrop and never a CSS blur", async () => {
+    it('uses the source photo and its blur backdrop under data-effects="full"', async () => {
+      document.documentElement.setAttribute("data-effects", "full");
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 1920 });
       imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
       const wrapper = createWrapper({ fit: "smart" });
       await setContainer(wrapper, 1600, 900);
 
-      const backdrop = wrapper.find(".photo-backdrop");
-      const image = backdrop.find("img.photo-backdrop__image");
+      const backdrop = wrapper.find("img.photo-backdrop--full");
+      expect(backdrop.exists()).toBe(true);
+      // The display source, not the small Standard thumbnail.
+      expect(backdrop.attributes("src")).toBe("/api/images/1?w=1920");
+      expect(wrapper.find(".photo-backdrop--soft").exists()).toBe(false);
+    });
+
+    it("keeps the tiny thumbnail backdrop under standard effects", async () => {
+      document.documentElement.setAttribute("data-effects", "standard");
+      imagesStore.currentImage = createImage({ width: 1000, height: 1500 });
+      const wrapper = createWrapper({ fit: "smart" });
+      await setContainer(wrapper, 1600, 900);
+
+      expect(wrapper.find("img.photo-backdrop--full").exists()).toBe(false);
+      const soft = wrapper.find(".photo-backdrop--soft");
+      expect(soft.exists()).toBe(true);
+      const image = soft.find("img.photo-backdrop__image");
       // Smallest width variant: upscaling it is naturally soft, so the kiosk
       // never runs a full-region filter.
       expect(image.attributes("src")).toBe("/api/images/1?w=640");
-      expect(backdrop.attributes("style") || "").not.toMatch(/filter/);
+      expect(soft.attributes("style") || "").not.toMatch(/filter/);
       expect(image.attributes("style") || "").not.toMatch(/filter/);
     });
 
@@ -510,18 +529,45 @@ describe("PhotoSlideshow", () => {
       "utf-8"
     );
     const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
+    const rules = styleRules("components/PhotoSlideshow.vue");
+    const isFull = rule => rule.selector.includes('[data-effects="full"]');
 
     it("covers the letterbox with the upscaled thumbnail and a plain dark overlay", () => {
       expect(STYLE).toMatch(/\.photo-backdrop\s*\{[^}]*overflow:\s*hidden/);
       expect(STYLE).toMatch(/\.photo-backdrop__image\s*\{[^}]*object-fit:\s*cover/);
       expect(STYLE).toMatch(
-        /\.photo-backdrop::after\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--scrim-solid\) 45%, transparent\)/
+        /\.photo-backdrop--soft::after\s*\{[^}]*background:\s*color-mix\(in srgb, var\(--scrim-solid\) 45%, transparent\)/
       );
     });
 
-    it("never runs a filter on the photo backdrop", () => {
-      expect(STYLE).not.toMatch(/filter\s*:/);
-      expect(STYLE).not.toMatch(/backdrop-filter/);
+    it('restores the original blurred source photo only under [data-effects="full"]', () => {
+      const blurRules = rules.filter(rule =>
+        rule.declarations.some(
+          declaration => declaration.prop === "filter" && /blur/.test(declaration.value)
+        )
+      );
+      expect(blurRules.length).toBeGreaterThan(0);
+      expect(blurRules.every(isFull)).toBe(true);
+      expect(
+        blurRules
+          .map(rule => rule.declarations.find(declaration => declaration.prop === "filter").value)
+          .join(" ")
+      ).toMatch(/blur\(28px\)\s*brightness\(0\.55\)/);
+      // Standard keeps the cheap thumbnail: no filter rule may live outside Full.
+      expect(
+        rules
+          .filter(rule => !isFull(rule))
+          .some(rule => rule.declarations.some(declaration => /filter/.test(declaration.prop)))
+      ).toBe(false);
+    });
+
+    it("scales the full backdrop slightly like the original", () => {
+      const full = rules.find(
+        rule => isFull(rule) && rule.selector.includes(".photo-backdrop--full")
+      );
+      expect(full).toBeTruthy();
+      const transform = full.declarations.find(declaration => declaration.prop === "transform");
+      expect(transform?.value).toBe("scale(1.1)");
     });
   });
 

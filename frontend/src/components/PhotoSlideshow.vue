@@ -66,17 +66,30 @@
           <!-- The container exists before the first request so the observer
                can measure it; no src is set until that measurement exists. -->
           <template v-if="currentImageUrl">
-            <!-- A tiny upscaled copy of the same photo, so a whole photo never
-                 sits on black bars. aria-hidden: it is decoration. -->
-            <div v-if="fitDecision.backdrop" class="photo-backdrop" aria-hidden="true">
+            <template v-if="fitDecision.backdrop">
+              <!-- Full: the original blurred copy of the photo itself (source
+                   image, filter and scale from before calvin-e70v). -->
               <img
-                :src="backdropImageUrl"
-                class="photo-backdrop__image"
+                v-if="fullEffects"
+                :src="currentImageUrl"
+                class="photo-backdrop photo-backdrop--full"
                 alt=""
+                aria-hidden="true"
                 decoding="async"
                 loading="eager"
               />
-            </div>
+              <!-- Standard: a tiny upscaled copy of the same photo, so a whole
+                   photo never sits on black bars. aria-hidden: it is decoration. -->
+              <div v-else class="photo-backdrop photo-backdrop--soft" aria-hidden="true">
+                <img
+                  :src="backdropImageUrl"
+                  class="photo-backdrop__image"
+                  alt=""
+                  decoding="async"
+                  loading="eager"
+                />
+              </div>
+            </template>
             <img
               :src="currentImageUrl"
               :alt="currentImage?.filename || 'Photo'"
@@ -115,6 +128,7 @@ import {
   withImageWidth,
 } from "@/utils/imageVariants";
 import { normalizePhotoFit, resolveImageAspect, resolvePhotoFit } from "@/utils/photoFit";
+import { useEffectsAttribute } from "@/composables/useEffectsAttribute";
 
 const { handleAction } = useKeyboardActions();
 const { hasPointer } = useTouchCapability();
@@ -167,6 +181,11 @@ const showControls = computed(() => props.controlsVisible ?? props.focused);
 
 const imagesStore = useImagesStore();
 const progressStore = useProgressStore();
+
+// Full restores the original blurred-photo backdrop; Standard uses the small
+// upscaled copy (the effects attribute is applied before mount in App.vue).
+const effectsLevel = useEffectsAttribute();
+const fullEffects = computed(() => effectsLevel.value === "full");
 
 // Fetching the photo-source list lights this region's frame (the app frame in
 // fullscreen). Rotation from cache and prefetching never do (CLV-115).
@@ -534,10 +553,10 @@ watch(sourceKey, async () => {
   overflow: hidden;
 }
 
-/* Tiny (200px) copy of the current photo, upscaled to cover the letterbox so
-   there are no black bars. Scaling up is naturally soft; the dark overlay does
-   the rest. Never put a CSS blur on this surface: on the Pi kiosk it re-runs
-   over the whole region on every photo change. */
+/* STANDARD: a tiny (640px) copy of the current photo, upscaled to cover the
+   letterbox so there are no black bars. Scaling up is naturally soft; the dark
+   overlay does the rest. Never let a CSS blur apply here: on the Pi kiosk it
+   re-runs over the whole region on every photo change. */
 .photo-backdrop {
   position: absolute;
   inset: 0;
@@ -552,12 +571,23 @@ watch(sourceKey, async () => {
   image-rendering: auto;
 }
 
-.photo-backdrop::after {
+.photo-backdrop--soft::after {
   content: "";
   position: absolute;
   inset: 0;
   /* ~45% black: --scrim-solid is the non-themed photo backdrop token. */
   background: color-mix(in srgb, var(--scrim-solid) 45%, transparent);
+}
+
+/* FULL: the original blurred, dimmed copy of the photo itself (calvin-e70v).
+   Gated by the effects level so Standard can never pay for the filter. */
+[data-effects="full"] .photo-backdrop--full {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  overflow: visible;
+  filter: blur(28px) brightness(0.55);
+  transform: scale(1.1);
 }
 
 .photo-image {

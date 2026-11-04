@@ -40,11 +40,74 @@ describe("dashboard motion stays on the compositor", () => {
     expect(full?.[1]).toMatch(/transform/);
   });
 
-  it("the status lamp keyframes animate opacity, never filter", () => {
+  it("the standard status lamp keyframes animate opacity, never filter", () => {
     const style = styleOf("components/StatusRail.vue");
-    const keyframes = style.slice(style.indexOf("@keyframes lamp-arrive"));
-    const end = keyframes.indexOf(".tile-enter-active");
-    // lamp-arrive, lamp-alert and timer-deplete; the timer uses transform.
-    expect(keyframes.slice(0, end)).not.toMatch(/filter\s*:/);
+    const standard = style.slice(
+      style.indexOf("@keyframes lamp-arrive"),
+      style.indexOf("@keyframes lamp-arrive-full")
+    );
+    expect(standard).toMatch(/@keyframes lamp-alert/);
+    expect(standard).not.toMatch(/filter\s*:/);
+  });
+
+  it('restores the lamp brightness flash only under [data-effects="full"]', () => {
+    const style = styleOf("components/StatusRail.vue");
+    const fullKeyframes = style.slice(
+      style.indexOf("@keyframes lamp-arrive-full"),
+      style.indexOf("@keyframes timer-deplete")
+    );
+    expect(fullKeyframes).toMatch(/filter:\s*brightness\(2\.2\)/);
+    expect(fullKeyframes).toMatch(/filter:\s*brightness\(2\.4\)/);
+
+    const rules = styleRules("components/StatusRail.vue");
+    const animationNames = rules
+      .filter(rule => !isFullStyle(rule.selector))
+      .flatMap(rule =>
+        rule.declarations
+          .filter(declaration => declaration.prop === "animation-name")
+          .map(declaration => declaration.value)
+      );
+    expect(animationNames).not.toContain("lamp-arrive-full");
+    expect(animationNames).not.toContain("lamp-alert-full");
+  });
+
+  it('restores the event item all-property transition only under [data-effects="full"]', () => {
+    const rules = styleRules("components/CalendarEventItem.vue");
+    const valueOf = rule => rule.declarations.find(d => d.prop === "transition").value;
+    const transitions = rules.filter(rule =>
+      rule.declarations.some(declaration => declaration.prop === "transition")
+    );
+    const standard = transitions
+      .filter(rule => !isFullStyle(rule.selector))
+      .map(valueOf)
+      .join(" ");
+    const full = transitions
+      .filter(rule => isFullStyle(rule.selector))
+      .map(valueOf)
+      .join(" ");
+    // Standard keeps the compositor-only hover lift; Full restores the
+    // border/shadow fades from before the audit.
+    expect(standard).toMatch(/opacity/);
+    expect(standard).toMatch(/transform/);
+    expect(standard).not.toMatch(/\ball\b/);
+    expect(full).toMatch(/\ball\b/);
+  });
+
+  it('restores the ribbon shadow transition only under [data-effects="full"]', () => {
+    const rules = styleRules("components/CalendarRibbon.vue");
+    const valueOf = rule => rule.declarations.find(d => d.prop === "transition").value;
+    const transitions = rules.filter(rule =>
+      rule.declarations.some(declaration => declaration.prop === "transition")
+    );
+    const standard = transitions
+      .filter(rule => !isFullStyle(rule.selector))
+      .map(valueOf)
+      .join(" ");
+    const full = transitions
+      .filter(rule => isFullStyle(rule.selector))
+      .map(valueOf)
+      .join(" ");
+    expect(standard).not.toMatch(/box-shadow/);
+    expect(full).toMatch(/box-shadow/);
   });
 });

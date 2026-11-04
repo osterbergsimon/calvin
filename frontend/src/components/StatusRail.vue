@@ -290,6 +290,45 @@ onUnmounted(() => {
   }
 }
 
+/* FULL: the original brightness flash/double-blink from before the kiosk perf
+   audit (calvin-e70v), gated by the effects level (calvin-uudb). */
+@keyframes lamp-arrive-full {
+  from {
+    opacity: 0;
+    filter: brightness(2.2);
+  }
+  to {
+    opacity: 1;
+    filter: brightness(1);
+  }
+}
+
+@keyframes lamp-alert-full {
+  0% {
+    filter: brightness(2.4);
+  }
+  20% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(2.4);
+  }
+  70% {
+    filter: brightness(1);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+[data-effects="full"] .annunciator__lamp {
+  animation-name: lamp-arrive-full;
+}
+[data-effects="full"] .annunciator--warning .annunciator__lamp,
+[data-effects="full"] .annunciator--error .annunciator__lamp {
+  animation-name: lamp-alert-full;
+}
+
 @keyframes timer-deplete {
   from {
     transform: scaleX(1);
@@ -331,6 +370,13 @@ onUnmounted(() => {
   .tile-leave-active,
   .tile-move {
     transition: none;
+    animation: none;
+  }
+  /* The full-gated animation-name sits later and more specifically; keep the
+     reduced-motion override authoritative there too. */
+  [data-effects="full"] .annunciator__lamp,
+  [data-effects="full"] .annunciator--warning .annunciator__lamp,
+  [data-effects="full"] .annunciator--error .annunciator__lamp {
     animation: none;
   }
   /* Keep the countdown meaningful but jump it rather than animate. */
