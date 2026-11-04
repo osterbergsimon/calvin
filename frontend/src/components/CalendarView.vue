@@ -1313,8 +1313,11 @@ const navigateNext = () => {
 const previousMonth = navigatePrevious;
 const nextMonth = navigateNext;
 
-const loadEvents = async (background = false) => {
-  lastLoadedAt = Date.now();
+// The one fetched window: `viewMode`, `rolling`, the week/day counts, the
+// current date and the selected sources all feed it. Watching its key (instead
+// of each input separately) means a screen switch that changes several props
+// still makes a single fetch.
+const eventsWindow = computed(() => {
   let startDate, endDate;
 
   if (viewMode.value === "day") {
@@ -1343,10 +1346,21 @@ const loadEvents = async (background = false) => {
     endDate.setHours(23, 59, 59, 999);
   }
 
+  return {
+    key: `${startDate.toISOString()}|${endDate.toISOString()}|${sourceKey.value}`,
+    startDate,
+    endDate,
+  };
+});
+
+const loadEvents = async (background = false, window = eventsWindow.value) => {
+  lastLoadedAt = Date.now();
+  const { startDate, endDate } = window;
+
   try {
-    // Don't force refresh on navigation - let the cache handle it
-    // Only refresh when explicitly requested (e.g., manual refresh button)
-    // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
+    // Don't force refresh on navigation - the store serves a fresh cache hit
+    // and revalidates older ones in the background. The periodic refresh (15
+    // minutes) and explicit user refreshes are real network fetches.
     const refresh = false;
 
     await trackLoad("events", () =>
@@ -1360,42 +1374,19 @@ const loadEvents = async (background = false) => {
   }
 };
 
-watch(currentDate, () => {
-  loadEvents();
-});
+// One watcher for the fetched window.
+watch(
+  () => eventsWindow.value.key,
+  () => loadEvents()
+);
 
-watch(sourceKey, () => {
-  loadEvents();
-});
-
-// The visible date range differs per view mode (a month spans wider than the
-// ±7-day week/day window), so refetch when the mode changes and drop any stale
-// event focus.
+// Dropping event focus is view-only: the window watcher above decides whether
+// a fetch is needed.
 watch(viewMode, () => {
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
   focusedMonthKey.value = null;
-  loadEvents();
 });
-
-// A larger window needs a wider fetch range than what's already loaded. Weeks
-// drive month view; days drive the week agenda strip.
-watch(rollingWeeks, () => {
-  if (viewMode.value === "month") loadEvents();
-});
-
-watch(rollingDays, () => {
-  if (viewMode.value === "week") loadEvents();
-});
-
-// Appending look-ahead weeks widens a non-rolling month's fetch range.
-watch(extraWeeks, () => {
-  if (viewMode.value === "month" && !rolling.value) loadEvents();
-});
-
-// Rolling on/off (and base mode) can flip the effective window; reload so the
-// fetched range matches what's rendered.
-watch(rolling, () => loadEvents());
 
 // Watch for route changes to reload events when navigating back to dashboard
 watch(
