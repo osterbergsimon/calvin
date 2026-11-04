@@ -365,6 +365,9 @@ export async function installApiMock(page, options = {}) {
     // Per-kiosk override layer written by Settings (stateful so a second
     // selection reads back what the first save wrote).
     overridesByKiosk: {},
+    // Bodies of PUT/PATCH /api/kiosks/{id}/overrides, so a test can prove the
+    // exact keys a screen page or the dashboard toggle sent.
+    overridesRequests: [],
     // Flip to true to simulate a server that stopped answering every route.
     down: false,
     requests: [],
@@ -548,12 +551,14 @@ export async function installApiMock(page, options = {}) {
       const id = decodeURIComponent(kioskOverrides[1]);
       if (method === "PUT") {
         const body = request.postDataJSON() || {};
+        state.overridesRequests.push({ method, path, body });
         state.overridesByKiosk[id] = body.overrides || {};
         return json(route, { id, overrides: state.overridesByKiosk[id] });
       }
       if (method === "PATCH") {
         // A per-screen row merges the keys it changes (F2); every other key stays.
         const body = request.postDataJSON() || {};
+        state.overridesRequests.push({ method, path, body });
         state.overridesByKiosk[id] = {
           ...(state.overridesByKiosk[id] || {}),
           ...(body.overrides || {}),
@@ -564,8 +569,8 @@ export async function installApiMock(page, options = {}) {
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
       // The real endpoint returns the household config with the kiosk's
-      // overrides merged in. Mirroring that lets e2e cover per-screen values
-      // (e.g. a dark theme) arriving without a reload.
+      // overrides merged in. A spec that needs that merge adds a route of its
+      // own (see settings-scope.spec.js) so other specs keep the plain config.
       return json(route, { ...state.config, deviceConfigVersion: "3" });
     }
 
