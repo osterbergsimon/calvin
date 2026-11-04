@@ -119,6 +119,14 @@ const handleFocus = () => emit("focus", props.ribbon);
   transition: background var(--dur-fast);
 }
 
+/* FULL: restore the focus-shadow fade from before the audit (calvin-e70v).
+   Standard keeps the cheaper background-only transition. */
+[data-effects="full"] .ribbon {
+  transition:
+    background var(--dur-fast),
+    box-shadow var(--dur-fast);
+}
+
 /* Endcaps carry the story: a squared, edge-bleeding end means the event runs
    past what you can see; a rounded end means it truly starts/ends here. */
 .ribbon.continues-left {

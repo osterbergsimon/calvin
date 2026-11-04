@@ -125,6 +125,12 @@ const handleFocus = () => {
   /* The parent container will naturally limit the height */
 }
 
+/* FULL: the original all-property transition (calvin-e70v), so the focus
+   border and shadow fade in again. Standard keeps the compositor-only lift. */
+[data-effects="full"] .event-item {
+  transition: all var(--dur);
+}
+
 /* Multi-day events get special styling via event-start, event-end, event-middle classes */
 
 .event-item.event-start {

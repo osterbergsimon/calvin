@@ -1,6 +1,6 @@
 <template>
   <template v-if="modelValue">
-    <DialogScrim @dismiss="onScrim" />
+    <DialogScrim :blur="scrimBlur" @dismiss="onScrim" />
     <div
       ref="overlayEl"
       class="dialog-overlay dialog-above-osk"
@@ -85,6 +85,8 @@ const props = defineProps({
   dismissible: { type: Boolean, default: true },
   // Accessible name for the close control (the pages editor says "Close editor").
   closeLabel: { type: String, default: "Close" },
+  // Blur the scrim behind a large editor sheet (Full effects only).
+  scrimBlur: { type: Boolean, default: false },
   // Optional selector for the control that should take focus first.
   initialFocus: { type: String, default: "" },
 });

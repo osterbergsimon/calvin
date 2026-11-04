@@ -418,7 +418,13 @@
       </template>
     </Dialog>
 
-    <Dialog v-model="fullDialogOpen" size="full" title="Pages & regions" close-label="Close editor">
+    <Dialog
+      v-model="fullDialogOpen"
+      size="full"
+      title="Pages & regions"
+      close-label="Close editor"
+      scrim-blur
+    >
       <template #subtitle>Design the pages your screens display · changes apply live</template>
       <div class="ui-gallery__full-sheet">
         <p class="ui-gallery__text">

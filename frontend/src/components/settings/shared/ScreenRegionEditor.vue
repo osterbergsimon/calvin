@@ -5,6 +5,7 @@
     :bleed="sizeClass !== 'wide'"
     label="Pages and regions"
     close-label="Close editor"
+    scrim-blur
     @close="$emit('close')"
   >
     <template #title>Pages &amp; regions</template>
