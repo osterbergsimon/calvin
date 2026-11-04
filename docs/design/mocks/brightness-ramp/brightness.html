@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brightness ramp</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root { --bg-0:#eef1f4; --bg-1:#fff; --line:#dde3e8; --line-soft:#e8edf1; --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#93a0a9; --focus:#e08a1e; --focus-ink:#fff; --ok:#2f8a57; --warn:#b25e00; --warn-bg:#fff4e5; --bad:#b3261e; --bad-bg:#fdecea;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace; --font-display:"IBM Plex Sans Condensed",system-ui,sans-serif; }
+* { box-sizing:border-box; } body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:var(--ink); }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; } h1 { font-family:var(--font-display); margin:0 0 6px; } .lede { margin:0 0 24px; color:var(--ink-2); max-width:80ch; }
+figure { margin:0 0 36px; } figcaption { font-size:.85rem; color:var(--ink-2); margin-top:8px; max-width:1280px; }
+.frame { width:1280px; height:720px; background:var(--bg-0); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; position:relative; }
+.topbar { height:56px; flex:none; background:var(--bg-1); border-bottom:1px solid var(--line); display:flex; align-items:center; padding:0 20px; gap:12px; font-weight:600; }
+.topbar .sp { flex:1; } .saved { font-size:.8rem; color:var(--ink-2); font-weight:400; } .done { height:36px; padding:0 14px; border-radius:8px; background:var(--focus); color:var(--focus-ink); display:flex; align-items:center; font-size:.85rem; }
+.content { padding:18px 28px; overflow:hidden; }
+.crumb { font-size:.85rem; color:var(--ink-2); margin-bottom:8px; }
+.sec { background:var(--bg-1); border:1px solid var(--line); border-radius:12px; margin-bottom:14px; }
+.sec h3 { margin:0; padding:12px 18px 4px; font-size:.98rem; font-weight:600; }
+.sub { padding:12px 18px 2px; font-size:.8rem; color:var(--ink-2); font-weight:600; border-top:1px solid var(--line-soft); }
+.row { display:flex; align-items:center; gap:14px; padding:10px 18px; border-top:1px solid var(--line-soft); min-height:3.2rem; }
+.sec h3 + .row, .sub + .row { border-top:0; }
+.txt { flex:1; min-width:0; } .txt b { font-weight:500; font-size:.92rem; } .txt p { margin:3px 0 0; font-size:.8rem; color:var(--ink-2); }
+.tog { width:42px; height:24px; border-radius:12px; background:var(--focus); position:relative; flex:none; }
+.tog::after { content:""; position:absolute; right:3px; top:3px; width:18px; height:18px; border-radius:50%; background:#fff; }
+.tog.off { background:var(--line); } .tog.off::after { right:auto; left:3px; } .tog.dis { opacity:.45; }
+.btn { flex:none; height:36px; padding:0 14px; border:1px solid var(--line); border-radius:9px; display:inline-flex; align-items:center; font-size:.85rem; background:#fff; white-space:nowrap; }
+.btn.primary { background:var(--focus); border-color:var(--focus); color:var(--focus-ink); font-weight:600; }
+.btn.danger { border-color:var(--bad); color:var(--bad); font-weight:600; }
+.btn.big { height:48px; padding:0 22px; font-size:.95rem; }
+.link { font-size:.82rem; text-decoration:underline; text-underline-offset:3px; }
+.mono { font-family:var(--font-data); }
+.note { font-size:.8rem; color:var(--ink-2); }
+.ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+/* slider */
+.slider { flex:0 0 420px; }
+.track { position:relative; height:28px; }
+.track .rail { position:absolute; left:0; right:0; top:12px; height:4px; background:var(--line); border-radius:2px; }
+.track .fill { position:absolute; left:0; top:12px; height:4px; background:var(--focus); border-radius:2px; }
+.track .over { position:absolute; top:10px; height:8px; background:repeating-linear-gradient(45deg,#e7c9c6 0 4px,#f6e3e1 4px 8px); border-radius:2px; right:0; }
+.track .knob { position:absolute; top:4px; width:20px; height:20px; margin-left:-10px; border-radius:50%; background:#fff; border:2px solid var(--focus); box-shadow:0 1px 3px rgba(0,0,0,.2); }
+.track .lim { position:absolute; top:2px; height:24px; width:2px; background:var(--bad); }
+.scale { display:flex; justify-content:space-between; font-size:.72rem; color:var(--ink-3); font-family:var(--font-data); }
+.val { font-size:1.35rem; font-weight:600; font-family:var(--font-display); }
+.val small { font-size:.78rem; color:var(--ink-3); font-family:var(--font-data); font-weight:400; margin-left:6px; }
+.banner { margin:6px 18px 12px; padding:10px 12px; border-radius:9px; font-size:.82rem; display:block; }
+.banner.warn { background:var(--warn-bg); color:#6b3b00; } .banner.bad { background:var(--bad-bg); color:#6d1712; } .banner.info { background:#eef4f8; color:#244355; }
+.facts { display:grid; grid-template-columns:auto 1fr auto; gap:6px 16px; font-size:.82rem; padding:4px 18px 14px; }
+.facts .k { color:var(--ink-2); }
+/* variants grid */
+.grid3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+/* dialog */
+.scrim { position:absolute; inset:0; background:rgba(20,30,38,.45); display:flex; align-items:center; justify-content:center; }
+.dlg { width:760px; background:#fff; border-radius:14px; box-shadow:0 10px 40px rgba(0,0,0,.3); display:flex; flex-direction:column; max-height:660px; }
+.dlg-head { padding:16px 22px 10px; border-bottom:1px solid var(--line-soft); }
+.dlg-head h2 { margin:0; font-size:1.1rem; } .dlg-head p { margin:3px 0 0; font-size:.82rem; color:var(--ink-2); }
+.steps { display:flex; gap:6px; padding:12px 22px 0; }
+.step { flex:1; font-size:.75rem; color:var(--ink-3); border-top:3px solid var(--line); padding-top:6px; }
+.step.is-done { color:var(--ok); border-color:var(--ok); } .step.is-now { color:var(--ink); border-color:var(--focus); font-weight:600; }
+.dlg-body { padding:18px 22px; flex:1; overflow:hidden; }
+.dlg-foot { padding:12px 22px; border-top:1px solid var(--line-soft); display:flex; gap:10px; align-items:center; }
+.dlg-foot .sp { flex:1; }
+.q { font-size:1.05rem; font-weight:600; margin:0 0 6px; } .qsub { font-size:.85rem; color:var(--ink-2); margin:0 0 16px; }
+.answers { display:flex; gap:10px; }
+.readings { width:100%; border-collapse:collapse; font-size:.85rem; margin:10px 0; }
+.readings td, .readings th { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line-soft); } .readings th { color:var(--ink-2); font-weight:500; font-size:.78rem; }
+.inp { height:40px; width:110px; border:1.5px solid var(--focus); border-radius:8px; padding:0 10px; font-size:1rem; font-family:var(--font-data); display:inline-flex; align-items:center; }
+.meter { position:relative; height:46px; background:var(--bg-0); border-radius:9px; overflow:hidden; margin:10px 0 4px; }
+.meter .f { position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,#f3c98d,var(--focus)); }
+.meter .mk { position:absolute; top:0; bottom:0; width:2px; background:var(--bad); }
+.meter .lbl { position:absolute; left:12px; top:10px; font-family:var(--font-display); font-weight:600; font-size:1.2rem; }
+.log { font-family:var(--font-data); font-size:.78rem; background:#f7f9fa; border:1px solid var(--line-soft); border-radius:8px; padding:8px 10px; height:150px; overflow:hidden; line-height:1.55; }
+/* phone */
+.phone { width:390px; height:800px; background:var(--bg-0); border-radius:28px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; display:flex; flex-direction:column; border:8px solid #222; }
+.phone .dlg { width:100%; max-height:none; height:100%; border-radius:0; box-shadow:none; }
+.pair { display:flex; gap:28px; align-items:flex-start; }
+.pair > figure { flex:none; }
+</style>
+</head>
+<body>
+<div class="board">
+<h1>Brightness ramp and display check</h1>
+<p class="lede">Mocks for calvin-29ws. They show Screens › {screen} › Power and the display check helper. The values are from the Pi 3B+ kitchen screen on 2026-11-04: DDC 5 → menu 28, 19 → 61, 22 → 67; it faulted at 28.</p>
+
+<!-- F1 -->
+<figure>
+<div class="frame">
+  <div class="topbar">CAL·VIN <span style="font-weight:400;color:var(--ink-2)">Screens</span><span class="sp"></span><span class="saved">● All changes saved</span><span class="done">Done</span></div>
+  <div class="content">
+    <div class="crumb">‹ Screens · <b>Kitchen</b> · Online · seen 3 s ago</div>
+    <div class="sec">
+      <h3>Power</h3>
+      <div class="row"><div class="txt"><b>Screen on/off schedule</b><p>Same as Default</p></div><span class="tog"></span></div>
+      <div class="row"><div class="txt"><b>Screen now</b><p>On now</p></div><span class="btn">Turn on now</span><span class="btn">Turn off now</span></div>
+      <div class="sub">Brightness</div>
+      <div class="row"><div class="txt"><b>Ramp brightness at sleep and wake</b><p>Dims before the screen turns off and brightens slowly after it wakes. Use it when the screen's power supply struggles as it wakes.</p></div><span class="tog"></span></div>
+      <div class="row" style="align-items:flex-start;padding-top:14px">
+        <div class="txt"><b>Brightness</b><p>Set after the screen starts and every time it wakes.</p>
+          <div class="val" style="margin-top:8px">61 <small>on the screen's menu · Calvin value 19 · estimated</small></div></div>
+        <div class="slider">
+          <div class="track"><div class="rail"></div><div class="fill" style="width:72%"></div><div class="over" style="left:85%"></div><div class="lim" style="left:100%"></div><div class="knob" style="left:72%"></div></div>
+          <div class="scale"><span>16</span><span>up to 67</span><span style="color:var(--bad)">limit ≈ 76</span></div>
+          <p class="note" style="margin:6px 0 0">You can go up to 67 on the screen's menu (Calvin 22). Above that is too close to the limit the display check found on 4 Nov.</p>
+        </div>
+      </div>
+      <div class="row"><div class="txt"><b>Last wake</b><p class="ok">Today 06:30 · brightened to 19 in 22 s · no power trouble</p></div><span class="link">History</span></div>
+      <div class="row"><div class="txt"><b>Display check</b><p>Answers brightness commands · changes take effect · menu match from 3 readings · limit 26 (4 Nov)</p></div><span class="btn">Check this display…</span></div>
+      <div class="row"><div class="txt"><b>Ramp speed</b><p>2 every 1.5 s · the pace that worked on this screen</p></div><span class="link">Change</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><b>1. Power › Brightness on a screen that has run the check.</b> The slider shows the screen's own menu number (owner question 5) with Calvin's DDC value in small text. It stops 2 steps below the limit; the hatched part can't be reached. "Last wake" reports each ramp's result, and a fault shows in amber with the level it stopped at. Ramp speed sits behind "Change", because almost nobody should touch it.</figcaption>
+</figure>
+
+<!-- F2 -->
+<figure>
+<div class="grid3" style="width:1280px">
+  <div class="sec"><h3>Not checked yet</h3>
+    <div class="row"><div class="txt"><b>Ramp brightness at sleep and wake</b><p>Calvin checks the display first. It takes about 10 s.</p></div><span class="tog off"></span></div>
+    <div class="banner info">Turning this on opens <b>Check this display</b> at the first step. The ramp starts once the screen has answered.</div>
+  </div>
+  <div class="sec"><h3>The screen doesn't answer</h3>
+    <div class="row"><div class="txt"><b>Ramp brightness at sleep and wake</b><p class="warn">Not available: this screen doesn't answer brightness commands (DDC/CI). Checked 4 Nov.</p></div><span class="tog off dis"></span></div>
+    <div class="row"><div class="txt"><p>Often the adapter or cable doesn't carry DDC, or DDC/CI is off in the screen's menu.</p></div><span class="btn">Check again</span></div>
+  </div>
+  <div class="sec"><h3>Can't control brightness here</h3>
+    <div class="row"><div class="txt"><b>Ramp brightness at sleep and wake</b><p class="warn">Needs a newer kiosk agent on Hallway (1.4 → 1.6).</p></div><span class="btn">Update kiosk software</span></div>
+    <div class="row"><div class="txt"><p>Other cases, same row: "Needs the Calvin kiosk display (cog). Hallway uses X11." "Kitchen is offline. You can change it; it applies when it's back."</p></div></div>
+  </div>
+</div>
+<figcaption><b>2. When the ramp isn't available yet.</b> The row stays in place and says why, plus the one action that fixes it. These settings have no household value, so Screens › Default shows one line instead: "Brightness is set on each screen."</figcaption>
+</figure>
+
+<!-- F2b -->
+<figure>
+<div class="grid3" style="width:1280px">
+  <div class="sec"><h3>Moving the slider</h3>
+    <div class="row"><div class="txt"><b>Brightness</b><p class="warn">Changing… 61 → 67 on the screen's menu, 2 at a time</p></div><span class="val">67 <small>Calvin 22</small></span></div>
+    <div class="banner info">It applies now, at the same careful pace, and never above the limit. If Kitchen is asleep, the note says "Applies when Kitchen wakes".</div>
+  </div>
+  <div class="sec"><h3>Turn off now, ramp on</h3>
+    <div class="row"><div class="txt"><b>Screen now</b><p class="warn">Dimming… then off · about 15 s</p></div><span class="btn">Turn on now</span></div>
+    <div class="banner info">At a schedule boundary the dim starts at the boundary time. Turn on now during the dim cancels it and brightens back from the current level.</div>
+  </div>
+  <div class="sec"><h3>Ramp turned off while asleep</h3>
+    <div class="row"><div class="txt"><b>Ramp brightness at sleep and wake</b><p>Kitchen is asleep at its lowest brightness. At its next wake it brightens to 61 once, carefully, then Calvin stops changing its brightness.</p></div><span class="tog off"></span></div>
+  </div>
+</div>
+<figcaption><b>2b. Live states.</b> These are the owner's answers 1, 3 and 4 as they appear in the rows. The words stay the same everywhere: "Changing…", "Dimming… then off", "Applies when Kitchen wakes".</figcaption>
+</figure>
+
+<!-- F3 -->
+<figure>
+<div class="frame">
+  <div class="topbar">CAL·VIN <span style="font-weight:400;color:var(--ink-2)">Screens</span><span class="sp"></span><span class="done">Done</span></div>
+  <div class="scrim">
+    <div class="dlg">
+      <div class="dlg-head"><h2>Check the Kitchen display</h2><p>Look at Kitchen while you answer. You can do this from your phone.</p></div>
+      <div class="steps"><div class="step is-done">1 · Find the display ✓</div><div class="step is-now">2 · Does it change?</div><div class="step">3 · Match the screen's menu</div><div class="step">4 · Find the safe limit (optional)</div></div>
+      <div class="dlg-body">
+        <div class="banner info" style="margin:0 0 16px">Found <b>NOMAD TOUCH</b> · DDC/CI 2.1 · HDMI-A-1. The screen always reports brightness 0, so Calvin needs your eyes for the next step.</div>
+        <p class="q">Did Kitchen get dimmer for a moment, then brighter again?</p>
+        <p class="qsub">Calvin stepped it from 19 down to 9 and back, 2 at a time. That took about 8 s.</p>
+        <div class="answers"><span class="btn primary big">Yes, it changed</span><span class="btn big">No, it looked the same</span><span class="btn big">Show me again</span></div>
+      </div>
+      <div class="dlg-foot"><span class="note">Kitchen is checking every 2 s while this is open.</span><span class="sp"></span><span class="btn">Stop the check</span></div>
+    </div>
+  </div>
+</div>
+<figcaption><b>3. Steps 1 and 2.</b> Step 1 runs on its own and reports the model. Step 2 makes a small change that stays under any known limit, then asks. "No" ends the check with "Brightness commands reach the screen but don't change it", and the ramp row shows Not available. Closing the dialog stops the check, and the screen goes back to its brightness.</figcaption>
+</figure>
+
+<!-- F4 -->
+<div class="pair">
+<figure>
+<div class="phone">
+  <div class="dlg">
+    <div class="dlg-head"><h2>Check the Kitchen display</h2><p>Step 3 of 4 · Match the screen's menu</p></div>
+    <div class="dlg-body">
+      <p class="q">Calvin set Kitchen to 19.</p>
+      <p class="qsub">Open the screen's own menu (the buttons on the screen) and type the Brightness it shows.</p>
+      <div style="display:flex;gap:10px;align-items:center"><span class="inp">61</span><span class="btn primary">Save reading</span></div>
+      <table class="readings"><tr><th>Calvin value</th><th>Screen's menu</th><th></th></tr>
+        <tr><td class="mono">5</td><td class="mono">28</td><td class="link">Remove</td></tr>
+        <tr><td class="mono">19</td><td class="mono">61</td><td class="link">Remove</td></tr>
+      </table>
+      <div class="banner info" style="margin:0">With 2 readings: menu ≈ 16 + 2.3 × Calvin value. Add a third reading to check it.</div>
+    </div>
+    <div class="dlg-foot"><span class="btn">Add a reading</span><span class="sp"></span><span class="btn primary">Next</span></div>
+  </div>
+</div>
+<figcaption style="max-width:390px"><b>4. Step 3 on a phone.</b> Calvin picks the values to read: 5, then the middle of the safe range, then near the top. You can skip this step; the slider then shows Calvin values with "Match it to your screen's menu".</figcaption>
+</figure>
+<figure>
+<div class="phone">
+  <div class="dlg">
+    <div class="dlg-head"><h2>Check the Kitchen display</h2><p>Step 4 of 4 · Find the safe limit</p></div>
+    <div class="dlg-body">
+      <div class="meter"><div class="f" style="width:26%"></div><div class="lbl">26</div></div>
+      <div class="scale"><span>0</span><span>stopping at the first trouble</span><span>100</span></div>
+      <p class="note" style="margin:10px 0 6px">Raising 2 every 1.5 s and watching for power trouble.</p>
+      <div class="log">20 · fine<br>22 · fine<br>24 · fine<br>26 · fine<br><span class="bad">28 · touch controller reset</span><br>→ back down to 24<br><b>Limit found: 26</b></div>
+      <div class="banner warn" style="margin:12px 0 0">Kitchen is going back to 19. If this page closes, Kitchen finishes safely on its own.</div>
+    </div>
+    <div class="dlg-foot"><span class="btn danger big" style="width:100%;justify-content:center">Stop now</span></div>
+  </div>
+</div>
+<figcaption style="max-width:390px"><b>5. Step 4 running.</b> The live level, a plain log, and one big Stop, which always stays visible. Stop asks the screen to step back down. It is never a jump.</figcaption>
+</figure>
+<figure>
+<div class="phone">
+  <div class="dlg">
+    <div class="dlg-head"><h2>Find the safe limit</h2><p>Optional · about 1–2 minutes</p></div>
+    <div class="dlg-body">
+      <p class="q">Calvin raises the brightness until the power supply shows trouble.</p>
+      <p class="qsub">Then it steps back down and remembers that level as Kitchen's limit. Calvin never goes above it.</p>
+      <div class="banner warn" style="margin:0 0 12px">While it runs, the screen may flicker, its touch may stop for a few seconds, and in the worst case it may restart.</div>
+      <div class="banner bad" style="margin:0 0 12px">You're on Kitchen itself. Run this step from your phone or computer, because the touch screen can stop responding mid-test.</div>
+      <p class="note">Shown only when the check runs on the screen it tests. Steps 1–3 work there.</p>
+    </div>
+    <div class="dlg-foot"><span class="btn">Skip, finish</span><span class="sp"></span><span class="btn primary">Start the test</span></div>
+  </div>
+</div>
+<figcaption style="max-width:390px"><b>6. Before step 4.</b> It warns plainly what can happen. On the screen being tested, Start is replaced by the red note (owner question 2).</figcaption>
+</figure>
+</div>
+
+</div>
+</body>
+</html>
