@@ -1,6 +1,7 @@
 /** Tests for calendar store. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import { useCalendarStore } from "@/stores/calendar";
 import { useConnectionStore } from "@/stores/connection";
@@ -504,6 +505,120 @@ describe("Calendar Store", () => {
       expect(store.selectedDate).toBe(null);
       expect(store.dayEvents).toEqual([]);
       expect(store.showAllDayEvents).toBe(false);
+    });
+  });
+
+  describe("cache-first events (calvin-qqnk)", () => {
+    const startDate = new Date("2024-01-01T00:00:00.000Z");
+    const endDate = new Date("2024-01-31T00:00:00.000Z");
+    const cachedEvents = {
+      events: [{ id: "1", title: "Cached", start: "2024-01-15T10:00:00Z" }],
+    };
+    const samePayload = () => ({
+      events: [{ id: "1", title: "Cached", start: "2024-01-15T10:00:00Z" }],
+    });
+    const changedPayload = {
+      events: [{ id: "2", title: "Changed", start: "2024-01-16T10:00:00Z" }],
+    };
+
+    beforeEach(() => {
+      mockConnectionStore.isFullyOnline.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const seedStaleHit = ageMs => {
+      vi.useFakeTimers();
+      setCachedData(eventsCacheKey(startDate, endDate), cachedEvents);
+      vi.setSystemTime(Date.now() + ageMs);
+    };
+
+    it("a second load for the same window inside the freshness window makes no request", async () => {
+      api.get.mockResolvedValue({ data: cachedEvents });
+      const store = useCalendarStore();
+
+      await store.fetchEvents(startDate, endDate);
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      await store.fetchEvents(startDate, endDate);
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(store.events).toEqual(cachedEvents.events);
+      expect(store.loading).toBe(false);
+    });
+
+    it("a stale cache hit revalidates once in the background without a loading light", async () => {
+      seedStaleHit(2 * 60 * 1000);
+      api.get.mockResolvedValue({ data: cachedEvents });
+      const store = useCalendarStore();
+
+      await store.fetchEvents(startDate, endDate);
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(store.events).toEqual(cachedEvents.events);
+      expect(store.loading).toBe(false);
+      expect(store.backgroundRefreshing).toBe(false);
+
+      await flushPromises();
+      expect(api.get).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the store untouched when a background revalidate returns the same payload", async () => {
+      seedStaleHit(2 * 60 * 1000);
+      api.get.mockResolvedValue({ data: samePayload() });
+      const store = useCalendarStore();
+
+      await store.fetchEvents(startDate, endDate);
+      const servedEvents = store.events;
+
+      await flushPromises();
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+      // Identity, not equality: an unchanged payload must not replace the array
+      // (which would re-render the whole calendar).
+      expect(store.events).toBe(servedEvents);
+    });
+
+    it("updates the store when a background revalidate returns a changed payload", async () => {
+      seedStaleHit(2 * 60 * 1000);
+      api.get.mockResolvedValue({ data: changedPayload });
+      const store = useCalendarStore();
+
+      await store.fetchEvents(startDate, endDate);
+      await flushPromises();
+
+      expect(store.events).toEqual(changedPayload.events);
+    });
+
+    it("concurrent calls for the same window share one request", async () => {
+      let resolveRequest;
+      api.get.mockReturnValue(
+        new Promise(resolve => {
+          resolveRequest = () => resolve({ data: cachedEvents });
+        })
+      );
+      const store = useCalendarStore();
+
+      const first = store.fetchEvents(startDate, endDate);
+      const second = store.fetchEvents(startDate, endDate);
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+
+      resolveRequest();
+      await Promise.all([first, second]);
+      expect(store.events).toEqual(cachedEvents.events);
+    });
+
+    it("still serves the cache while offline", async () => {
+      mockConnectionStore.isFullyOnline.mockReturnValue(false);
+      setCachedData(eventsCacheKey(startDate, endDate), cachedEvents);
+      const store = useCalendarStore();
+
+      await store.fetchEvents(startDate, endDate);
+
+      expect(api.get).not.toHaveBeenCalled();
+      expect(store.events).toEqual(cachedEvents.events);
     });
   });
 });

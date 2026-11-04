@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import api from "../services/api";
-import { fetchWithCache, setCachedData } from "../utils/cache";
+import { fetchWithCache, getCachedEntry, setCachedData } from "../utils/cache";
 import { useConnectionStore } from "./connection";
 import { logDebug, logError, logInfo } from "../utils/logger";
 import { friendlyError } from "../utils/friendlyError";
@@ -12,6 +12,12 @@ import { friendlyError } from "../utils/friendlyError";
  * @typedef {import("../api/types").components["schemas"]["CalendarSourcesResponse"]} CalendarSourcesResponse
  * @typedef {import("../api/types").components["schemas"]["CalendarEventsResponse"]} CalendarEventsResponse
  */
+
+// Events are cached for 30 minutes. A hit inside EVENTS_FRESHNESS_MS is served
+// without a request; an older hit is served at once and revalidated in the
+// background (stale-while-revalidate).
+export const EVENTS_CACHE_TTL_MS = 30 * 60 * 1000;
+export const EVENTS_FRESHNESS_MS = 60 * 1000;
 
 export const useCalendarStore = defineStore("calendar", () => {
   const events = ref([]);
@@ -121,6 +127,109 @@ export const useCalendarStore = defineStore("calendar", () => {
 
   const getEventsForSource = sourceIds => eventsBySourceKey.value[getSourceKey(sourceIds)] || [];
 
+  // In-flight event requests, keyed by cache key, so concurrent callers for
+  // the same window share one network request.
+  const eventsInFlight = new Map();
+  // Latest window requested per source selection. A slower response (or a
+  // delayed background revalidate) for an older window must not overwrite it.
+  let requestSeq = 0;
+  const latestRequestBySource = new Map();
+
+  // Cheap identity for an events payload; used to skip the store write (and
+  // the render it would trigger) when a background revalidate changes nothing.
+  const eventsSignature = value => JSON.stringify(value || []);
+
+  const applyEvents = (sourceKey, responseData) => {
+    const nextEvents = responseData?.events || [];
+    if (eventsSignature(eventsBySourceKey.value[sourceKey]) === eventsSignature(nextEvents)) {
+      return false;
+    }
+    eventsBySourceKey.value[sourceKey] = nextEvents;
+    if (sourceKey === "__all__") {
+      events.value = nextEvents;
+    }
+    return true;
+  };
+
+  const wantsNetworkRefresh = refreshParam => {
+    if (!refreshParam) return false;
+    if (typeof refreshParam === "string" && refreshParam.includes("refresh=")) {
+      return Boolean(refreshParam.match(/refresh=([^&]*)/));
+    }
+    return refreshParam === true || refreshParam === "true";
+  };
+
+  const requestEvents = (
+    cacheKey,
+    startDate,
+    endDate,
+    refresh,
+    normalizedSourceIds,
+    { dedupe = true } = {}
+  ) => {
+    const perform = async () => {
+      const params = {
+        start_date: startDate?.toISOString(),
+        end_date: endDate?.toISOString(),
+      };
+      if (normalizedSourceIds.length > 0) {
+        params.source_ids = normalizedSourceIds.join(",");
+      }
+      if (refresh) {
+        params.refresh = true;
+      }
+
+      const response = await api.get("/calendar/events", { params });
+      /** @type {CalendarEventsResponse} */
+      const data = response.data;
+      setCachedData(cacheKey, data);
+      return data;
+    };
+
+    // An explicit refresh must reach the network even if a background
+    // revalidate for the same key is already in flight.
+    if (!dedupe) return perform();
+
+    const inFlight = eventsInFlight.get(cacheKey);
+    if (inFlight) return inFlight;
+
+    const promise = perform().finally(() => {
+      if (eventsInFlight.get(cacheKey) === promise) {
+        eventsInFlight.delete(cacheKey);
+      }
+    });
+    eventsInFlight.set(cacheKey, promise);
+    return promise;
+  };
+
+  const revalidateEvents = async (
+    cacheKey,
+    startDate,
+    endDate,
+    normalizedSourceIds,
+    sourceKey,
+    requestId
+  ) => {
+    try {
+      const data = await requestEvents(cacheKey, startDate, endDate, false, normalizedSourceIds);
+      // A newer window may have loaded while this revalidate was in flight; its
+      // data owns the store now.
+      if (latestRequestBySource.get(sourceKey) !== requestId) return;
+      const changed = applyEvents(sourceKey, data);
+      stale.value = false;
+      logDebug(
+        "[Calendar]",
+        changed
+          ? `Background refresh updated events (${data?.events?.length || 0} events)`
+          : "Background refresh: events unchanged"
+      );
+    } catch (err) {
+      // The cached events stay on screen; a background failure must not
+      // surface an error over usable data.
+      logDebug("[Calendar]", "Background event refresh failed; keeping cached events", err);
+    }
+  };
+
   const fetchEvents = async (
     startDate,
     endDate,
@@ -128,68 +237,103 @@ export const useCalendarStore = defineStore("calendar", () => {
     background = false,
     sourceIds = []
   ) => {
-    if (background) {
-      backgroundRefreshing.value = true;
-    } else {
-      loading.value = true;
-    }
     clearError();
 
     const connectionStore = useConnectionStore();
     const normalizedSourceIds = normalizeSourceIds(sourceIds);
     const sourceKey = getSourceKey(normalizedSourceIds);
     const cacheKey = `calendar_events_${sourceKey}_${startDate?.toISOString()}_${endDate?.toISOString()}`;
-    const cacheTTL = 30 * 60 * 1000; // 30 minutes
+    const wantsRefresh = wantsNetworkRefresh(refreshParam);
+    const requestId = ++requestSeq;
+    latestRequestBySource.set(sourceKey, requestId);
 
     try {
-      const result = await fetchWithCache(
-        cacheKey,
-        cacheTTL,
-        async () => {
-          const params = {
-            start_date: startDate?.toISOString(),
-            end_date: endDate?.toISOString(),
-          };
-          if (normalizedSourceIds.length > 0) {
-            params.source_ids = normalizedSourceIds.join(",");
-          }
-
-          // Add refresh parameter if provided (for cache busting)
-          if (refreshParam) {
-            // Parse refresh param - could be a query string or boolean
-            if (typeof refreshParam === "string" && refreshParam.includes("refresh=")) {
-              // Extract refresh value from query string
-              const refreshMatch = refreshParam.match(/refresh=([^&]*)/);
-              if (refreshMatch) {
-                params.refresh = true;
-              }
-            } else if (refreshParam === true || refreshParam === "true") {
-              params.refresh = true;
-            }
-          }
-
-          const response = await api.get("/calendar/events", { params });
-          /** @type {CalendarEventsResponse} */
-          return response.data;
-        },
-        { preferCache: !connectionStore.isFullyOnline() }
-      );
-      const responseData = result.data;
-      eventsBySourceKey.value[sourceKey] = responseData?.events || [];
-      if (sourceKey === "__all__") {
-        events.value = responseData?.events || [];
-      }
-      stale.value = result.stale;
-
-      if (result.fromCache) {
+      if (!connectionStore.isFullyOnline()) {
+        // Offline behaviour is unchanged: serve the cache (stale included)
+        // and only touch the network when there is nothing cached.
+        if (background) {
+          backgroundRefreshing.value = true;
+        } else {
+          loading.value = true;
+        }
+        const result = await fetchWithCache(
+          cacheKey,
+          EVENTS_CACHE_TTL_MS,
+          () => requestEvents(cacheKey, startDate, endDate, wantsRefresh, normalizedSourceIds),
+          { preferCache: true }
+        );
+        applyEvents(sourceKey, result.data);
+        stale.value = result.stale;
         logInfo(
           "[Calendar]",
-          `Using ${result.stale ? "stale " : ""}cached events (${responseData?.events?.length || 0} events)`
+          `Using ${result.stale ? "stale " : ""}cached events (${result.data?.events?.length || 0} events)`
         );
-      } else {
-        logDebug("[Calendar]", `Fetched ${responseData?.events?.length || 0} events from API`);
+        return result.data;
       }
-      return responseData;
+
+      // Cache-first while online: a hit for the same window is shown at once.
+      // Within the freshness window it costs no request; an older hit is
+      // revalidated in the background without lighting the loading frame.
+      if (!wantsRefresh && !background) {
+        const entry = getCachedEntry(cacheKey, EVENTS_CACHE_TTL_MS);
+        if (entry && !entry.stale) {
+          applyEvents(sourceKey, entry.data);
+          stale.value = false;
+          logInfo(
+            "[Calendar]",
+            `Using cached events (${entry.data?.events?.length || 0} events, ${Math.round(entry.age / 1000)} s old)`
+          );
+          if (entry.age > EVENTS_FRESHNESS_MS) {
+            void revalidateEvents(
+              cacheKey,
+              startDate,
+              endDate,
+              normalizedSourceIds,
+              sourceKey,
+              requestId
+            );
+          }
+          return entry.data;
+        }
+      }
+
+      if (background) {
+        backgroundRefreshing.value = true;
+      } else {
+        loading.value = true;
+      }
+
+      let data;
+      try {
+        data = await requestEvents(
+          cacheKey,
+          startDate,
+          endDate,
+          wantsRefresh,
+          normalizedSourceIds,
+          { dedupe: !wantsRefresh }
+        );
+      } catch (err) {
+        const entry = getCachedEntry(cacheKey, EVENTS_CACHE_TTL_MS);
+        if (entry) {
+          if (latestRequestBySource.get(sourceKey) === requestId) {
+            applyEvents(sourceKey, entry.data);
+            stale.value = true;
+          }
+          logInfo(
+            "[Calendar]",
+            `Using stale cached events after a failed request (${entry.data?.events?.length || 0} events)`
+          );
+          return entry.data;
+        }
+        throw err;
+      }
+
+      if (latestRequestBySource.get(sourceKey) !== requestId) return data;
+      applyEvents(sourceKey, data);
+      stale.value = false;
+      logDebug("[Calendar]", `Fetched ${data?.events?.length || 0} events from API`);
+      return data;
     } catch (err) {
       captureError(err, "load your events", "Failed to fetch events:");
       throw err;
