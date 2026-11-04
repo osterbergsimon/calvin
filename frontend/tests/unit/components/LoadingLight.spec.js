@@ -34,12 +34,14 @@ describe("LoadingLight (CLV-115)", () => {
     vi.useFakeTimers();
     localStorage.clear();
     sessionStorage.clear();
+    document.documentElement.setAttribute("data-effects", "full");
     setActivePinia(createPinia());
     progress = useProgressStore();
     config = useConfigStore();
   });
 
   afterEach(() => {
+    document.documentElement.removeAttribute("data-effects");
     window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
   });

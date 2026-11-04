@@ -3,9 +3,11 @@
  * Animating box-shadow, filter, width/height or an offset repaints (or lays
  * out) a whole region every frame.
  */
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect } from "vitest";
+import { mount } from "@vue/test-utils";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import LoadingLight from "@/components/LoadingLight.vue";
 import { styleRules } from "./lint-helpers.js";
 
 const read = path => readFileSync(resolve(__dirname, "../../../src", path), "utf8");
@@ -109,5 +111,58 @@ describe("dashboard motion stays on the compositor", () => {
       .join(" ");
     expect(standard).not.toMatch(/box-shadow/);
     expect(full).toMatch(/box-shadow/);
+  });
+});
+
+describe("loading light effects budget (calvin-metj)", () => {
+  afterEach(() => {
+    document.documentElement.removeAttribute("data-effects");
+  });
+
+  it.each(["standard", null])("uses the opacity-only pulse when effects are %s", level => {
+    if (level) document.documentElement.setAttribute("data-effects", level);
+    const wrapper = mount(LoadingLight);
+
+    expect(wrapper.attributes("data-loading-light")).toBe("pulse");
+    expect(wrapper.find(".pulse").exists()).toBe(true);
+    expect(wrapper.find(".comet").exists()).toBe(false);
+    expect(wrapper.find(".comet__bead").exists()).toBe(false);
+  });
+
+  it("keeps the original comet under Full effects", () => {
+    document.documentElement.setAttribute("data-effects", "full");
+    const wrapper = mount(LoadingLight);
+
+    expect(wrapper.attributes("data-loading-light")).toBe("comet");
+    expect(wrapper.find(".pulse").exists()).toBe(false);
+    expect(wrapper.findAll(".comet__bead").length).toBeGreaterThan(0);
+  });
+
+  it("animates only opacity in the Standard pulse", () => {
+    const style = styleOf("components/indicators/PulseIndicator.vue");
+    const keyframes = style.slice(style.indexOf("@keyframes pulse-breathe"));
+    expect(keyframes).toMatch(/opacity\s*:/);
+    expect(keyframes).not.toMatch(/offset-path|box-shadow|filter|width|height/);
+
+    const rules = styleRules("components/indicators/PulseIndicator.vue");
+    const transitions = rules.flatMap(rule =>
+      rule.declarations.filter(declaration => declaration.prop === "transition")
+    );
+    expect(transitions.length).toBeGreaterThan(0);
+    expect(transitions.every(declaration => declaration.value.startsWith("opacity "))).toBe(true);
+  });
+
+  it.each([
+    ["components/indicators/CometIndicator.vue", ".comet__bead"],
+    ["components/indicators/PulseIndicator.vue", ".pulse__ring"],
+  ])("runs %s only while active", (file, part) => {
+    const rules = styleRules(file);
+    const base = rules.find(rule => rule.selector === part);
+    const running = rules.find(rule => rule.selector === `.loading-indicator.is-active ${part}`);
+
+    expect(base?.declarations.find(d => d.prop === "animation-play-state")?.value).toBe("paused");
+    expect(running?.declarations.find(d => d.prop === "animation-play-state")?.value).toBe(
+      "running"
+    );
   });
 });
