@@ -119,6 +119,14 @@ Answers to the design lead's review (owner, 2026-11-04, all as recommended):
    DDC value in small text); storage stays DDC. Without a conversion it uses DDC units, with a pointer to the helper.
    This replaces the first item in section 7.
 
+6. **"Dim only" sleep mode** (owner, 2026-11-04 late). Per screen: **At sleep: Standby** (default, today's
+   behaviour) **or Dim only**. With Dim only, a sleep (schedule boundary or "Turn off now") ramps the brightness down
+   to 0 and leaves the panel and the page running: no DPMS power-down, cog keeps running. A wake ramps back up to the
+   chosen brightness. It needs DDC (it's unavailable where DDC isn't). Trade-off shown in the UI: the backlight never
+   fully turns off and the page keeps running. Coordinator calls: dim to DDC 0; the setting lives in the same
+   Brightness group; it doesn't require "Ramp brightness" to be on (Dim only always ramps). Config key: sleepMode =
+   "standby" | "dim".
+
 ## 7. My calls (marked; the owner can overturn them)
 
 - The slider is on the **DDC scale (0–100)**, because that's what Calvin controls. With a conversion, the UI also
