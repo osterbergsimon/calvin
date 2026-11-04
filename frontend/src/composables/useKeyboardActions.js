@@ -1014,8 +1014,9 @@ export function useKeyboardActions() {
   };
 
   const activateScreen = screenId => {
-    configStore.activateDashboardScreen(screenId);
+    const switched = configStore.activateDashboardScreen(screenId);
     router.push("/");
+    return switched;
   };
 
   return {
