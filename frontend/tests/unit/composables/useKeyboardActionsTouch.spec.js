@@ -71,13 +71,13 @@ describe("useKeyboardActions touch helpers", () => {
     expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  it("activateScreen switches active screen and routes home", () => {
+  it("activateScreen switches active screen and routes home", async () => {
     const store = useConfigStore();
     store.setDashboardScreens(screens);
     vi.spyOn(store, "updateConfig").mockResolvedValue({});
     const { activateScreen } = useKeyboardActions();
 
-    activateScreen("s2");
+    await activateScreen("s2");
 
     expect(store.dashboardScreens.activeScreenId).toBe("s2");
     expect(pushMock).toHaveBeenCalledWith("/");

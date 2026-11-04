@@ -31,6 +31,16 @@ export const PROGRESS_TIMING = Object.freeze({
   sourceCapMs: 60_000,
 });
 
+/** Screen switches light at once and may use a shorter minimum than fetches. */
+export const SCREEN_SWITCH_TIMING = Object.freeze({
+  // A switch is a held interaction: show long enough to read, but not the full
+  // 800 ms a background fetch earns.
+  minVisibleMs: 300,
+  // A device whose last switch settled faster than this does not need a light
+  // for the next one.
+  fastSettleMs: 150,
+});
+
 /** Frame id of the whole-dashboard light. Region frames use the region id. */
 export const APP_FRAME = "app";
 
@@ -42,6 +52,9 @@ export const RELOAD_SOURCE_ID = "app:reload";
 
 /** First load after a page load, until the dashboard has content. */
 export const FIRST_LOAD_SOURCE_ID = "app:first-load";
+
+/** Switching dashboard screens: from the tap until the new screen has painted. */
+export const SCREEN_SWITCH_SOURCE_ID = "app:screen-switch";
 
 export const useProgressStore = defineStore("progress", () => {
   // id → { value: null | 0..1, regionId: string | null }. Vue 3 reactive
@@ -66,9 +79,17 @@ export const useProgressStore = defineStore("progress", () => {
     sources.value.delete(id);
   };
 
-  const begin = (id, { determinate = false, regionId = null } = {}) => {
+  const begin = (
+    id,
+    { determinate = false, regionId = null, immediate = false, minVisibleMs = null } = {}
+  ) => {
     clearCap(id);
-    sources.value.set(id, { value: determinate ? 0 : null, regionId: regionId || null });
+    sources.value.set(id, {
+      value: determinate ? 0 : null,
+      regionId: regionId || null,
+      immediate,
+      minVisibleMs,
+    });
     capTimers.set(
       id,
       setTimeout(() => {
@@ -80,6 +101,13 @@ export const useProgressStore = defineStore("progress", () => {
         end(id);
       }, PROGRESS_TIMING.sourceCapMs)
     );
+    // A frame that is already wanted does not re-fire the scope watcher, so an
+    // immediate source lights it here. Ordinary sources keep waiting out the
+    // watch's show delay.
+    if (immediate) {
+      const frame = wantedFrame.value;
+      if (frame) want(frame, { dueAt: Date.now(), minVisibleMs });
+    }
   };
 
   const setProgress = (id, value) => {
@@ -158,11 +186,13 @@ export const useProgressStore = defineStore("progress", () => {
    * counts from when the light first appeared) and the old frame goes dark in
    * the same mutation. No second light, no dark gap, no fresh 400 ms delay.
    */
-  const moveLight = (from, to) => {
+  const moveLight = (from, to, minVisibleMs = null) => {
     const { shownAt } = timersFor(from);
     clearFrame(from);
     clearFrame(to);
-    timersFor(to).shownAt = shownAt;
+    const timers = timersFor(to);
+    timers.shownAt = shownAt;
+    if (minVisibleMs != null) timers.minVisibleMs = minVisibleMs;
     const next = new Set(visible.value);
     next.delete(from);
     next.add(to);
@@ -171,17 +201,46 @@ export const useProgressStore = defineStore("progress", () => {
 
   // `dueAt`: when the show delay that began with the work runs out. A frame
   // taking over from one that never showed inherits that deadline, so the
-  // 400 ms counts from the first begin, not from the promotion.
-  const want = (frame, dueAt = Date.now() + PROGRESS_TIMING.showDelayMs) => {
+  // 400 ms counts from the first begin, not from the promotion. An immediate
+  // source has already run out its delay: it shows now, even if an ordinary
+  // source's timer was already waiting.
+  const want = (frame, { dueAt, minVisibleMs = null } = {}) => {
     const timers = timersFor(frame);
+    if (minVisibleMs != null) timers.minVisibleMs = minVisibleMs;
     if (timers.hideTimer) {
       // Back-to-back work inside the linger window: keep the same light.
       clearTimeout(timers.hideTimer);
       timers.hideTimer = null;
     }
-    if (visible.value.has(frame) || timers.showTimer) return;
-    timers.showDueAt = dueAt;
-    timers.showTimer = setTimeout(() => show(frame), Math.max(0, dueAt - Date.now()));
+    if (visible.value.has(frame)) return;
+    const deadline = dueAt ?? Date.now() + PROGRESS_TIMING.showDelayMs;
+    if (deadline <= Date.now()) {
+      if (timers.showTimer) {
+        clearTimeout(timers.showTimer);
+        timers.showTimer = null;
+      }
+      show(frame);
+      return;
+    }
+    if (timers.showTimer) return;
+    timers.showDueAt = deadline;
+    timers.showTimer = setTimeout(() => show(frame), Math.max(0, deadline - Date.now()));
+  };
+
+  // Timing asked for by the sources currently loading on `frame` (a region
+  // source counts on the app frame once two regions promote the light there).
+  const sourceTiming = frame => {
+    let immediate = false;
+    let minVisibleMs = null;
+    for (const entry of sources.value.values()) {
+      if (frame !== APP_FRAME && entry.regionId !== frame) continue;
+      if (entry.immediate) immediate = true;
+      if (entry.minVisibleMs != null) {
+        minVisibleMs =
+          minVisibleMs == null ? entry.minVisibleMs : Math.min(minVisibleMs, entry.minVisibleMs);
+      }
+    }
+    return { immediate, minVisibleMs };
   };
 
   const release = frame => {
@@ -197,7 +256,8 @@ export const useProgressStore = defineStore("progress", () => {
       return;
     }
     if (timers.hideTimer) return;
-    const untilMinimum = timers.shownAt + PROGRESS_TIMING.minVisibleMs - Date.now();
+    const minVisibleMs = timers.minVisibleMs ?? PROGRESS_TIMING.minVisibleMs;
+    const untilMinimum = timers.shownAt + minVisibleMs - Date.now();
     const delay = Math.max(PROGRESS_TIMING.lingerMs, untilMinimum);
     timers.hideTimer = setTimeout(() => hide(frame), delay);
   };
@@ -243,18 +303,26 @@ export const useProgressStore = defineStore("progress", () => {
         return;
       }
       if (frame && !visible.value.has(frame)) {
+        const timing = sourceTiming(frame);
         const lit = others.find(known => visible.value.has(known));
         if (lit) {
-          moveLight(lit, frame);
+          moveLight(lit, frame, timing.minVisibleMs);
         } else {
           const pending = others
             .map(known => frameTimers.get(known))
             .filter(timers => timers.showTimer)
             .map(timers => timers.showDueAt);
-          want(frame, pending.length ? Math.min(...pending) : undefined);
+          want(frame, {
+            dueAt: timing.immediate
+              ? Date.now()
+              : pending.length
+                ? Math.min(...pending)
+                : undefined,
+            minVisibleMs: timing.minVisibleMs,
+          });
         }
       } else if (frame) {
-        want(frame);
+        want(frame, { minVisibleMs: sourceTiming(frame).minVisibleMs });
       }
       for (const known of others) release(known);
     },

@@ -26,10 +26,25 @@ import {
 } from "../utils/screenSetting";
 import { useKiosksStore } from "./kiosks";
 import { useNotificationsStore } from "./notifications";
+import { SCREEN_SWITCH_SOURCE_ID, SCREEN_SWITCH_TIMING, useProgressStore } from "./progress";
 
 // The config is what a kiosk boots from, so its offline copy is kept for a day
 // and served (flagged stale) even after that when the backend is unreachable.
 const CONFIG_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+const nextFrame = () =>
+  new Promise(resolve => {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => resolve());
+    else setTimeout(resolve, 0);
+  });
+
+// Two frames: Vue patches the light in a microtask before the first callback,
+// and the second callback lands after the browser has painted it. Only then can
+// the heavy screen patch run without holding the light back.
+const afterPaint = async () => {
+  await nextFrame();
+  await nextFrame();
+};
 
 // Shared with useFocusLight, so its idle fade uses the same default as the
 // input-feedback label rather than duplicating the number.
@@ -589,16 +604,71 @@ export const useConfigStore = defineStore("config", () => {
     syncActiveRegions();
   };
 
-  const activateDashboardScreen = async screenId => {
+  // A screen switch is mostly render work: the new layout patches after the
+  // tap and can block the main thread. Remember how long the last one took so a
+  // device that switches quickly stops paying for a light it never needs.
+  let lastSwitchSettleMs = null;
+
+  const applyScreenSwitch = screenId => {
     if (getKioskId()) {
       // Kiosk mode: local only — never persist to global. Honor availableScreens.
       const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
-      if (ids.has(screenId)) kioskActiveScreenId.value = screenId;
-      return;
+      if (!ids.has(screenId)) return null;
+      kioskActiveScreenId.value = screenId;
+      return null;
     }
     const nextScreens = setActiveDashboardScreen(dashboardScreens.value, screenId);
     dashboardScreens.value = nextScreens;
-    await updateConfig({ dashboardScreens: nextScreens });
+    return updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const commitScreenSwitch = async screenId => {
+    const startedAt = Date.now();
+    const persistence = applyScreenSwitch(screenId);
+    // The caller still sees a failed save below; catch it now so it is not
+    // reported as unhandled while the light finishes painting.
+    if (persistence && typeof persistence.catch === "function") persistence.catch(() => {});
+    await nextTick();
+    await afterPaint();
+    lastSwitchSettleMs = Date.now() - startedAt;
+    // Return the save rather than awaiting it here: the light ends as soon as
+    // the screen has settled, not when the config write happens to finish.
+    return { persistence };
+  };
+
+  const activateDashboardScreen = async screenId => {
+    const activeId = effectiveDashboardScreens.value.activeScreenId;
+    if (screenId === activeId) return;
+    if (getKioskId()) {
+      // A screen this kiosk may not show was always a no-op.
+      const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
+      if (!ids.has(screenId)) return;
+    }
+
+    // "Off" keeps the light off; a device whose last switch was fast skips the
+    // light (and its extra painted-frame wait) for the next one.
+    const fastSwitch =
+      lastSwitchSettleMs != null && lastSwitchSettleMs < SCREEN_SWITCH_TIMING.fastSettleMs;
+    if (loadingLight.value === "off" || fastSwitch) {
+      const { persistence } = await commitScreenSwitch(screenId);
+      if (persistence) await persistence;
+      return;
+    }
+
+    const progress = useProgressStore();
+    const { persistence } = await progress.track(
+      SCREEN_SWITCH_SOURCE_ID,
+      async () => {
+        // Paint the light first, then let the patch take the main thread.
+        await afterPaint();
+        return commitScreenSwitch(screenId);
+      },
+      {
+        immediate: true,
+        minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+      }
+    );
+    if (persistence) await persistence;
   };
 
   const cycleDashboardScreenBy = async direction => {
