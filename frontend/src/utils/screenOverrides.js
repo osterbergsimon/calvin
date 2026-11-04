@@ -704,6 +704,49 @@ export const SCREEN_SETTING_LABELS = {
   defaultScreenId: "Start page",
 };
 
+// The rows a screen's page shows, in the order they appear. The Changed here
+// line lists overrides in this order only: a host-internal `_` key, the name,
+// Screen now or any key without a row never appears (settings-scope §5).
+const SCREEN_PAGE_ROW_ORDER = [
+  "availableScreens",
+  "defaultScreenId",
+  "selectedTheme",
+  "themeMode",
+  "darkModeStart",
+  "darkModeEnd",
+  "typeTheme",
+  "orientation",
+  "orientationFlipped",
+  "applyDisplayRotation",
+  "touchControlSize",
+  "uiSize",
+  "effectsLevel",
+  "focusLightMode",
+  "focusLightDimOthers",
+  "keyboardFeedbackEnabled",
+  "keyboardFeedbackMode",
+  "showUI",
+  "clockBarShowInKiosk",
+  "tapAnywhereReveal",
+  "hotCornerPosition",
+  "hotCornerOpacity",
+  "hotCornerSize",
+  "hotCornerLongPressMs",
+  "displayScheduleEnabled",
+  "displaySchedule",
+  "displayTimeout",
+  "touchControls",
+  "onScreenKeyboard",
+  "photoFrameEnabled",
+  "photoFrameTimeout",
+  "photoFrameSourceIds",
+  "loadingLight",
+  "layoutMode",
+];
+
+// The id a row carries so the Changed here line can scroll to it and flash it.
+export const rowAnchorId = key => `setting-${key}`;
+
 /** A value read as the descriptor's control expects it. */
 export const normalizeSettingValue = (descriptor, value) => {
   if (!descriptor) return value;
@@ -782,7 +825,17 @@ export const changedSettingKeys = overrides => {
   return settings;
 };
 
-export const changedSettingCount = overrides => changedSettingKeys(overrides).length;
+// The settings a screen page can point at: only overrides with a row on the
+// page, in page order, with the row's label.
+export const changedSettingRows = overrides => {
+  const changed = new Set(changedSettingKeys(overrides));
+  return SCREEN_PAGE_ROW_ORDER.filter(key => changed.has(key)).map(key => ({
+    key,
+    label: SCREEN_SETTING_LABELS[key] || key,
+  }));
+};
+
+export const changedSettingCount = overrides => changedSettingRows(overrides).length;
 
 export const hasOwnSettings = overrides => changedSettingCount(overrides) > 0;
 

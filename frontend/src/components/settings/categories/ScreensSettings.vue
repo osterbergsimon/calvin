@@ -180,6 +180,7 @@
       v-if="defaultOpen"
       :config="config"
       @update:config="patch => emit('update:config', patch)"
+      @open-screen="select"
     />
     <ThisBrowserSettings v-else-if="browserOpen" :config="config" @changed="refreshBrowserCount" />
 
@@ -193,6 +194,9 @@
         :display-stack="selectedKiosk.displayStack ?? null"
         :agent-version="selectedKiosk.agentVersion ?? null"
       />
+
+      <ChangedHereLine :items="changedHereItems" />
+      <ScreenSectionIndex :sections="sectionIndex" />
 
       <SettingsSection id="screen-name" title="Name">
         <SettingRow label="Name" description="Shown in this screen's clock bar.">
@@ -218,7 +222,7 @@
       </SettingsSection>
 
       <SettingsSection id="screen-pages" title="Pages">
-        <SettingRow label="Pages shown">
+        <SettingRow label="Pages shown" :id="rowAnchorId('availableScreens')">
           <template #description>
             <span>Pages are shared by all screens. Choose which ones this screen shows.</span>
             <InlineNote v-if="pages.length === 1" data-test="only-one-page">
@@ -271,7 +275,7 @@
             </Button>
           </template>
         </ListRow>
-        <SettingRow label="Start page">
+        <SettingRow label="Start page" :id="rowAnchorId('defaultScreenId')">
           <template #description>
             <ScopeLine
               :overridden="defaultOverridden"
@@ -295,6 +299,7 @@
         <template v-for="descriptor in visibleLookDescriptors" :key="descriptor.key">
           <ScreenSettingRow
             :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
             :value="look[descriptor.key]"
             :overridden="Boolean(lookOverridden[descriptor.key])"
             :note="lookNote.key === descriptor.key ? lookNote.text : ''"
@@ -314,7 +319,7 @@
       </SettingsSection>
 
       <SettingsSection id="screen-display" title="Display">
-        <SettingRow label="Orientation">
+        <SettingRow label="Orientation" :id="rowAnchorId('orientation')">
           <template #description>
             <ScopeLine
               :overridden="orientationOverridden"
@@ -332,7 +337,7 @@
             @update:model-value="setOrientation"
           />
         </SettingRow>
-        <SettingRow label="Upside down">
+        <SettingRow label="Upside down" :id="rowAnchorId('orientationFlipped')">
           <template #description>
             <ScopeLine :overridden="flipOverridden" reset-test="reset-flip" @reset="resetFlip" />
           </template>
@@ -342,7 +347,7 @@
             @update:model-value="setFlipped"
           />
         </SettingRow>
-        <SettingRow label="Rotate the screen output">
+        <SettingRow label="Rotate the screen output" :id="rowAnchorId('applyDisplayRotation')">
           <template #description>
             <ScopeLine
               :overridden="applyOverridden"
@@ -359,6 +364,7 @@
         <template v-for="descriptor in displaySizeDescriptors" :key="descriptor.key">
           <ScreenSettingRow
             :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
             :value="displaySizes[descriptor.key]"
             :overridden="Boolean(displaySizesOverridden[descriptor.key])"
             @set="value => setDisplaySize(descriptor.key, value)"
@@ -389,6 +395,7 @@
         <template v-for="descriptor in visibleEffectsDescriptors" :key="descriptor.key">
           <ScreenSettingRow
             :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
             :value="effects[descriptor.key]"
             :overridden="Boolean(effectsOverridden[descriptor.key])"
             :auto-note="descriptor.key === 'effectsLevel' ? effectsAutoCopy : ''"
@@ -411,6 +418,7 @@
         <template v-for="descriptor in visibleControlDescriptors" :key="descriptor.key">
           <ScreenSettingRow
             :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
             :value="controls[descriptor.key]"
             :overridden="Boolean(controlsOverridden[descriptor.key])"
             @set="value => setControl(descriptor.key, value)"
@@ -429,7 +437,7 @@
       </SettingsSection>
 
       <SettingsSection id="screen-power" title="Power">
-        <SettingRow label="Screen on/off schedule">
+        <SettingRow label="Screen on/off schedule" :id="rowAnchorId('displayScheduleEnabled')">
           <template #description>
             <ScopeLine
               :overridden="scheduleEnabledOverridden"
@@ -445,6 +453,7 @@
         </SettingRow>
         <DisplayScheduleGrid
           v-if="effScheduleEnabled"
+          :id="rowAnchorId('displaySchedule')"
           :model-value="effSchedule || []"
           :week-start="config.weekStartDay ?? 1"
           :time-format="config.timeFormat || '24h'"
@@ -454,7 +463,7 @@
           @update:model-value="setSchedule"
           @reset="resetDailySchedule"
         />
-        <SettingRow label="Turn off when idle">
+        <SettingRow label="Turn off when idle" :id="rowAnchorId('displayTimeout')">
           <template #description>
             <ScopeLine
               :overridden="idleOverridden"
@@ -505,7 +514,7 @@
       </SettingsSection>
 
       <SettingsSection id="screen-touch" title="Touch & keyboard">
-        <SettingRow label="Touchscreen">
+        <SettingRow label="Touchscreen" :id="rowAnchorId('touchControls')">
           <template #description>
             <ScopeLine
               :overridden="touchOverridden"
@@ -524,7 +533,7 @@
             @update:model-value="setTouch"
           />
         </SettingRow>
-        <SettingRow label="On-screen keyboard">
+        <SettingRow label="On-screen keyboard" :id="rowAnchorId('onScreenKeyboard')">
           <template #description>
             <ScopeLine :overridden="oskOverridden" reset-test="osk-use-shared" @reset="resetOsk" />
           </template>
@@ -555,6 +564,7 @@
           v-for="descriptor in visibleBehaviourDescriptors"
           :key="descriptor.key"
           :descriptor="descriptor"
+          :id="rowAnchorId(descriptor.key)"
           :value="behaviour[descriptor.key]"
           :overridden="Boolean(behaviourOverridden[descriptor.key])"
           @set="value => setBehaviour(descriptor.key, value)"
@@ -672,9 +682,11 @@ import {
 } from "@/utils/screenPower";
 import {
   changedSettingCount,
+  changedSettingRows,
   descriptorsForSection,
   formatSettingList,
   hasOwnSettings,
+  rowAnchorId,
   useAsDefaultPatch,
   visibleDescriptors,
   withoutAllOverrides,
@@ -699,11 +711,13 @@ import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import ScreenSectionIndex from "@/components/settings/shared/ScreenSectionIndex.vue";
 import ScreensLayout from "@/components/settings/shared/ScreensLayout.vue";
 import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
 import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
+import ChangedHereLine from "@/components/settings/shared/ChangedHereLine.vue";
 import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 
@@ -742,6 +756,21 @@ const DEFAULT_SECTION_IDS = new Set([
   "screen-effects",
   "screen-controls",
 ]);
+
+// The section index under a screen's header uses the same `section-<id>`
+// anchors the deep links scroll to (settings-scope §5).
+const sectionIndex = [
+  { id: "screen-name", label: "Name" },
+  { id: "screen-pages", label: "Pages" },
+  { id: "screen-look", label: "Look" },
+  { id: "screen-display", label: "Display" },
+  { id: "screen-effects", label: "Effects & focus" },
+  { id: "screen-controls", label: "Controls" },
+  { id: "screen-power", label: "Power" },
+  { id: "screen-touch", label: "Touch & keyboard" },
+  { id: "screen-behaviour", label: "Behaviour" },
+  { id: "screen-software", label: "Software" },
+];
 const initialOwnScreenId =
   props.initialSection && INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) && kioskId
     ? kioskId
@@ -910,6 +939,7 @@ const defaultSummary = computed(() => {
 // --- list / detail -------------------------------------------------------
 const selectedKiosk = computed(() => kiosks.value.find(k => k.id === selectedId.value) || null);
 const selectedChangedCount = computed(() => changedSettingCount(overrides.value));
+const changedHereItems = computed(() => changedSettingRows(overrides.value));
 const selectedName = computed(() => (selectedKiosk.value ? screenLabel(selectedKiosk.value) : ""));
 const footerCopy = computed(() => {
   const count = selectedChangedCount.value;
