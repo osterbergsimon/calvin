@@ -13,6 +13,7 @@
     <Dialog
       :model-value="phoneOpen && auth.authenticated"
       label="Set up from your phone"
+      scrim-blur
       @update:model-value="phoneOpen = $event"
     >
       <PhoneSetupCard :setting-id="phoneSettingId" />

@@ -1,6 +1,12 @@
 <template>
   <teleport to="body">
-    <Dialog :model-value="true" label="Embedded page" size="full" @close="$emit('close')">
+    <Dialog
+      :model-value="true"
+      label="Embedded page"
+      size="full"
+      scrim-blur
+      @close="$emit('close')"
+    >
       <div class="embed-overlay__frame">
         <IframeViewer :url="url" @error="$emit('fallback')" />
       </div>
