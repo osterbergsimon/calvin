@@ -256,6 +256,14 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    // One household design (clock bar editor §4). Null means "derive it from the
+    // old clock keys"; the resolver fills the rest.
+    name: "clockBarDesign",
+    keys: ["clockBarDesign", "clock_bar_design"],
+    defaultValue: null,
+    parse: value => (value && typeof value === "object" ? value : null),
+  },
+  {
     name: "focusLightMode",
     keys: ["focusLightMode", "focus_light_mode"],
     defaultValue: "interaction",

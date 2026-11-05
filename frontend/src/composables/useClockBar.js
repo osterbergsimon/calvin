@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useConfigStore } from "../stores/config";
+import { clockBarBarHeightPx, clockBarPartSizePx } from "../utils/clockBarDesign";
 
 /**
  * Shared clock-bar logic used by both ClockBarHorizontal and ClockBarVertical.
@@ -8,12 +9,7 @@ import { useConfigStore } from "../stores/config";
  * @param {() => boolean} opts.enabled         Whether the bar is enabled (reactive getter).
  * @param {() => boolean} opts.showInKiosk     Show when UI is hidden.
  * @param {() => boolean} opts.showInNonKiosk  Show when UI is visible.
- * @param {() => boolean} [opts.previewMode]   When true, always show and use preview overrides.
- * @param {() => number|null} [opts.previewTimeSize]
- * @param {() => number|null} [opts.previewDateSize]
- * @param {() => string|null} [opts.previewLayout]
- * @param {() => number|null} [opts.previewPadding]
- * @param {() => number|null} [opts.previewPluginItemSize]
+ * @param {() => Object|null} [opts.design]    Resolved clock bar design.
  * @param {() => 'horizontal'|'vertical'} [opts.orientation]
  */
 // Fixed edge gutter (px) along the bar's inline axis, so the leading logo is never
@@ -25,23 +21,23 @@ export function useClockBar(opts) {
 
   const get = (fn, fallback = null) => (typeof fn === "function" ? fn() : fallback);
 
-  const isPreview = computed(() => !!get(opts.previewMode, false));
   const orientation = computed(() => get(opts.orientation, "horizontal"));
+  const design = computed(() => get(opts.design, null));
+  const shapeState = computed(() => design.value?.[orientation.value] ?? null);
+  const zones = computed(() => shapeState.value?.zones ?? {});
 
   const shouldShow = computed(() => {
-    if (isPreview.value) return true;
     if (!get(opts.enabled, true)) return false;
     if (get(opts.showInNonKiosk, false) && configStore.shouldShowUI) return true;
     if (get(opts.showInKiosk, false) && !configStore.shouldShowUI) return true;
     return false;
   });
 
-  const showDate = computed(() => !!configStore.clockShowDate);
-  // Plugin tiles are rendered unconditionally: each one is gated by its own
-  // toggle in Dashboard › Clock bar items. Decision C removed the global "Show
-  // plugin info" switch, so a stale master flag can no longer hide every tile
-  // with no control to bring it back.
-  const showSeconds = computed(() => !!configStore.clockShowSeconds);
+  const partZone = id =>
+    Object.entries(zones.value).find(([, ids]) => (ids || []).includes(id))?.[0] ?? null;
+  const showDate = computed(() => Boolean(partZone("date")));
+  const showSeconds = computed(() => Boolean(shapeState.value?.parts?.time?.seconds));
+
   // Reject anything Intl can't accept as a time zone. The backend persists an
   // unset timezone as the literal string "None" (str(None)), which would make
   // every Intl formatter below throw "invalid time zone: None" and crash the
@@ -61,47 +57,36 @@ export function useClockBar(opts) {
   );
   const timeFormat = computed(() => configStore.timeFormat || "24h");
 
-  const fontSize = computed(() => {
-    const preview = get(opts.previewTimeSize, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalFontSize || 18;
-    return configStore.clockBarFontSize || 16;
-  });
+  const fontSize = computed(() =>
+    design.value ? clockBarPartSizePx(design.value, orientation.value, "time") : 16
+  );
 
-  const dateFontSize = computed(() => {
-    const preview = get(opts.previewDateSize, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalDateFontSize || 11;
-    return configStore.clockBarDateFontSize || 14;
-  });
+  const dateFontSize = computed(() =>
+    design.value ? clockBarPartSizePx(design.value, orientation.value, "date") : 14
+  );
 
   // Size of plugin statusbar item readouts (the value/number). Drives an override
   // of --plugin-value-size-sm scoped to the bar's PluginStatusbarItems wrapper.
-  const pluginItemSize = computed(() => {
-    const preview = get(opts.previewPluginItemSize, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalPluginItemSize ?? 16;
-    return configStore.clockBarPluginItemSize ?? 16;
-  });
+  const pluginItemSize = computed(() =>
+    design.value ? clockBarPartSizePx(design.value, orientation.value, "tile:any") : 16
+  );
 
+  // Kept for the components' layout classes (and the side bar's tests). The
+  // actual parts are drawn from their own settings.
   const layout = computed(() => {
-    const preview = get(opts.previewLayout, null);
-    if (isPreview.value && preview !== null) return preview;
     if (orientation.value === "vertical") {
-      if (configStore.clockBarVerticalLayout) return configStore.clockBarVerticalLayout;
-      return configStore.clockBarLayout === "vertical-compact" ? "compact-time" : "upright";
+      const parts = shapeState.value?.parts || {};
+      if (parts.time?.style === "stacked" && parts.date?.style === "stacked") {
+        return "compact-time-date";
+      }
+      return parts.time?.style === "stacked" ? "compact-time" : "upright";
     }
-    return configStore.clockBarLayout || "single-line";
+    return shapeState.value?.parts?.date?.underTime ? "two-lines" : "single-line";
   });
 
-  const barPadding = computed(() => {
-    const preview = get(opts.previewPadding, null);
-    if (isPreview.value && preview !== null) return preview;
-    // Nullish coalescing, not ||: padding 0 is valid ("all the way down") and
-    // must not fall back to the 8px default.
-    if (orientation.value === "vertical") return configStore.clockBarVerticalPadding ?? 8;
-    return configStore.clockBarPadding ?? 8;
-  });
+  const barPadding = computed(() =>
+    design.value ? clockBarBarHeightPx(design.value, orientation.value) : 8
+  );
 
   // The slider controls the bar's *thickness* (cross-axis) only. Padding along the
   // bar's inline axis just squeezes the fixed-size logo toward the screen edge, so

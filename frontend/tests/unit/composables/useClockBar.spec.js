@@ -3,6 +3,7 @@ import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import { useClockBar } from "@/composables/useClockBar";
 import { useConfigStore } from "@/stores/config";
+import { resolveClockBarDesign } from "@/utils/clockBarDesign";
 
 // useClockBar registers a timer in setup, so call it inside a mounted component.
 function useBar(orientation, extra = {}) {
@@ -13,7 +14,7 @@ function useBar(orientation, extra = {}) {
         enabled: () => true,
         showInKiosk: () => false,
         showInNonKiosk: () => true,
-        previewMode: () => false,
+        design: () => resolveClockBarDesign(useConfigStore(), []),
         orientation: () => orientation,
         ...extra,
       });
@@ -40,11 +41,6 @@ describe("useClockBar barPadding", () => {
     useConfigStore().clockBarVerticalPadding = undefined;
     expect(useBar("vertical").barPadding.value).toBe(8);
   });
-
-  it("prefers a live preview padding (including 0) when in preview mode", () => {
-    const api = useBar("vertical", { previewMode: () => true, previewPadding: () => 0 });
-    expect(api.barPadding.value).toBe(0);
-  });
 });
 
 describe("useClockBar pluginItemSize", () => {
@@ -63,14 +59,6 @@ describe("useClockBar pluginItemSize", () => {
   it("falls back to 16 when unset", () => {
     useConfigStore().clockBarPluginItemSize = undefined;
     expect(useBar("horizontal").pluginItemSize.value).toBe(16);
-  });
-
-  it("prefers a live preview size when in preview mode", () => {
-    const api = useBar("horizontal", {
-      previewMode: () => true,
-      previewPluginItemSize: () => 30,
-    });
-    expect(api.pluginItemSize.value).toBe(30);
   });
 });
 

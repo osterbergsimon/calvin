@@ -6,6 +6,7 @@ import { nextTick } from "vue"; // eslint-disable-line no-unused-vars
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
 import { useConfigStore } from "@/stores/config";
+import { useWebServicesStore } from "@/stores/webServices";
 
 // Mock window.matchMedia
 Object.defineProperty(window, "matchMedia", {
@@ -244,6 +245,10 @@ describe("ClockBarVertical", () => {
     // Decision C removed the global "Show plugin info" toggle: a stale false
     // value must not hide every tile with no control to bring them back.
     store.clockBarShowPluginItems = false;
+    const services = useWebServicesStore();
+    services.services = [
+      { id: "weather", name: "Weather", config: {}, statusbar_schema: { kind: "status" } },
+    ];
 
     const wrapper = mount(ClockBarVertical, {
       props: {

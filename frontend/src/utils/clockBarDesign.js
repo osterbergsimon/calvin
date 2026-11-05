@@ -115,7 +115,13 @@ const normalizeSize = (value, fallback = "m") => {
   return fallback;
 };
 
-const normalizeBarHeight = value => (CLOCK_BAR_BAR_HEIGHTS.includes(value) ? value : "normal");
+const normalizeBarHeight = value => {
+  if (CLOCK_BAR_BAR_HEIGHTS.includes(value)) return value;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.min(96, Math.max(0, Math.round(value)));
+  }
+  return "normal";
+};
 
 const normalizePart = (id, part) => {
   const base = { ...(DEFAULT_PARTS[id] || {}) };
@@ -199,7 +205,7 @@ const deriveFromOldKeys = (config, tiles) => {
     },
     barHeight:
       stepForBarHeight(read(config, "clockBarPadding", "clock_bar_padding") ?? 8, "horizontal") ??
-      "normal",
+      normalizeBarHeight(read(config, "clockBarPadding", "clock_bar_padding") ?? 8),
     tileSize:
       stepForPx(
         read(config, "clockBarPluginItemSize", "clock_bar_plugin_item_size") ?? 16,
@@ -259,7 +265,10 @@ const deriveFromOldKeys = (config, tiles) => {
       stepForBarHeight(
         read(config, "clockBarVerticalPadding", "clock_bar_vertical_padding") ?? 8,
         "vertical"
-      ) ?? "normal",
+      ) ??
+      normalizeBarHeight(
+        read(config, "clockBarVerticalPadding", "clock_bar_vertical_padding") ?? 8
+      ),
     tileSize:
       stepForPx(
         read(config, "clockBarVerticalPluginItemSize", "clock_bar_vertical_plugin_item_size") ?? 16,
@@ -443,7 +452,9 @@ export function clockBarPartSizePx(design, shape, part) {
 
 /** The px padding a bar height resolves to. */
 export function clockBarBarHeightPx(design, shape) {
-  return CLOCK_BAR_BAR_HEIGHT_TABLE[shape]?.[design[shape]?.barHeight] ?? 8;
+  const height = design[shape]?.barHeight;
+  if (typeof height === "number") return height;
+  return CLOCK_BAR_BAR_HEIGHT_TABLE[shape]?.[height] ?? 8;
 }
 
 /** A stored px value's step name, or null when it is Custom. */

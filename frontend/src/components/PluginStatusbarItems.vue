@@ -52,6 +52,13 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  // An ordered list of instance ids (§7 item 1). The clock bar passes one per
+  // zone/run; with it, this component never looks at show_in_statusbar — the
+  // design decides. Without it, it behaves exactly as before.
+  ids: {
+    type: Array,
+    default: null,
+  },
 });
 
 const sizeStyle = computed(() =>
@@ -74,9 +81,15 @@ function isStatusbarVisible(service) {
   return true;
 }
 
-const schemaServices = computed(() =>
-  webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s))
-);
+const schemaServices = computed(() => {
+  if (Array.isArray(props.ids)) {
+    const byId = new Map(
+      webServicesStore.services.filter(s => s.statusbar_schema?.kind).map(s => [s.id, s])
+    );
+    return props.ids.map(id => byId.get(id)).filter(Boolean);
+  }
+  return webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s));
+});
 
 onMounted(() => {
   if (webServicesStore.services.length === 0) {
