@@ -113,6 +113,11 @@
           @update:model-value="v => $emit('clock-position', v)"
         />
       </SettingRow>
+      <SettingRow v-if="clock.enabled" label="Look">
+        <Button size="sm" data-test="edit-clock-bar-look" @click="$emit('edit-clock-bar')">
+          Edit clock bar look…
+        </Button>
+      </SettingRow>
       <ScopeLine
         v-if="hasOverride"
         class="ins-scope"
@@ -188,6 +193,7 @@ const emit = defineEmits([
   "clock-enabled",
   "clock-position",
   "clock-inherit",
+  "edit-clock-bar",
   "duplicate",
   "delete",
   "hide",

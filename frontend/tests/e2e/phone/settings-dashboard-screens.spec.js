@@ -23,11 +23,16 @@ test.describe("phone: Dashboard", () => {
     const dashboard = page.locator(".dashboard-settings");
     await expect(dashboard.getByText("Pages & regions")).toBeVisible();
     await expect(dashboard.getByRole("button", { name: "Open editor" })).toBeVisible();
-    for (const section of ["Clock", "Clock bar layout", "Remote buttons"]) {
+    for (const section of ["Clock bar", "Remote buttons"]) {
       await expect(
         dashboard.locator(".settings-section__eyebrow", { hasText: section }).first()
       ).toBeVisible();
     }
+    // The three old clock sections are one section with the real bar preview.
+    await expect(dashboard.locator("[data-test='clock-bar-mini']")).toBeVisible();
+    await expect(dashboard.getByRole("button", { name: "Edit clock bar" })).toBeVisible();
+    await expect(dashboard.locator("#section-clock-bar-layout")).toHaveCount(0);
+    await expect(dashboard.locator("#section-clock-bar-items")).toHaveCount(0);
     // Appearance moved to Screens › Look, so Dashboard has no theme row.
     await expect(dashboard.locator("#section-appearance")).toHaveCount(0);
     await expect(dashboard.locator(".theme-picker__trigger")).toHaveCount(0);

@@ -370,6 +370,7 @@
               @clock-enabled="setClockEnabled"
               @clock-position="setClockPosition"
               @clock-inherit="clearClock"
+              @edit-clock-bar="clockEditorOpen = true"
               @duplicate="duplicateScreen"
               @delete="requestDeleteActiveScreen"
               @hide="hideActivePage"
@@ -399,6 +400,16 @@
         @alternative="hideActivePage"
         @cancel="deleteConfirm = null"
       />
+
+      <ClockBarEditor
+        :open="clockEditorOpen"
+        :config="configValue"
+        :shape="clock.mode"
+        :preview-screen-id="previewScreenId"
+        @close="clockEditorOpen = false"
+        @update:config="patch => emit('update:config', patch)"
+        @open-regions="clockEditorOpen = false"
+      />
     </div>
   </Dialog>
 </template>
@@ -426,6 +437,7 @@ import { screenLabel } from "@/utils/screenLabel";
 import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
+import ClockBarEditor from "./ClockBarEditor.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
 import { logError } from "@/utils/logger";
@@ -807,6 +819,7 @@ const STAGE_CHROME_HEIGHT = 72; // the stage tag above + the caption/note below
 
 const sheetOpen = ref(false);
 const clockSelected = ref(false);
+const clockEditorOpen = ref(false);
 
 const deviceBox = computed(() => {
   const vp = previewViewport.value;

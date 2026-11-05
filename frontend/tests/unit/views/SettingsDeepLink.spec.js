@@ -198,14 +198,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
-  it("opens Dashboard for clock-bar-items", async () => {
+  it("opens Dashboard for the old clock-bar-items id", async () => {
     route.query = { setting: "clock-bar-items" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
           DashboardSettings: {
-            template: `<div>${section("clock-bar-items", "Clock bar items")}</div>`,
+            template: `<div>${section("clock-bar", "Clock bar")}</div>`,
           },
         },
       },
@@ -214,7 +214,7 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     await flushPromises();
 
     expect(activeCategory(w)).toBe("dashboard");
-    expect(document.getElementById("section-clock-bar-items").scrollIntoView).toHaveBeenCalled();
+    expect(document.getElementById("section-clock-bar").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 

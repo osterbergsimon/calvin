@@ -57,8 +57,7 @@ describe("settings registry", () => {
       "dashboard-kiosk",
       "dashboard-kiosk-focus",
       "screen-behaviour",
-      "clock-bar-appearance",
-      "clock-bar-items",
+      "clock-bar-design",
       "content-calendars",
       "content-calendar-display",
       "content-photos",
@@ -140,18 +139,18 @@ describe("settings registry", () => {
       category: "dashboard",
       path: "Dashboard / Pages & regions",
     });
-    expect(getSettingDestinationById("clock-bar-appearance")).toMatchObject({
+    expect(getSettingDestinationById("clock-bar-design")).toMatchObject({
       category: "dashboard",
-      tab: "clock",
-      tabKey: "settings_tab_dashboard",
-      path: "Dashboard / Clock",
+      section: "clock-bar",
+      path: "Dashboard / Clock bar",
     });
-    expect(getSettingDestinationById("clock-bar-items")).toMatchObject({
-      category: "dashboard",
-      tab: "bar-items",
-      tabKey: "settings_tab_dashboard",
-      path: "Dashboard / Clock bar items",
-    });
+    // The three old ids all land on the one merged section (§5).
+    for (const oldId of ["clock-bar-appearance", "clock-bar-layout", "clock-bar-items"]) {
+      expect(getSettingDestinationById(oldId)).toMatchObject({
+        id: "clock-bar-design",
+        section: "clock-bar",
+      });
+    }
     expect(getSettingDestinationById("device-hardware")).toMatchObject({
       category: "maintenance",
       tab: "hardware",
@@ -190,6 +189,27 @@ describe("settings registry", () => {
       section: "device-keyboard",
       path: "Screens / Default · Touch & keyboard",
     });
+  });
+
+  it("finds the merged Clock bar section with every old keyword", () => {
+    for (const word of [
+      "clock",
+      "date",
+      "seconds",
+      "logo",
+      "two lines",
+      "clock bar items",
+      "plugin tiles",
+      "size",
+    ]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("clock-bar-design");
+    }
+    for (const oldId of ["clock-bar-appearance", "clock-bar-layout", "clock-bar-items"]) {
+      expect(getSettingDestinationById(oldId)?.id).toBe("clock-bar-design");
+    }
   });
 
   it("finds Look with the old appearance, theme, dark mode and font words", () => {
@@ -253,15 +273,15 @@ describe("settings registry", () => {
 
   it("searches labels, paths, and keywords under the new names", () => {
     expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual([
-      "clock-bar-appearance",
+      "clock-bar-design",
     ]);
-    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar-items"]);
+    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar-design"]);
     // "github" is a plugin-install word; the update source now lives in Advanced.
     expect(filterSettingsDestinations("github").map(item => item.id)).toContain("plugins");
 
     // Old names still find their new home.
     expect(filterSettingsDestinations("clock bar").map(item => item.id)).toContain(
-      "clock-bar-items"
+      "clock-bar-design"
     );
     expect(filterSettingsDestinations("display").map(item => item.id)).toContain(
       "dashboard-layout"

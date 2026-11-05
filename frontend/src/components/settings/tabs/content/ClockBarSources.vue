@@ -27,6 +27,20 @@
 
     <AddSourceButton ref="addButton" kind="clock" @saved="handleSaved" />
 
+    <InlineNote>
+      Parts, sizes and order of the bar.
+      <template #action>
+        <Button
+          variant="link"
+          size="sm"
+          data-test="edit-clock-bar-look"
+          @click="openClockBarEditor"
+        >
+          Edit clock bar look…
+        </Button>
+      </template>
+    </InlineNote>
+
     <InstanceModal
       :show="showModal"
       :plugin="editingPlugin"
@@ -43,16 +57,22 @@ import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
 import * as pluginsApi from "@/services/pluginsApi";
 import Button from "@/components/ui/Button.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
 import { buildSourceRow } from "@/utils/instanceSummary";
+import { resolveClockBarDesign, toStoredClockBarDesign } from "@/utils/clockBarDesign";
 import { logError } from "@/utils/logger";
 
 // Clock-bar-only sources (§3.1, §3.6): a service plugin that ships a tile and
 // no page. Adding one switches its tile on, so it actually appears; the row
 // says whether it is showing and links to the show/hide list.
-defineProps({
+const props = defineProps({
+  config: {
+    type: Object,
+    default: () => ({}),
+  },
   highlightId: {
     type: String,
     default: "",
@@ -62,6 +82,7 @@ defineProps({
     default: "",
   },
 });
+const emit = defineEmits(["update:config"]);
 
 const router = useRouter();
 const route = useRoute();
@@ -150,6 +171,18 @@ const handleSaved = async payload => {
         plugin_id: payload.pluginId,
         config: { ...(instance.config || {}), show_in_statusbar: true },
       });
+      // Adding it means you want to see it (§7 item 2): if the design already
+      // exists, take the new tile off the Not shown shelf as well.
+      if (props.config?.clockBarDesign) {
+        const design = toStoredClockBarDesign(resolveClockBarDesign(props.config, []));
+        const tileId = `tile:${instance.id}`;
+        for (const shape of ["horizontal", "vertical"]) {
+          if (Array.isArray(design?.[shape]?.hidden)) {
+            design[shape].hidden = design[shape].hidden.filter(id => id !== tileId);
+          }
+        }
+        emit("update:config", { clockBarDesign: design });
+      }
     } catch (error) {
       logError("[ClockBarSources]", "Failed to switch the new tile on:", error);
     }
@@ -162,7 +195,13 @@ const handleSaved = async payload => {
 };
 
 const openClockBarItems = () =>
-  router.push({ path: "/settings", query: { setting: "clock-bar-items" } });
+  router.push({ path: "/settings", query: { setting: "clock-bar-design" } });
+
+const openClockBarEditor = () =>
+  router.push({
+    path: "/settings",
+    query: { setting: "clock-bar-design", editClockBar: "1" },
+  });
 
 onMounted(async () => {
   if (plugins.value.length === 0 && !loadingPlugins.value) await loadPlugins();

@@ -113,7 +113,12 @@
     </SettingsSection>
 
     <SettingsSection id="content-clock-bar" title="Clock bar info">
-      <ClockBarSources :highlight-id="highlightId" :highlight-provider="highlightProvider" />
+      <ClockBarSources
+        :config="config"
+        :highlight-id="highlightId"
+        :highlight-provider="highlightProvider"
+        @update:config="patch => emit('update:config', patch)"
+      />
     </SettingsSection>
   </div>
 </template>

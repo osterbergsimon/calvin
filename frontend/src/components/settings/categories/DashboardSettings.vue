@@ -21,8 +21,25 @@
       />
     </SettingsSection>
 
-    <!-- CLOCK BAR (moved from the retired Clock Bar category) -->
-    <ClockBarSections :config="config" @update:config="patch => emit('update:config', patch)" />
+    <!-- CLOCK BAR: one section with a live preview and the editor (§5) -->
+    <SettingsSection id="clock-bar" title="Clock bar">
+      <ClockBarMiniPreview />
+      <SettingRow
+        label="Clock bar parts"
+        description="Where the logo, room, time, date and plugin tiles sit, and how big they are."
+      >
+        <Button variant="primary" data-test="edit-clock-bar" @click="clockEditorOpen = true">
+          Edit clock bar
+        </Button>
+      </SettingRow>
+      <ClockBarEditor
+        :open="clockEditorOpen"
+        :config="config"
+        @close="clockEditorOpen = false"
+        @update:config="patch => emit('update:config', patch)"
+        @open-regions="openRegionsFromClockBar"
+      />
+    </SettingsSection>
 
     <!-- The moved groups: one line where they used to be (§4). -->
     <InlineNote class="dashboard-signpost" data-test="dashboard-screen-signpost">
@@ -57,7 +74,8 @@ import InlineNote from "@/components/ui/InlineNote.vue";
 import Button from "@/components/ui/Button.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
+import ClockBarEditor from "@/components/settings/shared/ClockBarEditor.vue";
+import ClockBarMiniPreview from "@/components/settings/shared/ClockBarMiniPreview.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -75,6 +93,7 @@ const emit = defineEmits(["update:config"]);
 // attribute quoting.
 
 const editorOpen = ref(false);
+const clockEditorOpen = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { placement, clearPlacement } = usePlacementRequest();
@@ -116,6 +135,24 @@ const closeEditor = () => {
 const handlePlaced = () => {
   clearPlacement();
   clearRegionRequest();
+};
+
+// Content › Clock bar info and Pages & regions both link to the popup; the
+// query flag lets a deep link open it straight away.
+watch(
+  () => route?.query?.editClockBar,
+  value => {
+    if (value !== "1") return;
+    clockEditorOpen.value = true;
+    const { editClockBar: _editClockBar, ...rest } = route.query || {};
+    router.replace({ query: rest });
+  },
+  { immediate: true }
+);
+
+const openRegionsFromClockBar = () => {
+  clockEditorOpen.value = false;
+  editorOpen.value = true;
 };
 
 // "Open Screens": the same destination as the old Controls deep link. On a

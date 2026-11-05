@@ -54,6 +54,14 @@ export const settingsCategoryAliases = {
   kiosks: "screens",
 };
 
+// The clock bar editor merged three destinations (§5). Old ids still resolve to
+// the one section, so bookmarks and saved searches keep working.
+export const settingsDestinationAliases = {
+  "clock-bar-appearance": "clock-bar-design",
+  "clock-bar-layout": "clock-bar-design",
+  "clock-bar-items": "clock-bar-design",
+};
+
 export const settingsDestinations = [
   {
     // The Default screen (Default-is-a-screen §7): old "All screens" words are
@@ -212,39 +220,35 @@ export const settingsDestinations = [
     ],
   },
   {
-    id: "clock-bar-appearance",
-    label: "Clock",
-    path: "Dashboard / Clock",
+    // One Clock bar section replaced Clock, Clock bar layout and Clock bar
+    // items (§5). Every old keyword stays, and the old ids resolve here through
+    // settingsDestinationAliases, so a saved search or deep link still lands.
+    id: "clock-bar-design",
+    label: "Clock bar",
+    path: "Dashboard / Clock bar",
     category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "clock",
+    section: "clock-bar",
     keywords: [
       "clock",
       "clock bar",
+      "clock bar appearance",
+      "clock bar layout",
+      "clock bar items",
       "status bar",
       "date",
       "seconds",
-      "weather",
-      "font",
-      "logo",
-      "position",
-    ],
-  },
-  {
-    id: "clock-bar-items",
-    label: "Clock bar items",
-    path: "Dashboard / Clock bar items",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "bar-items",
-    keywords: [
-      "clock bar",
-      "status bar",
+      "two lines",
       "tiles",
       "items",
       "components",
       "plugins",
+      "plugin tiles",
       "weather tile",
+      "logo",
+      "size",
+      "font",
+      "position",
+      "edit clock bar",
     ],
   },
   {
@@ -531,7 +535,11 @@ export const isKnownSettingsCategory = categoryId =>
   normalizeSettingsCategoryId(categoryId) !== null;
 
 export const getSettingDestinationById = destinationId =>
-  settingsDestinations.find(destination => destination.id === destinationId);
+  settingsDestinations.find(
+    destination =>
+      destination.id === destinationId ||
+      destination.id === settingsDestinationAliases[destinationId]
+  );
 
 export const getSettingsDestinationSearchText = destination =>
   [destination.label, destination.path, ...(destination.keywords || [])].join(" ").toLowerCase();

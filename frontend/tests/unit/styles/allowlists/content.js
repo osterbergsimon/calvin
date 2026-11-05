@@ -14,7 +14,6 @@ export const roleLint = {
     "components/EventDetailPanel.vue",
     "components/WebServiceViewer.vue",
     "components/service/IframeViewer.vue",
-    "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
   ],
   baseline: [
     "components/BarLogo.vue",
@@ -27,7 +26,6 @@ export const roleLint = {
     "components/settings/specialized/ProviderPicker.vue",
     "components/settings/specialized/SourceList.vue",
     "components/settings/specialized/WhereItShows.vue",
-    "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
     "components/settings/tabs/content/CalendarSourcesTab.vue",
     "components/settings/tabs/content/ClockBarSources.vue",
     "components/settings/tabs/content/PhotoUpload.vue",
@@ -36,25 +34,19 @@ export const roleLint = {
 };
 
 export const controlLint = {
-  allowlist: [
-    "components/service/IframeViewer.vue",
-    "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
-  ],
+  allowlist: ["components/service/IframeViewer.vue"],
   baseline: [
     "components/service/IframeViewer.vue",
     "components/settings/specialized/SourceList.vue",
-    "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
     "components/settings/tabs/content/CalendarSourcesTab.vue",
     "components/settings/tabs/content/PhotoUpload.vue",
   ],
 };
 
 export const settingsNoStyle = {
-  allowlist: ["components/settings/tabs/clock-bar/ClockBarItemsTab.vue"],
+  allowlist: [],
   baseline: [
-    "components/settings/categories/ClockBarSections.vue",
     "components/settings/categories/ContentSettings.vue",
-    "components/settings/tabs/clock-bar/ClockBarItemsTab.vue",
     "components/settings/tabs/content/CalendarSourcesTab.vue",
     "components/settings/tabs/content/ClockBarSources.vue",
     "components/settings/tabs/content/ImagesTab.vue",

@@ -320,8 +320,10 @@ watch(activeCategory, async () => {
 const SECTION_BY_CATEGORY_TAB = {
   dashboard: {
     regions: "regions",
-    clock: "clock-bar-clock",
-    "bar-items": "clock-bar-items",
+    clock: "clock-bar",
+    "bar-items": "clock-bar",
+    "clock-bar": "clock-bar",
+    "clock-bar-design": "clock-bar",
     "kiosk-touch-focus": "kiosk-touch-focus",
   },
   content: {
