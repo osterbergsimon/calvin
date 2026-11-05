@@ -212,9 +212,12 @@ export const settingsDestinations = [
     ],
   },
   {
-    id: "clock-bar-appearance",
-    label: "Clock",
-    path: "Dashboard / Clock",
+    // One destination for the one clock bar section. The old ids
+    // (clock-bar-appearance / -layout / -items) stay as aliases so an old
+    // search word or deep link still lands here (§5).
+    id: "clock-bar",
+    label: "Clock bar",
+    path: "Dashboard / Clock bar",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "clock",
@@ -228,23 +231,17 @@ export const settingsDestinations = [
       "font",
       "logo",
       "position",
-    ],
-  },
-  {
-    id: "clock-bar-items",
-    label: "Clock bar items",
-    path: "Dashboard / Clock bar items",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "bar-items",
-    keywords: [
-      "clock bar",
-      "status bar",
+      "appearance",
+      "layout",
+      "two lines",
+      "clock bar items",
       "tiles",
       "items",
       "components",
       "plugins",
+      "plugin tiles",
       "weather tile",
+      "size",
     ],
   },
   {
@@ -521,6 +518,14 @@ export const settingsDestinations = [
   },
 ];
 
+// Old destination ids keep working: a saved link or a search habit lands on the
+// section that replaced them.
+const SETTINGS_DESTINATION_ALIASES = {
+  "clock-bar-appearance": "clock-bar",
+  "clock-bar-layout": "clock-bar",
+  "clock-bar-items": "clock-bar",
+};
+
 export const normalizeSettingsCategoryId = categoryId => {
   if (typeof categoryId !== "string") return null;
   const resolved = settingsCategoryAliases[categoryId] ?? categoryId;
@@ -530,8 +535,10 @@ export const normalizeSettingsCategoryId = categoryId => {
 export const isKnownSettingsCategory = categoryId =>
   normalizeSettingsCategoryId(categoryId) !== null;
 
-export const getSettingDestinationById = destinationId =>
-  settingsDestinations.find(destination => destination.id === destinationId);
+export const getSettingDestinationById = destinationId => {
+  const resolved = SETTINGS_DESTINATION_ALIASES[destinationId] ?? destinationId;
+  return settingsDestinations.find(destination => destination.id === resolved);
+};
 
 export const getSettingsDestinationSearchText = destination =>
   [destination.label, destination.path, ...(destination.keywords || [])].join(" ").toLowerCase();

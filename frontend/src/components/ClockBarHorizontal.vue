@@ -17,6 +17,7 @@
           `clock-bar-${zoneKey}`,
           { 'clock-bar-content': zoneKey === 'center', 'clock-bar-side': zoneKey !== 'center' },
         ]"
+        :data-drop-zone="zoneKey"
       >
         <template v-for="(item, itemIndex) in zoneItems[zoneKey]" :key="`${item.id}-${itemIndex}`">
           <div v-if="item.kind === 'pair'" class="clock-bar-time-stack">
@@ -118,6 +119,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  alwaysShow: {
+    type: Boolean,
+    default: false,
+  },
   // The editor draws the same component with its own resolved shape, sample
   // values and selectable chips.
   design: {
@@ -134,32 +139,6 @@ const props = defineProps({
   },
   selectedPart: {
     type: String,
-    default: null,
-  },
-  // Retired preview overrides, kept while ClockBarPreview still mounts. The
-  // dashboard never passed them; the design replaces them.
-  previewMode: {
-    type: Boolean,
-    default: false,
-  },
-  previewTimeSize: {
-    type: Number,
-    default: null,
-  },
-  previewDateSize: {
-    type: Number,
-    default: null,
-  },
-  previewLayout: {
-    type: String,
-    default: null,
-  },
-  previewPadding: {
-    type: Number,
-    default: null,
-  },
-  previewPluginItemSize: {
-    type: Number,
     default: null,
   },
 });
@@ -186,12 +165,7 @@ const {
   enabled: () => props.enabled,
   showInKiosk: () => props.showInKiosk,
   showInNonKiosk: () => props.showInNonKiosk,
-  previewMode: () => props.previewMode,
-  previewTimeSize: () => props.previewTimeSize,
-  previewDateSize: () => props.previewDateSize,
-  previewLayout: () => props.previewLayout,
-  previewPadding: () => props.previewPadding,
-  previewPluginItemSize: () => props.previewPluginItemSize,
+  alwaysShow: () => props.alwaysShow,
   orientation: () => "horizontal",
   design: () => bar.value,
 });
@@ -351,13 +325,13 @@ onMounted(() => {
    scrolled sideways, cutting the clock (CLV-66). The room name is the least
    load-bearing piece there and still shows in Settings. */
 @media (--bp-phone) {
-  .clock-bar-horizontal .clock-bar-room {
+  .clock-bar-horizontal :deep(.clock-bar-room) {
     display: none;
   }
   /* Screen dots are 44px touch targets each and cannot shrink; at 390px they
      ran under the centred time ("●15:31"). Below the phone breakpoint the dots
      give way so the clock keeps its own room. */
-  .clock-bar-horizontal .screen-dots {
+  .clock-bar-horizontal :deep(.screen-dots) {
     display: none;
   }
   .clock-bar-outer {

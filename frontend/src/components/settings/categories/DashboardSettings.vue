@@ -21,8 +21,16 @@
       />
     </SettingsSection>
 
-    <!-- CLOCK BAR (moved from the retired Clock Bar category) -->
-    <ClockBarSections :config="config" @update:config="patch => emit('update:config', patch)" />
+    <!-- CLOCK BAR: one section with a live preview and the design editor. -->
+    <SettingsSection id="clock-bar" title="Clock bar">
+      <ClockBarOverview :config="config" @edit="clockEditorOpen = true" />
+      <ClockBarEditor
+        :config="config"
+        :open="clockEditorOpen"
+        @update:config="patch => emit('update:config', patch)"
+        @close="clockEditorOpen = false"
+      />
+    </SettingsSection>
 
     <!-- The moved groups: one line where they used to be (§4). -->
     <InlineNote class="dashboard-signpost" data-test="dashboard-screen-signpost">
@@ -57,7 +65,8 @@ import InlineNote from "@/components/ui/InlineNote.vue";
 import Button from "@/components/ui/Button.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
+import ClockBarOverview from "@/components/settings/shared/ClockBarOverview.vue";
+import ClockBarEditor from "@/components/settings/shared/ClockBarEditor.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
@@ -75,6 +84,9 @@ const emit = defineEmits(["update:config"]);
 // attribute quoting.
 
 const editorOpen = ref(false);
+// The clock bar editor: opened by its section or by a link from Content /
+// Pages & regions (`?setting=clock-bar&edit=clock-bar`).
+const clockEditorOpen = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { placement, clearPlacement } = usePlacementRequest();
@@ -103,6 +115,15 @@ watch(
   () => regionRequest.value,
   next => {
     if (next) editorOpen.value = true;
+  },
+  { immediate: true }
+);
+
+// Content › Clock bar info and Pages & regions › Clock bar panel link here.
+watch(
+  () => route?.query?.edit,
+  next => {
+    if (next === "clock-bar") clockEditorOpen.value = true;
   },
   { immediate: true }
 );

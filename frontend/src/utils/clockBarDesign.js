@@ -148,12 +148,6 @@ const removeToken = (zones, token) => {
   }
 };
 
-const addToken = (zones, zone, token) => {
-  if (!zones[zone]) return;
-  if (zones[zone].includes(token)) return;
-  zones[zone].push(token);
-};
-
 const normalizeSizeValue = (value, table, allowed) => {
   if (typeof value === "number" && Number.isFinite(value)) {
     const rounded = Math.round(value);

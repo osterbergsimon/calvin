@@ -13,6 +13,7 @@
       :key="zoneKey"
       class="clock-bar-zone"
       :class="[`clock-bar-${zoneKey}`, { 'clock-bar-content': zoneKey === 'middle' }]"
+      :data-drop-zone="zoneKey"
     >
       <template v-for="(item, itemIndex) in zoneItems[zoneKey]" :key="`${item.id}-${itemIndex}`">
         <div v-if="item.kind === 'pair'" class="clock-bar-time-stack">
@@ -111,6 +112,10 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  alwaysShow: {
+    type: Boolean,
+    default: false,
+  },
   design: {
     type: Object,
     default: null,
@@ -125,31 +130,6 @@ const props = defineProps({
   },
   selectedPart: {
     type: String,
-    default: null,
-  },
-  // Retired preview overrides, kept while ClockBarPreview still mounts.
-  previewMode: {
-    type: Boolean,
-    default: false,
-  },
-  previewTimeSize: {
-    type: Number,
-    default: null,
-  },
-  previewDateSize: {
-    type: Number,
-    default: null,
-  },
-  previewLayout: {
-    type: String,
-    default: null,
-  },
-  previewPadding: {
-    type: Number,
-    default: null,
-  },
-  previewPluginItemSize: {
-    type: Number,
     default: null,
   },
 });
@@ -176,12 +156,7 @@ const {
   enabled: () => props.enabled,
   showInKiosk: () => props.showInKiosk,
   showInNonKiosk: () => props.showInNonKiosk,
-  previewMode: () => props.previewMode,
-  previewTimeSize: () => props.previewTimeSize,
-  previewDateSize: () => props.previewDateSize,
-  previewLayout: () => props.previewLayout,
-  previewPadding: () => props.previewPadding,
-  previewPluginItemSize: () => props.previewPluginItemSize,
+  alwaysShow: () => props.alwaysShow,
   orientation: () => "vertical",
   design: () => bar.value,
 });

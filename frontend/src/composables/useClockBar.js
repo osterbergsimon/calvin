@@ -9,6 +9,7 @@ import { useConfigStore } from "../stores/config";
  * @param {() => boolean} opts.showInKiosk     Show when UI is hidden.
  * @param {() => boolean} opts.showInNonKiosk  Show when UI is visible.
  * @param {() => boolean} [opts.previewMode]   When true, always show and use preview overrides.
+ * @param {() => boolean} [opts.alwaysShow]    Show even when the dashboard would hide it.
  * @param {() => number|null} [opts.previewTimeSize]
  * @param {() => number|null} [opts.previewDateSize]
  * @param {() => string|null} [opts.previewLayout]
@@ -31,6 +32,7 @@ export function useClockBar(opts) {
   const design = computed(() => get(opts.design, null));
 
   const shouldShow = computed(() => {
+    if (get(opts.alwaysShow, false)) return true;
     if (isPreview.value) return true;
     if (!get(opts.enabled, true)) return false;
     if (get(opts.showInNonKiosk, false) && configStore.shouldShowUI) return true;
