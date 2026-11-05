@@ -868,15 +868,6 @@ class BrightnessController:
             )
         return outcome
 
-    def _wake(self, settings, dim, cancel):
-        """Settle after a real panel power-on, then ramp to the chosen level."""
-        self._ramp(
-            brightness_target(settings, self.fault_ceiling),
-            cancel=cancel,
-            stop_on_fault=True,
-        )
-        return None
-
     def _sleep_standby(self, settings, cancel):
         """Dim first (when the ramp is on), then run the normal off."""
         if settings["enabled"] and self.level > 0:
@@ -1461,7 +1452,6 @@ def recover_display_check(
         _clear_state(path)
         return None
     settings = brightness_settings(cfg)
-    step = _as_int(state.get("step"))
     last_level = _as_int(state.get("level"))
     limit = _as_int(state.get("limit"))
     if state.get("step") == "limit" and limit is None and last_level is not None:
@@ -1717,7 +1707,7 @@ def run(
                     ddc=controller.ddc,
                     report=lambda payload: post_display_check(backend_url, payload),
                     controller=controller,
-                    panel_on=lambda: desired_on(cfg, now_in(cfg)),
+                    panel_on=lambda cfg=cfg: desired_on(cfg, now_in(cfg)),
                 )
                 recovered = True
             job = display_check_job(cfg)
