@@ -239,3 +239,28 @@ Public (no session; the kiosk's own traffic, like the config poll):
 The job reaches the agent as `displayCheck` (and `display_check`) on `GET /kiosks/{id}/config`, exactly the shape in
 PR #320 (`id`, `step`, `action`, `value`, `brightness`), present only while the run is `active`. The panel itself can
 call the public endpoints but not the admin ones without signing in.
+
+### 10.3 Findings (kept across runs)
+
+Only the latest run record is stored, so a later conversion or limit run would erase the detect and write verdicts.
+The backend therefore also keeps a per-kiosk **findings** object, updated from each finished run's report and never
+cleared by a later run. It is returned as `displayCheck` on every row of `GET /kiosks` and as `findings` next to `run`
+on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not checked yet.
+
+```json
+{ "checkedAt": "ISO-8601|null", "ddc": true, "writes": true, "model": "NOMAD TOUCH",
+  "connector": "card0-HDMI-A-1", "vcpVersion": "2.1", "limit": 26 }
+```
+
+- `detect` done: `ddc` true and `model`, `connector`, `vcpVersion` from the report's `info`; `detect` error: `ddc` false.
+- `write` done: `writes` true; `write` error: `writes` false.
+- `limit` done with a `limit`: `limit` set. A limit run that found none leaves the earlier `limit` alone.
+- `asleep`, `stopped`, `interrupted`, `timeout` and `running` change nothing.
+- `checkedAt` is the finish time of the last run that changed a field.
+- **`writes` is decided by the owner** (step 2). `POST /kiosks/{id}/display-check/verdict` (admin) takes
+  `{"writes": true|false}` ("Yes, it changed" / "No, it looked the same"), sets `findings.writes` and `checkedAt`, and
+  returns the findings object. It overrides the agent's own `write` verdict and leaves the other fields alone. 404
+  for an unknown kiosk, 422 for a missing or non-boolean `writes`.
+- **No `placeholderReads` field.** The merged agent's `detect` report does not say whether its reads are
+  placeholders, so the backend does not invent it. The UI can show the "screen always reports 0" line only if the
+  agent reports it in a later version.

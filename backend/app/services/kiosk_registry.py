@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
 from app.models.db_models import KioskDB
 from app.schemas.config_update import sanitize_overrides
+from app.services import display_check
 from app.utils.db_retry import retry_on_db_locked
 from app.utils.utc import as_utc, utcnow
 
@@ -226,6 +227,7 @@ async def list_kiosks() -> list[dict]:
             "overrides": public_overrides(row.overrides),
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
+            "displayCheck": display_check.findings_view(row.display_check_findings),
         }
         for row in rows
     ]

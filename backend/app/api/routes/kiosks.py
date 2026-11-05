@@ -121,7 +121,10 @@ async def get_display_check(kiosk_id: str):
     _valid_id_or_400(kiosk_id)
     if await get_overrides(kiosk_id) is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    return {"run": await display_check.get_run_view(kiosk_id)}
+    return {
+        "run": await display_check.get_run_view(kiosk_id),
+        "findings": await display_check.get_findings(kiosk_id),
+    }
 
 
 @router.post("/kiosks/{kiosk_id}/display-check/start")
@@ -174,6 +177,16 @@ async def save_display_check_limit(kiosk_id: str):
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     logger.info(f"Saved brightness limit {limit} for kiosk {kiosk_id!r}")
     return {"id": kiosk_id, "brightnessLimit": limit, "overrides": public_overrides(overrides)}
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/verdict")
+async def post_display_check_verdict(kiosk_id: str, body: display_check.VerdictRequest):
+    """The owner's answer to "did the screen change?" (admin). Returns the findings."""
+    _valid_id_or_400(kiosk_id)
+    try:
+        return await display_check.set_writes_verdict(kiosk_id, body.writes)
+    except display_check.UnknownKioskError:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
 
 
 @router.post("/kiosks/{kiosk_id}/display-check")

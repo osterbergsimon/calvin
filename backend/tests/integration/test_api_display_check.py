@@ -48,7 +48,7 @@ def test_start_validates_the_request(test_client: TestClient, kiosk):
     assert _start(test_client, "explode").status_code == 422
     assert _start(test_client, "conversion", value=101).status_code == 422
     assert _start(test_client, "detect", surprise=1).status_code == 422
-    assert test_client.get(BASE).json() == {"run": None}
+    assert test_client.get(BASE).json()["run"] is None
 
 
 @pytest.mark.integration
@@ -243,3 +243,135 @@ def test_save_limit_needs_a_finished_limit_run_with_a_limit(test_client: TestCli
     other = _start(test_client, "detect").json()
     _report(test_client, other["id"], "done", limit=30)
     assert test_client.post(f"{BASE}/save-limit").status_code == 409  # not a limit step
+
+
+EMPTY_FINDINGS = {
+    "checkedAt": None,
+    "ddc": None,
+    "writes": None,
+    "model": None,
+    "connector": None,
+    "vcpVersion": None,
+    "limit": None,
+}
+
+
+def _findings(client: TestClient) -> dict:
+    listed = client.get("/api/kiosks").json()["kiosks"]
+    return next(k for k in listed if k["id"] == KIOSK)["displayCheck"]
+
+
+@pytest.mark.integration
+def test_findings_start_empty(test_client: TestClient, kiosk):
+    assert _findings(test_client) == EMPTY_FINDINGS
+    assert test_client.get(BASE).json()["findings"] == EMPTY_FINDINGS
+
+
+@pytest.mark.integration
+def test_findings_survive_later_runs(test_client: TestClient, kiosk):
+    detect = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        detect["id"],
+        "done",
+        info={
+            "bus": 2,
+            "model": "NOMAD TOUCH",
+            "connector": "card0-HDMI-A-1",
+            "vcp_version": "2.1",
+        },
+    )
+    found = _findings(test_client)
+    assert found["ddc"] is True
+    assert found["model"] == "NOMAD TOUCH"
+    assert found["connector"] == "card0-HDMI-A-1"
+    assert found["vcpVersion"] == "2.1"
+    assert found["writes"] is None
+    assert found["checkedAt"]
+
+    write = _start(test_client, "write").json()
+    _report(test_client, write["id"], "done", level=19)
+    assert _findings(test_client)["writes"] is True
+
+    limit = _start(test_client, "limit").json()
+    _report(test_client, limit["id"], "done", limit=26)
+    found = _findings(test_client)
+    assert found["limit"] == 26
+    # The latest run is now the limit run, but the earlier verdicts stay.
+    assert (found["ddc"], found["writes"], found["model"]) == (True, True, "NOMAD TOUCH")
+    assert test_client.get(BASE).json()["findings"] == found
+
+
+@pytest.mark.integration
+def test_failed_runs_record_a_negative_verdict(test_client: TestClient, kiosk):
+    detect = _start(test_client, "detect").json()
+    _report(test_client, detect["id"], "error", detail="no display answered DDC/CI")
+    assert _findings(test_client)["ddc"] is False
+
+    write = _start(test_client, "write").json()
+    _report(test_client, write["id"], "error")
+    assert _findings(test_client)["writes"] is False
+
+
+@pytest.mark.integration
+def test_unfinished_runs_do_not_touch_findings(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "running")
+    for status in ("asleep", "stopped", "interrupted", "timeout"):
+        _report(test_client, run["id"], status)
+        run = _start(test_client, "write").json()
+    assert _findings(test_client) == EMPTY_FINDINGS
+
+
+@pytest.mark.integration
+def test_limit_run_without_a_limit_keeps_the_old_one(test_client: TestClient, kiosk):
+    first = _start(test_client, "limit").json()
+    _report(test_client, first["id"], "done", limit=26)
+    second = _start(test_client, "limit").json()
+    _report(test_client, second["id"], "done", detail="reached 100 with no fault")
+    assert _findings(test_client)["limit"] == 26
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_verdict_needs_admin(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/verdict", json={"writes": True}).status_code == 401
+
+
+@pytest.mark.integration
+def test_owner_verdict_sets_writes_and_checked_at(test_client: TestClient, kiosk):
+    write = _start(test_client, "write").json()
+    _report(test_client, write["id"], "done", level=19)
+    assert _findings(test_client)["writes"] is True  # the agent's own verdict
+
+    resp = test_client.post(f"{BASE}/verdict", json={"writes": False})
+    assert resp.status_code == 200, resp.text
+    found = _findings(test_client)
+    assert found["writes"] is False  # the owner has the last word
+    assert found["checkedAt"]
+    assert resp.json() == found
+
+    assert test_client.post(f"{BASE}/verdict", json={"writes": True}).json()["writes"] is True
+    assert _findings(test_client)["writes"] is True
+
+
+@pytest.mark.integration
+def test_verdict_keeps_the_other_findings(test_client: TestClient, kiosk):
+    detect = _start(test_client, "detect").json()
+    _report(test_client, detect["id"], "done", info={"model": "NOMAD TOUCH"})
+    test_client.post(f"{BASE}/verdict", json={"writes": True})
+    found = _findings(test_client)
+    assert (found["ddc"], found["model"], found["writes"]) == (True, "NOMAD TOUCH", True)
+
+
+@pytest.mark.integration
+def test_verdict_is_validated(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/verdict", json={}).status_code == 422
+    assert test_client.post(f"{BASE}/verdict", json={"writes": "maybe"}).status_code == 422
+    assert test_client.post(f"{BASE}/verdict", json={"writes": True, "x": 1}).status_code == 422
+    assert (
+        test_client.post(
+            "/api/kiosks/nobody-here/display-check/verdict", json={"writes": True}
+        ).status_code
+        == 404
+    )

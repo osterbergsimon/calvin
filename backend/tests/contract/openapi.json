@@ -2085,6 +2085,20 @@
         ],
         "title": "ValidationError",
         "type": "object"
+      },
+      "VerdictRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "writes": {
+            "title": "Writes",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "writes"
+        ],
+        "title": "VerdictRequest",
+        "type": "object"
       }
     }
   },
@@ -4644,6 +4658,57 @@
           }
         },
         "summary": "Stop Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/verdict": {
+      "post": {
+        "description": "The owner's answer to \"did the screen change?\" (admin). Returns the findings.",
+        "operationId": "post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerdictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Verdict",
         "tags": [
           "kiosks"
         ]
