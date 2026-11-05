@@ -12,287 +12,304 @@
       Look at {{ screenName }} while you answer. You can do this from your phone.
     </template>
 
-    <ol v-if="!readOnlyView" class="dcheck__strip" aria-label="Steps">
-      <li
-        v-for="item in STEPS"
-        :key="item.n"
-        class="dcheck__strip-item"
-        :class="{
-          'dcheck__strip-item--done': stepNumber > item.n || view === 'finish',
-          'dcheck__strip-item--now': stepNumber === item.n && view !== 'finish',
-        }"
-        :aria-current="stepNumber === item.n && view !== 'finish' ? 'step' : undefined"
-      >
-        {{ item.n }} · {{ item.label }}<template v-if="item.optional"> (optional)</template>
-      </li>
-    </ol>
+    <div class="dcheck__sheet" :class="{ 'dcheck__sheet--full': phone }">
+      <ol v-if="!readOnlyView" class="dcheck__strip" aria-label="Steps">
+        <li
+          v-for="item in STEPS"
+          :key="item.n"
+          class="dcheck__strip-item"
+          :class="{
+            'dcheck__strip-item--done': stepNumber > item.n || view === 'finish',
+            'dcheck__strip-item--now': stepNumber === item.n && view !== 'finish',
+          }"
+          :aria-current="stepNumber === item.n && view !== 'finish' ? 'step' : undefined"
+        >
+          {{ item.n }} · {{ item.label }}<template v-if="item.optional"> (optional)</template>
+        </li>
+      </ol>
 
-    <div class="dcheck__body" data-test="check-step-body">
-      <!-- Read-only: another device owns the run -->
-      <template v-if="view === 'readonly'">
-        <p class="dcheck__lead" data-test="check-readonly">
-          A check is running from another device
-        </p>
-        <p class="dcheck__sub">
-          Step: {{ stepLabel(check.run.value?.step)
-          }}<template v-if="check.run.value?.level != null">
-            · level {{ check.run.value.level }}
-          </template>
-        </p>
-        <ul v-if="logLines.length" class="dcheck__log">
-          <li v-for="(line, i) in logLines" :key="i">{{ line }}</li>
-        </ul>
-      </template>
-
-      <!-- The screen is asleep -->
-      <template v-else-if="view === 'asleep'">
-        <InlineNote tone="warn" data-test="check-asleep">
-          {{ screenName }} is asleep. Turn it on now to check it.
-        </InlineNote>
-      </template>
-
-      <!-- An end state -->
-      <template v-else-if="view === 'end'">
-        <InlineNote :tone="ending.tone" data-test="check-end">{{ ending.text }}</InlineNote>
-        <p v-if="ending.hint" class="dcheck__sub">{{ ending.hint }}</p>
-        <Button data-test="check-retry" @click="retry">Try again</Button>
-      </template>
-
-      <!-- Finish -->
-      <template v-else-if="view === 'finish'">
-        <div data-test="check-finish">
-          <p class="dcheck__lead">What Calvin found</p>
-          <ul class="dcheck__found">
-            <li v-if="foundText">✓ Found {{ foundText }}</li>
-            <li v-if="writesVerdict === true">✓ Brightness commands change the screen</li>
-            <li v-if="readings.length >= 2">
-              ✓ Menu match from {{ readings.length }} readings ({{ fitText }})
-            </li>
-            <li v-else>⚠ No menu match, so the slider stays on Calvin's scale</li>
-            <li v-if="limitFound != null">✓ Limit found: {{ limitFound }}</li>
-            <li v-else>⚠ No limit found, so Calvin has no ceiling for this screen</li>
-          </ul>
-          <p v-if="readings.length >= 2" class="dcheck__sub">
-            The Brightness slider now shows the screen's menu numbers.
+      <div class="dcheck__body" data-test="check-step-body">
+        <!-- Read-only: another device owns the run -->
+        <template v-if="view === 'readonly'">
+          <p class="dcheck__lead" data-test="check-readonly">
+            A check is running from another device
           </p>
-          <p v-if="limitFound != null" class="dcheck__sub">
-            <template v-if="limitSaved">Brightness can go up to {{ maxAfter }}.</template>
-            <template v-else>
-              {{ screenName }} is going back to {{ backTo }}. Save the limit so Calvin never goes
-              above it.
+          <p class="dcheck__sub">
+            Step: {{ stepLabel(check.run.value?.step)
+            }}<template v-if="check.run.value?.level != null">
+              · level {{ check.run.value.level }}
             </template>
           </p>
-          <Button
-            v-if="limitFound != null && !limitSaved"
-            variant="primary"
-            data-test="limit-save"
-            :loading="savingLimit"
-            @click="saveLimit"
-          >
-            Save limit {{ limitFound }}
-          </Button>
-        </div>
-      </template>
-
-      <!-- Step 1 -->
-      <template v-else-if="step === 1">
-        <p class="dcheck__lead">Find the display</p>
-        <p class="dcheck__sub">Asking {{ screenName }}'s screen…</p>
-      </template>
-
-      <!-- Step 2 -->
-      <template v-else-if="step === 2">
-        <InlineNote v-if="foundText" tone="ok" data-test="check-found">
-          Found {{ foundText }}.
-          <template v-if="placeholderReads">
-            The screen always reports brightness 0, so Calvin needs your eyes for the next step.
-          </template>
-        </InlineNote>
-        <template v-if="!answerReady">
-          <p class="dcheck__lead">Changing the brightness…</p>
-          <p class="dcheck__sub" role="status">
-            Calvin is stepping {{ screenName }} down and back.
-          </p>
-        </template>
-        <template v-else>
-          <p class="dcheck__lead">
-            Did {{ screenName }} get dimmer for a moment, then brighter again?
-          </p>
-          <p class="dcheck__sub">
-            Calvin stepped it from {{ writeFrom }} down to {{ writeTo }} and back, {{ stepSize }} at
-            a time. That took about {{ writeSeconds }} s.
-          </p>
-          <div class="dcheck__buttons">
-            <Button variant="primary" data-test="writes-yes" @click="answerWrites(true)">
-              Yes, it changed
-            </Button>
-            <Button data-test="writes-no" @click="answerWrites(false)">
-              No, it looked the same
-            </Button>
-            <Button data-test="writes-again" @click="again">Show me again</Button>
-          </div>
-        </template>
-      </template>
-
-      <!-- Step 3 -->
-      <template v-else-if="step === 3">
-        <p class="dcheck__lead">Match the screen's menu</p>
-        <template v-if="readyForReading">
-          <p class="dcheck__sub">
-            Calvin set {{ screenName }} to {{ pointShown }}. Open the screen's own menu (the buttons
-            on the screen) and type the Brightness it shows.
-          </p>
-          <div class="dcheck__reading">
-            <input
-              v-model="readingText"
-              class="dcheck__input"
-              data-test="reading-input"
-              type="text"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              aria-label="Brightness shown in the screen's menu"
-              @keyup.enter="saveReading"
-            />
-            <Button
-              variant="primary"
-              data-test="reading-save"
-              :disabled="!readingValid"
-              @click="saveReading"
-            >
-              Save reading
-            </Button>
-          </div>
-        </template>
-        <p v-else class="dcheck__sub" role="status">
-          Setting {{ screenName }} to {{ pendingPoint ?? "…" }}…
-        </p>
-
-        <table v-if="readings.length" class="dcheck__table">
-          <thead>
-            <tr>
-              <th>Calvin value</th>
-              <th>Screen's menu</th>
-              <th><span class="dcheck__sr">Remove</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(point, i) in readings" :key="point.ddc">
-              <td>{{ point.ddc }}</td>
-              <td>{{ point.menu }}</td>
-              <td>
-                <Button variant="link" :data-test="`reading-remove-${i}`" @click="removeReading(i)">
-                  Remove
-                </Button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <InlineNote v-if="fitText" :tone="outlier ? 'warn' : 'neutral'" data-test="check-fit">
-          <template v-if="outlier">These readings don't line up. Check the last one. </template>
-          With {{ readings.length }} readings: {{ fitText }}.
-          <template v-if="readings.length < 3">Add a third reading to check it.</template>
-        </InlineNote>
-        <div class="dcheck__buttons">
-          <Button
-            data-test="check-add"
-            :disabled="!readyForReading || nextPoint == null"
-            @click="startConversion"
-          >
-            Add a reading
-          </Button>
-          <Button
-            variant="primary"
-            data-test="check-next"
-            :disabled="readings.length < 2"
-            @click="goStep4"
-          >
-            Next
-          </Button>
-          <Button variant="link" data-test="check-skip" @click="goStep4">Skip this step</Button>
-        </div>
-      </template>
-
-      <!-- Step 4 -->
-      <template v-else-if="step === 4">
-        <template v-if="!limitRunning">
-          <p class="dcheck__lead">Find the safe limit</p>
-          <p class="dcheck__sub">
-            Calvin raises the brightness until the power supply shows trouble. Then it steps back
-            down and remembers that level as {{ screenName }}'s limit. Calvin never goes above it.
-          </p>
-          <InlineNote tone="warn">
-            While it runs, the screen may flicker, its touch may stop for a few seconds, and in the
-            worst case it may restart.
-          </InlineNote>
-          <InlineNote v-if="onPanel" tone="err" data-test="limit-on-panel">
-            You're on {{ screenName }} itself. Run this step from your phone or computer, because
-            the touch screen can stop responding mid-test.
-          </InlineNote>
-          <div class="dcheck__buttons">
-            <Button v-if="!onPanel" variant="primary" data-test="limit-start" @click="startLimit">
-              Start the test
-            </Button>
-            <Button data-test="limit-skip" @click="goFinish">Skip, finish</Button>
-          </div>
-        </template>
-        <template v-else>
-          <div class="dcheck__level" data-test="limit-level" aria-live="off">
-            <strong>{{ check.run.value?.level ?? 0 }}</strong>
-            <span class="dcheck__bar" aria-hidden="true">
-              <span class="dcheck__bar-fill" :style="{ width: `${barPercent}%` }" />
-              <span
-                v-if="check.run.value?.limit != null"
-                class="dcheck__bar-limit"
-                data-test="limit-marker"
-                :style="{ left: `${check.run.value.limit}%` }"
-              />
-            </span>
-          </div>
-          <p class="dcheck__sub" role="status">
-            Raising {{ stepSize }} every {{ stepSeconds }} s and watching for power trouble
-          </p>
-          <ul class="dcheck__log" data-test="limit-log" aria-label="Test log">
+          <ul v-if="logLines.length" class="dcheck__log">
             <li v-for="(line, i) in logLines" :key="i">{{ line }}</li>
           </ul>
-          <InlineNote v-if="check.run.value?.limit != null" tone="warn">
-            Limit found: {{ check.run.value.limit }}. {{ screenName }} is going back to
-            {{ backTo }}. If this page closes, {{ screenName }} finishes safely on its own.
+        </template>
+
+        <!-- The screen is asleep -->
+        <template v-else-if="view === 'asleep'">
+          <InlineNote tone="warn" data-test="check-asleep">
+            {{ screenName }} is asleep. Turn it on now to check it.
           </InlineNote>
-          <Button
-            class="dcheck__stop"
-            variant="danger"
-            data-test="limit-stop"
-            @click="check.stop()"
-          >
-            Stop now
-          </Button>
+          <div class="dcheck__buttons">
+            <Button
+              v-if="asleep"
+              variant="primary"
+              data-test="check-turn-on"
+              @click="emit('turn-on')"
+            >
+              Turn on now
+            </Button>
+            <Button v-else data-test="check-retry" @click="retry">Try again</Button>
+          </div>
         </template>
-      </template>
 
-      <InlineNote
-        v-if="view !== 'readonly' && check.silence.value === 'waiting'"
-        data-test="check-silence"
-      >
-        Waiting for {{ screenName }}…
-      </InlineNote>
-      <InlineNote
-        v-else-if="check.silence.value === 'silent'"
-        tone="warn"
-        data-test="check-silence"
-      >
-        {{ screenName }} isn't answering. Is it on and online?
-        <template #action>
-          <Button variant="link" data-test="check-silence-retry" @click="retry">Try again</Button>
+        <!-- An end state -->
+        <template v-else-if="view === 'end'">
+          <InlineNote :tone="ending.tone" data-test="check-end">{{ ending.text }}</InlineNote>
+          <p v-if="ending.hint" class="dcheck__sub">{{ ending.hint }}</p>
+          <Button data-test="check-retry" @click="retry">Try again</Button>
         </template>
-      </InlineNote>
-      <InlineNote v-if="check.error.value" tone="err" role="alert">
-        {{ check.error.value }}
-      </InlineNote>
 
-      <p class="dcheck__fine">
-        "Turn off now" or a schedule off while a check is running waits until the check ends (up to
-        10 min).
-      </p>
+        <!-- Finish -->
+        <template v-else-if="view === 'finish'">
+          <div data-test="check-finish">
+            <p class="dcheck__lead">What Calvin found</p>
+            <ul class="dcheck__found">
+              <li v-if="foundText">✓ Found {{ foundText }}</li>
+              <li v-if="writesVerdict === true">✓ Brightness commands change the screen</li>
+              <li v-if="readings.length >= 2">
+                ✓ Menu match from {{ readings.length }} readings ({{ fitText }})
+              </li>
+              <li v-else>⚠ No menu match, so the slider stays on Calvin's scale</li>
+              <li v-if="limitFound != null">✓ Limit found: {{ limitFound }}</li>
+              <li v-else>⚠ No limit found, so Calvin has no ceiling for this screen</li>
+            </ul>
+            <p v-if="readings.length >= 2" class="dcheck__sub">
+              The Brightness slider now shows the screen's menu numbers.
+            </p>
+            <p v-if="limitFound != null && limitSaved" class="dcheck__sub" data-test="limit-saved">
+              Saved. Brightness can go up to {{ maxAfter }}.
+            </p>
+            <p v-else-if="limitFound != null && limitSaveFailed" class="dcheck__sub">
+              Couldn't save the limit the usual way. Calvin applied it as a setting for now, so the
+              Brightness slider stops below it.
+            </p>
+            <Button
+              v-if="limitFound != null && limitSaveFailed && !limitSaved"
+              variant="primary"
+              data-test="limit-save"
+              :loading="savingLimit"
+              @click="saveLimit"
+            >
+              Try saving again
+            </Button>
+          </div>
+        </template>
+
+        <!-- Step 1 -->
+        <template v-else-if="step === 1">
+          <p class="dcheck__lead">Find the display</p>
+          <p class="dcheck__sub">Asking {{ screenName }}'s screen…</p>
+        </template>
+
+        <!-- Step 2 -->
+        <template v-else-if="step === 2">
+          <InlineNote v-if="foundText" tone="ok" data-test="check-found">
+            Found {{ foundText }}.
+            <template v-if="placeholderReads">
+              The screen always reports brightness 0, so Calvin needs your eyes for the next step.
+            </template>
+          </InlineNote>
+          <template v-if="!answerReady">
+            <p class="dcheck__lead">Changing the brightness…</p>
+            <p class="dcheck__sub" role="status">
+              Calvin is stepping {{ screenName }} down and back.
+            </p>
+          </template>
+          <template v-else>
+            <p class="dcheck__lead">
+              Did {{ screenName }} get dimmer for a moment, then brighter again?
+            </p>
+            <p class="dcheck__sub">
+              Calvin stepped it from {{ writeFrom }} down to {{ writeTo }} and back,
+              {{ stepSize }} at a time. That took about {{ writeSeconds }} s.
+            </p>
+            <div class="dcheck__buttons">
+              <Button variant="primary" data-test="writes-yes" @click="answerWrites(true)">
+                Yes, it changed
+              </Button>
+              <Button data-test="writes-no" @click="answerWrites(false)">
+                No, it looked the same
+              </Button>
+              <Button data-test="writes-again" @click="again">Show me again</Button>
+            </div>
+          </template>
+        </template>
+
+        <!-- Step 3 -->
+        <template v-else-if="step === 3">
+          <p class="dcheck__lead">Match the screen's menu</p>
+          <template v-if="readyForReading">
+            <p class="dcheck__sub">
+              Calvin set {{ screenName }} to {{ pointShown }}. Open the screen's own menu (the
+              buttons on the screen) and type the Brightness it shows.
+            </p>
+            <div class="dcheck__reading">
+              <input
+                v-model="readingText"
+                class="dcheck__input"
+                data-test="reading-input"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                aria-label="Brightness shown in the screen's menu"
+                @keyup.enter="saveReading"
+              />
+              <Button
+                variant="primary"
+                data-test="reading-save"
+                :disabled="!readingValid"
+                @click="saveReading"
+              >
+                Save reading
+              </Button>
+            </div>
+          </template>
+          <p v-else class="dcheck__sub" role="status">
+            Setting {{ screenName }} to {{ pendingPoint ?? "…" }}…
+          </p>
+
+          <table v-if="readings.length" class="dcheck__table">
+            <thead>
+              <tr>
+                <th>Calvin value</th>
+                <th>Screen's menu</th>
+                <th><span class="dcheck__sr">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(point, i) in readings" :key="point.ddc">
+                <td>{{ point.ddc }}</td>
+                <td>{{ point.menu }}</td>
+                <td>
+                  <Button
+                    variant="link"
+                    :data-test="`reading-remove-${i}`"
+                    @click="removeReading(i)"
+                  >
+                    Remove
+                  </Button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <InlineNote v-if="fitText" :tone="outlier ? 'warn' : 'neutral'" data-test="check-fit">
+            <template v-if="outlier">These readings don't line up. Check the last one. </template>
+            With {{ readings.length }} readings: {{ fitText }}.
+            <template v-if="readings.length < 3">Add a third reading to check it.</template>
+          </InlineNote>
+          <div class="dcheck__buttons">
+            <Button
+              data-test="check-add"
+              :disabled="!readyForReading || nextPoint == null"
+              @click="startConversion"
+            >
+              Add a reading
+            </Button>
+            <Button
+              variant="primary"
+              data-test="check-next"
+              :disabled="readings.length < 2"
+              @click="goStep4"
+            >
+              Next
+            </Button>
+            <Button variant="link" data-test="check-skip" @click="goStep4">Skip this step</Button>
+          </div>
+        </template>
+
+        <!-- Step 4 -->
+        <template v-else-if="step === 4">
+          <template v-if="!limitRunning">
+            <p class="dcheck__lead">Find the safe limit</p>
+            <p class="dcheck__sub">
+              Calvin raises the brightness until the power supply shows trouble. Then it steps back
+              down and remembers that level as {{ screenName }}'s limit. Calvin never goes above it.
+            </p>
+            <InlineNote tone="warn">
+              While it runs, the screen may flicker, its touch may stop for a few seconds, and in
+              the worst case it may restart.
+            </InlineNote>
+            <InlineNote v-if="onPanel" tone="err" data-test="limit-on-panel">
+              You're on {{ screenName }} itself. Run this step from your phone or computer, because
+              the touch screen can stop responding mid-test.
+            </InlineNote>
+            <div class="dcheck__buttons">
+              <Button v-if="!onPanel" variant="primary" data-test="limit-start" @click="startLimit">
+                Start the test
+              </Button>
+              <Button data-test="limit-skip" @click="goFinish">Skip, finish</Button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="dcheck__level" data-test="limit-level" aria-live="off">
+              <strong>{{ check.run.value?.level ?? 0 }}</strong>
+              <span class="dcheck__bar" aria-hidden="true">
+                <span class="dcheck__bar-fill" :style="{ width: `${barPercent}%` }" />
+                <span
+                  v-if="check.run.value?.limit != null"
+                  class="dcheck__bar-limit"
+                  data-test="limit-marker"
+                  :style="{ left: `${check.run.value.limit}%` }"
+                />
+              </span>
+            </div>
+            <p class="dcheck__sub" role="status">
+              Raising {{ stepSize }} every {{ stepSeconds }} s and watching for power trouble
+            </p>
+            <ul class="dcheck__log" data-test="limit-log" aria-label="Test log">
+              <li v-for="(line, i) in logLines" :key="i">{{ line }}</li>
+            </ul>
+            <InlineNote v-if="check.run.value?.limit != null" tone="warn">
+              Limit found: {{ check.run.value.limit }}. {{ screenName }} is going back to
+              {{ backTo }}. If this page closes, {{ screenName }} finishes safely on its own.
+            </InlineNote>
+            <Button
+              class="dcheck__stop"
+              variant="danger"
+              data-test="limit-stop"
+              @click="check.stop()"
+            >
+              Stop now
+            </Button>
+          </template>
+        </template>
+
+        <InlineNote
+          v-if="view !== 'readonly' && check.silence.value === 'waiting'"
+          data-test="check-silence"
+        >
+          Waiting for {{ screenName }}…
+        </InlineNote>
+        <InlineNote
+          v-else-if="check.silence.value === 'silent'"
+          tone="warn"
+          data-test="check-silence"
+        >
+          {{ screenName }} isn't answering. Is it on and online?
+          <template #action>
+            <Button variant="link" data-test="check-silence-retry" @click="retry">Try again</Button>
+          </template>
+        </InlineNote>
+        <InlineNote v-if="check.error.value" tone="err" role="alert">
+          {{ check.error.value }}
+        </InlineNote>
+
+        <p class="dcheck__fine">
+          "Turn off now" or a schedule off while a check is running waits until the check ends (up
+          to 10 min).
+        </p>
+      </div>
     </div>
 
     <template #actions>
@@ -339,7 +356,7 @@ const props = defineProps({
   // 1 detect (default), 3 conversion, 4 limit.
   startStep: { type: String, default: "detect" },
 });
-const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "saved-limit"]);
+const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "saved-limit", "turn-on"]);
 
 const STEPS = [
   { n: 1, label: "Find the display" },
@@ -366,6 +383,7 @@ const limitRunning = ref(false);
 const limitFound = ref(null);
 const limitSaved = ref(false);
 const savingLimit = ref(false);
+const limitSaveFailed = ref(false);
 const phone = ref(false);
 const handled = new Set();
 let currentRunId = null;
@@ -456,7 +474,9 @@ function goFinish() {
 function again() {
   startWrite();
 }
-function retry() {
+async function retry() {
+  // Try again while a run is still live: end it first, or the start is refused.
+  if (check.isActive.value) await check.stop();
   ending.value = null;
   view.value = "step";
   if (step.value === 3) startConversion();
@@ -467,8 +487,10 @@ function retry() {
 }
 
 async function answerWrites(changed) {
+  const saved = await check.recordVerdict(changed);
+  // The answer wasn't saved: stay on the question so the owner can answer again.
+  if (!saved) return;
   writesVerdict.value = changed;
-  await check.recordVerdict(changed);
   if (!changed) {
     end("no-writes");
     return;
@@ -490,14 +512,25 @@ function removeReading(index) {
   emit("patch", { brightnessConversion: readings.value.filter((_, i) => i !== index) });
 }
 
+// A found limit is applied as soon as the run finishes: the owner started the
+// run, and a lower cap is the safe side. If the server call fails the limit is
+// still written as a setting, so the slider never reaches past it.
 async function saveLimit() {
+  const found = limitFound.value;
+  if (found == null) return;
   savingLimit.value = true;
   const saved = await check.saveLimit();
   savingLimit.value = false;
   if (saved) {
     limitSaved.value = true;
+    limitSaveFailed.value = false;
+    check.error.value = "";
     emit("saved-limit", saved.brightnessLimit);
+    return;
   }
+  limitSaveFailed.value = true;
+  check.error.value = "";
+  emit("patch", { brightnessLimit: found });
 }
 
 // --- end states -------------------------------------------------------------
@@ -556,6 +589,7 @@ function onRun(run) {
       limitFound.value = run.limit ?? null;
       if (failed) return end("error", run.detail);
       view.value = "finish";
+      if (limitFound.value != null) saveLimit();
       return;
     default:
   }
@@ -584,6 +618,7 @@ async function onOpen() {
   currentRunId = null;
   view.value = "step";
   await check.load();
+  check.resume();
   if (check.readOnly.value) {
     view.value = "readonly";
     return;
@@ -612,6 +647,14 @@ watch(
 );
 onBeforeUnmount(() => onClosed());
 
+// "Turn on now" from the asleep state: begin as soon as the screen is awake.
+watch(
+  () => props.asleep,
+  asleep => {
+    if (!asleep && props.modelValue && view.value === "asleep") retry();
+  }
+);
+
 function onDialogModel(value) {
   emit("update:modelValue", value);
 }
@@ -623,7 +666,7 @@ function close() {
 <style scoped>
 .dcheck__strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
   gap: var(--gap-2);
   margin: 0 0 var(--gap-4);
   padding: 0;
@@ -642,6 +685,14 @@ function close() {
   border-top-color: var(--focus);
   color: var(--ink);
   font-weight: var(--weight-strong);
+}
+/* The full-screen phone sheet has no body padding of its own: give the content
+   the dialog's own gutter and let it scroll. */
+.dcheck__sheet--full {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--gap-3) var(--gap-5);
 }
 .dcheck__body {
   display: flex;
@@ -715,6 +766,7 @@ function close() {
   height: 0.75rem;
   overflow: hidden;
   background: var(--bg-2);
+  border: 1px solid var(--line);
   border-radius: var(--radius-round);
 }
 .dcheck__bar-fill {

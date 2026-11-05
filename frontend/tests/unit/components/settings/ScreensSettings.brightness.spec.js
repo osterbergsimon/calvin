@@ -176,6 +176,49 @@ describe("Screens › {screen} › Power › Brightness", () => {
   });
 });
 
+describe("Screens › Power › Brightness limit safety", () => {
+  it("a limit saved by the check caps the slider at once and lowers a brightness above it", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { brightnessRampEnabled: true, brightness: 25 },
+    });
+    await flushPromises();
+    await open(wrapper);
+    wrapper.findComponent(DisplayCheckDialog).vm.$emit("saved-limit", 26);
+    await flush();
+    expect(wrapper.findComponent(BrightnessGroup).props("overrides").brightnessLimit).toBe(26);
+    expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
+      brightness: 22,
+      brightnessLimit: 26,
+    });
+    expect(wrapper.find("[data-test='brightness-slider']").attributes("max")).toBe("22");
+  });
+
+  it("clamps a stored brightness when a patch changes the step", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { brightnessRampEnabled: true, brightness: 22, brightnessLimit: 26 },
+    });
+    await flushPromises();
+    await open(wrapper);
+    wrapper.findComponent(BrightnessGroup).vm.$emit("patch", { brightnessStep: 3 });
+    await flush();
+    expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
+      brightnessStep: 3,
+      brightness: 20,
+    });
+  });
+
+  it("turns the screen on from the check's asleep state with the normal Turn on now", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { screenNow: { power: "off", setAt: new Date().toISOString() } },
+    });
+    await flushPromises();
+    await open(wrapper);
+    wrapper.findComponent(DisplayCheckDialog).vm.$emit("turn-on");
+    await flush();
+    expect(store.saveOverrides.mock.calls.at(-1)[1].screenNow.power).toBe("on");
+  });
+});
+
 describe("Screens › Default", () => {
   it("has no Brightness rows, only a line saying where to set it", () => {
     setActivePinia(createPinia());

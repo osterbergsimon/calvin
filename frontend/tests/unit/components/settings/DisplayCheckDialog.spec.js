@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
 // A tiny in-memory backend: the dialog starts runs, the test plays the agent.
-const backend = vi.hoisted(() => ({ run: null, posts: [], seq: 0, activeOnStart: null }));
+const backend = vi.hoisted(() => ({
+  run: null,
+  posts: [],
+  seq: 0,
+  activeOnStart: null,
+  failSaveLimit: false,
+  failVerdict: false,
+}));
 vi.mock("@/services/api", () => ({
   default: {
     get: vi.fn(async () => ({ data: { run: backend.run } })),
@@ -35,6 +42,8 @@ vi.mock("@/services/api", () => ({
         backend.run = { ...backend.run, action: "stop" };
         return { data: backend.run };
       }
+      if (url.endsWith("/verdict") && backend.failVerdict) throw { response: { status: 500 } };
+      if (url.endsWith("/save-limit") && backend.failSaveLimit) throw { response: { status: 500 } };
       if (url.endsWith("/save-limit")) {
         return { data: { id: "kitchen", brightnessLimit: 26, overrides: {} } };
       }
@@ -92,6 +101,8 @@ beforeEach(() => {
   backend.posts = [];
   backend.seq = 0;
   backend.activeOnStart = null;
+  backend.failSaveLimit = false;
+  backend.failVerdict = false;
 });
 afterEach(() => {
   wrapper?.unmount();
@@ -274,16 +285,29 @@ describe("DisplayCheckDialog step 4: safe limit", () => {
     expect(backend.posts.some(([u]) => u.endsWith("/stop"))).toBe(true);
   });
 
-  it("finishes with the found limit, and saves it only when asked", async () => {
+  it("saves the found limit by itself when the test finishes, and says so", async () => {
     await toStep4();
     await click(wrapper, "limit-start");
     agent({ status: "done", level: 19, limit: 26, detail: "limit found: 26" });
     await settle();
     expect(find(wrapper, "check-finish").text()).toContain("Limit found: 26");
-    expect(backend.posts.some(([u]) => u.endsWith("/save-limit"))).toBe(false);
-    await click(wrapper, "limit-save");
-    expect(backend.posts.some(([u]) => u.endsWith("/save-limit"))).toBe(true);
+    expect(backend.posts.filter(([u]) => u.endsWith("/save-limit"))).toHaveLength(1);
+    expect(find(wrapper, "limit-save").exists()).toBe(false);
     expect(wrapper.emitted("saved-limit")[0][0]).toBe(26);
+    expect(find(wrapper, "check-finish").text()).toContain("Saved");
+    await settle(6000);
+    expect(backend.posts.filter(([u]) => u.endsWith("/save-limit"))).toHaveLength(1);
+  });
+
+  it("still caps the brightness when saving fails, and lets the owner retry", async () => {
+    backend.failSaveLimit = true;
+    await toStep4();
+    await click(wrapper, "limit-start");
+    agent({ status: "done", level: 19, limit: 26 });
+    await settle();
+    expect(wrapper.emitted("patch").at(-1)[0]).toEqual({ brightnessLimit: 26 });
+    expect(find(wrapper, "check-finish").text()).toContain("Couldn't save");
+    expect(find(wrapper, "limit-save").exists()).toBe(true);
   });
 
   it("says Kitchen restarted when the agent reports an interrupted run", async () => {
@@ -372,5 +396,57 @@ describe("DisplayCheckDialog rules", () => {
     await settle();
     expect(find(wrapper, "check-end").text()).toContain("timed out");
     expect(find(wrapper, "check-retry").exists()).toBe(true);
+  });
+
+  it("keeps the question and shows an error when the answer cannot be saved", async () => {
+    await throughDetectAndWrite();
+    backend.failVerdict = true;
+    await click(wrapper, "writes-yes");
+    expect(wrapper.text()).toContain("Couldn't save your answer");
+    expect(find(wrapper, "writes-yes").exists()).toBe(true);
+    expect(wrapper.emitted("writes-ok")).toBeUndefined();
+  });
+
+  it("Try again after silence stops the old run before starting a new one", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    await settle(62000);
+    backend.posts = [];
+    await click(wrapper, "check-silence-retry");
+    expect(backend.posts.map(([u]) => u.split("/").pop())).toEqual(["stop", "start"]);
+  });
+
+  it("offers Turn on now when asleep, and starts the check once the screen wakes", async () => {
+    wrapper = mountDialog({ asleep: true });
+    await flushPromises();
+    await click(wrapper, "check-turn-on");
+    expect(wrapper.emitted("turn-on")).toHaveLength(1);
+    expect(backend.posts.filter(([u]) => u.endsWith("/start"))).toHaveLength(0);
+    await wrapper.setProps({ asleep: false });
+    await flushPromises();
+    expect(lastStart()).toEqual({ step: "detect" });
+  });
+
+  it("resumes polling when reopened while another run is active", async () => {
+    backend.run = {
+      id: "elsewhere",
+      step: "limit",
+      status: "running",
+      active: true,
+      level: 22,
+      log: [],
+      requestedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    wrapper = mountDialog();
+    await flushPromises();
+    await wrapper.setProps({ modelValue: false });
+    await flushPromises();
+    await wrapper.setProps({ modelValue: true });
+    await flushPromises();
+    backend.run = { ...backend.run, level: 24 };
+    await settle(2100);
+    expect(find(wrapper, "check-readonly").exists()).toBe(true);
+    expect(wrapper.text()).toContain("level 24");
   });
 });

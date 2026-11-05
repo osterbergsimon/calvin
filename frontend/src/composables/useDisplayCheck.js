@@ -102,13 +102,14 @@ export function useDisplayCheck(kioskId) {
   // The owner's answer to "did it change?" is the one thing the agent cannot
   // see. An older backend without the endpoint is fine: the dialog keeps it.
   async function recordVerdict(writes) {
+    error.value = "";
     try {
       await api.post(path(kioskId, "/verdict"), { writes });
       return true;
     } catch (err) {
-      if (![404, 405].includes(err?.response?.status)) {
-        logError("[displayCheck]", "Failed to record the verdict", err);
-      }
+      if ([404, 405].includes(err?.response?.status)) return true;
+      error.value = "Couldn't save your answer. Try again.";
+      logError("[displayCheck]", "Failed to record the verdict", err);
       return false;
     }
   }
@@ -132,6 +133,12 @@ export function useDisplayCheck(kioskId) {
     timer = null;
   }
 
+  // A dialog reopened while a run is still active: the watch below does not
+  // fire (isActive never changed), so the caller restarts polling itself.
+  function resume() {
+    if (isActive.value) startTimer();
+  }
+
   watch(isActive, active => (active ? startTimer() : stopTimer()), { immediate: true });
   onScopeDispose(stopTimer);
 
@@ -148,6 +155,7 @@ export function useDisplayCheck(kioskId) {
     stop,
     saveLimit,
     recordVerdict,
+    resume,
     dispose: stopTimer,
   };
 }

@@ -158,4 +158,37 @@ describe("useDisplayCheck", () => {
     await check.load();
     expect(check.ownsRun.value).toBe(false);
   });
+
+  it("polls again after the dialog is closed and reopened while a run is still active", async () => {
+    api.get.mockResolvedValue({ data: { run: run() } });
+    const check = make();
+    await check.load();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(api.get).toHaveBeenCalledTimes(2);
+    check.dispose();
+    await vi.advanceTimersByTimeAsync(10000);
+    expect(api.get).toHaveBeenCalledTimes(2);
+    await check.load();
+    check.resume();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(api.get.mock.calls.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("resume does nothing without an active run", async () => {
+    api.get.mockResolvedValue({ data: { run: run({ active: false, status: "done" }) } });
+    const check = make();
+    await check.load();
+    check.resume();
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it("recordVerdict tolerates an older backend but reports other failures", async () => {
+    const check = make();
+    api.post.mockRejectedValueOnce({ response: { status: 404 } });
+    expect(await check.recordVerdict(true)).toBe(true);
+    api.post.mockRejectedValueOnce({ response: { status: 500 } });
+    expect(await check.recordVerdict(true)).toBe(false);
+    expect(check.error.value).toMatch(/Couldn't save your answer/);
+  });
 });

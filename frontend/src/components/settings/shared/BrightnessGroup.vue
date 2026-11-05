@@ -15,11 +15,11 @@
         <template v-else>{{ rampDescriptor.description }}</template>
       </template>
       <Button
-        v-if="avail.action === 'check'"
+        v-if="avail.action === 'check' && avail.state !== 'never'"
         data-test="availability-action"
         @click="emit('open-check', { step: 'detect' })"
       >
-        {{ avail.state === "never" ? "Check this display…" : "Check again" }}
+        Check again
       </Button>
       <span data-test="ramp-toggle">
         <ToggleSwitch
@@ -104,6 +104,13 @@
             is too close to the limit the display check found{{
               limitDate ? ` on ${limitDate}` : ""
             }}.
+            <Button
+              variant="link"
+              data-test="limit-clear"
+              @click="patch({ brightnessLimit: null })"
+            >
+              Clear limit
+            </Button>
           </template>
           <template v-else>
             No limit found yet.
@@ -168,8 +175,8 @@
         <span>Interval</span>
         <NumberStepper
           :model-value="stepSeconds"
-          :min="1"
-          :max="5"
+          :min="0.5"
+          :max="10"
           :step="0.5"
           unit=" s"
           aria-label="Interval"

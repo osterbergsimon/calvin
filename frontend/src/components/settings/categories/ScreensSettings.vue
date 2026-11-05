@@ -524,6 +524,7 @@
           :start-step="checkStep"
           @patch="patchBrightness"
           @writes-ok="onWritesOk"
+          @turn-on="setScreenNow('on')"
           @saved-limit="refreshKiosksAfterCheck"
         />
         <InlineNote
@@ -725,7 +726,7 @@ import ListRow from "@/components/ui/ListRow.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
 import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
 import DisplayCheckDialog from "@/components/settings/shared/DisplayCheckDialog.vue";
-import { dimSeconds, firstBrightness } from "@/utils/brightness";
+import { clampBrightness, dimSeconds, firstBrightness } from "@/utils/brightness";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
@@ -1169,7 +1170,8 @@ function patchBrightness(change) {
     if (value === null || value === undefined) delete next[key];
     else next[key] = value;
   }
-  persistPower(next);
+  // A brightness above the limit minus two steps is never stored.
+  persistPower(clampBrightness(next));
 }
 
 const checkOpen = ref(false);
@@ -1194,6 +1196,8 @@ function onWritesOk() {
 // re-read the kiosk list so the saved findings refresh.
 function refreshKiosksAfterCheck(limit) {
   overridesQueue.value?.confirmKey("brightnessLimit", limit);
+  const clamped = clampBrightness(overrides.value);
+  if (clamped !== overrides.value) persistPower(clamped);
   store.refreshKiosks?.();
 }
 

@@ -584,7 +584,7 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     label: "Ramp step interval",
     section: "brightness",
     perScreenOnly: true,
-    control: { kind: "number", min: 1, max: 5 },
+    control: { kind: "number", min: 0.5, max: 10 },
     defaultValue: 1.5,
     browserLayer: false,
     copyable: false,

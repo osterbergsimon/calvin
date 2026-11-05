@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   availability,
   checkSummary,
+  clampBrightness,
   ddcToMenu,
   dimSeconds,
   firstBrightness,
@@ -167,5 +168,25 @@ describe("checkSummary", () => {
     ).toBe(
       "Answers brightness commands · changes take effect · menu match from 3 readings · limit 26 (4 Nov)"
     );
+  });
+});
+
+describe("clampBrightness", () => {
+  it("lowers a stored brightness above the limit minus two steps", () => {
+    expect(clampBrightness({ brightness: 25, brightnessLimit: 26 })).toEqual({
+      brightness: 22,
+      brightnessLimit: 26,
+    });
+    expect(
+      clampBrightness({ brightness: 25, brightnessLimit: 26, brightnessStep: 3 }).brightness
+    ).toBe(20);
+  });
+  it("leaves a safe value, no limit or no brightness alone and returns the same object", () => {
+    const safe = { brightness: 20, brightnessLimit: 26 };
+    expect(clampBrightness(safe)).toBe(safe);
+    const none = { brightness: 90 };
+    expect(clampBrightness(none)).toBe(none);
+    const empty = { brightnessLimit: 26 };
+    expect(clampBrightness(empty)).toBe(empty);
   });
 });

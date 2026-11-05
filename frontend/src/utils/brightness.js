@@ -73,6 +73,21 @@ export function firstBrightness(limit, step = DEFAULT_STEP) {
 }
 
 /**
+ * The overrides with a stored brightness lowered to the limit minus two steps
+ * when it sits above it. Returns the same object when nothing changes, so a
+ * caller can tell whether a write is needed.
+ */
+export function clampBrightness(overrides) {
+  const limit = overrides?.brightnessLimit;
+  const level = overrides?.brightness;
+  if (limit === null || limit === undefined || level === null || level === undefined) {
+    return overrides;
+  }
+  const cap = maxPickable(limit, overrides.brightnessStep ?? DEFAULT_STEP);
+  return Number(level) > cap ? { ...overrides, brightness: cap } : overrides;
+}
+
+/**
  * The next Calvin value to ask the owner to read off the menu: 5 first, the
  * middle of the known-safe range, then near its top. Without a limit the range
  * stays at 20 or below. Null when all three have been read.

@@ -33,8 +33,27 @@ const SIZES = [
 
 async function shot(page, size, name) {
   if (!SHOTS) return;
-  const target = name === "settings-section" ? page.locator("#section-screen-power") : page;
-  await target.screenshot({ path: path.join(SHOTS, `${size}-${name}.png`) });
+  // Let the dialog's fade-in finish: a mid-fade frame shows the page through it.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter(a => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map(a => a.finished.catch(() => {}))
+    )
+  );
+  if (name !== "settings-section") {
+    await page.screenshot({ path: path.join(SHOTS, `${size}-${name}.png`) });
+    return;
+  }
+  // The section is taller than a kiosk screen: shoot it on a tall viewport.
+  const original = page.viewportSize();
+  await page.setViewportSize({ width: original.width, height: 1700 });
+  await page.locator("#section-screen-power").scrollIntoViewIfNeeded();
+  await page
+    .locator("#section-screen-power")
+    .screenshot({ path: path.join(SHOTS, `${size}-${name}.png`) });
+  await page.setViewportSize(original);
 }
 
 async function openHallway(page, { kiosk = null } = {}) {
@@ -197,11 +216,11 @@ for (const [size, viewport] of SIZES) {
         "Limit found: 26",
         { timeout: 8000 }
       );
-      // A found limit is saved only when asked.
-      expect(api.overridesByKiosk.hallway?.brightnessLimit).toBeUndefined();
-      await shot(page, size, "check-finished");
-      await page.getByRole("button", { name: "Save limit 26" }).click();
+      // A found limit is applied by itself: the owner never has to press Save.
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(26);
+      expect(api.displayCheckCalls.filter(call => call === "POST save-limit")).toHaveLength(1);
+      await expect(body(page).locator('[data-test="limit-saved"]')).toBeVisible();
+      await shot(page, size, "check-finished");
       await page.locator('[data-test="check-done"]').click();
       await expect(dialog(page)).toBeHidden();
       await expect(group.locator('[data-test="limit-note"]')).toContainText("limit");
@@ -255,6 +274,17 @@ for (const [size, viewport] of SIZES) {
         "hallway-pi is asleep. Turn it on now to check it."
       );
       expect(api.displayCheckCalls).not.toContain("POST start");
+
+      // The sheet keeps a side gutter, even when it is full screen on a phone.
+      const box = await dialog(page).locator('[data-test="check-asleep"]').boundingBox();
+      expect(box.x).toBeGreaterThanOrEqual(16);
+      const strip = await dialog(page).locator(".dcheck__strip").boundingBox();
+      expect(strip.x).toBeGreaterThanOrEqual(16);
+
+      // Turn on now is the normal Screen now action; the check starts once awake.
+      await dialog(page).locator('[data-test="check-turn-on"]').click();
+      await expect.poll(() => api.overridesByKiosk.hallway?.screenNow?.power).toBe("on");
+      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
     });
 
     test("a second device sees the running check read-only, with Stop", async ({ page }) => {

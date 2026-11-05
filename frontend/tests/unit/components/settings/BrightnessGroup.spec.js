@@ -258,4 +258,35 @@ describe("BrightnessGroup live states", () => {
     );
     expect(find(wrapper, "ramp-off-asleep-note").text()).toContain("stops changing its brightness");
   });
+
+  it("never checked: only the Display check row offers the check, not the ramp row", () => {
+    const wrapper = mountGroup({
+      kiosk: { id: "kitchen", displayStack: "cog", displayCheck: null },
+    });
+    expect(
+      wrapper.findAll("button").filter(b => b.text().includes("Check this display")).length
+    ).toBe(1);
+    expect(find(wrapper, "availability-action").exists()).toBe(false);
+  });
+});
+
+describe("BrightnessGroup ramp speed range and the limit", () => {
+  it("matches the API range: step 1-5, interval 0.5-10 s in half steps", async () => {
+    const wrapper = mountGroup({ overrides: ramp });
+    await find(wrapper, "ramp-speed-change").trigger("click");
+    const [size, interval] = wrapper.findAllComponents({ name: "NumberStepper" });
+    expect(size.props()).toMatchObject({ min: 1, max: 5, step: 1 });
+    expect(interval.props()).toMatchObject({ min: 0.5, max: 10, step: 0.5 });
+  });
+
+  it("lets the owner clear a saved limit", async () => {
+    const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await find(wrapper, "limit-clear").trigger("click");
+    expect(wrapper.emitted("patch")[0][0]).toEqual({ brightnessLimit: null });
+  });
+
+  it("offers no clear link without a limit", () => {
+    const wrapper = mountGroup({ overrides: ramp });
+    expect(find(wrapper, "limit-clear").exists()).toBe(false);
+  });
 });
