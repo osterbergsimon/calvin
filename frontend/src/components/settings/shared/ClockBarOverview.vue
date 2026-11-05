@@ -58,5 +58,8 @@ onMounted(() => {
   padding: var(--panel-pad-y) var(--panel-pad-x) 0;
   overflow: hidden;
   border-radius: var(--radius-control);
+  /* A preview, not a control: the ⋯ menu and page dots belong to the dashboard. */
+  pointer-events: none;
+  user-select: none;
 }
 </style>
