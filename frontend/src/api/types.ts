@@ -1185,6 +1185,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}/display-check/step": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Change Display Check Step
+     * @description Move the active run to another step/value (admin); the job is re-offered.
+     */
+    post: operations["change_display_check_step_api_kiosks__kiosk_id__display_check_step_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/display-check/stop": {
     parameters: {
       query?: never;
@@ -3092,6 +3112,19 @@ export interface components {
       /** Value */
       value?: number | null;
     };
+    /**
+     * StepRequest
+     * @description Move the active run to another step (and target value).
+     */
+    StepRequest: {
+      /**
+       * Step
+       * @enum {string}
+       */
+      step: "detect" | "write" | "conversion" | "limit";
+      /** Value */
+      value?: number | null;
+    };
     /** UpdateLinkBody */
     UpdateLinkBody: {
       /** Guests See All */
@@ -4925,6 +4958,41 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["StartRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  change_display_check_step_api_kiosks__kiosk_id__display_check_step_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StepRequest"];
       };
     };
     responses: {

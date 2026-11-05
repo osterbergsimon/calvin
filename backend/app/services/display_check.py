@@ -2,7 +2,10 @@
 
 An admin asks for a run (``start``); the display agent finds it as
 ``displayCheck`` on its config poll, works through it and reports back with
-``record_report``. The latest run per kiosk is kept in ``kiosks.display_check``
+``record_report``. A run is one *session*, like the agent's: it stays active
+across steps (the admin moves it on with ``change_step``), each step's ``done``
+report is a result stored under ``steps``, and only a stop, a failure or the
+expiry ends it. The latest run per kiosk is kept in ``kiosks.display_check``
 (replaced by the next start). Expiry is computed on read, so nothing needs a
 timer: a run not finished 10 minutes after it was requested reads ``timeout``
 and is no longer offered to the agent.
@@ -24,7 +27,10 @@ RUN_TTL = timedelta(minutes=10)
 
 Step = Literal["detect", "write", "conversion", "limit"]
 ReportStatus = Literal["running", "done", "stopped", "timeout", "error", "interrupted", "asleep"]
-TERMINAL_STATUSES = frozenset({"done", "stopped", "timeout", "error", "interrupted", "asleep"})
+# What ends a run. ``done`` is a step result while the run is active; it ends the
+# run only after an admin stop (the agent's final report) or past the expiry.
+ENDING_STATUSES = frozenset({"stopped", "timeout", "error", "interrupted", "asleep"})
+TERMINAL_STATUSES = ENDING_STATUSES | {"done"}
 _MAX_LOG_ENTRIES = 500
 _MAX_TEXT = 500
 
@@ -49,6 +55,10 @@ class RunEndedError(Exception):
     """A non-terminal report arrived for a run that has already ended."""
 
 
+class StoppingError(Exception):
+    """A stop is already on its way, so the step cannot change."""
+
+
 class NoActiveRunError(Exception):
     """There is no active run to stop."""
 
@@ -63,6 +73,15 @@ class StartRequest(BaseModel):
     step: Step
     value: int | None = Field(None, ge=0, le=100)
     brightness: int | None = Field(None, ge=0, le=100)
+
+
+class StepRequest(BaseModel):
+    """Move the active run to another step (and target value)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    step: Step
+    value: int | None = Field(None, ge=0, le=100)
 
 
 class VerdictRequest(BaseModel):
@@ -132,14 +151,21 @@ def findings_view(stored: dict | None) -> dict[str, Any]:
     return {**EMPTY_FINDINGS, **{k: v for k, v in (stored or {}).items() if k in EMPTY_FINDINGS}}
 
 
-def _apply_findings(stored: dict | None, run: dict) -> dict[str, Any] | None:
-    """Fold a finished run into the findings; None when it says nothing new."""
-    step, status = run["step"], run["status"]
+def _apply_findings(
+    stored: dict | None,
+    *,
+    step: str,
+    status: str,
+    limit: int | None,
+    info: dict | None,
+    finished_at: str,
+) -> dict[str, Any] | None:
+    """Fold a finished step into the findings; None when it says nothing new."""
     findings = findings_view(stored)
     changed = False
     if step == "detect":
         if status == "done":
-            info = run.get("info") or {}
+            info = info or {}
             findings["ddc"] = True
             findings["model"] = info.get("model")
             findings["connector"] = info.get("connector")
@@ -152,12 +178,12 @@ def _apply_findings(stored: dict | None, run: dict) -> dict[str, Any] | None:
         if status in ("done", "error"):
             findings["writes"] = status == "done"
             changed = True
-    elif step == "limit" and status == "done" and isinstance(run.get("limit"), int):
-        findings["limit"] = run["limit"]
+    elif step == "limit" and status == "done" and isinstance(limit, int):
+        findings["limit"] = limit
         changed = True
     if not changed:
         return None
-    findings["checkedAt"] = run["finishedAt"]
+    findings["checkedAt"] = finished_at
     return findings
 
 
@@ -178,6 +204,7 @@ def _view(run: dict | None) -> dict | None:
     if expired and view["status"] in ("requested", "running"):
         view["status"] = "timeout"
     view["active"] = view["status"] in ("requested", "running")
+    view.setdefault("steps", {})
     view["expiresAt"] = _iso(_expires_at(run))
     return view
 
@@ -241,6 +268,7 @@ async def start_run(kiosk_id: str, request: StartRequest) -> dict:
         "log": [],
         "detail": None,
         "info": None,
+        "steps": {},
         "requestedAt": _iso(utcnow()),
         "startedAt": None,
         "finishedAt": None,
@@ -265,30 +293,25 @@ async def stop_run(kiosk_id: str) -> dict:
     return _view(run)  # type: ignore[return-value]
 
 
-async def record_report(kiosk_id: str, report: AgentReport) -> None:
-    """Fold an agent report into the stored run.
-
-    The endpoint has no credential (the agent has none, accepted by the spec):
-    the only guard is that ``report.id`` is the stored run's id. Once a run has
-    ended (a terminal status, or expired) it can never become active again, so a
-    late ``running`` report from a rebooted agent, or one built from a stale
-    config poll, is refused and the job is not offered a second time.
-    """
+async def change_step(kiosk_id: str, request: StepRequest) -> dict:
+    """Move the active run to a new step/value; the agent re-runs on the new signature."""
     row = await _row(kiosk_id)
     if row is None:
         raise UnknownKioskError(kiosk_id)
-    stored = row.display_check
-    if not stored or stored.get("id") != report.id:
-        raise UnknownRunError(report.id)
-    was_active = _view(stored)["active"]  # type: ignore[index]
-    terminal = report.status in TERMINAL_STATUSES
-    if not was_active and not terminal:
-        raise RunEndedError(report.id)
-    run = dict(stored)
-    if was_active or stored["status"] not in TERMINAL_STATUSES:
-        # First terminal status (or progress) wins; a repeated terminal report
-        # only adds data.
-        run["status"] = report.status
+    current = _view(row.display_check)
+    if not current or not current["active"]:
+        raise NoActiveRunError(kiosk_id)
+    if current["action"] == "stop":
+        raise StoppingError(kiosk_id)
+    run = dict(row.display_check)
+    run["step"] = request.step
+    run["value"] = request.value
+    await _save(row, run)
+    logger.info(f"Display check {run['id']} for {kiosk_id!r} moved to {request.step}")
+    return _view(run)  # type: ignore[return-value]
+
+
+def _merge_progress(run: dict, report: AgentReport) -> None:
     run["updatedAt"] = _iso(utcnow())
     if report.level is not None:
         run["level"] = report.level
@@ -302,31 +325,95 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
         run["detail"] = report.detail
     if report.info is not None:
         run["info"] = report.info
-    # The agent sends finishedAt on every report; it only means something once
-    # the run has ended.
-    if terminal and not run.get("finishedAt"):
-        run["finishedAt"] = report.finishedAt or _iso(utcnow())
-    first_end = terminal and stored["status"] not in TERMINAL_STATUSES
-    findings = _apply_findings(row.display_check_findings, run) if first_end else None
+
+
+async def record_report(kiosk_id: str, report: AgentReport) -> None:
+    """Fold an agent report into the stored run.
+
+    The endpoint has no credential (the agent has none, accepted by the spec):
+    the only guard is that ``report.id`` is the stored run's id. Once a run has
+    ended (an ending status, or expired) it can never become active again, so a
+    late ``running`` report from a rebooted agent, or one built from a stale
+    config poll, is refused and the job is not offered a second time.
+
+    While the run is active a ``done`` report is the result of the step the
+    backend is currently offering (the agent files every report under its first
+    job's step, so the report's own ``step`` is not trusted).
+    """
+    row = await _row(kiosk_id)
+    if row is None:
+        raise UnknownKioskError(kiosk_id)
+    stored = row.display_check
+    if not stored or stored.get("id") != report.id:
+        raise UnknownRunError(report.id)
+    status = report.status
+    run = dict(stored)
+    now = _iso(utcnow())
+
+    if stored["status"] in TERMINAL_STATUSES:
+        # Already ended: only a repeated ending report (the agent's _finish
+        # sends one more) is accepted; the first status stays.
+        if status == "running":
+            raise RunEndedError(report.id)
+        _merge_progress(run, report)
+        await _save(row, run)
+        return
+
+    active = _view(stored)["active"]  # type: ignore[index]
+    if not active:
+        # Expired: the rebooted or timed-out agent may still finish safely.
+        if status == "running":
+            raise RunEndedError(report.id)
+        _merge_progress(run, report)
+        run["status"] = "timeout" if status == "done" else status
+        run["finishedAt"] = report.finishedAt or now
+        await _save(row, run)
+        logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
+        return
+
+    _merge_progress(run, report)
+    findings = None
+    ended = status in ENDING_STATUSES or (status == "done" and stored["action"] == "stop")
+    if status in ("done", "error"):
+        step = run["step"]
+        finished_at = report.finishedAt or now
+        steps = dict(run.get("steps") or {})
+        steps[step] = {
+            "status": status,
+            "value": run.get("value"),
+            "level": report.level if report.level is not None else run.get("level"),
+            "limit": report.limit,
+            "detail": report.detail,
+            "info": report.info,
+            "finishedAt": finished_at,
+        }
+        run["steps"] = steps
+        findings = _apply_findings(
+            row.display_check_findings,
+            step=step,
+            status=status,
+            limit=report.limit,
+            info=report.info,
+            finished_at=finished_at,
+        )
+    run["status"] = status if ended else "running"
+    if ended:
+        run["finishedAt"] = report.finishedAt or now
     await _save(row, run, findings)
-    if first_end:
+    if ended:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
 
 
 async def found_limit(kiosk_id: str) -> int:
-    """The limit the latest finished ``limit`` run found, else :class:`NoLimitError`."""
+    """The limit the ``limit`` step found in the latest run, else :class:`NoLimitError`."""
     row = await _row(kiosk_id)
     if row is None:
         raise UnknownKioskError(kiosk_id)
-    run = _view(row.display_check)
-    if (
-        not run
-        or run["step"] != "limit"
-        or run["status"] != "done"
-        or not isinstance(run.get("limit"), int)
-    ):
+    result = ((row.display_check or {}).get("steps") or {}).get("limit") or {}
+    limit = result.get("limit")
+    if result.get("status") != "done" or not isinstance(limit, int):
         raise NoLimitError(kiosk_id)
-    return int(run["limit"])
+    return limit
 
 
 async def get_findings(kiosk_id: str) -> dict[str, Any]:

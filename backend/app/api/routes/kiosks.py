@@ -127,7 +127,9 @@ async def get_display_check(kiosk_id: str):
     }
 
 
-async def _check_value_under_limit(kiosk_id: str, body: display_check.StartRequest) -> None:
+async def _check_value_under_limit(
+    kiosk_id: str, body: display_check.StartRequest | display_check.StepRequest
+) -> None:
     """Refuse a target above ``limit - 2 * step``: the agent's conversion step does
     not apply the limit itself, so 100 on a limited screen would ramp past it."""
     if body.value is None:
@@ -169,6 +171,25 @@ async def start_display_check(kiosk_id: str, body: display_check.StartRequest):
                 "code": "display_check_active",
                 "message": "A display check is already running on this screen.",
                 "run": exc.run,
+            },
+        )
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/step")
+async def change_display_check_step(kiosk_id: str, body: display_check.StepRequest):
+    """Move the active run to another step/value (admin); the job is re-offered."""
+    _valid_id_or_400(kiosk_id)
+    await _check_value_under_limit(kiosk_id, body)
+    try:
+        return await display_check.change_step(kiosk_id, body)
+    except (display_check.UnknownKioskError, display_check.NoActiveRunError):
+        raise HTTPException(status_code=404, detail="No display check is running")
+    except display_check.StoppingError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "display_check_stopping",
+                "message": "The display check is stopping; start a new one when it has ended.",
             },
         )
 

@@ -20,6 +20,10 @@ def _start(client: TestClient, step: str = "detect", **extra):
     return client.post(f"{BASE}/start", json={"step": step, **extra})
 
 
+def _step(client: TestClient, step: str, **extra):
+    return client.post(f"{BASE}/step", json={"step": step, **extra})
+
+
 def _report(client: TestClient, run_id: str, status: str = "running", **extra):
     payload = {"id": run_id, "step": "detect", "status": status, **extra}
     return client.post(BASE, json=payload)
@@ -90,7 +94,7 @@ def test_only_one_active_run_per_kiosk(test_client: TestClient, kiosk):
 
 
 @pytest.mark.integration
-def test_agent_reports_update_the_run_and_a_terminal_status_ends_it(test_client: TestClient, kiosk):
+def test_a_step_done_report_is_a_result_not_the_end_of_the_run(test_client: TestClient, kiosk):
     run = _start(test_client).json()
     log = [{"at": "2026-11-05T10:00:00+00:00", "level": 19, "note": "found NOMAD TOUCH"}]
 
@@ -120,14 +124,123 @@ def test_agent_reports_update_the_run_and_a_terminal_status_ends_it(test_client:
     )
     assert done.status_code == 200
     seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "running"  # the session goes on
+    assert seen["active"] is True
+    assert seen["finishedAt"] is None
+    assert seen["steps"]["detect"] == {
+        "status": "done",
+        "value": None,
+        "level": 19,
+        "limit": None,
+        "detail": "NOMAD TOUCH",
+        "info": {"bus": 2, "model": "NOMAD TOUCH"},
+        "finishedAt": "2026-11-05T10:00:05+00:00",
+    }
+    assert _config(test_client)["displayCheck"]["id"] == run["id"]
+    assert _start(test_client, "write").status_code == 409  # still one run per kiosk
+
+
+@pytest.mark.integration
+def test_stop_then_done_ends_the_run_and_clears_the_job(test_client: TestClient, kiosk):
+    run = _start(test_client, "conversion", value=19).json()
+    _report(test_client, run["id"], level=19)
+    _report(test_client, run["id"], "done", level=19)
+    test_client.post(f"{BASE}/stop")
+    assert _config(test_client)["displayCheck"]["action"] == "stop"
+    # The agent's _finish reports done once the job says stop (or is gone).
+    assert _report(test_client, run["id"], "done", level=15).status_code == 200
+    seen = test_client.get(BASE).json()["run"]
     assert seen["status"] == "done"
     assert seen["active"] is False
-    assert seen["info"] == {"bus": 2, "model": "NOMAD TOUCH"}
-    assert seen["detail"] == "NOMAD TOUCH"
-    assert seen["finishedAt"] == "2026-11-05T10:00:05+00:00"
+    assert seen["finishedAt"]
     assert "displayCheck" not in _config(test_client)
-    assert "display_check" not in _config(test_client)
-    assert _start(test_client, "write").status_code == 200  # the next step can start
+    assert _start(test_client, "write").status_code == 200
+
+
+@pytest.mark.integration
+def test_conversion_stays_offered_at_its_value_until_stopped(test_client: TestClient, kiosk):
+    run = _start(test_client, "conversion", value=19).json()
+    for _ in range(3):
+        _report(test_client, run["id"], level=19)
+        _report(test_client, run["id"], "done", level=19, detail="set to 19")
+        job = _config(test_client)["displayCheck"]
+        assert (job["id"], job["step"], job["value"], job["action"]) == (
+            run["id"],
+            "conversion",
+            19,
+            "start",
+        )
+
+
+@pytest.mark.integration
+def test_step_change_re_offers_the_job_with_the_new_step_and_value(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect", brightness=15).json()
+    _report(test_client, run["id"], "done", info={"model": "NOMAD TOUCH"})
+
+    changed = _step(test_client, "conversion", value=9)
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["id"] == run["id"]
+    assert (changed.json()["step"], changed.json()["value"]) == ("conversion", 9)
+    assert _config(test_client)["displayCheck"] == {
+        "id": run["id"],
+        "step": "conversion",
+        "action": "start",
+        "value": 9,
+        "brightness": 15,
+    }
+    # A step with no value drops the old one.
+    assert _step(test_client, "write").json()["value"] is None
+    assert _config(test_client)["displayCheck"]["value"] is None
+    # The results of earlier steps stay in the run.
+    assert test_client.get(BASE).json()["run"]["steps"]["detect"]["status"] == "done"
+
+
+@pytest.mark.integration
+def test_step_results_are_stored_per_step_for_the_step_that_was_offered(
+    test_client: TestClient, kiosk
+):
+    run = _start(test_client, "detect").json()
+    # The agent's reports carry the step of its FIRST job; the backend files each
+    # result under the step it is currently offering.
+    _report(test_client, run["id"], "done", step="detect", info={"model": "M"})
+    _step(test_client, "limit")
+    _report(test_client, run["id"], "done", step="detect", level=19, limit=26)
+    steps = test_client.get(BASE).json()["run"]["steps"]
+    assert steps["detect"]["info"] == {"model": "M"}
+    assert steps["limit"]["limit"] == 26
+    assert _findings(test_client)["limit"] == 26
+    assert _findings(test_client)["model"] == "M"
+
+
+@pytest.mark.integration
+def test_step_needs_admin_an_active_run_and_a_sane_request(test_client: TestClient, kiosk):
+    assert _step(test_client, "write").status_code == 404  # nothing active
+    run = _start(test_client, "detect").json()
+    assert _step(test_client, "explode").status_code == 422
+    assert _step(test_client, "write", value=101).status_code == 422
+    assert test_client.post(f"{BASE}/step", json={"step": "write", "x": 1}).status_code == 422
+    test_client.post(f"{BASE}/stop")
+    stopping = _step(test_client, "write")
+    assert stopping.status_code == 409  # a stop is already on its way
+    assert stopping.json()["detail"]["code"] == "display_check_stopping"
+    _report(test_client, run["id"], "stopped")
+    assert _step(test_client, "write").status_code == 404  # ended
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_step_change_needs_admin(test_client: TestClient, kiosk):
+    assert _step(test_client, "write").status_code == 401
+
+
+@pytest.mark.integration
+def test_step_change_respects_the_limit_cap(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    _start(test_client, "detect")
+    refused = _step(test_client, "conversion", value=23)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["max"] == 22
+    assert _step(test_client, "conversion", value=22).status_code == 200
 
 
 @pytest.mark.integration
@@ -232,16 +345,16 @@ def test_a_found_limit_is_saved_only_by_the_admin(test_client: TestClient, kiosk
 
 
 @pytest.mark.integration
-def test_save_limit_needs_a_finished_limit_run_with_a_limit(test_client: TestClient, kiosk):
+def test_save_limit_needs_a_limit_step_result_with_a_limit(test_client: TestClient, kiosk):
     run = _start(test_client, "limit").json()
-    assert test_client.post(f"{BASE}/save-limit").status_code == 409  # still running
+    assert test_client.post(f"{BASE}/save-limit").status_code == 409  # no result yet
     _report(test_client, run["id"], "done", level=100, detail="reached 100 with no fault")
     refused = test_client.post(f"{BASE}/save-limit")
     assert refused.status_code == 409
     assert refused.json()["detail"]["code"] == "no_limit"
 
-    other = _start(test_client, "detect").json()
-    _report(test_client, other["id"], "done", limit=30)
+    _step(test_client, "detect")
+    _report(test_client, run["id"], "done", limit=30)
     assert test_client.post(f"{BASE}/save-limit").status_code == 409  # not a limit step
 
 
@@ -268,7 +381,7 @@ def test_findings_start_empty(test_client: TestClient, kiosk):
 
 
 @pytest.mark.integration
-def test_findings_survive_later_runs(test_client: TestClient, kiosk):
+def test_findings_survive_later_steps(test_client: TestClient, kiosk):
     detect = _start(test_client, "detect").json()
     _report(
         test_client,
@@ -289,15 +402,15 @@ def test_findings_survive_later_runs(test_client: TestClient, kiosk):
     assert found["writes"] is None
     assert found["checkedAt"]
 
-    write = _start(test_client, "write").json()
-    _report(test_client, write["id"], "done", level=19)
+    _step(test_client, "write")
+    _report(test_client, detect["id"], "done", level=19)
     assert _findings(test_client)["writes"] is True
 
-    limit = _start(test_client, "limit").json()
-    _report(test_client, limit["id"], "done", limit=26)
+    _step(test_client, "limit")
+    _report(test_client, detect["id"], "done", limit=26)
     found = _findings(test_client)
     assert found["limit"] == 26
-    # The latest run is now the limit run, but the earlier verdicts stay.
+    # The current step is now the limit step, but the earlier verdicts stay.
     assert (found["ddc"], found["writes"], found["model"]) == (True, True, "NOMAD TOUCH")
     assert test_client.get(BASE).json()["findings"] == found
 
@@ -325,10 +438,11 @@ def test_unfinished_runs_do_not_touch_findings(test_client: TestClient, kiosk):
 
 @pytest.mark.integration
 def test_limit_run_without_a_limit_keeps_the_old_one(test_client: TestClient, kiosk):
-    first = _start(test_client, "limit").json()
-    _report(test_client, first["id"], "done", limit=26)
-    second = _start(test_client, "limit").json()
-    _report(test_client, second["id"], "done", detail="reached 100 with no fault")
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], "done", limit=26)
+    _step(test_client, "conversion", value=10)
+    _step(test_client, "limit")
+    _report(test_client, run["id"], "done", detail="reached 100 with no fault")
     assert _findings(test_client)["limit"] == 26
 
 
@@ -400,12 +514,14 @@ def test_a_repeated_terminal_report_is_accepted_and_keeps_the_first_status(
     test_client: TestClient, kiosk
 ):
     run = _start(test_client, "write").json()
-    assert _report(test_client, run["id"], "done", level=19).status_code == 200
-    assert _report(test_client, run["id"], "done", level=19, detail="again").status_code == 200
+    assert _report(test_client, run["id"], "stopped", level=19).status_code == 200
+    assert _report(test_client, run["id"], "stopped", level=19, detail="again").status_code == 200
+    assert _report(test_client, run["id"], "done").status_code == 200
     assert _report(test_client, run["id"], "interrupted").status_code == 200
     seen = test_client.get(BASE).json()["run"]
-    assert seen["status"] == "done"
+    assert seen["status"] == "stopped"
     assert seen["active"] is False
+    assert _report(test_client, run["id"], "running").status_code == 409
 
 
 @pytest.mark.integration
@@ -421,6 +537,19 @@ def test_an_expired_run_takes_a_terminal_report_but_not_a_running_one(
     assert "displayCheck" not in _config(test_client)
     assert _report(test_client, run["id"], "interrupted").status_code == 200
     assert test_client.get(BASE).json()["run"]["status"] == "interrupted"
+
+
+@pytest.mark.integration
+def test_the_agents_final_done_on_an_expired_run_reads_timeout(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    from app.services import display_check
+
+    run = _start(test_client, "conversion", value=10).json()
+    now = display_check.utcnow()
+    monkeypatch.setattr(display_check, "utcnow", lambda: now + timedelta(minutes=11))
+    assert _report(test_client, run["id"], "done").status_code == 200
+    assert test_client.get(BASE).json()["run"]["status"] == "timeout"
 
 
 def _set_overrides(client: TestClient, overrides: dict):
