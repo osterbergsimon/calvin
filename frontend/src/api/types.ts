@@ -1205,6 +1205,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}/display-check/verdict": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Display Check Verdict
+     * @description The owner's answer to "did the screen change?" (admin). Returns the findings.
+     */
+    post: operations["post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/overrides": {
     parameters: {
       query?: never;
@@ -2994,6 +3014,11 @@ export interface components {
       msg: string;
       /** Error Type */
       type: string;
+    };
+    /** VerdictRequest */
+    VerdictRequest: {
+      /** Writes */
+      writes: boolean;
     };
   };
   responses: never;
@@ -4840,6 +4865,41 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VerdictRequest"];
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {

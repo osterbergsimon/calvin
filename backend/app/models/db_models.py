@@ -183,3 +183,6 @@ class KioskDB(ormar.Model):
     display_check: dict | None = ormar.JSON(
         nullable=True
     )  # latest display-check run record, see app/services/display_check.py (calvin-29ws)
+    display_check_findings: dict | None = ormar.JSON(
+        nullable=True
+    )  # what finished runs found, kept across later runs (calvin-29ws)

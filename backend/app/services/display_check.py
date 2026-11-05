@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 from app.models.db_models import KioskDB
 from app.utils.db_retry import retry_on_db_locked
@@ -60,6 +60,12 @@ class StartRequest(BaseModel):
     brightness: int | None = Field(None, ge=0, le=100)
 
 
+class VerdictRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    writes: StrictBool
+
+
 class LogEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -83,6 +89,51 @@ class AgentReport(BaseModel):
     finishedAt: str | None = Field(None, max_length=64)
     detail: str | None = Field(None, max_length=500)
     info: dict[str, Any] | None = None
+
+
+EMPTY_FINDINGS: dict[str, Any] = {
+    "checkedAt": None,
+    "ddc": None,
+    "writes": None,
+    "model": None,
+    "connector": None,
+    "vcpVersion": None,
+    "limit": None,
+}
+
+
+def findings_view(stored: dict | None) -> dict[str, Any]:
+    """The persisted findings with every field present (null = not checked yet)."""
+    return {**EMPTY_FINDINGS, **{k: v for k, v in (stored or {}).items() if k in EMPTY_FINDINGS}}
+
+
+def _apply_findings(stored: dict | None, run: dict) -> dict[str, Any] | None:
+    """Fold a finished run into the findings; None when it says nothing new."""
+    step, status = run["step"], run["status"]
+    findings = findings_view(stored)
+    changed = False
+    if step == "detect":
+        if status == "done":
+            info = run.get("info") or {}
+            findings["ddc"] = True
+            findings["model"] = info.get("model")
+            findings["connector"] = info.get("connector")
+            findings["vcpVersion"] = info.get("vcp_version")
+            changed = True
+        elif status == "error":
+            findings["ddc"] = False
+            changed = True
+    elif step == "write":
+        if status in ("done", "error"):
+            findings["writes"] = status == "done"
+            changed = True
+    elif step == "limit" and status == "done" and isinstance(run.get("limit"), int):
+        findings["limit"] = run["limit"]
+        changed = True
+    if not changed:
+        return None
+    findings["checkedAt"] = run["finishedAt"]
+    return findings
 
 
 def _iso(dt: datetime) -> str:
@@ -136,10 +187,14 @@ async def get_run_view(kiosk_id: str) -> dict | None:
 
 
 @retry_on_db_locked()
-async def _save(row: KioskDB, run: dict) -> None:
+async def _save(row: KioskDB, run: dict, findings: dict | None = None) -> None:
     row.display_check = run
-    # Only this column: a concurrent heartbeat must not be overwritten.
-    await row.update(_columns=["display_check"])
+    columns = ["display_check"]
+    if findings is not None:
+        row.display_check_findings = findings
+        columns.append("display_check_findings")
+    # Only these columns: a concurrent heartbeat must not be overwritten.
+    await row.update(_columns=columns)
 
 
 async def start_run(kiosk_id: str, request: StartRequest) -> dict:
@@ -211,7 +266,12 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
     # the run has ended.
     if report.status in TERMINAL_STATUSES:
         run["finishedAt"] = report.finishedAt or _iso(utcnow())
-    await _save(row, run)
+    findings = (
+        _apply_findings(row.display_check_findings, run)
+        if report.status in TERMINAL_STATUSES
+        else None
+    )
+    await _save(row, run, findings)
     if report.status in TERMINAL_STATUSES:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {report.status}")
 
@@ -230,3 +290,27 @@ async def found_limit(kiosk_id: str) -> int:
     ):
         raise NoLimitError(kiosk_id)
     return int(run["limit"])
+
+
+async def get_findings(kiosk_id: str) -> dict[str, Any]:
+    row = await _row(kiosk_id)
+    return findings_view(row.display_check_findings if row else None)
+
+
+async def set_writes_verdict(kiosk_id: str, writes: bool) -> dict[str, Any]:
+    """Record the owner's answer to "did the screen change?" (it wins over the agent's)."""
+    row = await _row(kiosk_id)
+    if row is None:
+        raise UnknownKioskError(kiosk_id)
+    findings = findings_view(row.display_check_findings)
+    findings["writes"] = writes
+    findings["checkedAt"] = _iso(utcnow())
+    await _save_findings(row, findings)
+    logger.info(f"Owner verdict for {kiosk_id!r}: brightness writes take effect = {writes}")
+    return findings
+
+
+@retry_on_db_locked()
+async def _save_findings(row: KioskDB, findings: dict) -> None:
+    row.display_check_findings = findings
+    await row.update(_columns=["display_check_findings"])

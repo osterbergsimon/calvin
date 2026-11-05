@@ -1,4 +1,4 @@
-"""Add display_check column to the kiosks table.
+"""Add display_check and display_check_findings columns to the kiosks table.
 
 The latest display-check run for a screen: what an admin asked for and what the
 display agent reported back (calvin-29ws).
@@ -20,7 +20,9 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column("kiosks", sa.Column("display_check", sa.JSON(), nullable=True))
+    op.add_column("kiosks", sa.Column("display_check_findings", sa.JSON(), nullable=True))
 
 
 def downgrade() -> None:
+    op.drop_column("kiosks", "display_check_findings")
     op.drop_column("kiosks", "display_check")
