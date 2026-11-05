@@ -145,6 +145,14 @@ function restoreFocus() {
 const NESTED_OVERLAY = '[role="listbox"], [role="menu"], .popover__panel';
 
 function onKeydown(event) {
+  // Nested dialogs (the clock bar editor on top of Pages & regions): only the
+  // dialog that owns the focused element handles Escape and Tab, or Escape
+  // would close both at once.
+  if (panelEl.value) {
+    const panels = [...document.querySelectorAll(".dialog-overlay .dialog")].reverse();
+    const owner = panels.find(panel => panel.contains(document.activeElement));
+    if (owner && owner !== panelEl.value) return;
+  }
   if (event.key === "Escape") {
     if (event.target?.closest?.(NESTED_OVERLAY)) return;
     if (!props.dismissible) return;

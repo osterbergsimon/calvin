@@ -93,6 +93,7 @@
             :screens="screens"
             :active-screen-id="activeScreenId"
             :sample="sample"
+            :editable="editable"
             @select-screen="activateScreen"
           />
         </ClockBarPartChip>
@@ -139,6 +140,12 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
+  // The resolver output. The editor passes its live draft; on a screen the bar
+  // resolves the household config itself.
+  design: {
+    type: Object,
+    default: null,
+  },
   // Editor preview: draw sample room/dots/status values.
   sample: {
     type: Boolean,
@@ -162,7 +169,9 @@ const zoneLabels = { top: "Top", middle: "Middle", bottom: "Bottom" };
 
 const configStore = useConfigStore();
 const webServicesStore = useWebServicesStore();
-const design = computed(() => resolveClockBarDesign(configStore, webServicesStore.services));
+const design = computed(
+  () => props.design || resolveClockBarDesign(configStore, webServicesStore.services)
+);
 
 const {
   shouldShow,

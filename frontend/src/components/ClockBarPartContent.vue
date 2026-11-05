@@ -2,12 +2,21 @@
   <BarLogo v-if="partId === 'logo'" :vertical="shape === 'vertical'" />
   <span v-else-if="partId === 'room' && roomText" class="clock-bar-room">{{ roomText }}</span>
   <ScreenDots
-    v-else-if="partId === 'pageDots'"
+    v-else-if="partId === 'pageDots' && !sample"
     :vertical="shape === 'vertical'"
     :screens="dotsScreens"
     :active-screen-id="activeScreenId"
     @select-screen="$emit('select-screen', $event)"
   />
+  <span
+    v-else-if="partId === 'pageDots'"
+    class="clock-bar-dots-sample"
+    :class="{ 'is-vertical': shape === 'vertical' }"
+    aria-hidden="true"
+  >
+    <span class="clock-bar-dots-sample__pip is-active" />
+    <span class="clock-bar-dots-sample__pip" />
+  </span>
   <span v-else-if="partId === 'time'" class="clock-time" :style="{ fontSize: `${timeSize}px` }">
     <template v-if="stackedTime">
       <span class="compact-time">
@@ -45,6 +54,14 @@
     :orientation="shape === 'vertical' ? 'vertical' : 'horizontal'"
     :size="tileSize"
   />
+  <span
+    v-else-if="partId === 'status' && sample"
+    class="clock-bar-status-sample"
+    aria-hidden="true"
+  >
+    <span class="clock-bar-status-sample__dot" />
+    <span class="clock-bar-status-sample__more">⋯</span>
+  </span>
   <BarActionCluster v-else-if="partId === 'status'" :compact="shape === 'vertical'" />
 </template>
 
@@ -73,6 +90,9 @@ const props = defineProps({
   screens: { type: Array, default: () => [] },
   activeScreenId: { type: String, default: null },
   sample: { type: Boolean, default: false },
+  // Editor chips wrap the parts; their own controls are inert, so the live
+  // dots/status are drawn as static samples instead of focusable look-alikes.
+  editable: { type: Boolean, default: false },
 });
 
 defineEmits(["select-screen"]);
@@ -167,5 +187,49 @@ const dotsScreens = computed(() => (props.sample ? sampleScreens : props.screens
 .compact-date-year {
   font-size: 0.78em;
   color: var(--ink-2);
+}
+
+.clock-bar-dots-sample {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  justify-content: center;
+}
+
+.clock-bar-dots-sample.is-vertical {
+  flex-direction: column;
+}
+
+.clock-bar-dots-sample__pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+
+.clock-bar-dots-sample__pip.is-active {
+  background: var(--focus);
+  box-shadow: 0 0 9px var(--focus);
+}
+
+.clock-bar-status-sample {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-inline);
+}
+
+.clock-bar-status-sample__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--ok);
+}
+
+.clock-bar-status-sample__more {
+  font-family: var(--font-ui);
+  color: var(--ink-2);
+  letter-spacing: 0.1em;
 }
 </style>

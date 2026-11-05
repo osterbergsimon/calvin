@@ -44,7 +44,7 @@ defineEmits(["select"]);
 }
 
 .clock-bar-chip.is-editable {
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   outline: 1px dashed transparent;
   outline-offset: 2px;
 }
@@ -69,11 +69,11 @@ defineEmits(["select"]);
 .clock-bar-chip__hit {
   position: absolute;
   inset: -2px;
-  z-index: 2;
+  z-index: var(--z-raised);
   padding: 0;
   background: transparent;
   border: 0;
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-control);
   cursor: pointer;
 }
 
