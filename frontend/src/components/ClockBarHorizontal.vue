@@ -2,7 +2,7 @@
   <div
     v-if="shouldShow"
     class="clock-bar-horizontal"
-    :class="[`position-${position}`]"
+    :class="[`position-${position}`, { 'is-live': !editable }]"
     :style="{ padding: barPaddingStyle }"
     role="status"
     aria-label="Status bar"
@@ -316,18 +316,20 @@ onMounted(() => {
 /* On a phone the bar cannot hold the wordmark, the room, the clock, the
    connection pill and the ⋯ menu on one line: the row ran past the screen and
    scrolled sideways, cutting the clock (CLV-66). The room name is the least
-   load-bearing piece there and still shows in Settings. */
+   load-bearing piece there and still shows in Settings. The editor draws the bar
+   at its preview width and keeps every chip filled, so this is the live bar's
+   rule only. */
 @media (--bp-phone) {
-  .clock-bar-horizontal :deep(.clock-bar-room) {
+  .clock-bar-horizontal.is-live :deep(.clock-bar-room) {
     display: none;
   }
   /* Screen dots are 44px touch targets each and cannot shrink; at 390px they
      ran under the centred time ("●15:31"). Below the phone breakpoint the dots
      give way so the clock keeps its own room. */
-  .clock-bar-horizontal :deep(.screen-dots) {
+  .clock-bar-horizontal.is-live :deep(.screen-dots) {
     display: none;
   }
-  .clock-bar-outer {
+  .clock-bar-horizontal.is-live .clock-bar-outer {
     gap: var(--gap-2);
   }
 }

@@ -184,3 +184,34 @@ describe("side bar compact date (item 5)", () => {
     expect(wrapper.find(".clock-date").classes()).not.toContain("compact-date");
   });
 });
+
+describe("phone hide is scoped to the live bar (item 7)", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    useConfigStore().showUI = true;
+  });
+
+  it("marks the live bar and not the editable one", () => {
+    const live = mount(ClockBarHorizontal, {
+      props: { position: "top", ...barProps },
+      global: { stubs },
+    });
+    expect(live.find(".clock-bar-horizontal").classes()).toContain("is-live");
+
+    const design = resolveClockBarDesign({}, []).horizontal;
+    const editing = mount(ClockBarHorizontal, {
+      props: { position: "top", ...barProps, design, sample: true, editable: true },
+      global: { stubs },
+    });
+    expect(editing.find(".clock-bar-horizontal").classes()).not.toContain("is-live");
+  });
+
+  it("only hides room and dots under the live-bar selector", () => {
+    const style = styleOf(src("ClockBarHorizontal.vue"));
+    expect(style).toContain(".clock-bar-horizontal.is-live :deep(.clock-bar-room)");
+    expect(style).toContain(".clock-bar-horizontal.is-live :deep(.screen-dots)");
+    expect(style).not.toMatch(
+      /^\s*\.clock-bar-horizontal :deep\(\.(clock-bar-room|screen-dots)\)/m
+    );
+  });
+});

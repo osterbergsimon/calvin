@@ -249,6 +249,21 @@ describe("ClockBarEditor", () => {
     expect(wrapper.text()).toContain("Bottom");
   });
 
+  describe("stage width (item 7)", () => {
+    it("draws the bar at the previewed screen's width, by orientation", async () => {
+      const wrapper = mountEditor();
+      await flushPromises();
+      const device = () => wrapper.find(".cbe-device");
+      expect(device().attributes("style")).toContain("width: 800px");
+
+      const portrait = wrapper
+        .findAll('[role="radio"]')
+        .find(button => button.text() === "Portrait");
+      await portrait.trigger("click");
+      expect(device().attributes("style")).toContain("width: 480px");
+    });
+  });
+
   describe("keyboard moves (items 10 and 13)", () => {
     const chip = (wrapper, id) => wrapper.find(`[data-part-id="${id}"]`);
 

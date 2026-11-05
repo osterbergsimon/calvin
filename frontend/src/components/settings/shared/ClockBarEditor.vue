@@ -74,7 +74,7 @@
             </span>
           </div>
 
-          <div class="cbe-device" :class="`is-${orientation}`">
+          <div class="cbe-device" :class="`is-${orientation}`" :style="deviceStyle">
             <div class="cbe-page">
               <ClockBarHorizontal
                 v-if="shape === 'horizontal'"
@@ -450,6 +450,7 @@ const webServicesStore = useWebServicesStore();
 const {
   modalEl,
   stageEl,
+  stageSize,
   sizeClass,
   isPhone,
   coarsePointer,
@@ -541,6 +542,16 @@ const orientation = computed(() => {
 const orientationBadge = computed(() =>
   orientation.value === "portrait" ? "Portrait" : "Landscape"
 );
+
+// The bar is drawn at the previewed screen's own width and scaled down to fit
+// the stage, so the zones lay out as they do on the screen (spec section 8).
+const PREVIEW_WIDTH = { landscape: 800, portrait: 480 };
+const previewWidth = computed(() => PREVIEW_WIDTH[orientation.value] || PREVIEW_WIDTH.landscape);
+const deviceStyle = computed(() => {
+  const available = stageSize.value.width;
+  const scale = available > 0 ? Math.min(1, available / previewWidth.value) : 1;
+  return { width: `${previewWidth.value}px`, ...(scale < 1 ? { zoom: String(scale) } : {}) };
+});
 
 const setPreviewScreen = value => {
   previewScreenId.value = value;
@@ -1111,12 +1122,7 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: center;
   min-height: 0;
-}
-
-.cbe-device.is-portrait {
-  max-width: 24rem;
   margin: 0 auto;
-  width: 100%;
 }
 
 .cbe-page {

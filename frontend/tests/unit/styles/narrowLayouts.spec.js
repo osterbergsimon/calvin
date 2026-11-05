@@ -74,7 +74,7 @@ describe("clock bar at phone width", () => {
   });
 
   it("hides the screen dots so they cannot run under the time", () => {
-    expect(rule(phone, ".clock-bar-horizontal :deep(.screen-dots)")).toMatch(/display:\s*none/);
+    expect(rule(phone, ".clock-bar-horizontal.is-live :deep(.screen-dots)")).toMatch(/display:\s*none/);
   });
 });
 
