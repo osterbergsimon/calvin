@@ -58,6 +58,9 @@ the wake gentle, and a helper lets someone find out what their panel supports an
 
 - **A big brightness step.** Any single write larger than the configured step (default 2 DDC units) is a bug.
   That's exactly what reset the touch controller on 2026-11-04.
+  Owner exception (2026-11-05): when the agent does not know the panel's level (after an agent start or boot, or
+  after a mid-check reboot) it writes 0 once before off/dim/ramp. A single downward write to 0 is allowed; no upward
+  write may exceed the step.
 - Brightness changes while the panel is asleep or waking, before it has settled.
 - A diagnostics run that can leave the screen dark, or at a level above the limit, if the page or the network
   goes away mid-run. The agent owns the run and always finishes it in a safe state.
@@ -154,3 +157,85 @@ Answers to the design lead's review (owner, 2026-11-04, all as recommended):
 - The helper on the 3B+ reproduces tonight's findings: writes take effect, reads are placeholders, a conversion of
   ≈ 16 + 2.3 × DDC, a limit near DDC 26–28.
 - Pi 400 (MSI G241): DDC brightness only, never DDC power; the ramp off leaves it untouched.
+
+
+## 10. Backend API (lane 2)
+
+Status: contract for the frontend lane, written before the code (2026-11-05). The agent
+(`deploy/kiosk-agent/calvin_display_agent.py`, PR #320) is the source of truth for key names, types and payloads.
+All paths are under `/api`. `{id}` is the kiosk id (`[A-Za-z0-9._-]{1,64}`, else 400).
+
+### 10.1 Per-screen settings (override layer, Screens › {screen} › Power)
+
+The seven keys live in the kiosk's existing override layer and are written with the existing endpoints
+(`PATCH /kiosks/{id}/overrides` for single keys, `PUT` to replace the layer; both admin, and `PATCH` returns 403
+`override_needs_admin` without a session because none of these keys is in `KIOSK_SELF_WRITE_KEYS`). **Write camelCase
+only**; the snake_case spellings (`brightness_ramp_enabled`, `brightness_limit`, `brightness_step`,
+`brightness_step_seconds`, `brightness_conversion`, `sleep_mode`) are rejected with 400 `Invalid overrides`.
+`null` clears a key (back to the agent's default). Out-of-range or wrongly typed values are 400.
+
+| Key | Type | Range / values | Agent default when null/absent |
+|---|---|---|---|
+| `brightnessRampEnabled` | bool | | `false` |
+| `brightness` | int | 0–100 (Calvin/DDC scale) | DDC 20 (or `limit − 2 × step`) |
+| `brightnessLimit` | int | 0–100 | none |
+| `brightnessStep` | int | 1–5 | 2 |
+| `brightnessStepSeconds` | number | 0.5–10 | 1.5 |
+| `brightnessConversion` | list of `{ddc: int 0–100, menu: number 0–100}` | at most 20 points, no unknown fields | `[]` |
+| `sleepMode` | `"standby"` \| `"dim"` | | `"standby"` |
+
+`GET /kiosks/{id}/config` delivers them merged with the household layer; as for every override, both spellings are
+present in the body (the agent reads snake_case first). `GET /kiosks` already returns each kiosk's `overrides`, so the
+UI reads the saved values from there. The config `ETag` is a hash of the whole body, so it changes when any of these
+keys or the display-check job changes.
+
+### 10.2 Display check
+
+One run per kiosk is stored (the latest; a new start replaces it). **Run record** (what the UI reads):
+
+```json
+{
+  "id": "run-id", "step": "detect|write|conversion|limit", "value": 19, "brightness": 19,
+  "action": "start|stop",
+  "status": "requested|running|done|stopped|timeout|error|interrupted|asleep",
+  "active": true,
+  "level": 19, "limit": 26, "log": [{"at": "ISO-8601", "level": 19, "note": "text"}],
+  "detail": "text", "info": {"bus": 2, "model": "..."},
+  "requestedAt": "ISO-8601", "startedAt": "ISO-8601|null", "finishedAt": "ISO-8601|null",
+  "updatedAt": "ISO-8601|null", "expiresAt": "ISO-8601"
+}
+```
+
+`requested` = asked for, the agent has not reported yet. `active` is true while the status is `requested` or
+`running` and the run has not expired. A run expires 10 minutes after `requestedAt`: it then reads `timeout`
+(`active` false) and is no longer offered to the agent. The terminal statuses are `done`, `stopped`, `timeout`,
+`error`, `interrupted` and `asleep`. **`asleep` is surfaced and never retried**: the panel is asleep, nothing was
+written; the UI shows "Turn it on now to check it" and the admin starts a new run when ready.
+`updatedAt` is the time of the last agent report, so the UI can show "Waiting for {screen}…" (no report for 10 s)
+and "isn't answering" (60 s). While the run is `active`, the UI polls the status endpoint every 1–2 s.
+
+Admin endpoints (admin session or admin-scope API key, like every per-screen write; 401 otherwise):
+
+- `POST /kiosks/{id}/display-check/start`, body `{"step": "detect|write|conversion|limit", "value"?: 0–100, "brightness"?: 0–100}`
+  (extra fields are 422). Returns the run record. 404 unknown kiosk; **409 `display_check_active`** (body carries the
+  active run) when a run is already active, which is how a second device sees the "running from another device" state.
+- `POST /kiosks/{id}/display-check/stop`, no body. Marks the active run `action: "stop"`; the agent returns the
+  screen to its brightness at the normal pace and reports `stopped`. Returns the run record. 404 when there is no
+  active run. Stop stays available to any admin, whichever device started the run.
+- `POST /kiosks/{id}/display-check/save-limit`, no body. Saves the latest run's `limit` as the override
+  `brightnessLimit` and returns `{"id", "brightnessLimit", "overrides"}`. Only a finished `limit` run that reported a
+  `limit` qualifies, otherwise **409 `no_limit`**. **A found limit is never saved automatically**; the finish screen
+  calls this (and it can be offered again from the Display check row).
+
+Public (no session; the kiosk's own traffic, like the config poll):
+
+- `GET /kiosks/{id}/display-check` returns `{"run": <record>|null}`. A run that has expired is returned as `timeout`.
+  404 for an unknown kiosk.
+- `POST /kiosks/{id}/display-check` is the **agent's report** (payload as in PR #320). It is accepted only when `id`
+  matches the stored run (otherwise 409 and the report is dropped; a late report for a replaced run cannot overwrite
+  the new one). A terminal status ends the run, so the job leaves the config poll. An expired run still accepts the
+  reports of a rebooted agent finishing safely. Returns `{"accepted": true}`.
+
+The job reaches the agent as `displayCheck` (and `display_check`) on `GET /kiosks/{id}/config`, exactly the shape in
+PR #320 (`id`, `step`, `action`, `value`, `brightness`), present only while the run is `active`. The panel itself can
+call the public endpoints but not the admin ones without signing in.
