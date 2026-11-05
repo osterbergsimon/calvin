@@ -18,8 +18,8 @@ requests — the changelog, the tag and the container images are automated.
 ## The flow
 
 ```text
-feature PR ──▶ develop ──(CI passes)──▶ promote PR ──▶ main ──▶ release PR ──▶ vX.Y.Z tag
-                  │                      (automatic)            (automatic)      │
+feature PR ──▶ develop ──(you run it)──▶ promote PR ──▶ main ──▶ release PR ──▶ vX.Y.Z tag
+                  │                      (manual)               (automatic)      │
                   └─ :develop image                              CHANGELOG.md     └─ :X.Y.Z, :X.Y, :latest images
                                                                   GitHub Release
 ```
@@ -28,9 +28,13 @@ feature PR ──▶ develop ──(CI passes)──▶ promote PR ──▶ mai
    [conventional commit](https://www.conventionalcommits.org/) messages
    (`feat:`, `fix:`, `docs:`, `chore:`, …) — release-please reads them to build
    the changelog and pick the version.
-2. **CI succeeds on `develop`.**
+2. **You decide to release.** Run
    [`promote-develop-to-main.yml`](https://github.com/osterbergsimon/calvin/blob/develop/.github/workflows/promote-develop-to-main.yml)
-   opens (or updates) the **Promote develop to main** PR. Merging it is a
+   by hand (Actions → **Promote develop to main** → Run workflow, or
+   `gh workflow run promote-develop-to-main.yml --ref develop`). It opens (or
+   updates) the **Promote develop to main** PR. It does not run on every
+   `develop` merge, so no standing PR re-runs the full check suite between
+   releases. Merging it is a
    release-candidate step: `main` now builds exactly what passed CI on
    `develop`. Merge it as a **merge commit**, not a squash — `main` must stay a
    descendant of `develop` or the next promotion conflicts.
