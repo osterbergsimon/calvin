@@ -35,6 +35,11 @@ test.describe("phone: clock bar editor", () => {
     await expect(editor.locator(".cbe-shelf")).toBeVisible();
     await expectPhoneLayout(page, "clock bar editor", { scope: ".cbe-root", settleMs: 1600 });
 
+    // The phone-width hide belongs to the live bar: the editor keeps the room
+    // name and the page dots filled in (calvin-d7cl review 7).
+    await expect(editor.locator('[data-part-id="room"] .clock-bar-room')).toBeVisible();
+    await expect(editor.locator('[data-part-id="pageDots"] .screen-dots')).toBeVisible();
+
     // Move Time from the Centre zone to the Right zone with the keyboard/touch
     // alternative to drag.
     await editor.locator('[data-drop-zone="center"] [data-part-id="time"]').click();

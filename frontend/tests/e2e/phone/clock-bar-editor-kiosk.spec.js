@@ -43,6 +43,14 @@ test("kiosk: edit the clock bar at 800x480 and keep it after a reload", async ({
     settleMs: 1600,
   });
 
+  // The bar is drawn at the 800 px screen's width: the page dots keep clear of
+  // the time and the room name is drawn, not an empty box (calvin-d7cl review 7).
+  const box = id => editor.locator(`.clock-bar-horizontal [data-part-id="${id}"]`).boundingBox();
+  const dots = await box("pageDots");
+  const time = await box("time");
+  expect(dots.x + dots.width).toBeLessThanOrEqual(time.x);
+  await expect(editor.locator('[data-part-id="room"] .clock-bar-room')).toBeVisible();
+
   // Show the date from the Not shown shelf.
   await editor.locator('.cbe-shelf [data-part-id="date"]').click();
   await editor.getByLabel("Show Date").click();
