@@ -686,10 +686,10 @@ def wait_for_settle(
 
 
 # -- the ramp itself ----------------------------------------------------------
-def _two_steps_back(level, step, write):
+def _two_steps_back(level, step, write, *, floor=0):
     """Step back down two configured steps, one write at a time (never bigger)."""
     for _ in range(2):
-        back = max(0, level - step)
+        back = max(floor, level - step)
         if back == level:
             break
         if not write(back):
@@ -760,11 +760,7 @@ def ramp_brightness(
                 # now) must not stop it. Step back two, never below the target,
                 # then keep going; stop when there is nowhere lower to go.
                 before = level
-                for _ in range(2):
-                    lower = max(target, level - step)
-                    if lower == level or not write(lower):
-                        break
-                    level = lower
+                level = _two_steps_back(level, step, write, floor=target)
                 outcome["ceiling"] = level
                 if level == target or level == before:
                     break
@@ -896,6 +892,7 @@ class BrightnessController:
                     "falling back to standby"
                 )
                 return "failed"
+        self.panel_off = False
         self.log("brightness: dim-only sleep at 0; panel stays powered")
         return "ok"
 

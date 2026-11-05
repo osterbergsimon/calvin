@@ -2599,11 +2599,11 @@ def test_vcgencmd_under_voltage_bit_zero():
 
     assert agent.vcgencmd_under_voltage(run) is True
 
-    def sticky_only(argv, timeout=5):
-        # Bit 16 ("under-voltage occurred") is history, not a fault now.
+    def historical_only(argv, timeout=5):
+        # Bits 16 and 18 are historical; only bit 0 means under-voltage now.
         return SimpleNamespace(returncode=0, stdout="throttled=0x50000\n", stderr="")
 
-    assert agent.vcgencmd_under_voltage(sticky_only) is False
+    assert agent.vcgencmd_under_voltage(historical_only) is False
 
     def clean(argv, timeout=5):
         return SimpleNamespace(returncode=0, stdout="throttled=0x0\n", stderr="")
@@ -2738,6 +2738,21 @@ def test_ramp_down_keeps_going_after_a_fault():
     assert outcome["fault"] is not None
     assert outcome["level"] == 0
     assert writes[-1] == 0
+
+
+def test_ramp_down_fault_backoff_never_overshoots_a_nonzero_target():
+    writes = []
+    outcome = agent.ramp_brightness(
+        24,
+        19,
+        write=lambda level: writes.append(level) or True,
+        fault=lambda: True,
+        sleep=lambda seconds: None,
+        step=2,
+    )
+    assert outcome["level"] == 19
+    assert writes == [22, 20, 19]
+    assert min(writes) == 19
 
 
 def test_ramp_can_be_cancelled_cleanly():
@@ -2912,7 +2927,7 @@ def test_ramp_off_while_asleep_does_one_last_step_up_then_stops():
     once = ddc.writes[before:]
     assert once == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
     assert controller.pending_restore is None
-    assert applied == [False, True]  # one last power-on, then a careful step-up
+    assert applied == [False, True]  # standby wake still runs the normal power-on
 
     # After that single step-up the agent never touches brightness again.
     after = len(ddc.writes)
@@ -2952,6 +2967,20 @@ def test_dim_sleep_never_powers_the_panel_off_and_wake_ramps_up():
     before = len(ddc.writes)
     assert controller.reconcile(cfg, _local(hour=9), False) is True
     assert applied == []  # still no panel helper
+    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+
+
+def test_dim_sleep_at_agent_startup_does_not_power_cycle_on_wake():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.level = 19
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+
+    assert controller.reconcile(cfg, _local(hour=23), None) is False
+    assert applied == []
+    before = len(ddc.writes)
+    assert controller.reconcile(cfg, _local(hour=9), False) is True
+    assert applied == []
     assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
 
 
