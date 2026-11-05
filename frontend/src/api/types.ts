@@ -1121,6 +1121,90 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}/display-check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Display Check
+     * @description The latest display-check run for a kiosk (expiry applied), or ``null``.
+     */
+    get: operations["get_display_check_api_kiosks__kiosk_id__display_check_get"];
+    put?: never;
+    /**
+     * Post Display Check Report
+     * @description The display agent's report on a run. Dropped unless it names the stored run.
+     */
+    post: operations["post_display_check_report_api_kiosks__kiosk_id__display_check_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/save-limit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Save Display Check Limit
+     * @description Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin).
+     */
+    post: operations["save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start Display Check
+     * @description Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk.
+     */
+    post: operations["start_display_check_api_kiosks__kiosk_id__display_check_start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Stop Display Check
+     * @description Ask the agent to end the active run safely (admin).
+     */
+    post: operations["stop_display_check_api_kiosks__kiosk_id__display_check_stop_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/overrides": {
     parameters: {
       query?: never;
@@ -2233,6 +2317,37 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * AgentReport
+     * @description The agent's POST body (deploy/kiosk-agent, ``post_display_check``).
+     */
+    AgentReport: {
+      /** Detail */
+      detail?: string | null;
+      /** Finishedat */
+      finishedAt?: string | null;
+      /** Id */
+      id: string;
+      /** Info */
+      info?: {
+        [key: string]: unknown;
+      } | null;
+      /** Level */
+      level?: number | null;
+      /** Limit */
+      limit?: number | null;
+      /** Log */
+      log?: components["schemas"]["LogEntry"][] | null;
+      /** Startedat */
+      startedAt?: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "stopped" | "timeout" | "error" | "interrupted" | "asleep";
+      /** Step */
+      step?: string | null;
+    };
     /** AllowedOriginsBody */
     AllowedOriginsBody: {
       /** Origins */
@@ -2333,6 +2448,16 @@ export interface components {
        * Format: binary
        */
       file: string;
+    };
+    /**
+     * BrightnessPoint
+     * @description One owner reading for the DDC to panel-menu conversion (calvin-29ws).
+     */
+    BrightnessPoint: {
+      /** Ddc */
+      ddc: number;
+      /** Menu */
+      menu: number;
     };
     /**
      * CalendarEvent
@@ -2461,6 +2586,18 @@ export interface components {
       applyDisplayRotation?: boolean | null;
       /** Availablescreens */
       availableScreens?: string[] | null;
+      /** Brightness */
+      brightness?: number | null;
+      /** Brightnessconversion */
+      brightnessConversion?: components["schemas"]["BrightnessPoint"][] | null;
+      /** Brightnesslimit */
+      brightnessLimit?: number | null;
+      /** Brightnessrampenabled */
+      brightnessRampEnabled?: boolean | null;
+      /** Brightnessstep */
+      brightnessStep?: number | null;
+      /** Brightnessstepseconds */
+      brightnessStepSeconds?: number | null;
       /** Calendarrefreshinterval */
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
@@ -2574,6 +2711,8 @@ export interface components {
       showUI?: boolean | null;
       /** Showweeknumbers */
       showWeekNumbers?: boolean | null;
+      /** Sleepmode */
+      sleepMode?: ("standby" | "dim") | null;
       /** Tapanywherereveal */
       tapAnywhereReveal?: boolean | null;
       /** Thememode */
@@ -2645,6 +2784,18 @@ export interface components {
       mappings: {
         [key: string]: string;
       };
+    };
+    /** LogEntry */
+    LogEntry: {
+      /** At */
+      at?: string | null;
+      /** Level */
+      level?: number | null;
+      /**
+       * Note
+       * @default
+       */
+      note: string;
     };
     /** OverridesBody */
     OverridesBody: {
@@ -2815,6 +2966,18 @@ export interface components {
     SingleMapping: {
       /** Action */
       action: string;
+    };
+    /** StartRequest */
+    StartRequest: {
+      /** Brightness */
+      brightness?: number | null;
+      /**
+       * Step
+       * @enum {string}
+       */
+      step: "detect" | "write" | "conversion" | "limit";
+      /** Value */
+      value?: number | null;
     };
     /** UpdateLinkBody */
     UpdateLinkBody: {
@@ -4507,6 +4670,169 @@ export interface operations {
         vw?: number | null;
         vh?: number | null;
       };
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_display_check_api_kiosks__kiosk_id__display_check_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_display_check_report_api_kiosks__kiosk_id__display_check_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentReport"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_display_check_api_kiosks__kiosk_id__display_check_start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StartRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  stop_display_check_api_kiosks__kiosk_id__display_check_stop_post: {
+    parameters: {
+      query?: never;
       header?: never;
       path: {
         kiosk_id: string;

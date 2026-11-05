@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
 from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, is_admin
-from app.services import kiosk_bundle, kiosk_registry
+from app.services import display_check, kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
     agent_update_requested,
@@ -17,6 +17,7 @@ from app.services.kiosk_registry import (
     get_overrides,
     merge_into_overrides,
     merge_overrides,
+    public_overrides,
     set_overrides,
 )
 from app.utils.errors import internal_error
@@ -112,6 +113,78 @@ async def post_kiosk_update(kiosk_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     return {"id": kiosk_id, "requested": True}
+
+
+@router.get("/kiosks/{kiosk_id}/display-check")
+async def get_display_check(kiosk_id: str):
+    """The latest display-check run for a kiosk (expiry applied), or ``null``."""
+    _valid_id_or_400(kiosk_id)
+    if await get_overrides(kiosk_id) is None:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    return {"run": await display_check.get_run_view(kiosk_id)}
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/start")
+async def start_display_check(kiosk_id: str, body: display_check.StartRequest):
+    """Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk."""
+    _valid_id_or_400(kiosk_id)
+    try:
+        return await display_check.start_run(kiosk_id, body)
+    except display_check.UnknownKioskError:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    except display_check.RunActiveError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "display_check_active",
+                "message": "A display check is already running on this screen.",
+                "run": exc.run,
+            },
+        )
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/stop")
+async def stop_display_check(kiosk_id: str):
+    """Ask the agent to end the active run safely (admin)."""
+    _valid_id_or_400(kiosk_id)
+    try:
+        return await display_check.stop_run(kiosk_id)
+    except (display_check.UnknownKioskError, display_check.NoActiveRunError):
+        raise HTTPException(status_code=404, detail="No display check is running")
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/save-limit")
+async def save_display_check_limit(kiosk_id: str):
+    """Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin)."""
+    _valid_id_or_400(kiosk_id)
+    try:
+        limit = await display_check.found_limit(kiosk_id)
+    except display_check.UnknownKioskError:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    except display_check.NoLimitError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "no_limit",
+                "message": "The latest display check did not find a limit.",
+            },
+        )
+    overrides = await merge_into_overrides(kiosk_id, {"brightnessLimit": limit})
+    if overrides is None:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    logger.info(f"Saved brightness limit {limit} for kiosk {kiosk_id!r}")
+    return {"id": kiosk_id, "brightnessLimit": limit, "overrides": public_overrides(overrides)}
+
+
+@router.post("/kiosks/{kiosk_id}/display-check")
+async def post_display_check_report(kiosk_id: str, body: display_check.AgentReport):
+    """The display agent's report on a run. Dropped unless it names the stored run."""
+    _valid_id_or_400(kiosk_id)
+    try:
+        await display_check.record_report(kiosk_id, body)
+    except (display_check.UnknownKioskError, display_check.UnknownRunError):
+        raise HTTPException(status_code=409, detail="Not the current display check")
+    return {"accepted": True}
 
 
 @router.get("/kiosks/agent/manifest")
@@ -219,6 +292,11 @@ async def get_kiosk_config(
     merged["deviceConfigVersion"] = version
     merged["agentAvailableVersion"] = available
     merged["agentUpdateRequested"] = update_requested
+    job = display_check.job_for_config(await display_check.get_run(kiosk_id))
+    if job is not None:
+        # Both spellings, like every other key the agent reads (snake_case first).
+        merged["displayCheck"] = job
+        merged["display_check"] = job
     content = json.dumps(merged)
 
     # The ETag must cover the whole body, not just deviceConfigVersion: a
