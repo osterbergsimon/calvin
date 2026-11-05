@@ -36,27 +36,36 @@ async function openSettings(page, category = null) {
   return api;
 }
 
-/** Rows with a toggle / segmented control / select in their control column. */
-function compactRows(page) {
-  return page.$$eval(".setting-row:not(.setting-row--stacked)", rows =>
-    rows
-      .filter(row => row.offsetParent !== null)
-      .filter(row =>
-        row.querySelector(
-          ".setting-row__control [role='switch'], .setting-row__control [role='radiogroup'], .setting-row__control .pill-wrap"
+/**
+ * Rows with a toggle / segmented control / select in their control column.
+ * Dashboard's merged Clock bar section only has a button row and the remote
+ * stepper, so it asks for every row instead.
+ */
+function compactRows(page, { requireControl = true } = {}) {
+  return page.$$eval(
+    ".setting-row:not(.setting-row--stacked)",
+    (rows, requireControl) =>
+      rows
+        .filter(row => row.offsetParent !== null)
+        .filter(row =>
+          requireControl
+            ? row.querySelector(
+                ".setting-row__control [role='switch'], .setting-row__control [role='radiogroup'], .setting-row__control .pill-wrap"
+              )
+            : true
         )
-      )
-      .map(row => {
-        const label = row.querySelector(".setting-row__label");
-        const control = row.querySelector(".setting-row__control");
-        const line = label.getBoundingClientRect();
-        const box = control.getBoundingClientRect();
-        return {
-          label: label?.textContent.trim() || "",
-          height: Math.round(row.getBoundingClientRect().height),
-          sideBySide: box.top < line.bottom && box.bottom > line.top,
-        };
-      })
+        .map(row => {
+          const label = row.querySelector(".setting-row__label");
+          const control = row.querySelector(".setting-row__control");
+          const line = label.getBoundingClientRect();
+          const box = control.getBoundingClientRect();
+          return {
+            label: label?.textContent.trim() || "",
+            height: Math.round(row.getBoundingClientRect().height),
+            sideBySide: box.top < line.bottom && box.bottom > line.top,
+          };
+        }),
+    requireControl
   );
 }
 
@@ -68,7 +77,7 @@ test.describe("settings density at 1280", () => {
 
     await selectCategory(page, "Dashboard");
     await expect(page.locator(".setting-row").first()).toBeVisible();
-    const dashboardRows = await compactRows(page);
+    const dashboardRows = await compactRows(page, { requireControl: false });
     expect(dashboardRows.length).toBeGreaterThan(0);
     for (const row of dashboardRows) {
       expect(row.height, `Dashboard: ${row.label} is too tall`).toBeLessThanOrEqual(120);
