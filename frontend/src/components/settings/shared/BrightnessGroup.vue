@@ -356,16 +356,14 @@ const brightnessNote = computed(() => {
 }
 .brightness-group__title {
   margin: var(--gap-3) 0 var(--gap-1);
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: var(--text-meta);
+  font-weight: var(--weight-strong);
   color: var(--ink-2);
 }
 .brightness-group__hint,
 .brightness-group__note {
   margin: 0;
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink-2);
 }
 .brightness-slider {
@@ -381,11 +379,11 @@ const brightnessNote = computed(() => {
   gap: var(--gap-2);
 }
 .brightness-slider__big {
-  font-size: var(--fs-xl);
+  font-size: var(--text-display);
   font-family: var(--font-data);
 }
 .brightness-slider__scale {
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink-2);
 }
 .brightness-slider__track {
@@ -419,7 +417,7 @@ const brightnessNote = computed(() => {
   right: 0;
   top: 0.75rem;
   font-family: var(--font-data);
-  font-size: var(--fs-xs, 0.75rem);
+  font-size: var(--text-meta);
   color: var(--err-text);
   white-space: nowrap;
 }

@@ -233,6 +233,8 @@
         @dismiss="dismissNote"
       />
 
+      <InlineNote data-test="default-brightness-note">Brightness is set on each screen.</InlineNote>
+
       <!-- The reboot combo restarts the Pi, so it sits under Power (decision C)
            and no screen can override it. -->
       <div data-test="default-only-reboot">

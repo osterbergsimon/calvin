@@ -626,7 +626,7 @@ function close() {
 .dcheck__strip-item {
   padding-top: var(--gap-1);
   border-top: 3px solid var(--line);
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink-2);
 }
 .dcheck__strip-item--done {
@@ -635,7 +635,7 @@ function close() {
 .dcheck__strip-item--now {
   border-top-color: var(--focus);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: var(--weight-strong);
 }
 .dcheck__body {
   display: flex;
@@ -644,14 +644,14 @@ function close() {
 }
 .dcheck__lead {
   margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
 }
 .dcheck__sub,
 .dcheck__fine,
 .dcheck__footer-note {
   margin: 0;
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   color: var(--ink-2);
 }
 .dcheck__buttons {
@@ -668,7 +668,7 @@ function close() {
   width: 6rem;
   min-height: var(--touch-target);
   padding: 0 var(--gap-3);
-  font-size: var(--fs-lg);
+  font-size: var(--text-title);
   font-family: var(--font-data);
   color: var(--ink);
   background: var(--bg-1);
@@ -678,7 +678,7 @@ function close() {
 .dcheck__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
 }
 .dcheck__table th,
 .dcheck__table td {
@@ -700,7 +700,7 @@ function close() {
 }
 .dcheck__level strong {
   font-family: var(--font-data);
-  font-size: var(--fs-2xl, 2rem);
+  font-size: var(--text-display);
   min-width: 3ch;
 }
 .dcheck__bar {
@@ -723,7 +723,7 @@ function close() {
   overflow: auto;
   list-style: none;
   font-family: var(--font-data);
-  font-size: var(--fs-sm);
+  font-size: var(--text-meta);
   background: var(--bg-2);
   border-radius: var(--radius-control);
 }

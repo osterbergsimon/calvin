@@ -486,6 +486,9 @@
             <InlineNote v-if="activeOverride" data-test="screen-now-until">
               {{ untilCopy }}
             </InlineNote>
+            <InlineNote v-if="dimmingSeconds !== null" data-test="screen-now-dimming">
+              Dimming… then off · about {{ dimmingSeconds }} s
+            </InlineNote>
           </template>
           <Button data-test="screen-now-on" :disabled="desiredOnNow" @click="setScreenNow('on')">
             Turn on now
@@ -502,6 +505,27 @@
             Follow schedule
           </Button>
         </SettingRow>
+        <BrightnessGroup
+          :kiosk="selectedKiosk"
+          :overrides="overrides"
+          :screen-name="selectedName"
+          :asleep="!desiredOnNow"
+          :online="selectedKiosk ? isOnline(selectedKiosk) : true"
+          @patch="patchBrightness"
+          @open-check="openCheck"
+        />
+        <DisplayCheckDialog
+          v-model="checkOpen"
+          :kiosk-id="selectedId || ''"
+          :screen-name="selectedName"
+          :asleep="!desiredOnNow"
+          :on-panel="Boolean(kioskId) && kioskId === selectedId"
+          :overrides="overrides"
+          :start-step="checkStep"
+          @patch="patchBrightness"
+          @writes-ok="onWritesOk"
+          @saved-limit="refreshKiosksAfterCheck"
+        />
         <InlineNote
           v-if="powerMsg"
           class="screens-saved"
@@ -699,6 +723,9 @@ import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
+import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
+import DisplayCheckDialog from "@/components/settings/shared/DisplayCheckDialog.vue";
+import { dimSeconds, firstBrightness } from "@/utils/brightness";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
@@ -1114,6 +1141,60 @@ function setScreenNow(power) {
     screenNow: buildPowerOverride({ power, now: new Date() }),
   };
   persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+}
+
+// "Dimming… then off" (calvin-29ws): with the ramp on, "Turn off now" first steps
+// the brightness down. The agent picks the change up within its 60 s poll.
+const AGENT_POLL_S = 60;
+const dimmingSeconds = computed(() => {
+  const own = activeOverride.value;
+  const values = overrides.value;
+  if (!own || own.power !== "off") return null;
+  if (values.brightnessRampEnabled !== true && values.sleepMode !== "dim") return null;
+  const level = values.brightness ?? firstBrightness(values.brightnessLimit ?? null);
+  const seconds = dimSeconds(
+    level,
+    values.brightnessStep ?? 2,
+    values.brightnessStepSeconds ?? 1.5
+  );
+  const elapsed = (nowTick.value - Date.parse(own.setAt)) / 1000;
+  return elapsed < seconds + AGENT_POLL_S ? seconds : null;
+});
+
+// The Brightness group and the display check write typed per-screen overrides.
+// A key set to null is cleared.
+function patchBrightness(change) {
+  const next = { ...overrides.value };
+  for (const [key, value] of Object.entries(change)) {
+    if (value === null || value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  persistPower(next);
+}
+
+const checkOpen = ref(false);
+const checkStep = ref("detect");
+const enableAfterCheck = ref(false);
+function openCheck({ step = "detect", enableAfter = false } = {}) {
+  checkStep.value = step;
+  enableAfterCheck.value = enableAfter;
+  checkOpen.value = true;
+}
+// The first check passing the writes step is what turns the ramp on.
+function onWritesOk() {
+  if (!enableAfterCheck.value) return;
+  enableAfterCheck.value = false;
+  const change = { brightnessRampEnabled: true };
+  if (overrides.value.brightness == null) {
+    change.brightness = firstBrightness(overrides.value.brightnessLimit ?? null);
+  }
+  patchBrightness(change);
+}
+// The backend saved the limit itself: tell the queue it is confirmed, and
+// re-read the kiosk list so the saved findings refresh.
+function refreshKiosksAfterCheck(limit) {
+  overridesQueue.value?.confirmKey("brightnessLimit", limit);
+  store.refreshKiosks?.();
 }
 
 function followSchedule() {
