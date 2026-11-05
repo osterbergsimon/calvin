@@ -191,4 +191,66 @@ describe("useDisplayCheck", () => {
     expect(await check.recordVerdict(true)).toBe(false);
     expect(check.error.value).toMatch(/Couldn't save your answer/);
   });
+
+  it("moves the running session to another step with the step endpoint", async () => {
+    api.get.mockResolvedValue({ data: { run: run() } });
+    api.post.mockResolvedValue({ data: run({ step: "conversion", value: 5 }) });
+    const check = make();
+    await check.load();
+    const result = await check.changeStep("conversion", 5);
+    expect(api.post).toHaveBeenCalledWith("/kiosks/kitchen/display-check/step", {
+      step: "conversion",
+      value: 5,
+    });
+    expect(result).toEqual({ ok: true });
+    expect(check.run.value.step).toBe("conversion");
+  });
+
+  it("omits the value when a step has none", async () => {
+    api.post.mockResolvedValue({ data: run({ step: "limit" }) });
+    const check = make();
+    await check.changeStep("limit");
+    expect(api.post).toHaveBeenCalledWith("/kiosks/kitchen/display-check/step", { step: "limit" });
+  });
+
+  it("says the session is gone on 404 and already stopping on 409", async () => {
+    const check = make();
+    api.post.mockRejectedValueOnce({ response: { status: 404 } });
+    expect(await check.changeStep("write")).toEqual({ gone: true });
+    api.post.mockRejectedValueOnce({
+      response: { status: 409, data: { detail: { code: "display_check_stopping" } } },
+    });
+    expect(await check.changeStep("write")).toEqual({ stopping: true });
+    expect(check.error.value).toMatch(/already stopping/);
+  });
+
+  it("shows the cap inline when a value is above the safe limit", async () => {
+    const check = make();
+    api.post.mockRejectedValueOnce({
+      response: {
+        status: 422,
+        data: { detail: { code: "value_above_limit", max: 22, message: "x" } },
+      },
+    });
+    expect(await check.changeStep("conversion", 40)).toEqual({ capped: true, max: 22 });
+    expect(check.error.value).toBe(
+      "That's above this screen's safe limit. The most Calvin can set is 22."
+    );
+    api.post.mockRejectedValueOnce({
+      response: { status: 422, data: { detail: { code: "value_above_limit", max: 22 } } },
+    });
+    await check.start("conversion", { value: 40 });
+    expect(check.error.value).toMatch(/most Calvin can set is 22/);
+  });
+
+  it("does not call a long wait between steps silence", async () => {
+    api.get.mockResolvedValue({ data: { run: run() } });
+    const check = make();
+    await check.load();
+    await vi.advanceTimersByTimeAsync(120000);
+    expect(check.silence.value).toBe("silent");
+    api.post.mockResolvedValue({ data: run({ step: "limit" }) });
+    await check.changeStep("limit");
+    expect(check.silence.value).toBe("ok");
+  });
 });

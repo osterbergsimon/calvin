@@ -286,13 +286,13 @@
         </template>
 
         <InlineNote
-          v-if="view !== 'readonly' && check.silence.value === 'waiting'"
+          v-if="inFlight && view !== 'readonly' && check.silence.value === 'waiting'"
           data-test="check-silence"
         >
           Waiting for {{ screenName }}…
         </InlineNote>
         <InlineNote
-          v-else-if="check.silence.value === 'silent'"
+          v-else-if="inFlight && check.silence.value === 'silent'"
           tone="warn"
           data-test="check-silence"
         >
@@ -405,9 +405,7 @@ const writeSeconds = computed(
   () => dimSeconds(writeFrom.value - writeTo.value, stepSize.value, stepSeconds.value) * 2
 );
 const nextPoint = computed(() => nextReadingPoint(readings.value, limit.value, stepSize.value));
-const pointShown = computed(
-  () => check.run.value?.level ?? check.run.value?.value ?? pendingPoint.value
-);
+const pointShown = computed(() => pendingPoint.value);
 const readingValid = computed(() => {
   const n = Number(readingText.value);
   return readingText.value.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 100;
@@ -429,39 +427,101 @@ const stepLabel = name =>
     limit: "Find the safe limit",
   })[name] || "Display check";
 
-// --- starting steps ---------------------------------------------------------
+// --- the session -------------------------------------------------------------
+// One run lasts the whole check. The first step starts it; every later step
+// moves the same run with `changeStep`. A step's result arrives in run.steps
+// while the run stays active, and Stop or Done is what ends it.
 
-async function startRun(name, extra) {
-  const run = await check.start(name, extra);
-  if (run) currentRunId = run.id;
-  else if (check.readOnly.value) view.value = "readonly";
-  return run;
+const stepStamp = result =>
+  result ? `${result.status}|${result.value ?? ""}|${result.finishedAt ?? ""}` : "";
+let awaiting = null;
+// A step has been asked for and the agent has not answered yet.
+const inFlight = ref(false);
+
+function expectResult(name, value) {
+  awaiting = {
+    step: name,
+    value: value ?? null,
+    baseline: stepStamp(check.run.value?.steps?.[name]),
+  };
+  inFlight.value = true;
+}
+
+// Ask the agent for a step: start the session, or move the running one.
+async function go(name, value) {
+  const run = check.run.value;
+  if (run?.active && check.ownsRun.value) {
+    const result = await check.changeStep(name, value);
+    if (result.gone) {
+      end("gone");
+      return false;
+    }
+    if (!result.ok) return false;
+  } else {
+    const started = await check.start(name, value === undefined ? {} : { value });
+    if (!started) {
+      if (check.readOnly.value) view.value = "readonly";
+      return false;
+    }
+    currentRunId = started.id;
+  }
+  expectResult(name, value);
+  return true;
 }
 
 async function startDetect() {
   step.value = 1;
   view.value = "step";
-  await startRun("detect");
+  await go("detect");
 }
-async function startWrite() {
+let writeAgain = 0;
+async function startWrite(again = false) {
   step.value = 2;
+  const wasReady = answerReady.value;
   answerReady.value = false;
   const base = settings.value.brightness ?? firstBrightness(limit.value, stepSize.value);
   writeFrom.value = base;
   writeTo.value = Math.max(0, base - 10);
-  await startRun("write", { brightness: base });
+  // The kiosk ignores a repeat of the same step and value, so "Show me again"
+  // alternates the value it sends (the write test itself ignores it).
+  let value;
+  if (again) {
+    writeAgain += 1;
+    value = writeAgain % 2 === 1 ? (base >= 1 ? base - 1 : 1) : base;
+  }
+  const ok = await go("write", value);
+  if (!ok) answerReady.value = wasReady;
 }
 async function startConversion() {
   step.value = 3;
+  const wasReady = readyForReading.value;
+  const previous = pendingPoint.value;
+  const point = nextPoint.value ?? 5;
   readyForReading.value = false;
   readingText.value = "";
-  const point = nextPoint.value ?? 5;
   pendingPoint.value = point;
-  await startRun("conversion", { value: point });
+  const run = check.run.value;
+  if (
+    run?.active &&
+    check.ownsRun.value &&
+    run.step === "conversion" &&
+    run.value === point &&
+    run.steps?.conversion?.status === "done"
+  ) {
+    // Already at this point (a reading was removed and asked for again).
+    readyForReading.value = true;
+    return;
+  }
+  const ok = await go("conversion", point);
+  if (!ok) {
+    readyForReading.value = wasReady;
+    pendingPoint.value = previous;
+  }
 }
 async function startLimit() {
   limitRunning.value = true;
-  await startRun("limit");
+  const ok = await go("limit");
+  if (!ok) limitRunning.value = false;
 }
 function goStep4() {
   step.value = 4;
@@ -472,13 +532,15 @@ function goFinish() {
 }
 
 function again() {
-  startWrite();
+  startWrite(true);
 }
 async function retry() {
   // Try again while a run is still live: end it first, or the start is refused.
   if (check.isActive.value) await check.stop();
   ending.value = null;
   view.value = "step";
+  awaiting = null;
+  inFlight.value = false;
   if (step.value === 3) startConversion();
   else if (step.value === 4) {
     limitRunning.value = false;
@@ -553,6 +615,11 @@ function end(kind, detail = "") {
       text: `${name} restarted. That's the limit at work. If it comes back, check its Display check line for the result.`,
     },
     error: { tone: "err", text: detail || "The check couldn't finish." },
+    stopped: {
+      tone: "warn",
+      text: `The check was stopped. ${name} is going back to its brightness.`,
+    },
+    gone: { tone: "warn", text: "The check ended before this step could start." },
   };
   ending.value = texts[kind] || texts.error;
   view.value = "end";
@@ -560,34 +627,27 @@ function end(kind, detail = "") {
 
 // --- reacting to the agent --------------------------------------------------
 
-function onRun(run) {
-  if (!run || run.active || run.id !== currentRunId || handled.has(run.id)) return;
-  handled.add(run.id);
-  if (run.status === "asleep") {
-    view.value = "asleep";
-    return;
-  }
-  if (run.status === "timeout") return end("timeout");
-  if (run.status === "interrupted") return end("interrupted");
-  const failed = run.status === "error";
-  switch (run.step) {
+function onStepResult(name, result) {
+  const failed = result.status === "error";
+  switch (name) {
     case "detect":
       if (failed) return end("no-ddc");
-      foundText.value = run.detail || "a display";
-      placeholderReads.value = Boolean(run.info?.placeholderReads);
+      foundText.value = result.detail || result.info?.model || "a display";
+      placeholderReads.value = Boolean(result.info?.placeholderReads);
+      step.value = 2;
       return startWrite();
     case "write":
       if (failed) return end("no-writes");
       answerReady.value = true;
       return;
     case "conversion":
-      if (failed) return end("error", run.detail);
+      if (failed) return end("error", result.detail);
       readyForReading.value = true;
       return;
     case "limit":
       limitRunning.value = true;
-      limitFound.value = run.limit ?? null;
-      if (failed) return end("error", run.detail);
+      if (failed) return end("error", result.detail);
+      limitFound.value = result.limit ?? null;
       view.value = "finish";
       if (limitFound.value != null) saveLimit();
       return;
@@ -595,11 +655,45 @@ function onRun(run) {
   }
 }
 
-watch(
-  () =>
-    check.run.value && `${check.run.value.id}:${check.run.value.status}:${check.run.value.active}`,
-  () => onRun(check.run.value)
-);
+// The run ended: the agent refused (asleep), gave up, restarted, or was stopped.
+function onRunEnded(run) {
+  if (handled.has(run.id)) return;
+  handled.add(run.id);
+  awaiting = null;
+  inFlight.value = false;
+  if (run.status === "asleep") {
+    view.value = "asleep";
+    return;
+  }
+  if (view.value === "finish") return;
+  if (run.status === "timeout") return end("timeout");
+  if (run.status === "interrupted") return end("interrupted");
+  if (run.status === "error") {
+    return run.step === "detect" ? end("no-ddc") : end("error", run.detail);
+  }
+  if (run.status === "stopped" && view.value === "step") end("stopped");
+}
+
+function onRun(run) {
+  if (!run || run.id !== currentRunId) return;
+  if (!run.active) return onRunEnded(run);
+  if (!awaiting) return;
+  const result = run.steps?.[awaiting.step];
+  if (!result || stepStamp(result) === awaiting.baseline) return;
+  if (
+    awaiting.step === "conversion" &&
+    awaiting.value !== null &&
+    result.value !== awaiting.value
+  ) {
+    return;
+  }
+  const done = awaiting;
+  awaiting = null;
+  inFlight.value = false;
+  onStepResult(done.step, result);
+}
+
+watch(() => check.run.value, onRun);
 
 // --- open / close -----------------------------------------------------------
 
@@ -613,9 +707,14 @@ async function onOpen() {
   limitRunning.value = false;
   limitFound.value = null;
   limitSaved.value = false;
+  limitSaveFailed.value = false;
   writesVerdict.value = null;
   handled.clear();
   currentRunId = null;
+  awaiting = null;
+  inFlight.value = false;
+  writeAgain = 0;
+  pendingPoint.value = null;
   view.value = "step";
   await check.load();
   check.resume();
@@ -658,7 +757,9 @@ watch(
 function onDialogModel(value) {
   emit("update:modelValue", value);
 }
-function close() {
+// Done ends the session itself; closing the dialog any other way does too.
+async function close() {
+  if (check.isActive.value && check.ownsRun.value) await check.stop();
   emit("update:modelValue", false);
 }
 </script>

@@ -152,8 +152,7 @@ for (const [size, viewport] of SIZES) {
 
       // Step 1: the agent finds the display, then Calvin dims it and asks.
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
-      api.agentReport("hallway", {
-        status: "done",
+      api.agentStep("hallway", "detect", {
         detail: "NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1",
         info: { model: "NOMAD TOUCH" },
       });
@@ -161,8 +160,7 @@ for (const [size, viewport] of SIZES) {
         timeout: 8000,
       });
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("write");
-      api.agentReport("hallway", { status: "running", level: 9 });
-      api.agentReport("hallway", { status: "done", level: 20 });
+      api.agentStep("hallway", "write", { level: 20 });
       await expect(body(page)).toContainText("Did hallway-pi get dimmer for a moment", {
         timeout: 8000,
       });
@@ -174,14 +172,14 @@ for (const [size, viewport] of SIZES) {
 
       // Step 3: two readings.
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("conversion");
-      api.agentReport("hallway", { status: "done", level: 5 });
+      api.agentStep("hallway", "conversion", { value: 5, level: 5 });
       await expect(body(page)).toContainText("Calvin set hallway-pi to 5", { timeout: 8000 });
       await page.locator('[data-test="reading-input"]').fill("28");
       await page.getByRole("button", { name: "Save reading" }).click();
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessConversion?.length).toBe(1);
       await page.getByRole("button", { name: "Add a reading" }).click();
       await expect.poll(() => api.displayCheckRuns.hallway?.value).toBe(10);
-      api.agentReport("hallway", { status: "done", level: 10 });
+      api.agentStep("hallway", "conversion", { value: 10, level: 10 });
       await page.locator('[data-test="reading-input"]').fill("40");
       await page.getByRole("button", { name: "Save reading" }).click();
       await expect(body(page).locator('[data-test="check-fit"]')).toContainText("menu ≈");
@@ -206,12 +204,7 @@ for (const [size, viewport] of SIZES) {
       await expect(page.getByRole("button", { name: "Stop now" })).toBeVisible();
       await shot(page, size, "check-running");
 
-      api.agentReport("hallway", {
-        status: "done",
-        level: 20,
-        limit: 26,
-        detail: "limit found: 26",
-      });
+      api.agentStep("hallway", "limit", { level: 20, limit: 26, detail: "limit found: 26" });
       await expect(body(page).locator('[data-test="check-finish"]')).toContainText(
         "Limit found: 26",
         { timeout: 8000 }
@@ -221,8 +214,14 @@ for (const [size, viewport] of SIZES) {
       expect(api.displayCheckCalls.filter(call => call === "POST save-limit")).toHaveLength(1);
       await expect(body(page).locator('[data-test="limit-saved"]')).toBeVisible();
       await shot(page, size, "check-finished");
+      // One session the whole way: a single start, then step changes; Done ends it.
+      expect(api.displayCheckCalls.filter(call => call === "POST start")).toHaveLength(1);
+      expect(
+        api.displayCheckCalls.filter(call => call === "POST step").length
+      ).toBeGreaterThanOrEqual(4);
       await page.locator('[data-test="check-done"]').click();
       await expect(dialog(page)).toBeHidden();
+      await expect.poll(() => api.displayCheckCalls.includes("POST stop")).toBe(true);
       await expect(group.locator('[data-test="limit-note"]')).toContainText("limit");
       expect(consoleErrors).toEqual([]);
       expect(api.unmatched).toEqual([]);

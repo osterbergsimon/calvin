@@ -389,6 +389,28 @@ export async function installApiMock(page, options = {}) {
     // Set a run here to make the next start answer 409 display_check_active.
     displayCheckBusy: null,
   };
+  // A step's result: it fills run.steps while the run stays active (spec §10.2).
+  state.agentStep = (id, step, result = {}) => {
+    const run = state.displayCheckRuns[id];
+    if (!run) throw new Error(`no display check run for ${id}`);
+    state.displayCheckClock = (state.displayCheckClock || 0) + 1;
+    run.status = "running";
+    run.updatedAt = new Date().toISOString();
+    run.steps = {
+      ...(run.steps || {}),
+      [step]: {
+        status: "done",
+        value: null,
+        level: null,
+        limit: null,
+        detail: null,
+        info: null,
+        finishedAt: new Date(1800000000000 + state.displayCheckClock * 1000).toISOString(),
+        ...result,
+      },
+    };
+    if (step === "limit" && result.limit != null) run.limit = result.limit;
+  };
   state.agentReport = (id, patch) => {
     const run = state.displayCheckRuns[id];
     if (!run) throw new Error(`no display check run for ${id}`);
@@ -598,6 +620,7 @@ export async function installApiMock(page, options = {}) {
           level: null,
           limit: null,
           log: [],
+          steps: {},
           detail: null,
           info: null,
           requestedAt: now,
@@ -608,6 +631,14 @@ export async function installApiMock(page, options = {}) {
         };
         return json(route, state.displayCheckRuns[id]);
       }
+      if (action === "step") {
+        const run = state.displayCheckRuns[id];
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        const body = request.postDataJSON() || {};
+        run.step = body.step;
+        run.value = body.value ?? null;
+        return json(route, run);
+      }
       if (action === "stop") {
         const run = state.displayCheckRuns[id] ?? state.displayCheckBusy;
         if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
@@ -617,7 +648,7 @@ export async function installApiMock(page, options = {}) {
         return json(route, run);
       }
       if (action === "save-limit") {
-        const limit = state.displayCheckRuns[id]?.limit;
+        const limit = state.displayCheckRuns[id]?.steps?.limit?.limit;
         if (limit == null) return json(route, { detail: { code: "no_limit" } }, 409);
         state.overridesByKiosk[id] = {
           ...(state.overridesByKiosk[id] || {}),
