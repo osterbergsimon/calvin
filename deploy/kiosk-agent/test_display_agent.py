@@ -3283,7 +3283,9 @@ def test_recover_display_check_does_not_write_to_a_sleeping_panel(tmp_path):
 
 
 # -- the agent loop keeps the old behaviour unless the ramp is in use --------
-def test_run_with_a_controller_never_touches_ddc_when_the_ramp_is_off(tmp_path):
+def test_run_with_a_controller_never_touches_ddc_when_the_ramp_is_off(
+    tmp_path, monkeypatch
+):
     class BoomDdc:
         def available(self):
             raise AssertionError("ddcutil must not run with the ramp off")
@@ -3299,6 +3301,7 @@ def test_run_with_a_controller_never_touches_ddc_when_the_ramp_is_off(tmp_path):
     applied = []
     controller.applier = lambda on: applied.append(on) or "cog"
     monkeypatch_cfg = _cfg()
+    monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=9))
     agent.run(
         "http://x",
         900,
@@ -3475,6 +3478,7 @@ def test_display_check_runner_gets_the_real_panel_state(monkeypatch):
 
     monkeypatch.setattr(agent, "DisplayCheckRunner", Spy)
     controller, clock, _ = _controller()
+    controller.sleeping = False  # a transition succeeded: the panel is awake
     thread = agent.start_display_check(
         _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
         backend_url="http://x", controller=controller, sleep=clock.sleep,
@@ -3525,7 +3529,9 @@ def _state(tmp_path, level=28, step="limit", limit="null"):
     )
 
 
-def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(tmp_path):
+def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(
+    tmp_path, monkeypatch
+):
     """Item 4a: recover only once the panel settled and the monitor is armed."""
     events = []
 
@@ -3539,18 +3545,18 @@ def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(tmp_path)
     controller.state_dir = str(tmp_path)
     _state(tmp_path)
     cfg = _ramp_cfg(brightness=40)
+    monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=9))
     agent.run(
         "http://x", 900, fetch=lambda url: cfg, sleep=lambda s: None,
         iterations=1, apply_device=lambda c: None, brightness=controller,
     )
-    reconcile_writes = list(range(2, 41, 2))
-    assert ddc.writes[: 1 + len(reconcile_writes)] == [0] + reconcile_writes
-    recovery_start = 1 + len(reconcile_writes)
-    # the monitor was (re)armed after the reconcile's writes, before recovery's
-    assert ("arm", recovery_start) in events
-    assert ddc.writes[recovery_start:][-1] == 22  # limit 26 - 2 steps - ... capped
+    # the persisted run's limit (28 - 2 = 26) caps the wake ramp at 22
+    # BEFORE it starts: it never rises above the limit and comes back down
+    assert ddc.writes == [0] + list(range(2, 23, 2))
+    assert ("arm", len(ddc.writes)) in events
     assert max(_steps(ddc.writes)) <= 2
     assert controller.level == 22
+    assert not (tmp_path / agent.DISPLAY_CHECK_STATE).exists()
 
 
 def test_recovery_records_the_ramps_actual_outcome(tmp_path):
@@ -3574,18 +3580,57 @@ def test_recovery_records_the_ramps_actual_outcome(tmp_path):
     assert controller.level == 24  # not the 19 target
 
 
-def test_recovery_of_a_sleeping_panel_leaves_the_level_unknown(tmp_path):
-    """Item 4c: asleep -> the standby/dim path must write 0 itself."""
+def test_recovery_of_a_sleeping_panel_writes_zero_once_with_the_ramp_off(tmp_path):
+    """Item 4c: the panel may still hold the check's level: write 0 once."""
     ddc = FakeDdc()
-    controller, _, _ = _controller(ddc=ddc)
-    controller.level = 0
-    _state(tmp_path, level=28, step="write")
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.panel_off = True
+    controller.sleeping = True
+    off = _ramp_cfg(brightness_ramp_enabled=False)
+    _state(tmp_path, level=28)
+    agent.recover_display_check(
+        str(tmp_path), off, ddc=ddc, controller=controller,
+        panel_on=lambda: False,
+    )
+    assert ddc.writes == [0]
+    assert controller.level == 0
+    # the next wake does not bring it above 0 (the agent does not own it)
+    assert controller.reconcile(off, _local(hour=9), False) is True
+    assert ddc.writes == [0]
+
+
+def test_recovery_of_a_sleeping_panel_with_a_failed_write_stays_unknown(tmp_path):
+    ddc = FakeDdc(ok=False)
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.sleeping = True
+    _state(tmp_path, level=28)
     agent.recover_display_check(
         str(tmp_path), _ramp_cfg(), ddc=ddc, controller=controller,
         panel_on=lambda: False,
     )
-    assert ddc.writes == []
     assert controller.level is None
+
+
+def test_a_failed_boot_off_counts_as_asleep_for_display_checks(monkeypatch):
+    """Item D: until a transition succeeded the panel state is not 'awake'."""
+    reports = []
+    monkeypatch.setattr(
+        agent, "post_display_check",
+        lambda url, payload, **kw: reports.append(payload) or True,
+    )
+    ddc = FakeDdc()
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.applier = lambda on: "none"  # the boot OFF apply fails
+    assert controller.reconcile(_ramp_cfg(), _local(hour=23), None) is None
+    assert controller.sleeping is None
+    writes = list(ddc.writes)
+    thread = agent.start_display_check(
+        _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    assert thread is None
+    assert reports[-1]["status"] == "asleep"
+    assert ddc.writes == writes
 
 
 def test_a_fault_from_the_last_up_step_is_caught():

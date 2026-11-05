@@ -842,6 +842,9 @@ class BrightnessController:
         self.level = None
         self.panel_off = True
         self.sleeping = None  # True once a sleep transition completed
+        # Ceiling from an interrupted check's persisted limit; applied to every
+        # up-ramp until recovery has finished (None = no cap).
+        self.recovery_cap = None
         self.settings = None
         self.fault_ceiling = None
         self.pending_restore = None
@@ -858,8 +861,17 @@ class BrightnessController:
             self.level = level
 
     def panel_asleep(self):
-        """True once a sleep transition completed, in standby or dim mode."""
-        return bool(self.sleeping)
+        """True unless a wake transition has succeeded (None = not yet known).
+
+        A boot whose first apply failed has not proven the panel awake, so it
+        counts as asleep and refuses display checks until a transition works.
+        """
+        return self.sleeping is not False
+
+    def _ceiling(self):
+        """The fault ceiling combined with the interrupted-check cap."""
+        caps = [c for c in (self.fault_ceiling, self.recovery_cap) if c is not None]
+        return min(caps) if caps else None
 
     def _apply_on(self, on):
         applier = self.applier or apply_on
@@ -1036,7 +1048,7 @@ class BrightnessController:
                 owned = settings["enabled"] or (dim and self._ddc_available())
                 if owned:
                     outcome = self._ramp(
-                        brightness_target(settings, self.fault_ceiling),
+                        brightness_target(settings, self._ceiling()),
                         cancel=cancel,
                     )
                     if outcome.get("cancelled"):
@@ -1106,7 +1118,7 @@ class BrightnessController:
             settings["sleep_mode"] == "dim" and self._ddc_available()
         )
         if on and owned:
-            target = brightness_target(settings, self.fault_ceiling)
+            target = brightness_target(settings, self._ceiling())
             if target != self.level:
                 outcome = self._ramp(
                     target,
@@ -1551,6 +1563,30 @@ class DisplayCheckRunner:
                 controller.check_running = False
 
 
+def _interrupted_limit(state, settings):
+    """The limit an interrupted run implies (a reboot mid limit-test is one)."""
+    last_level = _as_int(state.get("level"))
+    limit = _as_int(state.get("limit"))
+    if state.get("step") == "limit" and limit is None and last_level is not None:
+        limit = max(0, last_level - settings["step"])
+    return limit
+
+
+def interrupted_check_cap(state_dir, cfg):
+    """Ceiling for the first wake ramp after a reboot that interrupted a check.
+
+    None when no running check was persisted or it implies no limit.
+    """
+    state = _load_state(_json_state_path(state_dir, DISPLAY_CHECK_STATE))
+    if not state or state.get("status") != "running":
+        return None
+    settings = brightness_settings(cfg)
+    limit = _interrupted_limit(state, settings)
+    if limit is None:
+        return None
+    return max(0, int(limit) - 2 * settings["step"])
+
+
 def recover_display_check(
     state_dir,
     cfg,
@@ -1577,9 +1613,7 @@ def recover_display_check(
         return None
     settings = brightness_settings(cfg)
     last_level = _as_int(state.get("level"))
-    limit = _as_int(state.get("limit"))
-    if state.get("step") == "limit" and limit is None and last_level is not None:
-        limit = max(0, last_level - settings["step"])
+    limit = _interrupted_limit(state, settings)
     payload = {
         "id": state.get("id"),
         "step": state.get("step"),
@@ -1599,8 +1633,12 @@ def recover_display_check(
     if not awake:
         # Nothing is written to a sleeping panel, and it may still hold the
         # level the check reached: make the standby/dim path write 0 itself.
+        # The panel may still hold the level the check reached, and a ramp-off
+        # reconcile powered it off without writing: the one-last-touch exception
+        # writes 0 so the next wake cannot light it at that level.
         if controller is not None:
-            controller.set_level(None)
+            with controller.lock:
+                controller.set_level(0 if ddc.set_brightness(0) else None)
     elif last_level is not None:
         target = _safe_target(settings, limit)
         lock = controller.lock if controller is not None else threading.Lock()
@@ -1905,6 +1943,12 @@ def run(
                 check_thread, handled_check_id = maybe_start_check(
                     cfg, check_thread, handled_check_id
                 )
+            if first_pass:
+                # Cap the first wake ramp at the interrupted run's limit before
+                # it starts, so it never rises above it and comes back down.
+                controller.recovery_cap = interrupted_check_cap(
+                    controller.state_dir, cfg
+                )
             now = now_in(cfg)
             prev = last
             if controller is None:
@@ -1926,6 +1970,7 @@ def run(
                     panel_on=lambda: not controller.panel_asleep(),
                 )
                 recovered = True
+                controller.recovery_cap = None
                 check_thread, handled_check_id = maybe_start_check(
                     cfg, check_thread, handled_check_id
                 )
