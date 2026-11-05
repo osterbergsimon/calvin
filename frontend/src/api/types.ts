@@ -2453,6 +2453,95 @@ export interface components {
       claim: string;
     };
     /**
+     * ClockBarDesign
+     * @description The household clock bar design (docs/design/2026-11-04-clock-bar-editor.md §4).
+     */
+    ClockBarDesign: {
+      horizontal?: components["schemas"]["ClockBarHorizontalDesign"] | null;
+      /**
+       * Version
+       * @default 1
+       * @constant
+       */
+      version: 1;
+      vertical?: components["schemas"]["ClockBarVerticalDesign"] | null;
+    };
+    /** ClockBarHorizontalDesign */
+    ClockBarHorizontalDesign: {
+      /**
+       * Barheight
+       * @default normal
+       */
+      barHeight: number | ("slim" | "normal" | "roomy");
+      /** Hidden */
+      hidden?: string[];
+      /** Parts */
+      parts?: {
+        [key: string]: components["schemas"]["ClockBarPart"];
+      };
+      /**
+       * Tilesize
+       * @default m
+       */
+      tileSize: number | ("s" | "m" | "l");
+      zones: components["schemas"]["ClockBarHorizontalZones"];
+    };
+    /** ClockBarHorizontalZones */
+    ClockBarHorizontalZones: {
+      /** Center */
+      center?: string[];
+      /** Left */
+      left?: string[];
+      /** Right */
+      right?: string[];
+    };
+    /**
+     * ClockBarPart
+     * @description One part's options inside a clock bar design.
+     *
+     *     A size is a step name or a px value (Custom). Part ids are dynamic for
+     *     plugin tiles, so they are not validated here.
+     */
+    ClockBarPart: {
+      /** Seconds */
+      seconds?: boolean | null;
+      /** Size */
+      size?: number | ("s" | "m" | "l" | "xl") | null;
+      /** Style */
+      style?: ("upright" | "stacked" | "line") | null;
+      /** Undertime */
+      underTime?: boolean | null;
+    };
+    /** ClockBarVerticalDesign */
+    ClockBarVerticalDesign: {
+      /**
+       * Barheight
+       * @default normal
+       */
+      barHeight: number | ("slim" | "normal" | "roomy");
+      /** Hidden */
+      hidden?: string[];
+      /** Parts */
+      parts?: {
+        [key: string]: components["schemas"]["ClockBarPart"];
+      };
+      /**
+       * Tilesize
+       * @default m
+       */
+      tileSize: number | ("s" | "m" | "l");
+      zones: components["schemas"]["ClockBarVerticalZones"];
+    };
+    /** ClockBarVerticalZones */
+    ClockBarVerticalZones: {
+      /** Bottom */
+      bottom?: string[];
+      /** Middle */
+      middle?: string[];
+      /** Top */
+      top?: string[];
+    };
+    /**
      * ConfigUpdate
      * @description Configuration update model.
      */
@@ -2465,6 +2554,7 @@ export interface components {
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
       calendarSplit?: number | null;
+      clockBarDesign?: components["schemas"]["ClockBarDesign"] | null;
       /** Clockbarpluginitemsize */
       clockBarPluginItemSize?: number | null;
       /** Clockbarshowinkiosk */

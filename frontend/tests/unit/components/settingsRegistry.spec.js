@@ -57,8 +57,7 @@ describe("settings registry", () => {
       "dashboard-kiosk",
       "dashboard-kiosk-focus",
       "screen-behaviour",
-      "clock-bar-appearance",
-      "clock-bar-items",
+      "clock-bar",
       "content-calendars",
       "content-calendar-display",
       "content-photos",
@@ -141,16 +140,23 @@ describe("settings registry", () => {
       path: "Dashboard / Pages & regions",
     });
     expect(getSettingDestinationById("clock-bar-appearance")).toMatchObject({
+      id: "clock-bar",
       category: "dashboard",
       tab: "clock",
       tabKey: "settings_tab_dashboard",
-      path: "Dashboard / Clock",
+      path: "Dashboard / Clock bar",
     });
     expect(getSettingDestinationById("clock-bar-items")).toMatchObject({
+      id: "clock-bar",
       category: "dashboard",
-      tab: "bar-items",
+      tab: "clock",
       tabKey: "settings_tab_dashboard",
-      path: "Dashboard / Clock bar items",
+      path: "Dashboard / Clock bar",
+    });
+    expect(getSettingDestinationById("clock-bar-layout")).toMatchObject({
+      id: "clock-bar",
+      category: "dashboard",
+      tab: "clock",
     });
     expect(getSettingDestinationById("device-hardware")).toMatchObject({
       category: "maintenance",
@@ -252,17 +258,14 @@ describe("settings registry", () => {
   });
 
   it("searches labels, paths, and keywords under the new names", () => {
-    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual([
-      "clock-bar-appearance",
-    ]);
-    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar-items"]);
+    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual(["clock-bar"]);
+    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar"]);
+    expect(filterSettingsDestinations("two lines").map(item => item.id)).toEqual(["clock-bar"]);
     // "github" is a plugin-install word; the update source now lives in Advanced.
     expect(filterSettingsDestinations("github").map(item => item.id)).toContain("plugins");
 
     // Old names still find their new home.
-    expect(filterSettingsDestinations("clock bar").map(item => item.id)).toContain(
-      "clock-bar-items"
-    );
+    expect(filterSettingsDestinations("clock bar").map(item => item.id)).toContain("clock-bar");
     expect(filterSettingsDestinations("display").map(item => item.id)).toContain(
       "dashboard-layout"
     );

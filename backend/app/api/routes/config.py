@@ -439,6 +439,10 @@ async def build_global_config() -> dict:
         config["clockBarShowLogo"] = True
     elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
         config["clockBarShowLogo"] = config["clock_bar_show_logo"]
+    # The clock bar design is optional: absent means the frontend derives one
+    # from the old keys, so a null is the honest value here.
+    if "clockBarDesign" not in config:
+        config["clockBarDesign"] = None
     if "uiSize" not in config and "ui_size" not in config:
         config["uiSize"] = "default"  # Global UI size preset
     elif "ui_size" in config and "uiSize" not in config:

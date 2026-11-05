@@ -18,8 +18,8 @@
           <template v-if="row.inClockBar">In the clock bar</template>
           <template v-else>Hidden from the clock bar</template>
           ·
-          <Button variant="link" class="cbs-link" @click="openClockBarItems">
-            Clock bar items
+          <Button variant="link" class="cbs-link" @click="openClockBarEditor">
+            Edit clock bar look…
           </Button>
         </span>
       </template>
@@ -41,12 +41,14 @@
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePlugins } from "@/composables";
+import { useConfigStore } from "@/stores/config";
 import * as pluginsApi from "@/services/pluginsApi";
 import Button from "@/components/ui/Button.vue";
 import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
 import { buildSourceRow } from "@/utils/instanceSummary";
+import { showTileInDesign } from "@/utils/clockBarDesign";
 import { logError } from "@/utils/logger";
 
 // Clock-bar-only sources (§3.1, §3.6): a service plugin that ships a tile and
@@ -65,6 +67,7 @@ defineProps({
 
 const router = useRouter();
 const route = useRoute();
+const configStore = useConfigStore();
 const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
 
 const addButton = ref(null);
@@ -150,6 +153,13 @@ const handleSaved = async payload => {
         plugin_id: payload.pluginId,
         config: { ...(instance.config || {}), show_in_statusbar: true },
       });
+      // The design wins over show_in_statusbar once a tile is listed in it, so
+      // remove it from the Not shown shelf too (§7.2).
+      if (configStore.clockBarDesign) {
+        await configStore.updateConfig({
+          clockBarDesign: showTileInDesign(configStore.clockBarDesign, instance.id),
+        });
+      }
     } catch (error) {
       logError("[ClockBarSources]", "Failed to switch the new tile on:", error);
     }
@@ -161,8 +171,8 @@ const handleSaved = async payload => {
   await loadPlugins();
 };
 
-const openClockBarItems = () =>
-  router.push({ path: "/settings", query: { setting: "clock-bar-items" } });
+const openClockBarEditor = () =>
+  router.push({ path: "/settings", query: { setting: "clock-bar", edit: "clock-bar" } });
 
 onMounted(async () => {
   if (plugins.value.length === 0 && !loadingPlugins.value) await loadPlugins();

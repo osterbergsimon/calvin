@@ -116,6 +116,7 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarVerticalPluginItemSize = ref(16);
   const clockBarShowPluginItems = ref(true);
   const clockBarShowLogo = ref(true);
+  const clockBarDesign = ref(null); // The one household design (docs/design/2026-11-04-clock-bar-editor.md)
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
   const effectsLevel = ref("auto"); // 'auto' | 'full' | 'standard', per screen (calvin-uudb)
@@ -222,6 +223,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
+    clockBarDesign,
     focusLightMode,
     focusLightDimOthers,
     effectsLevel,
@@ -817,6 +819,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
+    clockBarDesign,
     uiSize,
     consoleLogEnabled,
     consoleLogLevel,

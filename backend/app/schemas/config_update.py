@@ -13,7 +13,7 @@ wrong shape or range is rejected.
 from __future__ import annotations
 
 import re
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from loguru import logger
 from pydantic import (
@@ -26,6 +26,87 @@ from pydantic import (
 )
 
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
+
+
+class ClockBarPart(BaseModel):
+    """One part's options inside a clock bar design.
+
+    A size is a step name or a px value (Custom). Part ids are dynamic for
+    plugin tiles, so they are not validated here.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    size: Annotated[int, Field(ge=0, le=200)] | Literal["s", "m", "l", "xl"] | None = None
+    seconds: bool | None = None
+    underTime: bool | None = None
+    style: Literal["upright", "stacked", "line"] | None = None
+
+
+class ClockBarHorizontalZones(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    left: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    center: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    right: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+
+
+class ClockBarVerticalZones(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    top: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    middle: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    bottom: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+
+
+class ClockBarHorizontalDesign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    zones: ClockBarHorizontalZones
+    hidden: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    parts: Annotated[
+        dict[Annotated[str, Field(max_length=64)], ClockBarPart], Field(max_length=50)
+    ] = Field(default_factory=dict)
+    barHeight: Annotated[int, Field(ge=0, le=200)] | Literal["slim", "normal", "roomy"] = "normal"
+    tileSize: Annotated[int, Field(ge=0, le=200)] | Literal["s", "m", "l"] = "m"
+
+
+class ClockBarVerticalDesign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    zones: ClockBarVerticalZones
+    hidden: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
+        default_factory=list
+    )
+    parts: Annotated[
+        dict[Annotated[str, Field(max_length=64)], ClockBarPart], Field(max_length=50)
+    ] = Field(default_factory=dict)
+    barHeight: Annotated[int, Field(ge=0, le=200)] | Literal["slim", "normal", "roomy"] = "normal"
+    tileSize: Annotated[int, Field(ge=0, le=200)] | Literal["s", "m", "l"] = "m"
+
+
+class ClockBarDesign(BaseModel):
+    """The household clock bar design (docs/design/2026-11-04-clock-bar-editor.md §4)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1] = 1
+    horizontal: ClockBarHorizontalDesign | None = None
+    vertical: ClockBarVerticalDesign | None = None
 
 
 class ConfigUpdate(BaseModel):
@@ -96,6 +177,10 @@ class ConfigUpdate(BaseModel):
                 validate_git_branch(data["git_branch"])
             if data.get("git_repo_url") is not None:
                 validate_git_repo_url(data["git_repo_url"])
+            # The frontend reads the stored clock_bar_design too, so it must
+            # not be a way around the clockBarDesign model above.
+            if "clock_bar_design" in data:
+                raise ValueError("send clockBarDesign, not clock_bar_design")
         return data
 
     @field_validator("gitRepoUrl")
@@ -123,6 +208,9 @@ class ConfigUpdate(BaseModel):
     clockBarVerticalPadding: int | None = None
     clockBarPluginItemSize: int | None = None
     clockBarVerticalPluginItemSize: int | None = None
+    # The one household clock bar design. Not in CONFIG_DISPLAY_KEYS: editing it
+    # needs admin, like the other clock bar keys.
+    clockBarDesign: ClockBarDesign | None = None
 
     # --- Per-screen settings (settings-scope §7 item 8) -------------------
     # Keys a Screens page can write into a screen's override layer. The

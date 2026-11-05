@@ -113,6 +113,14 @@
     </SettingsSection>
 
     <SettingsSection id="content-clock-bar" title="Clock bar info">
+      <InlineNote class="content-clock-bar-link" data-test="clock-bar-look-line">
+        Where these tiles sit on the bar is set in the clock bar editor.
+        <template #action>
+          <Button variant="link" data-test="open-clock-bar-editor" @click="openClockBarEditor">
+            Edit clock bar look…
+          </Button>
+        </template>
+      </InlineNote>
       <ClockBarSources :highlight-id="highlightId" :highlight-provider="highlightProvider" />
     </SettingsSection>
   </div>
@@ -128,6 +136,7 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
@@ -153,5 +162,9 @@ const highlightId = computed(() =>
 const router = useRouter();
 const openPhotoFrameSettings = () => {
   router.push({ path: "/settings", query: { setting: "screen-behaviour" } });
+};
+
+const openClockBarEditor = () => {
+  router.push({ path: "/settings", query: { setting: "clock-bar", edit: "clock-bar" } });
 };
 </script>

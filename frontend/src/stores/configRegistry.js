@@ -256,6 +256,13 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    // The one household clock bar design. null means the resolver derives one
+    // from the old keys (docs/design/2026-11-04-clock-bar-editor.md §4).
+    name: "clockBarDesign",
+    keys: ["clockBarDesign", "clock_bar_design"],
+    defaultValue: null,
+  },
+  {
     name: "focusLightMode",
     keys: ["focusLightMode", "focus_light_mode"],
     defaultValue: "interaction",

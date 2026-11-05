@@ -23,11 +23,12 @@ test.describe("phone: Dashboard", () => {
     const dashboard = page.locator(".dashboard-settings");
     await expect(dashboard.getByText("Pages & regions")).toBeVisible();
     await expect(dashboard.getByRole("button", { name: "Open editor" })).toBeVisible();
-    for (const section of ["Clock", "Clock bar layout", "Remote buttons"]) {
+    for (const section of ["Clock bar", "Remote buttons"]) {
       await expect(
         dashboard.locator(".settings-section__eyebrow", { hasText: section }).first()
       ).toBeVisible();
     }
+    await expect(dashboard.locator('[data-test="edit-clock-bar"]')).toBeVisible();
     // Appearance moved to Screens › Look, so Dashboard has no theme row.
     await expect(dashboard.locator("#section-appearance")).toHaveCount(0);
     await expect(dashboard.locator(".theme-picker__trigger")).toHaveCount(0);
