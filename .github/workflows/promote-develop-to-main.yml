@@ -1,10 +1,11 @@
 name: Promote develop to main
 
+# Manual only: develop is promoted to main when the owner decides to release
+# (Actions -> "Promote develop to main" -> Run workflow). It used to run after
+# every green CI on develop, which kept a standing develop->main PR whose full
+# check suite re-ran on every develop merge.
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
-    branches: [develop]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,7 +13,6 @@ permissions:
 
 jobs:
   open-promotion-pr:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -37,7 +37,7 @@ jobs:
 
           commits=$(git log --pretty=format:'- %h %s' origin/main..origin/develop)
           body=$(printf '%s\n\n%s\n\n%s\n' \
-            "Auto-opened by \`promote-develop-to-main.yml\` after CI succeeded on \`develop\`." \
+            "Opened by a manual run of \`promote-develop-to-main.yml\`." \
             "**Commits ($ahead ahead of main):**" \
             "$commits")
 
