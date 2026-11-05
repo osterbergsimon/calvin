@@ -39,6 +39,19 @@ class BrightnessPoint(BaseModel):
     menu: float = Field(ge=0, le=100)
 
 
+# The camelCase brightness keys: per-screen only, refused on the household config.
+BRIGHTNESS_KEYS = frozenset(
+    {
+        "brightnessRampEnabled",
+        "brightness",
+        "brightnessLimit",
+        "brightnessStep",
+        "brightnessStepSeconds",
+        "brightnessConversion",
+        "sleepMode",
+    }
+)
+
 # snake_case spellings the display agent also reads. Writes are camelCase only.
 BRIGHTNESS_SNAKE_KEYS = frozenset(
     {

@@ -144,7 +144,7 @@ def test_reports_are_validated(test_client: TestClient, kiosk):
     run = _start(test_client).json()
     assert _report(test_client, run["id"], "exploded").status_code == 422
     assert _report(test_client, run["id"], level=101).status_code == 422
-    assert _report(test_client, run["id"], surprise=1).status_code == 422
+    assert _report(test_client, run["id"], surprise=1).status_code == 200  # ignored
     assert test_client.get("/api/kiosks/nobody-here/display-check").status_code == 404
     assert test_client.post("/api/kiosks/nobody-here/display-check", json={}).status_code == 422
 
@@ -375,3 +375,109 @@ def test_verdict_is_validated(test_client: TestClient, kiosk):
         ).status_code
         == 404
     )
+
+
+@pytest.mark.integration
+def test_a_finished_run_is_never_reactivated_by_a_late_running_report(
+    test_client: TestClient, kiosk
+):
+    """The limit test browns out the Pi; the rebooted agent reports interrupted, then a
+    stale config poll makes it send running again. That must not re-offer the job."""
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], level=24)
+    assert _report(test_client, run["id"], "interrupted", level=0).status_code == 200
+
+    late = _report(test_client, run["id"], "running", level=2)
+    assert late.status_code == 409
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "interrupted"
+    assert seen["active"] is False
+    assert "displayCheck" not in _config(test_client)
+
+
+@pytest.mark.integration
+def test_a_repeated_terminal_report_is_accepted_and_keeps_the_first_status(
+    test_client: TestClient, kiosk
+):
+    run = _start(test_client, "write").json()
+    assert _report(test_client, run["id"], "done", level=19).status_code == 200
+    assert _report(test_client, run["id"], "done", level=19, detail="again").status_code == 200
+    assert _report(test_client, run["id"], "interrupted").status_code == 200
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "done"
+    assert seen["active"] is False
+
+
+@pytest.mark.integration
+def test_an_expired_run_takes_a_terminal_report_but_not_a_running_one(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    from app.services import display_check
+
+    run = _start(test_client, "limit").json()
+    now = display_check.utcnow()
+    monkeypatch.setattr(display_check, "utcnow", lambda: now + timedelta(minutes=11))
+    assert _report(test_client, run["id"], "running").status_code == 409
+    assert "displayCheck" not in _config(test_client)
+    assert _report(test_client, run["id"], "interrupted").status_code == 200
+    assert test_client.get(BASE).json()["run"]["status"] == "interrupted"
+
+
+def _set_overrides(client: TestClient, overrides: dict):
+    resp = client.put(f"/api/kiosks/{KIOSK}/overrides", json={"overrides": overrides})
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.integration
+def test_start_accepts_any_value_without_a_limit(test_client: TestClient, kiosk):
+    assert _start(test_client, "conversion", value=100).status_code == 200
+
+
+@pytest.mark.integration
+def test_start_refuses_a_value_above_the_limit_minus_two_steps(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    refused = _start(test_client, "conversion", value=23)  # 26 - 2*2 = 22 is the top
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_limit"
+    assert refused.json()["detail"]["max"] == 22
+    assert test_client.get(BASE).json()["run"] is None  # nothing was started
+    assert _start(test_client, "conversion", value=22).status_code == 200
+
+
+@pytest.mark.integration
+def test_value_limit_follows_the_screens_step(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26, "brightnessStep": 5})
+    assert _start(test_client, "conversion", value=17).status_code == 422  # max is 16
+    assert _start(test_client, "conversion", value=16).status_code == 200
+
+
+@pytest.mark.integration
+def test_a_report_with_long_notes_and_unknown_fields_is_accepted(test_client: TestClient, kiosk):
+    run = _start(test_client, "limit").json()
+    log = [{"at": "2026-11-05T10:00:00+00:00", "level": 5, "note": "x" * 5000, "extra": 1}]
+    resp = test_client.post(
+        BASE,
+        json={
+            "id": run["id"],
+            "status": "running",
+            "log": log,
+            "detail": "d" * 5000,
+            "somethingNew": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    seen = test_client.get(BASE).json()["run"]
+    assert len(seen["log"][0]["note"]) <= 500
+    assert len(seen["detail"]) <= 500
+    assert "extra" not in seen["log"][0]
+
+
+@pytest.mark.integration
+def test_a_huge_log_is_trimmed_to_the_newest_entries(test_client: TestClient, kiosk):
+    run = _start(test_client, "limit").json()
+    log = [{"level": i % 100, "note": f"n{i}"} for i in range(800)]
+    resp = test_client.post(BASE, json={"id": run["id"], "status": "running", "log": log})
+    assert resp.status_code == 200, resp.text
+    seen = test_client.get(BASE).json()["run"]["log"]
+    assert len(seen) == 500
+    assert seen[-1]["note"] == "n799"

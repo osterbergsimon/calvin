@@ -62,6 +62,17 @@ PER_SCREEN_VALUES = [
 ]
 
 
+BRIGHTNESS_KEYS = {
+    "brightnessRampEnabled",
+    "brightness",
+    "brightnessLimit",
+    "brightnessStep",
+    "brightnessStepSeconds",
+    "brightnessConversion",
+    "sleepMode",
+}
+
+
 @pytest.fixture(autouse=True)
 def _host_control_off(monkeypatch):
     """A config write with orientation must never reach the host's display."""
@@ -86,6 +97,8 @@ def test_kiosk_overrides_accept_valid_and_reject_invalid(
 @pytest.mark.integration
 @pytest.mark.parametrize(("key", "valid", "invalid"), PER_SCREEN_VALUES)
 def test_config_accepts_valid_and_rejects_invalid(test_client: TestClient, key, valid, invalid):
+    if key in BRIGHTNESS_KEYS:
+        pytest.skip("per-screen only: see test_household_config_refuses_brightness_keys")
     ok = test_client.post("/api/config", json={key: valid})
     assert ok.status_code == 200, ok.text
 
@@ -190,3 +203,14 @@ def test_brightness_null_clears_and_config_delivers_both_spellings(test_client: 
     assert body["brightnessRampEnabled"] is True
     assert body["brightness_ramp_enabled"] is True
     assert body["brightness_step_seconds"] == 2
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("key", "valid", "_invalid"), [v for v in PER_SCREEN_VALUES if v[0] in BRIGHTNESS_KEYS]
+)
+def test_household_config_refuses_brightness_keys(test_client: TestClient, key, valid, _invalid):
+    """Brightness is per screen only: a household value would reach every panel."""
+    bad = test_client.post("/api/config", json={key: valid})
+    assert bad.status_code == 422, bad.text
+    assert test_client.get("/api/config").json().get(key) is None

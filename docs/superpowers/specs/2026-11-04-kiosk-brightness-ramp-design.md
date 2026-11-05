@@ -264,3 +264,22 @@ on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not
 - **No `placeholderReads` field.** The merged agent's `detect` report does not say whether its reads are
   placeholders, so the backend does not invent it. The UI can show the "screen always reports 0" line only if the
   agent reports it in a later version.
+
+### 10.4 Rules added in review
+
+- **The report endpoint has no credential.** The agent has none, so `POST /kiosks/{id}/display-check` is guarded only by
+  the run id (accepted by this spec). A caller who knows a live run id can post reports for it; the run ids are random
+  and the reports cannot change brightness, only what the UI shows and the saved findings.
+- **A run that has ended never becomes active again.** After a terminal status, or once the run has expired, a
+  non-terminal (`running`) report is refused with 409 and the job is not offered again. A repeated terminal report
+  (the agent's `_finish` sends `done` twice) and the terminal report of a rebooted agent on an expired run are
+  accepted; the first terminal status stays.
+- **A start target above `limit - 2 × step` is refused** (422 `value_above_limit`, with `max`), using the screen's
+  merged `brightnessLimit` and `brightnessStep` (default 2). With no limit, 0–100 is allowed. The agent's conversion
+  step does not apply the limit itself.
+- **Agent reports are tolerant**: unknown fields are ignored, and log notes and `detail` are clipped to 500 characters
+  and the log to its newest 500 entries, so one long error never rejects a report. Admin request bodies stay strict.
+- **Brightness keys are per-screen only.** `POST /config` refuses all seven with 422; write them to a screen's
+  overrides.
+- **Stopping the run of an offline kiosk**: `stop` only marks the run `action: "stop"`. The run stays active until the
+  agent reports or the run expires (at most 10 minutes); the UI should say so.

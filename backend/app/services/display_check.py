@@ -10,10 +10,10 @@ and is no longer offered to the agent.
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictBool
 
 from app.models.db_models import KioskDB
 from app.utils.db_retry import retry_on_db_locked
@@ -26,6 +26,7 @@ Step = Literal["detect", "write", "conversion", "limit"]
 ReportStatus = Literal["running", "done", "stopped", "timeout", "error", "interrupted", "asleep"]
 TERMINAL_STATUSES = frozenset({"done", "stopped", "timeout", "error", "interrupted", "asleep"})
 _MAX_LOG_ENTRIES = 500
+_MAX_TEXT = 500
 
 
 class RunActiveError(Exception):
@@ -42,6 +43,10 @@ class UnknownKioskError(Exception):
 
 class UnknownRunError(Exception):
     """A report named a run other than the stored one."""
+
+
+class RunEndedError(Exception):
+    """A non-terminal report arrived for a run that has already ended."""
 
 
 class NoActiveRunError(Exception):
@@ -66,28 +71,48 @@ class VerdictRequest(BaseModel):
     writes: StrictBool
 
 
-class LogEntry(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+def _clip(limit: int):
+    def clip(value: Any) -> Any:
+        return value[:limit] if isinstance(value, str) else value
 
-    at: str | None = Field(None, max_length=64)
+    return clip
+
+
+def _newest(limit: int):
+    def newest(value: Any) -> Any:
+        return value[-limit:] if isinstance(value, list) else value
+
+    return newest
+
+
+class LogEntry(BaseModel):
+    # The agent resends its whole log on every report, so one oversized note or
+    # a field a newer agent adds must never reject the report: clip, ignore.
+    model_config = ConfigDict(extra="ignore")
+
+    at: Annotated[str | None, BeforeValidator(_clip(64))] = None
     level: int | None = Field(None, ge=0, le=100)
-    note: str = Field("", max_length=500)
+    note: Annotated[str, BeforeValidator(_clip(_MAX_TEXT))] = ""
 
 
 class AgentReport(BaseModel):
-    """The agent's POST body (deploy/kiosk-agent, ``post_display_check``)."""
+    """The agent's POST body (deploy/kiosk-agent, ``post_display_check``).
 
-    model_config = ConfigDict(extra="forbid")
+    Tolerant on purpose: unknown fields are ignored and long text is clipped,
+    because a rejected report leaves the run stuck ``running`` until it expires.
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     id: str = Field(min_length=1, max_length=128)
-    step: str | None = Field(None, max_length=32)
+    step: Annotated[str | None, BeforeValidator(_clip(32))] = None
     status: ReportStatus
     level: int | None = Field(None, ge=0, le=100)
     limit: int | None = Field(None, ge=0, le=100)
-    log: list[LogEntry] | None = Field(None, max_length=_MAX_LOG_ENTRIES)
-    startedAt: str | None = Field(None, max_length=64)
-    finishedAt: str | None = Field(None, max_length=64)
-    detail: str | None = Field(None, max_length=500)
+    log: Annotated[list[LogEntry] | None, BeforeValidator(_newest(_MAX_LOG_ENTRIES))] = None
+    startedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
+    finishedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
+    detail: Annotated[str | None, BeforeValidator(_clip(_MAX_TEXT))] = None
     info: dict[str, Any] | None = None
 
 
@@ -241,14 +266,29 @@ async def stop_run(kiosk_id: str) -> dict:
 
 
 async def record_report(kiosk_id: str, report: AgentReport) -> None:
+    """Fold an agent report into the stored run.
+
+    The endpoint has no credential (the agent has none, accepted by the spec):
+    the only guard is that ``report.id`` is the stored run's id. Once a run has
+    ended (a terminal status, or expired) it can never become active again, so a
+    late ``running`` report from a rebooted agent, or one built from a stale
+    config poll, is refused and the job is not offered a second time.
+    """
     row = await _row(kiosk_id)
     if row is None:
         raise UnknownKioskError(kiosk_id)
     stored = row.display_check
     if not stored or stored.get("id") != report.id:
         raise UnknownRunError(report.id)
+    was_active = _view(stored)["active"]  # type: ignore[index]
+    terminal = report.status in TERMINAL_STATUSES
+    if not was_active and not terminal:
+        raise RunEndedError(report.id)
     run = dict(stored)
-    run["status"] = report.status
+    if was_active or stored["status"] not in TERMINAL_STATUSES:
+        # First terminal status (or progress) wins; a repeated terminal report
+        # only adds data.
+        run["status"] = report.status
     run["updatedAt"] = _iso(utcnow())
     if report.level is not None:
         run["level"] = report.level
@@ -264,16 +304,13 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
         run["info"] = report.info
     # The agent sends finishedAt on every report; it only means something once
     # the run has ended.
-    if report.status in TERMINAL_STATUSES:
+    if terminal and not run.get("finishedAt"):
         run["finishedAt"] = report.finishedAt or _iso(utcnow())
-    findings = (
-        _apply_findings(row.display_check_findings, run)
-        if report.status in TERMINAL_STATUSES
-        else None
-    )
+    first_end = terminal and stored["status"] not in TERMINAL_STATUSES
+    findings = _apply_findings(row.display_check_findings, run) if first_end else None
     await _save(row, run, findings)
-    if report.status in TERMINAL_STATUSES:
-        logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {report.status}")
+    if first_end:
+        logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
 
 
 async def found_limit(kiosk_id: str) -> int:

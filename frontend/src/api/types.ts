@@ -2340,6 +2340,9 @@ export interface components {
     /**
      * AgentReport
      * @description The agent's POST body (deploy/kiosk-agent, ``post_display_check``).
+     *
+     *     Tolerant on purpose: unknown fields are ignored and long text is clipped,
+     *     because a rejected report leaves the run stuck ``running`` until it expires.
      */
     AgentReport: {
       /** Detail */
