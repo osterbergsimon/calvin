@@ -3437,6 +3437,31 @@ def test_display_check_refuses_a_sleeping_standby_panel(monkeypatch):
     assert controller.check_running is False
 
 
+def test_display_check_refuses_a_dimmed_asleep_panel(monkeypatch):
+    """Item 2: dim-asleep is asleep too; the backlight must stay at 0."""
+    reports = []
+    monkeypatch.setattr(
+        agent, "post_display_check",
+        lambda url, payload, **kw: reports.append(payload) or True,
+    )
+    ddc = FakeDdc()
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    assert controller.reconcile(dim, _local(hour=23), True) is False
+    assert controller.level == 0
+    writes = list(ddc.writes)
+    thread = agent.start_display_check(
+        _check_job(), dim, fetch=lambda url: dim,
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    assert thread is None
+    assert reports[-1]["status"] == "asleep"
+    assert ddc.writes == writes
+    assert controller.level == 0
+
+
 def test_display_check_runner_gets_the_real_panel_state(monkeypatch):
     """Item 2: the runner's limit guard must see the live panel state."""
     seen = {}

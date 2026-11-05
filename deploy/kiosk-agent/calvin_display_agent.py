@@ -858,8 +858,8 @@ class BrightnessController:
             self.level = level
 
     def panel_asleep(self):
-        """True when the panel is really in standby (powered off, not dimmed)."""
-        return bool(self.sleeping) and self.panel_off
+        """True once a sleep transition completed, in standby or dim mode."""
+        return bool(self.sleeping)
 
     def _apply_on(self, on):
         applier = self.applier or apply_on
@@ -1647,7 +1647,7 @@ def recover_display_check(
 def start_display_check(job, cfg, *, fetch, backend_url, controller, sleep=None):
     """Run a diagnostics job in a daemon thread; returns the thread.
 
-    A panel that sleeps in standby refuses the job (state "asleep", the level
+    A panel that sleeps (standby or dim) refuses the job (state "asleep", the level
     stays at 0) and nothing is started: returns None.
     """
     def poll():
@@ -1667,7 +1667,7 @@ def start_display_check(job, cfg, *, fetch, backend_url, controller, sleep=None)
                 "limit": None,
                 "log": [],
                 "detail": "the panel is asleep; wake it to run a check",
-                "finishedAt": datetime.now(timezone.utc).isoformat(),
+                "finishedAt": datetime.now().astimezone().isoformat(),
             }
         )
         return None
