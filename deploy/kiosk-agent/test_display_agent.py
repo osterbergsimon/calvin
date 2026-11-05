@@ -2595,9 +2595,15 @@ def test_kernel_fault_lines_match_brownout_and_resets():
 
 def test_vcgencmd_under_voltage_bit_zero():
     def run(argv, timeout=5):
-        return SimpleNamespace(returncode=0, stdout="throttled=0x50000\n", stderr="")
+        return SimpleNamespace(returncode=0, stdout="throttled=0x50001\n", stderr="")
 
     assert agent.vcgencmd_under_voltage(run) is True
+
+    def sticky_only(argv, timeout=5):
+        # Bit 16 ("under-voltage occurred") is history, not a fault now.
+        return SimpleNamespace(returncode=0, stdout="throttled=0x50000\n", stderr="")
+
+    assert agent.vcgencmd_under_voltage(sticky_only) is False
 
     def clean(argv, timeout=5):
         return SimpleNamespace(returncode=0, stdout="throttled=0x0\n", stderr="")
@@ -2899,11 +2905,14 @@ def test_ramp_off_while_asleep_does_one_last_step_up_then_stops():
     assert controller.pending_restore == 19
 
     before = len(ddc.writes)
+    before_clock = clock.t
     controller.reconcile(off_cfg, _local(hour=9), False)  # the next wake
+    # The one-last step-up is a wake ramp: it waits for the panel to settle too.
+    assert clock.t - before_clock >= agent.SETTLE_QUIET_SECONDS
     once = ddc.writes[before:]
     assert once == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
     assert controller.pending_restore is None
-    assert applied == [False]  # no panel power cycle for a ramp-only wake
+    assert applied == [False, True]  # one last power-on, then a careful step-up
 
     # After that single step-up the agent never touches brightness again.
     after = len(ddc.writes)
@@ -2977,6 +2986,26 @@ def test_switching_dim_to_standby_powers_off_at_the_next_sleep():
         True,
     )
     assert applied == [False]
+
+
+def test_switching_dim_to_standby_while_asleep_restores_brightness_on_wake():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    controller.reconcile(dim, _local(hour=23), True)
+    assert controller.level == 0
+
+    standby = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby")
+    controller.reconcile(standby, _local(hour=23, minute=1), False)
+    assert controller.pending_restore == 19
+
+    before = len(ddc.writes)
+    assert controller.reconcile(standby, _local(hour=9), False) is True
+    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+    assert controller.pending_restore is None
+    assert applied == []  # the panel never powered off in dim mode
 
 
 def test_a_new_on_during_the_dim_cancels_and_brightens_back():
@@ -3084,6 +3113,17 @@ def test_runner_detect_reports_the_display(tmp_path):
     assert ddc.writes == []  # detection never changes brightness
 
 
+def test_runner_persists_each_level_so_a_reboot_can_finish_safely(tmp_path):
+    ddc = FakeDdc()
+    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
+           "brightness": 19}
+    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
+    assert runner._write_level(21) is True
+    state = agent._load_state(str(tmp_path / agent.DISPLAY_CHECK_STATE))
+    assert state["status"] == "running"
+    assert state["level"] == 21
+
+
 def test_runner_write_dims_then_returns(tmp_path):
     ddc = FakeDdc()
     job = {"id": "c1", "step": "write", "action": "start", "value": None,
@@ -3100,9 +3140,8 @@ def test_runner_conversion_sets_the_value_and_waits(tmp_path):
     ddc = FakeDdc()
     job = {"id": "c1", "step": "conversion", "action": "start", "value": 19,
            "brightness": 19}
-    configs = iter([_cfg()])  # job gone: the dialog closed
     runner, reports, clock = _runner(
-        job, _ramp_cfg(), ddc, tmp_path, poll=lambda: next(configs)
+        job, _ramp_cfg(), ddc, tmp_path, poll=_cfg  # job gone: the dialog closed
     )
     runner.run()
     assert ddc.writes[-1] == 19
@@ -3120,7 +3159,7 @@ def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
     job = {"id": "c1", "step": "limit", "action": "start", "value": None,
            "brightness": 19}
     runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
-    runner.level = 19
+    runner.level = 20
     runner.controller = agent.BrightnessController(
         ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
     )
