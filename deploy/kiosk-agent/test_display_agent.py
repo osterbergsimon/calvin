@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import os
+import threading
 import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
@@ -3307,3 +3308,92 @@ def test_run_with_a_controller_never_touches_ddc_when_the_ramp_is_off(tmp_path):
         brightness=controller,
     )
     assert applied == [True]  # on at startup, then no change
+
+
+# -- fix round 1: the diagnostics thread must not race the main loop --------
+def test_display_check_blocks_reconcile_ramps_and_keeps_the_step(tmp_path):
+    """A live-apply while a check runs must not interleave a second ramp.
+
+    The check owns the level until it finishes, so reconcile must skip all DDC
+    work; otherwise two ramps interleave and a write can jump by more than one
+    configured step (30 -> 14 -> 32).
+    """
+    writes = []
+    reached = threading.Event()
+    resume = threading.Event()
+
+    def on_write(level):
+        writes.append(level)
+        if level == 30 and not reached.is_set():
+            reached.set()
+            resume.wait(2)  # pause the check's ramp mid-flight
+
+    ddc = FakeDdc(on_write=on_write)
+    controller, clock, applied = _controller(ddc=ddc)
+    live_apply = _ramp_cfg(brightness=14)  # a lower value ramps *down*
+    job = {"id": "c1", "step": "limit", "action": "start",
+           "value": None, "brightness": 19}
+    runner, reports, rclock = _runner(job, _ramp_cfg(), ddc, tmp_path)
+    runner.controller = controller
+    runner.level = 0
+    # A check is in progress (the runner owns the level until _finish).
+    controller.check_running = True
+
+    thread = threading.Thread(target=runner.run)
+    thread.start()
+    assert reached.wait(2), "the limit test never reached level 30"
+    try:
+        # This is the very race: a live-apply poll arrives mid-check.
+        controller.reconcile(live_apply, _local(hour=9), True)
+    finally:
+        resume.set()
+    thread.join(2)
+    assert not thread.is_alive()
+    controller.check_running = False
+
+    assert writes  # the check did ramp
+    assert max(_steps([0] + writes)) <= 2  # never a jump > brightnessStep
+
+
+def test_fault_monitor_never_loses_or_duplicates_lines_across_threads(monkeypatch):
+    """Concurrent new_faults() calls must each see a line exactly once.
+
+    A yield is forced *inside* the lines[self._seen:] slice, i.e. between the
+    read of _seen and its update. Two threads racing there is exactly what
+    swallows a fault line; the monitor's lock must serialize them.
+    """
+    lines = ["Under-voltage detected!", "usb 1-1.2: reset"]
+    gate = threading.Event()
+
+    class SlowLines(list):
+        def __getitem__(self, key):
+            gate.wait(2)  # release the GIL while new_faults is mid-slice
+            return list.__getitem__(self, key)
+
+    monkeypatch.setattr(
+        agent, "kernel_fault_lines",
+        lambda since, run=None: SlowLines(lines),
+    )
+    monitor = agent.FaultMonitor(
+        run=lambda *a, **k: SimpleNamespace(
+            returncode=0, stdout="", stderr=""
+        ),
+        clock=FakeClock(),
+    )
+    monitor.arm()
+    collected = []
+    started = threading.Barrier(3)
+
+    def poll():
+        started.wait()
+        collected.extend(monitor.new_faults())
+
+    threads = [threading.Thread(target=poll) for _ in range(2)]
+    for t in threads:
+        t.start()
+    started.wait()
+    time_module.sleep(0.05)  # let a worker reach the slice
+    gate.set()
+    for t in threads:
+        t.join()
+    assert sorted(collected) == sorted(lines)

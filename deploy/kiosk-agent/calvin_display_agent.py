@@ -592,22 +592,28 @@ class FaultMonitor:
     def __init__(self, *, run=None, clock=None):
         self._run = run or _default_ddc_run
         self._clock = clock or time_module.time
+        self._lock = threading.Lock()
         self._since = None
         self._seen = 0
 
     def arm(self):
-        self._since = self._clock()
-        self._seen = 0
+        with self._lock:
+            self._since = self._clock()
+            self._seen = 0
 
     def new_faults(self):
-        faults = []
-        if self._since is not None:
-            lines = kernel_fault_lines(self._since, run=self._run)
-            faults = lines[self._seen :]
-            self._seen = len(lines)
-        if vcgencmd_under_voltage(self._run):
-            faults.append("under-voltage (vcgencmd get_throttled)")
-        return faults
+        # The same monitor is polled by the main loop and the diagnostics
+        # thread. Serialise the read of _seen and its update so neither thread
+        # swallows (or duplicates) a fault line.
+        with self._lock:
+            faults = []
+            if self._since is not None:
+                lines = kernel_fault_lines(self._since, run=self._run)
+                faults = lines[self._seen :]
+                self._seen = len(lines)
+            if vcgencmd_under_voltage(self._run):
+                faults.append("under-voltage (vcgencmd get_throttled)")
+            return faults
 
     def __call__(self):
         return bool(self.new_faults())
@@ -813,6 +819,11 @@ class BrightnessController:
         self.connected = connected
         self.cog = cog
         self.log = log_fn or log
+        # One lock guards every brightness ramp and every level read/write.
+        # The diagnostics runner holds it while it owns the level; the main
+        # loop's reconcile skips all DDC work for the duration of a check.
+        self.lock = threading.RLock()
+        self.check_running = False
         self.level = 0
         self.panel_off = True
         self.settings = None
@@ -821,6 +832,14 @@ class BrightnessController:
         self.last_fault = None
         self.last_limit = None
         self.reschedule = False
+
+    def get_level(self):
+        with self.lock:
+            return self.level
+
+    def set_level(self, level):
+        with self.lock:
+            self.level = level
 
     def _apply_on(self, on):
         applier = self.applier or apply_on
@@ -839,19 +858,20 @@ class BrightnessController:
             arm()
 
     def _ramp(self, target, *, cancel=None, stop_on_fault=True):
-        outcome = ramp_brightness(
-            self.level,
-            target,
-            write=self.ddc.set_brightness,
-            fault=self.fault,
-            sleep=self.sleep,
-            step=self.settings["step"],
-            step_seconds=self.settings["step_seconds"],
-            cancel=cancel,
-            stop_on_fault=stop_on_fault,
-            log_fn=self.log,
-        )
-        self.level = outcome["level"]
+        with self.lock:
+            outcome = ramp_brightness(
+                self.level,
+                target,
+                write=self.ddc.set_brightness,
+                fault=self.fault,
+                sleep=self.sleep,
+                step=self.settings["step"],
+                step_seconds=self.settings["step_seconds"],
+                cancel=cancel,
+                stop_on_fault=stop_on_fault,
+                log_fn=self.log,
+            )
+            self.level = outcome["level"]
         if outcome.get("fault"):
             self.last_fault = outcome["fault"]
             self.last_limit = outcome.get("limit")
@@ -899,6 +919,17 @@ class BrightnessController:
     def reconcile(self, cfg, now, last_on, cancel=None):
         """Power/settle/ramp one poll; returns the new display on/off state."""
         self.reschedule = False
+        if self.check_running:
+            # A diagnostics run owns brightness until its _finish: never
+            # interleave a reconcile ramp with the runner's DDC writes. Keep
+            # the recorded state unchanged so a pending on/off transition is
+            # retried on the next poll, once the check has finished.
+            return last_on
+        with self.lock:
+            return self._reconcile_locked(cfg, now, last_on, cancel)
+
+    def _reconcile_locked(self, cfg, now, last_on, cancel=None):
+        """The reconcile body, holding the brightness lock throughout."""
         settings = brightness_settings(cfg)
         previous = self.settings
         on = desired_on(cfg, now)
@@ -1156,7 +1187,11 @@ class DisplayCheckRunner:
             self.settings = dict(
                 self.settings, brightness=job["brightness"]
             )
-        self.level = controller.level if controller is not None else 0
+        if controller is not None:
+            level = controller.get_level()
+            self.level = 0 if level is None else level
+        else:
+            self.level = 0
         if controller is not None:
             arm = getattr(controller.fault, "arm", None)
             if arm is not None:
@@ -1204,7 +1239,7 @@ class DisplayCheckRunner:
         self.level = level
         self._touched = True
         if self.controller is not None:
-            self.controller.level = level
+            self.controller.set_level(level)
         # Persist every step: if the kiosk reboots mid-ramp (the limit test can
         # cause exactly that), recovery must know the last level reached.
         self._save()
@@ -1240,23 +1275,34 @@ class DisplayCheckRunner:
         if cancel_missing is True:
             cancel = self._cancel
         elif cancel_missing is False:
-            cancel = lambda: self._cancel(gone_is_stop=False)
+
+            def cancel():
+                return self._cancel(gone_is_stop=False)
+
         else:
             # Finishing is a safety action: a Stop or a closed dialog must not
             # leave the screen at whatever level the check stopped on.
             cancel = None
-        return ramp_brightness(
-            self.level,
-            target,
-            write=self._write_level,
-            fault=self.controller.fault if self.controller else None,
-            sleep=self.sleep,
-            step=self.settings["step"],
-            step_seconds=self.settings["step_seconds"],
-            cancel=cancel,
-            stop_on_fault=stop_on_fault,
-            log_fn=log,
+        # Hold the controller's brightness lock for the whole ramp: this
+        # serialises every DDC write and level update with reconcile.
+        lock = (
+            self.controller.lock
+            if self.controller is not None
+            else threading.Lock()
         )
+        with lock:
+            return ramp_brightness(
+                self.level,
+                target,
+                write=self._write_level,
+                fault=self.controller.fault if self.controller else None,
+                sleep=self.sleep,
+                step=self.settings["step"],
+                step_seconds=self.settings["step_seconds"],
+                cancel=cancel,
+                stop_on_fault=stop_on_fault,
+                log_fn=log,
+            )
 
     def _execute(self, job):
         step = job["step"]
@@ -1382,46 +1428,56 @@ class DisplayCheckRunner:
 
     def run(self):
         """Poll every 1.5 s while the job is active; always finish safely."""
-        self._save()
-        self.report(self._payload("running"))
-        current = self.job
-        while True:
-            if self.clock() >= self._deadline:
-                return self._finish("timeout")
-            if current.get("action") == "stop":
-                return self._finish("stopped")
-            signature = (current["id"], current["step"], current.get("value"))
-            if signature not in self._seen:
-                self._seen.add(signature)
-                try:
-                    self._execute(current)
-                except Exception as e:  # a check must never take the agent down
-                    self._entry(f"failed: {e}")
-                    self._stop_reason = "error"
-                if self._stop_reason is not None:
-                    status = self._stop_reason
-                    self._stop_reason = None
-                    return self._finish(status)
-            # Wait for the owner's next step (or the dialog closing).
+        controller = self.controller
+        if controller is not None:
+            # The runner owns the level until _finish; reconcile must skip
+            # all DDC work for the whole run. The flag is cleared in finally
+            # so even an erroring check hands brightness back to the loop.
+            controller.check_running = True
+        try:
+            self._save()
+            self.report(self._payload("running"))
+            current = self.job
             while True:
                 if self.clock() >= self._deadline:
                     return self._finish("timeout")
-                if self.poll is None:
-                    return self._finish("done")
-                try:
-                    cfg = self.poll()
-                except Exception:
-                    self.sleep(DISPLAY_CHECK_POLL_SECONDS)
-                    continue
-                nxt = display_check_job(cfg)
-                if nxt is None or nxt["id"] != self.job["id"]:
-                    return self._finish("done")
-                if nxt["action"] == "stop":
+                if current.get("action") == "stop":
                     return self._finish("stopped")
-                if (nxt["id"], nxt["step"], nxt.get("value")) != signature:
-                    current = nxt
-                    break
-                self.sleep(DISPLAY_CHECK_POLL_SECONDS)
+                signature = (current["id"], current["step"], current.get("value"))
+                if signature not in self._seen:
+                    self._seen.add(signature)
+                    try:
+                        self._execute(current)
+                    except Exception as e:  # a check must never take the agent down
+                        self._entry(f"failed: {e}")
+                        self._stop_reason = "error"
+                    if self._stop_reason is not None:
+                        status = self._stop_reason
+                        self._stop_reason = None
+                        return self._finish(status)
+                # Wait for the owner's next step (or the dialog closing).
+                while True:
+                    if self.clock() >= self._deadline:
+                        return self._finish("timeout")
+                    if self.poll is None:
+                        return self._finish("done")
+                    try:
+                        cfg = self.poll()
+                    except Exception:
+                        self.sleep(DISPLAY_CHECK_POLL_SECONDS)
+                        continue
+                    nxt = display_check_job(cfg)
+                    if nxt is None or nxt["id"] != self.job["id"]:
+                        return self._finish("done")
+                    if nxt["action"] == "stop":
+                        return self._finish("stopped")
+                    if (nxt["id"], nxt["step"], nxt.get("value")) != signature:
+                        current = nxt
+                        break
+                    self.sleep(DISPLAY_CHECK_POLL_SECONDS)
+        finally:
+            if controller is not None:
+                controller.check_running = False
 
 
 def recover_display_check(
@@ -1515,6 +1571,9 @@ def start_display_check(job, cfg, *, fetch, backend_url, controller, sleep=None)
     thread = threading.Thread(
         target=runner.run, daemon=True, name="calvin-display-check"
     )
+    # Claim the level synchronously, before the loop's next reconcile can
+    # ramp; run() re-asserts it and clears it in its own finally.
+    controller.check_running = True
     thread.start()
     return thread
 
