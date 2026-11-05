@@ -154,10 +154,10 @@ describe("clockBarDesign resolver — old-key parity", () => {
     expect(hidden.horizontal.hidden).toContain("tile:energy");
     expect(expandClockBarZone(hidden, "horizontal", "right")).not.toContain("tile:energy");
 
-    const shown = deriveClockBarDesign(
-      oldConfig(),
-      [service("energy", true), service("weather", undefined)]
-    );
+    const shown = deriveClockBarDesign(oldConfig(), [
+      service("energy", true),
+      service("weather", undefined),
+    ]);
     expect(shown.horizontal.hidden).not.toContain("tile:energy");
     expect(expandClockBarZone(shown, "horizontal", "right")).toEqual([
       "tile:energy",
@@ -295,6 +295,8 @@ describe("clockBarDesign resolver — old-key parity", () => {
 
   it("uses three size steps as the spec's S/M/L mapping, with M equal to today", () => {
     expect(CLOCK_BAR_SIZE_STEPS).toEqual(["s", "m", "l", "xl"]);
-    expect(clockBarPartSizePx({ horizontal: { parts: { time: { size: "m" } } } }, "horizontal", "time")).toBe(16);
+    expect(
+      clockBarPartSizePx({ horizontal: { parts: { time: { size: "m" } } } }, "horizontal", "time")
+    ).toBe(16);
   });
 });

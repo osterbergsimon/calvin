@@ -115,8 +115,7 @@ const normalizeSize = (value, fallback = "m") => {
   return fallback;
 };
 
-const normalizeBarHeight = value =>
-  CLOCK_BAR_BAR_HEIGHTS.includes(value) ? value : "normal";
+const normalizeBarHeight = value => (CLOCK_BAR_BAR_HEIGHTS.includes(value) ? value : "normal");
 
 const normalizePart = (id, part) => {
   const base = { ...(DEFAULT_PARTS[id] || {}) };
@@ -177,29 +176,30 @@ const deriveFromOldKeys = (config, tiles) => {
       logo: { size: "m" },
       room: { size: "m" },
       time: {
-        size: stepForPx(
-          read(config, "clockBarFontSize", "clock_bar_font_size") ?? 16,
-          "time",
-          "horizontal"
-        ) ?? normalizeSize(read(config, "clockBarFontSize", "clock_bar_font_size") ?? 16),
+        size:
+          stepForPx(
+            read(config, "clockBarFontSize", "clock_bar_font_size") ?? 16,
+            "time",
+            "horizontal"
+          ) ?? normalizeSize(read(config, "clockBarFontSize", "clock_bar_font_size") ?? 16),
         seconds: showSeconds,
         style: "upright",
       },
       date: {
-        size: stepForPx(
-          read(config, "clockBarDateFontSize", "clock_bar_date_font_size") ?? 14,
-          "date",
-          "horizontal"
-        ) ?? normalizeSize(read(config, "clockBarDateFontSize", "clock_bar_date_font_size") ?? 14),
+        size:
+          stepForPx(
+            read(config, "clockBarDateFontSize", "clock_bar_date_font_size") ?? 14,
+            "date",
+            "horizontal"
+          ) ??
+          normalizeSize(read(config, "clockBarDateFontSize", "clock_bar_date_font_size") ?? 14),
         underTime: horizontalLayout === "two-lines",
         style: "line",
       },
     },
     barHeight:
-      stepForBarHeight(
-        read(config, "clockBarPadding", "clock_bar_padding") ?? 8,
-        "horizontal"
-      ) ?? "normal",
+      stepForBarHeight(read(config, "clockBarPadding", "clock_bar_padding") ?? 8, "horizontal") ??
+      "normal",
     tileSize:
       stepForPx(
         read(config, "clockBarPluginItemSize", "clock_bar_plugin_item_size") ?? 16,
@@ -209,7 +209,9 @@ const deriveFromOldKeys = (config, tiles) => {
       normalizeSize(read(config, "clockBarPluginItemSize", "clock_bar_plugin_item_size") ?? 16),
   };
 
-  const stacked = ["compact-time", "compact-time-date", "vertical-compact"].includes(verticalLayout);
+  const stacked = ["compact-time", "compact-time-date", "vertical-compact"].includes(
+    verticalLayout
+  );
   const stackedDate = verticalLayout === "compact-time-date";
   const vertical = {
     zones: {
@@ -227,20 +229,25 @@ const deriveFromOldKeys = (config, tiles) => {
       logo: { size: "m" },
       room: { size: "m" },
       time: {
-        size: stepForPx(
-          read(config, "clockBarVerticalFontSize", "clock_bar_vertical_font_size") ?? 18,
-          "time",
-          "vertical"
-        ) ?? normalizeSize(read(config, "clockBarVerticalFontSize", "clock_bar_vertical_font_size") ?? 18),
+        size:
+          stepForPx(
+            read(config, "clockBarVerticalFontSize", "clock_bar_vertical_font_size") ?? 18,
+            "time",
+            "vertical"
+          ) ??
+          normalizeSize(
+            read(config, "clockBarVerticalFontSize", "clock_bar_vertical_font_size") ?? 18
+          ),
         seconds: showSeconds,
         style: stacked ? "stacked" : "upright",
       },
       date: {
-        size: stepForPx(
-          read(config, "clockBarVerticalDateFontSize", "clock_bar_vertical_date_font_size") ?? 11,
-          "date",
-          "vertical"
-        ) ??
+        size:
+          stepForPx(
+            read(config, "clockBarVerticalDateFontSize", "clock_bar_vertical_date_font_size") ?? 11,
+            "date",
+            "vertical"
+          ) ??
           normalizeSize(
             read(config, "clockBarVerticalDateFontSize", "clock_bar_vertical_date_font_size") ?? 11
           ),
@@ -249,8 +256,10 @@ const deriveFromOldKeys = (config, tiles) => {
       },
     },
     barHeight:
-      stepForBarHeight(read(config, "clockBarVerticalPadding", "clock_bar_vertical_padding") ?? 8, "vertical") ??
-      "normal",
+      stepForBarHeight(
+        read(config, "clockBarVerticalPadding", "clock_bar_vertical_padding") ?? 8,
+        "vertical"
+      ) ?? "normal",
     tileSize:
       stepForPx(
         read(config, "clockBarVerticalPluginItemSize", "clock_bar_vertical_plugin_item_size") ?? 16,
@@ -322,7 +331,10 @@ const ensureStatus = (shape, zones, hidden) => {
 
 const ensureTileDefaults = (shape, zones, hidden, tiles) => {
   if (!tiles.length) return hidden;
-  const explicit = new Set([...CLOCK_BAR_SHAPE_ZONES[shape].flatMap(zone => zones[zone]), ...hidden]);
+  const explicit = new Set([
+    ...CLOCK_BAR_SHAPE_ZONES[shape].flatMap(zone => zones[zone]),
+    ...hidden,
+  ]);
   const placeholder = hasPlaceholder(shape, zones);
   const next = [...hidden];
   for (const tile of tiles) {
@@ -422,7 +434,11 @@ export function clockBarPartSizePx(design, shape, part) {
   const size = part.startsWith("tile:") ? state?.tileSize : state?.parts?.[part]?.size;
   if (typeof size === "number") return size;
   const tablePart = part.startsWith("tile:") ? "tile" : part;
-  return CLOCK_BAR_SIZE_TABLE[shape]?.[tablePart]?.[size] ?? CLOCK_BAR_SIZE_TABLE[shape]?.[tablePart]?.m ?? 16;
+  return (
+    CLOCK_BAR_SIZE_TABLE[shape]?.[tablePart]?.[size] ??
+    CLOCK_BAR_SIZE_TABLE[shape]?.[tablePart]?.m ??
+    16
+  );
 }
 
 /** The px padding a bar height resolves to. */
