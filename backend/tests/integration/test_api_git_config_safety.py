@@ -191,3 +191,19 @@ def test_update_refuses_stored_unsafe_git_branch(test_client, tmp_path, monkeypa
 
     assert response.status_code == 400
     mock_popen.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"clock_bar_design": {"junk": ["<script>"]}},
+        {"clock_bar_design": {"version": 1}},
+        {"clock_bar_design": None},
+    ],
+)
+def test_config_rejects_snake_case_clock_bar_design(test_client, payload):
+    """The frontend also reads clock_bar_design, so the snake_case key must not
+    store an unvalidated design (calvin-d7cl review 8)."""
+    response = test_client.post("/api/config", json=payload)
+
+    assert response.status_code == 422

@@ -78,7 +78,9 @@ class ClockBarHorizontalDesign(BaseModel):
     hidden: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
         default_factory=list
     )
-    parts: Annotated[dict[str, ClockBarPart], Field(max_length=50)] = Field(default_factory=dict)
+    parts: Annotated[
+        dict[Annotated[str, Field(max_length=64)], ClockBarPart], Field(max_length=50)
+    ] = Field(default_factory=dict)
     barHeight: Annotated[int, Field(ge=0, le=200)] | Literal["slim", "normal", "roomy"] = "normal"
     tileSize: Annotated[int, Field(ge=0, le=200)] | Literal["s", "m", "l"] = "m"
 
@@ -90,7 +92,9 @@ class ClockBarVerticalDesign(BaseModel):
     hidden: Annotated[list[Annotated[str, Field(max_length=120)]], Field(max_length=100)] = Field(
         default_factory=list
     )
-    parts: Annotated[dict[str, ClockBarPart], Field(max_length=50)] = Field(default_factory=dict)
+    parts: Annotated[
+        dict[Annotated[str, Field(max_length=64)], ClockBarPart], Field(max_length=50)
+    ] = Field(default_factory=dict)
     barHeight: Annotated[int, Field(ge=0, le=200)] | Literal["slim", "normal", "roomy"] = "normal"
     tileSize: Annotated[int, Field(ge=0, le=200)] | Literal["s", "m", "l"] = "m"
 
@@ -173,6 +177,10 @@ class ConfigUpdate(BaseModel):
                 validate_git_branch(data["git_branch"])
             if data.get("git_repo_url") is not None:
                 validate_git_repo_url(data["git_repo_url"])
+            # The frontend reads the stored clock_bar_design too, so it must
+            # not be a way around the clockBarDesign model above.
+            if "clock_bar_design" in data:
+                raise ValueError("send clockBarDesign, not clock_bar_design")
         return data
 
     @field_validator("gitRepoUrl")

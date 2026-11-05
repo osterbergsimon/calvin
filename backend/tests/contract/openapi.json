@@ -471,6 +471,9 @@
               "$ref": "#/components/schemas/ClockBarPart"
             },
             "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 64
+            },
             "title": "Parts",
             "type": "object"
           },
@@ -641,6 +644,9 @@
               "$ref": "#/components/schemas/ClockBarPart"
             },
             "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 64
+            },
             "title": "Parts",
             "type": "object"
           },

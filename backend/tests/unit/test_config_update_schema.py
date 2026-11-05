@@ -121,6 +121,8 @@ def test_clock_bar_design_accepts_only_one_shape():
         {"horizontal": {"zones": {}, "parts": {"time": {"size": "xxl"}}}},
         {"horizontal": {"zones": {}, "parts": {"time": {"style": "diagonal"}}}},
         {"horizontal": {"zones": {}, "unknown": True}},
+        {"horizontal": {"zones": {}, "parts": {"x" * 65: {"size": "m"}}}},
+        {"vertical": {"zones": {}, "parts": {"x" * 65: {"size": "m"}}}},
     ],
 )
 def test_clock_bar_design_rejects_bad_shapes(patch):
@@ -134,3 +136,22 @@ def test_clock_bar_design_is_admin_only():
     from app.security.route_policy import CONFIG_DISPLAY_KEYS
 
     assert "clockBarDesign" not in CONFIG_DISPLAY_KEYS
+
+
+@pytest.mark.unit
+def test_clock_bar_design_part_key_at_the_cap_is_accepted():
+    update = ConfigUpdate(
+        clockBarDesign={
+            "version": 1,
+            "horizontal": {"zones": {}, "parts": {"x" * 64: {"size": "m"}}},
+        }
+    )
+    assert update.clockBarDesign is not None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("value", [{"junk": 1}, None, {"version": 1}])
+def test_snake_case_clock_bar_design_key_is_refused(value):
+    """extra="allow" would store it unvalidated and the frontend reads it."""
+    with pytest.raises(ValueError, match="clockBarDesign"):
+        ConfigUpdate(**{"clock_bar_design": value})
