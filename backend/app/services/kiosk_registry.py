@@ -99,6 +99,18 @@ def _normalized_viewport(viewport: dict | None) -> dict | None:
     return {"w": w, "h": h}
 
 
+_HEARTBEAT_COLUMNS = [
+    "hostname",
+    "last_seen",
+    "agent_version",
+    "agent_update_status",
+    "agent_update_message",
+    "viewport",
+    "display_stack",
+    "overrides",
+]
+
+
 @retry_on_db_locked()
 async def record_kiosk(
     kiosk_id: str,
@@ -191,7 +203,9 @@ async def record_kiosk(
     ):
         return
     existing.last_seen = now
-    await existing.update()
+    # Never the display-check columns: the kiosk's own poll rewrites its row about
+    # every 1.5 s during a check and must not put back a stale copy of the run.
+    await existing.update(_columns=_HEARTBEAT_COLUMNS)
 
 
 def _to_utc_iso(dt: datetime | None) -> str | None:
@@ -575,7 +589,8 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
                 # Extremely unlikely (row vanished again); nothing safe to do.
                 return
     existing.overrides = overrides
-    await existing.update()
+    # Only this column: a stale whole-row write would put back an old display-check run.
+    await existing.update(_columns=["overrides"])
 
 
 @retry_on_db_locked()

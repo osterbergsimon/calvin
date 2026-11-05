@@ -52,6 +52,13 @@ const props = defineProps({
     type: Number,
     default: null,
   },
+  // An ordered list of instance ids (docs/design/2026-11-04-clock-bar-editor.md
+  // §7.1). With ids the caller (the clock bar design) decides which tiles show,
+  // so `show_in_statusbar` is not read. Without it, today's behaviour.
+  ids: {
+    type: Array,
+    default: null,
+  },
 });
 
 const sizeStyle = computed(() =>
@@ -74,9 +81,14 @@ function isStatusbarVisible(service) {
   return true;
 }
 
-const schemaServices = computed(() =>
-  webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s))
-);
+const schemaServices = computed(() => {
+  const barServices = webServicesStore.services.filter(service => service.statusbar_schema?.kind);
+  if (Array.isArray(props.ids)) {
+    const byId = new Map(barServices.map(service => [service.id, service]));
+    return props.ids.map(id => byId.get(id)).filter(Boolean);
+  }
+  return barServices.filter(isStatusbarVisible);
+});
 
 onMounted(() => {
   if (webServicesStore.services.length === 0) {

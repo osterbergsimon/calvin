@@ -2,40 +2,78 @@
   <div
     v-if="shouldShow"
     class="clock-bar-horizontal"
-    :class="[`position-${position}`, { 'show-date': showDate }]"
+    :class="[`position-${position}`, { 'is-live': !editable }]"
     :style="{ padding: barPaddingStyle }"
     role="status"
     aria-label="Status bar"
     aria-live="polite"
   >
     <div class="clock-bar-outer">
-      <div class="clock-bar-side clock-bar-left">
-        <BarLogo v-if="showLogo" />
-        <span v-if="!previewMode && roomLabel" class="clock-bar-room">{{ roomLabel }}</span>
-        <ScreenDots
-          v-if="!previewMode"
-          :screens="screens"
-          :active-screen-id="activeScreenId"
-          @select-screen="activateScreen"
-        />
-      </div>
-
       <div
-        class="clock-bar-content"
-        :class="{
-          'layout-single-line': layout === 'single-line',
-          'layout-two-lines': layout === 'two-lines',
-        }"
+        v-for="zoneKey in zoneKeys"
+        :key="zoneKey"
+        class="clock-bar-zone"
+        :class="[
+          `clock-bar-${zoneKey}`,
+          { 'clock-bar-content': zoneKey === 'center', 'clock-bar-side': zoneKey !== 'center' },
+        ]"
+        :data-drop-zone="zoneKey"
       >
-        <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
-        <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
-          formattedDate
-        }}</span>
-      </div>
-
-      <div class="clock-bar-side clock-bar-right">
-        <PluginStatusbarItems :size="pluginItemSize" />
-        <BarActionCluster v-if="!previewMode" :compact="false" />
+        <template v-for="item in zoneItems[zoneKey]" :key="itemKey(item)">
+          <div v-if="item.kind === 'pair'" class="clock-bar-time-stack">
+            <ClockBarPart
+              part-id="time"
+              :part="partFor('time')"
+              :orientation="'horizontal'"
+              :sample="sample"
+              :editable="editable"
+              :selected="selectedPart === 'time'"
+              :zone="zoneKey"
+              :index="zoneMeta(zoneKey, 'time').index"
+              :count="zoneMeta(zoneKey, 'time').count"
+              :label="partAria('time', zoneKey)"
+              :time-data="timeData"
+              @select="$emit('select-part', $event)"
+              @move="$emit('move-part', $event)"
+            />
+            <ClockBarPart
+              part-id="date"
+              :part="partFor('date')"
+              :orientation="'horizontal'"
+              :sample="sample"
+              :editable="editable"
+              :selected="selectedPart === 'date'"
+              :zone="zoneKey"
+              :index="zoneMeta(zoneKey, 'date').index"
+              :count="zoneMeta(zoneKey, 'date').count"
+              :label="partAria('date', zoneKey)"
+              :time-data="timeData"
+              @select="$emit('select-part', $event)"
+              @move="$emit('move-part', $event)"
+            />
+          </div>
+          <ClockBarPart
+            v-else
+            :part-id="item.id"
+            :part="partFor(item.id)"
+            :tile-ids="item.ids || []"
+            :orientation="'horizontal'"
+            :sample="sample"
+            :editable="editable"
+            :selected="selectedPart === item.id"
+            :zone="zoneKey"
+            :index="zoneMeta(zoneKey, item.id).index"
+            :count="zoneMeta(zoneKey, item.id).count"
+            :label="partAria(item.id, zoneKey)"
+            :time-data="timeData"
+            :room-label="roomLabel"
+            :screens="screens"
+            :active-screen-id="activeScreenId"
+            @select="$emit('select-part', $event)"
+            @move="$emit('move-part', $event)"
+            @select-screen="activateScreen"
+          />
+        </template>
       </div>
     </div>
   </div>
@@ -45,14 +83,21 @@
 import { computed, onMounted } from "vue";
 import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
+import { useWebServicesStore } from "../stores/webServices";
 import { useClockBar } from "../composables/useClockBar";
+import { useBarServices } from "../composables/useBarServices";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { getActiveDashboardScreen } from "../utils/layout";
 import { getKioskId } from "../utils/kioskId";
-import PluginStatusbarItems from "./PluginStatusbarItems.vue";
-import BarActionCluster from "./BarActionCluster.vue";
-import BarLogo from "./BarLogo.vue";
-import ScreenDots from "./ui/ScreenDots.vue";
+import {
+  CLOCK_BAR_TILES,
+  CLOCK_BAR_ZONE_LABELS,
+  isTilePart,
+  partLabel,
+  resolveClockBarDesign,
+  tileInstanceId,
+} from "../utils/clockBarDesign";
+import ClockBarPart from "./ClockBarPart.vue";
 
 defineOptions({
   name: "ClockBarHorizontal",
@@ -76,74 +121,155 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  previewMode: {
+  alwaysShow: {
     type: Boolean,
     default: false,
   },
-  previewTimeSize: {
-    type: Number,
+  // The editor draws the same component with its own resolved shape, sample
+  // values and selectable chips.
+  design: {
+    type: Object,
     default: null,
   },
-  previewDateSize: {
-    type: Number,
-    default: null,
+  sample: {
+    type: Boolean,
+    default: false,
   },
-  previewLayout: {
+  editable: {
+    type: Boolean,
+    default: false,
+  },
+  selectedPart: {
     type: String,
-    default: null,
-  },
-  previewPadding: {
-    type: Number,
-    default: null,
-  },
-  previewPluginItemSize: {
-    type: Number,
     default: null,
   },
 });
 
+defineEmits(["select-part", "move-part"]);
+
+const configStore = useConfigStore();
+const webServicesStore = useWebServicesStore();
+const zoneKeys = ["left", "center", "right"];
+
+const bar = computed(
+  () =>
+    props.design ||
+    resolveClockBarDesign(configStore.$state, webServicesStore.services, {
+      servicesLoaded: webServicesStore.loaded,
+    }).horizontal
+);
+
 const {
   shouldShow,
-  showDate,
   formattedTime,
+  compactTimeParts,
   formattedDate,
-  fontSize,
-  dateFontSize,
-  pluginItemSize,
-  layout,
+  compactDateParts,
   barPaddingStyle,
 } = useClockBar({
   enabled: () => props.enabled,
   showInKiosk: () => props.showInKiosk,
   showInNonKiosk: () => props.showInNonKiosk,
-  previewMode: () => props.previewMode,
-  previewTimeSize: () => props.previewTimeSize,
-  previewDateSize: () => props.previewDateSize,
-  previewLayout: () => props.previewLayout,
-  previewPadding: () => props.previewPadding,
-  previewPluginItemSize: () => props.previewPluginItemSize,
+  alwaysShow: () => props.alwaysShow,
   orientation: () => "horizontal",
+  design: () => bar.value,
 });
 
-const configStore = useConfigStore();
-const showLogo = computed(() => configStore.clockBarShowLogo !== false);
+const timeData = computed(() => ({
+  formattedTime: formattedTime.value,
+  compactTimeParts: compactTimeParts.value,
+  formattedDate: formattedDate.value,
+  compactDateParts: compactDateParts.value,
+}));
 
 const { activateScreen } = useKeyboardActions();
 const screensConfig = computed(() => configStore.effectiveDashboardScreens);
-const screens = computed(() => screensConfig.value.screens);
+const screens = computed(() =>
+  props.sample
+    ? [
+        { id: "sample-kitchen", name: "Kitchen" },
+        { id: "sample-patio", name: "Patio" },
+      ]
+    : screensConfig.value.screens
+);
 const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 
 // The room name is a screen's own Name (its displayName override), never a
 // global value: a browser that is not a known screen shows nothing, and an
-// unnamed screen shows nothing here too (CLV-84). The screen's card falls back
-// to its hostname; the clock bar does not.
+// unnamed screen shows nothing here too (CLV-84). The editor's sample fills it.
 const kioskId = getKioskId();
 const kiosksStore = useKiosksStore();
 const roomLabel = computed(() => {
+  if (props.sample) return "Kitchen";
   if (!kioskId) return "";
   const self = kiosksStore.kiosks.find(kiosk => kiosk.id === kioskId);
   return self?.overrides?.displayName || "";
 });
+
+const visiblePartIds = zoneKey =>
+  (bar.value.zones?.[zoneKey] || []).filter(
+    // "tiles" is the stored placeholder, kept only while services load.
+    partId => partId !== CLOCK_BAR_TILES && (partId !== "room" || roomLabel.value)
+  );
+
+const zoneItems = computed(() => {
+  const result = {};
+  for (const zoneKey of zoneKeys) {
+    const items = [];
+    let tileRun = [];
+    const flushTiles = () => {
+      if (!tileRun.length) return;
+      items.push({ kind: props.editable ? "part" : "tiles", id: "tiles", ids: [...tileRun] });
+      tileRun = [];
+    };
+    for (const partId of visiblePartIds(zoneKey)) {
+      if (isTilePart(partId)) {
+        if (props.editable) {
+          flushTiles();
+          items.push({ kind: "part", id: partId });
+        } else {
+          tileRun.push(tileInstanceId(partId));
+        }
+        continue;
+      }
+      flushTiles();
+      if (partId === "date" && bar.value.parts?.date?.underTime) {
+        const previous = items[items.length - 1];
+        if (previous?.kind === "part" && previous.id === "time") {
+          previous.kind = "pair";
+          continue;
+        }
+      }
+      items.push({ kind: "part", id: partId });
+    }
+    flushTiles();
+    result[zoneKey] = items;
+  }
+  return result;
+});
+
+// Keyed by the part so a reorder moves the element instead of remounting it
+// (a remount drops keyboard focus). A run of tiles is keyed by its first tile.
+const itemKey = item => (item.kind === "tiles" ? `tiles:${item.ids[0]}` : item.id);
+
+const zoneMeta = (zoneKey, partId) => {
+  const ids = visiblePartIds(zoneKey);
+  const index = ids.indexOf(partId);
+  return { index: index < 0 ? 0 : index, count: ids.length };
+};
+
+const partAria = (partId, zoneKey) => {
+  const zoneName = CLOCK_BAR_ZONE_LABELS.horizontal[zoneKey] || zoneKey;
+  const { index, count } = zoneMeta(zoneKey, partId);
+  return `${partLabel(partId, webServicesStore.services)}, in ${zoneName}, ${index + 1} of ${count}`;
+};
+
+const partFor = partId => {
+  if (partId === "tiles" || isTilePart(partId)) return { sizePx: bar.value.tileSizePx };
+  return bar.value.parts?.[partId] || {};
+};
+
+useBarServices();
 
 onMounted(() => {
   if (kioskId) kiosksStore.loadKiosks();
@@ -180,63 +306,39 @@ onMounted(() => {
   border-radius: var(--radius-control);
 }
 
-.clock-bar-content {
+.clock-bar-time-stack {
   display: flex;
-  align-items: center;
-  gap: var(--gap-4);
-}
-
-.clock-bar-content.layout-two-lines {
   flex-direction: column;
-  gap: var(--gap-1);
   align-items: center;
-}
-
-.clock-time {
-  font-family: var(--font-display);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-weight: var(--weight-title);
-  color: var(--ink);
-  white-space: nowrap;
-}
-
-.clock-date {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums lining-nums;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.clock-bar-room {
-  font-family: var(--font-ui);
-  color: var(--ink-3);
-  font-size: var(--text-body);
+  gap: var(--gap-1);
 }
 
 /* On a phone the bar cannot hold the wordmark, the room, the clock, the
    connection pill and the ⋯ menu on one line: the row ran past the screen and
    scrolled sideways, cutting the clock (CLV-66). The room name is the least
-   load-bearing piece there and still shows in Settings. */
+   load-bearing piece there and still shows in Settings. The editor draws the bar
+   at its preview width and keeps every chip filled, so this is the live bar's
+   rule only. */
 @media (--bp-phone) {
-  .clock-bar-horizontal .clock-bar-room {
+  .clock-bar-horizontal.is-live :deep(.clock-bar-room) {
     display: none;
   }
   /* Screen dots are 44px touch targets each and cannot shrink; at 390px they
      ran under the centred time ("●15:31"). Below the phone breakpoint the dots
      give way so the clock keeps its own room. */
-  .clock-bar-horizontal .screen-dots {
+  .clock-bar-horizontal.is-live :deep(.screen-dots) {
     display: none;
   }
-  .clock-bar-outer {
+  .clock-bar-horizontal.is-live .clock-bar-outer {
     gap: var(--gap-2);
   }
 }
 
-.clock-bar-horizontal.position-between .clock-time {
+.clock-bar-horizontal.position-between :deep(.clock-time) {
   font-size: var(--text-body);
 }
 
-.clock-bar-horizontal.position-between .clock-date {
+.clock-bar-horizontal.position-between :deep(.clock-date) {
   font-size: var(--text-caption);
 }
 
@@ -248,8 +350,7 @@ onMounted(() => {
   min-width: 0;
 }
 
-.clock-bar-side {
-  flex: 1;
+.clock-bar-zone {
   display: flex;
   align-items: center;
   /* One spacing token for both sides: the wordmark, room name and screen dots
@@ -258,18 +359,26 @@ onMounted(() => {
   min-width: 0;
 }
 
+.clock-bar-side {
+  gap: var(--gap-inline);
+}
+
 .clock-bar-left {
+  flex: 1;
   justify-content: flex-start;
 }
 
 .clock-bar-right {
+  flex: 1;
   justify-content: flex-end;
 }
 
+/* The centred clock keeps its full width: the side groups yield instead of
+   the time being squeezed under the screen dots (CLV-91). */
 .clock-bar-content {
-  /* The centred clock keeps its full width: the side groups yield instead of
-     the time being squeezed under the screen dots (CLV-91). */
   flex: 0 0 auto;
+  justify-content: center;
+  gap: var(--gap-4);
   min-width: 0;
 }
 </style>

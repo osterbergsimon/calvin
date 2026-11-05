@@ -2,13 +2,11 @@
   "components": {
     "schemas": {
       "AgentReport": {
-        "additionalProperties": false,
-        "description": "The agent's POST body (deploy/kiosk-agent, ``post_display_check``).",
+        "description": "The agent's POST body (deploy/kiosk-agent, ``post_display_check``).\n\nTolerant on purpose: unknown fields are ignored and long text is clipped,\nbecause a rejected report leaves the run stuck ``running`` until it expires.",
         "properties": {
           "detail": {
             "anyOf": [
               {
-                "maxLength": 500,
                 "type": "string"
               },
               {
@@ -20,7 +18,6 @@
           "finishedAt": {
             "anyOf": [
               {
-                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -79,7 +76,6 @@
                 "items": {
                   "$ref": "#/components/schemas/LogEntry"
                 },
-                "maxItems": 500,
                 "type": "array"
               },
               {
@@ -91,7 +87,6 @@
           "startedAt": {
             "anyOf": [
               {
-                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -116,7 +111,6 @@
           "step": {
             "anyOf": [
               {
-                "maxLength": 32,
                 "type": "string"
               },
               {
@@ -557,6 +551,318 @@
         "title": "ClaimBody",
         "type": "object"
       },
+      "ClockBarDesign": {
+        "additionalProperties": false,
+        "description": "The household clock bar design (docs/design/2026-11-04-clock-bar-editor.md \u00a74).",
+        "properties": {
+          "horizontal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarHorizontalDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          },
+          "vertical": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarVerticalDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ClockBarDesign",
+        "type": "object"
+      },
+      "ClockBarHorizontalDesign": {
+        "additionalProperties": false,
+        "properties": {
+          "barHeight": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "slim",
+                  "normal",
+                  "roomy"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "normal",
+            "title": "Barheight"
+          },
+          "hidden": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Hidden",
+            "type": "array"
+          },
+          "parts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ClockBarPart"
+            },
+            "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 64
+            },
+            "title": "Parts",
+            "type": "object"
+          },
+          "tileSize": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "s",
+                  "m",
+                  "l"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "m",
+            "title": "Tilesize"
+          },
+          "zones": {
+            "$ref": "#/components/schemas/ClockBarHorizontalZones"
+          }
+        },
+        "required": [
+          "zones"
+        ],
+        "title": "ClockBarHorizontalDesign",
+        "type": "object"
+      },
+      "ClockBarHorizontalZones": {
+        "additionalProperties": false,
+        "properties": {
+          "center": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Center",
+            "type": "array"
+          },
+          "left": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Left",
+            "type": "array"
+          },
+          "right": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Right",
+            "type": "array"
+          }
+        },
+        "title": "ClockBarHorizontalZones",
+        "type": "object"
+      },
+      "ClockBarPart": {
+        "additionalProperties": false,
+        "description": "One part's options inside a clock bar design.\n\nA size is a step name or a px value (Custom). Part ids are dynamic for\nplugin tiles, so they are not validated here.",
+        "properties": {
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "s",
+                  "m",
+                  "l",
+                  "xl"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "enum": [
+                  "upright",
+                  "stacked",
+                  "line"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "underTime": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undertime"
+          }
+        },
+        "title": "ClockBarPart",
+        "type": "object"
+      },
+      "ClockBarVerticalDesign": {
+        "additionalProperties": false,
+        "properties": {
+          "barHeight": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "slim",
+                  "normal",
+                  "roomy"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "normal",
+            "title": "Barheight"
+          },
+          "hidden": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Hidden",
+            "type": "array"
+          },
+          "parts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ClockBarPart"
+            },
+            "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 64
+            },
+            "title": "Parts",
+            "type": "object"
+          },
+          "tileSize": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "s",
+                  "m",
+                  "l"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "m",
+            "title": "Tilesize"
+          },
+          "zones": {
+            "$ref": "#/components/schemas/ClockBarVerticalZones"
+          }
+        },
+        "required": [
+          "zones"
+        ],
+        "title": "ClockBarVerticalDesign",
+        "type": "object"
+      },
+      "ClockBarVerticalZones": {
+        "additionalProperties": false,
+        "properties": {
+          "bottom": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Bottom",
+            "type": "array"
+          },
+          "middle": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Middle",
+            "type": "array"
+          },
+          "top": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Top",
+            "type": "array"
+          }
+        },
+        "title": "ClockBarVerticalZones",
+        "type": "object"
+      },
       "ConfigUpdate": {
         "additionalProperties": true,
         "description": "Configuration update model.",
@@ -686,6 +992,16 @@
               }
             ],
             "title": "Calendarsplit"
+          },
+          "clockBarDesign": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "clockBarPluginItemSize": {
             "anyOf": [
@@ -1561,12 +1877,10 @@
         "type": "object"
       },
       "LogEntry": {
-        "additionalProperties": false,
         "properties": {
           "at": {
             "anyOf": [
               {
-                "maxLength": 64,
                 "type": "string"
               },
               {
@@ -1590,7 +1904,6 @@
           },
           "note": {
             "default": "",
-            "maxLength": 500,
             "title": "Note",
             "type": "string"
           }
@@ -2021,6 +2334,40 @@
           "step"
         ],
         "title": "StartRequest",
+        "type": "object"
+      },
+      "StepRequest": {
+        "additionalProperties": false,
+        "description": "Move the active run to another step (and target value).",
+        "properties": {
+          "step": {
+            "enum": [
+              "detect",
+              "write",
+              "conversion",
+              "limit"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StepRequest",
         "type": "object"
       },
       "UpdateLinkBody": {
@@ -4617,6 +4964,57 @@
           }
         },
         "summary": "Start Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/step": {
+      "post": {
+        "description": "Move the active run to another step/value (admin); the job is re-offered.",
+        "operationId": "change_display_check_step_api_kiosks__kiosk_id__display_check_step_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Display Check Step",
         "tags": [
           "kiosks"
         ]

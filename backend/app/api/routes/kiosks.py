@@ -127,10 +127,46 @@ async def get_display_check(kiosk_id: str):
     }
 
 
+async def _check_value_under_limit(
+    kiosk_id: str, body: display_check.StartRequest | display_check.StepRequest
+) -> None:
+    """Refuse a target above ``limit - 2 * step``: the agent's conversion step does
+    not apply the limit itself, so 100 on a limited screen would ramp past it."""
+    if body.value is None:
+        return
+    overrides = await get_overrides(kiosk_id)
+    if overrides is None:
+        return  # unknown kiosk: start_run answers 404
+    merged = merge_overrides(await build_global_config(), overrides)
+    saved = merged.get("brightnessLimit", merged.get("brightness_limit"))
+    limits = [saved] if isinstance(saved, int) and not isinstance(saved, bool) else []
+    try:
+        # A limit this run found but the admin has not saved yet counts too.
+        limits.append(await display_check.found_limit(kiosk_id))
+    except display_check.NoLimitError:
+        pass
+    if not limits:
+        return
+    limit = min(limits)
+    step = merged.get("brightnessStep", merged.get("brightness_step"))
+    step = step if isinstance(step, int) and not isinstance(step, bool) else 2
+    top = max(0, limit - 2 * min(max(step, 1), 5))
+    if body.value > top:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "value_above_limit",
+                "message": f"This screen's limit allows at most {top}.",
+                "max": top,
+            },
+        )
+
+
 @router.post("/kiosks/{kiosk_id}/display-check/start")
 async def start_display_check(kiosk_id: str, body: display_check.StartRequest):
     """Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk."""
     _valid_id_or_400(kiosk_id)
+    await _check_value_under_limit(kiosk_id, body)
     try:
         return await display_check.start_run(kiosk_id, body)
     except display_check.UnknownKioskError:
@@ -142,6 +178,25 @@ async def start_display_check(kiosk_id: str, body: display_check.StartRequest):
                 "code": "display_check_active",
                 "message": "A display check is already running on this screen.",
                 "run": exc.run,
+            },
+        )
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/step")
+async def change_display_check_step(kiosk_id: str, body: display_check.StepRequest):
+    """Move the active run to another step/value (admin); the job is re-offered."""
+    _valid_id_or_400(kiosk_id)
+    await _check_value_under_limit(kiosk_id, body)
+    try:
+        return await display_check.change_step(kiosk_id, body)
+    except (display_check.UnknownKioskError, display_check.NoActiveRunError):
+        raise HTTPException(status_code=404, detail="No display check is running")
+    except display_check.StoppingError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "display_check_stopping",
+                "message": "The display check is stopping; start a new one when it has ended.",
             },
         )
 
@@ -195,7 +250,11 @@ async def post_display_check_report(kiosk_id: str, body: display_check.AgentRepo
     _valid_id_or_400(kiosk_id)
     try:
         await display_check.record_report(kiosk_id, body)
-    except (display_check.UnknownKioskError, display_check.UnknownRunError):
+    except (
+        display_check.UnknownKioskError,
+        display_check.UnknownRunError,
+        display_check.RunEndedError,
+    ):
         raise HTTPException(status_code=409, detail="Not the current display check")
     return {"accepted": True}
 

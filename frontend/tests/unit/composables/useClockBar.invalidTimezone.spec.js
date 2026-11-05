@@ -37,6 +37,7 @@ describe("useClockBar with an invalid timezone", () => {
     // Reproduces the poisoned value the backend stores via str(None).
     store.timezone = "None";
     store.clockShowSeconds = true;
+    store.clockBarVerticalLayout = "compact-time";
 
     const errors = [];
 
@@ -46,8 +47,6 @@ describe("useClockBar with an invalid timezone", () => {
         showInNonKiosk: true,
         showInKiosk: false,
         enabled: true,
-        previewMode: true,
-        previewLayout: "compact-time",
       },
       global: {
         config: {

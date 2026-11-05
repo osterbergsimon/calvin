@@ -234,6 +234,7 @@ export function useConfigForm(initialConfig = {}) {
         clockBarShowPluginItems:
           response.clockBarShowPluginItems ?? response.clock_bar_show_plugin_items ?? true,
         clockBarShowLogo: response.clockBarShowLogo ?? response.clock_bar_show_logo ?? true,
+        clockBarDesign: response.clockBarDesign ?? response.clock_bar_design ?? null,
         // Other
         uiSize: response.uiSize ?? response.ui_size ?? "default",
         consoleLogEnabled: response.consoleLogEnabled ?? response.console_log_enabled ?? true,

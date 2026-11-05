@@ -1185,6 +1185,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}/display-check/step": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Change Display Check Step
+     * @description Move the active run to another step/value (admin); the job is re-offered.
+     */
+    post: operations["change_display_check_step_api_kiosks__kiosk_id__display_check_step_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/display-check/stop": {
     parameters: {
       query?: never;
@@ -2340,6 +2360,9 @@ export interface components {
     /**
      * AgentReport
      * @description The agent's POST body (deploy/kiosk-agent, ``post_display_check``).
+     *
+     *     Tolerant on purpose: unknown fields are ignored and long text is clipped,
+     *     because a rejected report leaves the run stuck ``running`` until it expires.
      */
     AgentReport: {
       /** Detail */
@@ -2598,6 +2621,95 @@ export interface components {
       claim: string;
     };
     /**
+     * ClockBarDesign
+     * @description The household clock bar design (docs/design/2026-11-04-clock-bar-editor.md §4).
+     */
+    ClockBarDesign: {
+      horizontal?: components["schemas"]["ClockBarHorizontalDesign"] | null;
+      /**
+       * Version
+       * @default 1
+       * @constant
+       */
+      version: 1;
+      vertical?: components["schemas"]["ClockBarVerticalDesign"] | null;
+    };
+    /** ClockBarHorizontalDesign */
+    ClockBarHorizontalDesign: {
+      /**
+       * Barheight
+       * @default normal
+       */
+      barHeight: number | ("slim" | "normal" | "roomy");
+      /** Hidden */
+      hidden?: string[];
+      /** Parts */
+      parts?: {
+        [key: string]: components["schemas"]["ClockBarPart"];
+      };
+      /**
+       * Tilesize
+       * @default m
+       */
+      tileSize: number | ("s" | "m" | "l");
+      zones: components["schemas"]["ClockBarHorizontalZones"];
+    };
+    /** ClockBarHorizontalZones */
+    ClockBarHorizontalZones: {
+      /** Center */
+      center?: string[];
+      /** Left */
+      left?: string[];
+      /** Right */
+      right?: string[];
+    };
+    /**
+     * ClockBarPart
+     * @description One part's options inside a clock bar design.
+     *
+     *     A size is a step name or a px value (Custom). Part ids are dynamic for
+     *     plugin tiles, so they are not validated here.
+     */
+    ClockBarPart: {
+      /** Seconds */
+      seconds?: boolean | null;
+      /** Size */
+      size?: number | ("s" | "m" | "l" | "xl") | null;
+      /** Style */
+      style?: ("upright" | "stacked" | "line") | null;
+      /** Undertime */
+      underTime?: boolean | null;
+    };
+    /** ClockBarVerticalDesign */
+    ClockBarVerticalDesign: {
+      /**
+       * Barheight
+       * @default normal
+       */
+      barHeight: number | ("slim" | "normal" | "roomy");
+      /** Hidden */
+      hidden?: string[];
+      /** Parts */
+      parts?: {
+        [key: string]: components["schemas"]["ClockBarPart"];
+      };
+      /**
+       * Tilesize
+       * @default m
+       */
+      tileSize: number | ("s" | "m" | "l");
+      zones: components["schemas"]["ClockBarVerticalZones"];
+    };
+    /** ClockBarVerticalZones */
+    ClockBarVerticalZones: {
+      /** Bottom */
+      bottom?: string[];
+      /** Middle */
+      middle?: string[];
+      /** Top */
+      top?: string[];
+    };
+    /**
      * ConfigUpdate
      * @description Configuration update model.
      */
@@ -2622,6 +2734,7 @@ export interface components {
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
       calendarSplit?: number | null;
+      clockBarDesign?: components["schemas"]["ClockBarDesign"] | null;
       /** Clockbarpluginitemsize */
       clockBarPluginItemSize?: number | null;
       /** Clockbarshowinkiosk */
@@ -2991,6 +3104,19 @@ export interface components {
     StartRequest: {
       /** Brightness */
       brightness?: number | null;
+      /**
+       * Step
+       * @enum {string}
+       */
+      step: "detect" | "write" | "conversion" | "limit";
+      /** Value */
+      value?: number | null;
+    };
+    /**
+     * StepRequest
+     * @description Move the active run to another step (and target value).
+     */
+    StepRequest: {
       /**
        * Step
        * @enum {string}
@@ -4832,6 +4958,41 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["StartRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  change_display_check_step_api_kiosks__kiosk_id__display_check_step_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StepRequest"];
       };
     };
     responses: {

@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from app.config import settings
-from app.schemas.config_update import ConfigUpdate
+from app.schemas.config_update import BRIGHTNESS_KEYS, ConfigUpdate
 from app.security.admin_auth import get_admin_store
 from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
 from app.services.config_service import config_service
@@ -439,6 +439,10 @@ async def build_global_config() -> dict:
         config["clockBarShowLogo"] = True
     elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
         config["clockBarShowLogo"] = config["clock_bar_show_logo"]
+    # The clock bar design is optional: absent means the frontend derives one
+    # from the old keys, so a null is the honest value here.
+    if "clockBarDesign" not in config:
+        config["clockBarDesign"] = None
     if "uiSize" not in config and "ui_size" not in config:
         config["uiSize"] = "default"  # Global UI size preset
     elif "ui_size" in config and "uiSize" not in config:
@@ -504,6 +508,14 @@ async def update_config(config_update: ConfigUpdate, request: Request):
     # A mixed request is rejected as a whole (design §3).
     if not is_admin(request) and not update_dict.keys() <= CONFIG_DISPLAY_KEYS:
         raise admin_error(get_admin_store().is_configured())
+
+    # Brightness belongs to one panel: a household value would reach every screen.
+    household_refused = sorted(BRIGHTNESS_KEYS & update_dict.keys())
+    if household_refused:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{', '.join(household_refused)}: set per screen (Screens), not household-wide",
+        )
 
     # Convert camelCase to snake_case for storage
     if "orientationFlipped" in update_dict:
