@@ -116,6 +116,11 @@ describe("availability", () => {
   it("is available after a good check", () => {
     expect(availability({ displayStack: "cog" }, found).state).toBe("ok");
   });
+  it("treats the backend's all-null findings as never checked", () => {
+    const empty = { checkedAt: null, ddc: null, writes: null, limit: null };
+    expect(availability({ displayStack: "cog" }, empty).state).toBe("never");
+    expect(checkSummary(empty, [], null)).toBe("Not checked yet");
+  });
   it("is never-checked without findings and keeps the toggle usable", () => {
     const a = availability({ displayStack: "cog" }, null);
     expect(a.state).toBe("never");

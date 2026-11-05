@@ -14,6 +14,16 @@ import { installApiMock } from "./fixtures/api-mock.js";
 import { KIOSK, gotoSettings, expectSettingsReady } from "./fixtures/navigation.js";
 
 const SHOTS = process.env.BRIGHTNESS_SHOTS || "";
+// What GET /kiosks carries for a screen nobody has checked: every field present.
+const NEVER = {
+  checkedAt: null,
+  ddc: null,
+  writes: null,
+  model: null,
+  connector: null,
+  vcpVersion: null,
+  limit: null,
+};
 const FOUND = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
 
 const SIZES = [
@@ -98,7 +108,7 @@ for (const [size, viewport] of SIZES) {
 
     test("an unchecked screen explains itself and offers the check", async ({ page }) => {
       const api = await installApiMock(page, {
-        kioskExtras: { hallway: { displayStack: "cog", displayCheck: null } },
+        kioskExtras: { hallway: { displayStack: "cog", displayCheck: NEVER } },
       });
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await expect(group.locator('[data-test="availability-text"]')).toContainText(
@@ -114,7 +124,7 @@ for (const [size, viewport] of SIZES) {
       consoleErrors,
     }) => {
       const api = await installApiMock(page, {
-        kioskExtras: { hallway: { displayStack: "cog", displayCheck: null } },
+        kioskExtras: { hallway: { displayStack: "cog", displayCheck: NEVER } },
       });
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await group.getByRole("switch", { name: "Ramp brightness at sleep and wake" }).click();

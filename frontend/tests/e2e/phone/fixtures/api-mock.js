@@ -629,7 +629,12 @@ export async function installApiMock(page, options = {}) {
           overrides: state.overridesByKiosk[id],
         });
       }
-      if (action === "verdict") return json(route, { ok: true });
+      if (action === "verdict") {
+        const kiosk = state.kiosks.find(item => item.id === id);
+        const writes = (request.postDataJSON() || {}).writes;
+        if (kiosk) kiosk.displayCheck = { ...(kiosk.displayCheck || {}), writes };
+        return json(route, kiosk?.displayCheck ?? {});
+      }
     }
     if (path === "/api/kiosks/agent/manifest") return json(route, { version: "1.6.0" });
     const kioskOverrides = path.match(/^\/api\/kiosks\/([^/]+)\/overrides$/);
