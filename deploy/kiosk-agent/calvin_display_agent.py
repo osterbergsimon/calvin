@@ -265,6 +265,7 @@ SETTLE_QUIET_SECONDS = 5.0
 SETTLE_TIMEOUT_SECONDS = 30.0
 SETTLE_POLL_SECONDS = 1.0
 RAMP_RESCHEDULE_SECONDS = 1
+RAMP_CANCEL_TIMEOUT = 2  # the per-step config check must never stall a ramp
 SLEEP_MODES = ("standby", "dim")
 DDC_BUS_STATE = "ddc-bus.json"
 DISPLAY_CHECK_STATE = "display-check.json"
@@ -692,6 +693,17 @@ def wait_for_settle(
 
 
 # -- the ramp itself ----------------------------------------------------------
+def _poll_faults(fault):
+    """The fault lines (or a generic note) the probe reports right now."""
+    new_faults = getattr(fault, "new_faults", None)
+    found = new_faults() if new_faults is not None else fault()
+    if not found:
+        return []
+    if isinstance(found, (list, tuple)):
+        return [str(line) for line in found]
+    return ["fault reported"]
+
+
 def _two_steps_back(level, step, write, *, floor=0):
     """Step back down two configured steps, one write at a time (never bigger)."""
     for _ in range(2):
@@ -714,7 +726,6 @@ def ramp_brightness(
     step=DEFAULT_BRIGHTNESS_STEP,
     step_seconds=DEFAULT_BRIGHTNESS_STEP_SECONDS,
     cancel=None,
-    stop_on_fault=True,
     log_fn=None,
 ):
     """Ramp DDC brightness one step at a time; returns what happened.
@@ -743,17 +754,16 @@ def ramp_brightness(
         f"brightness: ramp {'up' if direction > 0 else 'down'} "
         f"{level} -> {target}, step {step} every {step_seconds}s"
     )
+    settling = False  # waiting out the last up-step: only the fault check runs
     while True:
-        if cancel is not None and cancel():
+        if not settling and cancel is not None and cancel():
             outcome["cancelled"] = True
             log_fn(f"brightness: ramp cancelled at {level}")
             break
         if fault is not None:
-            faults = fault()
+            faults = _poll_faults(fault)
             if faults:
-                detail = (
-                    faults[0] if isinstance(faults, (list, tuple)) else str(faults)
-                )
+                detail = "; ".join(faults)
                 outcome["fault"] = detail
                 log_fn(f"brightness: fault at {level}: {detail}")
                 if direction > 0:
@@ -781,8 +791,11 @@ def ramp_brightness(
             break
         level = nxt
         outcome["steps"] += 1
-        if level != target:
+        if level != target or direction > 0:
+            # A fault caused by the last up-step shows up a moment later: wait
+            # one step and let the loop check once more before calling it done.
             sleep(step_seconds)
+        settling = level == target
     outcome["level"] = level
     log_fn(f"brightness: ramp stopped at {level}")
     return outcome
@@ -824,8 +837,11 @@ class BrightnessController:
         # loop's reconcile skips all DDC work for the duration of a check.
         self.lock = threading.RLock()
         self.check_running = False
-        self.level = 0
+        # None = unknown: after an agent restart the panel keeps whatever DDC
+        # value it had, so the first write the agent makes is always a 0.
+        self.level = None
         self.panel_off = True
+        self.sleeping = None  # True once a sleep transition completed
         self.settings = None
         self.fault_ceiling = None
         self.pending_restore = None
@@ -840,6 +856,10 @@ class BrightnessController:
     def set_level(self, level):
         with self.lock:
             self.level = level
+
+    def panel_asleep(self):
+        """True when the panel is really in standby (powered off, not dimmed)."""
+        return bool(self.sleeping) and self.panel_off
 
     def _apply_on(self, on):
         applier = self.applier or apply_on
@@ -857,8 +877,23 @@ class BrightnessController:
         if arm is not None:
             arm()
 
-    def _ramp(self, target, *, cancel=None, stop_on_fault=True):
+    def _ramp(self, target, *, cancel=None):
         with self.lock:
+            if self.level is None:
+                # Never trust the value the panel held before the restart: the
+                # first write is 0, then the ramp goes on from there.
+                if not self.ddc.set_brightness(0):
+                    self.log("brightness: could not write 0 from an unknown level")
+                    return {
+                        "level": None,
+                        "fault": None,
+                        "ceiling": None,
+                        "limit": None,
+                        "cancelled": False,
+                        "steps": 0,
+                        "write_failed": True,
+                    }
+                self.level = 0
             outcome = ramp_brightness(
                 self.level,
                 target,
@@ -868,7 +903,6 @@ class BrightnessController:
                 step=self.settings["step"],
                 step_seconds=self.settings["step_seconds"],
                 cancel=cancel,
-                stop_on_fault=stop_on_fault,
                 log_fn=self.log,
             )
             self.level = outcome["level"]
@@ -886,24 +920,32 @@ class BrightnessController:
 
     def _sleep_standby(self, settings, cancel):
         """Dim first (when the ramp is on), then run the normal off."""
-        if settings["enabled"] and self.level > 0:
-            outcome = self._ramp(0, cancel=cancel, stop_on_fault=False)
+        if settings["enabled"] and self.level != 0:
+            outcome = self._ramp(0, cancel=cancel)
             if outcome.get("cancelled"):
                 return "cancelled"
-        if self.level > 0:
+        if settings["enabled"] and self.level != 0:
             # A failed write: never turn a panel off at an unknown bright level.
-            self.log(f"brightness: could not dim below {self.level}; turning off anyway")
+            self.log(
+                f"brightness: could not dim below {self.level}; turning off anyway"
+            )
+        elif self.level is not None and self.level > 0:
+            self.log(
+                f"brightness: ramp is off but the level is {self.level}; "
+                "turning off anyway"
+            )
         result = self._apply_on(False)
         if result == "none":
             self.log("display -> OFF failed; retrying on the next poll")
             return "failed"
         self.panel_off = True
+        self.sleeping = True
         return "ok"
 
     def _sleep_dim(self, settings, cancel):
         """Dim only: stay powered and running, just take the backlight to 0."""
-        if self.level > 0:
-            outcome = self._ramp(0, cancel=cancel, stop_on_fault=False)
+        if self.level != 0:
+            outcome = self._ramp(0, cancel=cancel)
             if outcome.get("cancelled"):
                 return "cancelled"
             if outcome.get("write_failed"):
@@ -913,6 +955,7 @@ class BrightnessController:
                 )
                 return "failed"
         self.panel_off = False
+        self.sleeping = True
         self.log("brightness: dim-only sleep at 0; panel stays powered")
         return "ok"
 
@@ -970,6 +1013,7 @@ class BrightnessController:
                         self.settings = previous or settings
                         return last_on
                     self.panel_off = False
+                    self.sleeping = False
                     # After a real power-on the panel and its USB devices must
                     # settle before any DDC write. (Dim-only wakes never powered
                     # anything off, so they go straight back up.)
@@ -988,12 +1032,12 @@ class BrightnessController:
                         )
                 else:
                     self._arm()
+                self.sleeping = False
                 owned = settings["enabled"] or (dim and self._ddc_available())
                 if owned:
                     outcome = self._ramp(
                         brightness_target(settings, self.fault_ceiling),
                         cancel=cancel,
-                        stop_on_fault=True,
                     )
                     if outcome.get("cancelled"):
                         self.reschedule = True
@@ -1006,7 +1050,6 @@ class BrightnessController:
                             brightness_ceiling(settings),
                         ),
                         cancel=cancel,
-                        stop_on_fault=True,
                     )
                     self.pending_restore = None
                 return True
@@ -1037,6 +1080,27 @@ class BrightnessController:
                     return last_on
                 return False
 
+        # "Dim only" switched to standby while the panel sleeps dimmed: it is
+        # still powered, so apply the standby off now rather than at the next wake.
+        if (
+            not on
+            and last_on is False
+            and previous is not None
+            and previous["sleep_mode"] == "dim"
+            and settings["sleep_mode"] != "dim"
+            and not self.panel_off
+            and self.level == 0
+        ):
+            result = self._apply_on(False)
+            if result == "none":
+                self.log("display -> OFF failed; retrying on the next poll")
+                self.settings = previous
+            else:
+                self.panel_off = True
+                self.sleeping = True
+                self.log("brightness: dim switched to standby while asleep; panel off")
+            return False
+
         # No on/off transition: a changed brightness applies now (owner 1).
         owned = settings["enabled"] or (
             settings["sleep_mode"] == "dim" and self._ddc_available()
@@ -1047,7 +1111,6 @@ class BrightnessController:
                 outcome = self._ramp(
                     target,
                     cancel=cancel,
-                    stop_on_fault=target > self.level,
                 )
                 if outcome.get("cancelled"):
                     self.reschedule = True
@@ -1055,7 +1118,6 @@ class BrightnessController:
             self._ramp(
                 min(self.pending_restore, brightness_ceiling(settings)),
                 cancel=cancel,
-                stop_on_fault=True,
             )
             self.pending_restore = None
         return on
@@ -1092,10 +1154,20 @@ def display_check_report_url(backend_url, kiosk_id):
     return base + DISPLAY_CHECK_REPORT_PATH.format(kiosk_id=kiosk_id)
 
 
+_warned_no_kiosk_id = False
+
+
 def post_display_check(backend_url, payload, *, kiosk_id=None, opener=None):
     """POST a diagnostics report; never raises (the job keeps running if it fails)."""
+    global _warned_no_kiosk_id
     kiosk_id = kiosk_id or os.environ.get("CALVIN_KIOSK_ID", "").strip()
     if not kiosk_id:
+        if not _warned_no_kiosk_id:
+            _warned_no_kiosk_id = True
+            log(
+                "display check: CALVIN_KIOSK_ID is not set; "
+                "display check reports are not sent"
+            )
         return False
     opener = opener or urllib.request
     url = display_check_report_url(backend_url, kiosk_id)
@@ -1271,7 +1343,7 @@ class DisplayCheckRunner:
             return True
         return False
 
-    def _ramp(self, target, *, stop_on_fault=True, cancel_missing=True):
+    def _ramp(self, target, *, cancel_missing=True):
         if cancel_missing is True:
             cancel = self._cancel
         elif cancel_missing is False:
@@ -1300,7 +1372,6 @@ class DisplayCheckRunner:
                 step=self.settings["step"],
                 step_seconds=self.settings["step_seconds"],
                 cancel=cancel,
-                stop_on_fault=stop_on_fault,
                 log_fn=log,
             )
 
@@ -1330,9 +1401,9 @@ class DisplayCheckRunner:
             base = self.level or brightness_target(self.settings)
             low = max(0, base - 10)
             self._entry(f"stepping {base} down to {low} and back")
-            down = self._ramp(low, stop_on_fault=False)
+            down = self._ramp(low)
             if not down.get("write_failed") and not down.get("cancelled"):
-                self._ramp(base, stop_on_fault=True)
+                self._ramp(base)
             if down.get("write_failed"):
                 self._entry("brightness writes did not take effect")
                 self._stop_reason = "error"
@@ -1345,7 +1416,7 @@ class DisplayCheckRunner:
                 value = self.level or brightness_target(self.settings)
             value = max(0, min(BRIGHTNESS_MAX, int(value)))
             outcome = self._ramp(
-                value, stop_on_fault=value > self.level, cancel_missing=False
+                value, cancel_missing=False
             )
             if outcome.get("write_failed"):
                 self._entry("brightness writes did not take effect")
@@ -1365,7 +1436,7 @@ class DisplayCheckRunner:
                 self._entry("the panel is asleep; a limit test needs it awake")
                 self._stop_reason = "error"
                 return
-            outcome = self._ramp(BRIGHTNESS_MAX, stop_on_fault=True)
+            outcome = self._ramp(BRIGHTNESS_MAX)
             if outcome.get("fault"):
                 self.limit = outcome.get("limit")
                 self._entry(
@@ -1415,7 +1486,7 @@ class DisplayCheckRunner:
         target = _safe_target(self.settings, self.limit)
         if self._touched and self.panel_on() and self.level != target:
             self._ramp(
-                target, stop_on_fault=target > self.level, cancel_missing=None
+                target, cancel_missing=None
             )
         payload = self._payload(status)
         self.report(payload)
@@ -1525,21 +1596,44 @@ def recover_display_check(
             awake = bool(panel_on())
         except Exception:
             awake = True
-    if awake and last_level is not None:
-        target = _safe_target(settings, limit)
-        ramp_brightness(
-            last_level,
-            target,
-            write=ddc.set_brightness,
-            fault=controller.fault if controller else None,
-            sleep=controller.sleep if controller else time_module.sleep,
-            step=settings["step"],
-            step_seconds=settings["step_seconds"],
-            stop_on_fault=target > last_level,
-            log_fn=log_fn,
-        )
+    if not awake:
+        # Nothing is written to a sleeping panel, and it may still hold the
+        # level the check reached: make the standby/dim path write 0 itself.
         if controller is not None:
-            controller.level = target
+            controller.set_level(None)
+    elif last_level is not None:
+        target = _safe_target(settings, limit)
+        lock = controller.lock if controller is not None else threading.Lock()
+        with lock:
+            start = last_level
+            if controller is not None:
+                # The monitor must be armed and the panel settled before any
+                # DDC write, exactly like a wake ramp.
+                arm = getattr(controller.fault, "arm", None)
+                if arm is not None:
+                    arm()
+                wait_for_settle(
+                    fault_monitor=controller.fault,
+                    connected=controller.connected,
+                    cog=controller.cog,
+                    clock=controller.clock,
+                    sleep=controller.sleep,
+                )
+                if controller.level is not None:
+                    start = controller.level  # the first reconcile's real level
+            outcome = ramp_brightness(
+                start,
+                target,
+                write=ddc.set_brightness,
+                fault=controller.fault if controller else None,
+                sleep=controller.sleep if controller else time_module.sleep,
+                step=settings["step"],
+                step_seconds=settings["step_seconds"],
+                log_fn=log_fn,
+            )
+            if controller is not None:
+                # What the ramp really reached, not what it was aiming for.
+                controller.level = outcome["level"]
     if report is not None:
         report(payload)
     _clear_state(path)
@@ -1551,12 +1645,32 @@ def recover_display_check(
 
 
 def start_display_check(job, cfg, *, fetch, backend_url, controller, sleep=None):
-    """Run a diagnostics job in a daemon thread; returns the thread."""
+    """Run a diagnostics job in a daemon thread; returns the thread.
+
+    A panel that sleeps in standby refuses the job (state "asleep", the level
+    stays at 0) and nothing is started: returns None.
+    """
     def poll():
         return fetch(backend_url)
 
     def report(payload):
         post_display_check(backend_url, payload)
+
+    if controller.panel_asleep():
+        log(f"display check {job['id']} refused: the panel is asleep")
+        report(
+            {
+                "id": job["id"],
+                "step": job.get("step"),
+                "status": "asleep",
+                "level": controller.get_level(),
+                "limit": None,
+                "log": [],
+                "detail": "the panel is asleep; wake it to run a check",
+                "finishedAt": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return None
 
     runner = DisplayCheckRunner(
         job,
@@ -1567,6 +1681,9 @@ def start_display_check(job, cfg, *, fetch, backend_url, controller, sleep=None)
         sleep=sleep or time_module.sleep,
         state_dir=controller.state_dir,
         controller=controller,
+        # The live panel state (what the agent actually applied), read when the
+        # runner asks, so its limit guard and _finish see a sleeping panel.
+        panel_on=lambda: not controller.panel_asleep(),
     )
     thread = threading.Thread(
         target=runner.run, daemon=True, name="calvin-display-check"
@@ -1677,7 +1794,7 @@ def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None,
     return base + "/api/config"
 
 
-def fetch_config(backend_url, kstat=None, kmsg=None):
+def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT):
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
     host = os.environ.get("CALVIN_KIOSK_HOSTNAME", "").strip() or socket.gethostname()
     if kstat is None:
@@ -1691,7 +1808,7 @@ def fetch_config(backend_url, kstat=None, kmsg=None):
         kmsg=kmsg,
         kstack=display_stack(),
     )
-    with urllib.request.urlopen(url, timeout=HTTP_TIMEOUT) as r:
+    with urllib.request.urlopen(url, timeout=timeout) as r:
         cfg = json.load(r)
     touch_ready()
     return cfg
@@ -1729,12 +1846,39 @@ def run(
     handled_check_id = None
     recovered = False
 
+    def maybe_start_check(cfg, check_thread, handled_check_id):
+        job = display_check_job(cfg)
+        if job is None or job["id"] != handled_check_id:
+            handled_check_id = None
+        if (
+            controller is not None
+            and job is not None
+            and job["id"] != handled_check_id
+            and (check_thread is None or not check_thread.is_alive())
+        ):
+            handled_check_id = job["id"]
+            check_thread = start_display_check(
+                job,
+                cfg,
+                fetch=fetch,
+                backend_url=backend_url,
+                controller=controller,
+                sleep=sleep,
+            )
+        return check_thread, handled_check_id
+
     def ramp_cancel(desired):
-        """Notice a new on/off while a ramp is running, and cancel it cleanly."""
+        """Notice a new on/off while a ramp is running, and cancel it cleanly.
+
+        A failed or slow check counts as "not cancelled" so the step pace holds.
+        """
 
         def cancel():
             try:
-                fresh = fetch(backend_url)
+                if fetch is fetch_config:
+                    fresh = fetch_config(backend_url, timeout=RAMP_CANCEL_TIMEOUT)
+                else:
+                    fresh = fetch(backend_url)
             except Exception:
                 return False
             try:
@@ -1756,33 +1900,10 @@ def run(
             if version != last_version:
                 apply_device(cfg)
                 last_version = version
-            if controller is not None and not recovered:
-                recover_display_check(
-                    controller.state_dir,
-                    cfg,
-                    ddc=controller.ddc,
-                    report=lambda payload: post_display_check(backend_url, payload),
-                    controller=controller,
-                    panel_on=lambda cfg=cfg: desired_on(cfg, now_in(cfg)),
-                )
-                recovered = True
-            job = display_check_job(cfg)
-            if job is None or job["id"] != handled_check_id:
-                handled_check_id = None
-            if (
-                controller is not None
-                and job is not None
-                and job["id"] != handled_check_id
-                and (check_thread is None or not check_thread.is_alive())
-            ):
-                handled_check_id = job["id"]
-                check_thread = start_display_check(
-                    job,
-                    cfg,
-                    fetch=fetch,
-                    backend_url=backend_url,
-                    controller=controller,
-                    sleep=sleep,
+            first_pass = controller is not None and not recovered
+            if not first_pass:
+                check_thread, handled_check_id = maybe_start_check(
+                    cfg, check_thread, handled_check_id
                 )
             now = now_in(cfg)
             prev = last
@@ -1792,6 +1913,21 @@ def run(
                 desired = desired_on(cfg, now)
                 last = controller.reconcile(
                     cfg, now, last, cancel=ramp_cancel(desired)
+                )
+            if first_pass:
+                # Recover an interrupted check only once the first reconcile
+                # has powered the panel and let it settle.
+                recover_display_check(
+                    controller.state_dir,
+                    cfg,
+                    ddc=controller.ddc,
+                    report=lambda payload: post_display_check(backend_url, payload),
+                    controller=controller,
+                    panel_on=lambda: not controller.panel_asleep(),
+                )
+                recovered = True
+                check_thread, handled_check_id = maybe_start_check(
+                    cfg, check_thread, handled_check_id
                 )
             if prev != last:
                 log(f"display -> {'ON' if last else 'OFF'}")

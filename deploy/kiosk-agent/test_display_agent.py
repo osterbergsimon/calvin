@@ -2734,7 +2734,6 @@ def test_ramp_down_keeps_going_after_a_fault():
         sleep=clock.sleep,
         step=2,
         step_seconds=1.5,
-        stop_on_fault=False,
     )
     assert outcome["fault"] is not None
     assert outcome["level"] == 0
@@ -2853,6 +2852,7 @@ def test_sleep_with_ramp_dims_to_zero_then_powers_off():
 def test_wake_with_ramp_settles_then_ramps_up():
     ddc = FakeDdc()
     controller, clock, applied = _controller(ddc=ddc)
+    controller.level = 0  # the panel slept at 0 (a known level)
     last = controller.reconcile(_ramp_cfg(), _local(hour=9), False)
     assert last is True
     assert applied == [True]
@@ -3030,12 +3030,13 @@ def test_switching_dim_to_standby_while_asleep_restores_brightness_on_wake():
     standby = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby")
     controller.reconcile(standby, _local(hour=23, minute=1), False)
     assert controller.pending_restore == 19
+    assert applied == [False]  # standby off applies now (item 8)
 
     before = len(ddc.writes)
     assert controller.reconcile(standby, _local(hour=9), False) is True
     assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
     assert controller.pending_restore is None
-    assert applied == []  # the panel never powered off in dim mode
+    assert applied == [False, True]  # and the wake powers it back on
 
 
 def test_a_new_on_during_the_dim_cancels_and_brightens_back():
@@ -3397,3 +3398,268 @@ def test_fault_monitor_never_loses_or_duplicates_lines_across_threads(monkeypatc
     for t in threads:
         t.join()
     assert sorted(collected) == sorted(lines)
+
+
+# -- fix round 2 --------------------------------------------------------------
+def _night_cfg(**over):
+    return _ramp_cfg(**over)
+
+
+def _check_job(step="limit", job_id="c1"):
+    return {"id": job_id, "step": step, "action": "start", "value": None,
+            "brightness": 19}
+
+
+def test_display_check_refuses_a_sleeping_standby_panel(monkeypatch):
+    """Item 2: a standby-off panel must not be written to by a check."""
+    reports = []
+    monkeypatch.setattr(
+        agent, "post_display_check",
+        lambda url, payload, **kw: reports.append(payload) or True,
+    )
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    assert controller.reconcile(_ramp_cfg(), _local(hour=23), True) is False
+    assert applied == [False] and controller.level == 0
+    writes = list(ddc.writes)
+
+    thread = agent.start_display_check(
+        _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    assert thread is None
+    assert reports[-1]["status"] == "asleep"
+    assert reports[-1]["id"] == "c1"
+    assert ddc.writes == writes  # nothing written to the sleeping panel
+    assert controller.level == 0
+    assert controller.check_running is False
+
+
+def test_display_check_runner_gets_the_real_panel_state(monkeypatch):
+    """Item 2: the runner's limit guard must see the live panel state."""
+    seen = {}
+
+    class Spy:
+        def __init__(self, *a, **kw):
+            seen.update(kw)
+
+        def run(self):
+            pass
+
+    monkeypatch.setattr(agent, "DisplayCheckRunner", Spy)
+    controller, clock, _ = _controller()
+    thread = agent.start_display_check(
+        _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    thread.join(2)
+    assert seen["panel_on"]() is True
+    controller.panel_off = True
+    controller.sleeping = True
+    assert seen["panel_on"]() is False
+
+
+def test_boot_in_the_sleep_window_dims_to_zero_before_powering_off():
+    """Item 3: an unknown level is written to 0 before the standby off."""
+    order = []
+    ddc = FakeDdc(on_write=lambda level: order.append(("w", level)))
+    controller, _, _ = _controller(ddc=ddc)
+    controller.applier = lambda on: order.append(("power", on)) or "cog"
+    assert controller.reconcile(_ramp_cfg(), _local(hour=23), None) is False
+    assert order == [("w", 0), ("power", False)]
+    assert controller.level == 0
+
+
+def test_dim_mode_boot_at_night_writes_zero():
+    """Item 3: dim mode at boot must really take the backlight to 0."""
+    ddc = FakeDdc()
+    controller, _, applied = _controller(ddc=ddc)
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    assert controller.reconcile(cfg, _local(hour=23), None) is False
+    assert ddc.writes == [0]
+    assert controller.level == 0
+    assert applied == []
+
+
+def test_up_ramp_from_an_unknown_level_starts_at_zero_after_settle():
+    """Item 3: never trust the pre-reboot DDC value."""
+    ddc = FakeDdc()
+    controller, _, _ = _controller(ddc=ddc)
+    assert controller.level is None
+    assert controller.reconcile(_ramp_cfg(), _local(hour=9), None) is True
+    assert ddc.writes[0] == 0
+    assert ddc.writes[1:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+
+
+def _state(tmp_path, level=28, step="limit", limit="null"):
+    (tmp_path / agent.DISPLAY_CHECK_STATE).write_text(
+        f'{{"id": "c1", "step": "{step}", "status": "running", '
+        f'"level": {level}, "limit": {limit}, "log": []}}'
+    )
+
+
+def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(tmp_path):
+    """Item 4a: recover only once the panel settled and the monitor is armed."""
+    events = []
+
+    class Fault(FakeFault):
+        def arm(self):
+            events.append(("arm", len(ddc.writes)))
+            super().arm()
+
+    ddc = FakeDdc(on_write=lambda level: events.append(("w", level)))
+    controller, _, _ = _controller(ddc=ddc, fault=Fault())
+    controller.state_dir = str(tmp_path)
+    _state(tmp_path)
+    cfg = _ramp_cfg(brightness=40)
+    agent.run(
+        "http://x", 900, fetch=lambda url: cfg, sleep=lambda s: None,
+        iterations=1, apply_device=lambda c: None, brightness=controller,
+    )
+    reconcile_writes = list(range(2, 41, 2))
+    assert ddc.writes[: 1 + len(reconcile_writes)] == [0] + reconcile_writes
+    recovery_start = 1 + len(reconcile_writes)
+    # the monitor was (re)armed after the reconcile's writes, before recovery's
+    assert ("arm", recovery_start) in events
+    assert ddc.writes[recovery_start:][-1] == 22  # limit 26 - 2 steps - ... capped
+    assert max(_steps(ddc.writes)) <= 2
+    assert controller.level == 22
+
+
+def test_recovery_records_the_ramps_actual_outcome(tmp_path):
+    """Item 4b: a stopped ramp must not claim the target."""
+    state = {"n": 0}
+
+    def on_write(level):
+        state["n"] += 1
+        if state["n"] >= 2:
+            ddc.ok = False
+
+    ddc = FakeDdc(on_write=on_write)
+    controller, _, _ = _controller(ddc=ddc)
+    controller.panel_off = False
+    _state(tmp_path, level=28, step="write")
+    agent.recover_display_check(
+        str(tmp_path), _ramp_cfg(), ddc=ddc, controller=controller,
+        panel_on=lambda: True,
+    )
+    assert ddc.writes == [26, 24]
+    assert controller.level == 24  # not the 19 target
+
+
+def test_recovery_of_a_sleeping_panel_leaves_the_level_unknown(tmp_path):
+    """Item 4c: asleep -> the standby/dim path must write 0 itself."""
+    ddc = FakeDdc()
+    controller, _, _ = _controller(ddc=ddc)
+    controller.level = 0
+    _state(tmp_path, level=28, step="write")
+    agent.recover_display_check(
+        str(tmp_path), _ramp_cfg(), ddc=ddc, controller=controller,
+        panel_on=lambda: False,
+    )
+    assert ddc.writes == []
+    assert controller.level is None
+
+
+def test_a_fault_from_the_last_up_step_is_caught():
+    """Item 5: check once more after the final up-write."""
+    writes = []
+    clock = FakeClock()
+    slept_after_final = {"v": False}
+
+    def write(level):
+        writes.append(level)
+        return True
+
+    def sleep(seconds):
+        clock.sleep(seconds)
+        if writes[-1:] == [4]:
+            slept_after_final["v"] = True
+
+    # the kernel only reports the trouble a moment after the last write
+    def fault():
+        return slept_after_final["v"] and writes.count(4) == 1
+
+    outcome = agent.ramp_brightness(
+        0, 4, write=write, fault=fault, sleep=sleep, step=2, step_seconds=1.5,
+    )
+    assert outcome["fault"]
+    assert outcome["limit"] == 2
+    assert writes == [2, 4, 2, 0]
+    assert max(_steps([0] + writes)) <= 2
+
+
+def test_the_journal_names_the_kernel_fault_line():
+    fault = FakeFault()
+    fault.faults = ["usb 1-1.2: reset high-speed USB device"]
+    logs = []
+    agent.ramp_brightness(
+        0, 10, write=lambda level: True, fault=fault, sleep=lambda s: None,
+        step=2, step_seconds=1.5, log_fn=logs.append,
+    )
+    line = next(m for m in logs if m.startswith("brightness: fault at"))
+    assert "usb 1-1.2: reset high-speed USB device" in line
+    assert "True" not in line
+
+
+def test_ramp_brightness_has_no_unused_stop_on_fault_parameter():
+    import inspect
+
+    assert "stop_on_fault" not in inspect.signature(agent.ramp_brightness).parameters
+
+
+def test_switching_dim_to_standby_while_dimmed_powers_off_now():
+    """Item 8: standby off applies at once, not at the next wake."""
+    ddc = FakeDdc()
+    controller, _, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    controller.reconcile(dim, _local(hour=23), True)
+    assert applied == []
+    standby = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby")
+    last = controller.reconcile(standby, _local(hour=23, minute=1), False)
+    assert last is False
+    assert applied == [False]
+    assert controller.panel_off is True
+
+
+def test_ramp_cancel_polls_with_a_short_timeout_and_a_failure_is_not_a_cancel(
+    monkeypatch,
+):
+    """Item 9: the per-step config check must not stall the ramp."""
+    timeouts = []
+    calls = {"n": 0}
+    cfg = _ramp_cfg()
+
+    def fake_fetch(url, kstat=None, kmsg=None, timeout=agent.HTTP_TIMEOUT):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return cfg  # the main poll
+        timeouts.append(timeout)
+        raise OSError("backend down")
+
+    monkeypatch.setattr(agent, "fetch_config", fake_fetch)
+    ddc = FakeDdc()
+    controller, _, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=23))
+    agent.run(
+        "http://x", 900, fetch=agent.fetch_config, sleep=lambda s: None,
+        iterations=1, apply_device=lambda c: None, brightness=controller,
+    )
+    assert timeouts and max(timeouts) <= 2
+    assert ddc.writes[-1] == 0  # the ramp finished despite the failed checks
+    assert applied == [False]
+
+
+def test_post_display_check_warns_once_without_a_kiosk_id(monkeypatch, capsys):
+    monkeypatch.delenv("CALVIN_KIOSK_ID", raising=False)
+    monkeypatch.setattr(agent, "_warned_no_kiosk_id", False, raising=False)
+    assert agent.post_display_check("http://x", {"id": "c1"}) is False
+    assert agent.post_display_check("http://x", {"id": "c1"}) is False
+    out = capsys.readouterr().out
+    assert out.count("CALVIN_KIOSK_ID") == 1
