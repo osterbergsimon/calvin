@@ -20,12 +20,36 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    StrictBool,
+    StrictInt,
     ValidationError,
     field_validator,
     model_validator,
 )
 
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
+
+
+class BrightnessPoint(BaseModel):
+    """One owner reading for the DDC to panel-menu conversion (calvin-29ws)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    ddc: StrictInt = Field(ge=0, le=100)
+    menu: float = Field(ge=0, le=100)
+
+
+# snake_case spellings the display agent also reads. Writes are camelCase only.
+BRIGHTNESS_SNAKE_KEYS = frozenset(
+    {
+        "brightness_ramp_enabled",
+        "brightness_limit",
+        "brightness_step",
+        "brightness_step_seconds",
+        "brightness_conversion",
+        "sleep_mode",
+    }
+)
 
 
 class ConfigUpdate(BaseModel):
@@ -96,6 +120,12 @@ class ConfigUpdate(BaseModel):
                 validate_git_branch(data["git_branch"])
             if data.get("git_repo_url") is not None:
                 validate_git_repo_url(data["git_repo_url"])
+            snake = sorted(BRIGHTNESS_SNAKE_KEYS & set(data))
+            if snake:
+                raise ValueError(
+                    f"{', '.join(snake)}: write the camelCase spelling "
+                    "(the agent reads both, writes are camelCase only)"
+                )
         return data
 
     @field_validator("gitRepoUrl")
@@ -144,6 +174,16 @@ class ConfigUpdate(BaseModel):
     focusLightMode: Literal["always", "interaction", "off"] | None = None
     focusLightDimOthers: bool | None = None
     touchControlSize: Literal["xsmall", "small", "medium", "large", "xlarge"] | None = None
+
+    # Brightness ramp, dim-only sleep (calvin-29ws). Ranges match the clamps in
+    # deploy/kiosk-agent/calvin_display_agent.py. Calvin/DDC scale, 0-100.
+    brightnessRampEnabled: StrictBool | None = None
+    brightness: StrictInt | None = Field(None, ge=0, le=100)
+    brightnessLimit: StrictInt | None = Field(None, ge=0, le=100)
+    brightnessStep: StrictInt | None = Field(None, ge=1, le=5)
+    brightnessStepSeconds: float | None = Field(None, ge=0.5, le=10)
+    brightnessConversion: list[BrightnessPoint] | None = Field(None, max_length=20)
+    sleepMode: Literal["standby", "dim"] | None = None
 
     # Per-kiosk content assignment (calvin-dd9.4). Override keys; null/absent on global config.
     availableScreens: list[str] | None = None  # allowlist of screen ids a kiosk may show
