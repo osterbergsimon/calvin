@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import os
+import threading
 import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
@@ -395,7 +396,9 @@ def test_main_uses_default_refresh_unless_overridden(monkeypatch):
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setattr(agent, "check_python", lambda: None)
-    monkeypatch.setattr(agent, "run", lambda url, refresh: seen.append(refresh))
+    monkeypatch.setattr(
+        agent, "run", lambda url, refresh, **kw: seen.append(refresh)
+    )
     agent.main()
     monkeypatch.setenv("CALVIN_DISPLAY_REFRESH_SECONDS", "900")
     agent.main()
@@ -2312,3 +2315,1421 @@ def test_start_watchdog_runs_in_a_daemon_thread():
     assert seen == ["probe"]
     assert thread.daemon is True
     assert not thread.is_alive()
+
+
+# --- per-screen brightness ramp (calvin-29ws) --------------------------------
+# The agent owns brightness over DDC/CI: dim before sleep, settle then ramp
+# back up after wake, and never write when the ramp is off. Every helper takes
+# its writer/fault probe/clock/sleep as arguments, so this suite never runs
+# ddcutil, vcgencmd, journalctl or systemctl.
+
+DETECT_OUTPUT = """\
+Display 1
+   I2C bus:  /dev/i2c-2
+   DRM connector:           card0-HDMI-A-1
+   EDID synopsis:
+      Mfg id:               LOG
+      Model:                NOMAD TOUCH
+      Serial number:
+   VCP version:         2.1
+"""
+
+
+class FakeClock:
+    def __init__(self):
+        self.t = 0.0
+
+    def __call__(self):
+        return self.t
+
+    def sleep(self, seconds):
+        self.t += seconds
+
+
+class FakeDdc:
+    def __init__(self, bus=2, ok=True, on_write=None):
+        self.bus = bus
+        self.ok = ok
+        self.writes = []
+        self.on_write = on_write
+        self.detect_info = {
+            "bus": bus,
+            "model": "NOMAD TOUCH",
+            "connector": "card0-HDMI-A-1",
+            "vcp_version": "2.1",
+        }
+
+    def available(self):
+        return self.bus is not None
+
+    def detect(self, refresh=False):
+        return dict(self.detect_info)
+
+    def set_brightness(self, level):
+        if not self.ok:
+            return False
+        self.writes.append(level)
+        if self.on_write is not None:
+            self.on_write(level)
+        return True
+
+    def read_brightness(self):
+        return None
+
+
+class FakeFault:
+    def __init__(self):
+        self.faults = []
+
+    def arm(self):
+        self.faults = []
+
+    def new_faults(self):
+        return list(self.faults)
+
+    def __call__(self):
+        return bool(self.faults)
+
+
+def _ramp_cfg(**over):
+    base = {
+        "display_schedule_enabled": True,
+        "display_schedule": _sched(),
+        "timezone": None,
+        "brightness_ramp_enabled": True,
+        "brightness": 19,
+    }
+    base.update(over)
+    return base
+
+
+def _controller(ddc=None, fault=None, clock=None):
+    clock = clock or FakeClock()
+    applied = []
+    controller = agent.BrightnessController(
+        ddc=ddc or FakeDdc(),
+        fault=fault or FakeFault(),
+        clock=clock,
+        sleep=clock.sleep,
+        applier=lambda on: applied.append(on) or "cog",
+        connected=lambda: True,
+        cog=lambda: True,
+    )
+    return controller, clock, applied
+
+
+def _steps(writes):
+    return [abs(b - a) for a, b in zip(writes, writes[1:])]
+
+
+# -- config keys --------------------------------------------------------------
+def test_brightness_settings_defaults_are_safe():
+    settings = agent.brightness_settings({})
+    assert settings["enabled"] is False
+    assert settings["brightness"] is None
+    assert settings["limit"] is None
+    assert settings["step"] == 2
+    assert settings["step_seconds"] == 1.5
+    assert settings["conversion"] == []
+    assert settings["sleep_mode"] == "standby"
+
+
+def test_brightness_settings_accept_camel_and_snake_case():
+    camel = agent.brightness_settings(
+        {
+            "brightnessRampEnabled": True,
+            "brightness": 19,
+            "brightnessLimit": 26,
+            "brightnessStep": 3,
+            "brightnessStepSeconds": 2,
+            "brightnessConversion": [{"ddc": 5, "menu": 28}],
+            "sleepMode": "dim",
+        }
+    )
+    snake = agent.brightness_settings(
+        {
+            "brightness_ramp_enabled": True,
+            "brightness": 19,
+            "brightness_limit": 26,
+            "brightness_step": 3,
+            "brightness_step_seconds": 2,
+            "brightness_conversion": [{"ddc": 5, "menu": 28}],
+            "sleep_mode": "dim",
+        }
+    )
+    assert camel == snake
+    assert camel["enabled"] is True
+    assert camel["limit"] == 26
+    assert camel["step"] == 3
+    assert camel["step_seconds"] == 2.0
+    assert camel["sleep_mode"] == "dim"
+    assert camel["conversion"] == [{"ddc": 5, "menu": 28}]
+
+
+def test_brightness_settings_clamp_unsafe_values():
+    settings = agent.brightness_settings(
+        {
+            "brightness": 250,
+            "brightness_limit": -4,
+            "brightness_step": 40,  # one big step reset the touch controller
+            "brightness_step_seconds": 0,
+            "sleep_mode": "nonsense",
+        }
+    )
+    assert settings["brightness"] == 100
+    assert settings["limit"] == 0
+    assert settings["step"] == agent.BRIGHTNESS_STEP_MAX
+    assert settings["step_seconds"] == agent.BRIGHTNESS_INTERVAL_MIN
+    assert settings["sleep_mode"] == "standby"
+
+
+def test_brightness_target_is_capped_at_limit_minus_two_steps():
+    settings = agent.brightness_settings(
+        {"brightness_ramp_enabled": True, "brightness": 50, "brightness_limit": 26}
+    )
+    assert agent.brightness_target(settings) == 22
+    # Slider asks above the cap: the agent never steps above it.
+    assert agent.brightness_target(settings, fault_ceiling=20) == 20
+
+
+def test_brightness_target_defaults_to_ddc_twenty():
+    settings = agent.brightness_settings({"brightness_ramp_enabled": True})
+    assert agent.brightness_target(settings) == 20
+    low = agent.brightness_settings(
+        {"brightness_ramp_enabled": True, "brightness_limit": 18}
+    )
+    assert agent.brightness_target(low) == 14  # limit 18 - two steps of 2
+
+
+def test_menu_estimate_fits_the_owner_readings():
+    settings = agent.brightness_settings(
+        {
+            "brightness_conversion": [
+                {"ddc": 5, "menu": 28},
+                {"ddc": 19, "menu": 61},
+            ]
+        }
+    )
+    assert agent.menu_estimate(settings, 5) == pytest.approx(28)
+    assert agent.menu_estimate(settings, 19) == pytest.approx(61)
+    assert agent.menu_estimate(settings, None) is None
+    assert agent.menu_estimate(agent.brightness_settings({}), 10) is None
+
+
+# -- ddcutil access -----------------------------------------------------------
+def test_parse_ddcutil_detect_reads_bus_model_and_connector():
+    info = agent.parse_ddcutil_detect(DETECT_OUTPUT)
+    assert info == {
+        "bus": 2,
+        "model": "NOMAD TOUCH",
+        "connector": "card0-HDMI-A-1",
+        "vcp_version": "2.1",
+    }
+
+
+def test_parse_ddcutil_brightness():
+    assert agent.parse_ddcutil_brightness("VCP 10 C current value =  19") == 19
+    assert agent.parse_ddcutil_brightness("nonsense") is None
+
+
+def test_ddc_controller_detects_once_uses_bus_and_caches_it(tmp_path):
+    calls = []
+
+    def run(argv, timeout=20):
+        calls.append(argv)
+        if argv[:2] == ["ddcutil", "detect"]:
+            return SimpleNamespace(returncode=0, stdout=DETECT_OUTPUT, stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    ddc = agent.DdcController(run=run, state_dir=str(tmp_path))
+    assert ddc.set_brightness(19) is True
+    assert calls == [
+        ["ddcutil", "detect"],
+        ["ddcutil", "--bus", "2", "setvcp", "10", "19"],
+    ]
+    # A fresh process reads the cached bus instead of paying for detect again.
+    calls.clear()
+    again = agent.DdcController(run=run, state_dir=str(tmp_path))
+    assert again.ensure_bus() == 2
+    assert calls == []
+
+
+def test_ddc_controller_reports_no_display_without_calling_setvcp(tmp_path):
+    calls = []
+
+    def run(argv, timeout=20):
+        calls.append(argv)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    ddc = agent.DdcController(run=run, state_dir=str(tmp_path))
+    assert ddc.set_brightness(19) is False
+    assert calls == [["ddcutil", "detect"]]
+
+
+def test_ddc_write_failure_is_reported(tmp_path):
+    def run(argv, timeout=20):
+        if argv[:2] == ["ddcutil", "detect"]:
+            return SimpleNamespace(returncode=0, stdout=DETECT_OUTPUT, stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="i2c error")
+
+    ddc = agent.DdcController(run=run, state_dir=str(tmp_path))
+    assert ddc.set_brightness(19) is False
+
+
+def test_kernel_fault_lines_match_brownout_and_resets():
+    text = (
+        "usb 1-1.2: reset full-speed USB device number 4\n"
+        "hci0: over-current change\n"
+        "Under-voltage detected! (0x00050005)\n"
+        "unrelated kernel line\n"
+    )
+
+    def run(argv, timeout=10):
+        return SimpleNamespace(returncode=0, stdout=text, stderr="")
+
+    lines = agent.kernel_fault_lines(1000, run=run)
+    assert any("reset" in line for line in lines)
+    assert any("over-current" in line for line in lines)
+    assert any("Under-voltage" in line for line in lines)
+    assert all("unrelated" not in line for line in lines)
+
+
+def test_vcgencmd_under_voltage_bit_zero():
+    def run(argv, timeout=5):
+        return SimpleNamespace(returncode=0, stdout="throttled=0x50001\n", stderr="")
+
+    assert agent.vcgencmd_under_voltage(run) is True
+
+    def historical_only(argv, timeout=5):
+        # Bits 16 and 18 are historical; only bit 0 means under-voltage now.
+        return SimpleNamespace(returncode=0, stdout="throttled=0x50000\n", stderr="")
+
+    assert agent.vcgencmd_under_voltage(historical_only) is False
+
+    def clean(argv, timeout=5):
+        return SimpleNamespace(returncode=0, stdout="throttled=0x0\n", stderr="")
+
+    assert agent.vcgencmd_under_voltage(clean) is False
+
+
+def test_fault_monitor_returns_only_new_kernel_lines():
+    lines = {"text": ""}
+    clock = FakeClock()
+
+    def run(argv, timeout=10):
+        return SimpleNamespace(returncode=0, stdout=lines["text"], stderr="")
+
+    monitor = agent.FaultMonitor(run=run, clock=clock)
+    monitor.arm()
+    lines["text"] = "Under-voltage detected!\n"
+    # vcgencmd is also called through the same runner; an empty stdout is clean.
+    assert monitor.new_faults() == ["Under-voltage detected!"]
+    assert monitor.new_faults() == []
+
+
+def test_drm_connector_connected_and_cog_active():
+    def listing(path):
+        return ["card0-HDMI-A-1", "card0-DP-1"]
+
+    statuses = {
+        "/sys/class/drm/card0-HDMI-A-1/status": "connected\n",
+        "/sys/class/drm/card0-DP-1/status": "disconnected\n",
+    }
+    assert (
+        agent.drm_connector_connected(
+            listing=listing, read=lambda p: statuses[p]
+        )
+        is True
+    )
+    statuses["/sys/class/drm/card0-HDMI-A-1/status"] = "disconnected\n"
+    assert (
+        agent.drm_connector_connected(
+            listing=listing, read=lambda p: statuses[p]
+        )
+        is False
+    )
+
+    def active(argv, timeout=5):
+        return SimpleNamespace(returncode=0, stdout="active\n", stderr="")
+
+    assert agent.cog_active(active) is True
+
+
+# -- the ramp -----------------------------------------------------------------
+def test_ramp_down_reaches_zero_in_steps():
+    clock = FakeClock()
+    writes = []
+    outcome = agent.ramp_brightness(
+        19,
+        0,
+        write=lambda level: writes.append(level) or True,
+        sleep=clock.sleep,
+        step=2,
+        step_seconds=1.5,
+    )
+    assert writes == [17, 15, 13, 11, 9, 7, 5, 3, 1, 0]
+    assert max(_steps(writes)) <= 2
+    assert outcome["level"] == 0
+
+
+def test_ramp_up_reaches_target_in_steps():
+    clock = FakeClock()
+    writes = []
+    outcome = agent.ramp_brightness(
+        0,
+        19,
+        write=lambda level: writes.append(level) or True,
+        sleep=clock.sleep,
+        step=2,
+        step_seconds=1.5,
+    )
+    assert writes == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+    assert max(_steps([0] + writes)) <= 2
+    assert outcome["level"] == 19
+
+
+def test_ramp_fault_stops_steps_back_two_steps_and_records_the_limit():
+    clock = FakeClock()
+    writes = []
+    state = {"level": 0}
+
+    def write(level):
+        writes.append(level)
+        state["level"] = level
+        return True
+
+    outcome = agent.ramp_brightness(
+        0,
+        30,
+        write=write,
+        fault=lambda: state["level"] >= 26,
+        sleep=clock.sleep,
+        step=2,
+        step_seconds=1.5,
+    )
+    # Fault at 26: limit is 24 (the last fine level), then two steps back to 22.
+    assert outcome["fault"] is not None
+    assert outcome["limit"] == 24
+    assert outcome["ceiling"] == 22
+    assert outcome["level"] == 22
+    assert writes[-2:] == [24, 22]
+    assert max(_steps(writes)) <= 2
+
+
+def test_ramp_down_keeps_going_after_a_fault():
+    clock = FakeClock()
+    writes = []
+    state = {"level": 40}
+
+    def write(level):
+        writes.append(level)
+        state["level"] = level
+        return True
+
+    outcome = agent.ramp_brightness(
+        40,
+        0,
+        write=write,
+        fault=lambda: state["level"] <= 30,
+        sleep=clock.sleep,
+        step=2,
+        step_seconds=1.5,
+    )
+    assert outcome["fault"] is not None
+    assert outcome["level"] == 0
+    assert writes[-1] == 0
+
+
+def test_ramp_down_fault_backoff_never_overshoots_a_nonzero_target():
+    writes = []
+    outcome = agent.ramp_brightness(
+        24,
+        19,
+        write=lambda level: writes.append(level) or True,
+        fault=lambda: True,
+        sleep=lambda seconds: None,
+        step=2,
+    )
+    assert outcome["level"] == 19
+    assert writes == [22, 20, 19]
+    assert min(writes) == 19
+
+
+def test_ramp_can_be_cancelled_cleanly():
+    clock = FakeClock()
+    writes = []
+    calls = {"n": 0}
+
+    def cancel():
+        calls["n"] += 1
+        return calls["n"] > 3
+
+    outcome = agent.ramp_brightness(
+        0,
+        20,
+        write=lambda level: writes.append(level) or True,
+        sleep=clock.sleep,
+        step=2,
+        step_seconds=1.5,
+        cancel=cancel,
+    )
+    assert outcome["cancelled"] is True
+    assert len(writes) <= 3
+    assert outcome["level"] == writes[-1]
+
+
+def test_ramp_does_nothing_when_already_at_target():
+    writes = []
+    outcome = agent.ramp_brightness(
+        19, 19, write=lambda level: writes.append(level) or True
+    )
+    assert writes == []
+    assert outcome["steps"] == 0
+
+
+# -- settle -------------------------------------------------------------------
+def test_wait_for_settle_needs_five_quiet_seconds():
+    clock = FakeClock()
+    outcome = agent.wait_for_settle(
+        fault_monitor=FakeFault(),
+        connected=lambda: True,
+        cog=lambda: True,
+        clock=clock,
+        sleep=clock.sleep,
+        poll=1.0,
+    )
+    assert outcome["settled"] is True
+    assert clock.t >= agent.SETTLE_QUIET_SECONDS
+
+
+def test_wait_for_settle_resets_on_a_fault_and_caps_at_thirty_seconds():
+    clock = FakeClock()
+    fault = FakeFault()
+    probes = {"n": 0}
+
+    class Flapping:
+        def new_faults(self):
+            probes["n"] += 1
+            return ["Undervoltage detected"] if probes["n"] < 4 else []
+
+    outcome = agent.wait_for_settle(
+        fault_monitor=Flapping(),
+        connected=lambda: True,
+        cog=lambda: True,
+        clock=clock,
+        sleep=clock.sleep,
+        poll=1.0,
+    )
+    assert outcome["settled"] is True
+    assert clock.t >= 4
+
+    stuck = FakeClock()
+    outcome = agent.wait_for_settle(
+        fault_monitor=fault,
+        connected=lambda: False,
+        cog=lambda: True,
+        clock=stuck,
+        sleep=stuck.sleep,
+        poll=1.0,
+    )
+    assert outcome["timed_out"] is True
+    assert stuck.t >= agent.SETTLE_TIMEOUT_SECONDS
+
+
+# -- the controller -----------------------------------------------------------
+def test_sleep_with_ramp_dims_to_zero_then_powers_off():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.level = 19
+    last = controller.reconcile(_ramp_cfg(), _local(hour=23), True)
+    assert last is False
+    assert applied == [False]
+    assert ddc.writes[-1] == 0
+    assert max(_steps([19] + ddc.writes)) <= 2
+    assert controller.level == 0
+
+
+def test_wake_with_ramp_settles_then_ramps_up():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.level = 0  # the panel slept at 0 (a known level)
+    last = controller.reconcile(_ramp_cfg(), _local(hour=9), False)
+    assert last is True
+    assert applied == [True]
+    assert ddc.writes == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+    # The settle wait (5 s) happened before the first write.
+    assert clock.t >= agent.SETTLE_QUIET_SECONDS
+    assert controller.level == 19
+
+
+def test_wake_ramp_never_exceeds_the_limit_minus_two_steps():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.reconcile(
+        _ramp_cfg(brightness=50, brightness_limit=26), _local(hour=9), False
+    )
+    assert ddc.writes[-1] == 22  # 26 - 2 * 2, not the chosen 50
+
+
+def test_live_brightness_change_ramps_to_the_new_value_now():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    controller.reconcile(_ramp_cfg(), _local(hour=9), True)
+    assert ddc.writes == []
+    controller.reconcile(
+        _ramp_cfg(brightness=31), _local(hour=10), True
+    )
+    assert ddc.writes == [21, 23, 25, 27, 29, 31]
+    assert applied == []  # never touches panel power
+
+
+def test_fault_during_wake_steps_back_and_caps_this_wake():
+    fault = FakeFault()
+    ddc = FakeDdc(
+        on_write=lambda level: fault.faults.append("Under-voltage detected")
+        if level >= 26
+        else None
+    )
+    controller, clock, applied = _controller(ddc=ddc, fault=fault)
+    controller.reconcile(
+        _ramp_cfg(brightness=50), _local(hour=9), False
+    )
+    assert controller.last_fault is not None
+    assert controller.last_limit == 24
+    assert controller.level == 22
+
+    # The same wake never tries above the ceiling again.
+    before = len(ddc.writes)
+    controller.reconcile(
+        _ramp_cfg(brightness=50), _local(hour=10), True
+    )
+    assert ddc.writes[before:] == []
+    assert controller.level == 22
+
+
+def test_ramp_off_while_asleep_does_one_last_step_up_then_stops():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.level = 19
+    controller.reconcile(_ramp_cfg(), _local(hour=23), True)
+    assert controller.level == 0
+
+    off_cfg = _ramp_cfg(brightness_ramp_enabled=False)
+    controller.reconcile(off_cfg, _local(hour=23, minute=1), False)
+    assert controller.pending_restore == 19
+
+    before = len(ddc.writes)
+    before_clock = clock.t
+    controller.reconcile(off_cfg, _local(hour=9), False)  # the next wake
+    # The one-last step-up is a wake ramp: it waits for the panel to settle too.
+    assert clock.t - before_clock >= agent.SETTLE_QUIET_SECONDS
+    once = ddc.writes[before:]
+    assert once == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+    assert controller.pending_restore is None
+    assert applied == [False, True]  # standby wake still runs the normal power-on
+
+    # After that single step-up the agent never touches brightness again.
+    after = len(ddc.writes)
+    controller.reconcile(
+        _ramp_cfg(brightness_ramp_enabled=False, brightness=60),
+        _local(hour=10),
+        True,
+    )
+    assert ddc.writes[after:] == []
+
+
+def test_ramp_off_and_no_diagnostics_never_calls_ddcutil():
+    class BoomDdc:
+        def available(self):
+            raise AssertionError("ddcutil must not run with the ramp off")
+
+        def set_brightness(self, level):
+            raise AssertionError("ddcutil must not run with the ramp off")
+
+    controller, clock, applied = _controller(ddc=BoomDdc())
+    controller.reconcile(_cfg(), _local(hour=9), None)
+    controller.reconcile(_cfg(), _local(hour=23), True)
+    assert applied == [True, False]
+
+
+def test_dim_sleep_never_powers_the_panel_off_and_wake_ramps_up():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+
+    assert controller.reconcile(cfg, _local(hour=23), True) is False
+    assert applied == []  # no DPMS / cog stop
+    assert ddc.writes[-1] == 0
+
+    before = len(ddc.writes)
+    assert controller.reconcile(cfg, _local(hour=9), False) is True
+    assert applied == []  # still no panel helper
+    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+
+
+def test_dim_sleep_at_agent_startup_does_not_power_cycle_on_wake():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.level = 19
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+
+    assert controller.reconcile(cfg, _local(hour=23), None) is False
+    assert applied == []
+    before = len(ddc.writes)
+    assert controller.reconcile(cfg, _local(hour=9), False) is True
+    assert applied == []
+    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+
+
+def test_dim_falls_back_to_standby_without_ddc():
+    ddc = FakeDdc(bus=None)
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    last = controller.reconcile(
+        _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim"),
+        _local(hour=23),
+        True,
+        )
+    assert last is False
+    assert applied == [False]  # standby off is the safe fallback
+    assert ddc.writes == []
+
+
+def test_switching_dim_to_standby_powers_off_at_the_next_sleep():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    controller.reconcile(dim, _local(hour=23), True)
+    assert applied == []
+    controller.reconcile(dim, _local(hour=9), False)  # wake
+
+    controller.reconcile(
+        _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby"),
+        _local(hour=23),
+        True,
+    )
+    assert applied == [False]
+
+
+def test_switching_dim_to_standby_while_asleep_restores_brightness_on_wake():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    controller.reconcile(dim, _local(hour=23), True)
+    assert controller.level == 0
+
+    standby = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby")
+    controller.reconcile(standby, _local(hour=23, minute=1), False)
+    assert controller.pending_restore == 19
+    assert applied == [False]  # standby off applies now (item 8)
+
+    before = len(ddc.writes)
+    assert controller.reconcile(standby, _local(hour=9), False) is True
+    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+    assert controller.pending_restore is None
+    assert applied == [False, True]  # and the wake powers it back on
+
+
+def test_a_new_on_during_the_dim_cancels_and_brightens_back():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    cancels = {"n": 0}
+
+    def cancel():
+        cancels["n"] += 1
+        return cancels["n"] > 3
+
+    last = controller.reconcile(
+        _ramp_cfg(), _local(hour=23), True, cancel=cancel
+    )
+    assert last is True  # never finished the off
+    assert applied == []
+    assert controller.reschedule is True
+    assert controller.level == 13  # stopped where the cancel fired
+
+
+# -- diagnostics job shape ----------------------------------------------------
+def test_display_check_job_parses_the_proposed_config_shape():
+    job = agent.display_check_job(
+        {
+            "displayCheck": {
+                "id": "chk-1",
+                "step": "conversion",
+                "action": "start",
+                "value": 19,
+                "brightness": 19,
+            }
+        }
+    )
+    assert job == {
+        "id": "chk-1",
+        "step": "conversion",
+        "action": "start",
+        "value": 19,
+        "brightness": 19,
+    }
+    assert agent.display_check_job({"display_check": {"id": "x", "step": "limit"}})[
+        "step"
+    ] == "limit"
+    assert agent.display_check_job({}) is None
+    assert agent.display_check_job({"displayCheck": {"step": "detect"}}) is None
+
+
+def test_display_check_report_url_and_post():
+    assert (
+        agent.display_check_report_url("http://h:8000/", "k1")
+        == "http://h:8000/api/kiosks/k1/display-check"
+    )
+    seen = {}
+
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    class Opener:
+        def urlopen(self, request, timeout=None):
+            seen["url"] = request.full_url
+            seen["body"] = request.data
+            return Response()
+
+    assert agent.post_display_check(
+        "http://h", {"id": "c1"}, kiosk_id="k1", opener=Opener()
+    ) is True
+    assert seen["url"] == "http://h/api/kiosks/k1/display-check"
+    assert b'"c1"' in seen["body"]
+
+
+# -- the diagnostics runner ---------------------------------------------------
+def _runner(job, cfg, ddc, tmp_path, *, poll=None, panel_on=None, clock=None):
+    clock = clock or FakeClock()
+    reports = []
+    runner = agent.DisplayCheckRunner(
+        job,
+        cfg,
+        ddc=ddc,
+        report=reports.append,
+        poll=poll,
+        clock=clock,
+        sleep=clock.sleep,
+        state_dir=str(tmp_path),
+        panel_on=panel_on or (lambda: True),
+    )
+    return runner, reports, clock
+
+
+def test_runner_detect_reports_the_display(tmp_path):
+    ddc = FakeDdc()
+    job = {"id": "c1", "step": "detect", "action": "start", "value": None,
+           "brightness": None}
+    runner, reports, clock = _runner(job, _cfg(), ddc, tmp_path)
+    runner.run()
+    assert reports[-1]["status"] == "done"
+    assert reports[-1]["info"]["model"] == "NOMAD TOUCH"
+    assert ddc.writes == []  # detection never changes brightness
+
+
+def test_runner_persists_each_level_so_a_reboot_can_finish_safely(tmp_path):
+    ddc = FakeDdc()
+    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
+           "brightness": 19}
+    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
+    assert runner._write_level(21) is True
+    state = agent._load_state(str(tmp_path / agent.DISPLAY_CHECK_STATE))
+    assert state["status"] == "running"
+    assert state["level"] == 21
+
+
+def test_runner_write_dims_then_returns(tmp_path):
+    ddc = FakeDdc()
+    job = {"id": "c1", "step": "write", "action": "start", "value": None,
+           "brightness": 19}
+    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
+    runner.level = 19
+    runner.run()
+    assert min(ddc.writes) == 9  # dimmed ten levels, can't overrun an unknown limit
+    assert ddc.writes[-1] == 19
+    assert reports[-1]["status"] == "done"
+
+
+def test_runner_conversion_sets_the_value_and_waits(tmp_path):
+    ddc = FakeDdc()
+    job = {"id": "c1", "step": "conversion", "action": "start", "value": 19,
+           "brightness": 19}
+    runner, reports, clock = _runner(
+        job, _ramp_cfg(), ddc, tmp_path, poll=_cfg  # job gone: the dialog closed
+    )
+    runner.run()
+    assert ddc.writes[-1] == 19
+    assert reports[-1]["status"] == "done"
+    assert reports[-1]["level"] == 19
+
+
+def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
+    fault = FakeFault()
+    ddc = FakeDdc(
+        on_write=lambda level: fault.faults.append("Under-voltage detected")
+        if level >= 28
+        else None
+    )
+    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
+           "brightness": 19}
+    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
+    runner.level = 20
+    runner.controller = agent.BrightnessController(
+        ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
+    )
+    runner.run()
+    final = reports[-1]
+    assert final["status"] == "done"
+    assert final["limit"] == 26  # fault at 28, one step below it
+    assert final["level"] == 19  # returned to the chosen brightness
+    assert max(ddc.writes) == 28
+    assert not (tmp_path / agent.DISPLAY_CHECK_STATE).exists()
+
+
+def test_runner_stop_during_the_limit_test_steps_back_safely(tmp_path):
+    fault = FakeFault()
+    ddc = FakeDdc()
+    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
+           "brightness": 19}
+    polled = {"n": 0}
+
+    def poll():
+        polled["n"] += 1
+        # The owner presses Stop once the ramp is underway.
+        action = "stop" if polled["n"] > 5 else "start"
+        return {
+            "displayCheck": {
+                "id": "c1", "step": "limit", "action": action,
+                "value": None, "brightness": 19,
+            }
+        }
+
+    runner, reports, clock = _runner(
+        job, _ramp_cfg(), ddc, tmp_path, poll=poll
+    )
+    runner.level = 19
+    runner.controller = agent.BrightnessController(
+        ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
+    )
+    runner.run()
+    assert reports[-1]["status"] == "stopped"
+    assert ddc.writes[-1] == 19  # back at the chosen brightness
+    assert max(ddc.writes) < 40  # stopped early, not at 100
+
+
+def test_runner_timeout_always_finishes_safely(tmp_path):
+    ddc = FakeDdc()
+    clock = FakeClock()
+    job = {"id": "c1", "step": "conversion", "action": "start", "value": 19,
+           "brightness": 19}
+    # Keep offering the same job so the runner never sees it finish.
+    same = {"displayCheck": dict(job)}
+    runner, reports, clock = _runner(
+        job, _ramp_cfg(), ddc, tmp_path, poll=lambda: same, clock=clock
+    )
+    runner.run()
+    assert reports[-1]["status"] == "timeout"
+    assert ddc.writes[-1] == 19
+
+
+def test_recover_display_check_after_a_reboot(tmp_path):
+    ddc = FakeDdc()
+    path = tmp_path / agent.DISPLAY_CHECK_STATE
+    path.write_text(
+        '{"id": "c1", "step": "limit", "status": "running", '
+        '"level": 28, "limit": null, "log": []}'
+    )
+    reports = []
+    payload = agent.recover_display_check(
+        str(tmp_path),
+        _ramp_cfg(),
+        ddc=ddc,
+        report=reports.append,
+    )
+    assert payload["status"] == "interrupted"
+    assert payload["limit"] == 26  # the reboot happened at 28
+    assert reports[-1]["status"] == "interrupted"
+    assert ddc.writes[-1] == 19  # back to the chosen brightness
+    assert not path.exists()
+
+
+def test_recover_display_check_does_not_write_to_a_sleeping_panel(tmp_path):
+    ddc = FakeDdc()
+    (tmp_path / agent.DISPLAY_CHECK_STATE).write_text(
+        '{"id": "c1", "step": "write", "status": "running", "level": 19}'
+    )
+    payload = agent.recover_display_check(
+        str(tmp_path), _ramp_cfg(), ddc=ddc, panel_on=lambda: False
+    )
+    assert payload["status"] == "interrupted"
+    assert ddc.writes == []
+
+
+# -- the agent loop keeps the old behaviour unless the ramp is in use --------
+def test_run_with_a_controller_never_touches_ddc_when_the_ramp_is_off(
+    tmp_path, monkeypatch
+):
+    class BoomDdc:
+        def available(self):
+            raise AssertionError("ddcutil must not run with the ramp off")
+
+        def set_brightness(self, level):
+            raise AssertionError("ddcutil must not run with the ramp off")
+
+    controller = agent.BrightnessController(
+        ddc=BoomDdc(),
+        state_dir=str(tmp_path),
+        applier=lambda on: "cog",
+    )
+    applied = []
+    controller.applier = lambda on: applied.append(on) or "cog"
+    monkeypatch_cfg = _cfg()
+    monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=9))
+    agent.run(
+        "http://x",
+        900,
+        fetch=lambda url: monkeypatch_cfg,
+        sleep=lambda s: None,
+        iterations=2,
+        apply_device=lambda cfg: None,
+        brightness=controller,
+    )
+    assert applied == [True]  # on at startup, then no change
+
+
+# -- fix round 1: the diagnostics thread must not race the main loop --------
+def test_display_check_blocks_reconcile_ramps_and_keeps_the_step(tmp_path):
+    """A live-apply while a check runs must not interleave a second ramp.
+
+    The check owns the level until it finishes, so reconcile must skip all DDC
+    work; otherwise two ramps interleave and a write can jump by more than one
+    configured step (30 -> 14 -> 32).
+    """
+    writes = []
+    reached = threading.Event()
+    resume = threading.Event()
+
+    def on_write(level):
+        writes.append(level)
+        if level == 30 and not reached.is_set():
+            reached.set()
+            resume.wait(2)  # pause the check's ramp mid-flight
+
+    ddc = FakeDdc(on_write=on_write)
+    controller, clock, applied = _controller(ddc=ddc)
+    live_apply = _ramp_cfg(brightness=14)  # a lower value ramps *down*
+    job = {"id": "c1", "step": "limit", "action": "start",
+           "value": None, "brightness": 19}
+    runner, reports, rclock = _runner(job, _ramp_cfg(), ddc, tmp_path)
+    runner.controller = controller
+    runner.level = 0
+    # A check is in progress (the runner owns the level until _finish).
+    controller.check_running = True
+
+    thread = threading.Thread(target=runner.run)
+    thread.start()
+    assert reached.wait(2), "the limit test never reached level 30"
+    try:
+        # This is the very race: a live-apply poll arrives mid-check.
+        controller.reconcile(live_apply, _local(hour=9), True)
+    finally:
+        resume.set()
+    thread.join(2)
+    assert not thread.is_alive()
+    controller.check_running = False
+
+    assert writes  # the check did ramp
+    assert max(_steps([0] + writes)) <= 2  # never a jump > brightnessStep
+
+
+def test_fault_monitor_never_loses_or_duplicates_lines_across_threads(monkeypatch):
+    """Concurrent new_faults() calls must each see a line exactly once.
+
+    A yield is forced *inside* the lines[self._seen:] slice, i.e. between the
+    read of _seen and its update. Two threads racing there is exactly what
+    swallows a fault line; the monitor's lock must serialize them.
+    """
+    lines = ["Under-voltage detected!", "usb 1-1.2: reset"]
+    gate = threading.Event()
+
+    class SlowLines(list):
+        def __getitem__(self, key):
+            gate.wait(2)  # release the GIL while new_faults is mid-slice
+            return list.__getitem__(self, key)
+
+    monkeypatch.setattr(
+        agent, "kernel_fault_lines",
+        lambda since, run=None: SlowLines(lines),
+    )
+    monitor = agent.FaultMonitor(
+        run=lambda *a, **k: SimpleNamespace(
+            returncode=0, stdout="", stderr=""
+        ),
+        clock=FakeClock(),
+    )
+    monitor.arm()
+    collected = []
+    started = threading.Barrier(3)
+
+    def poll():
+        started.wait()
+        collected.extend(monitor.new_faults())
+
+    threads = [threading.Thread(target=poll) for _ in range(2)]
+    for t in threads:
+        t.start()
+    started.wait()
+    time_module.sleep(0.05)  # let a worker reach the slice
+    gate.set()
+    for t in threads:
+        t.join()
+    assert sorted(collected) == sorted(lines)
+
+
+# -- fix round 2 --------------------------------------------------------------
+def _night_cfg(**over):
+    return _ramp_cfg(**over)
+
+
+def _check_job(step="limit", job_id="c1"):
+    return {"id": job_id, "step": step, "action": "start", "value": None,
+            "brightness": 19}
+
+
+def test_display_check_refuses_a_sleeping_standby_panel(monkeypatch):
+    """Item 2: a standby-off panel must not be written to by a check."""
+    reports = []
+    monkeypatch.setattr(
+        agent, "post_display_check",
+        lambda url, payload, **kw: reports.append(payload) or True,
+    )
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    assert controller.reconcile(_ramp_cfg(), _local(hour=23), True) is False
+    assert applied == [False] and controller.level == 0
+    writes = list(ddc.writes)
+
+    thread = agent.start_display_check(
+        _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    assert thread is None
+    assert reports[-1]["status"] == "asleep"
+    assert reports[-1]["id"] == "c1"
+    assert ddc.writes == writes  # nothing written to the sleeping panel
+    assert controller.level == 0
+    assert controller.check_running is False
+
+
+def test_display_check_refuses_a_dimmed_asleep_panel(monkeypatch):
+    """Item 2: dim-asleep is asleep too; the backlight must stay at 0."""
+    reports = []
+    monkeypatch.setattr(
+        agent, "post_display_check",
+        lambda url, payload, **kw: reports.append(payload) or True,
+    )
+    ddc = FakeDdc()
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    assert controller.reconcile(dim, _local(hour=23), True) is False
+    assert controller.level == 0
+    writes = list(ddc.writes)
+    thread = agent.start_display_check(
+        _check_job(), dim, fetch=lambda url: dim,
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    assert thread is None
+    assert reports[-1]["status"] == "asleep"
+    assert ddc.writes == writes
+    assert controller.level == 0
+
+
+def test_display_check_runner_gets_the_real_panel_state(monkeypatch):
+    """Item 2: the runner's limit guard must see the live panel state."""
+    seen = {}
+
+    class Spy:
+        def __init__(self, *a, **kw):
+            seen.update(kw)
+
+        def run(self):
+            pass
+
+    monkeypatch.setattr(agent, "DisplayCheckRunner", Spy)
+    controller, clock, _ = _controller()
+    controller.sleeping = False  # a transition succeeded: the panel is awake
+    thread = agent.start_display_check(
+        _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    thread.join(2)
+    assert seen["panel_on"]() is True
+    controller.panel_off = True
+    controller.sleeping = True
+    assert seen["panel_on"]() is False
+
+
+def test_boot_in_the_sleep_window_dims_to_zero_before_powering_off():
+    """Item 3: an unknown level is written to 0 before the standby off."""
+    order = []
+    ddc = FakeDdc(on_write=lambda level: order.append(("w", level)))
+    controller, _, _ = _controller(ddc=ddc)
+    controller.applier = lambda on: order.append(("power", on)) or "cog"
+    assert controller.reconcile(_ramp_cfg(), _local(hour=23), None) is False
+    assert order == [("w", 0), ("power", False)]
+    assert controller.level == 0
+
+
+def test_dim_mode_boot_at_night_writes_zero():
+    """Item 3: dim mode at boot must really take the backlight to 0."""
+    ddc = FakeDdc()
+    controller, _, applied = _controller(ddc=ddc)
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    assert controller.reconcile(cfg, _local(hour=23), None) is False
+    assert ddc.writes == [0]
+    assert controller.level == 0
+    assert applied == []
+
+
+def test_up_ramp_from_an_unknown_level_starts_at_zero_after_settle():
+    """Item 3: never trust the pre-reboot DDC value."""
+    ddc = FakeDdc()
+    controller, _, _ = _controller(ddc=ddc)
+    assert controller.level is None
+    assert controller.reconcile(_ramp_cfg(), _local(hour=9), None) is True
+    assert ddc.writes[0] == 0
+    assert ddc.writes[1:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
+
+
+def _state(tmp_path, level=28, step="limit", limit="null"):
+    (tmp_path / agent.DISPLAY_CHECK_STATE).write_text(
+        f'{{"id": "c1", "step": "{step}", "status": "running", '
+        f'"level": {level}, "limit": {limit}, "log": []}}'
+    )
+
+
+def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(
+    tmp_path, monkeypatch
+):
+    """Item 4a: recover only once the panel settled and the monitor is armed."""
+    events = []
+
+    class Fault(FakeFault):
+        def arm(self):
+            events.append(("arm", len(ddc.writes)))
+            super().arm()
+
+    ddc = FakeDdc(on_write=lambda level: events.append(("w", level)))
+    controller, _, _ = _controller(ddc=ddc, fault=Fault())
+    controller.state_dir = str(tmp_path)
+    _state(tmp_path)
+    cfg = _ramp_cfg(brightness=40)
+    monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=9))
+    agent.run(
+        "http://x", 900, fetch=lambda url: cfg, sleep=lambda s: None,
+        iterations=1, apply_device=lambda c: None, brightness=controller,
+    )
+    # the persisted run's limit (28 - 2 = 26) caps the wake ramp at 22
+    # BEFORE it starts: it never rises above the limit and comes back down
+    assert ddc.writes == [0] + list(range(2, 23, 2))
+    assert ("arm", len(ddc.writes)) in events
+    assert max(_steps(ddc.writes)) <= 2
+    assert controller.level == 22
+    assert not (tmp_path / agent.DISPLAY_CHECK_STATE).exists()
+
+
+def test_recovery_records_the_ramps_actual_outcome(tmp_path):
+    """Item 4b: a stopped ramp must not claim the target."""
+    state = {"n": 0}
+
+    def on_write(level):
+        state["n"] += 1
+        if state["n"] >= 2:
+            ddc.ok = False
+
+    ddc = FakeDdc(on_write=on_write)
+    controller, _, _ = _controller(ddc=ddc)
+    controller.panel_off = False
+    _state(tmp_path, level=28, step="write")
+    agent.recover_display_check(
+        str(tmp_path), _ramp_cfg(), ddc=ddc, controller=controller,
+        panel_on=lambda: True,
+    )
+    assert ddc.writes == [26, 24]
+    assert controller.level == 24  # not the 19 target
+
+
+def test_recovery_of_a_sleeping_panel_writes_zero_once_with_the_ramp_off(tmp_path):
+    """Item 4c: the panel may still hold the check's level: write 0 once."""
+    ddc = FakeDdc()
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.panel_off = True
+    controller.sleeping = True
+    off = _ramp_cfg(brightness_ramp_enabled=False)
+    _state(tmp_path, level=28)
+    agent.recover_display_check(
+        str(tmp_path), off, ddc=ddc, controller=controller,
+        panel_on=lambda: False,
+    )
+    assert ddc.writes == [0]
+    assert controller.level == 0
+    # the next wake does not bring it above 0 (the agent does not own it)
+    assert controller.reconcile(off, _local(hour=9), False) is True
+    assert ddc.writes == [0]
+
+
+def test_recovery_of_a_sleeping_panel_with_a_failed_write_stays_unknown(tmp_path):
+    ddc = FakeDdc(ok=False)
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.sleeping = True
+    _state(tmp_path, level=28)
+    agent.recover_display_check(
+        str(tmp_path), _ramp_cfg(), ddc=ddc, controller=controller,
+        panel_on=lambda: False,
+    )
+    assert controller.level is None
+
+
+def test_a_failed_boot_off_counts_as_asleep_for_display_checks(monkeypatch):
+    """Item D: until a transition succeeded the panel state is not 'awake'."""
+    reports = []
+    monkeypatch.setattr(
+        agent, "post_display_check",
+        lambda url, payload, **kw: reports.append(payload) or True,
+    )
+    ddc = FakeDdc()
+    controller, clock, _applied = _controller(ddc=ddc)
+    controller.applier = lambda on: "none"  # the boot OFF apply fails
+    assert controller.reconcile(_ramp_cfg(), _local(hour=23), None) is None
+    assert controller.sleeping is None
+    writes = list(ddc.writes)
+    thread = agent.start_display_check(
+        _check_job(), _ramp_cfg(), fetch=lambda url: _ramp_cfg(),
+        backend_url="http://x", controller=controller, sleep=clock.sleep,
+    )
+    assert thread is None
+    assert reports[-1]["status"] == "asleep"
+    assert ddc.writes == writes
+
+
+def test_a_fault_from_the_last_up_step_is_caught():
+    """Item 5: check once more after the final up-write."""
+    writes = []
+    clock = FakeClock()
+    slept_after_final = {"v": False}
+
+    def write(level):
+        writes.append(level)
+        return True
+
+    def sleep(seconds):
+        clock.sleep(seconds)
+        if writes[-1:] == [4]:
+            slept_after_final["v"] = True
+
+    # the kernel only reports the trouble a moment after the last write
+    def fault():
+        return slept_after_final["v"] and writes.count(4) == 1
+
+    outcome = agent.ramp_brightness(
+        0, 4, write=write, fault=fault, sleep=sleep, step=2, step_seconds=1.5,
+    )
+    assert outcome["fault"]
+    assert outcome["limit"] == 2
+    assert writes == [2, 4, 2, 0]
+    assert max(_steps([0] + writes)) <= 2
+
+
+def test_the_journal_names_the_kernel_fault_line():
+    fault = FakeFault()
+    fault.faults = ["usb 1-1.2: reset high-speed USB device"]
+    logs = []
+    agent.ramp_brightness(
+        0, 10, write=lambda level: True, fault=fault, sleep=lambda s: None,
+        step=2, step_seconds=1.5, log_fn=logs.append,
+    )
+    line = next(m for m in logs if m.startswith("brightness: fault at"))
+    assert "usb 1-1.2: reset high-speed USB device" in line
+    assert "True" not in line
+
+
+def test_ramp_brightness_has_no_unused_stop_on_fault_parameter():
+    import inspect
+
+    assert "stop_on_fault" not in inspect.signature(agent.ramp_brightness).parameters
+
+
+def test_switching_dim_to_standby_while_dimmed_powers_off_now():
+    """Item 8: standby off applies at once, not at the next wake."""
+    ddc = FakeDdc()
+    controller, _, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
+    controller.reconcile(dim, _local(hour=23), True)
+    assert applied == []
+    standby = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby")
+    last = controller.reconcile(standby, _local(hour=23, minute=1), False)
+    assert last is False
+    assert applied == [False]
+    assert controller.panel_off is True
+
+
+def test_ramp_cancel_polls_with_a_short_timeout_and_a_failure_is_not_a_cancel(
+    monkeypatch,
+):
+    """Item 9: the per-step config check must not stall the ramp."""
+    timeouts = []
+    calls = {"n": 0}
+    cfg = _ramp_cfg()
+
+    def fake_fetch(url, kstat=None, kmsg=None, timeout=agent.HTTP_TIMEOUT):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return cfg  # the main poll
+        timeouts.append(timeout)
+        raise OSError("backend down")
+
+    monkeypatch.setattr(agent, "fetch_config", fake_fetch)
+    ddc = FakeDdc()
+    controller, _, applied = _controller(ddc=ddc)
+    controller.panel_off = False
+    controller.level = 19
+    monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=23))
+    agent.run(
+        "http://x", 900, fetch=agent.fetch_config, sleep=lambda s: None,
+        iterations=1, apply_device=lambda c: None, brightness=controller,
+    )
+    assert timeouts and max(timeouts) <= 2
+    assert ddc.writes[-1] == 0  # the ramp finished despite the failed checks
+    assert applied == [False]
+
+
+def test_post_display_check_warns_once_without_a_kiosk_id(monkeypatch, capsys):
+    monkeypatch.delenv("CALVIN_KIOSK_ID", raising=False)
+    monkeypatch.setattr(agent, "_warned_no_kiosk_id", False, raising=False)
+    assert agent.post_display_check("http://x", {"id": "c1"}) is False
+    assert agent.post_display_check("http://x", {"id": "c1"}) is False
+    out = capsys.readouterr().out
+    assert out.count("CALVIN_KIOSK_ID") == 1
