@@ -23,6 +23,7 @@ const CONTROL_KINDS = [
   "range",
   "photoSources",
   "schedule",
+  "readings",
   "theme",
   "time",
 ];
