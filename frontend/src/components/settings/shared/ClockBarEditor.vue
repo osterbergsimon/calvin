@@ -467,6 +467,7 @@ const zoneKeys = computed(() => CLOCK_BAR_ZONE_KEYS[shape.value]);
 const zoneLabels = computed(() => CLOCK_BAR_ZONE_LABELS[shape.value]);
 
 const services = computed(() => webServicesStore.services);
+const resolveOptions = () => ({ servicesLoaded: webServicesStore.loaded });
 const clonedShape = source => ({
   zones: Object.fromEntries(
     CLOCK_BAR_ZONE_KEYS[source.shape].map(key => [key, [...(source.zones[key] || [])]])
@@ -486,13 +487,19 @@ const cloneDesign = design => ({
 const designState = ref(null);
 const resolved = computed(() => {
   const design = designState.value ? buildClockBarDesign(designState.value) : null;
-  return resolveClockBarDesign({ ...props.config, clockBarDesign: design }, services.value);
+  return resolveClockBarDesign(
+    { ...props.config, clockBarDesign: design },
+    services.value,
+    resolveOptions()
+  );
 });
 const shapeDesign = computed(() => resolved.value[shape.value]);
 const hiddenParts = computed(() => shapeDesign.value.hidden || []);
 
 const resetDraft = () => {
-  designState.value = cloneDesign(resolveClockBarDesign(props.config, services.value));
+  designState.value = cloneDesign(
+    resolveClockBarDesign(props.config, services.value, resolveOptions())
+  );
   selectedPart.value = null;
   undoState.value = null;
   sheetOpen.value = false;
@@ -773,7 +780,11 @@ let undoTimer = null;
 const resetToDefault = () => {
   const previous = designState.value ? buildClockBarDesign(designState.value) : null;
   designState.value = cloneDesign(
-    resolveClockBarDesign({ clockBarDesign: defaultClockBarDesign() }, services.value)
+    resolveClockBarDesign(
+      { clockBarDesign: defaultClockBarDesign() },
+      services.value,
+      resolveOptions()
+    )
   );
   selectedPart.value = null;
   confirmReset.value = false;
@@ -790,7 +801,8 @@ const undoReset = () => {
   designState.value = cloneDesign(
     resolveClockBarDesign(
       { ...props.config, clockBarDesign: undoState.value.previous },
-      services.value
+      services.value,
+      resolveOptions()
     )
   );
   undoState.value = null;

@@ -37,7 +37,11 @@ const props = defineProps({
 defineEmits(["edit"]);
 
 const webServicesStore = useWebServicesStore();
-const resolved = computed(() => resolveClockBarDesign(props.config, webServicesStore.services));
+const resolved = computed(() =>
+  resolveClockBarDesign(props.config, webServicesStore.services, {
+    servicesLoaded: webServicesStore.loaded,
+  })
+);
 
 onMounted(() => {
   if (webServicesStore.services.length === 0 && !webServicesStore.loading) {

@@ -90,6 +90,7 @@ import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { getActiveDashboardScreen } from "../utils/layout";
 import { getKioskId } from "../utils/kioskId";
 import {
+  CLOCK_BAR_TILES,
   CLOCK_BAR_ZONE_LABELS,
   isTilePart,
   partLabel,
@@ -152,7 +153,10 @@ const zoneKeys = ["left", "center", "right"];
 
 const bar = computed(
   () =>
-    props.design || resolveClockBarDesign(configStore.$state, webServicesStore.services).horizontal
+    props.design ||
+    resolveClockBarDesign(configStore.$state, webServicesStore.services, {
+      servicesLoaded: webServicesStore.loaded,
+    }).horizontal
 );
 
 const {
@@ -203,7 +207,10 @@ const roomLabel = computed(() => {
 });
 
 const visiblePartIds = zoneKey =>
-  (bar.value.zones?.[zoneKey] || []).filter(partId => partId !== "room" || roomLabel.value);
+  (bar.value.zones?.[zoneKey] || []).filter(
+    // "tiles" is the stored placeholder, kept only while services load.
+    partId => partId !== CLOCK_BAR_TILES && (partId !== "room" || roomLabel.value)
+  );
 
 const zoneItems = computed(() => {
   const result = {};

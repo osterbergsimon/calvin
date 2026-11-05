@@ -150,11 +150,11 @@ const removeToken = (zones, token) => {
 
 const normalizeSizeValue = (value, table, allowed) => {
   if (typeof value === "number" && Number.isFinite(value)) {
-    const rounded = Math.round(value);
+    // Custom px keeps its decimals: the editor's number field allows them.
     const match = Object.entries(table).find(
-      ([step, px]) => px === rounded && allowed.includes(step)
+      ([step, px]) => px === value && allowed.includes(step)
     );
-    return match ? match[0] : Math.max(0, Math.min(MAX_CUSTOM_SIZE, rounded));
+    return match ? match[0] : Math.max(0, Math.min(MAX_CUSTOM_SIZE, value));
   }
   if (typeof value === "string") {
     const lower = value.trim().toLowerCase();
@@ -219,18 +219,18 @@ function deriveLegacyShape(shape, config, services) {
   }
 
   if (shape === "horizontal") {
-    parts.time.size = stepFor(shape, "time", source.clockBarFontSize ?? 16, ["s", "m", "l", "xl"]);
-    parts.date.size = stepFor(shape, "date", source.clockBarDateFontSize ?? 14, ["s", "m", "l"]);
+    parts.time.size = stepFor(shape, "time", source.clockBarFontSize || 16, ["s", "m", "l", "xl"]);
+    parts.date.size = stepFor(shape, "date", source.clockBarDateFontSize || 14, ["s", "m", "l"]);
     parts.logo.size = "m";
     parts.room.size = "m";
   } else {
-    parts.time.size = stepFor(shape, "time", source.clockBarVerticalFontSize ?? 18, [
+    parts.time.size = stepFor(shape, "time", source.clockBarVerticalFontSize || 18, [
       "s",
       "m",
       "l",
       "xl",
     ]);
-    parts.date.size = stepFor(shape, "date", source.clockBarVerticalDateFontSize ?? 11, [
+    parts.date.size = stepFor(shape, "date", source.clockBarVerticalDateFontSize || 11, [
       "s",
       "m",
       "l",
@@ -274,9 +274,15 @@ function normalizePart(shape, partId, raw) {
   if ("seconds" in defaults) next.seconds = Boolean(source.seconds);
   if ("underTime" in defaults) next.underTime = Boolean(source.underTime);
   if ("style" in defaults) {
-    const allowed = shape === "horizontal" ? ["upright"] : ["upright", "stacked"];
+    const allowed =
+      partId === "date"
+        ? shape === "vertical"
+          ? ["line", "stacked"]
+          : ["line"]
+        : shape === "vertical"
+          ? ["upright", "stacked"]
+          : ["upright"];
     next.style = allowed.includes(source.style) ? source.style : defaults.style;
-    if (partId === "date" && shape === "vertical") next.style = "line";
   }
   return next;
 }
@@ -335,16 +341,17 @@ function resolvedParts(shape, stored) {
  * expanded, unknown ids have been dropped, a deleted instance is gone and
  * Status & menu is always present somewhere.
  */
-function resolveShape(shape, stored, config, services, hasDesign) {
+function resolveShape(shape, stored, config, services, hasDesign, servicesLoaded) {
   const tileIds = tileInstances(services).map(service => service.id);
   const knownTiles = new Set(tileIds.map(tilePartId));
   const map = serviceById(services);
 
   const validFixed = new Set(CLOCK_BAR_FIXED_PARTS);
+  // Until the services list has loaded an unknown tile id is not "deleted", it
+  // is just not known yet: keep it so a save does not drop it.
+  const isKnownTile = token => isTilePart(token) && (knownTiles.has(token) || !servicesLoaded);
   const isValidToken = token =>
-    validFixed.has(token) ||
-    token === CLOCK_BAR_TILES ||
-    (isTilePart(token) && knownTiles.has(token));
+    validFixed.has(token) || token === CLOCK_BAR_TILES || isKnownTile(token);
 
   const hiddenTokens = [...new Set(stored.hidden.filter(isValidToken))];
   const hiddenSet = new Set(hiddenTokens.filter(token => token !== "status"));
@@ -384,6 +391,9 @@ function resolveShape(shape, stored, config, services, hasDesign) {
           }
           push(zoneKey, tokenId);
         }
+        // Not loaded yet: keep the placeholder so a save still has it. The bars
+        // do not draw it.
+        if (!servicesLoaded) push(zoneKey, CLOCK_BAR_TILES);
         continue;
       }
       if (token === "status" && hiddenSet.has(token)) continue;
@@ -410,7 +420,7 @@ function resolveShape(shape, stored, config, services, hasDesign) {
   }
 
   const hidden = [...hiddenSet].filter(
-    token => !seen.has(token) && (validFixed.has(token) || knownTiles.has(token))
+    token => !seen.has(token) && (validFixed.has(token) || isKnownTile(token))
   );
 
   // Settings stays reachable: Status & menu is never hidden.
@@ -457,8 +467,11 @@ function resolveShape(shape, stored, config, services, hasDesign) {
  * @param {Object} config the household config (camelCase keys)
  * @param {Array} services plugin instances; those with a `statusbar_schema`
  *   become tile parts.
+ * @param {{servicesLoaded?: boolean}} [options] with `servicesLoaded: false` a
+ *   tile id that is not in `services` is kept (not yet known), not dropped.
  */
-export function resolveClockBarDesign(config, services) {
+export function resolveClockBarDesign(config, services, options = {}) {
+  const servicesLoaded = options.servicesLoaded !== false;
   const source = config || {};
   const rawDesign = source.clockBarDesign;
   const hasDesign = Boolean(rawDesign && typeof rawDesign === "object");
@@ -469,7 +482,7 @@ export function resolveClockBarDesign(config, services) {
       ? normalizeStoredShape(shape, rawDesign?.[shape]) ||
         deriveLegacyShape(shape, source, services)
       : deriveLegacyShape(shape, source, services);
-    result[shape] = resolveShape(shape, stored, source, services, hasDesign);
+    result[shape] = resolveShape(shape, stored, source, services, hasDesign, servicesLoaded);
   }
   return result;
 }

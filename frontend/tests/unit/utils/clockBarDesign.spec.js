@@ -358,3 +358,88 @@ describe("buildClockBarDesign", () => {
     expect(design.horizontal.hidden).toContain("tile:weather");
   });
 });
+
+describe("clock bar design — review fixes", () => {
+  const stored = patch => ({
+    version: 1,
+    horizontal: {
+      zones: { left: ["tile:a"], center: ["time"], right: ["tiles", "status"] },
+      hidden: ["tile:z"],
+      parts: {},
+      barHeight: "normal",
+      tileSize: "m",
+      ...patch,
+    },
+  });
+
+  it("keeps a side-bar stacked date through build and re-resolve (item 4)", () => {
+    const legacy = config({ clockShowDate: true, clockBarVerticalLayout: "compact-time-date" });
+    const first = resolveClockBarDesign(legacy, []);
+    expect(first.vertical.parts.date.style).toBe("stacked");
+
+    const saved = buildClockBarDesign(first);
+    expect(saved.vertical.parts.date.style).toBe("stacked");
+
+    const again = resolveClockBarDesign(config({ clockBarDesign: saved }), []);
+    expect(again.vertical.parts.date.style).toBe("stacked");
+    expect(again.vertical.parts.time.style).toBe("stacked");
+  });
+
+  it("still defaults a horizontal date to the line style (item 4)", () => {
+    const design = resolveClockBarDesign(
+      config({
+        clockBarDesign: { version: 1, horizontal: { parts: { date: { style: "stacked" } } } },
+      }),
+      []
+    );
+    expect(design.horizontal.parts.date.style).toBe("line");
+  });
+
+  it("keeps pinned and hidden tiles through a save before services load (item 6)", () => {
+    const resolved = resolveClockBarDesign(config({ clockBarDesign: stored() }), [], {
+      servicesLoaded: false,
+    });
+    const saved = buildClockBarDesign(resolved);
+
+    expect(saved.horizontal.zones.left).toEqual(["tile:a"]);
+    expect(saved.horizontal.zones.right).toEqual(["tiles", "status"]);
+    expect(saved.horizontal.hidden).toEqual(["tile:z"]);
+  });
+
+  it("drops a deleted instance once the services list is loaded (item 6)", () => {
+    const resolved = resolveClockBarDesign(config({ clockBarDesign: stored() }), [tile("b")], {
+      servicesLoaded: true,
+    });
+    const saved = buildClockBarDesign(resolved);
+    expect(saved.horizontal.zones.left).toEqual([]);
+    expect(saved.horizontal.hidden).toEqual([]);
+  });
+
+  it("falls back to the default font size for a legacy 0, as before (item 11)", () => {
+    const resolved = resolveClockBarDesign(
+      config({
+        clockBarFontSize: 0,
+        clockBarDateFontSize: 0,
+        clockBarVerticalFontSize: 0,
+        clockBarVerticalDateFontSize: 0,
+        clockShowDate: true,
+      }),
+      []
+    );
+    expect(resolved.horizontal.parts.time.sizePx).toBe(16);
+    expect(resolved.horizontal.parts.date.sizePx).toBe(14);
+    expect(resolved.vertical.parts.time.sizePx).toBe(18);
+    expect(resolved.vertical.parts.date.sizePx).toBe(11);
+  });
+
+  it("keeps a fractional custom px size (item 12)", () => {
+    const resolved = resolveClockBarDesign(
+      config({
+        clockBarDesign: { version: 1, horizontal: { parts: { time: { size: 10.5 } } } },
+      }),
+      []
+    );
+    expect(resolved.horizontal.parts.time.size).toBe(10.5);
+    expect(resolved.horizontal.parts.time.sizePx).toBe(10.5);
+  });
+});
