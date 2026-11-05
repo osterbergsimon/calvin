@@ -610,3 +610,24 @@ def test_a_huge_log_is_trimmed_to_the_newest_entries(test_client: TestClient, ki
     seen = test_client.get(BASE).json()["run"]["log"]
     assert len(seen) == 500
     assert seen[-1]["note"] == "n799"
+
+
+@pytest.mark.integration
+def test_step_value_is_also_capped_by_the_limit_this_run_found(test_client: TestClient, kiosk):
+    """A limit found by the limit step but not saved yet still caps the next target."""
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], "done", level=30, limit=30)
+    refused = _step(test_client, "conversion", value=90)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_limit"
+    assert refused.json()["detail"]["max"] == 26  # 30 - 2 * 2
+    assert _step(test_client, "conversion", value=26).status_code == 200
+
+
+@pytest.mark.integration
+def test_the_lower_of_the_saved_and_the_found_limit_wins(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 20})
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], "done", level=30, limit=30)
+    assert _step(test_client, "conversion", value=17).status_code == 422  # 20 - 4 = 16
+    assert _step(test_client, "conversion", value=16).status_code == 200

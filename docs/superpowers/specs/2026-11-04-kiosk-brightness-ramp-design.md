@@ -292,7 +292,7 @@ on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not
   send a second one) and the ending report of a rebooted agent on an expired run are accepted; the first ending
   status stays, and a `done` on an expired run reads `timeout`.
 - **A start target above `limit - 2 × step` is refused** (422 `value_above_limit`, with `max`), using the screen's
-  merged `brightnessLimit` and `brightnessStep` (default 2). With no limit, 0–100 is allowed. The agent's conversion
+  merged `brightnessLimit` and `brightnessStep` (default 2), and also the limit this run's `limit` step found but the admin has not saved yet (the lower of the two applies). With no limit, 0–100 is allowed. The agent's conversion
   step does not apply the limit itself.
 - **Agent reports are tolerant**: unknown fields are ignored, and log notes and `detail` are clipped to 500 characters
   and the log to its newest 500 entries, so one long error never rejects a report. Admin request bodies stay strict.

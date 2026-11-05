@@ -138,9 +138,16 @@ async def _check_value_under_limit(
     if overrides is None:
         return  # unknown kiosk: start_run answers 404
     merged = merge_overrides(await build_global_config(), overrides)
-    limit = merged.get("brightnessLimit", merged.get("brightness_limit"))
-    if not isinstance(limit, int) or isinstance(limit, bool):
+    saved = merged.get("brightnessLimit", merged.get("brightness_limit"))
+    limits = [saved] if isinstance(saved, int) and not isinstance(saved, bool) else []
+    try:
+        # A limit this run found but the admin has not saved yet counts too.
+        limits.append(await display_check.found_limit(kiosk_id))
+    except display_check.NoLimitError:
+        pass
+    if not limits:
         return
+    limit = min(limits)
     step = merged.get("brightnessStep", merged.get("brightness_step"))
     step = step if isinstance(step, int) and not isinstance(step, bool) else 2
     top = max(0, limit - 2 * min(max(step, 1), 5))
