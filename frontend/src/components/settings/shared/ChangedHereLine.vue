@@ -58,6 +58,9 @@ function jumpTo(key) {
   color: var(--focus-text);
   text-decoration: underline;
   text-underline-offset: 2px;
+  /* A link that wraps across two lines has a box that covers its neighbour's
+     centre, so the tap lands on the wrong link. Keep each name on one line. */
+  white-space: nowrap;
 }
 
 .changed-here__link:focus-visible {

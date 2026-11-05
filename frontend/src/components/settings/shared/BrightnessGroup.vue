@@ -356,6 +356,7 @@ const brightnessNote = computed(() => {
 }
 .brightness-group__title {
   margin: var(--gap-3) 0 var(--gap-1);
+  padding: 0 var(--gap-4);
   font-size: var(--text-meta);
   font-weight: var(--weight-strong);
   color: var(--ink-2);

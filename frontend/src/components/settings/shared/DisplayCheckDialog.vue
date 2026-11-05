@@ -240,6 +240,12 @@
             <strong>{{ check.run.value?.level ?? 0 }}</strong>
             <span class="dcheck__bar" aria-hidden="true">
               <span class="dcheck__bar-fill" :style="{ width: `${barPercent}%` }" />
+              <span
+                v-if="check.run.value?.limit != null"
+                class="dcheck__bar-limit"
+                data-test="limit-marker"
+                :style="{ left: `${check.run.value.limit}%` }"
+              />
             </span>
           </div>
           <p class="dcheck__sub" role="status">
@@ -704,6 +710,7 @@ function close() {
   min-width: 3ch;
 }
 .dcheck__bar {
+  position: relative;
   flex: 1;
   height: 0.75rem;
   overflow: hidden;
@@ -715,6 +722,13 @@ function close() {
   height: 100%;
   background: var(--focus);
   transition: width var(--dur-fast) linear;
+}
+.dcheck__bar-limit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--err);
 }
 .dcheck__log {
   margin: 0;
