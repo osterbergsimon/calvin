@@ -90,19 +90,20 @@
             <p v-if="limitFound != null && limitSaved" class="dcheck__sub" data-test="limit-saved">
               Saved. Brightness can go up to {{ maxAfter }}.
             </p>
-            <p v-else-if="limitFound != null && limitSaveFailed" class="dcheck__sub">
-              Couldn't save the limit the usual way. Calvin applied it as a setting for now, so the
-              Brightness slider stops below it.
-            </p>
-            <Button
-              v-if="limitFound != null && limitSaveFailed && !limitSaved"
-              variant="primary"
-              data-test="limit-save"
-              :loading="savingLimit"
-              @click="saveLimit"
-            >
-              Try saving again
-            </Button>
+            <template v-else-if="limitFound != null">
+              <p class="dcheck__sub">{{ screenName }} is going back to {{ backTo }}.</p>
+              <Button
+                variant="primary"
+                data-test="limit-save"
+                :loading="savingLimit"
+                @click="saveLimit"
+              >
+                Save {{ limitFound }} as {{ screenName }}'s limit
+              </Button>
+              <p class="dcheck__sub" data-test="limit-pending-note">
+                A found limit only applies once you save it. The old limit stays until you save.
+              </p>
+            </template>
           </div>
         </template>
 
@@ -383,7 +384,6 @@ const limitRunning = ref(false);
 const limitFound = ref(null);
 const limitSaved = ref(false);
 const savingLimit = ref(false);
-const limitSaveFailed = ref(false);
 const phone = ref(false);
 const handled = new Set();
 let currentRunId = null;
@@ -574,25 +574,17 @@ function removeReading(index) {
   emit("patch", { brightnessConversion: readings.value.filter((_, i) => i !== index) });
 }
 
-// A found limit is applied as soon as the run finishes: the owner started the
-// run, and a lower cap is the safe side. If the server call fails the limit is
-// still written as a setting, so the slider never reaches past it.
+// A found limit is only a proposal: a report can be forged on the LAN, so it
+// takes effect only when the owner saves it. The old limit stays until then.
 async function saveLimit() {
   const found = limitFound.value;
   if (found == null) return;
   savingLimit.value = true;
   const saved = await check.saveLimit();
   savingLimit.value = false;
-  if (saved) {
-    limitSaved.value = true;
-    limitSaveFailed.value = false;
-    check.error.value = "";
-    emit("saved-limit", saved.brightnessLimit);
-    return;
-  }
-  limitSaveFailed.value = true;
-  check.error.value = "";
-  emit("patch", { brightnessLimit: found });
+  if (!saved) return;
+  limitSaved.value = true;
+  emit("saved-limit", saved.brightnessLimit);
 }
 
 // --- end states -------------------------------------------------------------
@@ -649,7 +641,6 @@ function onStepResult(name, result) {
       if (failed) return end("error", result.detail);
       limitFound.value = result.limit ?? null;
       view.value = "finish";
-      if (limitFound.value != null) saveLimit();
       return;
     default:
   }
@@ -707,7 +698,6 @@ async function onOpen() {
   limitRunning.value = false;
   limitFound.value = null;
   limitSaved.value = false;
-  limitSaveFailed.value = false;
   writesVerdict.value = null;
   handled.clear();
   currentRunId = null;

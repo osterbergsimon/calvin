@@ -209,11 +209,15 @@ for (const [size, viewport] of SIZES) {
         "Limit found: 26",
         { timeout: 8000 }
       );
-      // A found limit is applied by itself: the owner never has to press Save.
+      // A found limit is only proposed: nothing is saved until the owner clicks.
+      await expect(body(page).locator('[data-test="limit-pending-note"]')).toBeVisible();
+      expect(api.overridesByKiosk.hallway?.brightnessLimit).toBeUndefined();
+      expect(api.displayCheckCalls).not.toContain("POST save-limit");
+      await shot(page, size, "check-finished");
+      await page.getByRole("button", { name: /^Save 26 as .* limit$/ }).click();
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(26);
       expect(api.displayCheckCalls.filter(call => call === "POST save-limit")).toHaveLength(1);
       await expect(body(page).locator('[data-test="limit-saved"]')).toBeVisible();
-      await shot(page, size, "check-finished");
       // One session the whole way: a single start, then step changes; Done ends it.
       expect(api.displayCheckCalls.filter(call => call === "POST start")).toHaveLength(1);
       expect(

@@ -390,41 +390,56 @@ describe("DisplayCheckDialog step 4: safe limit", () => {
     expect(posts("start")).toHaveLength(1);
   });
 
-  it("saves the found limit by itself when the limit step reports, and says so", async () => {
+  it("only proposes the found limit: nothing is saved until the owner clicks", async () => {
     await toStep4();
     await click(wrapper, "limit-start");
     agentStep("limit", { level: 19, limit: 26, detail: "limit found: 26" });
     await settle();
-    expect(find(wrapper, "check-finish").text()).toContain("Limit found: 26");
-    expect(posts("save-limit")).toHaveLength(1);
-    expect(find(wrapper, "limit-save").exists()).toBe(false);
-    expect(wrapper.emitted("saved-limit")[0][0]).toBe(26);
-    expect(find(wrapper, "check-finish").text()).toContain("Saved");
     await settle(6000);
-    expect(posts("save-limit")).toHaveLength(1);
+    expect(find(wrapper, "check-finish").text()).toContain("Limit found: 26");
+    expect(find(wrapper, "limit-save").text()).toBe("Save 26 as Kitchen's limit");
+    expect(find(wrapper, "limit-pending-note").text()).toContain("stays until you save");
+    expect(posts("save-limit")).toHaveLength(0);
+    expect(wrapper.emitted("saved-limit")).toBeUndefined();
+    expect(wrapper.emitted("patch")).toBeUndefined();
     // The session is still open until Done or Stop.
     expect(posts("stop")).toHaveLength(0);
   });
 
-  it("Done on the finish screen ends the session", async () => {
+  it("saves the limit once, on the click, and says so", async () => {
+    await toStep4();
+    await click(wrapper, "limit-start");
+    agentStep("limit", { level: 19, limit: 26 });
+    await settle();
+    await click(wrapper, "limit-save");
+    expect(posts("save-limit")).toHaveLength(1);
+    expect(wrapper.emitted("saved-limit")[0][0]).toBe(26);
+    expect(find(wrapper, "limit-saved").text()).toContain("Saved");
+    expect(find(wrapper, "limit-save").exists()).toBe(false);
+    expect(find(wrapper, "limit-pending-note").exists()).toBe(false);
+  });
+
+  it("Done without saving ends the session and keeps the old limit", async () => {
     await toStep4();
     await click(wrapper, "limit-start");
     agentStep("limit", { level: 19, limit: 26 });
     await settle();
     await click(wrapper, "check-done");
     expect(posts("stop")).toHaveLength(1);
+    expect(posts("save-limit")).toHaveLength(0);
     expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
   });
 
-  it("still caps the brightness when saving fails, and lets the owner retry", async () => {
+  it("keeps the button and shows an error when saving fails, without changing any setting", async () => {
     backend.failSaveLimit = true;
     await toStep4();
     await click(wrapper, "limit-start");
     agentStep("limit", { level: 19, limit: 26 });
     await settle();
-    expect(wrapper.emitted("patch").at(-1)[0]).toEqual({ brightnessLimit: 26 });
-    expect(find(wrapper, "check-finish").text()).toContain("Couldn't save");
+    await click(wrapper, "limit-save");
+    expect(wrapper.text()).toContain("Couldn't save the limit");
     expect(find(wrapper, "limit-save").exists()).toBe(true);
+    expect(wrapper.emitted("patch")).toBeUndefined();
   });
 
   it("says Kitchen restarted when the agent reports an interrupted run", async () => {
