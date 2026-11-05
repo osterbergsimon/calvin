@@ -85,6 +85,7 @@ import { useConfigStore } from "../stores/config";
 import { useKiosksStore } from "../stores/kiosks";
 import { useWebServicesStore } from "../stores/webServices";
 import { useClockBar } from "../composables/useClockBar";
+import { useBarServices } from "../composables/useBarServices";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { getActiveDashboardScreen } from "../utils/layout";
 import { getKioskId } from "../utils/kioskId";
@@ -257,6 +258,8 @@ const partFor = partId => {
   return bar.value.parts?.[partId] || {};
 };
 
+useBarServices();
+
 onMounted(() => {
   if (kioskId) kiosksStore.loadKiosks();
 });
@@ -299,27 +302,6 @@ onMounted(() => {
   gap: var(--gap-1);
 }
 
-.clock-time {
-  font-family: var(--font-display);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-weight: var(--weight-title);
-  color: var(--ink);
-  white-space: nowrap;
-}
-
-.clock-date {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums lining-nums;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.clock-bar-room {
-  font-family: var(--font-ui);
-  color: var(--ink-3);
-  font-size: var(--text-body);
-}
-
 /* On a phone the bar cannot hold the wordmark, the room, the clock, the
    connection pill and the ⋯ menu on one line: the row ran past the screen and
    scrolled sideways, cutting the clock (CLV-66). The room name is the least
@@ -339,11 +321,11 @@ onMounted(() => {
   }
 }
 
-.clock-bar-horizontal.position-between .clock-time {
+.clock-bar-horizontal.position-between :deep(.clock-time) {
   font-size: var(--text-body);
 }
 
-.clock-bar-horizontal.position-between .clock-date {
+.clock-bar-horizontal.position-between :deep(.clock-date) {
   font-size: var(--text-caption);
 }
 

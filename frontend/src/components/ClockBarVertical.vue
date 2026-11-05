@@ -29,6 +29,7 @@
             :count="zoneMeta(zoneKey, 'time').count"
             :label="partAria('time', zoneKey)"
             :time-data="timeData"
+            :compact-date="compactDate"
             @select="$emit('select-part', $event)"
             @move="$emit('move-part', $event)"
           />
@@ -44,6 +45,7 @@
             :count="zoneMeta(zoneKey, 'date').count"
             :label="partAria('date', zoneKey)"
             :time-data="timeData"
+            :compact-date="compactDate"
             @select="$emit('select-part', $event)"
             @move="$emit('move-part', $event)"
           />
@@ -62,6 +64,7 @@
           :count="zoneMeta(zoneKey, item.id).count"
           :label="partAria(item.id, zoneKey)"
           :time-data="timeData"
+          :compact-date="compactDate"
           :room-label="roomLabel"
           :screens="screens"
           :active-screen-id="activeScreenId"
@@ -77,6 +80,7 @@
 <script setup>
 import { computed } from "vue";
 import { useClockBar } from "../composables/useClockBar";
+import { useBarServices } from "../composables/useBarServices";
 import { useConfigStore } from "../stores/config";
 import { useWebServicesStore } from "../stores/webServices";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
@@ -161,6 +165,8 @@ const {
   design: () => bar.value,
 });
 
+useBarServices();
+
 const timeData = computed(() => ({
   formattedTime: formattedTime.value,
   compactTimeParts: compactTimeParts.value,
@@ -180,6 +186,8 @@ const screens = computed(() =>
 );
 const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
 const roomLabel = computed(() => (props.sample ? "Kitchen" : ""));
+// The side bar draws a non-stacked date vertically when the time is stacked.
+const compactDate = computed(() => bar.value.parts?.time?.style === "stacked");
 
 const visiblePartIds = zoneKey =>
   (bar.value.zones?.[zoneKey] || []).filter(partId => partId !== "room" || roomLabel.value);
@@ -316,64 +324,11 @@ const partFor = partId => {
   gap: var(--gap-1);
 }
 
-.compact-time {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  line-height: 0.92;
-  font-variant-numeric: tabular-nums;
-}
-
-.compact-period {
-  margin-top: var(--gap-1);
-  font-size: 0.45em;
-  line-height: 1;
-}
-
-.compact-date-stacked {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  max-height: none;
-  writing-mode: horizontal-tb;
-  text-orientation: mixed;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.compact-date-year {
-  font-size: 0.78em;
-  color: var(--ink-2);
-}
-
-.clock-time {
-  font-family: var(--font-display);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-weight: var(--weight-title);
-  color: var(--ink);
-  line-height: 1.1;
-}
-
-.clock-date {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums lining-nums;
-  color: var(--ink-2);
-  line-height: 1.1;
-}
-
-.clock-bar-room {
-  font-family: var(--font-ui);
-  color: var(--ink-3);
+.clock-bar-vertical.position-between :deep(.clock-time) {
   font-size: var(--text-body);
 }
 
-.clock-bar-vertical.position-between .clock-time {
-  font-size: var(--text-body);
-}
-
-.clock-bar-vertical.position-between .clock-date {
+.clock-bar-vertical.position-between :deep(.clock-date) {
   font-size: var(--text-caption);
 }
 </style>
