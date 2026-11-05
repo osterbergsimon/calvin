@@ -1084,6 +1084,20 @@ onMounted(() => {
   min-height: 28rem;
 }
 
+/* A short wall panel keeps the shelf in view: the page placeholder is scenery,
+   not a full page preview. */
+.size-compact .cbe-page {
+  min-height: 0;
+}
+
+.size-compact .cbe-page-body {
+  min-height: 1.5rem;
+}
+
+.size-phone .cbe-page {
+  min-height: 10rem;
+}
+
 .cbe-page-body {
   flex: 1 1 auto;
   min-height: 8rem;
@@ -1280,15 +1294,13 @@ onMounted(() => {
   transition: none;
 }
 
-.size-compact .cbe-body {
-  flex-direction: column;
-}
-
+/* Compact (a short wall panel): stage and inspector side by side, like Pages &
+   regions. */
 .size-compact .cbe-rail {
-  flex: 0 0 auto;
-  max-height: 45%;
-  border-top: 1px solid var(--line);
-  border-left: none;
+  flex: 0 0 280px;
+  max-height: none;
+  border-top: none;
+  border-left: 1px solid var(--line);
 }
 
 .size-phone .cbe-stage,
