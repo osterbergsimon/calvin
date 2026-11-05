@@ -29,6 +29,9 @@ PUBLIC_WRITES = frozenset(
         # in the route itself (F2, settings-scope §7 item 9). Replacing a layer
         # stays admin-only.
         ("PATCH", "/api/kiosks/{kiosk_id}/overrides"),
+        # The display agent's diagnostics report; it has no credential, like its
+        # config poll. Accepted only for the stored run's id (calvin-29ws).
+        ("POST", "/api/kiosks/{kiosk_id}/display-check"),
         ("POST", "/api/auth/setup"),
         ("POST", "/api/auth/login"),
         ("POST", "/api/auth/logout"),

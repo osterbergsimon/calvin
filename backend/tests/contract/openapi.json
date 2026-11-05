@@ -1,6 +1,132 @@
 {
   "components": {
     "schemas": {
+      "AgentReport": {
+        "description": "The agent's POST body (deploy/kiosk-agent, ``post_display_check``).\n\nTolerant on purpose: unknown fields are ignored and long text is clipped,\nbecause a rejected report leaves the run stuck ``running`` until it expires.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "info": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Info"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "log": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LogEntry"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "stopped",
+              "timeout",
+              "error",
+              "interrupted",
+              "asleep"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "AgentReport",
+        "type": "object"
+      },
       "AllowedOriginsBody": {
         "properties": {
           "origins": {
@@ -163,6 +289,30 @@
           "file"
         ],
         "title": "Body_upload_image_api_images_upload_post",
+        "type": "object"
+      },
+      "BrightnessPoint": {
+        "additionalProperties": false,
+        "description": "One owner reading for the DDC to panel-menu conversion (calvin-29ws).",
+        "properties": {
+          "ddc": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Ddc",
+            "type": "integer"
+          },
+          "menu": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Menu",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ddc",
+          "menu"
+        ],
+        "title": "BrightnessPoint",
         "type": "object"
       },
       "CalendarEvent": {
@@ -741,6 +891,84 @@
               }
             ],
             "title": "Availablescreens"
+          },
+          "brightness": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightness"
+          },
+          "brightnessConversion": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BrightnessPoint"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessconversion"
+          },
+          "brightnessLimit": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnesslimit"
+          },
+          "brightnessRampEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessrampenabled"
+          },
+          "brightnessStep": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessstep"
+          },
+          "brightnessStepSeconds": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessstepseconds"
           },
           "calendarRefreshInterval": {
             "anyOf": [
@@ -1384,6 +1612,21 @@
             ],
             "title": "Showweeknumbers"
           },
+          "sleepMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standby",
+                  "dim"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sleepmode"
+          },
           "tapAnywhereReveal": {
             "anyOf": [
               {
@@ -1631,6 +1874,41 @@
           "mappings"
         ],
         "title": "KeyboardMappings",
+        "type": "object"
+      },
+      "LogEntry": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "LogEntry",
         "type": "object"
       },
       "OverridesBody": {
@@ -2012,6 +2290,86 @@
         "title": "SingleMapping",
         "type": "object"
       },
+      "StartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "brightness": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightness"
+          },
+          "step": {
+            "enum": [
+              "detect",
+              "write",
+              "conversion",
+              "limit"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StartRequest",
+        "type": "object"
+      },
+      "StepRequest": {
+        "additionalProperties": false,
+        "description": "Move the active run to another step (and target value).",
+        "properties": {
+          "step": {
+            "enum": [
+              "detect",
+              "write",
+              "conversion",
+              "limit"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StepRequest",
+        "type": "object"
+      },
       "UpdateLinkBody": {
         "properties": {
           "guests_see_all": {
@@ -2073,6 +2431,20 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VerdictRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "writes": {
+            "title": "Writes",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "writes"
+        ],
+        "title": "VerdictRequest",
         "type": "object"
       }
     }
@@ -4410,6 +4782,331 @@
           }
         },
         "summary": "Get Kiosk Config",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check": {
+      "get": {
+        "description": "The latest display-check run for a kiosk (expiry applied), or ``null``.",
+        "operationId": "get_display_check_api_kiosks__kiosk_id__display_check_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      },
+      "post": {
+        "description": "The display agent's report on a run. Dropped unless it names the stored run.",
+        "operationId": "post_display_check_report_api_kiosks__kiosk_id__display_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Report",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/save-limit": {
+      "post": {
+        "description": "Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin).",
+        "operationId": "save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Display Check Limit",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/start": {
+      "post": {
+        "description": "Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk.",
+        "operationId": "start_display_check_api_kiosks__kiosk_id__display_check_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/step": {
+      "post": {
+        "description": "Move the active run to another step/value (admin); the job is re-offered.",
+        "operationId": "change_display_check_step_api_kiosks__kiosk_id__display_check_step_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Display Check Step",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/stop": {
+      "post": {
+        "description": "Ask the agent to end the active run safely (admin).",
+        "operationId": "stop_display_check_api_kiosks__kiosk_id__display_check_stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/verdict": {
+      "post": {
+        "description": "The owner's answer to \"did the screen change?\" (admin). Returns the findings.",
+        "operationId": "post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerdictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Verdict",
         "tags": [
           "kiosks"
         ]

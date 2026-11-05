@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
 from app.models.db_models import KioskDB
 from app.schemas.config_update import sanitize_overrides
+from app.services import display_check
 from app.utils.db_retry import retry_on_db_locked
 from app.utils.utc import as_utc, utcnow
 
@@ -96,6 +97,18 @@ def _normalized_viewport(viewport: dict | None) -> dict | None:
     if w <= 0 or h <= 0 or w > 20000 or h > 20000:
         return None
     return {"w": w, "h": h}
+
+
+_HEARTBEAT_COLUMNS = [
+    "hostname",
+    "last_seen",
+    "agent_version",
+    "agent_update_status",
+    "agent_update_message",
+    "viewport",
+    "display_stack",
+    "overrides",
+]
 
 
 @retry_on_db_locked()
@@ -190,7 +203,9 @@ async def record_kiosk(
     ):
         return
     existing.last_seen = now
-    await existing.update()
+    # Never the display-check columns: the kiosk's own poll rewrites its row about
+    # every 1.5 s during a check and must not put back a stale copy of the run.
+    await existing.update(_columns=_HEARTBEAT_COLUMNS)
 
 
 def _to_utc_iso(dt: datetime | None) -> str | None:
@@ -226,6 +241,7 @@ async def list_kiosks() -> list[dict]:
             "overrides": public_overrides(row.overrides),
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
+            "displayCheck": display_check.findings_view(row.display_check_findings),
         }
         for row in rows
     ]
@@ -573,7 +589,8 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
                 # Extremely unlikely (row vanished again); nothing safe to do.
                 return
     existing.overrides = overrides
-    await existing.update()
+    # Only this column: a stale whole-row write would put back an old display-check run.
+    await existing.update(_columns=["overrides"])
 
 
 @retry_on_db_locked()

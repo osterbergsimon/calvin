@@ -58,6 +58,9 @@ the wake gentle, and a helper lets someone find out what their panel supports an
 
 - **A big brightness step.** Any single write larger than the configured step (default 2 DDC units) is a bug.
   That's exactly what reset the touch controller on 2026-11-04.
+  Owner exception (2026-11-05): when the agent does not know the panel's level (after an agent start or boot, or
+  after a mid-check reboot) it writes 0 once before off/dim/ramp. A single downward write to 0 is allowed; no upward
+  write may exceed the step.
 - Brightness changes while the panel is asleep or waking, before it has settled.
 - A diagnostics run that can leave the screen dark, or at a level above the limit, if the page or the network
   goes away mid-run. The agent owns the run and always finishes it in a safe state.
@@ -154,3 +157,147 @@ Answers to the design lead's review (owner, 2026-11-04, all as recommended):
 - The helper on the 3B+ reproduces tonight's findings: writes take effect, reads are placeholders, a conversion of
   ≈ 16 + 2.3 × DDC, a limit near DDC 26–28.
 - Pi 400 (MSI G241): DDC brightness only, never DDC power; the ramp off leaves it untouched.
+
+
+## 10. Backend API (lane 2)
+
+Status: contract for the frontend lane, written before the code (2026-11-05). The agent
+(`deploy/kiosk-agent/calvin_display_agent.py`, PR #320) is the source of truth for key names, types and payloads.
+All paths are under `/api`. `{id}` is the kiosk id (`[A-Za-z0-9._-]{1,64}`, else 400).
+
+### 10.1 Per-screen settings (override layer, Screens › {screen} › Power)
+
+The seven keys live in the kiosk's existing override layer and are written with the existing endpoints
+(`PATCH /kiosks/{id}/overrides` for single keys, `PUT` to replace the layer; both admin, and `PATCH` returns 403
+`override_needs_admin` without a session because none of these keys is in `KIOSK_SELF_WRITE_KEYS`). **Write camelCase
+only**; the snake_case spellings (`brightness_ramp_enabled`, `brightness_limit`, `brightness_step`,
+`brightness_step_seconds`, `brightness_conversion`, `sleep_mode`) are rejected with 400 `Invalid overrides`.
+`null` clears a key (back to the agent's default). Out-of-range or wrongly typed values are 400.
+
+| Key | Type | Range / values | Agent default when null/absent |
+|---|---|---|---|
+| `brightnessRampEnabled` | bool | | `false` |
+| `brightness` | int | 0–100 (Calvin/DDC scale) | DDC 20 (or `limit − 2 × step`) |
+| `brightnessLimit` | int | 0–100 | none |
+| `brightnessStep` | int | 1–5 | 2 |
+| `brightnessStepSeconds` | number | 0.5–10 | 1.5 |
+| `brightnessConversion` | list of `{ddc: int 0–100, menu: number 0–100}` | at most 20 points, no unknown fields | `[]` |
+| `sleepMode` | `"standby"` \| `"dim"` | | `"standby"` |
+
+`GET /kiosks/{id}/config` delivers them merged with the household layer; as for every override, both spellings are
+present in the body (the agent reads snake_case first). `GET /kiosks` already returns each kiosk's `overrides`, so the
+UI reads the saved values from there. The config `ETag` is a hash of the whole body, so it changes when any of these
+keys or the display-check job changes.
+
+### 10.2 Display check
+
+**One run is one session**, like the agent's: a run (one id) stays active across steps. The dialog starts it once,
+moves it from step to step with `step`, and ends it with `stop` (or closing the dialog). A step's `done` report is a
+**result**, not the end of the run, and the job stays on the config poll until the run ends. One run per kiosk is
+stored (the latest; a new start replaces an ended one). **Run record** (what the UI reads):
+
+```json
+{
+  "id": "run-id", "step": "detect|write|conversion|limit", "value": 19, "brightness": 19,
+  "action": "start|stop",
+  "status": "requested|running|done|stopped|timeout|error|interrupted|asleep",
+  "active": true,
+  "level": 19, "limit": 26, "log": [{"at": "ISO-8601", "level": 19, "note": "text"}],
+  "detail": "text", "info": {"bus": 2, "model": "..."},
+  "steps": {
+    "detect": {"status": "done|error", "value": null, "level": 19, "limit": null,
+               "detail": "text", "info": {"model": "..."}, "finishedAt": "ISO-8601"}
+  },
+  "requestedAt": "ISO-8601", "startedAt": "ISO-8601|null", "finishedAt": "ISO-8601|null",
+  "updatedAt": "ISO-8601|null", "expiresAt": "ISO-8601"
+}
+```
+
+`requested` = asked for, the agent has not reported yet; `running` = the agent is on it (between steps too).
+`active` is true while the status is `requested` or `running` and the run has not expired. **The run ends** (and the
+job leaves the config poll) on `stopped`, `timeout`, `error`, `interrupted`, `asleep`, or on a `done` report that
+arrives after an admin stop (the agent's final report); `finishedAt` is set then. Before that, a `done` report only
+fills `steps[step]` (`step` is the one the backend is offering at that moment, because the agent files every report
+under its first job's step) and updates the findings. A run expires 10 minutes after `requestedAt`, as the agent's
+own timeout does (it is **not** extended by steps or reports): it then reads `timeout` (`active` false) and is no
+longer offered. **`asleep` is surfaced and never retried**: the panel is asleep, nothing was written; the UI shows
+"Turn it on now to check it" and the admin starts a new run when ready. `updatedAt` is the time of the last agent
+report, so the UI can show "Waiting for {screen}…" (no report for 10 s) and "isn't answering" (60 s). While the run
+is `active`, the UI polls the status endpoint every 1–2 s. A **conversion** step stays at its `value` (the job keeps
+being offered unchanged) until the admin changes the step or stops the run.
+
+Admin endpoints (admin session or admin-scope API key, like every per-screen write; 401 otherwise):
+
+- `POST /kiosks/{id}/display-check/start`, body `{"step": "detect|write|conversion|limit", "value"?: 0–100, "brightness"?: 0–100}`
+  (extra fields are 422). Returns the run record. 404 unknown kiosk; **409 `display_check_active`** (body carries the
+  active run) when a run is already active, which is how a second device sees the "running from another device" state.
+- `POST /kiosks/{id}/display-check/step`, body `{"step": ..., "value"?: 0–100}` (extra fields are 422). Moves the
+  active run to another step and target (a step without `value` drops the old one) and returns the record; the agent
+  re-runs on the new `(id, step, value)`. Same value cap as `start`. 404 when no run is active; **409
+  `display_check_stopping`** when a stop is already on its way. The agent ignores an unchanged `(step, value)`, so
+  "Show me again" needs a different value or an intermediate step.
+- `POST /kiosks/{id}/display-check/stop`, no body. Marks the active run `action: "stop"`; the agent returns the
+  screen to its brightness at the normal pace and reports `stopped` (or a final `done`). Returns the run record. 404
+  when there is no active run. Stop stays available to any admin, whichever device started the run.
+- `POST /kiosks/{id}/display-check/save-limit`, no body. Saves the `limit` found by the `limit` step of the latest
+  run (`steps.limit`, available as soon as that step reports `done`, even while the run is still active) as the
+  override `brightnessLimit` and returns `{"id", "brightnessLimit", "overrides"}`. Without such a result, **409
+  `no_limit`**. **A found limit is never saved automatically**; the finish screen calls this (and it can be offered
+  again from the Display check row).
+
+Public (no session; the kiosk's own traffic, like the config poll):
+
+- `GET /kiosks/{id}/display-check` returns `{"run": <record>|null, "findings": {...}}`. A run that has expired is
+  returned as `timeout`. 404 for an unknown kiosk.
+- `POST /kiosks/{id}/display-check` is the **agent's report** (payload as in PR #320). It is accepted only when `id`
+  matches the stored run (otherwise 409 and the report is dropped; a late report for a replaced run cannot overwrite
+  the new one). Returns `{"accepted": true}`.
+
+The job reaches the agent as `displayCheck` (and `display_check`) on `GET /kiosks/{id}/config`, exactly the shape in
+PR #320 (`id`, `step`, `action`, `value`, `brightness`), present only while the run is `active`. The panel itself can
+call the public endpoints but not the admin ones without signing in.
+
+### 10.3 Findings (kept across runs)
+
+Only the latest run record is stored, so a later run would erase the detect and write verdicts of an earlier one.
+The backend therefore also keeps a per-kiosk **findings** object, updated from each finished run's report and never
+cleared by a later run. It is returned as `displayCheck` on every row of `GET /kiosks` and as `findings` next to `run`
+on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not checked yet.
+
+```json
+{ "checkedAt": "ISO-8601|null", "ddc": true, "writes": true, "model": "NOMAD TOUCH",
+  "connector": "card0-HDMI-A-1", "vcpVersion": "2.1", "limit": 26 }
+```
+
+- Each step's `done` or `error` report updates these while the run goes on. `detect` done: `ddc` true and `model`, `connector`, `vcpVersion` from the report's `info`; `detect` error: `ddc` false.
+- `write` done: `writes` true; `write` error: `writes` false.
+- `limit` done with a `limit`: `limit` set. A limit step that found none leaves the earlier `limit` alone.
+- `asleep`, `stopped`, `interrupted`, `timeout` and `running` change nothing.
+- `checkedAt` is the finish time of the last run that changed a field.
+- **`writes` is decided by the owner** (step 2). `POST /kiosks/{id}/display-check/verdict` (admin) takes
+  `{"writes": true|false}` ("Yes, it changed" / "No, it looked the same"), sets `findings.writes` and `checkedAt`, and
+  returns the findings object. It overrides the agent's own `write` verdict and leaves the other fields alone. 404
+  for an unknown kiosk, 422 for a missing or non-boolean `writes`.
+- **No `placeholderReads` field.** The merged agent's `detect` report does not say whether its reads are
+  placeholders, so the backend does not invent it. The UI can show the "screen always reports 0" line only if the
+  agent reports it in a later version.
+
+### 10.4 Rules added in review
+
+- **The report endpoint has no credential.** The agent has none, so `POST /kiosks/{id}/display-check` is guarded only by
+  the run id (accepted by this spec). A caller who knows a live run id can post reports for it; the run ids are random
+  and a report can only propose a limit (and change what the UI shows and the findings): a limit takes effect only
+  after the admin's explicit `save-limit`.
+- **A run that has ended never becomes active again.** After it has ended, or once it has expired, a `running`
+  report is refused with 409 and the job is not offered again. A repeated ending report (the agent's `_finish` can
+  send a second one) and the ending report of a rebooted agent on an expired run are accepted; the first ending
+  status stays, and a `done` on an expired run reads `timeout`.
+- **A start target above `limit - 2 × step` is refused** (422 `value_above_limit`, with `max`), using the screen's
+  merged `brightnessLimit` and `brightnessStep` (default 2), and also the limit this run's `limit` step found but the admin has not saved yet (the lower of the two applies). With no limit, 0–100 is allowed. The agent's conversion
+  step does not apply the limit itself.
+- **Agent reports are tolerant**: unknown fields are ignored, and log notes and `detail` are clipped to 500 characters
+  and the log to its newest 500 entries, so one long error never rejects a report. Admin request bodies stay strict.
+- **Brightness keys are per-screen only.** `POST /config` refuses all seven with 422; write them to a screen's
+  overrides.
+- **Stopping the run of an offline kiosk**: `stop` only marks the run `action: "stop"`. The run stays active until the
+  agent reports or the run expires (at most 10 minutes); the UI should say so.

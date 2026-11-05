@@ -51,7 +51,26 @@ PER_SCREEN_VALUES = [
     ("typeTheme", "marquee", 3),
     ("availableScreens", ["screen-home"], "screen-home"),
     ("defaultScreenId", "screen-home", 5),
+    # Brightness ramp (calvin-29ws): ranges match the kiosk agent's clamps.
+    ("brightnessRampEnabled", True, "maybe"),
+    ("brightness", 19, 101),
+    ("brightnessLimit", 26, -1),
+    ("brightnessStep", 2, 6),
+    ("brightnessStepSeconds", 1.5, 0.4),
+    ("brightnessConversion", [{"ddc": 19, "menu": 61}], [{"ddc": 19}]),
+    ("sleepMode", "dim", "off"),
 ]
+
+
+BRIGHTNESS_KEYS = {
+    "brightnessRampEnabled",
+    "brightness",
+    "brightnessLimit",
+    "brightnessStep",
+    "brightnessStepSeconds",
+    "brightnessConversion",
+    "sleepMode",
+}
 
 
 @pytest.fixture(autouse=True)
@@ -78,6 +97,8 @@ def test_kiosk_overrides_accept_valid_and_reject_invalid(
 @pytest.mark.integration
 @pytest.mark.parametrize(("key", "valid", "invalid"), PER_SCREEN_VALUES)
 def test_config_accepts_valid_and_rejects_invalid(test_client: TestClient, key, valid, invalid):
+    if key in BRIGHTNESS_KEYS:
+        pytest.skip("per-screen only: see test_household_config_refuses_brightness_keys")
     ok = test_client.post("/api/config", json={key: valid})
     assert ok.status_code == 200, ok.text
 
@@ -135,3 +156,61 @@ def test_stored_bad_overrides_do_not_break_loading(test_client: TestClient):
     listed = test_client.get("/api/kiosks").json()["kiosks"]
     row = next(k for k in listed if k["id"] == "k-stale")
     assert row["overrides"] == overrides
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "key",
+    [
+        "brightness_ramp_enabled",
+        "brightness_limit",
+        "brightness_step",
+        "brightness_step_seconds",
+        "brightness_conversion",
+        "sleep_mode",
+    ],
+)
+def test_brightness_snake_case_spellings_are_refused_on_write(test_client: TestClient, key):
+    """The agent reads both spellings, but writes are camelCase only (calvin-29ws)."""
+    bad = test_client.put("/api/kiosks/k-snake/overrides", json={"overrides": {key: 1}})
+    assert bad.status_code == 400
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("key", "invalid"),
+    [
+        ("brightnessStep", 2.5),
+        ("brightnessStep", True),
+        ("brightnessStepSeconds", 11),
+        ("brightnessConversion", [{"ddc": 19, "menu": 61, "extra": 1}]),
+        ("brightnessConversion", [{"ddc": 101, "menu": 61}]),
+        ("brightnessConversion", [{"ddc": 1, "menu": 1}] * 21),
+    ],
+)
+def test_brightness_values_are_strictly_validated(test_client: TestClient, key, invalid):
+    bad = test_client.put("/api/kiosks/k-strict/overrides", json={"overrides": {key: invalid}})
+    assert bad.status_code == 400
+
+
+@pytest.mark.integration
+def test_brightness_null_clears_and_config_delivers_both_spellings(test_client: TestClient):
+    test_client.put(
+        "/api/kiosks/k-deliver/overrides",
+        json={"overrides": {"brightnessRampEnabled": True, "brightnessStepSeconds": 2}},
+    )
+    body = test_client.get("/api/kiosks/k-deliver/config").json()
+    assert body["brightnessRampEnabled"] is True
+    assert body["brightness_ramp_enabled"] is True
+    assert body["brightness_step_seconds"] == 2
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("key", "valid", "_invalid"), [v for v in PER_SCREEN_VALUES if v[0] in BRIGHTNESS_KEYS]
+)
+def test_household_config_refuses_brightness_keys(test_client: TestClient, key, valid, _invalid):
+    """Brightness is per screen only: a household value would reach every panel."""
+    bad = test_client.post("/api/config", json={key: valid})
+    assert bad.status_code == 422, bad.text
+    assert test_client.get("/api/config").json().get(key) is None
