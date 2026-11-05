@@ -401,6 +401,396 @@
         "title": "ClaimBody",
         "type": "object"
       },
+      "ClockBarDesign": {
+        "additionalProperties": false,
+        "properties": {
+          "horizontal": {
+            "$ref": "#/components/schemas/ClockBarHorizontal"
+          },
+          "version": {
+            "const": 1,
+            "title": "Version",
+            "type": "integer"
+          },
+          "vertical": {
+            "$ref": "#/components/schemas/ClockBarVertical"
+          }
+        },
+        "required": [
+          "version",
+          "horizontal",
+          "vertical"
+        ],
+        "title": "ClockBarDesign",
+        "type": "object"
+      },
+      "ClockBarHorizontal": {
+        "additionalProperties": false,
+        "properties": {
+          "barHeight": {
+            "anyOf": [
+              {
+                "enum": [
+                  "slim",
+                  "normal",
+                  "roomy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Barheight"
+          },
+          "hidden": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden"
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarParts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tileSize": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tilesize"
+          },
+          "zones": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarHorizontalZones"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ClockBarHorizontal",
+        "type": "object"
+      },
+      "ClockBarHorizontalZones": {
+        "additionalProperties": false,
+        "properties": {
+          "center": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Center"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right"
+          }
+        },
+        "title": "ClockBarHorizontalZones",
+        "type": "object"
+      },
+      "ClockBarPart": {
+        "additionalProperties": false,
+        "description": "One named part's settings; tile ids carry no per-part settings.",
+        "properties": {
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "enum": [
+                  "upright",
+                  "stacked",
+                  "line"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "underTime": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undertime"
+          }
+        },
+        "title": "ClockBarPart",
+        "type": "object"
+      },
+      "ClockBarParts": {
+        "additionalProperties": false,
+        "properties": {
+          "date": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarPart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "logo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarPart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pageDots": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarPart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "room": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarPart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarPart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarPart"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ClockBarParts",
+        "type": "object"
+      },
+      "ClockBarVertical": {
+        "additionalProperties": false,
+        "properties": {
+          "barHeight": {
+            "anyOf": [
+              {
+                "enum": [
+                  "slim",
+                  "normal",
+                  "roomy"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Barheight"
+          },
+          "hidden": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden"
+          },
+          "parts": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarParts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tileSize": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tilesize"
+          },
+          "zones": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarVerticalZones"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ClockBarVertical",
+        "type": "object"
+      },
+      "ClockBarVerticalZones": {
+        "additionalProperties": false,
+        "properties": {
+          "bottom": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom"
+          },
+          "middle": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Middle"
+          },
+          "top": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top"
+          }
+        },
+        "title": "ClockBarVerticalZones",
+        "type": "object"
+      },
       "ConfigUpdate": {
         "additionalProperties": true,
         "description": "Configuration update model.",
@@ -452,6 +842,16 @@
               }
             ],
             "title": "Calendarsplit"
+          },
+          "clockBarDesign": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "clockBarPluginItemSize": {
             "anyOf": [

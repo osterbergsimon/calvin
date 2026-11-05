@@ -27,6 +27,135 @@ from pydantic import (
 
 from app.utils.git_refs import validate_git_branch, validate_git_repo_url
 
+# One household clock-bar design (§4). The cap stops a hand-crafted write from
+# stuffing a megabyte of ids into one config row; the shape is validated below.
+_CLOCK_BAR_DESIGN_MAX_BYTES = 64 * 1024
+_CLOCK_BAR_LIST_MAX = 200
+_CLOCK_BAR_ID_MAX = 128
+_CLOCK_BAR_CUSTOM_SIZE_MIN = 8
+_CLOCK_BAR_CUSTOM_SIZE_MAX = 96
+
+_CLOCK_BAR_SIZE_STEPS = {"s", "m", "l", "xl"}
+
+
+class ClockBarPart(BaseModel):
+    """One named part's settings; tile ids carry no per-part settings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    size: str | int | None = None
+    seconds: bool | None = None
+    underTime: bool | None = None
+    style: Literal["upright", "stacked", "line"] | None = None
+
+    @field_validator("size")
+    @classmethod
+    def _check_size(cls, value: str | int | None) -> str | int | None:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            raise ValueError("a clock bar size is a step name or a number in px")
+        if isinstance(value, str):
+            if value not in _CLOCK_BAR_SIZE_STEPS:
+                raise ValueError(f"unknown clock bar size step {value!r}")
+            return value
+        if not _CLOCK_BAR_CUSTOM_SIZE_MIN <= value <= _CLOCK_BAR_CUSTOM_SIZE_MAX:
+            raise ValueError(
+                f"clock bar size must be {_CLOCK_BAR_CUSTOM_SIZE_MIN}"
+                f"-{_CLOCK_BAR_CUSTOM_SIZE_MAX}px"
+            )
+        return value
+
+
+class ClockBarHorizontalZones(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    left: list[str] | None = None
+    center: list[str] | None = None
+    right: list[str] | None = None
+
+
+class ClockBarVerticalZones(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    top: list[str] | None = None
+    middle: list[str] | None = None
+    bottom: list[str] | None = None
+
+
+class ClockBarParts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    logo: ClockBarPart | None = None
+    room: ClockBarPart | None = None
+    pageDots: ClockBarPart | None = None
+    time: ClockBarPart | None = None
+    date: ClockBarPart | None = None
+    status: ClockBarPart | None = None
+
+
+class ClockBarShape(BaseModel):
+    """The shared shape both the top/bottom and side designs use."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hidden: list[str] | None = None
+    parts: ClockBarParts | None = None
+    barHeight: Literal["slim", "normal", "roomy"] | None = None
+    tileSize: str | int | None = None
+
+    @field_validator("tileSize")
+    @classmethod
+    def _check_tile_size(cls, value: str | int | None) -> str | int | None:
+        return ClockBarPart._check_size(value)
+
+
+class ClockBarHorizontal(ClockBarShape):
+    zones: ClockBarHorizontalZones | None = None
+
+
+class ClockBarVertical(ClockBarShape):
+    zones: ClockBarVerticalZones | None = None
+
+
+class ClockBarDesign(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    version: Literal[1]
+    horizontal: ClockBarHorizontal
+    vertical: ClockBarVertical
+
+    @model_validator(mode="after")
+    def _check_lists_and_cap(self) -> ClockBarDesign:
+        for shape in (self.horizontal, self.vertical):
+            zones = shape.zones
+            lists = [shape.hidden or []]
+            if zones is not None:
+                lists.extend(
+                    value
+                    for value in (
+                        getattr(zones, "left", None),
+                        getattr(zones, "center", None),
+                        getattr(zones, "right", None),
+                        getattr(zones, "top", None),
+                        getattr(zones, "middle", None),
+                        getattr(zones, "bottom", None),
+                    )
+                    if value is not None
+                )
+            for values in lists:
+                if len(values) > _CLOCK_BAR_LIST_MAX:
+                    raise ValueError(f"a clock bar list holds at most {_CLOCK_BAR_LIST_MAX} parts")
+                if any(
+                    not isinstance(value, str) or len(value) > _CLOCK_BAR_ID_MAX for value in values
+                ):
+                    raise ValueError(
+                        f"a clock bar part id is a string of at most {_CLOCK_BAR_ID_MAX} characters"
+                    )
+        if len(self.model_dump_json().encode()) > _CLOCK_BAR_DESIGN_MAX_BYTES:
+            raise ValueError("clockBarDesign is too large")
+        return self
+
 
 class ConfigUpdate(BaseModel):
     """Configuration update model."""
@@ -123,6 +252,10 @@ class ConfigUpdate(BaseModel):
     clockBarVerticalPadding: int | None = None
     clockBarPluginItemSize: int | None = None
     clockBarVerticalPluginItemSize: int | None = None
+    # One household design for the clock bar's parts (§4); admin-only (not in
+    # CONFIG_DISPLAY_KEYS). The old per-key clock settings stay for the resolver's
+    # fallback and are removed in a later cleanup.
+    clockBarDesign: ClockBarDesign | None = None
 
     # --- Per-screen settings (settings-scope §7 item 8) -------------------
     # Keys a Screens page can write into a screen's override layer. The
@@ -182,6 +315,14 @@ def sanitize_overrides(overrides: dict | None, *, kiosk_id: str | None = None) -
     clean = dict(overrides)
     for key, value in overrides.items():
         if key.startswith("_"):
+            continue
+        # The clock bar design is one household setting (§4): keep it out of a
+        # screen's own layer so a PUT cannot fork the bar per screen.
+        if key in {"clockBarDesign", "clock_bar_design"}:
+            logger.warning(
+                "Dropping household-only override {!r} on screen {!r}", key, kiosk_id or "unknown"
+            )
+            del clean[key]
             continue
         # The Settings UI writes camelCase; older layers may hold snake_case.
         # Both spellings name the same setting, so validate either against the

@@ -2452,6 +2452,79 @@ export interface components {
       /** Claim */
       claim: string;
     };
+    /** ClockBarDesign */
+    ClockBarDesign: {
+      horizontal: components["schemas"]["ClockBarHorizontal"];
+      /**
+       * Version
+       * @constant
+       */
+      version: 1;
+      vertical: components["schemas"]["ClockBarVertical"];
+    };
+    /** ClockBarHorizontal */
+    ClockBarHorizontal: {
+      /** Barheight */
+      barHeight?: ("slim" | "normal" | "roomy") | null;
+      /** Hidden */
+      hidden?: string[] | null;
+      parts?: components["schemas"]["ClockBarParts"] | null;
+      /** Tilesize */
+      tileSize?: string | number | null;
+      zones?: components["schemas"]["ClockBarHorizontalZones"] | null;
+    };
+    /** ClockBarHorizontalZones */
+    ClockBarHorizontalZones: {
+      /** Center */
+      center?: string[] | null;
+      /** Left */
+      left?: string[] | null;
+      /** Right */
+      right?: string[] | null;
+    };
+    /**
+     * ClockBarPart
+     * @description One named part's settings; tile ids carry no per-part settings.
+     */
+    ClockBarPart: {
+      /** Seconds */
+      seconds?: boolean | null;
+      /** Size */
+      size?: string | number | null;
+      /** Style */
+      style?: ("upright" | "stacked" | "line") | null;
+      /** Undertime */
+      underTime?: boolean | null;
+    };
+    /** ClockBarParts */
+    ClockBarParts: {
+      date?: components["schemas"]["ClockBarPart"] | null;
+      logo?: components["schemas"]["ClockBarPart"] | null;
+      pageDots?: components["schemas"]["ClockBarPart"] | null;
+      room?: components["schemas"]["ClockBarPart"] | null;
+      status?: components["schemas"]["ClockBarPart"] | null;
+      time?: components["schemas"]["ClockBarPart"] | null;
+    };
+    /** ClockBarVertical */
+    ClockBarVertical: {
+      /** Barheight */
+      barHeight?: ("slim" | "normal" | "roomy") | null;
+      /** Hidden */
+      hidden?: string[] | null;
+      parts?: components["schemas"]["ClockBarParts"] | null;
+      /** Tilesize */
+      tileSize?: string | number | null;
+      zones?: components["schemas"]["ClockBarVerticalZones"] | null;
+    };
+    /** ClockBarVerticalZones */
+    ClockBarVerticalZones: {
+      /** Bottom */
+      bottom?: string[] | null;
+      /** Middle */
+      middle?: string[] | null;
+      /** Top */
+      top?: string[] | null;
+    };
     /**
      * ConfigUpdate
      * @description Configuration update model.
@@ -2465,6 +2538,7 @@ export interface components {
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
       calendarSplit?: number | null;
+      clockBarDesign?: components["schemas"]["ClockBarDesign"] | null;
       /** Clockbarpluginitemsize */
       clockBarPluginItemSize?: number | null;
       /** Clockbarshowinkiosk */

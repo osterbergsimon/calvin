@@ -73,6 +73,7 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "clockBarVerticalPluginItemSize",
         "clockBarShowPluginItems",
         "clockBarShowLogo",
+        "clockBarDesign",
         "uiSize",
         "consoleLogEnabled",
         "consoleLogLevel",
@@ -105,6 +106,59 @@ def test_get_config_reports_version_and_build_revision(test_client: TestClient, 
     assert data["version"] == app.__version__
     assert data["revision"] is None or isinstance(data["revision"], str)
     assert "frontendVersion" in data
+
+
+@pytest.mark.integration
+def test_clock_bar_design_round_trips_as_one_household_key(test_client: TestClient):
+    """The editor writes clockBarDesign; it persists as JSON and comes back typed."""
+    design = {
+        "version": 1,
+        "horizontal": {
+            "zones": {"left": ["logo"], "center": ["time", "date"], "right": ["tiles", "status"]},
+            "hidden": [],
+            "parts": {"time": {"size": "l", "seconds": True}},
+            "barHeight": "roomy",
+            "tileSize": 20,
+        },
+        "vertical": {
+            "zones": {"top": [], "middle": ["time"], "bottom": ["status"]},
+            "hidden": [],
+            "parts": {"date": {"size": "s", "underTime": True, "style": "stacked"}},
+            "barHeight": "normal",
+            "tileSize": "m",
+        },
+    }
+
+    update = test_client.post("/api/config", json={"clockBarDesign": design})
+    assert update.status_code == 200
+    assert update.json().get("clockBarDesign") == design
+
+    persisted = test_client.get("/api/config")
+    assert persisted.status_code == 200
+    assert persisted.json().get("clockBarDesign") == design
+
+
+@pytest.mark.integration
+def test_clock_bar_design_rejects_a_bad_zone(test_client: TestClient):
+    design = {
+        "version": 1,
+        "horizontal": {
+            "zones": {"left": [], "center": [], "middle": []},
+            "hidden": [],
+            "parts": {},
+            "barHeight": "normal",
+            "tileSize": "m",
+        },
+        "vertical": {
+            "zones": {"top": [], "middle": [], "bottom": []},
+            "hidden": [],
+            "parts": {},
+            "barHeight": "normal",
+            "tileSize": "m",
+        },
+    }
+    response = test_client.post("/api/config", json={"clockBarDesign": design})
+    assert response.status_code == 422
 
 
 @pytest.mark.integration

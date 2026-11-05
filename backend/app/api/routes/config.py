@@ -439,6 +439,12 @@ async def build_global_config() -> dict:
         config["clockBarShowLogo"] = True
     elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
         config["clockBarShowLogo"] = config["clock_bar_show_logo"]
+    # The one clock bar design (§4). Absent until the editor first writes it;
+    # the resolver then derives today's look from the old keys.
+    if "clockBarDesign" not in config and "clock_bar_design" in config:
+        config["clockBarDesign"] = config["clock_bar_design"]
+    elif "clockBarDesign" not in config:
+        config["clockBarDesign"] = None
     if "uiSize" not in config and "ui_size" not in config:
         config["uiSize"] = "default"  # Global UI size preset
     elif "ui_size" in config and "uiSize" not in config:
@@ -613,6 +619,7 @@ async def update_config(config_update: ConfigUpdate, request: Request):
         "clockBarVerticalPluginItemSize": "clock_bar_vertical_plugin_item_size",
         "clockBarShowPluginItems": "clock_bar_show_plugin_items",
         "clockBarShowLogo": "clock_bar_show_logo",
+        "clockBarDesign": "clock_bar_design",
     }
     for camel_key, snake_key in clock_key_map.items():
         if camel_key in update_dict:
