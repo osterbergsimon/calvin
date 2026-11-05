@@ -273,7 +273,7 @@ DISPLAY_CHECK_POLL_SECONDS = 1.5
 DISPLAY_CHECK_TIMEOUT_SECONDS = 600
 DISPLAY_CHECK_REPORT_PATH = "/api/kiosks/{kiosk_id}/display-check"
 RAMP_FAULT_RE = re.compile(
-    r"(Undervoltage detected|over-current|usb .*: reset)", re.IGNORECASE
+    r"(Under-?voltage detected|over-current|usb .*: reset)", re.IGNORECASE
 )
 COG_UNIT = "calvin-cog.service"
 
@@ -686,10 +686,10 @@ def wait_for_settle(
 
 
 # -- the ramp itself ----------------------------------------------------------
-def _two_steps_back(level, step, write):
+def _two_steps_back(level, step, write, *, floor=0):
     """Step back down two configured steps, one write at a time (never bigger)."""
     for _ in range(2):
-        back = max(0, level - step)
+        back = max(floor, level - step)
         if back == level:
             break
         if not write(back):
@@ -756,10 +756,9 @@ def ramp_brightness(
                     outcome["ceiling"] = level
                     log_fn(f"brightness: stepped back to {level}; stopping this ramp")
                     break
-                level = _two_steps_back(level, step, write)
+                level = _two_steps_back(level, step, write, floor=target)
                 outcome["ceiling"] = level
-                continued = level != target
-                if not continued:
+                if level == target:
                     break
                 continue
         if level == target:
@@ -898,6 +897,7 @@ class BrightnessController:
                     "falling back to standby"
                 )
                 return "failed"
+        self.panel_off = False
         self.log("brightness: dim-only sleep at 0; panel stays powered")
         return "ok"
 
@@ -938,7 +938,7 @@ class BrightnessController:
                     # After a real power-on the panel and its USB devices must
                     # settle before any DDC write. (Dim-only wakes never powered
                     # anything off, so they go straight back up.)
-                    if settings["enabled"] or dim:
+                    if settings["enabled"] or dim or self.pending_restore is not None:
                         self._arm()
                         wait_for_settle(
                             fault_monitor=self.fault,
@@ -1417,7 +1417,6 @@ def recover_display_check(
         _clear_state(path)
         return None
     settings = brightness_settings(cfg)
-    step = _as_int(state.get("step"))
     last_level = _as_int(state.get("level"))
     limit = _as_int(state.get("limit"))
     if state.get("step") == "limit" and limit is None and last_level is not None:
