@@ -1159,6 +1159,8 @@ class DisplayCheckRunner:
         self._stop_reason = None
         self._deadline = self.clock() + DISPLAY_CHECK_TIMEOUT_SECONDS
         self.log_entries = []
+        self.result = {}
+        self.log = log_fn or log
         self.started_at = datetime.now(timezone.utc).isoformat()
 
     def _path(self):
@@ -1173,6 +1175,10 @@ class DisplayCheckRunner:
                 "status": "running",
                 "level": self.level,
                 "limit": self.limit,
+                "brightness": self.settings.get("brightness"),
+                "stepSize": self.settings["step"],
+                "stepSeconds": self.settings["step_seconds"],
+                "touched": self._touched,
                 "startedAt": self.started_at,
                 "log": self.log_entries,
             },
@@ -1185,7 +1191,10 @@ class DisplayCheckRunner:
             "note": note,
         }
         self.log_entries.append(entry)
-        log(f"display check: {note}" + (f" (level {entry['level']})" if level is None else ""))
+        self.log(
+            f"display check: {note}"
+            + (f" (level {entry['level']})" if level is None else "")
+        )
         self._save()
 
     def _write_level(self, level):
@@ -1195,6 +1204,8 @@ class DisplayCheckRunner:
         self._touched = True
         if self.controller is not None:
             self.controller.level = level
+        # The last attempted level is the reboot/fault evidence for a limit run.
+        self._save()
         return True
 
     def _cancel(self):
@@ -1210,12 +1221,17 @@ class DisplayCheckRunner:
         except Exception:
             return False
         job = display_check_job(cfg)
-        if job is None or job["id"] != self.job["id"] or job["action"] == "stop":
+        if job is None:
+            # Removing a completed one-shot request is a normal finish. An
+            # explicit stop (or a replacement job) cancels the active step.
+            self._stop_reason = "done"
+            return True
+        if job["id"] != self.job["id"] or job["action"] == "stop":
             self._stop_reason = "stopped"
             return True
         return False
 
-    def _ramp(self, target, *, stop_on_fault=True):
+    def _ramp(self, target, *, stop_on_fault=True, cleanup=False):
         return ramp_brightness(
             self.level,
             target,
@@ -1224,9 +1240,10 @@ class DisplayCheckRunner:
             sleep=self.sleep,
             step=self.settings["step"],
             step_seconds=self.settings["step_seconds"],
-            cancel=self._cancel,
+            # Stop/timeout cancels the test, never the safe return ramp.
+            cancel=None if cleanup else self._cancel,
             stop_on_fault=stop_on_fault,
-            log_fn=log,
+            log_fn=self.log,
         )
 
     def _execute(self, job):
@@ -1247,11 +1264,10 @@ class DisplayCheckRunner:
                 if part
             )
             self._entry(f"found {detail or 'a DDC display'}")
-            self.report(
-                self._payload(
-                    "done", info=info, detail=detail or "found a DDC/CI display"
-                )
-            )
+            self.result = {
+                "info": info,
+                "detail": detail or "found a DDC/CI display",
+            }
             return
         if step == "write":
             base = self.level or brightness_target(self.settings)
@@ -1264,25 +1280,27 @@ class DisplayCheckRunner:
                 self._entry("brightness writes did not take effect")
                 self._stop_reason = "error"
                 return
-            self.report(self._payload("done", level=self.level))
             return
         if step == "conversion":
             value = job.get("value")
             if value is None:
                 value = self.level or brightness_target(self.settings)
-            value = max(0, min(BRIGHTNESS_MAX, int(value)))
+            limit = self.settings.get("limit")
+            ceiling = (
+                20
+                if limit is None
+                else max(0, limit - 2 * self.settings["step"])
+            )
+            value = max(0, min(ceiling, int(value)))
             outcome = self._ramp(value, stop_on_fault=value > self.level)
             if outcome.get("write_failed"):
                 self._entry("brightness writes did not take effect")
                 self._stop_reason = "error"
                 return
-            self.report(
-                self._payload(
-                    "done",
-                    level=self.level,
-                    detail=f"set to {self.level}; read the screen's own menu",
-                )
-            )
+            if not outcome.get("cancelled"):
+                self.result = {
+                    "detail": f"set to {self.level}; read the screen's own menu"
+                }
             return
         if step == "limit":
             self._entry("raising brightness and watching for power trouble")
@@ -1297,26 +1315,12 @@ class DisplayCheckRunner:
                     f"fault at {outcome['level']}: {outcome['fault']}; "
                     f"limit found: {self.limit}"
                 )
-                self.report(
-                    self._payload(
-                        "done",
-                        level=self.level,
-                        limit=self.limit,
-                        detail=f"limit found: {self.limit}",
-                    )
-                )
+                self.result = {"detail": f"limit found: {self.limit}"}
             elif outcome.get("cancelled"):
                 self._entry("test stopped by the owner")
             else:
                 self._entry("reached 100 with no fault; no limit found")
-                self.report(
-                    self._payload(
-                        "done",
-                        level=self.level,
-                        limit=None,
-                        detail="reached 100 with no fault",
-                    )
-                )
+                self.result = {"detail": "reached 100 with no fault"}
             return
         self._entry(f"unknown display check step {step!r}")
         self._stop_reason = "error"
@@ -1332,17 +1336,19 @@ class DisplayCheckRunner:
             "startedAt": self.started_at,
             "finishedAt": datetime.now(timezone.utc).isoformat(),
         }
+        payload.update(self.result)
         payload.update(extra)
         return payload
 
     def _finish(self, status):
         target = _safe_target(self.settings, self.limit)
-        if self._touched and self.panel_on() and self.level != target:
-            self._ramp(target, stop_on_fault=target > self.level)
+        needs_safe_level = self.job.get("step") in ("write", "conversion", "limit")
+        if needs_safe_level and self.panel_on() and self.level != target:
+            self._ramp(target, stop_on_fault=target > self.level, cleanup=True)
         payload = self._payload(status)
         self.report(payload)
         _clear_state(self._path())
-        log(
+        self.log(
             f"display check {self.job['id']} finished ({status}); "
             f"brightness {self.level} (target {target})"
         )
@@ -1401,6 +1407,7 @@ def recover_display_check(
     controller=None,
     state=None,
     panel_on=None,
+    sleep=None,
     log_fn=None,
 ):
     """Finish a diagnostics run that a reboot interrupted (never leave it unsafe).
@@ -1417,6 +1424,12 @@ def recover_display_check(
         _clear_state(path)
         return None
     settings = brightness_settings(cfg)
+    if _as_int(state.get("brightness")) is not None:
+        settings["brightness"] = _as_int(state.get("brightness"))
+    if _as_int(state.get("stepSize")) is not None:
+        settings["step"] = _as_int(state.get("stepSize"))
+    if _as_float(state.get("stepSeconds")) is not None:
+        settings["step_seconds"] = _as_float(state.get("stepSeconds"))
     last_level = _as_int(state.get("level"))
     limit = _as_int(state.get("limit"))
     if state.get("step") == "limit" and limit is None and last_level is not None:
@@ -1429,6 +1442,7 @@ def recover_display_check(
         "limit": limit,
         "log": state.get("log") or [],
         "detail": "the kiosk restarted during the check",
+        "startedAt": state.get("startedAt"),
         "finishedAt": datetime.now(timezone.utc).isoformat(),
     }
     awake = True
@@ -1437,27 +1451,28 @@ def recover_display_check(
             awake = bool(panel_on())
         except Exception:
             awake = True
-    if awake and last_level is not None:
-        target = _safe_target(settings, limit)
-        ramp_brightness(
+    target = _safe_target(settings, limit)
+    if awake and state.get("touched", True) and last_level is not None:
+        outcome = ramp_brightness(
             last_level,
             target,
             write=ddc.set_brightness,
             fault=controller.fault if controller else None,
-            sleep=controller.sleep if controller else time_module.sleep,
+            sleep=sleep or (controller.sleep if controller else time_module.sleep),
             step=settings["step"],
             step_seconds=settings["step_seconds"],
             stop_on_fault=target > last_level,
             log_fn=log_fn,
         )
+        payload["level"] = outcome["level"]
         if controller is not None:
-            controller.level = target
+            controller.level = outcome["level"]
     if report is not None:
         report(payload)
     _clear_state(path)
     log_fn(
         f"display check {state.get('id')} was interrupted by a restart; "
-        f"returned to {_safe_target(settings, limit)} (limit {limit})"
+        f"brightness {payload['level']} (safe target {target}, limit {limit})"
     )
     return payload
 

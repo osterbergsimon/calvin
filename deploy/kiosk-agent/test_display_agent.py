@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 import os
 import time as time_module
 from datetime import datetime, time, timedelta, timezone
@@ -3146,6 +3147,29 @@ def test_runner_conversion_sets_the_value_and_waits(tmp_path):
     assert reports[-1]["level"] == 19
 
 
+def test_runner_conversion_never_exceeds_the_safe_range(tmp_path):
+    job = {"id": "c1", "step": "conversion", "action": "start", "value": 80,
+           "brightness": 19}
+    runner, reports, clock = _runner(
+        job, _ramp_cfg(brightness_limit=26), FakeDdc(), tmp_path
+    )
+    runner.run()
+    assert runner.level == 19
+    assert max(ddc_level for ddc_level in runner.ddc.writes) == 22
+
+
+def test_runner_persists_every_brightness_level_for_reboot_recovery(tmp_path):
+    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
+           "brightness": 19}
+    runner, reports, clock = _runner(job, _ramp_cfg(), FakeDdc(), tmp_path)
+    runner._save()
+    runner._write_level(28)
+    state = json.loads((tmp_path / agent.DISPLAY_CHECK_STATE).read_text())
+    assert state["level"] == 28
+    assert state["brightness"] == 19
+    assert state["touched"] is True
+
+
 def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
     fault = FakeFault()
     ddc = FakeDdc(
@@ -3160,6 +3184,7 @@ def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
     runner.controller = agent.BrightnessController(
         ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
     )
+    runner.level = 20  # even steps reach the test's fault threshold at 28
     runner.run()
     final = reports[-1]
     assert final["status"] == "done"
@@ -3228,6 +3253,7 @@ def test_recover_display_check_after_a_reboot(tmp_path):
         _ramp_cfg(),
         ddc=ddc,
         report=reports.append,
+        sleep=lambda seconds: None,
     )
     assert payload["status"] == "interrupted"
     assert payload["limit"] == 26  # the reboot happened at 28
@@ -3236,13 +3262,34 @@ def test_recover_display_check_after_a_reboot(tmp_path):
     assert not path.exists()
 
 
+def test_recover_display_check_uses_the_persisted_return_brightness(tmp_path):
+    ddc = FakeDdc()
+    (tmp_path / agent.DISPLAY_CHECK_STATE).write_text(
+        '{"id": "c1", "step": "limit", "status": "running", '
+        '"level": 28, "brightness": 17, "touched": true}'
+    )
+    payload = agent.recover_display_check(
+        str(tmp_path),
+        _ramp_cfg(brightness=60),
+        ddc=ddc,
+        sleep=lambda seconds: None,
+    )
+    assert payload["limit"] == 26
+    assert payload["level"] == 17
+    assert ddc.writes[-1] == 17
+
+
 def test_recover_display_check_does_not_write_to_a_sleeping_panel(tmp_path):
     ddc = FakeDdc()
     (tmp_path / agent.DISPLAY_CHECK_STATE).write_text(
         '{"id": "c1", "step": "write", "status": "running", "level": 19}'
     )
     payload = agent.recover_display_check(
-        str(tmp_path), _ramp_cfg(), ddc=ddc, panel_on=lambda: False
+        str(tmp_path),
+        _ramp_cfg(),
+        ddc=ddc,
+        panel_on=lambda: False,
+        sleep=lambda seconds: None,
     )
     assert payload["status"] == "interrupted"
     assert ddc.writes == []
