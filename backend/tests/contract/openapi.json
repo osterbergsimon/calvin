@@ -430,12 +430,10 @@
           "barHeight": {
             "anyOf": [
               {
-                "enum": [
-                  "slim",
-                  "normal",
-                  "roomy"
-                ],
                 "type": "string"
+              },
+              {
+                "type": "integer"
               },
               {
                 "type": "null"
@@ -677,12 +675,10 @@
           "barHeight": {
             "anyOf": [
               {
-                "enum": [
-                  "slim",
-                  "normal",
-                  "roomy"
-                ],
                 "type": "string"
+              },
+              {
+                "type": "integer"
               },
               {
                 "type": "null"

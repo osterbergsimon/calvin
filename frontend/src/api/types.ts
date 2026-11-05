@@ -2465,7 +2465,7 @@ export interface components {
     /** ClockBarHorizontal */
     ClockBarHorizontal: {
       /** Barheight */
-      barHeight?: ("slim" | "normal" | "roomy") | null;
+      barHeight?: string | number | null;
       /** Hidden */
       hidden?: string[] | null;
       parts?: components["schemas"]["ClockBarParts"] | null;
@@ -2508,7 +2508,7 @@ export interface components {
     /** ClockBarVertical */
     ClockBarVertical: {
       /** Barheight */
-      barHeight?: ("slim" | "normal" | "roomy") | null;
+      barHeight?: string | number | null;
       /** Hidden */
       hidden?: string[] | null;
       parts?: components["schemas"]["ClockBarParts"] | null;

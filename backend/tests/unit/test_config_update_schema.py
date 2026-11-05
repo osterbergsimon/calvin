@@ -89,6 +89,26 @@ def test_clock_bar_design_caps_the_whole_payload():
 
 
 @pytest.mark.unit
+def test_clock_bar_design_accepts_a_custom_bar_height():
+    design = _design()
+    design["horizontal"]["barHeight"] = 0
+    design["vertical"]["barHeight"] = 14
+
+    update = ConfigUpdate(clockBarDesign=design)
+    assert update.model_dump()["clockBarDesign"]["horizontal"]["barHeight"] == 0
+    assert update.model_dump()["clockBarDesign"]["vertical"]["barHeight"] == 14
+
+
+@pytest.mark.unit
+def test_clock_bar_design_rejects_a_bar_height_outside_the_cap():
+    design = _design()
+    design["horizontal"]["barHeight"] = 400
+
+    with pytest.raises(ValueError):
+        ConfigUpdate(clockBarDesign=design)
+
+
+@pytest.mark.unit
 def test_clock_bar_design_is_admin_only():
     from app.security.route_policy import CONFIG_DISPLAY_KEYS
 

@@ -101,8 +101,23 @@ class ClockBarShape(BaseModel):
 
     hidden: list[str] | None = None
     parts: ClockBarParts | None = None
-    barHeight: Literal["slim", "normal", "roomy"] | None = None
+    barHeight: str | int | None = None
     tileSize: str | int | None = None
+
+    @field_validator("barHeight")
+    @classmethod
+    def _check_bar_height(cls, value: str | int | None) -> str | int | None:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            raise ValueError("clock bar height is a step name or a number in px")
+        if isinstance(value, str):
+            if value not in {"slim", "normal", "roomy"}:
+                raise ValueError(f"unknown clock bar height step {value!r}")
+            return value
+        if not 0 <= value <= _CLOCK_BAR_CUSTOM_SIZE_MAX:
+            raise ValueError(f"clock bar height must be 0-{_CLOCK_BAR_CUSTOM_SIZE_MAX}px")
+        return value
 
     @field_validator("tileSize")
     @classmethod
