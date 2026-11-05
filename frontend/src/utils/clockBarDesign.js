@@ -104,7 +104,9 @@ export function asBoolean(value) {
 }
 
 const tileInstances = services =>
-  (Array.isArray(services) ? services : []).filter(service => service?.id && service.statusbar_schema?.kind);
+  (Array.isArray(services) ? services : []).filter(
+    service => service?.id && service.statusbar_schema?.kind
+  );
 
 const serviceById = services => {
   const map = {};
@@ -122,7 +124,11 @@ const defaultParts = shape => ({
 
 function defaultZones(shape) {
   return shape === "horizontal"
-    ? { left: ["logo", "room", "pageDots"], center: ["time", "date"], right: [CLOCK_BAR_TILES, "status"] }
+    ? {
+        left: ["logo", "room", "pageDots"],
+        center: ["time", "date"],
+        right: [CLOCK_BAR_TILES, "status"],
+      }
     : { top: ["logo", "pageDots"], middle: ["time", "date"], bottom: [CLOCK_BAR_TILES, "status"] };
 }
 
@@ -151,7 +157,9 @@ const addToken = (zones, zone, token) => {
 const normalizeSizeValue = (value, table, allowed) => {
   if (typeof value === "number" && Number.isFinite(value)) {
     const rounded = Math.round(value);
-    const match = Object.entries(table).find(([step, px]) => px === rounded && allowed.includes(step));
+    const match = Object.entries(table).find(
+      ([step, px]) => px === rounded && allowed.includes(step)
+    );
     return match ? match[0] : Math.max(0, Math.min(MAX_CUSTOM_SIZE, rounded));
   }
   if (typeof value === "string") {
@@ -263,7 +271,11 @@ function normalizePart(shape, partId, raw) {
   const next = { ...defaults };
   if ("size" in defaults) {
     const allowed = CLOCK_BAR_PART_SIZE_STEPS[partId] || ["s", "m", "l"];
-    next.size = normalizeSizeValue(source.size ?? defaults.size, CLOCK_BAR_SIZE_TABLES[shape][partId], allowed);
+    next.size = normalizeSizeValue(
+      source.size ?? defaults.size,
+      CLOCK_BAR_SIZE_TABLES[shape][partId],
+      allowed
+    );
   }
   if ("seconds" in defaults) next.seconds = Boolean(source.seconds);
   if ("underTime" in defaults) next.underTime = Boolean(source.underTime);
@@ -286,7 +298,9 @@ function normalizeStoredShape(shape, raw) {
       : [...defaults.zones[key]];
   }
   const hidden = Array.isArray(raw.hidden)
-    ? raw.hidden.filter(entry => typeof entry === "string" && entry.length > 0 && entry.length <= 120)
+    ? raw.hidden.filter(
+        entry => typeof entry === "string" && entry.length > 0 && entry.length <= 120
+      )
     : [...defaults.hidden];
   const parts = {};
   for (const partId of ["logo", "room", "pageDots", "time", "date"]) {
@@ -334,7 +348,9 @@ function resolveShape(shape, stored, config, services, hasDesign) {
 
   const validFixed = new Set(CLOCK_BAR_FIXED_PARTS);
   const isValidToken = token =>
-    validFixed.has(token) || token === CLOCK_BAR_TILES || (isTilePart(token) && knownTiles.has(token));
+    validFixed.has(token) ||
+    token === CLOCK_BAR_TILES ||
+    (isTilePart(token) && knownTiles.has(token));
 
   const hiddenTokens = [...new Set(stored.hidden.filter(isValidToken))];
   const hiddenSet = new Set(hiddenTokens.filter(token => token !== "status"));
@@ -417,8 +433,7 @@ function resolveShape(shape, stored, config, services, hasDesign) {
     const timeIndex = list.indexOf("time");
     const dateIndex = list.indexOf("date");
     const adjacent = dateIndex === timeIndex + 1;
-    parts.date.underTime =
-      shape === "vertical" ? true : Boolean(parts.date.underTime) && adjacent;
+    parts.date.underTime = shape === "vertical" ? true : Boolean(parts.date.underTime) && adjacent;
     parts.date.adjacentToTime = adjacent;
   } else {
     parts.date.underTime = shape === "vertical";
@@ -457,7 +472,8 @@ export function resolveClockBarDesign(config, services) {
 
   for (const shape of CLOCK_BAR_SHAPES) {
     const stored = hasDesign
-      ? normalizeStoredShape(shape, rawDesign?.[shape]) || deriveLegacyShape(shape, source, services)
+      ? normalizeStoredShape(shape, rawDesign?.[shape]) ||
+        deriveLegacyShape(shape, source, services)
       : deriveLegacyShape(shape, source, services);
     result[shape] = resolveShape(shape, stored, source, services, hasDesign);
   }

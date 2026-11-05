@@ -228,10 +228,7 @@ describe("resolveClockBarDesign — stored design", () => {
 
   it("never hides Status & menu", () => {
     const design = shape(
-      resolveClockBarDesign(
-        config({ clockBarDesign: stored({ hidden: ["status"] }) }),
-        []
-      )
+      resolveClockBarDesign(config({ clockBarDesign: stored({ hidden: ["status"] }) }), [])
     );
 
     expect(design.zones.right).toContain("status");
@@ -259,7 +256,11 @@ describe("resolveClockBarDesign — stored design", () => {
   it("puts a new instance where the tiles placeholder is", () => {
     const design = shape(
       resolveClockBarDesign(
-        config({ clockBarDesign: stored({ zones: { left: ["logo"], center: ["time"], right: ["tiles", "status"] } }) }),
+        config({
+          clockBarDesign: stored({
+            zones: { left: ["logo"], center: ["time"], right: ["tiles", "status"] },
+          }),
+        }),
         [tile("weather"), tile("recipes")]
       )
     );
@@ -299,7 +300,11 @@ describe("resolveClockBarDesign — stored design", () => {
   it("hides an unlisted tile whose own flag is false", () => {
     const design = shape(
       resolveClockBarDesign(
-        config({ clockBarDesign: stored({ zones: { left: ["logo"], center: ["time"], right: ["tiles", "status"] } }) }),
+        config({
+          clockBarDesign: stored({
+            zones: { left: ["logo"], center: ["time"], right: ["tiles", "status"] },
+          }),
+        }),
         [tile("weather"), tile("recipes", { show_in_statusbar: false })]
       )
     );
