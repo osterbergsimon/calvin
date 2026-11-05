@@ -39,6 +39,7 @@ defineEmits(["select"]);
 .clock-bar-chip {
   position: relative;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   min-width: 0;
 }

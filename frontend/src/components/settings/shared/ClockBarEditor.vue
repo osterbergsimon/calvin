@@ -1112,6 +1112,7 @@ function openRegions() {
 .cbe-stage {
   position: relative;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   min-height: 0;
@@ -1176,6 +1177,7 @@ function openRegions() {
 
 .cbe-shelf {
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: var(--gap-inline);
   padding: var(--gap-inline);
@@ -1318,12 +1320,17 @@ function openRegions() {
 }
 
 .cbe-root.is-phone .cbe-device {
-  max-height: 38vh;
+  max-height: none;
+}
+
+.cbe-root.is-phone .cbe-preview-label,
+.cbe-root.is-phone .cbe-hint {
+  display: none;
 }
 
 .cbe-root.is-phone .cbe-rail {
   flex: 0 0 auto;
-  max-height: 42vh;
+  max-height: 36vh;
   border-left: 0;
   border-top: 1px solid var(--line);
   border-radius: var(--radius-card) var(--radius-card) 0 0;

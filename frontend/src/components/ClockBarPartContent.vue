@@ -232,4 +232,13 @@ const dotsScreens = computed(() => (props.sample ? sampleScreens : props.screens
   color: var(--ink-2);
   letter-spacing: 0.1em;
 }
+
+/* The same phone rule as the dashboard bar (CLV-66): the room name and dots
+   give way so the clock keeps its room. The editor's sample values obey it too. */
+@media (--bp-phone) {
+  .clock-bar-room,
+  .clock-bar-dots-sample {
+    display: none;
+  }
+}
 </style>
