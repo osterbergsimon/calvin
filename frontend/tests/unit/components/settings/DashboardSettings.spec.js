@@ -27,9 +27,7 @@ const baseConfig = () => ({
 });
 
 const stubs = {
-  ClockBarSizePicker: true,
-  ClockBarPreview: true,
-  ClockBarItemsTab: true,
+  ClockBarEditor: true,
   KeyboardTab: true,
 };
 
@@ -43,13 +41,11 @@ describe("DashboardSettings", () => {
     window.sessionStorage.clear();
   });
 
-  it("renders what the home shows, with the clock sections folded in", () => {
+  it("renders what the home shows, with the clock section folded in", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     expect(sectionIds(w)).toEqual([
       "section-regions",
-      "section-clock-bar-clock",
-      "section-clock-bar-layout",
-      "section-clock-bar-items",
+      "section-clock-bar",
       "section-kiosk-touch-focus",
     ]);
     // Appearance moved to Screens › Look (§7 item 6).
@@ -61,12 +57,16 @@ describe("DashboardSettings", () => {
     expect(w.findComponent({ name: "ScreenRegionEditor" }).exists()).toBe(true);
   });
 
-  it("names the clock sections Clock, Clock bar layout and Clock bar items", () => {
+  it("has one Clock bar section with a preview and the editor", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const eyebrows = w.findAll(".settings-section__eyebrow").map(e => e.text());
-    expect(eyebrows).toContain("Clock");
-    expect(eyebrows).toContain("Clock bar layout");
-    expect(eyebrows).toContain("Clock bar items");
+    expect(eyebrows).toContain("Clock bar");
+    expect(eyebrows).not.toContain("Clock");
+    expect(eyebrows).not.toContain("Clock bar layout");
+    expect(eyebrows).not.toContain("Clock bar items");
+    expect(w.find('[data-test="clock-bar-mini-preview"]').exists()).toBe(true);
+    expect(w.find('[data-test="edit-clock-bar"]').text()).toBe("Edit clock bar");
+    expect(w.findComponent({ name: "ClockBarEditor" }).exists()).toBe(true);
   });
 
   it("leaves only the remote rows and points to Screens for the rest", () => {
