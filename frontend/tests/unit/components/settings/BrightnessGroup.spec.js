@@ -152,7 +152,9 @@ describe("BrightnessGroup slider", () => {
 
   it("falls back to Calvin's scale with a link to the match step", async () => {
     const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
-    expect(find(wrapper, "brightness-value").text()).toContain("19 (Calvin's scale)");
+    expect(find(wrapper, "brightness-value").text().replace(/\s+/g, " ")).toContain(
+      "19 (Calvin's scale)"
+    );
     await find(wrapper, "match-link").trigger("click");
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "conversion" });
   });
