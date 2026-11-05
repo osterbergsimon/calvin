@@ -419,15 +419,80 @@ describe("DisplayCheckDialog step 4: safe limit", () => {
     expect(find(wrapper, "limit-pending-note").exists()).toBe(false);
   });
 
-  it("Done without saving ends the session and keeps the old limit", async () => {
+  async function toUnsavedLimit() {
     await toStep4();
     await click(wrapper, "limit-start");
     agentStep("limit", { level: 19, limit: 26 });
     await settle();
+  }
+
+  it("Done with an unsaved limit asks before leaving, and nothing happens yet", async () => {
+    await toUnsavedLimit();
     await click(wrapper, "check-done");
-    expect(posts("stop")).toHaveLength(1);
+    expect(wrapper.text()).toContain("Leave without saving limit 26?");
+    expect(posts("stop")).toHaveLength(0);
     expect(posts("save-limit")).toHaveLength(0);
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("Save in that question saves the limit, ends the session and closes", async () => {
+    await toUnsavedLimit();
+    await click(wrapper, "check-done");
+    await click(wrapper, "confirm-accept");
+    expect(posts("save-limit")).toHaveLength(1);
+    expect(wrapper.emitted("saved-limit")[0][0]).toBe(26);
+    expect(posts("stop")).toHaveLength(1);
     expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
+  });
+
+  it("Leave in that question ends the session without saving and keeps the old limit", async () => {
+    await toUnsavedLimit();
+    await click(wrapper, "check-done");
+    await click(wrapper, "confirm-alternative");
+    expect(posts("save-limit")).toHaveLength(0);
+    expect(posts("stop")).toHaveLength(1);
+    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
+  });
+
+  it("Cancel in that question stays on the finish screen", async () => {
+    await toUnsavedLimit();
+    await click(wrapper, "check-done");
+    await click(wrapper, "confirm-cancel");
+    expect(find(wrapper, "limit-save").exists()).toBe(true);
+    expect(posts("stop")).toHaveLength(0);
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("the × asks the same question", async () => {
+    await toUnsavedLimit();
+    wrapper.findComponent({ name: "Dialog" }).vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(wrapper.text()).toContain("Leave without saving limit 26?");
+    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  });
+
+  it("closes without asking once the limit is saved", async () => {
+    await toUnsavedLimit();
+    await click(wrapper, "limit-save");
+    await click(wrapper, "check-done");
+    expect(wrapper.text()).not.toContain("Leave without saving");
+    expect(posts("stop")).toHaveLength(1);
+    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
+  });
+
+  it("Done with no limit found closes without asking", async () => {
+    await toStep4();
+    await click(wrapper, "limit-skip");
+    await click(wrapper, "check-done");
+    expect(wrapper.text()).not.toContain("Leave without saving");
+    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
+  });
+
+  it("explains the limit as offered, and applied once saved", async () => {
+    await toStep4();
+    expect(wrapper.text()).toContain(
+      "Then it steps back down and offers that level as Kitchen's limit. Once you save it, Calvin never goes above it."
+    );
   });
 
   it("keeps the button and shows an error when saving fails, without changing any setting", async () => {

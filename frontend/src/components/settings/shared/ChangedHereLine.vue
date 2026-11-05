@@ -1,14 +1,17 @@
 <!-- frontend/src/components/settings/shared/ChangedHereLine.vue -->
 <template>
   <p v-if="items.length > 0" class="changed-here" data-test="changed-here-line">
-    <span class="changed-here__label">Changed here:</span>&nbsp;<a
+    <span class="changed-here__label">Changed here:</span>&nbsp;<template
       v-for="(item, index) in items"
       :key="item.key"
-      class="changed-here__link"
-      :href="`#${rowAnchorId(item.key)}`"
-      :data-test="`changed-here-${item.key}`"
-      @click.prevent="jumpTo(item.key)"
-      >{{ index > 0 ? ", " : "" }}{{ item.label }}</a
+      ><span v-if="index > 0">{{ ", " }}</span
+      ><a
+        class="changed-here__link"
+        :href="`#${rowAnchorId(item.key)}`"
+        :data-test="`changed-here-${item.key}`"
+        @click.prevent="jumpTo(item.key)"
+        >{{ item.label }}</a
+      ></template
     >
   </p>
 </template>

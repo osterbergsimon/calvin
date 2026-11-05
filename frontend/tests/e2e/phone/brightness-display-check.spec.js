@@ -213,6 +213,14 @@ for (const [size, viewport] of SIZES) {
       await expect(body(page).locator('[data-test="limit-pending-note"]')).toBeVisible();
       expect(api.overridesByKiosk.hallway?.brightnessLimit).toBeUndefined();
       expect(api.displayCheckCalls).not.toContain("POST save-limit");
+      // The footer keeps the body's gutter and Done is not clipped at the bottom.
+      const done = await page.locator('[data-test="check-done"]').boundingBox();
+      const view = await page.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+      // The layout must not have grown past the screen (a long Changed-here line did that).
+      expect(view.w).toBe(viewport ? viewport.width : 390);
+      expect(done.x + done.width).toBeLessThanOrEqual(view.w - 19);
+      // The 800x480 kiosk sheet scrolls; the full-screen phone sheet must fit.
+      if (!viewport) expect(done.y + done.height).toBeLessThanOrEqual(view.h - 8);
       await shot(page, size, "check-finished");
       await page.getByRole("button", { name: /^Save 26 as .* limit$/ }).click();
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(26);

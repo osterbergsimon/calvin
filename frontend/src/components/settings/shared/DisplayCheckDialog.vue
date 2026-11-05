@@ -235,7 +235,8 @@
             <p class="dcheck__lead">Find the safe limit</p>
             <p class="dcheck__sub">
               Calvin raises the brightness until the power supply shows trouble. Then it steps back
-              down and remembers that level as {{ screenName }}'s limit. Calvin never goes above it.
+              down and offers that level as {{ screenName }}'s limit. Once you save it, Calvin never
+              goes above it.
             </p>
             <InlineNote tone="warn">
               While it runs, the screen may flicker, its touch may stop for a few seconds, and in
@@ -313,16 +314,29 @@
       </div>
     </div>
 
+    <ConfirmModal
+      :show="confirmLeave"
+      title="Leave without saving?"
+      :message="`Leave without saving limit ${limitFound}?`"
+      confirm-text="Save"
+      alternative-text="Leave"
+      @confirm="leaveSaving"
+      @alternative="leaveWithout"
+      @cancel="confirmLeave = false"
+    />
+
     <template #actions>
-      <span v-if="check.isActive.value" class="dcheck__footer-note" role="status">
-        {{ screenName }} is checking every 2 s while this is open.
-      </span>
-      <Button v-if="check.isActive.value" data-test="check-stop" @click="check.stop()">
-        Stop the check
-      </Button>
-      <Button v-if="view === 'finish'" variant="primary" data-test="check-done" @click="close">
-        Done
-      </Button>
+      <div class="dcheck__actions" :class="{ 'dcheck__actions--full': phone }">
+        <span v-if="check.isActive.value" class="dcheck__footer-note" role="status">
+          {{ screenName }} is checking every 2 s while this is open.
+        </span>
+        <Button v-if="check.isActive.value" data-test="check-stop" @click="check.stop()">
+          Stop the check
+        </Button>
+        <Button v-if="view === 'finish'" variant="primary" data-test="check-done" @click="close">
+          Done
+        </Button>
+      </div>
     </template>
   </Dialog>
 </template>
@@ -330,6 +344,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, toRef, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import { useDisplayCheck } from "@/composables/useDisplayCheck";
@@ -744,13 +759,40 @@ watch(
   }
 );
 
+// A found limit nobody saved yet: leaving would lose it, so ask first.
+const confirmLeave = ref(false);
+const unsavedLimit = computed(
+  () => view.value === "finish" && limitFound.value != null && !limitSaved.value
+);
+
 function onDialogModel(value) {
+  if (value === false && unsavedLimit.value) {
+    confirmLeave.value = true;
+    return;
+  }
   emit("update:modelValue", value);
 }
+
 // Done ends the session itself; closing the dialog any other way does too.
-async function close() {
+async function endAndClose() {
+  confirmLeave.value = false;
   if (check.isActive.value && check.ownsRun.value) await check.stop();
   emit("update:modelValue", false);
+}
+function close() {
+  if (unsavedLimit.value) {
+    confirmLeave.value = true;
+    return;
+  }
+  return endAndClose();
+}
+async function leaveSaving() {
+  await saveLimit();
+  if (limitSaved.value) await endAndClose();
+  else confirmLeave.value = false;
+}
+function leaveWithout() {
+  return endAndClose();
 }
 </script>
 
@@ -872,6 +914,19 @@ async function close() {
   bottom: 0;
   width: 2px;
   background: var(--err);
+}
+.dcheck__actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--gap-inline);
+}
+/* The full-screen phone sheet: the dialog footer already has the body's gutter;
+   this clears the home indicator so Done is never clipped. */
+.dcheck__actions--full {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 .dcheck__log {
   margin: 0;

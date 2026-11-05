@@ -106,8 +106,8 @@ other and step 4 is optional, so the numbers are a real sequence:
      line by more than 5 menu units, it says "These readings don't line up. Check the last one".
    - **Add a reading** sets the next point. **Next** needs at least two readings. **Skip this step** is allowed.
 4. **Find the safe limit** (optional). Before it starts, a plain warning (fig. 6): "Calvin raises the brightness until
-   the power supply shows trouble. Then it steps back down and remembers that level as Kitchen's limit. Calvin never
-   goes above it. While it runs, the screen may flicker, its touch may stop for a few seconds, and in the worst case
+   the power supply shows trouble. Then it steps back down and offers that level as Kitchen's limit. Once you save it,
+   Calvin never goes above it. While it runs, the screen may flicker, its touch may stop for a few seconds, and in the worst case
    it may restart." The buttons are **Start the test** and **Skip, finish**.
    - **On the panel itself** (the browser's kiosk id is the screen being checked), Start is replaced by a red note:
      "You're on Kitchen itself. Run this step from your phone or computer, because the touch screen can stop
@@ -122,8 +122,12 @@ other and step 4 is optional, so the numbers are a real sequence:
      then the result once the agent reports it.
 
 **Finish screen.** It lists what was found, with a tick or a warning per line, and what changes because of it: "The
-Brightness slider now shows the screen's menu numbers" and "Brightness can go up to 67". Its button is **Done**. All
-results are saved per screen and appear in the Display check row and in History.
+Brightness slider now shows the screen's menu numbers". A found limit is only offered: the primary button is **Save 26
+as Kitchen's limit**, with a quiet note that the old limit stays until it is saved. Once saved, the screen says
+"Brightness can go up to 67". Its other button is **Done**: with an unsaved limit, Done (and ×) asks "Leave without
+saving limit 26?" with **Save** / **Leave** (Cancel stays). Saved results are per screen and appear in the Display
+check row and in History. On a phone the footer keeps the body's gutter and clears the safe area at the bottom, so Done
+is never clipped.
 
 **Rules for the whole dialog**
 
