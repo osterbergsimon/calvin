@@ -11,7 +11,11 @@ timer: a run not finished 10 minutes after it was requested reads ``timeout``
 and is no longer offered to the agent.
 """
 
+import asyncio
+import functools
 import uuid
+import weakref
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Literal
 
@@ -187,6 +191,30 @@ def _apply_findings(
     return findings
 
 
+# One lock per kiosk (and per event loop, as an asyncio.Lock belongs to the loop
+# it is first contended in). Every read-modify-write of a kiosk's run or
+# findings holds it, so a stop or step change racing a report is never lost.
+_locks: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[str, asyncio.Lock]]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _kiosk_lock(kiosk_id: str) -> asyncio.Lock:
+    per_loop = _locks.setdefault(asyncio.get_running_loop(), {})
+    return per_loop.setdefault(kiosk_id, asyncio.Lock())
+
+
+def _serialised[T](fn: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
+    """Run ``fn(kiosk_id, ...)`` under the kiosk's lock."""
+
+    @functools.wraps(fn)
+    async def wrapper(kiosk_id: str, *args: Any, **kwargs: Any) -> T:
+        async with _kiosk_lock(kiosk_id):
+            return await fn(kiosk_id, *args, **kwargs)
+
+    return wrapper
+
+
 def _iso(dt: datetime) -> str:
     return as_utc(dt).isoformat()
 
@@ -249,6 +277,7 @@ async def _save(row: KioskDB, run: dict, findings: dict | None = None) -> None:
     await row.update(_columns=columns)
 
 
+@_serialised
 async def start_run(kiosk_id: str, request: StartRequest) -> dict:
     row = await _row(kiosk_id)
     if row is None:
@@ -279,6 +308,7 @@ async def start_run(kiosk_id: str, request: StartRequest) -> dict:
     return _view(run)  # type: ignore[return-value]
 
 
+@_serialised
 async def stop_run(kiosk_id: str) -> dict:
     row = await _row(kiosk_id)
     if row is None:
@@ -293,6 +323,7 @@ async def stop_run(kiosk_id: str) -> dict:
     return _view(run)  # type: ignore[return-value]
 
 
+@_serialised
 async def change_step(kiosk_id: str, request: StepRequest) -> dict:
     """Move the active run to a new step/value; the agent re-runs on the new signature."""
     row = await _row(kiosk_id)
@@ -327,6 +358,7 @@ def _merge_progress(run: dict, report: AgentReport) -> None:
         run["info"] = report.info
 
 
+@_serialised
 async def record_report(kiosk_id: str, report: AgentReport) -> None:
     """Fold an agent report into the stored run.
 
@@ -421,6 +453,7 @@ async def get_findings(kiosk_id: str) -> dict[str, Any]:
     return findings_view(row.display_check_findings if row else None)
 
 
+@_serialised
 async def set_writes_verdict(kiosk_id: str, writes: bool) -> dict[str, Any]:
     """Record the owner's answer to "did the screen change?" (it wins over the agent's)."""
     row = await _row(kiosk_id)

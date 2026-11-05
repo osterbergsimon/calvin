@@ -286,7 +286,8 @@ on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not
 
 - **The report endpoint has no credential.** The agent has none, so `POST /kiosks/{id}/display-check` is guarded only by
   the run id (accepted by this spec). A caller who knows a live run id can post reports for it; the run ids are random
-  and the reports cannot change brightness, only what the UI shows and the saved findings.
+  and a report can only propose a limit (and change what the UI shows and the findings): a limit takes effect only
+  after the admin's explicit `save-limit`.
 - **A run that has ended never becomes active again.** After it has ended, or once it has expired, a `running`
   report is refused with 409 and the job is not offered again. A repeated ending report (the agent's `_finish` can
   send a second one) and the ending report of a rebooted agent on an expired run are accepted; the first ending
