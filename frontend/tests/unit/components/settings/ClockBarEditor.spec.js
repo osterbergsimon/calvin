@@ -55,13 +55,14 @@ const services = () => [
   },
 ];
 
-const mountEditor = (config = baseConfig()) => {
+const mountEditor = (config = baseConfig(), mountOptions = {}) => {
   const web = useWebServicesStore();
   web.services = services();
   web.fetchServices = vi.fn(async () => {});
   const kiosks = useKiosksStore();
   kiosks.loadKiosks = vi.fn(async () => {});
   return mount(ClockBarEditor, {
+    ...mountOptions,
     props: { config, open: true },
     global: {
       stubs: {
@@ -246,5 +247,72 @@ describe("ClockBarEditor", () => {
     expect(wrapper.find(".clock-bar-vertical").exists()).toBe(true);
     expect(wrapper.text()).toContain("Top");
     expect(wrapper.text()).toContain("Bottom");
+  });
+
+  describe("keyboard moves (items 10 and 13)", () => {
+    const chip = (wrapper, id) => wrapper.find(`[data-part-id="${id}"]`);
+
+    it("keeps focus on the chip across two consecutive arrow moves", async () => {
+      const wrapper = mountEditor(baseConfig(), { attachTo: document.body });
+      await flushPromises();
+
+      chip(wrapper, "logo").element.focus();
+      await chip(wrapper, "logo").trigger("keydown.right");
+      await flushPromises();
+      expect(document.activeElement?.dataset?.partId).toBe("logo");
+      expect(latestDesign(wrapper).horizontal.zones.left.slice(0, 2)).toEqual(["room", "logo"]);
+
+      await chip(wrapper, "logo").trigger("keydown.right");
+      await flushPromises();
+      expect(document.activeElement?.dataset?.partId).toBe("logo");
+      expect(latestDesign(wrapper).horizontal.zones.left).toEqual(["room", "pageDots", "logo"]);
+      wrapper.unmount();
+    });
+
+    it("announces a move to assistive tech", async () => {
+      const wrapper = mountEditor();
+      await flushPromises();
+
+      await chip(wrapper, "logo").trigger("keydown.right");
+      await flushPromises();
+
+      const live = wrapper.find('[data-test="clock-bar-announcer"]');
+      expect(live.attributes("aria-live")).toBe("polite");
+      expect(live.text()).toBe("Calvin logo moved to Left, 2 of 3.");
+    });
+
+    it("cancels a pending drag on pointercancel instead of dropping", async () => {
+      const wrapper = mountEditor(baseConfig(), { attachTo: document.body });
+      await flushPromises();
+      const before = wrapper.emitted("update:config")?.length || 0;
+      const target = chip(wrapper, "logo");
+      const spot = document.elementFromPoint;
+      document.elementFromPoint = () => wrapper.find('[data-drop-zone="right"]').element;
+
+      await target.trigger("pointerdown", { button: 0, clientX: 5, clientY: 5 });
+      window.dispatchEvent(new MouseEvent("pointermove", { clientX: 80, clientY: 40 }));
+      window.dispatchEvent(new Event("pointercancel"));
+      await flushPromises();
+
+      document.elementFromPoint = spot;
+      expect(wrapper.emitted("update:config")?.length || 0).toBe(before);
+      wrapper.unmount();
+    });
+
+    it("drops on pointerup", async () => {
+      const wrapper = mountEditor(baseConfig(), { attachTo: document.body });
+      await flushPromises();
+      const spot = document.elementFromPoint;
+      document.elementFromPoint = () => wrapper.find('[data-drop-zone="right"]').element;
+
+      await chip(wrapper, "logo").trigger("pointerdown", { button: 0, clientX: 5, clientY: 5 });
+      window.dispatchEvent(new MouseEvent("pointermove", { clientX: 80, clientY: 40 }));
+      window.dispatchEvent(new Event("pointerup"));
+      await flushPromises();
+
+      document.elementFromPoint = spot;
+      expect(latestDesign(wrapper).horizontal.zones.right).toContain("logo");
+      wrapper.unmount();
+    });
   });
 });

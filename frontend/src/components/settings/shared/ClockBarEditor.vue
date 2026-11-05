@@ -142,6 +142,10 @@
             :style="dropLineStyle"
           />
 
+          <p class="cbe-sr-only" data-test="clock-bar-announcer" aria-live="polite">
+            {{ announcement }}
+          </p>
+
           <div v-if="undoState" class="cbe-toast" role="status" aria-live="polite">
             <span>Reset to the default clock bar.</span>
             <Button variant="link" size="sm" data-test="clock-bar-undo" @click="undoReset">
@@ -561,6 +565,22 @@ const removeEverywhere = (state, partId) => {
   state.hidden = state.hidden.filter(entry => entry !== partId);
 };
 
+/* Moves are announced (spec section 6): the position is read after the move. */
+const announcement = ref("");
+const announceMove = partId => {
+  const state = currentShapeState();
+  if (!state) return;
+  const label = labelFor(partId);
+  if (state.hidden.includes(partId)) {
+    announcement.value = `${label} moved to Not shown.`;
+    return;
+  }
+  const zone = zoneKeys.value.find(key => state.zones[key].includes(partId));
+  if (!zone) return;
+  const list = state.zones[zone];
+  announcement.value = `${label} moved to ${zoneLabels.value[zone]}, ${list.indexOf(partId) + 1} of ${list.length}.`;
+};
+
 const movePart = (partId, zone, index = null) => {
   const state = currentShapeState();
   if (!state) return;
@@ -574,6 +594,7 @@ const movePart = (partId, zone, index = null) => {
     list.splice(at, 0, partId);
   }
   persist();
+  announceMove(partId);
 };
 
 const selectPart = partId => {
@@ -692,6 +713,7 @@ const moveSelected = delta => {
     list.splice(index, 1);
     list.splice(target, 0, selectedPart.value);
     persist();
+    announceMove(selectedPart.value);
     return;
   }
   const zoneIndex = zoneKeys.value.indexOf(zone);
@@ -700,12 +722,20 @@ const moveSelected = delta => {
   movePart(selectedPart.value, nextZone, delta < 0 ? 0 : null);
 };
 
+// A keyboard move re-renders the bar; keep the keyboard on the chip it moved
+// so the next arrow key still lands on it.
+const focusChip = async partId => {
+  await nextTick();
+  stageEl.value?.querySelector(`[data-part-id="${CSS.escape(partId)}"]`)?.focus();
+};
+
 const onMovePart = ({ partId, direction }) => {
   const earlier = shape.value === "horizontal" ? direction === "left" : direction === "up";
   const later = shape.value === "horizontal" ? direction === "right" : direction === "down";
   if (selectedPart.value !== partId) selectedPart.value = partId;
   if (!earlier && !later) return;
   moveSelected(earlier ? -1 : 1);
+  focusChip(partId);
 };
 
 const setPartOption = (key, value) => {
@@ -837,8 +867,8 @@ const startDrag = event => {
     dragging: false,
   };
   window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", stopDrag, { once: true });
-  window.addEventListener("pointercancel", stopDrag, { once: true });
+  window.addEventListener("pointerup", stopDrag);
+  window.addEventListener("pointercancel", cancelDrag);
 };
 
 const updateDropTarget = event => {
@@ -935,16 +965,24 @@ const onPointerMove = event => {
   updateDropTarget(event);
 };
 
-const stopDrag = () => {
-  const state = dragState.value;
+const endDrag = () => {
   window.removeEventListener("pointermove", onPointerMove);
-  if (state?.dragging && dropTarget.value) {
-    movePart(state.partId, dropTarget.value.zone, dropTarget.value.index);
-  }
+  window.removeEventListener("pointerup", stopDrag);
+  window.removeEventListener("pointercancel", cancelDrag);
   dragState.value = null;
   dropTarget.value = null;
   dropLine.value = null;
 };
+
+const stopDrag = () => {
+  const state = dragState.value;
+  const target = dropTarget.value;
+  endDrag();
+  if (state?.dragging && target) movePart(state.partId, target.zone, target.index);
+};
+
+// The system took the pointer (a scroll, a call): that is no drop.
+const cancelDrag = () => endDrag();
 
 /* --- links --------------------------------------------------------------- */
 const openTileSource = () => {
@@ -1198,6 +1236,16 @@ onMounted(() => {
 .cbe-stage.drop-bottom :deep([data-drop-zone="bottom"]) {
   background: color-mix(in srgb, var(--focus) 15%, transparent);
   outline: 1px dashed var(--focus);
+}
+
+.cbe-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .cbe-toast {

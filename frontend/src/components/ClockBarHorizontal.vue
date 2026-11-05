@@ -19,7 +19,7 @@
         ]"
         :data-drop-zone="zoneKey"
       >
-        <template v-for="(item, itemIndex) in zoneItems[zoneKey]" :key="`${item.id}-${itemIndex}`">
+        <template v-for="item in zoneItems[zoneKey]" :key="itemKey(item)">
           <div v-if="item.kind === 'pair'" class="clock-bar-time-stack">
             <ClockBarPart
               part-id="time"
@@ -247,6 +247,10 @@ const zoneItems = computed(() => {
   }
   return result;
 });
+
+// Keyed by the part so a reorder moves the element instead of remounting it
+// (a remount drops keyboard focus). A run of tiles is keyed by its first tile.
+const itemKey = item => (item.kind === "tiles" ? `tiles:${item.ids[0]}` : item.id);
 
 const zoneMeta = (zoneKey, partId) => {
   const ids = visiblePartIds(zoneKey);
