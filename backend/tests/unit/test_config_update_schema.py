@@ -60,3 +60,77 @@ def test_sanitize_logs_a_warning_per_dropped_key():
     assert all("kitchen" in message for message in messages)
     assert any("themeMode" in message for message in messages)
     assert any("hotCornerOpacity" in message for message in messages)
+
+
+CLOCK_BAR_DESIGN = {
+    "version": 1,
+    "horizontal": {
+        "zones": {
+            "left": ["logo", "room", "pageDots"],
+            "center": ["time", "date"],
+            "right": ["tiles", "status"],
+        },
+        "hidden": [],
+        "parts": {
+            "time": {"size": "m", "seconds": False},
+            "date": {"size": 13, "underTime": True},
+        },
+        "barHeight": "normal",
+        "tileSize": "m",
+    },
+    "vertical": {
+        "zones": {"top": ["logo"], "middle": ["time"], "bottom": ["tiles", "status"]},
+        "hidden": ["room", "date"],
+        "parts": {"time": {"size": "l", "style": "stacked"}, "date": {"style": "stacked"}},
+        "barHeight": "slim",
+        "tileSize": 18,
+    },
+}
+
+
+@pytest.mark.unit
+def test_clock_bar_design_accepts_the_documented_shape():
+    update = ConfigUpdate(clockBarDesign=CLOCK_BAR_DESIGN)
+    dumped = update.model_dump(exclude_unset=True)["clockBarDesign"]
+
+    assert dumped["horizontal"]["zones"]["left"] == ["logo", "room", "pageDots"]
+    assert dumped["horizontal"]["parts"]["date"]["size"] == 13
+    assert dumped["vertical"]["barHeight"] == "slim"
+
+
+@pytest.mark.unit
+def test_clock_bar_design_accepts_only_one_shape():
+    update = ConfigUpdate(
+        clockBarDesign={"version": 1, "horizontal": CLOCK_BAR_DESIGN["horizontal"]}
+    )
+    assert update.model_dump(exclude_unset=True)["clockBarDesign"].get("vertical") is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "patch",
+    [
+        {"version": 2},
+        {"horizontal": {"zones": {"sideways": []}}},
+        {"horizontal": {"zones": {"left": [123]}}},
+        {"horizontal": {"zones": {"left": ["x" * 121]}}},
+        {"horizontal": {"zones": {"left": ["x"] * 101}}},
+        {"horizontal": {"zones": {}, "barHeight": "huge"}},
+        {"horizontal": {"zones": {}, "tileSize": "xl"}},
+        {"horizontal": {"zones": {}, "parts": {"time": {"size": 201}}}},
+        {"horizontal": {"zones": {}, "parts": {"time": {"size": "xxl"}}}},
+        {"horizontal": {"zones": {}, "parts": {"time": {"style": "diagonal"}}}},
+        {"horizontal": {"zones": {}, "unknown": True}},
+    ],
+)
+def test_clock_bar_design_rejects_bad_shapes(patch):
+    with pytest.raises(ValueError):
+        ConfigUpdate(clockBarDesign={"version": 1, **patch})
+
+
+@pytest.mark.unit
+def test_clock_bar_design_is_admin_only():
+    """Editing the bar needs admin, like the other clock bar keys."""
+    from app.security.route_policy import CONFIG_DISPLAY_KEYS
+
+    assert "clockBarDesign" not in CONFIG_DISPLAY_KEYS
