@@ -73,6 +73,7 @@ def test_start_offers_the_job_on_the_config_poll(test_client: TestClient, kiosk)
         "action": "start",
         "value": 19,
         "brightness": 15,
+        "ceiling": None,
     }
     assert after.json()["display_check"] == job
     # The ETag covers the job (calvin-fufd): the old tag must not give a 304.
@@ -187,6 +188,7 @@ def test_step_change_re_offers_the_job_with_the_new_step_and_value(test_client: 
         "action": "start",
         "value": 9,
         "brightness": 15,
+        "ceiling": None,
     }
     # A step with no value drops the old one.
     assert _step(test_client, "write").json()["value"] is None
@@ -366,6 +368,7 @@ EMPTY_FINDINGS = {
     "connector": None,
     "vcpVersion": None,
     "limit": None,
+    "powerTrouble": None,
 }
 
 
@@ -631,3 +634,312 @@ def test_the_lower_of_the_saved_and_the_found_limit_wins(test_client: TestClient
     _report(test_client, run["id"], "done", level=30, limit=30)
     assert _step(test_client, "conversion", value=17).status_code == 422  # 20 - 4 = 16
     assert _step(test_client, "conversion", value=16).status_code == 200
+
+
+# -- calibration v2 (calvin-c805) ---------------------------------------------
+START_KNOWN = {"level": 19, "known": True, "source": "last_set"}
+FAULT = {
+    "step": "write",
+    "level": 12,
+    "kind": "under-voltage",
+    "at": "2026-11-06T17:33:39+00:00",
+    "lastGood": 14,
+    "alsoAt": [8],
+}
+
+
+def _run_record(client: TestClient) -> dict:
+    return client.get(BASE).json()["run"]
+
+
+@pytest.mark.integration
+def test_report_stores_preflight_start_fault_and_reason(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        run["id"],
+        "running",
+        preflight={"status": "clean", "faults": []},
+        start=START_KNOWN,
+    )
+    record = _run_record(test_client)
+    assert record["preflight"] == {"status": "clean", "faults": []}
+    assert record["start"] == START_KNOWN
+    assert record["fault"] is None
+    assert record["reason"] is None
+    assert record["menuAtStart"] is None
+
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    record = _run_record(test_client)
+    assert record["status"] == "error"
+    assert record["reason"] == "power_trouble"
+    assert record["fault"] == FAULT
+    assert record["start"] == START_KNOWN  # kept from the earlier report
+
+
+@pytest.mark.integration
+def test_detect_info_passes_placeholder_reads_through(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "done", info={"model": "X", "placeholderReads": True})
+    assert _run_record(test_client)["steps"]["detect"]["info"]["placeholderReads"] is True
+
+
+@pytest.mark.integration
+def test_menu_at_start_is_admin_only_and_needs_an_active_run(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28}).status_code == 404
+    _start(test_client, "detect")
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 101}).status_code == 422
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28, "x": 1}).status_code == 422
+    stored = test_client.post(f"{BASE}/menu-at-start", json={"menu": 28})
+    assert stored.status_code == 200, stored.text
+    assert stored.json()["menuAtStart"] == 28
+    assert _run_record(test_client)["menuAtStart"] == 28
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28}).status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_menu_at_start_needs_admin(test_client: TestClient):
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28}).status_code == 401
+
+
+@pytest.mark.integration
+def test_menu_at_start_unknown_kiosk_is_404(test_client: TestClient):
+    assert (
+        test_client.post(
+            "/api/kiosks/nobody/display-check/menu-at-start", json={"menu": 1}
+        ).status_code
+        == 404
+    )
+
+
+def _with_start(client, level=19, known=True, **extra):
+    run = _start(client, "detect").json()
+    start = {"level": level, "known": known, "source": "last_set" if known else None}
+    _report(client, run["id"], "running", start=start, **extra)
+    return run
+
+
+@pytest.mark.integration
+def test_ceiling_is_the_start_level_until_a_fit_exists(test_client: TestClient, kiosk):
+    assert _run_record(test_client) is None
+    run = _with_start(test_client, 19)
+    assert _run_record(test_client)["ceiling"] == 19
+    # menuAtStart alone (no 2-point fit) never changes the base.
+    test_client.post(f"{BASE}/menu-at-start", json={"menu": 40})
+    assert _run_record(test_client)["ceiling"] == 19
+    assert _config(test_client)["displayCheck"]["ceiling"] == 19
+    assert run["id"]
+
+
+@pytest.mark.integration
+def test_unknown_start_ceiling_is_the_floor(test_client: TestClient, kiosk):
+    _with_start(test_client, None, known=False)
+    assert _run_record(test_client)["ceiling"] == 5
+
+
+@pytest.mark.integration
+def test_menu_at_start_raises_the_base_once_the_fit_has_two_points(test_client: TestClient, kiosk):
+    # menu = 16 + 2.4 * ddc  ->  menu 28 is ddc 5, menu 40 is ddc 10
+    _set_overrides(
+        test_client,
+        {"brightnessConversion": [{"ddc": 5, "menu": 28}, {"ddc": 15, "menu": 52}]},
+    )
+    _with_start(test_client, 5, known=False)
+    test_client.post(f"{BASE}/menu-at-start", json={"menu": 40})
+    assert _run_record(test_client)["ceiling"] == 10
+
+
+@pytest.mark.integration
+def test_ceiling_takes_the_lowest_of_base_limit_and_fault_caps(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 30})  # limit cap 26
+    _with_start(test_client, 40)
+    assert _run_record(test_client)["ceiling"] == 26
+    run = _run_record(test_client)
+    # fault at 12, lastGood 14: faultLimit = min(14, 12) - 2 = 10, faultCap = 6
+    _report(test_client, run["id"], "running", fault=FAULT)
+    assert _run_record(test_client)["ceiling"] == 6
+
+
+@pytest.mark.integration
+def test_a_limit_step_fault_adds_no_ceiling_term(test_client: TestClient, kiosk):
+    run = _with_start(test_client, 40)
+    _report(test_client, run["id"], "running", fault={**FAULT, "step": "limit", "level": 30})
+    assert _run_record(test_client)["ceiling"] == 40
+
+
+@pytest.mark.integration
+def test_conversion_value_above_the_ceiling_is_refused(test_client: TestClient, kiosk):
+    _with_start(test_client, 19)
+    refused = _step(test_client, "conversion", value=20)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_ceiling"
+    assert refused.json()["detail"]["max"] == 19
+    assert _step(test_client, "conversion", value=19).status_code == 200
+    assert _step(test_client, "conversion", value=15).status_code == 200
+    assert _step(test_client, "write").status_code == 200  # no value, no check
+
+
+TWO_READINGS = [{"ddc": 5, "menu": 28}, {"ddc": 1, "menu": 18}]
+
+
+@pytest.mark.integration
+def test_the_third_reading_under_a_known_limit_passes_the_ceiling(test_client: TestClient, kiosk):
+    _set_overrides(
+        test_client, {"brightnessLimit": 26, "brightnessConversion": TWO_READINGS}
+    )  # top is 22
+    _with_start(test_client, 5, known=False)
+    assert _step(test_client, "conversion", value=22).status_code == 200
+    # The job carries the value-specific allowance for the agent.
+    assert _config(test_client)["displayCheck"]["ceiling"] == 22
+    refused = _step(test_client, "conversion", value=21)  # not the offered point
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["max"] == 5
+
+
+@pytest.mark.integration
+def test_the_third_reading_needs_two_readings_first(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    _with_start(test_client, 5, known=False)
+    refused = _step(test_client, "conversion", value=22)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_ceiling"
+    assert refused.json()["detail"]["max"] == 5
+
+
+@pytest.mark.integration
+def test_a_high_limit_does_not_open_everything_below_it(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 80, "brightnessConversion": TWO_READINGS})
+    _with_start(test_client, 5, known=False)
+    refused = _step(test_client, "conversion", value=60)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["max"] == 5
+    assert _step(test_client, "conversion", value=76).status_code == 200  # 80 - 4
+
+
+@pytest.mark.integration
+def test_a_fault_cap_still_binds_the_third_reading(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26, "brightnessConversion": TWO_READINGS})
+    run = _with_start(test_client, 19)
+    _report(test_client, run["id"], "running", fault=FAULT)  # faultCap 6
+    refused = _step(test_client, "conversion", value=7)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_ceiling"
+    assert refused.json()["detail"]["max"] == 6
+
+
+@pytest.mark.integration
+def test_save_limit_from_a_calibration_fault(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    saved = test_client.post(f"{BASE}/save-limit")
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["brightnessLimit"] == 10  # min(14, 12) - 2, never lastGood itself
+    assert _config(test_client)["brightnessLimit"] == 10
+
+
+@pytest.mark.integration
+def test_save_limit_prefers_a_limit_step_result_over_a_fault(test_client: TestClient, kiosk):
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], "done", level=30, limit=26, fault={**FAULT, "step": "limit"})
+    assert test_client.post(f"{BASE}/save-limit").json()["brightnessLimit"] == 26
+
+
+@pytest.mark.integration
+def test_save_limit_ignores_a_limit_step_fault_without_a_result(test_client: TestClient, kiosk):
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], "running", fault={**FAULT, "step": "limit"})
+    refused = test_client.post(f"{BASE}/save-limit")
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "no_limit"
+
+
+@pytest.mark.integration
+def test_findings_power_trouble_from_a_preflight_fault(test_client: TestClient, kiosk):
+    assert _findings(test_client)["powerTrouble"] is None
+    run = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        run["id"],
+        "error",
+        reason="power_at_idle",
+        preflight={"status": "fault", "faults": ["Under-voltage detected!"]},
+    )
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble["step"] == "preflight"
+    assert trouble["level"] is None
+    assert trouble["kind"] == "under-voltage"
+    assert trouble["at"]
+
+
+@pytest.mark.integration
+def test_findings_power_trouble_from_a_calibration_fault(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble == {
+        "at": FAULT["at"],
+        "step": "write",
+        "level": 12,
+        "kind": "under-voltage",
+    }
+
+
+@pytest.mark.integration
+def test_a_limit_step_fault_is_not_power_trouble(test_client: TestClient, kiosk):
+    run = _start(test_client, "limit").json()
+    _report(test_client, run["id"], "done", limit=26, fault={**FAULT, "step": "limit"})
+    assert _findings(test_client)["powerTrouble"] is None
+
+
+@pytest.mark.integration
+def test_a_clean_later_run_clears_power_trouble(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    assert _findings(test_client)["powerTrouble"] is not None
+
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "running", preflight={"status": "clean", "faults": []})
+    _report(test_client, run["id"], "done", info={"model": "X"})
+    assert _findings(test_client)["powerTrouble"] is not None  # step 2 not passed yet
+    _step(test_client, "write")
+    _report(test_client, run["id"], "done", level=19)
+    assert _findings(test_client)["powerTrouble"] is None
+
+
+@pytest.mark.integration
+def test_a_run_with_a_dirty_preflight_does_not_clear_power_trouble(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    run = _start(test_client, "write").json()
+    _report(
+        test_client,
+        run["id"],
+        "done",
+        preflight={"status": "fault", "faults": ["Under-voltage detected!"]},
+    )
+    assert _findings(test_client)["powerTrouble"] is not None
+
+
+@pytest.mark.integration
+def test_save_limit_refuses_a_limit_at_or_below_the_floor(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    idle = {**FAULT, "step": "detect", "level": None, "lastGood": None}
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=idle)
+    refused = test_client.post(f"{BASE}/save-limit")
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "no_limit"
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble["step"] == "detect" and trouble["level"] is None
+    assert (
+        "brightnessLimit"
+        not in test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
+    )
+
+
+@pytest.mark.integration
+def test_save_limit_refuses_a_fault_limit_of_zero_or_the_floor(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    low = {**FAULT, "level": 7, "lastGood": 9}  # 7 - 2 = 5, the floor
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=low)
+    assert test_client.post(f"{BASE}/save-limit").status_code == 409

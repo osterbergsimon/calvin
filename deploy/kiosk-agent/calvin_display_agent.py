@@ -275,6 +275,11 @@ DDC_BUS_STATE = "ddc-bus.json"
 DISPLAY_CHECK_STATE = "display-check.json"
 DISPLAY_CHECK_STEPS = ("detect", "write", "conversion", "limit")
 DISPLAY_CHECK_POLL_SECONDS = 1.5
+# Calibration v2 (calvin-c805): steps 1-3 never brighten the screen.
+CHECK_FLOOR = 5  # where an unknown start is dimmed to
+PREFLIGHT_SECONDS = 10.0  # the power watch before the first write
+PREFLIGHT_POLL_SECONDS = 1.0
+CALIBRATION_STEPS = ("detect", "write", "conversion")
 DISPLAY_CHECK_TIMEOUT_SECONDS = 600
 DISPLAY_CHECK_REPORT_PATH = "/api/kiosks/{kiosk_id}/display-check"
 RAMP_FAULT_RE = re.compile(
@@ -731,8 +736,13 @@ def ramp_brightness(
     step_seconds=DEFAULT_BRIGHTNESS_STEP_SECONDS,
     cancel=None,
     log_fn=None,
+    stop_on_fault=False,
 ):
     """Ramp DDC brightness one step at a time; returns what happened.
+
+    `stop_on_fault` (display-check calibration): any fault, in either direction,
+    stops the ramp where it is and is reported (`fault_level`, `last_good`);
+    the caller decides how to back off.
 
     On a fault while ramping up: stop, step back down two steps, record the
     highest level that was fine (the limit) and the level reached this wake
@@ -750,7 +760,10 @@ def ramp_brightness(
         "cancelled": False,
         "steps": 0,
         "write_failed": False,
+        "fault_level": None,
+        "last_good": None,
     }
+    last_good = level  # the last level polled with no fault
     direction = 1 if target > level else -1 if target < level else 0
     if direction == 0:
         return outcome
@@ -769,7 +782,11 @@ def ramp_brightness(
             if faults:
                 detail = "; ".join(faults)
                 outcome["fault"] = detail
+                outcome["fault_level"] = level
+                outcome["last_good"] = last_good
                 log_fn(f"brightness: fault at {level}: {detail}")
+                if stop_on_fault:
+                    break
                 if direction > 0:
                     outcome["limit"] = max(0, level - step)
                     level = _two_steps_back(level, step, write)
@@ -785,6 +802,7 @@ def ramp_brightness(
                 if level == target or level == before:
                     break
                 continue
+            last_good = level
         if level == target:
             break
         nxt = level + direction * step
@@ -1161,6 +1179,7 @@ def display_check_job(cfg):
         "action": str(raw.get("action") or "start").strip().lower(),
         "value": _as_int(raw.get("value")),
         "brightness": _as_int(raw.get("brightness")),
+        "ceiling": _as_int(raw.get("ceiling")),
     }
     return job
 
@@ -1229,6 +1248,16 @@ def _clear_state(path):
         pass
 
 
+def _fault_kind(lines):
+    """under-voltage, over-current or touch controller reset, from kernel lines."""
+    text = " ".join(str(line) for line in lines).lower()
+    if "over-current" in text or "overcurrent" in text:
+        return "over-current"
+    if "reset" in text and "voltage" not in text:
+        return "touch controller reset"
+    return "under-voltage"
+
+
 def _safe_target(settings, limit=None):
     target = brightness_target(settings)
     if limit is not None:
@@ -1278,12 +1307,23 @@ class DisplayCheckRunner:
         if controller is not None:
             level = controller.get_level()
             self.level = 0 if level is None else level
+            # None = the agent never set a level since it started.
+            self.last_set = level
         else:
             self.level = 0
+            self.last_set = None
         if controller is not None:
             arm = getattr(controller.fault, "arm", None)
             if arm is not None:
                 arm()
+        # Calibration v2: what the report carries (see spec section 10.2.1).
+        self.start = None  # {"level", "known", "source"}
+        self.preflight = None
+        self.fault = None  # the incident
+        self.reason = None
+        self.current_step = job.get("step")
+        self.live_settings = self.settings  # refreshed from every config poll
+        self._placeholder = None
         self.limit = None
         self.settled = False
         self._touched = False
@@ -1302,10 +1342,11 @@ class DisplayCheckRunner:
             self._path(),
             {
                 "id": self.job["id"],
-                "step": self.job.get("step"),
+                "step": self.current_step,
                 "status": "running",
                 "level": self.level,
                 "limit": self.limit,
+                "start": self.start,
                 "startedAt": self.started_at,
                 "log": self.log_entries,
             },
@@ -1345,6 +1386,7 @@ class DisplayCheckRunner:
             cfg = self.poll()
         except Exception:
             return False
+        self.live_settings = brightness_settings(cfg)
         job = display_check_job(cfg)
         if job is not None and job["id"] == self.job["id"]:
             if job["action"] == "stop":
@@ -1359,7 +1401,7 @@ class DisplayCheckRunner:
             return True
         return False
 
-    def _ramp(self, target, *, cancel_missing=True):
+    def _ramp(self, target, *, cancel_missing=True, stop_on_fault=False):
         if cancel_missing is True:
             cancel = self._cancel
         elif cancel_missing is False:
@@ -1389,7 +1431,173 @@ class DisplayCheckRunner:
                 step_seconds=self.settings["step_seconds"],
                 cancel=cancel,
                 log_fn=log,
+                stop_on_fault=stop_on_fault,
             )
+
+    # -- calibration v2 -----------------------------------------------------
+    def _polled_faults(self):
+        if self.controller is None:
+            return []
+        return _poll_faults(self.controller.fault)
+
+    def _watch_power(self):
+        """The 10 s power watch before the first write; False on trouble or stop."""
+        if self.controller is None:
+            self.preflight = {"status": "clean", "faults": []}
+            return True
+        arm = getattr(self.controller.fault, "arm", None)
+        if arm is not None:
+            arm()
+        end = self.clock() + PREFLIGHT_SECONDS
+        faults = []
+        while True:
+            faults = self._polled_faults()
+            if faults or self.clock() >= end:
+                break
+            if self._cancel():
+                return False
+            self.sleep(PREFLIGHT_POLL_SECONDS)
+        if faults:
+            self.preflight = {"status": "fault", "faults": faults}
+            self.reason = "power_at_idle"
+            self._entry(f"power trouble at idle before any change: {'; '.join(faults)}")
+            self._stop_reason = "error"
+            return False
+        self.preflight = {"status": "clean", "faults": []}
+        self._entry("no power trouble in 10 s; starting")
+        return True
+
+    def _find_start(self):
+        """The level the screen is at, read once per run (the first time).
+
+        The read-back is trusted only when it follows a write: it must equal
+        the last level the agent itself set. Anything else (a constant 0, a
+        constant 100, no write yet) is a placeholder, and the start is the last
+        level the agent set, or unknown.
+        """
+        if self.start is not None:
+            return self._placeholder
+        try:
+            read = self.ddc.read_brightness()
+        except Exception:
+            read = None
+        follows_write = read is not None and self.last_set is not None and read == self.last_set
+        self._placeholder = not follows_write
+        if follows_write:
+            self.start = {"level": read, "known": True, "source": "read"}
+            self.level = read
+        elif self.last_set is not None:
+            self.start = {"level": self.last_set, "known": True, "source": "last_set"}
+            self.level = self.last_set
+        else:
+            self.start = {"level": None, "known": False, "source": None}
+        return self._placeholder
+
+    def _start_level(self):
+        return None if self.start is None else self.start["level"]
+
+    def _dim_to_floor(self):
+        """An unknown start: one downward write to the floor, then use it as the start."""
+        self._entry(f"the brightness is unknown; dimming to {CHECK_FLOOR} first")
+        if not self._write_level(CHECK_FLOOR):
+            return False
+        self.start = dict(self.start, level=CHECK_FLOOR)
+        return True
+
+    def _third_reading(self, value):
+        """The one write above the start: limit - 2 * step, after two readings."""
+        live = self.live_settings
+        limit = live.get("limit")
+        if limit is None or self.fault is not None:
+            return False
+        return value == max(0, limit - 2 * live["step"]) and len(live["conversion"]) >= 2
+
+    def _cap(self, job):
+        """The highest level this conversion job may write.
+
+        The lower of the run's start level and the backend's ceiling for this
+        job. The one exception is the third reading, which the agent checks
+        itself against the limit and the saved readings.
+        """
+        cap = self._start_level()
+        if cap is None:
+            cap = CHECK_FLOOR
+        ceiling = job.get("ceiling")
+        if ceiling is not None:
+            cap = min(cap, ceiling)
+            value = job.get("value")
+            if (
+                value is not None
+                and value > cap
+                and value <= ceiling
+                and self._third_reading(value)
+            ):
+                cap = value
+        return cap
+
+    def _calibration_ramp(self, target, *, cancel_missing=True):
+        """A calibration ramp: any fault stops it where it is."""
+        return self._ramp(target, cancel_missing=cancel_missing, stop_on_fault=True)
+
+    def _also_at(self, level):
+        if self.fault is not None and level not in self.fault["alsoAt"]:
+            self.fault["alsoAt"].append(level)
+
+    def _dim_recording(self, target):
+        """Ramp down to `target`, normal pace, recording later faults in `alsoAt`."""
+        lock = self.controller.lock if self.controller is not None else threading.Lock()
+        step = self.settings["step"]
+        with lock:
+            while self.level > target:
+                if not self._write_level(max(target, self.level - step)):
+                    return False
+                self.sleep(self.settings["step_seconds"])
+                if self._polled_faults():
+                    self._also_at(self.level)
+        return True
+
+    def _settle(self):
+        """Hold until the supply has been clear for 5 s (capped at 30 s)."""
+        if self.controller is None:
+            return True
+        begin = self.clock()
+        quiet_since = None
+        while True:
+            now = self.clock()
+            if self._polled_faults():
+                self._also_at(self.level)
+                quiet_since = None
+            else:
+                if quiet_since is None:
+                    quiet_since = now
+                if now - quiet_since >= SETTLE_QUIET_SECONDS:
+                    return True
+            if now - begin >= SETTLE_TIMEOUT_SECONDS:
+                self._entry(f"the power did not settle in {int(SETTLE_TIMEOUT_SECONDS)} s")
+                return False
+            self.sleep(SETTLE_POLL_SECONDS)
+
+    def _fault_incident(self, step, level, last_good, lines):
+        self.fault = {
+            "step": step,
+            "level": level,
+            "kind": _fault_kind(lines),
+            "at": datetime.now(timezone.utc).isoformat(),
+            "lastGood": last_good,
+            "alsoAt": [],
+        }
+        self.reason = "power_trouble"
+        where = "an unknown level" if level is None else str(level)
+        self._entry(f"power trouble at {where}: {'; '.join(lines)}")
+
+    def _calibration_fault(self, step, level, last_good, lines):
+        """A fault in steps 1-3 ends the run: floor at the normal pace, settle, no retry."""
+        self._fault_incident(step, level, last_good, lines)
+        self.report(self._payload("running"))
+        self._entry(f"dimming to {CHECK_FLOOR} and waiting for the power to settle")
+        self._dim_recording(CHECK_FLOOR)
+        self._settle()
+        self._stop_reason = "error"
 
     def _execute(self, job):
         step = job["step"]
@@ -1409,17 +1617,34 @@ class DisplayCheckRunner:
                 if part
             )
             self._entry(f"found {detail or 'a DDC display'}")
-            self.result["info"] = info
+            placeholder = self._find_start()
+            self.result["info"] = dict(info, placeholderReads=placeholder)
             self.result["detail"] = detail or "found a DDC/CI display"
             self.report(self._payload("done"))
             return
         if step == "write":
-            base = self.level or brightness_target(self.settings)
+            if self.start is None:
+                self._find_start()
+            if self._start_level() is None and not self._dim_to_floor():
+                self._entry("brightness writes did not take effect")
+                self._stop_reason = "error"
+                return
+            base = self._start_level()
             low = max(0, base - 10)
             self._entry(f"stepping {base} down to {low} and back")
-            down = self._ramp(low)
+            down = self._calibration_ramp(low)
+            if down.get("fault"):
+                self._calibration_fault(
+                    "write", down["fault_level"], down["last_good"], [down["fault"]]
+                )
+                return
             if not down.get("write_failed") and not down.get("cancelled"):
-                self._ramp(base)
+                up = self._calibration_ramp(base)
+                if up.get("fault"):
+                    self._calibration_fault(
+                        "write", up["fault_level"], up["last_good"], [up["fault"]]
+                    )
+                    return
             if down.get("write_failed"):
                 self._entry("brightness writes did not take effect")
                 self._stop_reason = "error"
@@ -1427,13 +1652,29 @@ class DisplayCheckRunner:
             self.report(self._payload("done", level=self.level))
             return
         if step == "conversion":
+            if self.start is None:
+                self._find_start()
             value = job.get("value")
             if value is None:
-                value = self.level or brightness_target(self.settings)
+                value = self.level
             value = max(0, min(BRIGHTNESS_MAX, int(value)))
-            outcome = self._ramp(
-                value, cancel_missing=False
-            )
+            cap = self._cap(job)
+            if self.fault is not None and self.fault["lastGood"] is not None:
+                cap = min(cap, self.fault["lastGood"])
+            if value > cap:
+                self.reason = "above_ceiling"
+                self._entry(f"refused: {value} is above this check's ceiling {cap}")
+                self._stop_reason = "error"
+                return
+            outcome = self._calibration_ramp(value, cancel_missing=False)
+            if outcome.get("fault"):
+                self._calibration_fault(
+                    "conversion",
+                    outcome["fault_level"],
+                    outcome["last_good"],
+                    [outcome["fault"]],
+                )
+                return
             if outcome.get("write_failed"):
                 self._entry("brightness writes did not take effect")
                 self._stop_reason = "error"
@@ -1455,10 +1696,18 @@ class DisplayCheckRunner:
             outcome = self._ramp(BRIGHTNESS_MAX)
             if outcome.get("fault"):
                 self.limit = outcome.get("limit")
+                self._fault_incident(
+                    "limit",
+                    outcome["fault_level"],
+                    outcome["last_good"],
+                    [outcome["fault"]],
+                )
+                self.reason = None  # finding the limit is what this step is for
                 self._entry(
-                    f"fault at {outcome['level']}: {outcome['fault']}; "
+                    f"fault at {outcome['fault_level']}: {outcome['fault']}; "
                     f"limit found: {self.limit}"
                 )
+                self._settle()
                 self.report(
                     self._payload(
                         "done",
@@ -1486,7 +1735,7 @@ class DisplayCheckRunner:
     def _payload(self, status, **extra):
         payload = {
             "id": self.job["id"],
-            "step": self.job.get("step"),
+            "step": self.current_step,
             "status": status,
             "level": self.level,
             "limit": self.limit,
@@ -1494,13 +1743,40 @@ class DisplayCheckRunner:
             "startedAt": self.started_at,
             "finishedAt": datetime.now(timezone.utc).isoformat(),
         }
+        for key, value in (
+            ("reason", self.reason),
+            ("preflight", self.preflight),
+            ("start", self.start),
+            ("fault", self.fault),
+        ):
+            if value is not None:
+                payload[key] = value
         payload.update(self.result)
         payload.update(extra)
         return payload
 
+    def _finish_target(self):
+        """Where the screen goes on the way out; None = stay where it is.
+
+        Never above the start level (calibration never brightens). After power
+        trouble in steps 1-3 the screen stays at the floor it was dimmed to.
+        """
+        if self.fault is not None and self.fault["step"] in CALIBRATION_STEPS:
+            return None
+        start = self._start_level()
+        target = CHECK_FLOOR if start is None else start
+        if self.limit is not None:
+            target = min(target, max(0, int(self.limit) - 2 * self.settings["step"]))
+        return target
+
     def _finish(self, status):
-        target = _safe_target(self.settings, self.limit)
-        if self._touched and self.panel_on() and self.level != target:
+        target = self._finish_target()
+        if (
+            target is not None
+            and self._touched
+            and self.panel_on()
+            and self.level != target
+        ):
             self._ramp(
                 target, cancel_missing=None
             )
@@ -1524,6 +1800,12 @@ class DisplayCheckRunner:
         try:
             self._save()
             self.report(self._payload("running"))
+            if not self._watch_power():
+                status = self._stop_reason or "stopped"
+                self._stop_reason = None
+                return self._finish(status)
+            self._find_start()
+            self.report(self._payload("running"))
             current = self.job
             while True:
                 if self.clock() >= self._deadline:
@@ -1533,6 +1815,8 @@ class DisplayCheckRunner:
                 signature = (current["id"], current["step"], current.get("value"))
                 if signature not in self._seen:
                     self._seen.add(signature)
+                    self.current_step = current["step"]
+                    self._save()
                     try:
                         self._execute(current)
                     except Exception as e:  # a check must never take the agent down
@@ -1548,11 +1832,21 @@ class DisplayCheckRunner:
                         return self._finish("timeout")
                     if self.poll is None:
                         return self._finish("done")
+                    if current["step"] in CALIBRATION_STEPS:
+                        lines = self._polled_faults()
+                        if lines:
+                            # With an unknown start the level is a guess (0):
+                            # report none, so no limit is ever derived from it.
+                            at = self.level if self._start_level() is not None else None
+                            self._calibration_fault(current["step"], at, at, lines)
+                            self._stop_reason = None
+                            return self._finish("error")
                     try:
                         cfg = self.poll()
                     except Exception:
                         self.sleep(DISPLAY_CHECK_POLL_SECONDS)
                         continue
+                    self.live_settings = brightness_settings(cfg)
                     nxt = display_check_job(cfg)
                     if nxt is None or nxt["id"] != self.job["id"]:
                         return self._finish("done")
@@ -1618,6 +1912,13 @@ def recover_display_check(
     settings = brightness_settings(cfg)
     last_level = _as_int(state.get("level"))
     limit = _interrupted_limit(state, settings)
+    # A run that recorded its start never goes above it on the way out; with
+    # an unknown start the floor is the cap. Older state files have no start.
+    start_state = state.get("start")
+    start_cap = None
+    if isinstance(start_state, dict):
+        start_level = _as_int(start_state.get("level"))
+        start_cap = CHECK_FLOOR if start_level is None else start_level
     payload = {
         "id": state.get("id"),
         "step": state.get("step"),
@@ -1645,6 +1946,8 @@ def recover_display_check(
                 controller.set_level(0 if ddc.set_brightness(0) else None)
     elif last_level is not None:
         target = _safe_target(settings, limit)
+        if start_cap is not None:
+            target = min(target, start_cap)
         lock = controller.lock if controller is not None else threading.Lock()
         with lock:
             start = last_level

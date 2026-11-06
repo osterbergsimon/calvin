@@ -203,7 +203,13 @@ stored (the latest; a new start replaces an ended one). **Run record** (what the
   "status": "requested|running|done|stopped|timeout|error|interrupted|asleep",
   "active": true,
   "level": 19, "limit": 26, "log": [{"at": "ISO-8601", "level": 19, "note": "text"}],
-  "detail": "text", "info": {"bus": 2, "model": "..."},
+  "detail": "text", "info": {"bus": 2, "model": "...", "placeholderReads": false},
+  "reason": "power_at_idle|power_trouble|above_ceiling|null",
+  "preflight": {"status": "clean|fault", "faults": ["text"]},
+  "start": {"level": 19, "known": true, "source": "read|last_set|null"},
+  "ceiling": 19, "menuAtStart": 28,
+  "fault": {"step": "write", "level": 12, "kind": "under-voltage", "at": "ISO-8601",
+            "lastGood": 14, "alsoAt": [8]},
   "steps": {
     "detect": {"status": "done|error", "value": null, "level": 19, "limit": null,
                "detail": "text", "info": {"model": "..."}, "finishedAt": "ISO-8601"}
@@ -257,6 +263,67 @@ The job reaches the agent as `displayCheck` (and `display_check`) on `GET /kiosk
 PR #320 (`id`, `step`, `action`, `value`, `brightness`), present only while the run is `active`. The panel itself can
 call the public endpoints but not the admin ones without signing in.
 
+#### 10.2.1 Calibration v2 (calvin-c805, calvin-u8yn)
+
+Design: [brightness-ramp-ui.md §3](../../design/2026-11-04-brightness-ramp-ui.md). Steps 1-3 (`detect`, `write`,
+`conversion`) are **calibration** and never raise the brightness above the run's start level; `limit` (step 4) is the
+only step that raises.
+
+**Agent report, new optional fields** (all ignored when absent; sent again on every later report of the run):
+
+| Field | Shape | Meaning |
+|---|---|---|
+| `reason` | string | Why a run ended with `status: "error"`: `power_at_idle` (preflight found trouble, nothing was written), `power_trouble` (a fault in steps 1-3), `above_ceiling` (the agent refused a `conversion` value above the ceiling). |
+| `preflight` | `{status: "clean"\|"fault", faults: [text]}` | The 10 s power watch before the first write. `fault` ends the run (`error`, `power_at_idle`) with no write made. |
+| `start` | `{level: int\|null, known: bool, source: "read"\|"last_set"\|null}` | The brightness the screen was at when the run started. `read` = the DDC read-back is real; `last_set` = the last level the agent itself set; `known: false` = neither (a read-back counts only when it equals the last level the agent set, so a constant non-zero read is a placeholder too; the start is read once per run), and `level` stays `null` until the agent has dimmed the screen to the floor (`5`) at the start of step 2, then `level` is `5`. |
+| `fault` | `{step, level, kind, at, lastGood, alsoAt: [int]}` | One incident. `level` = where the fault showed; `lastGood` = the last level written before it with no fault (above `level` while dimming); `kind` = `under-voltage`\|`over-current`\|`touch controller reset`; `alsoAt` = levels of further faults seen while settling (they never start a new step-down). Sent for a fault in any step. |
+| `info.placeholderReads` | bool | On the `detect` report: the DDC read-back is a placeholder (always 0 or `null`). |
+
+**Agent behaviour** (each rule has a test in `deploy/kiosk-agent/test_display_agent.py`):
+
+- Preflight: before the first write the agent watches its fault monitor for 10 s without writing. Trouble ends the run
+  before any write.
+- Steps 1-3 never write above `start.level` (unknown start: one downward write to the floor `5` first).
+  `write` dims `S -> max(0, S-10) -> S`. `conversion` refuses (does not clamp) a value above the job's `ceiling`.
+- A fault in steps 1-3 ends the run: ramp to the floor at the normal pace, settle (5 s of clean power, capped at 30 s),
+  report `error` / `power_trouble` with `fault`. No retry. Faults seen while settling join `fault.alsoAt`.
+- Every ramp step is at most the configured step. The single downward write to `0` (and to the floor from an unknown
+  start) is the only larger write.
+- Ending a run returns to `start.level` when it is known, never above the start on the way out of steps 1-3; with an
+  unknown start the screen stays at the floor.
+
+**Job** (`displayCheck` on the config poll) gains `ceiling`: for a `conversion` job, the most that job's `value` may
+reach (the ceiling below, or the third reading's value when it qualifies); otherwise the ceiling or `null`. It is read
+from every job, not only the first. The agent applies the lower of it and its own start level, and accepts a value above
+the start only for the third reading, which it checks itself against the limit and the saved readings.
+
+**The ceiling.** The backend computes it on every read and puts it in the run record (`null` until the run has
+a start level):
+
+```
+base       = convert(menuAtStart)   when menuAtStart is set and brightnessConversion has >= 2 points,
+             else start.level (the floor 5 when the start is unknown)
+faultLimit = min(fault.lastGood, fault.level) - step          (calibration faults only; none otherwise)
+faultCap   = faultLimit - 2 * step
+ceiling    = min(base, limit - 2 * step, faultCap)             (terms that do not exist are left out)
+```
+
+`limit` is the lower of the saved `brightnessLimit` and the limit this run's `limit` step found. A `fault` from the
+`limit` step is not a calibration fault and adds no term. A known fault or limit always wins over `menuAtStart`, which
+can only raise the base. Values are clamped to >= 0.
+
+**New and changed endpoints**
+
+- `POST /kiosks/{id}/display-check/menu-at-start` (admin), body `{"menu": 0-100}` (a number; extra fields 422). Stores
+  `menuAtStart` on the active run and returns the run record. 404 when there is no active run (or an unknown kiosk).
+- `step` with a `conversion` `value` above the active run's ceiling is refused with **422 `value_above_ceiling`** and
+  `max`. Everything is capped at the `ceiling`. The only value allowed above it is the third reading: `value == limit - 2 * step`
+  with a limit known and at least two saved readings (then the maximum is `min(limit - 2 * step, faultCap)`). `value_above_limit` is unchanged. `start` begins a new run, which has no ceiling yet, so it is not checked; other
+  steps carry no ceiling check. The ceiling is also in the run record's `ceiling` on every read.
+- `save-limit` with no `limit`-step result saves `faultLimit` from the latest run's calibration `fault` (never
+  `lastGood` itself) and returns the same body as before. A limit at or below the floor (5), or from a fault with no level (an idle fault with an unknown start), is never saved: 409 `no_limit`. A `limit`-step result still wins; with neither, 409
+  `no_limit`.
+
 ### 10.3 Findings (kept across runs)
 
 Only the latest run record is stored, so a later run would erase the detect and write verdicts of an earlier one.
@@ -266,8 +333,14 @@ on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not
 
 ```json
 { "checkedAt": "ISO-8601|null", "ddc": true, "writes": true, "model": "NOMAD TOUCH",
-  "connector": "card0-HDMI-A-1", "vcpVersion": "2.1", "limit": 26 }
+  "connector": "card0-HDMI-A-1", "vcpVersion": "2.1", "limit": 26,
+  "powerTrouble": {"at": "ISO-8601", "step": "write", "level": 12, "kind": "under-voltage"} }
 ```
+
+- `powerTrouble` is `null` or the latest incident. A preflight fault sets it with `step: "preflight"`, `level: null`
+  and `kind` from the fault text; a calibration fault (steps 1-3) sets it from `fault`. A later run clears it when its
+  preflight is clean and its `write` step reports `done` with no fault in that run (a later fault sets it again). A fault in the
+  `limit` step does not set it.
 
 - Each step's `done` or `error` report updates these while the run goes on. `detect` done: `ddc` true and `model`, `connector`, `vcpVersion` from the report's `info`; `detect` error: `ddc` false.
 - `write` done: `writes` true; `write` error: `writes` false.
@@ -278,9 +351,7 @@ on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not
   `{"writes": true|false}` ("Yes, it changed" / "No, it looked the same"), sets `findings.writes` and `checkedAt`, and
   returns the findings object. It overrides the agent's own `write` verdict and leaves the other fields alone. 404
   for an unknown kiosk, 422 for a missing or non-boolean `writes`.
-- **No `placeholderReads` field.** The merged agent's `detect` report does not say whether its reads are
-  placeholders, so the backend does not invent it. The UI can show the "screen always reports 0" line only if the
-  agent reports it in a later version.
+- **`placeholderReads`** is passed through in the `detect` result's `info` (calibration v2); older agents omit it.
 
 ### 10.4 Rules added in review
 
