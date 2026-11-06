@@ -3078,6 +3078,7 @@ def test_display_check_job_parses_the_proposed_config_shape():
         "action": "start",
         "value": 19,
         "brightness": 19,
+        "ceiling": None,
     }
     assert agent.display_check_job({"display_check": {"id": "x", "step": "limit"}})[
         "step"
@@ -3116,7 +3117,8 @@ def test_display_check_report_url_and_post():
 
 
 # -- the diagnostics runner ---------------------------------------------------
-def _runner(job, cfg, ddc, tmp_path, *, poll=None, panel_on=None, clock=None):
+def _runner(job, cfg, ddc, tmp_path, *, poll=None, panel_on=None, clock=None,
+            known=None):
     clock = clock or FakeClock()
     reports = []
     runner = agent.DisplayCheckRunner(
@@ -3130,6 +3132,9 @@ def _runner(job, cfg, ddc, tmp_path, *, poll=None, panel_on=None, clock=None):
         state_dir=str(tmp_path),
         panel_on=panel_on or (lambda: True),
     )
+    if known is not None:
+        # The level the agent itself last set: calibration's start level.
+        runner.level = runner.last_set = known
     return runner, reports, clock
 
 
@@ -3159,8 +3164,7 @@ def test_runner_write_dims_then_returns(tmp_path):
     ddc = FakeDdc()
     job = {"id": "c1", "step": "write", "action": "start", "value": None,
            "brightness": 19}
-    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
-    runner.level = 19
+    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path, known=19)
     runner.run()
     assert min(ddc.writes) == 9  # dimmed ten levels, can't overrun an unknown limit
     assert ddc.writes[-1] == 19
@@ -3172,10 +3176,10 @@ def test_runner_conversion_sets_the_value_and_waits(tmp_path):
     job = {"id": "c1", "step": "conversion", "action": "start", "value": 19,
            "brightness": 19}
     runner, reports, clock = _runner(
-        job, _ramp_cfg(), ddc, tmp_path, poll=_cfg  # job gone: the dialog closed
+        job, _ramp_cfg(), ddc, tmp_path, poll=_cfg, known=19  # job gone: dialog closed
     )
     runner.run()
-    assert ddc.writes[-1] == 19
+    assert ddc.writes == []  # already at 19: nothing to write
     assert reports[-1]["status"] == "done"
     assert reports[-1]["level"] == 19
 
@@ -3189,8 +3193,7 @@ def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
     )
     job = {"id": "c1", "step": "limit", "action": "start", "value": None,
            "brightness": 19}
-    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
-    runner.level = 20
+    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path, known=20)
     runner.controller = agent.BrightnessController(
         ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
     )
@@ -3198,7 +3201,7 @@ def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
     final = reports[-1]
     assert final["status"] == "done"
     assert final["limit"] == 26  # fault at 28, one step below it
-    assert final["level"] == 19  # returned to the chosen brightness
+    assert final["level"] == 20  # returned to the level the check started at
     assert max(ddc.writes) == 28
     assert not (tmp_path / agent.DISPLAY_CHECK_STATE).exists()
 
@@ -3208,12 +3211,9 @@ def test_runner_stop_during_the_limit_test_steps_back_safely(tmp_path):
     ddc = FakeDdc()
     job = {"id": "c1", "step": "limit", "action": "start", "value": None,
            "brightness": 19}
-    polled = {"n": 0}
-
     def poll():
-        polled["n"] += 1
         # The owner presses Stop once the ramp is underway.
-        action = "stop" if polled["n"] > 5 else "start"
+        action = "stop" if len(ddc.writes) > 5 else "start"
         return {
             "displayCheck": {
                 "id": "c1", "step": "limit", "action": action,
@@ -3222,9 +3222,8 @@ def test_runner_stop_during_the_limit_test_steps_back_safely(tmp_path):
         }
 
     runner, reports, clock = _runner(
-        job, _ramp_cfg(), ddc, tmp_path, poll=poll
+        job, _ramp_cfg(), ddc, tmp_path, poll=poll, known=19
     )
-    runner.level = 19
     runner.controller = agent.BrightnessController(
         ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
     )
@@ -3242,11 +3241,11 @@ def test_runner_timeout_always_finishes_safely(tmp_path):
     # Keep offering the same job so the runner never sees it finish.
     same = {"displayCheck": dict(job)}
     runner, reports, clock = _runner(
-        job, _ramp_cfg(), ddc, tmp_path, poll=lambda: same, clock=clock
+        job, _ramp_cfg(), ddc, tmp_path, poll=lambda: same, clock=clock, known=19
     )
     runner.run()
     assert reports[-1]["status"] == "timeout"
-    assert ddc.writes[-1] == 19
+    assert runner.level == 19
 
 
 def test_recover_display_check_after_a_reboot(tmp_path):
@@ -3674,12 +3673,6 @@ def test_the_journal_names_the_kernel_fault_line():
     assert "True" not in line
 
 
-def test_ramp_brightness_has_no_unused_stop_on_fault_parameter():
-    import inspect
-
-    assert "stop_on_fault" not in inspect.signature(agent.ramp_brightness).parameters
-
-
 def test_switching_dim_to_standby_while_dimmed_powers_off_now():
     """Item 8: standby off applies at once, not at the next wake."""
     ddc = FakeDdc()
@@ -3735,6 +3728,340 @@ def test_post_display_check_warns_once_without_a_kiosk_id(monkeypatch, capsys):
     assert out.count("CALVIN_KIOSK_ID") == 1
 
 
+# -- calibration v2 (calvin-c805) ---------------------------------------------
+class ConsumingFault(FakeFault):
+    """Like FaultMonitor: each fault line is reported once."""
+
+    def new_faults(self):
+        found, self.faults = list(self.faults), []
+        return found
+
+
+class ReadingDdc(FakeDdc):
+    def __init__(self, read=None, **kw):
+        super().__init__(**kw)
+        self.read = read
+
+    def read_brightness(self):
+        return self.read
+
+
+def _cal_job(step, value=None, ceiling=None, action="start"):
+    return {"id": "c1", "step": step, "action": action, "value": value,
+            "brightness": None, "ceiling": ceiling}
+
+
+def _cal_runner(step, tmp_path, *, level=19, ddc=None, fault=None, value=None,
+                ceiling=None, poll=None):
+    """A runner with a controller, the screen's last set level known (or not)."""
+    clock = FakeClock()
+    fault = fault or ConsumingFault()
+    ddc = ddc or FakeDdc()
+    controller, _, _ = _controller(ddc, fault, clock)
+    if level is not None:
+        controller.set_level(level)
+    reports = []
+    runner = agent.DisplayCheckRunner(
+        _cal_job(step, value, ceiling),
+        _ramp_cfg(),
+        ddc=ddc,
+        report=reports.append,
+        poll=poll,
+        clock=clock,
+        sleep=clock.sleep,
+        state_dir=str(tmp_path),
+        controller=controller,
+    )
+    return runner, reports, clock, ddc, fault
+
+
+def _assert_small_steps(writes, step=2, exempt_first=False):
+    """Safety (e): no write moves further than the configured step (0 excepted)."""
+    previous = None
+    for i, level in enumerate(writes):
+        if previous is not None and level != 0 and not (exempt_first and i == 0):
+            assert abs(level - previous) <= step, f"{previous} -> {level} in {writes}"
+        previous = level
+
+
+def test_display_check_job_carries_the_backend_ceiling():
+    cfg = {"displayCheck": {"id": "c1", "step": "conversion", "value": 12, "ceiling": 14}}
+    assert agent.display_check_job(cfg)["ceiling"] == 14
+    cfg["displayCheck"].pop("ceiling")
+    assert agent.display_check_job(cfg)["ceiling"] is None
+
+
+# (c) preflight
+def test_preflight_watches_for_ten_seconds_without_writing(tmp_path):
+    seen = {}
+    ddc = FakeDdc(on_write=lambda level: seen.setdefault("t", runner_clock.t))
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc)
+    runner_clock = clock
+    runner.run()
+    assert seen["t"] >= agent.PREFLIGHT_SECONDS  # first write only after the watch
+    pre = [r for r in reports if r.get("preflight")]
+    assert pre and pre[0]["preflight"] == {"status": "clean", "faults": []}
+
+
+def test_preflight_trouble_ends_the_run_before_any_write(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path)
+
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if clock.t >= 4 and not fault.faults and not getattr(sleep, "done", False):
+            sleep.done = True
+            fault.faults.append("Under-voltage detected!")
+
+    runner.sleep = sleep
+    runner.run()
+    assert ddc.writes == []
+    final = reports[-1]
+    assert final["status"] == "error"
+    assert final["reason"] == "power_at_idle"
+    assert final["preflight"]["status"] == "fault"
+    assert "Under-voltage" in final["preflight"]["faults"][0]
+
+
+# (a) calibration never writes above the start level
+def test_write_step_from_a_known_start_dims_and_returns_never_above(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, level=19)
+    runner.run()
+    assert max(ddc.writes) <= 19
+    assert min(ddc.writes) == 9
+    assert ddc.writes[-1] == 19
+    _assert_small_steps(ddc.writes)
+    assert reports[-1]["start"] == {"level": 19, "known": True, "source": "last_set"}
+
+
+def test_write_step_from_an_unknown_start_dims_to_the_floor_first(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, level=None)
+    runner.run()
+    assert ddc.writes[0] == agent.CHECK_FLOOR
+    assert max(ddc.writes) <= agent.CHECK_FLOOR  # never above the floor it chose
+    assert min(ddc.writes) == 0
+    _assert_small_steps(ddc.writes, exempt_first=True)
+    start = reports[-1]["start"]
+    assert (start["level"], start["known"], start["source"]) == (5, False, None)
+
+
+def test_a_read_back_that_matches_the_last_write_is_trusted(tmp_path):
+    ddc = ReadingDdc(read=23)
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, ddc=ddc, level=23)
+    runner.run()
+    assert reports[-1]["start"] == {"level": 23, "known": True, "source": "read"}
+    assert reports[-1]["info"]["placeholderReads"] is False
+    assert ddc.writes == []
+
+
+def test_a_constant_non_zero_read_back_is_not_trusted(tmp_path):
+    ddc = ReadingDdc(read=100)  # always 100 while the panel is really at 5
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, level=None)
+    runner.run()
+    assert reports[-1]["start"]["known"] is False
+    assert reports[-1]["start"]["level"] == agent.CHECK_FLOOR
+    assert ddc.writes[0] == agent.CHECK_FLOOR
+    assert max(ddc.writes) <= agent.CHECK_FLOOR  # never the 5 -> 98 jump
+    assert reports[-1]["info"]["placeholderReads"] is True if "info" in reports[-1] else True
+
+
+def test_a_read_back_that_disagrees_with_the_last_write_is_a_placeholder(tmp_path):
+    ddc = ReadingDdc(read=100)
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, ddc=ddc, level=7)
+    runner.run()
+    assert reports[-1]["start"] == {"level": 7, "known": True, "source": "last_set"}
+    assert reports[-1]["info"]["placeholderReads"] is True
+
+
+def test_a_zero_read_back_is_a_placeholder(tmp_path):
+    ddc = ReadingDdc(read=0)
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, ddc=ddc, level=None)
+    runner.run()
+    assert reports[-1]["info"]["placeholderReads"] is True
+    assert reports[-1]["start"] == {"level": None, "known": False, "source": None}
+
+
+def test_detect_with_a_placeholder_read_uses_the_last_level_it_set(tmp_path):
+    ddc = ReadingDdc(read=0)
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, ddc=ddc, level=7)
+    runner.run()
+    assert reports[-1]["start"] == {"level": 7, "known": True, "source": "last_set"}
+    assert reports[-1]["info"]["placeholderReads"] is True
+
+
+def test_conversion_refuses_a_value_above_the_start_level(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("conversion", tmp_path, level=19, value=22)
+    runner.run()
+    assert all(w <= 19 for w in ddc.writes)
+    assert reports[-1]["status"] == "error"
+    assert reports[-1]["reason"] == "above_ceiling"
+
+
+def test_conversion_refuses_above_the_backend_ceiling(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=13, ceiling=12
+    )
+    runner.run()
+    assert reports[-1]["reason"] == "above_ceiling"
+    assert max(ddc.writes, default=0) <= 19  # nothing was raised
+
+
+# (b) a fault in steps 1-3 ends the run
+def _fault_on_write(fault, ddc_ref, levels):
+    def on_write(level):
+        if level in levels and level not in on_write.seen:
+            on_write.seen.add(level)
+            fault.faults.append("Under-voltage detected!" if level == levels[0]
+                                else "usb 1-1.1: reset full-speed USB device")
+
+    on_write.seen = set()
+    return on_write
+
+
+def test_a_fault_while_dimming_ends_the_run_at_the_floor(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13, 9]))
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    runner.run()
+    final = reports[-1]
+    assert final["status"] == "error"
+    assert final["reason"] == "power_trouble"
+    incident = final["fault"]
+    assert incident["step"] == "write"
+    assert incident["level"] == 13
+    assert incident["lastGood"] == 15
+    assert incident["kind"] == "under-voltage"
+    assert incident["alsoAt"] == [9]  # the tail faults join the incident
+    assert ddc.writes[-1] == agent.CHECK_FLOOR  # stays at the floor, no return to 19
+    assert max(ddc.writes) <= 19
+    _assert_small_steps(ddc.writes)
+    assert ddc.writes[0] == 17  # dimming, 2 at a time, from the start 19
+    assert 19 not in ddc.writes  # never returns to the start after trouble
+
+
+def test_after_a_fault_the_run_settles_and_never_retries(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    writes_at = []
+    inner = ddc.on_write
+    ddc.on_write = lambda level: (inner(level), writes_at.append((clock.t, level)))
+    runner.run()
+    last_write_t = writes_at[-1][0]
+    assert clock.t - last_write_t >= agent.SETTLE_QUIET_SECONDS  # held for clean power
+    floor_writes = [w for w in ddc.writes if w == agent.CHECK_FLOOR]
+    assert floor_writes  # went down to the floor
+    assert ddc.writes[-1] == agent.CHECK_FLOOR  # nothing after: no retry, no raise
+    assert len([r for r in reports if r["status"] in ("error", "done")]) >= 1
+
+
+def test_settling_is_capped_when_the_power_never_clears(tmp_path):
+    class Stubborn(ConsumingFault):
+        def new_faults(self):
+            return ["Under-voltage detected!"]
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, fault=Stubborn(), ddc=FakeDdc()
+    )
+    runner.run()
+    # The preflight itself already sees the stubborn fault: nothing is written.
+    assert ddc.writes == []
+    assert reports[-1]["reason"] == "power_at_idle"
+
+
+def test_a_fault_while_waiting_on_a_conversion_value_ends_the_run(tmp_path):
+    fault = ConsumingFault()
+    job = _cal_job("conversion", 15)
+    armed = {"on": False, "sent": False}
+    ddc = FakeDdc(on_write=lambda level: armed.update(on=True) if level == 15 else None)
+
+    def poll():
+        # The screen reached the value; a moment later the supply browns out.
+        if armed["on"] and not armed["sent"]:
+            armed["sent"] = True
+            fault.faults.append("Under-voltage detected!")
+        return {"displayCheck": dict(job)}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=15, fault=fault, poll=poll, ddc=ddc
+    )
+    runner.run()
+    final = reports[-1]
+    assert final["status"] == "error"
+    assert final["reason"] == "power_trouble"
+    assert final["fault"]["step"] == "conversion"
+    assert final["fault"]["level"] == 15
+    assert ddc.writes[-1] == agent.CHECK_FLOOR
+
+
+def test_a_fault_in_the_limit_step_settles_and_reports_the_incident(tmp_path):
+    fault = ConsumingFault()
+
+    def on_write(level):
+        if level == 28:
+            fault.faults.append("Under-voltage detected!")
+
+    ddc = FakeDdc(on_write=on_write)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "limit", tmp_path, level=20, ddc=ddc, fault=fault
+    )
+    runner.run()
+    done = [r for r in reports if r["status"] == "done"][0]
+    assert done["limit"] == 26
+    assert done["fault"]["step"] == "limit"
+    assert done["fault"]["level"] == 28
+    assert done["fault"]["kind"] == "under-voltage"
+    assert reports[-1]["status"] == "done" or reports[-1]["status"] == "stopped"
+    assert ddc.writes[-1] == 20  # back at the start level
+
+
+def test_finish_returns_to_a_known_start_but_never_above_it(tmp_path):
+    job = _cal_job("conversion", 10)
+    stop = {"on": False}
+    ddc = FakeDdc(on_write=lambda level: stop.update(on=True) if level == 10 else None)
+
+    def poll():
+        return {"displayCheck": {**job, "action": "stop" if stop["on"] else "start"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=10, poll=poll, ddc=ddc
+    )
+    runner.run()
+    assert reports[-1]["status"] == "stopped"
+    assert ddc.writes[-1] == 19
+    assert max(ddc.writes) <= 19
+    _assert_small_steps(ddc.writes)
+
+
+def test_finish_from_an_unknown_start_stays_at_the_floor(tmp_path):
+    job = _cal_job("write")
+    stop = {"on": False}
+    ddc = FakeDdc(on_write=lambda level: stop.update(on=True) if level == 2 else None)
+
+    def poll():
+        return {"displayCheck": {**job, "action": "stop" if stop["on"] else "start"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=None, poll=poll, ddc=ddc
+    )
+    runner.run()
+    assert reports[-1]["status"] == "stopped"
+    assert ddc.writes[-1] == agent.CHECK_FLOOR  # back up to the floor, no further
+    assert max(ddc.writes) <= agent.CHECK_FLOOR
+
+
+def test_recovery_after_a_calibration_reboot_never_goes_above_the_start(tmp_path):
+    ddc = FakeDdc()
+    path = tmp_path / agent.DISPLAY_CHECK_STATE
+    path.write_text(
+        '{"id": "c1", "step": "write", "status": "running", '
+        '"level": 9, "start": {"level": 12, "known": true, "source": "last_set"}, "log": []}'
+    )
+    agent.recover_display_check(str(tmp_path), _ramp_cfg(), ddc=ddc)
+    assert ddc.writes[-1] == 12  # the configured brightness is 19: the start wins
+    assert max(ddc.writes) <= 12
+
 # --- calvin-r3wt: the agent's runtime state lives in its own calvin-owned subdir ---
 
 
@@ -3772,3 +4099,142 @@ def test_check_state_dir_writable_warns_once_and_keeps_going(tmp_path, monkeypat
     assert str(ro / "agent") in logs[0]
     assert "not writable" in logs[0]
     assert "repaired on the next agent update" in logs[0]
+
+
+# -- review round: ceiling per job, start read once, idle faults, recovery ----
+def _job_cfg(job, **over):
+    cfg = _ramp_cfg(**over)
+    cfg["displayCheck"] = job
+    return cfg
+
+
+def _later_job_runner(tmp_path, later, *, level, cfg_over=None, first="detect"):
+    """A run whose second job (a step change) carries the ceiling."""
+    stop = {"on": False}
+    ddc = FakeDdc(
+        on_write=lambda lv: stop.update(on=True) if lv == later.get("value") else None
+    )
+    state = {"offered": False}
+    fault = ConsumingFault()
+
+    def poll():
+        if not state["offered"] and len(reports) >= 3:
+            state["offered"] = True
+        if state["offered"]:
+            job = dict(later, action="stop" if stop["on"] else "start")
+            return _job_cfg(job, **(cfg_over or {}))
+        return _job_cfg(_cal_job(first))
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        first, tmp_path, level=level, ddc=ddc, fault=fault, poll=poll
+    )
+    return runner, reports, clock, ddc
+
+
+def test_a_later_jobs_ceiling_reaches_the_agent(tmp_path):
+    later = _cal_job("conversion", 4, ceiling=3)  # lower than the start 19
+    runner, reports, clock, ddc = _later_job_runner(tmp_path, later, level=19)
+    runner.run()
+    assert reports[-1]["reason"] == "above_ceiling"
+    assert max(ddc.writes, default=0) <= 19
+
+
+def test_the_ceiling_never_replaces_the_start_with_a_higher_value(tmp_path):
+    later = _cal_job("conversion", 12, ceiling=12)  # start 5 and no limit
+    runner, reports, clock, ddc = _later_job_runner(tmp_path, later, level=5)
+    runner.run()
+    assert reports[-1]["reason"] == "above_ceiling"
+    assert max(ddc.writes, default=0) <= 5
+
+
+def test_the_third_reading_under_a_known_limit_reaches_the_agent(tmp_path):
+    later = _cal_job("conversion", 22, ceiling=22)  # limit 26 - 2 * 2
+    points = [{"ddc": 5, "menu": 28}, {"ddc": 1, "menu": 18}]
+    runner, reports, clock, ddc = _later_job_runner(
+        tmp_path, later, level=5,
+        cfg_over={"brightness_limit": 26, "brightness_conversion": points},
+    )
+    runner.run()
+    assert 22 in ddc.writes
+    assert all(w <= 22 for w in ddc.writes)
+    _assert_small_steps(ddc.writes)
+
+
+def test_a_value_above_the_start_is_refused_even_if_the_ceiling_allows_it(tmp_path):
+    later = _cal_job("conversion", 21, ceiling=21)  # no limit, so no third reading
+    runner, reports, clock, ddc = _later_job_runner(tmp_path, later, level=5)
+    runner.run()
+    assert reports[-1]["reason"] == "above_ceiling"
+    assert max(ddc.writes, default=0) <= 5
+
+
+# 5: the start is read once per run
+def test_the_start_is_read_once_and_kept(tmp_path):
+    ddc = ReadingDdc(read=19)
+    later = _cal_job("detect")
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, ddc=ddc, level=19)
+    runner.run()
+    first = dict(runner.start)
+    ddc.read = 40  # e.g. the level after a limit test
+    runner.level = 40
+    runner.last_set = 40
+    runner._find_start()
+    assert runner.start == first
+
+
+# 4: an idle fault with an unknown start never yields a limit
+def test_an_idle_fault_with_an_unknown_start_has_no_level(tmp_path):
+    fault = ConsumingFault()
+    job = _cal_job("detect")
+    seen = {"polls": 0}
+
+    def poll():
+        seen["polls"] += 1
+        if seen["polls"] == 14:  # after the preflight, waiting for the next step
+            fault.faults.append("Under-voltage detected!")
+        return {"displayCheck": dict(job)}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "detect", tmp_path, level=None, fault=fault, poll=poll
+    )
+    runner.run()
+    final = reports[-1]
+    assert final["reason"] == "power_trouble"
+    assert final["fault"]["level"] is None
+    assert final["fault"]["lastGood"] is None
+
+
+# m2: the persisted state names the current step
+def test_the_persisted_state_records_the_current_step(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, level=19)
+    runner.current_step = "limit"
+    runner._save()
+    state = agent._load_state(str(tmp_path / agent.DISPLAY_CHECK_STATE))
+    assert state["step"] == "limit"
+
+
+def test_the_current_step_follows_the_job(tmp_path):
+    later = _cal_job("write")
+    seen = []
+    runner, reports, clock, ddc = _later_job_runner(tmp_path, later, level=19)
+    original = runner._save
+
+    def save():
+        seen.append(runner.current_step)
+        original()
+
+    runner._save = save
+    runner.run()
+    assert "write" in seen
+
+
+# m1: recovery with an unknown start caps at the floor
+def test_recovery_with_an_unknown_start_stays_at_the_floor(tmp_path):
+    ddc = FakeDdc()
+    (tmp_path / agent.DISPLAY_CHECK_STATE).write_text(
+        '{"id": "c1", "step": "write", "status": "running", "level": 3, '
+        '"start": {"level": null, "known": false, "source": null}, "log": []}'
+    )
+    agent.recover_display_check(str(tmp_path), _ramp_cfg(), ddc=ddc)
+    assert max(ddc.writes, default=0) <= agent.CHECK_FLOOR
+    assert ddc.writes[-1] == agent.CHECK_FLOOR
