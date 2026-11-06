@@ -3771,3 +3771,4 @@ def test_check_state_dir_writable_warns_once_and_keeps_going(tmp_path, monkeypat
     assert len(logs) == 1
     assert str(ro / "agent") in logs[0]
     assert "not writable" in logs[0]
+    assert "repaired on the next agent update" in logs[0]

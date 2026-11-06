@@ -1769,8 +1769,8 @@ def check_state_dir_writable(path=RUNTIME_STATE_DIR, log_fn=None):
     except OSError as e:
         log_fn(
             f"state dir {path} is not writable ({e}); display-check and DDC state "
-            "will not survive a restart until the next agent update fixes its "
-            "ownership"
+            "will not survive a restart; this is repaired on the next agent "
+            "update"
         )
         return False
 

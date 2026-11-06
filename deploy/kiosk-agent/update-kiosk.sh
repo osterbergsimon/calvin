@@ -287,8 +287,14 @@ mkdir -p "$STATE_DIR"
 # kiosks installed with a root-owned state dir are fixed by their next self-update.
 # Idempotent; a failure must not block the update (the agent warns at startup).
 ensure_agent_runtime_dir() {
+  # Never chown through a symlink: where the state dir is user-writable the agent
+  # user could point "agent" at a root file. Refuse anything that is not a plain dir.
+  if [ -L "$AGENT_RUNTIME_DIR" ] || { [ -e "$AGENT_RUNTIME_DIR" ] && [ ! -d "$AGENT_RUNTIME_DIR" ]; }; then
+    log "refusing to prepare ${AGENT_RUNTIME_DIR}: it is a symlink or not a directory; agent run state will not persist"
+    return 0
+  fi
   if mkdir -p "$AGENT_RUNTIME_DIR" && chmod 0755 "$AGENT_RUNTIME_DIR" \
-    && "$CHOWN" "${AGENT_USER}:${AGENT_USER}" "$AGENT_RUNTIME_DIR"; then
+    && "$CHOWN" -h "${AGENT_USER}:${AGENT_USER}" "$AGENT_RUNTIME_DIR"; then
     return 0
   fi
   log "could not prepare ${AGENT_RUNTIME_DIR} for user ${AGENT_USER}; agent run state will not persist"

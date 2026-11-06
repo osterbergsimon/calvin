@@ -134,7 +134,12 @@ from the Calvin admin UI — no SSH, no re-flash.
    Every update also (re)creates `/var/lib/calvin/agent/` owned by the agent user
    (`calvin`); the agent keeps its display-check and DDC state there while the
    updater files above stay root-owned. This repairs kiosks installed with a
-   root-owned state dir.
+   root-owned state dir. The repair is made by the updater that is already
+   installed, so a kiosk updating from an agent that predates it gets the new
+   agent first and the directory on the *next* agent update; until then the
+   agent logs `state dir ... is not writable ... repaired on the next agent
+   update` once at startup. A symlinked or non-directory `agent` path is refused
+   (never chowned) and logged.
 
 5. **Auto-rollback on unhealthy agent.** If the display-agent was among the
    restarted units, the updater waits up to 30 seconds for it to become both
