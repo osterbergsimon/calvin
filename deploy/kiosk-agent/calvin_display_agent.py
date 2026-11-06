@@ -30,6 +30,10 @@ except ImportError:  # pragma: no cover - py<3.9
 
 MIN_PYTHON = (3, 9)
 STATE_DIR = "/var/lib/calvin"
+# The updater (root) owns STATE_DIR itself; the agent runs as user calvin and keeps
+# its own run state (display-check, DDC bus cache) in a calvin-owned subdir that
+# update-kiosk.sh creates and chowns (calvin-r3wt).
+RUNTIME_STATE_DIR = os.path.join(STATE_DIR, "agent")
 READY_MARKER = "/run/calvin/agent-ready"
 
 
@@ -427,7 +431,7 @@ class DdcController:
     disk. The rest of the agent never shells out when the ramp is off.
     """
 
-    def __init__(self, run=None, state_dir=STATE_DIR, log_fn=None):
+    def __init__(self, run=None, state_dir=RUNTIME_STATE_DIR, log_fn=None):
         self._run = run or _default_ddc_run
         self.state_dir = state_dir
         self.log = log_fn or log
@@ -817,7 +821,7 @@ class BrightnessController:
         fault=None,
         clock=None,
         sleep=time_module.sleep,
-        state_dir=STATE_DIR,
+        state_dir=RUNTIME_STATE_DIR,
         applier=None,
         connected=None,
         cog=None,
@@ -1250,7 +1254,7 @@ class DisplayCheckRunner:
         poll=None,
         clock=None,
         sleep=time_module.sleep,
-        state_dir=STATE_DIR,
+        state_dir=RUNTIME_STATE_DIR,
         controller=None,
         panel_on=None,
         settings=None,
@@ -1746,6 +1750,29 @@ UPDATE_UNIT = "calvin-kiosk-update.service"
 
 def log(msg):
     print(f"[calvin-display-agent] {msg}", flush=True)
+
+
+def check_state_dir_writable(path=RUNTIME_STATE_DIR, log_fn=None):
+    """Probe the agent's runtime state dir once at startup.
+
+    Logs a single warning when it can't be written (the agent keeps working, it
+    just can't persist run state across restarts). Returns True when writable.
+    """
+    log_fn = log_fn or log
+    probe = os.path.join(path, ".write-probe")
+    try:
+        os.makedirs(path, exist_ok=True)
+        with open(probe, "w") as f:
+            f.write("ok")
+        os.remove(probe)
+        return True
+    except OSError as e:
+        log_fn(
+            f"state dir {path} is not writable ({e}); display-check and DDC state "
+            "will not survive a restart; this is repaired on the next agent "
+            "update"
+        )
+        return False
 
 
 def _fire_updater():
@@ -3054,6 +3081,7 @@ def main():
         os.environ.get("CALVIN_DISPLAY_REFRESH_SECONDS", DEFAULT_REFRESH_SECONDS)
     )
     log(f"starting: backend={backend} refresh={refresh}s stack={display_stack()}")
+    check_state_dir_writable()
     watchdog = kiosk_watchdog_config()
     if not watchdog_applies(display_stack()):
         log(
