@@ -200,7 +200,7 @@ async def _check_value_under_ceiling(kiosk_id: str, body: display_check.StepRequ
     run = await display_check.get_run_view(kiosk_id)
     if not run or not run["active"]:
         return  # change_step answers 404
-    top = display_check.allowed_max(run, await _screen_settings(kiosk_id))
+    top = display_check.allowed_max(run, await _screen_settings(kiosk_id), body.value)
     if top is not None and body.value > top:
         raise HTTPException(
             status_code=422,

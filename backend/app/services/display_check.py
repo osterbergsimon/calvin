@@ -329,7 +329,13 @@ def job_for_config(run: dict | None, settings: dict | None = None) -> dict | Non
         "action": view["action"],
         "value": view["value"],
         "brightness": view["brightness"],
-        "ceiling": ceiling_for(view, settings),
+        # What this job's value may reach: the third reading is the only one
+        # allowed above the base, so the agent can check it against the job.
+        "ceiling": (
+            allowed_max(view, settings, view["value"])
+            if view["step"] == "conversion"
+            else ceiling_for(view, settings)
+        ),
     }
 
 
@@ -420,24 +426,35 @@ def ceiling_for(run: dict, settings: dict | None) -> int | None:
     return min(caps)
 
 
-def allowed_max(run: dict, settings: dict | None) -> int | None:
+def _reading_count(points: Any) -> int:
+    return sum(
+        1
+        for p in (points or [])
+        if isinstance(p, dict)
+        and isinstance(p.get("ddc"), int | float)
+        and isinstance(p.get("menu"), int | float)
+    )
+
+
+def allowed_max(run: dict, settings: dict | None, value: int | None = None) -> int | None:
     """The highest ``conversion`` value this run may be asked for.
 
-    With a known limit the third reading at ``limit - 2*step`` is allowed even
-    above the base; a calibration fault's cap still binds.
+    Everything is capped at the ceiling. The only write above it is the third
+    reading offer (``value == limit - 2*step``, after two saved readings); a
+    calibration fault's cap still binds it.
     """
     ceiling = ceiling_for(run, settings)
     if ceiling is None:
         return None
-    saved, step, _ = _settings(settings)
+    saved, step, points = _settings(settings)
     limit = _known_limit(run, saved)
-    if limit is None:
+    if limit is None or value is None or _reading_count(points) < 2:
         return ceiling
-    caps = [max(0, limit - 2 * step)]
+    third = max(0, limit - 2 * step)
+    if value != third:
+        return ceiling
     fault_cap = _fault_cap(run, step)
-    if fault_cap is not None:
-        caps.append(fault_cap)
-    return min(caps)
+    return third if fault_cap is None else min(third, fault_cap)
 
 
 def with_ceiling(view: dict | None, settings: dict | None) -> dict | None:
@@ -672,7 +689,9 @@ async def fault_limit_for_save(kiosk_id: str, step: int) -> int:
     if row is None:
         raise UnknownKioskError(kiosk_id)
     limit = fault_limit(row.display_check, step)
-    if limit is None:
+    # A limit at or below the floor would leave a dark screen (an idle fault
+    # with an unknown level, or trouble at the very bottom): never offered.
+    if limit is None or limit <= CHECK_FLOOR:
         raise NoLimitError(kiosk_id)
     return limit
 

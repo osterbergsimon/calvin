@@ -780,17 +780,46 @@ def test_conversion_value_above_the_ceiling_is_refused(test_client: TestClient, 
     assert _step(test_client, "write").status_code == 200  # no value, no check
 
 
+TWO_READINGS = [{"ddc": 5, "menu": 28}, {"ddc": 1, "menu": 18}]
+
+
 @pytest.mark.integration
 def test_the_third_reading_under_a_known_limit_passes_the_ceiling(test_client: TestClient, kiosk):
-    _set_overrides(test_client, {"brightnessLimit": 26})  # top is 22
+    _set_overrides(
+        test_client, {"brightnessLimit": 26, "brightnessConversion": TWO_READINGS}
+    )  # top is 22
     _with_start(test_client, 5, known=False)
     assert _step(test_client, "conversion", value=22).status_code == 200
-    assert _step(test_client, "conversion", value=23).status_code == 422
+    # The job carries the value-specific allowance for the agent.
+    assert _config(test_client)["displayCheck"]["ceiling"] == 22
+    refused = _step(test_client, "conversion", value=21)  # not the offered point
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["max"] == 5
+
+
+@pytest.mark.integration
+def test_the_third_reading_needs_two_readings_first(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    _with_start(test_client, 5, known=False)
+    refused = _step(test_client, "conversion", value=22)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_ceiling"
+    assert refused.json()["detail"]["max"] == 5
+
+
+@pytest.mark.integration
+def test_a_high_limit_does_not_open_everything_below_it(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 80, "brightnessConversion": TWO_READINGS})
+    _with_start(test_client, 5, known=False)
+    refused = _step(test_client, "conversion", value=60)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["max"] == 5
+    assert _step(test_client, "conversion", value=76).status_code == 200  # 80 - 4
 
 
 @pytest.mark.integration
 def test_a_fault_cap_still_binds_the_third_reading(test_client: TestClient, kiosk):
-    _set_overrides(test_client, {"brightnessLimit": 26})
+    _set_overrides(test_client, {"brightnessLimit": 26, "brightnessConversion": TWO_READINGS})
     run = _with_start(test_client, 19)
     _report(test_client, run["id"], "running", fault=FAULT)  # faultCap 6
     refused = _step(test_client, "conversion", value=7)
@@ -890,3 +919,27 @@ def test_a_run_with_a_dirty_preflight_does_not_clear_power_trouble(test_client: 
         preflight={"status": "fault", "faults": ["Under-voltage detected!"]},
     )
     assert _findings(test_client)["powerTrouble"] is not None
+
+
+@pytest.mark.integration
+def test_save_limit_refuses_a_limit_at_or_below_the_floor(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    idle = {**FAULT, "step": "detect", "level": None, "lastGood": None}
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=idle)
+    refused = test_client.post(f"{BASE}/save-limit")
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "no_limit"
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble["step"] == "detect" and trouble["level"] is None
+    assert (
+        "brightnessLimit"
+        not in test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
+    )
+
+
+@pytest.mark.integration
+def test_save_limit_refuses_a_fault_limit_of_zero_or_the_floor(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    low = {**FAULT, "level": 7, "lastGood": 9}  # 7 - 2 = 5, the floor
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=low)
+    assert test_client.post(f"{BASE}/save-limit").status_code == 409

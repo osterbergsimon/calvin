@@ -275,7 +275,7 @@ only step that raises.
 |---|---|---|
 | `reason` | string | Why a run ended with `status: "error"`: `power_at_idle` (preflight found trouble, nothing was written), `power_trouble` (a fault in steps 1-3), `above_ceiling` (the agent refused a `conversion` value above the ceiling). |
 | `preflight` | `{status: "clean"\|"fault", faults: [text]}` | The 10 s power watch before the first write. `fault` ends the run (`error`, `power_at_idle`) with no write made. |
-| `start` | `{level: int\|null, known: bool, source: "read"\|"last_set"\|null}` | The brightness the screen was at when the run started. `read` = the DDC read-back is real; `last_set` = the last level the agent itself set; `known: false` = neither, and `level` stays `null` until the agent has dimmed the screen to the floor (`5`) at the start of step 2, then `level` is `5`. |
+| `start` | `{level: int\|null, known: bool, source: "read"\|"last_set"\|null}` | The brightness the screen was at when the run started. `read` = the DDC read-back is real; `last_set` = the last level the agent itself set; `known: false` = neither (a read-back counts only when it equals the last level the agent set, so a constant non-zero read is a placeholder too; the start is read once per run), and `level` stays `null` until the agent has dimmed the screen to the floor (`5`) at the start of step 2, then `level` is `5`. |
 | `fault` | `{step, level, kind, at, lastGood, alsoAt: [int]}` | One incident. `level` = where the fault showed; `lastGood` = the last level written before it with no fault (above `level` while dimming); `kind` = `under-voltage`\|`over-current`\|`touch controller reset`; `alsoAt` = levels of further faults seen while settling (they never start a new step-down). Sent for a fault in any step. |
 | `info.placeholderReads` | bool | On the `detect` report: the DDC read-back is a placeholder (always 0 or `null`). |
 
@@ -292,8 +292,10 @@ only step that raises.
 - Ending a run returns to `start.level` when it is known, never above the start on the way out of steps 1-3; with an
   unknown start the screen stays at the floor.
 
-**Job** (`displayCheck` on the config poll) gains `ceiling`: the backend's ceiling (below) or `null`. The agent applies
-the lower of it and its own start level.
+**Job** (`displayCheck` on the config poll) gains `ceiling`: for a `conversion` job, the most that job's `value` may
+reach (the ceiling below, or the third reading's value when it qualifies); otherwise the ceiling or `null`. It is read
+from every job, not only the first. The agent applies the lower of it and its own start level, and accepts a value above
+the start only for the third reading, which it checks itself against the limit and the saved readings.
 
 **The ceiling.** The backend computes it on every read and puts it in the run record (`null` until the run has
 a start level):
@@ -315,11 +317,11 @@ can only raise the base. Values are clamped to >= 0.
 - `POST /kiosks/{id}/display-check/menu-at-start` (admin), body `{"menu": 0-100}` (a number; extra fields 422). Stores
   `menuAtStart` on the active run and returns the run record. 404 when there is no active run (or an unknown kiosk).
 - `step` with a `conversion` `value` above the active run's ceiling is refused with **422 `value_above_ceiling`** and
-  `max`. The third reading at `limit - 2 * step` (under a known limit) passes: with a limit known, the allowed maximum is
-  `min(limit - 2 * step, faultCap)` rather than the full ceiling. `value_above_limit` is unchanged. `start` begins a new run, which has no ceiling yet, so it is not checked; other
+  `max`. Everything is capped at the `ceiling`. The only value allowed above it is the third reading: `value == limit - 2 * step`
+  with a limit known and at least two saved readings (then the maximum is `min(limit - 2 * step, faultCap)`). `value_above_limit` is unchanged. `start` begins a new run, which has no ceiling yet, so it is not checked; other
   steps carry no ceiling check. The ceiling is also in the run record's `ceiling` on every read.
 - `save-limit` with no `limit`-step result saves `faultLimit` from the latest run's calibration `fault` (never
-  `lastGood` itself) and returns the same body as before. A `limit`-step result still wins; with neither, 409
+  `lastGood` itself) and returns the same body as before. A limit at or below the floor (5), or from a fault with no level (an idle fault with an unknown start), is never saved: 409 `no_limit`. A `limit`-step result still wins; with neither, 409
   `no_limit`.
 
 ### 10.3 Findings (kept across runs)
