@@ -131,6 +131,11 @@ from the Calvin admin UI — no SSH, no re-flash.
    - restarts only the systemd units that own the changed files (uses
      `daemon-reload` when a unit file changed).
 
+   Every update also (re)creates `/var/lib/calvin/agent/` owned by the agent user
+   (`calvin`); the agent keeps its display-check and DDC state there while the
+   updater files above stay root-owned. This repairs kiosks installed with a
+   root-owned state dir.
+
 5. **Auto-rollback on unhealthy agent.** If the display-agent was among the
    restarted units, the updater waits up to 30 seconds for it to become both
    `active` and to have written the ready-marker

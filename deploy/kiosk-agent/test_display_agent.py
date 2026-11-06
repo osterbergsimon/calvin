@@ -3733,3 +3733,41 @@ def test_post_display_check_warns_once_without_a_kiosk_id(monkeypatch, capsys):
     assert agent.post_display_check("http://x", {"id": "c1"}) is False
     out = capsys.readouterr().out
     assert out.count("CALVIN_KIOSK_ID") == 1
+
+
+# --- calvin-r3wt: the agent's runtime state lives in its own calvin-owned subdir ---
+
+
+def test_runtime_state_dir_is_a_subdir_of_the_updater_state_dir():
+    assert agent.RUNTIME_STATE_DIR == os.path.join(agent.STATE_DIR, "agent")
+    # The root-owned updater files stay where the updater writes them.
+    assert agent.STATE_DIR == "/var/lib/calvin"
+
+
+def test_default_ddc_and_brightness_state_use_the_runtime_dir():
+    assert agent.DdcController().state_dir == agent.RUNTIME_STATE_DIR
+    assert agent.BrightnessController().state_dir == agent.RUNTIME_STATE_DIR
+
+
+def test_check_state_dir_writable_is_silent_when_writable(tmp_path):
+    logs = []
+    assert agent.check_state_dir_writable(str(tmp_path / "agent"), log_fn=logs.append)
+    assert logs == []
+    assert (tmp_path / "agent").is_dir()
+    assert list((tmp_path / "agent").iterdir()) == []  # probe file cleaned up
+
+
+def test_check_state_dir_writable_warns_once_and_keeps_going(tmp_path, monkeypatch):
+    logs = []
+    ro = tmp_path / "ro"
+    ro.mkdir()
+
+    def deny(*a, **k):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(agent.os, "makedirs", deny)
+    monkeypatch.setattr("builtins.open", deny)
+    assert agent.check_state_dir_writable(str(ro / "agent"), log_fn=logs.append) is False
+    assert len(logs) == 1
+    assert str(ro / "agent") in logs[0]
+    assert "not writable" in logs[0]
