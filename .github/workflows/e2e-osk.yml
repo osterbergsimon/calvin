@@ -35,8 +35,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: ./frontend
-        run: npx playwright install --with-deps webkit chromium
+        timeout-minutes: 8
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: webkit chromium
 
       # The backend is mocked with route interception (installApiMock); no
       # backend is started and host-acting routes are always intercepted.
