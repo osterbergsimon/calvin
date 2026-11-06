@@ -647,8 +647,18 @@ export async function installApiMock(page, options = {}) {
         run.active = false;
         return json(route, run);
       }
+      if (action === "menu-at-start") {
+        const run = state.displayCheckRuns[id];
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        run.menuAtStart = (request.postDataJSON() || {}).menu;
+        return json(route, run);
+      }
       if (action === "save-limit") {
-        const limit = state.displayCheckRuns[id]?.steps?.limit?.limit;
+        // A limit found by step 4, or one step under a calibration fault (calvin-c805).
+        const latest = state.displayCheckRuns[id];
+        const fault = latest?.fault;
+        const faultLimit = fault ? Math.min(fault.lastGood, fault.level) - 2 : null;
+        const limit = latest?.steps?.limit?.limit ?? faultLimit;
         if (limit == null) return json(route, { detail: { code: "no_limit" } }, 409);
         state.overridesByKiosk[id] = {
           ...(state.overridesByKiosk[id] || {}),

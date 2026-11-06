@@ -68,6 +68,60 @@ describe("BrightnessGroup rows", () => {
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
+  it("shows saved power trouble in amber with a link to the fix", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: {
+          ...FINDINGS,
+          powerTrouble: {
+            at: "2026-11-06T17:33:00Z",
+            step: "write",
+            level: 12,
+            kind: "under-voltage",
+          },
+        },
+      },
+    });
+    const note = find(wrapper, "power-trouble");
+    expect(note.text()).toContain("Power trouble at Calvin 12 (6 Nov)");
+    const link = find(wrapper, "power-fix-link");
+    expect(link.text()).toBe("How to fix the power");
+    expect(link.attributes("href")).toContain("KIOSK_POWER.md");
+    expect(link.attributes("target")).toBe("_blank");
+  });
+
+  it("says power trouble at idle when the check never started", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: {
+          ...FINDINGS,
+          powerTrouble: {
+            at: "2026-11-06T17:33:00Z",
+            step: "preflight",
+            level: null,
+            kind: "under-voltage",
+          },
+        },
+      },
+    });
+    expect(find(wrapper, "power-trouble").text()).toContain("Power trouble at idle (6 Nov)");
+  });
+
+  it("shows no power line once a later check cleared it", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: { ...FINDINGS, powerTrouble: null },
+      },
+    });
+    expect(find(wrapper, "power-trouble").exists()).toBe(false);
+  });
+
   it("says Not checked yet before any check", () => {
     const wrapper = mountGroup({
       kiosk: { id: "kitchen", displayStack: "cog", displayCheck: null },

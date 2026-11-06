@@ -51,6 +51,15 @@ export function useDisplayCheck(kioskId) {
 
   const capMessage = max =>
     `That's above this screen's safe limit. The most Calvin can set is ${max}.`;
+  // The run's own ceiling (calvin-c805): a fault or the start level caps a check.
+  const ceilingMessage = max =>
+    `That's above what's safe for this check. The most Calvin can set is ${max}.`;
+  // Both 422s mean "too high"; the ceiling is the run's, the limit is the screen's.
+  function aboveCap(detail) {
+    if (detail?.code === "value_above_ceiling") return ceilingMessage(detail.max);
+    if (detail?.code === "value_above_limit") return capMessage(detail.max);
+    return "";
+  }
 
   async function start(step, extra = {}) {
     error.value = "";
@@ -69,8 +78,8 @@ export function useDisplayCheck(kioskId) {
         now.value = Date.now();
         return null;
       }
-      if (err?.response?.status === 422 && detail?.code === "value_above_limit") {
-        error.value = capMessage(detail.max);
+      if (err?.response?.status === 422 && aboveCap(detail)) {
+        error.value = aboveCap(detail);
         return null;
       }
       if (err?.response?.status !== 401) {
@@ -102,8 +111,8 @@ export function useDisplayCheck(kioskId) {
         error.value = "The check is already stopping. Start a new one when it has ended.";
         return { stopping: true };
       }
-      if (status === 422 && detail?.code === "value_above_limit") {
-        error.value = capMessage(detail.max);
+      if (status === 422 && aboveCap(detail)) {
+        error.value = aboveCap(detail);
         return { capped: true, max: detail.max };
       }
       if (status !== 401)
@@ -138,6 +147,23 @@ export function useDisplayCheck(kioskId) {
           : "Couldn't save the limit. Try again.";
       logError("[displayCheck]", "Failed to save the limit", err);
       return null;
+    }
+  }
+
+  // What the screen's own menu showed before Calvin changed anything (unknown
+  // start). The run keeps it; it can only raise the check's base level.
+  async function recordMenuAtStart(menu) {
+    error.value = "";
+    try {
+      const response = await api.post(path(kioskId, "/menu-at-start"), { menu });
+      run.value = response.data ?? run.value;
+      return true;
+    } catch (err) {
+      // 404: the run ended meanwhile; nothing more to record.
+      if (err?.response?.status === 404) return true;
+      error.value = "Couldn't save that value. Try again.";
+      logError("[displayCheck]", "Failed to record the menu at start", err);
+      return false;
     }
   }
 
@@ -198,6 +224,7 @@ export function useDisplayCheck(kioskId) {
     stop,
     saveLimit,
     recordVerdict,
+    recordMenuAtStart,
     resume,
     dispose: stopTimer,
   };

@@ -87,16 +87,48 @@ export function clampBrightness(overrides) {
   return Number(level) > cap ? { ...overrides, brightness: cap } : overrides;
 }
 
+/** Calibration never goes below this when the start level is unknown. */
+export const CHECK_FLOOR = 5;
+const READING_GAP = 4;
+const DIM_TEST = 10;
+
 /**
- * The next Calvin value to ask the owner to read off the menu: 5 first, the
- * middle of the known-safe range, then near its top. Without a limit the range
- * stays at 20 or below. Null when all three have been read.
+ * The two calibration readings: at the start level, and a little below it
+ * (never below 0). `room` is false when the screen is too near the bottom for a
+ * second reading to differ enough to fit a line.
  */
-export function nextReadingPoint(readings, limit, step = DEFAULT_STEP) {
-  const cap = limit === null || limit === undefined ? DEFAULT_START : maxPickable(limit, step);
-  const done = new Set(validPoints(readings).map(p => Number(p.ddc)));
-  const candidates = [Math.min(5, cap), Math.round(cap / 2), cap];
-  return candidates.find(value => !done.has(value)) ?? null;
+export function calibrationPoints(start) {
+  const first = Number(start);
+  const second = Math.max(0, first - READING_GAP);
+  return { first, second, room: first - second >= 2 };
+}
+
+/** The optional third reading, near the top of a known limit. Null without a limit. */
+export function thirdReadingPoint(limit, step = DEFAULT_STEP) {
+  if (limit === null || limit === undefined) return null;
+  return maxPickable(limit, step);
+}
+
+/**
+ * The limit to offer after a calibration fault: one step under the lower of the
+ * last clean level and the fault. Steps 1-3 dim, so the last clean level is above
+ * the fault. Null when nothing useful is left.
+ */
+export function faultLimit(fault, step = DEFAULT_STEP) {
+  if (!fault || fault.level == null) return null;
+  const good = fault.lastGood == null ? fault.level : fault.lastGood;
+  const value = Math.min(Number(good), Number(fault.level)) - (Number(step) || DEFAULT_STEP);
+  return value > 0 ? value : null;
+}
+
+/**
+ * The two targets "Show me again" alternates between. The agent ignores a repeat
+ * of the same value, so the second is one off the first (start - 9 / start - 10).
+ */
+export function writeTargets(start) {
+  const low = Math.max(0, Number(start) - DIM_TEST);
+  const high = Math.max(0, Number(start) - DIM_TEST + 1);
+  return high === low ? [low + 1, low] : [high, low];
 }
 
 /** Whole seconds the agent needs to step from `level` down to 0. */

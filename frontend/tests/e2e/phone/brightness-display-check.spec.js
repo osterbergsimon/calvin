@@ -148,10 +148,16 @@ for (const [size, viewport] of SIZES) {
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await group.getByRole("switch", { name: "Ramp brightness at sleep and wake" }).click();
       await expect(dialog(page)).toBeVisible();
-      await expect(body(page)).toContainText("Asking hallway-pi's screen…");
+      await expect(dialog(page)).toContainText(
+        "Checking hallway-pi's power before changing anything"
+      );
 
-      // Step 1: the agent finds the display, then Calvin dims it and asks.
+      // Power check, then step 1: the agent finds the display. The screen is at 20.
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
+      api.agentReport("hallway", {
+        preflight: { status: "clean", faults: [] },
+        start: { level: 20, known: true, source: "read" },
+      });
       api.agentStep("hallway", "detect", {
         detail: "NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1",
         info: { model: "NOMAD TOUCH" },
@@ -159,6 +165,11 @@ for (const [size, viewport] of SIZES) {
       await expect(body(page)).toContainText("Found NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1", {
         timeout: 8000,
       });
+      await expect(body(page)).toContainText("The check stays at Calvin 20 or below");
+      await shot(page, size, "check-found");
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+
+      // Step 2: it dims from 20 and back, never above the start.
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("write");
       api.agentStep("hallway", "write", { level: 20 });
       await expect(body(page)).toContainText("Did hallway-pi get dimmer for a moment", {
@@ -170,21 +181,28 @@ for (const [size, viewport] of SIZES) {
       // The ramp starts once step 2 passes.
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessRampEnabled).toBe(true);
 
-      // Step 3: two readings.
-      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("conversion");
-      api.agentStep("hallway", "conversion", { value: 5, level: 5 });
-      await expect(body(page)).toContainText("Calvin set hallway-pi to 5", { timeout: 8000 });
-      await page.locator('[data-test="reading-input"]').fill("28");
+      // Step 3: reading 1 where the screen is, reading 2 a little below.
+      await expect.poll(() => api.displayCheckRuns.hallway?.value).toBe(20);
+      api.agentStep("hallway", "conversion", { value: 20, level: 20 });
+      await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+        "Reading 1 of 2 · hallway-pi is at Calvin 20, unchanged",
+        { timeout: 8000 }
+      );
+      await page.locator('[data-test="reading-input"]').fill("64");
       await page.getByRole("button", { name: "Save reading" }).click();
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessConversion?.length).toBe(1);
-      await page.getByRole("button", { name: "Add a reading" }).click();
-      await expect.poll(() => api.displayCheckRuns.hallway?.value).toBe(10);
-      api.agentStep("hallway", "conversion", { value: 10, level: 10 });
-      await page.locator('[data-test="reading-input"]').fill("40");
+      await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+        "1 of 2 readings · Next, Calvin dims to 16"
+      );
+      await shot(page, size, "check-after-reading-1");
+      await page.getByRole("button", { name: "Dim to 16 for reading 2" }).click();
+      await expect.poll(() => api.displayCheckRuns.hallway?.value).toBe(16);
+      api.agentStep("hallway", "conversion", { value: 16, level: 16 });
+      await page.locator('[data-test="reading-input"]').fill("54");
       await page.getByRole("button", { name: "Save reading" }).click();
-      await expect(body(page).locator('[data-test="check-fit"]')).toContainText("menu ≈");
+      await expect(body(page).locator('[data-test="check-fit"]')).toContainText("approximate");
       await shot(page, size, "check-menu-match");
-      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByRole("button", { name: "Next: safe limit (optional)" }).click();
 
       // Step 4: the warning, then a running test with a live log.
       await expect(body(page)).toContainText("it may restart");
@@ -237,6 +255,80 @@ for (const [size, viewport] of SIZES) {
       await expect(group.locator('[data-test="limit-note"]')).toContainText("limit");
       expect(consoleErrors).toEqual([]);
       expect(api.unmatched).toEqual([]);
+    });
+
+    test("power trouble before the check starts refuses it and points to the fix", async ({
+      page,
+    }) => {
+      const api = await installApiMock(page, {
+        kioskExtras: { hallway: { displayStack: "cog", displayCheck: FOUND } },
+      });
+      const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
+      await group.locator('[data-test="check-open"]').click();
+      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
+      api.agentReport("hallway", {
+        preflight: { status: "fault", faults: [{ kind: "under-voltage" }] },
+        status: "error",
+        reason: "power_at_idle",
+      });
+      await expect(dialog(page)).toContainText("hallway-pi has power trouble already", {
+        timeout: 8000,
+      });
+      await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+        "Check not started · power trouble at idle"
+      );
+      await expect(dialog(page).getByRole("link", { name: "How to fix the power" })).toBeVisible();
+      await shot(page, size, "check-power-idle");
+      await expectPhoneLayout(page, `power trouble at idle (${size})`);
+      expect(api.displayCheckCalls).not.toContain("POST step");
+    });
+
+    test("a fault in calibration ends it and offers the limit under the fault", async ({
+      page,
+    }) => {
+      const api = await installApiMock(page, {
+        kioskExtras: { hallway: { displayStack: "cog", displayCheck: FOUND } },
+      });
+      const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
+      await group.locator('[data-test="check-open"]').click();
+      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
+      api.agentReport("hallway", {
+        preflight: { status: "clean", faults: [] },
+        start: { level: 19, known: true, source: "read" },
+      });
+      api.agentStep("hallway", "detect", { detail: "NOMAD TOUCH" });
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("write");
+      const fault = {
+        step: "write",
+        level: 12,
+        kind: "under-voltage",
+        at: "x",
+        lastGood: 14,
+        alsoAt: [],
+      };
+      api.agentReport("hallway", { fault });
+      await expect(dialog(page).locator('[data-test="check-fault"]')).toContainText(
+        "Power trouble at Calvin 12 · under-voltage",
+        { timeout: 8000 }
+      );
+      await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+        "Stopping safely"
+      );
+      await shot(page, size, "check-fault-stopping");
+      api.agentReport("hallway", { fault, status: "error", reason: "power_trouble" });
+      await expect(dialog(page)).toContainText("hallway-pi's power supply is too weak", {
+        timeout: 8000,
+      });
+      await shot(page, size, "check-fault-ended");
+      await expectPhoneLayout(page, `calibration ended by power trouble (${size})`);
+      await dialog(page)
+        .getByRole("button", { name: /^Save 10 as .* limit$/ })
+        .click();
+      await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(10);
+      await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+        "Calvin stays at or below 10 on hallway-pi"
+      );
     });
 
     test("Stop now ends a running limit test, and closing the dialog stops the run", async ({
