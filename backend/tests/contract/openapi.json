@@ -15,6 +15,16 @@
             ],
             "title": "Detail"
           },
+          "fault": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FaultIncident"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "finishedAt": {
             "anyOf": [
               {
@@ -83,6 +93,37 @@
               }
             ],
             "title": "Log"
+          },
+          "preflight": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Preflight"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StartLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "startedAt": {
             "anyOf": [
@@ -1846,6 +1887,79 @@
         "title": "CreateLinkBody",
         "type": "object"
       },
+      "FaultIncident": {
+        "description": "One power-trouble incident; faults seen while settling join ``alsoAt``.",
+        "properties": {
+          "alsoAt": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Alsoat",
+            "type": "array"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "lastGood": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastgood"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "title": "FaultIncident",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1909,6 +2023,23 @@
           }
         },
         "title": "LogEntry",
+        "type": "object"
+      },
+      "MenuAtStartRequest": {
+        "additionalProperties": false,
+        "description": "The Brightness the screen's own menu showed before the check changed anything.",
+        "properties": {
+          "menu": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Menu",
+            "type": "number"
+          }
+        },
+        "required": [
+          "menu"
+        ],
+        "title": "MenuAtStartRequest",
         "type": "object"
       },
       "OverridesBody": {
@@ -2245,6 +2376,31 @@
         "title": "PluginTypeConfigUpdateResponse",
         "type": "object"
       },
+      "Preflight": {
+        "description": "The 10 s power watch before the first write (calibration v2).",
+        "properties": {
+          "faults": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Faults",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "clean",
+              "fault"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Preflight",
+        "type": "object"
+      },
       "SealedModeBody": {
         "properties": {
           "sealed_mode": {
@@ -2288,6 +2444,46 @@
           "action"
         ],
         "title": "SingleMapping",
+        "type": "object"
+      },
+      "StartLevel": {
+        "description": "The brightness the screen was at when the run started.",
+        "properties": {
+          "known": {
+            "default": false,
+            "title": "Known",
+            "type": "boolean"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "last_set"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "title": "StartLevel",
         "type": "object"
       },
       "StartRequest": {
@@ -4872,6 +5068,57 @@
           }
         },
         "summary": "Post Display Check Report",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/menu-at-start": {
+      "post": {
+        "description": "The Brightness the screen's own menu showed before the check began (admin).",
+        "operationId": "post_display_check_menu_at_start_api_kiosks__kiosk_id__display_check_menu_at_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenuAtStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Menu At Start",
         "tags": [
           "kiosks"
         ]

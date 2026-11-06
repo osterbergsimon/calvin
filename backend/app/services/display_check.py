@@ -17,7 +17,7 @@ import uuid
 import weakref
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeGuard
 
 from loguru import logger
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, StrictBool
@@ -88,6 +88,14 @@ class StepRequest(BaseModel):
     value: int | None = Field(None, ge=0, le=100)
 
 
+class MenuAtStartRequest(BaseModel):
+    """The Brightness the screen's own menu showed before the check changed anything."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    menu: float = Field(ge=0, le=100)
+
+
 class VerdictRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -118,6 +126,38 @@ class LogEntry(BaseModel):
     note: Annotated[str, BeforeValidator(_clip(_MAX_TEXT))] = ""
 
 
+class Preflight(BaseModel):
+    """The 10 s power watch before the first write (calibration v2)."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    status: Literal["clean", "fault"]
+    faults: Annotated[list[str], BeforeValidator(_newest(20))] = Field(default_factory=list)
+
+
+class StartLevel(BaseModel):
+    """The brightness the screen was at when the run started."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    level: int | None = Field(None, ge=0, le=100)
+    known: bool = False
+    source: Literal["read", "last_set"] | None = None
+
+
+class FaultIncident(BaseModel):
+    """One power-trouble incident; faults seen while settling join ``alsoAt``."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    step: Annotated[str | None, BeforeValidator(_clip(32))] = None
+    level: int | None = Field(None, ge=0, le=100)
+    kind: Annotated[str | None, BeforeValidator(_clip(64))] = None
+    at: Annotated[str | None, BeforeValidator(_clip(64))] = None
+    lastGood: int | None = Field(None, ge=0, le=100)
+    alsoAt: Annotated[list[int], BeforeValidator(_newest(50))] = Field(default_factory=list)
+
+
 class AgentReport(BaseModel):
     """The agent's POST body (deploy/kiosk-agent, ``post_display_check``).
 
@@ -137,6 +177,11 @@ class AgentReport(BaseModel):
     finishedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
     detail: Annotated[str | None, BeforeValidator(_clip(_MAX_TEXT))] = None
     info: dict[str, Any] | None = None
+    # Calibration v2 (calvin-c805); all optional, an older agent omits them.
+    reason: Annotated[str | None, BeforeValidator(_clip(64))] = None
+    preflight: Preflight | None = None
+    start: StartLevel | None = None
+    fault: FaultIncident | None = None
 
 
 EMPTY_FINDINGS: dict[str, Any] = {
@@ -147,7 +192,12 @@ EMPTY_FINDINGS: dict[str, Any] = {
     "connector": None,
     "vcpVersion": None,
     "limit": None,
+    "powerTrouble": None,
 }
+
+CALIBRATION_STEPS = frozenset({"detect", "write", "conversion"})
+# The level the agent dims an unknown start to (CHECK_FLOOR in the agent).
+CHECK_FLOOR = 5
 
 
 def findings_view(stored: dict | None) -> dict[str, Any]:
@@ -189,6 +239,34 @@ def _apply_findings(
         return None
     findings["checkedAt"] = finished_at
     return findings
+
+
+_UNCHANGED: Any = object()
+
+
+def _power_trouble(run: dict, report: AgentReport, status: str, now: str) -> Any:
+    """The new ``findings.powerTrouble`` after a report, or ``_UNCHANGED``."""
+    preflight = report.preflight
+    if preflight is not None and preflight.status == "fault":
+        return {
+            "at": report.finishedAt or now,
+            "step": "preflight",
+            "level": None,
+            "kind": classify_fault(preflight.faults[0] if preflight.faults else None),
+        }
+    fault = report.fault
+    if fault is not None and fault.step in CALIBRATION_STEPS:
+        return {
+            "at": fault.at or report.finishedAt or now,
+            "step": fault.step,
+            "level": fault.level,
+            "kind": fault.kind or "under-voltage",
+        }
+    clean = (run.get("preflight") or {}).get("status") == "clean"
+    faulted = isinstance(run.get("fault"), dict) and run["fault"].get("step") in CALIBRATION_STEPS
+    if clean and not faulted and run.get("step") == "write" and status == "done":
+        return None
+    return _UNCHANGED
 
 
 # One lock per kiosk (and per event loop, as an asyncio.Lock belongs to the loop
@@ -233,11 +311,14 @@ def _view(run: dict | None) -> dict | None:
         view["status"] = "timeout"
     view["active"] = view["status"] in ("requested", "running")
     view.setdefault("steps", {})
+    for key in ("reason", "preflight", "start", "fault", "menuAtStart"):
+        view.setdefault(key, None)
+    view["ceiling"] = None
     view["expiresAt"] = _iso(_expires_at(run))
     return view
 
 
-def job_for_config(run: dict | None) -> dict | None:
+def job_for_config(run: dict | None, settings: dict | None = None) -> dict | None:
     """The job as the agent reads it from the config poll, only while active."""
     view = _view(run)
     if view is None or not view["active"]:
@@ -248,7 +329,131 @@ def job_for_config(run: dict | None) -> dict | None:
         "action": view["action"],
         "value": view["value"],
         "brightness": view["brightness"],
+        "ceiling": ceiling_for(view, settings),
     }
+
+
+# -- the calibration ceiling (calvin-c805) -------------------------------------
+def _is_int(value: Any) -> TypeGuard[int]:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def convert_menu_to_ddc(points: Any, menu: float) -> int | None:
+    """Invert the least-squares line through the saved readings (None: fewer than 2)."""
+    pts = [
+        (float(p["ddc"]), float(p["menu"]))
+        for p in (points or [])
+        if isinstance(p, dict)
+        and isinstance(p.get("ddc"), int | float)
+        and isinstance(p.get("menu"), int | float)
+    ]
+    if len(pts) < 2:
+        return None
+    n = len(pts)
+    mean_x = sum(x for x, _ in pts) / n
+    mean_y = sum(y for _, y in pts) / n
+    var = sum((x - mean_x) ** 2 for x, _ in pts)
+    if var == 0:
+        return None
+    slope = sum((x - mean_x) * (y - mean_y) for x, y in pts) / var
+    if slope <= 0:
+        return None
+    ddc = mean_x + (menu - mean_y) / slope
+    return max(0, min(100, int(ddc)))
+
+
+def _settings(settings: dict | None) -> tuple[int | None, int, Any]:
+    settings = settings or {}
+    limit = settings.get("limit")
+    step = settings.get("step")
+    return (
+        limit if _is_int(limit) else None,
+        min(max(step, 1), 5) if _is_int(step) else 2,
+        settings.get("conversion"),
+    )
+
+
+def _known_limit(run: dict, saved: int | None) -> int | None:
+    found = (run.get("steps") or {}).get("limit") or {}
+    limits = [saved] if saved is not None else []
+    if found.get("status") == "done" and _is_int(found.get("limit")):
+        limits.append(found["limit"])
+    return min(limits) if limits else None
+
+
+def fault_limit(run: dict | None, step: int) -> int | None:
+    """``min(lastGood, level) - step`` of a calibration fault, never below 0."""
+    fault = (run or {}).get("fault")
+    if not isinstance(fault, dict) or fault.get("step") not in CALIBRATION_STEPS:
+        return None
+    levels = [v for v in (fault.get("lastGood"), fault.get("level")) if _is_int(v)]
+    if not levels:
+        return None
+    return max(0, min(levels) - step)
+
+
+def _fault_cap(run: dict, step: int) -> int | None:
+    limit = fault_limit(run, step)
+    return None if limit is None else max(0, limit - 2 * step)
+
+
+def ceiling_for(run: dict, settings: dict | None) -> int | None:
+    """``min(base, limit - 2*step, faultCap)``; None until the run has a start."""
+    start = run.get("start")
+    if not isinstance(start, dict):
+        return None
+    saved, step, points = _settings(settings)
+    level = start.get("level")
+    base = level if _is_int(level) else CHECK_FLOOR
+    menu = run.get("menuAtStart")
+    if isinstance(menu, int | float) and not isinstance(menu, bool):
+        converted = convert_menu_to_ddc(points, float(menu))
+        if converted is not None:
+            base = converted
+    caps = [base]
+    limit = _known_limit(run, saved)
+    if limit is not None:
+        caps.append(max(0, limit - 2 * step))
+    fault_cap = _fault_cap(run, step)
+    if fault_cap is not None:
+        caps.append(fault_cap)
+    return min(caps)
+
+
+def allowed_max(run: dict, settings: dict | None) -> int | None:
+    """The highest ``conversion`` value this run may be asked for.
+
+    With a known limit the third reading at ``limit - 2*step`` is allowed even
+    above the base; a calibration fault's cap still binds.
+    """
+    ceiling = ceiling_for(run, settings)
+    if ceiling is None:
+        return None
+    saved, step, _ = _settings(settings)
+    limit = _known_limit(run, saved)
+    if limit is None:
+        return ceiling
+    caps = [max(0, limit - 2 * step)]
+    fault_cap = _fault_cap(run, step)
+    if fault_cap is not None:
+        caps.append(fault_cap)
+    return min(caps)
+
+
+def with_ceiling(view: dict | None, settings: dict | None) -> dict | None:
+    """A run view with ``ceiling`` computed from the screen's current settings."""
+    if view is not None:
+        view["ceiling"] = ceiling_for(view, settings)
+    return view
+
+
+def classify_fault(text: str | None) -> str:
+    low = (text or "").lower()
+    if "over-current" in low or "overcurrent" in low:
+        return "over-current"
+    if "reset" in low:
+        return "touch controller reset"
+    return "under-voltage"
 
 
 @retry_on_db_locked()
@@ -356,6 +561,14 @@ def _merge_progress(run: dict, report: AgentReport) -> None:
         run["detail"] = report.detail
     if report.info is not None:
         run["info"] = report.info
+    if report.reason is not None:
+        run["reason"] = report.reason
+    if report.preflight is not None:
+        run["preflight"] = report.preflight.model_dump()
+    if report.start is not None:
+        run["start"] = report.start.model_dump()
+    if report.fault is not None:
+        run["fault"] = report.fault.model_dump()
 
 
 @_serialised
@@ -428,6 +641,11 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
             info=report.info,
             finished_at=finished_at,
         )
+    trouble = _power_trouble(run, report, status, now)
+    if trouble is not _UNCHANGED:
+        findings = findings or findings_view(row.display_check_findings)
+        findings["powerTrouble"] = trouble
+        findings["checkedAt"] = report.finishedAt or now
     run["status"] = status if ended else "running"
     if ended:
         run["finishedAt"] = report.finishedAt or now
@@ -446,6 +664,33 @@ async def found_limit(kiosk_id: str) -> int:
     if result.get("status") != "done" or not isinstance(limit, int):
         raise NoLimitError(kiosk_id)
     return limit
+
+
+async def fault_limit_for_save(kiosk_id: str, step: int) -> int:
+    """The limit a calibration fault implies (``faultLimit``), else :class:`NoLimitError`."""
+    row = await _row(kiosk_id)
+    if row is None:
+        raise UnknownKioskError(kiosk_id)
+    limit = fault_limit(row.display_check, step)
+    if limit is None:
+        raise NoLimitError(kiosk_id)
+    return limit
+
+
+@_serialised
+async def set_menu_at_start(kiosk_id: str, menu: float) -> dict:
+    """Store the menu value the owner read before the check changed anything."""
+    row = await _row(kiosk_id)
+    if row is None:
+        raise UnknownKioskError(kiosk_id)
+    current = _view(row.display_check)
+    if not current or not current["active"]:
+        raise NoActiveRunError(kiosk_id)
+    run = dict(row.display_check)
+    run["menuAtStart"] = int(menu) if float(menu).is_integer() else menu
+    await _save(row, run)
+    logger.info(f"Display check {run['id']} for {kiosk_id!r}: menu at start {menu}")
+    return _view(run)  # type: ignore[return-value]
 
 
 async def get_findings(kiosk_id: str) -> dict[str, Any]:

@@ -115,6 +115,33 @@ async def post_kiosk_update(kiosk_id: str):
     return {"id": kiosk_id, "requested": True}
 
 
+async def _screen_settings(kiosk_id: str) -> dict:
+    """What the ceiling needs from the screen's merged settings."""
+    overrides = await get_overrides(kiosk_id)
+    merged = merge_overrides(await build_global_config(), overrides or {})
+    return _settings_of(merged)
+
+
+def _settings_of(merged: dict) -> dict:
+    def pick(*keys):
+        for key in keys:
+            if key in merged:
+                return merged[key]
+        return None
+
+    return {
+        "limit": pick("brightnessLimit", "brightness_limit"),
+        "step": pick("brightnessStep", "brightness_step"),
+        "conversion": pick("brightnessConversion", "brightness_conversion"),
+    }
+
+
+async def _ceilinged(kiosk_id: str, view: dict | None) -> dict | None:
+    if view is None:
+        return None
+    return display_check.with_ceiling(view, await _screen_settings(kiosk_id))
+
+
 @router.get("/kiosks/{kiosk_id}/display-check")
 async def get_display_check(kiosk_id: str):
     """The latest display-check run for a kiosk (expiry applied), or ``null``."""
@@ -122,7 +149,7 @@ async def get_display_check(kiosk_id: str):
     if await get_overrides(kiosk_id) is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     return {
-        "run": await display_check.get_run_view(kiosk_id),
+        "run": await _ceilinged(kiosk_id, await display_check.get_run_view(kiosk_id)),
         "findings": await display_check.get_findings(kiosk_id),
     }
 
@@ -162,13 +189,36 @@ async def _check_value_under_limit(
         )
 
 
+async def _check_value_under_ceiling(kiosk_id: str, body: display_check.StepRequest) -> None:
+    """Refuse a ``conversion`` target above the active run's ceiling (calvin-c805).
+
+    ``start`` begins a new run, so it has no ceiling yet and the previous run is
+    never consulted; only ``step`` is checked.
+    """
+    if body.step != "conversion" or body.value is None:
+        return
+    run = await display_check.get_run_view(kiosk_id)
+    if not run or not run["active"]:
+        return  # change_step answers 404
+    top = display_check.allowed_max(run, await _screen_settings(kiosk_id))
+    if top is not None and body.value > top:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "value_above_ceiling",
+                "message": f"This check may not go above {top}.",
+                "max": top,
+            },
+        )
+
+
 @router.post("/kiosks/{kiosk_id}/display-check/start")
 async def start_display_check(kiosk_id: str, body: display_check.StartRequest):
     """Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk."""
     _valid_id_or_400(kiosk_id)
     await _check_value_under_limit(kiosk_id, body)
     try:
-        return await display_check.start_run(kiosk_id, body)
+        return await _ceilinged(kiosk_id, await display_check.start_run(kiosk_id, body))
     except display_check.UnknownKioskError:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     except display_check.RunActiveError as exc:
@@ -187,8 +237,9 @@ async def change_display_check_step(kiosk_id: str, body: display_check.StepReque
     """Move the active run to another step/value (admin); the job is re-offered."""
     _valid_id_or_400(kiosk_id)
     await _check_value_under_limit(kiosk_id, body)
+    await _check_value_under_ceiling(kiosk_id, body)
     try:
-        return await display_check.change_step(kiosk_id, body)
+        return await _ceilinged(kiosk_id, await display_check.change_step(kiosk_id, body))
     except (display_check.UnknownKioskError, display_check.NoActiveRunError):
         raise HTTPException(status_code=404, detail="No display check is running")
     except display_check.StoppingError:
@@ -206,7 +257,7 @@ async def stop_display_check(kiosk_id: str):
     """Ask the agent to end the active run safely (admin)."""
     _valid_id_or_400(kiosk_id)
     try:
-        return await display_check.stop_run(kiosk_id)
+        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id))
     except (display_check.UnknownKioskError, display_check.NoActiveRunError):
         raise HTTPException(status_code=404, detail="No display check is running")
 
@@ -216,7 +267,13 @@ async def save_display_check_limit(kiosk_id: str):
     """Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin)."""
     _valid_id_or_400(kiosk_id)
     try:
-        limit = await display_check.found_limit(kiosk_id)
+        try:
+            limit = await display_check.found_limit(kiosk_id)
+        except display_check.NoLimitError:
+            # No limit-step result: a calibration fault implies one (calvin-c805).
+            limit = await display_check.fault_limit_for_save(
+                kiosk_id, display_check._settings(await _screen_settings(kiosk_id))[1]
+            )
     except display_check.UnknownKioskError:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     except display_check.NoLimitError:
@@ -232,6 +289,17 @@ async def save_display_check_limit(kiosk_id: str):
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     logger.info(f"Saved brightness limit {limit} for kiosk {kiosk_id!r}")
     return {"id": kiosk_id, "brightnessLimit": limit, "overrides": public_overrides(overrides)}
+
+
+@router.post("/kiosks/{kiosk_id}/display-check/menu-at-start")
+async def post_display_check_menu_at_start(kiosk_id: str, body: display_check.MenuAtStartRequest):
+    """The Brightness the screen's own menu showed before the check began (admin)."""
+    _valid_id_or_400(kiosk_id)
+    try:
+        run = await display_check.set_menu_at_start(kiosk_id, body.menu)
+    except (display_check.UnknownKioskError, display_check.NoActiveRunError):
+        raise HTTPException(status_code=404, detail="No display check is running")
+    return await _ceilinged(kiosk_id, run)
 
 
 @router.post("/kiosks/{kiosk_id}/display-check/verdict")
@@ -364,7 +432,7 @@ async def get_kiosk_config(
     merged["deviceConfigVersion"] = version
     merged["agentAvailableVersion"] = available
     merged["agentUpdateRequested"] = update_requested
-    job = display_check.job_for_config(await display_check.get_run(kiosk_id))
+    job = display_check.job_for_config(await display_check.get_run(kiosk_id), _settings_of(merged))
     if job is not None:
         # Both spellings, like every other key the agent reads (snake_case first).
         merged["displayCheck"] = job

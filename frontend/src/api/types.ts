@@ -1145,6 +1145,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}/display-check/menu-at-start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Display Check Menu At Start
+     * @description The Brightness the screen's own menu showed before the check began (admin).
+     */
+    post: operations["post_display_check_menu_at_start_api_kiosks__kiosk_id__display_check_menu_at_start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/display-check/save-limit": {
     parameters: {
       query?: never;
@@ -2367,6 +2387,7 @@ export interface components {
     AgentReport: {
       /** Detail */
       detail?: string | null;
+      fault?: components["schemas"]["FaultIncident"] | null;
       /** Finishedat */
       finishedAt?: string | null;
       /** Id */
@@ -2381,6 +2402,10 @@ export interface components {
       limit?: number | null;
       /** Log */
       log?: components["schemas"]["LogEntry"][] | null;
+      preflight?: components["schemas"]["Preflight"] | null;
+      /** Reason */
+      reason?: string | null;
+      start?: components["schemas"]["StartLevel"] | null;
       /** Startedat */
       startedAt?: string | null;
       /**
@@ -2903,6 +2928,24 @@ export interface components {
       /** Name */
       name: string;
     };
+    /**
+     * FaultIncident
+     * @description One power-trouble incident; faults seen while settling join ``alsoAt``.
+     */
+    FaultIncident: {
+      /** Alsoat */
+      alsoAt?: number[];
+      /** At */
+      at?: string | null;
+      /** Kind */
+      kind?: string | null;
+      /** Lastgood */
+      lastGood?: number | null;
+      /** Level */
+      level?: number | null;
+      /** Step */
+      step?: string | null;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -2929,6 +2972,14 @@ export interface components {
        * @default
        */
       note: string;
+    };
+    /**
+     * MenuAtStartRequest
+     * @description The Brightness the screen's own menu showed before the check changed anything.
+     */
+    MenuAtStartRequest: {
+      /** Menu */
+      menu: number;
     };
     /** OverridesBody */
     OverridesBody: {
@@ -3080,6 +3131,19 @@ export interface components {
       /** Success */
       success: boolean;
     };
+    /**
+     * Preflight
+     * @description The 10 s power watch before the first write (calibration v2).
+     */
+    Preflight: {
+      /** Faults */
+      faults?: string[];
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "clean" | "fault";
+    };
     /** SealedModeBody */
     SealedModeBody: {
       /** Sealed Mode */
@@ -3099,6 +3163,21 @@ export interface components {
     SingleMapping: {
       /** Action */
       action: string;
+    };
+    /**
+     * StartLevel
+     * @description The brightness the screen was at when the run started.
+     */
+    StartLevel: {
+      /**
+       * Known
+       * @default false
+       */
+      known: boolean;
+      /** Level */
+      level?: number | null;
+      /** Source */
+      source?: ("read" | "last_set") | null;
     };
     /** StartRequest */
     StartRequest: {
@@ -4892,6 +4971,41 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["AgentReport"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_display_check_menu_at_start_api_kiosks__kiosk_id__display_check_menu_at_start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MenuAtStartRequest"];
       };
     };
     responses: {
