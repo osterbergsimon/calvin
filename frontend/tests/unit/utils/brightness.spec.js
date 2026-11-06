@@ -10,7 +10,10 @@ import {
   fitSentence,
   maxPickable,
   menuToDdc,
-  nextReadingPoint,
+  calibrationPoints,
+  faultLimit,
+  thirdReadingPoint,
+  writeTargets,
   readingsOutlier,
 } from "@/utils/brightness";
 
@@ -76,32 +79,25 @@ describe("limits", () => {
     expect(firstBrightness(22, 2)).toBe(18);
     expect(firstBrightness(null, 2)).toBe(20);
   });
-  it("picks conversion points 5, the middle, then near the top, never above the limit", () => {
-    expect(nextReadingPoint([], 26, 2)).toBe(5);
-    expect(nextReadingPoint([{ ddc: 5, menu: 28 }], 26, 2)).toBe(11);
-    expect(
-      nextReadingPoint(
-        [
-          { ddc: 5, menu: 28 },
-          { ddc: 11, menu: 41 },
-        ],
-        26,
-        2
-      )
-    ).toBe(22);
+  it("takes the second reading 4 below the start, and has no room at the very bottom", () => {
+    expect(calibrationPoints(19)).toEqual({ first: 19, second: 15, room: true });
+    expect(calibrationPoints(5)).toEqual({ first: 5, second: 1, room: true });
+    expect(calibrationPoints(3)).toEqual({ first: 3, second: 0, room: true });
+    expect(calibrationPoints(1)).toEqual({ first: 1, second: 0, room: false });
   });
-  it("stays at 20 or below without a limit", () => {
-    expect(nextReadingPoint([{ ddc: 5, menu: 28 }], null, 2)).toBe(10);
-    expect(
-      nextReadingPoint(
-        [
-          { ddc: 5, menu: 28 },
-          { ddc: 10, menu: 40 },
-        ],
-        null,
-        2
-      )
-    ).toBe(20);
+  it("puts the optional third reading at the limit minus two steps", () => {
+    expect(thirdReadingPoint(26, 2)).toBe(22);
+    expect(thirdReadingPoint(null, 2)).toBeNull();
+  });
+  it("offers the fault limit one step under the lower of the last good level and the fault", () => {
+    expect(faultLimit({ level: 12, lastGood: 14 }, 2)).toBe(10);
+    expect(faultLimit({ level: 12, lastGood: 8 }, 2)).toBe(6);
+    expect(faultLimit({ level: 2, lastGood: 4 }, 2)).toBeNull();
+    expect(faultLimit(null, 2)).toBeNull();
+  });
+  it("alternates the repeat targets of the dim test", () => {
+    expect(writeTargets(19)).toEqual([10, 9]);
+    expect(writeTargets(5)).toEqual([1, 0]);
   });
 });
 

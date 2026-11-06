@@ -243,6 +243,42 @@ describe("useDisplayCheck", () => {
     expect(check.error.value).toMatch(/most Calvin can set is 22/);
   });
 
+  it("explains a value above the run's ceiling, in a step and in a start", async () => {
+    api.get.mockResolvedValue({ data: { run: run() } });
+    const check = make();
+    await check.load();
+    api.post.mockRejectedValueOnce({
+      response: {
+        status: 422,
+        data: { detail: { code: "value_above_ceiling", max: 12, message: "x" } },
+      },
+    });
+    expect(await check.changeStep("conversion", 20)).toEqual({ capped: true, max: 12 });
+    expect(check.error.value).toBe(
+      "That's above what's safe for this check. The most Calvin can set is 12."
+    );
+    api.post.mockRejectedValueOnce({
+      response: { status: 422, data: { detail: { code: "value_above_ceiling", max: 12 } } },
+    });
+    expect(await check.start("conversion", { value: 20 })).toBeNull();
+    expect(check.error.value).toMatch(/most Calvin can set is 12/);
+  });
+
+  it("records the menu value the screen showed at the start", async () => {
+    api.get.mockResolvedValue({ data: { run: run() } });
+    const check = make();
+    await check.load();
+    api.post.mockResolvedValueOnce({ data: run({ menuAtStart: 28 }) });
+    expect(await check.recordMenuAtStart(28)).toBe(true);
+    expect(api.post).toHaveBeenLastCalledWith("/kiosks/kitchen/display-check/menu-at-start", {
+      menu: 28,
+    });
+    expect(check.run.value.menuAtStart).toBe(28);
+    api.post.mockRejectedValueOnce({ response: { status: 500 } });
+    expect(await check.recordMenuAtStart(28)).toBe(false);
+    expect(check.error.value).toMatch(/Couldn't save/);
+  });
+
   it("does not call a long wait between steps silence", async () => {
     api.get.mockResolvedValue({ data: { run: run() } });
     const check = make();
