@@ -387,7 +387,7 @@ describe("step 3: match the screen's menu", () => {
     expect(wrapper.text()).toContain("Calvin hasn't changed it.");
     expect(find(wrapper, "reading-input").attributes("inputmode")).toBe("numeric");
     expect(primary(wrapper).text()).toBe("Save reading");
-    expect(find(wrapper, "check-skip").text()).toContain("Skip: finish without a menu match");
+    expect(find(wrapper, "check-skip").text()).toContain("Skip the menu match");
   });
 
   it("saves a reading as a patch", async () => {
@@ -490,7 +490,7 @@ describe("step 3: match the screen's menu", () => {
     });
     expect(status(wrapper)).toContain("1 reading · Kitchen is already at its lowest");
     expect(wrapper.text()).toContain("so the slider stays on Calvin's scale");
-    expect(primary(wrapper).text()).toBe("Finish with 1 reading");
+    expect(primary(wrapper).text()).toBe("Go on with 1 reading");
   });
 
   it("removes a reading", async () => {
@@ -598,6 +598,14 @@ describe("power trouble during the check", () => {
     expect(find(wrapper, "check-done").exists()).toBe(true);
   });
 
+  it("does not repeat itself: one fix link and no second banner line once it ended", async () => {
+    await ended();
+    expect(wrapper.findAll('[data-test="fix-link"]')).toHaveLength(1);
+    expect(find(wrapper, "check-fault").text()).toContain("Power trouble at Calvin 12");
+    expect(find(wrapper, "check-fault").text()).not.toContain("Calvin dimmed");
+    expect(find(wrapper, "check-fault").text()).not.toContain("waiting for the power to settle");
+  });
+
   it("keeps a two-reading match", async () => {
     await ended(2);
     expect(wrapper.text()).toContain("Your 2 readings are saved, so the menu match is kept.");
@@ -638,6 +646,7 @@ describe("DisplayCheckDialog step 4: safe limit", () => {
   it("replaces Start with a red note on the panel itself", async () => {
     await toStep4({ onPanel: true });
     expect(find(wrapper, "limit-start").exists()).toBe(false);
+    expect(primary(wrapper).text()).toBe("Skip, finish");
     expect(find(wrapper, "limit-on-panel").text()).toContain(
       "You're on Kitchen itself. Run this step from your phone or computer"
     );

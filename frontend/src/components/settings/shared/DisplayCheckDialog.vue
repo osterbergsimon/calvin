@@ -36,7 +36,7 @@
         <!-- A power fault seen in any step: one banner for the whole incident -->
         <div v-if="fault" class="dcheck__fault" role="alert" data-test="check-fault">
           <strong>Power trouble at Calvin {{ fault.level }} · {{ fault.kind }}</strong>
-          <span>{{ faultAction }}</span>
+          <span v-if="view !== 'power-ended'">{{ faultAction }}</span>
           <span v-for="at in fault.alsoAt || []" :key="at">also at {{ at }} while settling</span>
         </div>
 
@@ -92,15 +92,6 @@
               step under where the trouble showed).
             </p>
             <p class="dcheck__sub">{{ FIX_LINE }}</p>
-            <a
-              class="dcheck__fix"
-              data-test="fix-link"
-              :href="HELP_URL"
-              target="_blank"
-              rel="noopener"
-            >
-              How to fix the power
-            </a>
           </div>
         </template>
 
@@ -338,7 +329,11 @@
             {{ answer.label }}
           </Button>
         </div>
-        <div v-if="ui.field || ui.primary" class="dcheck__primary-row">
+        <div
+          v-if="ui.field || ui.primary"
+          class="dcheck__primary-row"
+          :class="{ 'dcheck__primary-row--field': ui.field }"
+        >
           <input
             v-if="ui.field"
             ref="readingInput"
@@ -983,7 +978,7 @@ const state = computed(() => {
 });
 
 const skipFirst = () => ({
-  label: "Skip: finish without a menu match",
+  label: "Skip the menu match",
   test: "check-skip",
   run: skipReading,
 });
@@ -1177,7 +1172,7 @@ const ui = computed(() => {
     case "noroom":
       return {
         status: `1 reading · ${name} is already at its lowest`,
-        primary: { label: "Finish with 1 reading", test: "check-next", run: goStep4 },
+        primary: { label: "Go on with 1 reading", test: "check-next", run: goStep4 },
       };
     case "matched": {
       const secondary = [];
@@ -1214,9 +1209,11 @@ const ui = computed(() => {
       return {
         status: "Step 4 · optional · raises the brightness until the power shows trouble",
         primary: props.onPanel
-          ? null
+          ? { label: "Skip, finish", test: "limit-skip", run: goFinish }
           : { label: "Start the test", test: "limit-start", run: startLimit },
-        secondary: [{ label: "Skip, finish", test: "limit-skip", run: goFinish, plain: true }],
+        secondary: props.onPanel
+          ? []
+          : [{ label: "Skip, finish", test: "limit-skip", run: goFinish, plain: true }],
       };
     default: {
       const level = run.value?.level ?? 0;
@@ -1561,7 +1558,7 @@ function leaveWithout() {
   gap: var(--gap-2);
   align-items: center;
 }
-.dcheck__primary-row > :last-child {
+.dcheck__primary-row--field > :last-child {
   flex: 1 1 auto;
 }
 .dcheck__input--reading {
