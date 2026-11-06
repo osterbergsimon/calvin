@@ -4053,3 +4053,41 @@ def test_recovery_after_a_calibration_reboot_never_goes_above_the_start(tmp_path
     agent.recover_display_check(str(tmp_path), _ramp_cfg(), ddc=ddc)
     assert ddc.writes[-1] == 12  # the configured brightness is 19: the start wins
     assert max(ddc.writes) <= 12
+
+# --- calvin-r3wt: the agent's runtime state lives in its own calvin-owned subdir ---
+
+
+def test_runtime_state_dir_is_a_subdir_of_the_updater_state_dir():
+    assert agent.RUNTIME_STATE_DIR == os.path.join(agent.STATE_DIR, "agent")
+    # The root-owned updater files stay where the updater writes them.
+    assert agent.STATE_DIR == "/var/lib/calvin"
+
+
+def test_default_ddc_and_brightness_state_use_the_runtime_dir():
+    assert agent.DdcController().state_dir == agent.RUNTIME_STATE_DIR
+    assert agent.BrightnessController().state_dir == agent.RUNTIME_STATE_DIR
+
+
+def test_check_state_dir_writable_is_silent_when_writable(tmp_path):
+    logs = []
+    assert agent.check_state_dir_writable(str(tmp_path / "agent"), log_fn=logs.append)
+    assert logs == []
+    assert (tmp_path / "agent").is_dir()
+    assert list((tmp_path / "agent").iterdir()) == []  # probe file cleaned up
+
+
+def test_check_state_dir_writable_warns_once_and_keeps_going(tmp_path, monkeypatch):
+    logs = []
+    ro = tmp_path / "ro"
+    ro.mkdir()
+
+    def deny(*a, **k):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(agent.os, "makedirs", deny)
+    monkeypatch.setattr("builtins.open", deny)
+    assert agent.check_state_dir_writable(str(ro / "agent"), log_fn=logs.append) is False
+    assert len(logs) == 1
+    assert str(ro / "agent") in logs[0]
+    assert "not writable" in logs[0]
+    assert "repaired on the next agent update" in logs[0]
