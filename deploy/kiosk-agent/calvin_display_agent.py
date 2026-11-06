@@ -1321,7 +1321,9 @@ class DisplayCheckRunner:
         self.preflight = None
         self.fault = None  # the incident
         self.reason = None
-        self.ceiling = job.get("ceiling")
+        self.current_step = job.get("step")
+        self.live_settings = self.settings  # refreshed from every config poll
+        self._placeholder = None
         self.limit = None
         self.settled = False
         self._touched = False
@@ -1340,7 +1342,7 @@ class DisplayCheckRunner:
             self._path(),
             {
                 "id": self.job["id"],
-                "step": self.job.get("step"),
+                "step": self.current_step,
                 "status": "running",
                 "level": self.level,
                 "limit": self.limit,
@@ -1384,6 +1386,7 @@ class DisplayCheckRunner:
             cfg = self.poll()
         except Exception:
             return False
+        self.live_settings = brightness_settings(cfg)
         job = display_check_job(cfg)
         if job is not None and job["id"] == self.job["id"]:
             if job["action"] == "stop":
@@ -1465,14 +1468,22 @@ class DisplayCheckRunner:
         return True
 
     def _find_start(self):
-        """The level the screen is at now: read back, last set, or unknown."""
-        read = None
+        """The level the screen is at, read once per run (the first time).
+
+        The read-back is trusted only when it follows a write: it must equal
+        the last level the agent itself set. Anything else (a constant 0, a
+        constant 100, no write yet) is a placeholder, and the start is the last
+        level the agent set, or unknown.
+        """
+        if self.start is not None:
+            return self._placeholder
         try:
             read = self.ddc.read_brightness()
         except Exception:
             read = None
-        placeholder = read is None or read == 0
-        if not placeholder:
+        follows_write = read is not None and self.last_set is not None and read == self.last_set
+        self._placeholder = not follows_write
+        if follows_write:
             self.start = {"level": read, "known": True, "source": "read"}
             self.level = read
         elif self.last_set is not None:
@@ -1480,7 +1491,7 @@ class DisplayCheckRunner:
             self.level = self.last_set
         else:
             self.start = {"level": None, "known": False, "source": None}
-        return placeholder
+        return self._placeholder
 
     def _start_level(self):
         return None if self.start is None else self.start["level"]
@@ -1493,14 +1504,36 @@ class DisplayCheckRunner:
         self.start = dict(self.start, level=CHECK_FLOOR)
         return True
 
-    def _cap(self):
-        """The highest level a conversion value may be (the lower of backend and own)."""
-        own = self._start_level()
-        if own is None:
-            own = CHECK_FLOOR
-        if self.ceiling is not None:
-            own = self.ceiling
-        return own
+    def _third_reading(self, value):
+        """The one write above the start: limit - 2 * step, after two readings."""
+        live = self.live_settings
+        limit = live.get("limit")
+        if limit is None or self.fault is not None:
+            return False
+        return value == max(0, limit - 2 * live["step"]) and len(live["conversion"]) >= 2
+
+    def _cap(self, job):
+        """The highest level this conversion job may write.
+
+        The lower of the run's start level and the backend's ceiling for this
+        job. The one exception is the third reading, which the agent checks
+        itself against the limit and the saved readings.
+        """
+        cap = self._start_level()
+        if cap is None:
+            cap = CHECK_FLOOR
+        ceiling = job.get("ceiling")
+        if ceiling is not None:
+            cap = min(cap, ceiling)
+            value = job.get("value")
+            if (
+                value is not None
+                and value > cap
+                and value <= ceiling
+                and self._third_reading(value)
+            ):
+                cap = value
+        return cap
 
     def _calibration_ramp(self, target, *, cancel_missing=True):
         """A calibration ramp: any fault stops it where it is."""
@@ -1554,7 +1587,8 @@ class DisplayCheckRunner:
             "alsoAt": [],
         }
         self.reason = "power_trouble"
-        self._entry(f"power trouble at {level}: {'; '.join(lines)}", level=level)
+        where = "an unknown level" if level is None else str(level)
+        self._entry(f"power trouble at {where}: {'; '.join(lines)}")
 
     def _calibration_fault(self, step, level, last_good, lines):
         """A fault in steps 1-3 ends the run: floor at the normal pace, settle, no retry."""
@@ -1624,9 +1658,9 @@ class DisplayCheckRunner:
             if value is None:
                 value = self.level
             value = max(0, min(BRIGHTNESS_MAX, int(value)))
-            cap = self._cap()
-            if self.fault is not None:
-                cap = min(cap, self.fault["lastGood"] or 0)
+            cap = self._cap(job)
+            if self.fault is not None and self.fault["lastGood"] is not None:
+                cap = min(cap, self.fault["lastGood"])
             if value > cap:
                 self.reason = "above_ceiling"
                 self._entry(f"refused: {value} is above this check's ceiling {cap}")
@@ -1701,7 +1735,7 @@ class DisplayCheckRunner:
     def _payload(self, status, **extra):
         payload = {
             "id": self.job["id"],
-            "step": self.job.get("step"),
+            "step": self.current_step,
             "status": status,
             "level": self.level,
             "limit": self.limit,
@@ -1781,6 +1815,8 @@ class DisplayCheckRunner:
                 signature = (current["id"], current["step"], current.get("value"))
                 if signature not in self._seen:
                     self._seen.add(signature)
+                    self.current_step = current["step"]
+                    self._save()
                     try:
                         self._execute(current)
                     except Exception as e:  # a check must never take the agent down
@@ -1799,9 +1835,10 @@ class DisplayCheckRunner:
                     if current["step"] in CALIBRATION_STEPS:
                         lines = self._polled_faults()
                         if lines:
-                            self._calibration_fault(
-                                current["step"], self.level, self.level, lines
-                            )
+                            # With an unknown start the level is a guess (0):
+                            # report none, so no limit is ever derived from it.
+                            at = self.level if self._start_level() is not None else None
+                            self._calibration_fault(current["step"], at, at, lines)
                             self._stop_reason = None
                             return self._finish("error")
                     try:
@@ -1809,6 +1846,7 @@ class DisplayCheckRunner:
                     except Exception:
                         self.sleep(DISPLAY_CHECK_POLL_SECONDS)
                         continue
+                    self.live_settings = brightness_settings(cfg)
                     nxt = display_check_job(cfg)
                     if nxt is None or nxt["id"] != self.job["id"]:
                         return self._finish("done")
@@ -1874,14 +1912,13 @@ def recover_display_check(
     settings = brightness_settings(cfg)
     last_level = _as_int(state.get("level"))
     limit = _interrupted_limit(state, settings)
-    # Calibration (steps 1-3) never brightens: a reboot mid-run returns to the
-    # start level at most, whatever the configured brightness is.
-    start_level = _as_int((state.get("start") or {}).get("level"))
-    start_cap = (
-        start_level
-        if state.get("step") in CALIBRATION_STEPS and start_level is not None
-        else None
-    )
+    # A run that recorded its start never goes above it on the way out; with
+    # an unknown start the floor is the cap. Older state files have no start.
+    start_state = state.get("start")
+    start_cap = None
+    if isinstance(start_state, dict):
+        start_level = _as_int(start_state.get("level"))
+        start_cap = CHECK_FLOOR if start_level is None else start_level
     payload = {
         "id": state.get("id"),
         "step": state.get("step"),
