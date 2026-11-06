@@ -75,6 +75,9 @@ const idleLabel = seconds => {
  * source picker, or the schedule grid. `browserLayer` says a plain browser has
  * a localStorage choice of its own; without one it follows Default.
  *
+ * `perScreenOnly` marks a device-physical setting with no household value, so
+ * Screens › Default has no row for it (brightness, calvin-29ws).
+ *
  * Derived from this list: DEFAULT_COPYABLE_KEYS and SCREEN_SETTING_LABELS.
  */
 export const SCREEN_SETTING_DESCRIPTORS = [
@@ -539,6 +542,100 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     keywords: ["power", "idle", "timeout", "screensaver", "screen off", "display"],
   },
   {
+    key: "brightnessRampEnabled",
+    label: "Ramp brightness at sleep and wake",
+    section: "brightness",
+    perScreenOnly: true,
+    description:
+      "Dims before the screen turns off and brightens slowly after it wakes. Use it when the screen's power supply struggles as it wakes.",
+    control: { kind: "toggle" },
+    defaultValue: false,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness-ramp",
+    keywords: ["brightness", "dim", "ramp", "wake", "under-voltage", "brown out", "power supply"],
+  },
+  {
+    key: "brightness",
+    label: "Brightness",
+    section: "brightness",
+    perScreenOnly: true,
+    control: { kind: "range", min: 0, max: 100 },
+    defaultValue: 20,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness",
+    keywords: ["brightness", "dim", "ramp", "wake", "menu"],
+  },
+  {
+    key: "brightnessStep",
+    label: "Ramp step size",
+    section: "brightness",
+    perScreenOnly: true,
+    control: { kind: "number", min: 1, max: 5 },
+    defaultValue: 2,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness-step",
+    keywords: ["brightness", "ramp", "step", "speed"],
+  },
+  {
+    key: "brightnessStepSeconds",
+    label: "Ramp step interval",
+    section: "brightness",
+    perScreenOnly: true,
+    control: { kind: "number", min: 0.5, max: 10 },
+    defaultValue: 1.5,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness-step-seconds",
+    keywords: ["brightness", "ramp", "step", "speed", "interval"],
+  },
+  {
+    key: "sleepMode",
+    label: "At sleep",
+    section: "brightness",
+    perScreenOnly: true,
+    description:
+      "Dim only keeps the screen running at backlight 0 instead of turning it off. The backlight never fully turns off and the page keeps running.",
+    control: {
+      kind: "segmented",
+      options: [
+        { value: "standby", label: "Standby" },
+        { value: "dim", label: "Dim only" },
+      ],
+    },
+    defaultValue: "standby",
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-sleep-mode",
+    keywords: ["brightness", "dim", "sleep", "standby", "dim only", "power"],
+  },
+  {
+    key: "brightnessLimit",
+    label: "Brightness limit",
+    section: "brightness",
+    perScreenOnly: true,
+    control: { kind: "number", min: 0, max: 100 },
+    defaultValue: null,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness-limit",
+    keywords: ["brightness", "limit", "safe limit", "display check"],
+  },
+  {
+    key: "brightnessConversion",
+    label: "Menu match",
+    section: "brightness",
+    perScreenOnly: true,
+    control: { kind: "readings" },
+    defaultValue: [],
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness-conversion",
+    keywords: ["brightness", "menu match", "display check", "conversion"],
+  },
+  {
     key: "touchControls",
     label: "Touchscreen",
     section: "touch",
@@ -735,6 +832,13 @@ const SCREEN_PAGE_ROW_ORDER = [
   "displayScheduleEnabled",
   "displaySchedule",
   "displayTimeout",
+  "brightnessRampEnabled",
+  "brightness",
+  "brightnessStep",
+  "brightnessStepSeconds",
+  "sleepMode",
+  "brightnessLimit",
+  "brightnessConversion",
   "touchControls",
   "onScreenKeyboard",
   "photoFrameEnabled",
@@ -872,10 +976,14 @@ export const withoutPromotedSettings = overrides => {
 };
 
 // "Reset everything to default" keeps the name and drops every other override.
+// The display check's findings (limit, menu match) survive: they describe the
+// hardware, not a preference (calvin-29ws).
+const KEPT_ON_RESET = new Set(["displayName", "brightnessLimit", "brightnessConversion"]);
+
 export const withoutAllOverrides = overrides => {
   const next = { ...(overrides || {}) };
   for (const key of Object.keys(next)) {
-    if (key !== "displayName") delete next[key];
+    if (!KEPT_ON_RESET.has(key)) delete next[key];
   }
   return next;
 };

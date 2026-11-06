@@ -188,8 +188,10 @@ async function emitRowValue(wrapper, descriptor, value) {
   control.vm.$emit("update:modelValue", value);
 }
 
+// Per-screen-only settings (brightness, calvin-29ws) have no Default row; they
+// are covered by BrightnessGroup.spec.js.
 const descriptorsUnderTest = SCREEN_SETTING_DESCRIPTORS.filter(
-  descriptor => !SHARED_IDLE_KEYS.has(descriptor.key)
+  descriptor => !SHARED_IDLE_KEYS.has(descriptor.key) && !descriptor.perScreenOnly
 );
 
 beforeEach(() => {

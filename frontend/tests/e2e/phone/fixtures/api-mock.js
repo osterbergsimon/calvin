@@ -379,6 +379,45 @@ export async function installApiMock(page, options = {}) {
     // Share links (calvin-mwqo): what Settings › Content › Photos lists.
     shareLinks: options.shareLinks ? [...options.shareLinks] : [],
     shareFolders: options.shareFolders ? [...options.shareFolders] : ["Guests", "Party"],
+    // The kiosk list, with any extra fields a spec needs (displayStack and the
+    // saved display-check findings, calvin-29ws). Mutable: a test changes it.
+    kiosks: sampleKiosks.map(kiosk => ({ ...kiosk, ...(options.kioskExtras?.[kiosk.id] || {}) })),
+    // Display check (calvin-29ws): the latest run per kiosk. A test plays the
+    // agent with `agentReport`; the backend side is answered here.
+    displayCheckRuns: {},
+    displayCheckCalls: [],
+    // Set a run here to make the next start answer 409 display_check_active.
+    displayCheckBusy: null,
+  };
+  // A step's result: it fills run.steps while the run stays active (spec §10.2).
+  state.agentStep = (id, step, result = {}) => {
+    const run = state.displayCheckRuns[id];
+    if (!run) throw new Error(`no display check run for ${id}`);
+    state.displayCheckClock = (state.displayCheckClock || 0) + 1;
+    run.status = "running";
+    run.updatedAt = new Date().toISOString();
+    run.steps = {
+      ...(run.steps || {}),
+      [step]: {
+        status: "done",
+        value: null,
+        level: null,
+        limit: null,
+        detail: null,
+        info: null,
+        finishedAt: new Date(1800000000000 + state.displayCheckClock * 1000).toISOString(),
+        ...result,
+      },
+    };
+    if (step === "limit" && result.limit != null) run.limit = result.limit;
+  };
+  state.agentReport = (id, patch) => {
+    const run = state.displayCheckRuns[id];
+    if (!run) throw new Error(`no display check run for ${id}`);
+    Object.assign(run, { status: "running", updatedAt: new Date().toISOString() }, patch);
+    if (["done", "error", "stopped", "asleep", "timeout", "interrupted"].includes(run.status)) {
+      run.active = false;
+    }
   };
 
   await page.route("**/api/**", async route => {
@@ -544,7 +583,90 @@ export async function installApiMock(page, options = {}) {
       return json(route, { detail: "not found" }, 404);
     }
 
-    if (path === "/api/kiosks") return json(route, { kiosks: sampleKiosks });
+    if (path === "/api/kiosks") {
+      return json(route, {
+        kiosks: state.kiosks.map(kiosk => ({
+          ...kiosk,
+          overrides: state.overridesByKiosk[kiosk.id] ?? kiosk.overrides,
+        })),
+      });
+    }
+    const displayCheck = path.match(/^\/api\/kiosks\/([^/]+)\/display-check(?:\/([a-z-]+))?$/);
+    if (displayCheck) {
+      const id = decodeURIComponent(displayCheck[1]);
+      const action = displayCheck[2] || "";
+      state.displayCheckCalls.push(`${method} ${action || "status"}`);
+      if (!action && method === "GET") {
+        return json(route, { run: state.displayCheckRuns[id] ?? state.displayCheckBusy ?? null });
+      }
+      if (action === "start") {
+        if (state.displayCheckBusy) {
+          return json(
+            route,
+            { detail: { code: "display_check_active", run: state.displayCheckBusy } },
+            409
+          );
+        }
+        const body = request.postDataJSON() || {};
+        const now = new Date().toISOString();
+        state.displayCheckRuns[id] = {
+          id: `run-${Object.keys(state.displayCheckRuns).length}-${state.displayCheckCalls.length}`,
+          step: body.step,
+          value: body.value ?? null,
+          brightness: body.brightness ?? null,
+          action: "start",
+          status: "requested",
+          active: true,
+          level: null,
+          limit: null,
+          log: [],
+          steps: {},
+          detail: null,
+          info: null,
+          requestedAt: now,
+          startedAt: null,
+          finishedAt: null,
+          updatedAt: null,
+          expiresAt: new Date(Date.now() + 600000).toISOString(),
+        };
+        return json(route, state.displayCheckRuns[id]);
+      }
+      if (action === "step") {
+        const run = state.displayCheckRuns[id];
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        const body = request.postDataJSON() || {};
+        run.step = body.step;
+        run.value = body.value ?? null;
+        return json(route, run);
+      }
+      if (action === "stop") {
+        const run = state.displayCheckRuns[id] ?? state.displayCheckBusy;
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        run.action = "stop";
+        run.status = "stopped";
+        run.active = false;
+        return json(route, run);
+      }
+      if (action === "save-limit") {
+        const limit = state.displayCheckRuns[id]?.steps?.limit?.limit;
+        if (limit == null) return json(route, { detail: { code: "no_limit" } }, 409);
+        state.overridesByKiosk[id] = {
+          ...(state.overridesByKiosk[id] || {}),
+          brightnessLimit: limit,
+        };
+        return json(route, {
+          id,
+          brightnessLimit: limit,
+          overrides: state.overridesByKiosk[id],
+        });
+      }
+      if (action === "verdict") {
+        const kiosk = state.kiosks.find(item => item.id === id);
+        const writes = (request.postDataJSON() || {}).writes;
+        if (kiosk) kiosk.displayCheck = { ...(kiosk.displayCheck || {}), writes };
+        return json(route, kiosk?.displayCheck ?? {});
+      }
+    }
     if (path === "/api/kiosks/agent/manifest") return json(route, { version: "1.6.0" });
     const kioskOverrides = path.match(/^\/api\/kiosks\/([^/]+)\/overrides$/);
     if (kioskOverrides) {

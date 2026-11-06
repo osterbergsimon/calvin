@@ -6,6 +6,7 @@
     :class="{ on: modelValue }"
     :aria-checked="modelValue ? 'true' : 'false'"
     :aria-label="ariaLabel"
+    :disabled="disabled"
     @click="toggle"
   />
 </template>
@@ -14,6 +15,8 @@
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   ariaLabel: { type: String, default: null },
+  // An unavailable setting stays in place but cannot be switched.
+  disabled: { type: Boolean, default: false },
 });
 const emit = defineEmits(["update:modelValue"]);
 const toggle = () => emit("update:modelValue", !props.modelValue);
@@ -67,6 +70,10 @@ const toggle = () => emit("update:modelValue", !props.modelValue);
 .tog.on::after {
   transform: translateX(var(--toggle-travel));
   background: var(--switch-knob-on);
+}
+.tog:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .tog:focus-visible {
   outline: 2px solid var(--focus);

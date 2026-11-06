@@ -1,15 +1,19 @@
 <!-- frontend/src/components/settings/shared/ChangedHereLine.vue -->
 <template>
   <p v-if="items.length > 0" class="changed-here" data-test="changed-here-line">
-    <span class="changed-here__label">Changed here:</span>&nbsp;<a
+    <span class="changed-here__label">Changed here:</span>&nbsp;<template
       v-for="(item, index) in items"
       :key="item.key"
-      class="changed-here__link"
-      :href="`#${rowAnchorId(item.key)}`"
-      :data-test="`changed-here-${item.key}`"
-      @click.prevent="jumpTo(item.key)"
-      >{{ index > 0 ? ", " : "" }}{{ item.label }}</a
     >
+      <span v-if="index > 0">{{ ", " }}</span
+      ><a
+        class="changed-here__link"
+        :href="`#${rowAnchorId(item.key)}`"
+        :data-test="`changed-here-${item.key}`"
+        @click.prevent="jumpTo(item.key)"
+        >{{ item.label }}</a
+      >
+    </template>
   </p>
 </template>
 
@@ -58,6 +62,9 @@ function jumpTo(key) {
   color: var(--focus-text);
   text-decoration: underline;
   text-underline-offset: 2px;
+  /* A link that wraps across two lines has a box that covers its neighbour's
+     centre, so the tap lands on the wrong link. Keep each name on one line. */
+  white-space: nowrap;
 }
 
 .changed-here__link:focus-visible {
