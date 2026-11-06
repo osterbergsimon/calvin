@@ -1,0 +1,37 @@
+name: Install Playwright browsers
+description: >
+  Install Playwright browsers and system deps with a per-attempt time box and
+  one retry. A stalled apt download (no data from a mirror) otherwise hangs
+  until the job timeout; each attempt is killed after 3 minutes (normal run is
+  under 1 minute).
+inputs:
+  browsers:
+    description: Space-separated browser names passed to `playwright install`
+    required: true
+  working-directory:
+    description: Directory containing the Playwright install (node_modules)
+    default: frontend
+runs:
+  using: composite
+  steps:
+    - name: Install browsers (time-boxed, one retry)
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        # Make apt give up on a silent mirror instead of waiting forever.
+        printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\n' \
+          | sudo tee /etc/apt/apt.conf.d/99-ci-timeouts >/dev/null
+        for attempt in 1 2; do
+          # shellcheck disable=SC2086
+          if timeout --kill-after=10 180 npx playwright install --with-deps $BROWSERS; then
+            exit 0
+          fi
+          echo "::warning::Playwright browser install attempt ${attempt} failed or timed out"
+          sudo pkill -x apt-get || true
+          sudo dpkg --configure -a || true
+          sleep 5
+        done
+        echo "::error::Playwright browser install failed after 2 attempts"
+        exit 1
