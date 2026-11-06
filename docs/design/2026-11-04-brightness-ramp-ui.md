@@ -233,7 +233,10 @@ Step 4 also follows the settling rule. It shows faults the same way as §3.3.
 The lines in the body:
 - **Readings line.** Either "Your 1 reading is saved. A menu match needs 2, so the slider stays on Calvin's scale." or
   "Your 2 readings are saved, so the menu match is kept."
-- **Limit line** (my call): "Calvin can keep Kitchen at **10** or below (the last level before the trouble)."
+- **Limit line** (my call): "Calvin can keep Kitchen at **10** or below (one step under where the trouble showed)."
+  - The offered value is **`faultLimit = min(lastGood, fault.level) − step`** (fault at 12, step 2 → 10). In steps
+    1–3 the panel is dimming, so the last clean level is *above* the fault; taking the minimum keeps the offer under
+    the fault. Step 4 is unchanged: it is rising, so its last good level is already below the fault.
   - The fault level gives a real limit, and saving it is the one thing in this dialog that protects the screen now.
     So it is the primary action, and the power fix is a link.
   - It follows the same explicit-save rule as step 4: the old limit stays until it is saved, and Done with it unsaved
@@ -317,7 +320,7 @@ Everything below is new unless it says otherwise. The names are suggestions; the
    - Add `placeholderReads: true|false` to the detect `info` (the read-back is always 0, or doesn't follow a write).
    - **Unknown start:** ramp down to `CHECK_FLOOR = 5` before step 2, and use that as the start.
 3. **Calibration ceiling.**
-   - Steps 1–3 never write above `ceiling = min(start, savedLimit − 2×step, firstFault − 2×step)`. The third
+   - Steps 1–3 never write above the run's `ceiling` (defined once, in point 9). The third
      reading's limit − 2 × step point is the only exception (rule 3).
    - `write` steps S → max(0, S − 10) → S. It no longer uses `self.level or brightness_target(...)`, which was the 5 →
      20 jump.
@@ -326,8 +329,9 @@ Everything below is new unless it says otherwise. The names are suggestions; the
    - Stop the step, ramp down to the floor at the normal pace, then settle: 5 s without new faults, capped at 30 s, as
      `wait_for_settle` does.
    - Report `status: "error"`, `reason: "power_trouble"`,
-     `fault: {step, level, kind, at, lastGood, alsoAt: [...]}`. `kind` is one of `under-voltage`, `over-current`,
-     `touch controller reset`.
+     `fault: {step, level, kind, at, lastGood, alsoAt: [...]}`. `level` is where the fault showed; `lastGood` is the
+     last level written before it with no fault (above `level` while dimming). `kind` is one of `under-voltage`,
+     `over-current`, `touch controller reset`.
    - The run ends there, with no retry.
 5. **Settling in every step, step 4 included.** Faults seen while settling join the incident's `alsoAt`; they never
    start a new step-down.
@@ -343,11 +347,15 @@ Everything below is new unless it says otherwise. The names are suggestions; the
 9. **Ceiling enforcement.**
    - `step`/`start` with `conversion` refuses a value above the run's ceiling: 422 `value_above_ceiling`, with `max`.
      This extends today's `value_above_limit`.
-   - The ceiling is `min(start, limit − 2×step, fault.lastGood − step)`, raised to `convert(menuAtStart)` once the
-     conversion has 2 points.
+   - The ceiling, used by both the backend and the agent:
+     - `base = convert(menuAtStart)` once the fit has 2 points, else `start.level`;
+     - `faultLimit = min(fault.lastGood, fault.level) − step` (none when there is no fault);
+     - `faultCap = faultLimit − 2×step`;
+     - `ceiling = min(base, limit − 2×step, faultCap)`, leaving out the terms that don't exist.
+     A known fault or limit always wins over `menuAtStart`; `menuAtStart` can only raise the base, never a cap.
    - The third reading (limit − 2 × step) passes this check because it is under a known limit.
-10. **`save-limit` accepts a calibration fault.** With no `steps.limit` result, it saves `fault.lastGood` from the
-    latest run. Otherwise it is unchanged, including 409 `no_limit` when there is neither.
+10. **`save-limit` accepts a calibration fault.** With no `steps.limit` result, it saves `faultLimit` (point 9) from
+    the latest run's `fault`, never `lastGood` itself. Otherwise it is unchanged, including 409 `no_limit` when there is neither.
 11. **Findings gain `powerTrouble: {at, step, level, kind}|null`.**
     - It is set by a preflight fault (`level: null`) or a calibration fault.
     - It is cleared by a later run whose preflight is clean and whose steps 1–3 finish without one.
@@ -415,7 +423,7 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
   - every state renders exactly one primary button and a status line (busy states: none, Stop in the footer);
   - step 3: reading 1 at the start, then "Dim to {start − 4}"; Next only after two; fit marked approximate; the third
     reading only when a limit is known; an off-line third reading asks to type it again;
-  - a fault report in steps 1–3 shows the banner, then the ended-by-power-trouble state with Save {lastGood} as the
+  - a fault report in steps 1–3 shows the banner, then the ended-by-power-trouble state with Save {faultLimit} as the
     primary; settling faults join the same incident;
   - step 4's Start is replaced on the panel itself;
   - Stop is always visible while the test runs;
