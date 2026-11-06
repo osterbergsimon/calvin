@@ -138,6 +138,18 @@
     <SettingRow label="Display check" :id="rowAnchorId('brightnessLimit')">
       <template #description>
         <InlineNote data-test="check-summary">{{ summary }}</InlineNote>
+        <InlineNote v-if="troubleText" tone="warn" data-test="power-trouble">
+          {{ troubleText }} ·
+          <a
+            class="brightness-group__fix"
+            data-test="power-fix-link"
+            :href="POWER_HELP_URL"
+            target="_blank"
+            rel="noopener"
+          >
+            How to fix the power
+          </a>
+        </InlineNote>
       </template>
       <Button data-test="check-open" @click="emit('open-check', { step: 'detect' })">
         Check this display…
@@ -270,6 +282,16 @@ const valueText = computed(() =>
     : `${shownValue.value} on Calvin's scale`
 );
 const limitDate = computed(() => checkedDate(findings.value?.checkedAt));
+const POWER_HELP_URL =
+  "https://github.com/osterbergsimon/calvin/blob/main/docs/setup/KIOSK_POWER.md";
+// Power trouble a check saw (calvin-c805): kept until a later clean check clears it.
+const troubleText = computed(() => {
+  const trouble = findings.value?.powerTrouble;
+  if (!trouble) return "";
+  const when = checkedDate(trouble.at);
+  const where = trouble.level == null ? "at idle" : `at Calvin ${trouble.level}`;
+  return `Power trouble ${where}${when ? ` (${when})` : ""}`;
+});
 const summary = computed(() => checkSummary(findings.value, readings.value, limit.value));
 
 const showSleepMode = computed(() => !avail.value.disabled || sleepMode.value !== "standby");
@@ -357,6 +379,10 @@ const brightnessNote = computed(() => {
 </script>
 
 <style scoped>
+.brightness-group__fix {
+  color: inherit;
+  text-decoration: underline;
+}
 .brightness-group {
   display: flex;
   flex-direction: column;
