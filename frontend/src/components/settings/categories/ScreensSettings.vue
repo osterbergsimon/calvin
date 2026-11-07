@@ -119,6 +119,9 @@
               <template #meta>
                 <InlineNote data-test="screen-id">{{ k.id }}</InlineNote>
                 <InlineNote data-test="screen-summary">{{ summaryFor(k) }}</InlineNote>
+                <InlineNote data-test="screen-last-seen">
+                  {{ k.lastSeen ? `Last seen ${relativeTime(k.lastSeen)}` : "Never seen" }}
+                </InlineNote>
                 <InlineNote
                   v-if="changedSettingCount(k.overrides) > 0"
                   data-test="screen-changed-count"
@@ -640,6 +643,36 @@
         </SettingRow>
       </SettingsSection>
 
+      <SettingsSection id="screen-remove" title="Remove screen">
+        <SettingRow label="Remove this screen">
+          <template #description>
+            <InlineNote>
+              For a screen that has been taken away. Its own settings and calibration are deleted.
+            </InlineNote>
+            <InlineNote v-if="removeBlockedReason" data-test="remove-screen-reason">
+              {{ removeBlockedReason }}
+            </InlineNote>
+          </template>
+          <Button
+            variant="danger"
+            data-test="remove-screen-btn"
+            :disabled="Boolean(removeBlockedReason)"
+            @click="askRemove"
+          >
+            Remove screen
+          </Button>
+        </SettingRow>
+        <InlineNote
+          v-if="removeMsg"
+          class="screens-saved"
+          :tone="toneFor(removeMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ removeMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <!-- Page footer: only when this screen differs from Default (§4). -->
       <Card v-if="selectedChangedCount > 0" data-test="screen-override-footer">
         <InlineNote>
@@ -985,6 +1018,7 @@ function clearMessages() {
   touchMsg.value = "";
   behaviourMsg.value = "";
   footerMsg.value = "";
+  removeMsg.value = "";
 }
 
 function openDefault() {
@@ -1639,9 +1673,44 @@ function askUseAsDefault() {
   confirm.show = true;
 }
 
+const removeMsg = ref("");
+const removeBlockedReason = computed(() =>
+  selectedKiosk.value?.displayCheckActive
+    ? "A display check is running on this screen. Stop it first."
+    : ""
+);
+
+function askRemove() {
+  confirm.mode = "remove";
+  confirm.title = `Remove ${selectedName.value}?`;
+  confirm.message =
+    "Its own settings and calibration are deleted. If this screen is still running, it will show up again the next time it checks in.";
+  confirm.confirmText = "Remove";
+  confirm.show = true;
+}
+
+async function removeSelected() {
+  const id = selectedId.value;
+  if (!id) return;
+  const name = selectedName.value;
+  try {
+    await store.removeKiosk(id);
+  } catch (err) {
+    removeMsg.value =
+      err?.response?.status === 409
+        ? "Couldn't remove it: a display check is running on this screen."
+        : `Couldn't remove ${name}. Try again.`;
+    return;
+  }
+  // Land on the list, which has the next screen to pick.
+  closeDetail();
+  notifications.notify({ severity: "success", eyebrow: "Screens", message: `Removed ${name}.` });
+}
+
 async function onConfirm() {
   const mode = confirm.mode;
   confirm.show = false;
+  if (mode === "remove") return removeSelected();
   if (mode === "reset") {
     await persist(
       withoutAllOverrides(overrides.value),

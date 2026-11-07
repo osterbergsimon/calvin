@@ -12,6 +12,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
@@ -497,6 +498,7 @@ describe("ScreensSettings — one screen's page", () => {
       "section-screen-touch",
       "section-screen-behaviour",
       "section-screen-software",
+      "section-screen-remove",
     ]);
   });
 
@@ -537,7 +539,6 @@ describe("ScreensSettings — one screen's page", () => {
     expect(root.classes()).not.toContain("screens--two-pane");
     // The list stays in the DOM (so state survives) but is hidden by layout.
     expect(wrapper.find("[data-test='screens-list']").exists()).toBe(true);
-    expect(wrapper.find("[data-test='screens-back']").exists()).toBe(true);
 
     await wrapper.find("[data-test='screens-back']").trigger("click");
     expect(wrapper.find("[data-test='screens-category']").classes()).not.toContain(
@@ -2494,5 +2495,60 @@ describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
     await flushPromisesNow();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
+  });
+});
+
+describe("ScreensSettings — remove a screen", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows when each screen was last seen", async () => {
+    const { wrapper } = mountScreens({
+      kiosks: [kiosk({ lastSeen: new Date(Date.now() - 3 * 86400000).toISOString() })],
+    });
+    await flushPromises();
+    expect(wrapper.find("[data-test='screen-last-seen']").text()).toBe("Last seen 3d ago");
+  });
+
+  it("confirms with the screen's name and warns it can come back", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+    await wrapper.find("[data-test='remove-screen-btn']").trigger("click");
+    await flushPromises();
+    const modal = wrapper.findComponent(ConfirmModal);
+    expect(modal.props("show")).toBe(true);
+    expect(modal.props("title")).toBe("Remove kitchen-pi?");
+    expect(modal.props("message")).toContain("it will show up again the next time it checks in");
+    expect(modal.props("confirmText")).toBe("Remove");
+    expect(modal.props("danger")).toBe(true);
+  });
+
+  it("removes the screen and returns to the list", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk(), kiosk({ id: "hall", hostname: "hall-pi" })],
+    });
+    store.removeKiosk = vi.fn(async id => {
+      store.kiosks = store.kiosks.filter(k => k.id !== id);
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    await wrapper.find("[data-test='remove-screen-btn']").trigger("click");
+    await flushPromises();
+    wrapper.findComponent(ConfirmModal).vm.$emit("confirm");
+    await flushPromises();
+    expect(store.removeKiosk).toHaveBeenCalledWith("kitchen");
+    expect(wrapper.findAll("[data-test='screen-card']")).toHaveLength(1);
+    expect(wrapper.find("[data-test='remove-screen-btn']").exists()).toBe(false);
+  });
+
+  it("is disabled, with the reason, while a display check runs", async () => {
+    const { wrapper } = mountScreens({ kiosks: [kiosk({ displayCheckActive: true })] });
+    await flushPromises();
+    await selectFirst(wrapper);
+    const btn = wrapper.find("[data-test='remove-screen-btn']");
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(wrapper.find("[data-test='remove-screen-reason']").text()).toContain(
+      "display check is running"
+    );
   });
 });

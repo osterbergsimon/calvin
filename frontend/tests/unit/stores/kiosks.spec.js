@@ -226,3 +226,27 @@ describe("kiosks store — triggerUpdate", () => {
     expect(api.post).toHaveBeenCalledWith("/kiosks/a%2Fb/update");
   });
 });
+
+describe("kiosks store — removeKiosk", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it("deletes the screen and drops it from the list", async () => {
+    api.delete.mockResolvedValue({ data: { removed: true } });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "a/b" }, { id: "k2" }];
+    await store.removeKiosk("a/b");
+    expect(api.delete).toHaveBeenCalledWith("/kiosks/a%2Fb");
+    expect(store.kiosks.map(k => k.id)).toEqual(["k2"]);
+  });
+
+  it("keeps the screen when the server refuses", async () => {
+    api.delete.mockRejectedValue({ response: { status: 409 } });
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1" }];
+    await expect(store.removeKiosk("k1")).rejects.toBeTruthy();
+    expect(store.kiosks).toHaveLength(1);
+  });
+});

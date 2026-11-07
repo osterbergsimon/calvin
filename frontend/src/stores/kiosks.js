@@ -85,6 +85,14 @@ export const useKiosksStore = defineStore("kiosks", () => {
     }
   }
 
+  // Removes the screen's row and everything stored for it. A screen that is
+  // still running shows up again on its next check-in.
+  async function removeKiosk(id) {
+    await api.delete(`/kiosks/${encodeURIComponent(id)}`);
+    kiosks.value = kiosks.value.filter(k => k.id !== id);
+    setCachedData(CACHE_KEY, kiosks.value);
+  }
+
   async function triggerUpdate(id) {
     await api.post(`/kiosks/${encodeURIComponent(id)}/update`);
     await loadKiosks();
@@ -108,6 +116,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     mergeOverrides,
     setKioskOverrides,
     fetchDeviceConfigVersion,
+    removeKiosk,
     triggerUpdate,
     fetchAvailableAgentVersion,
   };

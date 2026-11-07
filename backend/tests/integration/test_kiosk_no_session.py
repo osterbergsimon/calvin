@@ -52,3 +52,8 @@ def test_screen_now_override_needs_admin(test_client):
         json={"overrides": {"screenNow": {"power": "off", "setAt": "2026-11-01T20:00:00Z"}}},
     )
     assert response.status_code == 401
+
+
+def test_kiosk_remove_needs_admin(test_client):
+    response = test_client.delete("/api/kiosks/no-session-kiosk")
+    assert response.status_code == 401

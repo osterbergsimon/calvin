@@ -242,9 +242,32 @@ async def list_kiosks() -> list[dict]:
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
             "displayCheck": display_check.findings_view(row.display_check_findings),
+            "displayCheckActive": bool((display_check.view_of(row.display_check) or {}).get("active")),
         }
         for row in rows
     ]
+
+
+@retry_on_db_locked()
+async def remove_kiosk(kiosk_id: str) -> bool:
+    """Delete a kiosk's row and with it everything keyed by it.
+
+    The overrides (calibration, the pending update request) and the display-check
+    run and findings are columns of the same row, so one delete clears them all.
+    Returns False for an unknown kiosk; raises ``display_check.RunActiveError``
+    while a display check is active on it.
+    """
+    if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
+        return False
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return False
+    current = display_check.view_of(row.display_check)
+    if current and current["active"]:
+        raise display_check.RunActiveError(current)
+    await row.delete()
+    logger.info(f"Removed kiosk {kiosk_id!r}")
+    return True
 
 
 @retry_on_db_locked()
