@@ -59,6 +59,19 @@ describe("ThemeSelector", () => {
     );
   });
 
+  it("shows each theme as a light thumbnail and a dark one", () => {
+    const w = mountSelector({ showBothModes: true });
+    const ocean = w.findAll(".theme-selection-item")[1];
+    const previews = ocean.findAll(".theme-preview-mini");
+    expect(previews).toHaveLength(2);
+    expect(previews[0].element.style.backgroundColor).toBe("rgb(217, 236, 243)");
+    expect(previews[1].element.style.backgroundColor).toBe("rgb(7, 23, 31)");
+    expect(ocean.findAll(".theme-preview-caption").map(node => node.text())).toEqual([
+      "Light",
+      "Dark",
+    ]);
+  });
+
   it("renders page, panel, button and tag in the preview", () => {
     const w = mountSelector();
     const row = w.findAll(".theme-selection-item")[1];

@@ -4,7 +4,7 @@ import api from "@/services/api";
 import { useKiosksStore } from "@/stores/kiosks";
 
 vi.mock("@/services/api", () => ({
-  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
   LONG_REQUEST_TIMEOUT: 600000,
 }));
 
@@ -55,6 +55,75 @@ describe("kiosks store", () => {
     }
   });
 
+  it("refreshKiosks merges presence and software fields without replacing overrides", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [
+      {
+        id: "k1",
+        hostname: "pi",
+        lastSeen: "2026-07-12T00:00:00Z",
+        agentVersion: "old",
+        overrides: { displayName: "Draft name", orientation: "portrait" },
+      },
+    ];
+    api.get.mockResolvedValueOnce({
+      data: {
+        kiosks: [
+          {
+            id: "k1",
+            hostname: "pi",
+            lastSeen: "2026-07-12T00:00:30Z",
+            agentVersion: "new",
+            agentUpdateStatus: "ok",
+            overrides: { displayName: "Server name" },
+          },
+        ],
+      },
+    });
+
+    await store.refreshKiosks();
+
+    expect(store.kiosks[0]).toMatchObject({
+      lastSeen: "2026-07-12T00:00:30Z",
+      agentVersion: "new",
+      agentUpdateStatus: "ok",
+    });
+    expect(store.kiosks[0].overrides).toEqual({
+      displayName: "Draft name",
+      orientation: "portrait",
+    });
+  });
+
+  it("refreshKiosks ignores an older response that arrives after the latest refresh", async () => {
+    const store = useKiosksStore();
+    let resolveFirst;
+    let resolveSecond;
+    api.get
+      .mockReturnValueOnce(new Promise(resolve => (resolveFirst = resolve)))
+      .mockReturnValueOnce(new Promise(resolve => (resolveSecond = resolve)));
+
+    const first = store.refreshKiosks();
+    const second = store.refreshKiosks();
+    resolveSecond({ data: { kiosks: [{ id: "k1", lastSeen: "newest" }] } });
+    await second;
+    resolveFirst({ data: { kiosks: [{ id: "k1", lastSeen: "stale" }] } });
+    await first;
+
+    expect(store.kiosks[0].lastSeen).toBe("newest");
+  });
+
+  it("refreshKiosks quietly keeps the current list when the request fails", async () => {
+    const store = useKiosksStore();
+    store.kiosks = [{ id: "k1", lastSeen: "2026-07-12T00:00:00Z" }];
+    const current = store.kiosks;
+    api.get.mockRejectedValueOnce(new Error("offline"));
+
+    await store.refreshKiosks();
+
+    expect(store.kiosks).toBe(current);
+    expect(store.kiosks[0].lastSeen).toBe("2026-07-12T00:00:00Z");
+  });
+
   it("fetchOverrides returns the layer, maps 404 to empty", async () => {
     const store = useKiosksStore();
     api.get.mockResolvedValueOnce({ data: { id: "k1", overrides: { orientation: "portrait" } } });
@@ -69,6 +138,33 @@ describe("kiosks store", () => {
     await store.saveOverrides("a b", { orientation: "portrait" });
     expect(api.put).toHaveBeenCalledWith("/kiosks/a%20b/overrides", {
       overrides: { orientation: "portrait" },
+    });
+  });
+
+  it("mergeOverrides PATCHes only the changed keys and returns the merged layer", async () => {
+    // A screen without admin may only send the keys it is changing (F2); the
+    // server merges them into the layer it already has.
+    api.patch.mockResolvedValue({
+      data: { id: "k1", overrides: { orientation: "portrait", showUI: false } },
+    });
+    const store = useKiosksStore();
+
+    const merged = await store.mergeOverrides("k1", { showUI: false });
+
+    expect(api.patch).toHaveBeenCalledWith("/kiosks/k1/overrides", {
+      overrides: { showUI: false },
+    });
+    expect(api.put).not.toHaveBeenCalled();
+    expect(merged).toEqual({ orientation: "portrait", showUI: false });
+  });
+
+  it("mergeOverrides url-encodes the id and tolerates a bare response", async () => {
+    api.patch.mockResolvedValue({ data: {} });
+    const store = useKiosksStore();
+
+    expect(await store.mergeOverrides("a/b", { showUI: true })).toBeNull();
+    expect(api.patch).toHaveBeenCalledWith("/kiosks/a%2Fb/overrides", {
+      overrides: { showUI: true },
     });
   });
 });

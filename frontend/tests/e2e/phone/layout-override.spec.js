@@ -2,8 +2,8 @@
  * calvin-tnkg — a screen can force the desktop layout.
  *
  * At a phone's 390x844 the layout is the phone one. Choosing Desktop in
- * Settings › Screens › Default › Behaviour must switch to the desktop layout
- * and survive a reload; Auto must keep today's phone layout.
+ * Settings › Screens › Default › Behaviour (the household default) must switch
+ * the layout and survive a reload; Auto must keep today's phone layout.
  */
 
 import { expect } from "@playwright/test";
@@ -48,9 +48,11 @@ test("Auto keeps the phone layout and Desktop forces the desktop one", async ({
   await layout.getByRole("radio", { name: "Desktop" }).click();
   await expect(html).toHaveClass(/calvin-layout-desktop/);
   await expect.poll(() => settingsColumns(page)).toBe(2);
-  expect(await page.evaluate(() => localStorage.getItem("calvin-layout-mode"))).toBe("desktop");
+  // Default is the household value, so it writes /api/config, not this browser.
+  await expect.poll(() => api.config.layoutMode).toBe("desktop");
+  expect(await page.evaluate(() => localStorage.getItem("calvin-layout-mode"))).toBeNull();
 
-  // The choice is remembered for this browser.
+  // The household choice is remembered across a reload.
   await page.reload();
   await expect(page.locator("html")).toHaveClass(/calvin-layout-desktop/);
   await expectSettingsReady(page);
@@ -64,7 +66,8 @@ test("Auto keeps the phone layout and Desktop forces the desktop one", async ({
     .click();
   await expect(page.locator("html")).not.toHaveClass(/calvin-layout-desktop/);
   await expect.poll(() => settingsColumns(page)).toBe(1);
-  expect(await page.evaluate(() => localStorage.getItem("calvin-layout-mode"))).toBe("auto");
+  await expect.poll(() => api.config.layoutMode).toBe("auto");
+  expect(await page.evaluate(() => localStorage.getItem("calvin-layout-mode"))).toBeNull();
 
   expect(api.unmatched).toEqual([]);
   expect(consoleErrors).toEqual([]);

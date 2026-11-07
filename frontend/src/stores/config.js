@@ -14,6 +14,7 @@ import {
   setRegionView,
 } from "../utils/layout";
 import { applyConfigPayload, createDefaultDisplaySchedule } from "./configRegistry";
+import { useActiveRegionStore } from "./activeRegion";
 import { migrateDisplaySettings } from "../utils/displaySettingsMigration";
 import { configPath, getKioskId, withViewport } from "@/utils/kioskId";
 import {
@@ -25,10 +26,25 @@ import {
 } from "../utils/screenSetting";
 import { useKiosksStore } from "./kiosks";
 import { useNotificationsStore } from "./notifications";
+import { SCREEN_SWITCH_SOURCE_ID, SCREEN_SWITCH_TIMING, useProgressStore } from "./progress";
 
 // The config is what a kiosk boots from, so its offline copy is kept for a day
 // and served (flagged stale) even after that when the backend is unreachable.
 const CONFIG_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+const nextFrame = () =>
+  new Promise(resolve => {
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => resolve());
+    else setTimeout(resolve, 0);
+  });
+
+// Two frames: Vue patches the light in a microtask before the first callback,
+// and the second callback lands after the browser has painted it. Only then can
+// the heavy screen patch run without holding the light back.
+const afterPaint = async () => {
+  await nextFrame();
+  await nextFrame();
+};
 
 // Shared with useFocusLight, so its idle fade uses the same default as the
 // input-feedback label rather than duplicating the number.
@@ -71,6 +87,7 @@ export const useConfigStore = defineStore("config", () => {
   const selectedTheme = ref(null); // Selected custom theme ID (null = use themeMode)
   const darkModeStart = ref(18); // Dark mode start hour (0-23, default 18 = 6 PM)
   const darkModeEnd = ref(6); // Dark mode end hour (0-23, default 6 = 6 AM)
+  const typeTheme = ref(null); // Household font id (H4); null = no household choice yet
   const displayScheduleEnabled = ref(false); // Enable display power schedule
   const displaySchedule = ref(createDefaultDisplaySchedule()); // Display schedule per day of week
   const displayTimeoutEnabled = ref(false); // Enable display timeout (screensaver)
@@ -99,8 +116,10 @@ export const useConfigStore = defineStore("config", () => {
   const clockBarVerticalPluginItemSize = ref(16);
   const clockBarShowPluginItems = ref(true);
   const clockBarShowLogo = ref(true);
+  const clockBarDesign = ref(null); // The one household design (docs/design/2026-11-04-clock-bar-editor.md)
   const focusLightMode = ref("interaction");
   const focusLightDimOthers = ref(true);
+  const effectsLevel = ref("auto"); // 'auto' | 'full' | 'standard', per screen (calvin-uudb)
   const loadingLight = ref("comet"); // Loading light style: 'comet' | 'pulse' | 'off' (CLV-115)
   const layoutMode = ref("auto"); // Forced layout per screen: 'auto' | 'desktop' | 'phone' (calvin-tnkg)
   const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
@@ -135,11 +154,19 @@ export const useConfigStore = defineStore("config", () => {
   // Set after the first successful load: from then on the in-memory config is
   // newer than the cached copy, so a failed poll keeps it instead.
   let loadedFromServer = false;
+  // Signature of the last payload written into the config refs. The 30 s poll
+  // returns the same payload most of the time; re-applying it replaces every
+  // reactive object and re-renders all dashboard regions for nothing.
+  let lastAppliedPayloadSignature = null;
+  const payloadSignature = payload => JSON.stringify(payload ?? null);
   // Latches true once the initial config load has settled. Consumers use this
   // to ignore the boot-time hydration, where refs flip from their defaults to
   // the persisted values (e.g. showUI true->false) and would otherwise look
   // like user-driven changes. See NotificationSystem's mode HUD (calvin-2ck).
   const hydrated = ref(false);
+  const activeRegionStore = useActiveRegionStore();
+
+  const syncActiveRegions = () => activeRegionStore.syncScreens(dashboardScreens.value?.screens);
 
   const configRefs = {
     orientation,
@@ -167,6 +194,7 @@ export const useConfigStore = defineStore("config", () => {
     selectedTheme,
     darkModeStart,
     darkModeEnd,
+    typeTheme,
     displayScheduleEnabled,
     displaySchedule,
     displayTimeoutEnabled,
@@ -195,8 +223,10 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
+    clockBarDesign,
     focusLightMode,
     focusLightDimOthers,
+    effectsLevel,
     loadingLight,
     layoutMode,
     regionsLocked,
@@ -344,18 +374,25 @@ export const useConfigStore = defineStore("config", () => {
     const path = withViewport(configPath());
     const cacheKey = `config_${path}`;
     const applyFetched = data => {
+      const signature = payloadSignature(data);
+      if (signature === lastAppliedPayloadSignature) return false;
       applyConfigPayload(data, configRefs, { useDefaults: true });
       if (getKioskId()) {
         availableScreens.value = data?.availableScreens ?? null;
         defaultScreenId.value = data?.defaultScreenId ?? null;
         seedKioskActiveScreen();
       }
+      lastAppliedPayloadSignature = signature;
+      return true;
     };
     try {
       const response = await api.get(path);
-      applyFetched(response.data);
-      await migrateDisplaySettingsOnce(response.data);
-      setCachedData(cacheKey, response.data);
+      const applied = applyFetched(response.data);
+      if (applied) {
+        await migrateDisplaySettingsOnce(response.data);
+        syncActiveRegions();
+        setCachedData(cacheKey, response.data);
+      }
       loadedFromServer = true;
       stale.value = false;
       return response.data;
@@ -364,8 +401,11 @@ export const useConfigStore = defineStore("config", () => {
         const cached = getCachedData(cacheKey, CONFIG_CACHE_TTL, { allowStale: true });
         if (cached) {
           logInfo("[ConfigStore]", "Backend unreachable, using cached config");
-          applyFetched(cached);
-          await migrateDisplaySettingsOnce(cached);
+          const applied = applyFetched(cached);
+          if (applied) {
+            await migrateDisplaySettingsOnce(cached);
+            syncActiveRegions();
+          }
           stale.value = true;
           return cached;
         }
@@ -390,7 +430,10 @@ export const useConfigStore = defineStore("config", () => {
     try {
       const response = await api.post("/config", config);
       applyConfigPayload(config, configRefs);
-      applyConfigPayload(response.data || {}, configRefs);
+      const responseData = response.data || {};
+      applyConfigPayload(responseData, configRefs);
+      syncActiveRegions();
+      lastAppliedPayloadSignature = payloadSignature(responseData);
       return response.data;
     } catch (err) {
       captureError(err, "save your settings", "Failed to update config:");
@@ -560,18 +603,74 @@ export const useConfigStore = defineStore("config", () => {
 
   const setDashboardScreens = screens => {
     dashboardScreens.value = normalizeDashboardScreens(screens);
+    syncActiveRegions();
   };
 
-  const activateDashboardScreen = async screenId => {
+  // A screen switch is mostly render work: the new layout patches after the
+  // tap and can block the main thread. Remember how long the last one took so a
+  // device that switches quickly stops paying for a light it never needs.
+  let lastSwitchSettleMs = null;
+
+  const applyScreenSwitch = screenId => {
     if (getKioskId()) {
       // Kiosk mode: local only — never persist to global. Honor availableScreens.
       const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
-      if (ids.has(screenId)) kioskActiveScreenId.value = screenId;
-      return;
+      if (!ids.has(screenId)) return null;
+      kioskActiveScreenId.value = screenId;
+      return null;
     }
     const nextScreens = setActiveDashboardScreen(dashboardScreens.value, screenId);
     dashboardScreens.value = nextScreens;
-    await updateConfig({ dashboardScreens: nextScreens });
+    return updateConfig({ dashboardScreens: nextScreens });
+  };
+
+  const commitScreenSwitch = async screenId => {
+    const startedAt = Date.now();
+    const persistence = applyScreenSwitch(screenId);
+    // The caller still sees a failed save below; catch it now so it is not
+    // reported as unhandled while the light finishes painting.
+    if (persistence && typeof persistence.catch === "function") persistence.catch(() => {});
+    await nextTick();
+    await afterPaint();
+    lastSwitchSettleMs = Date.now() - startedAt;
+    // Return the save rather than awaiting it here: the light ends as soon as
+    // the screen has settled, not when the config write happens to finish.
+    return { persistence };
+  };
+
+  const activateDashboardScreen = async screenId => {
+    const activeId = effectiveDashboardScreens.value.activeScreenId;
+    if (screenId === activeId) return;
+    if (getKioskId()) {
+      // A screen this kiosk may not show was always a no-op.
+      const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
+      if (!ids.has(screenId)) return;
+    }
+
+    // "Off" keeps the light off; a device whose last switch was fast skips the
+    // light (and its extra painted-frame wait) for the next one.
+    const fastSwitch =
+      lastSwitchSettleMs != null && lastSwitchSettleMs < SCREEN_SWITCH_TIMING.fastSettleMs;
+    if (loadingLight.value === "off" || fastSwitch) {
+      const { persistence } = await commitScreenSwitch(screenId);
+      if (persistence) await persistence;
+      return;
+    }
+
+    const progress = useProgressStore();
+    const { persistence } = await progress.track(
+      SCREEN_SWITCH_SOURCE_ID,
+      async () => {
+        // Paint the light first, then let the patch take the main thread.
+        await afterPaint();
+        return commitScreenSwitch(screenId);
+      },
+      {
+        immediate: true,
+        minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+      }
+    );
+    if (persistence) await persistence;
   };
 
   const cycleDashboardScreenBy = async direction => {
@@ -692,6 +791,7 @@ export const useConfigStore = defineStore("config", () => {
     selectedTheme,
     darkModeStart,
     darkModeEnd,
+    typeTheme,
     displayScheduleEnabled,
     displaySchedule,
     displayTimeoutEnabled,
@@ -719,6 +819,7 @@ export const useConfigStore = defineStore("config", () => {
     clockBarVerticalPluginItemSize,
     clockBarShowPluginItems,
     clockBarShowLogo,
+    clockBarDesign,
     uiSize,
     consoleLogEnabled,
     consoleLogLevel,
@@ -728,6 +829,7 @@ export const useConfigStore = defineStore("config", () => {
     pluginCatalogRepo,
     focusLightMode,
     focusLightDimOthers,
+    effectsLevel,
     loadingLight,
     layoutMode,
     regionsLocked,

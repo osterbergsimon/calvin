@@ -49,6 +49,7 @@ defineProps({
 
 <style scoped>
 .icon-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -59,6 +60,18 @@ defineProps({
     background var(--dur),
     border-color var(--dur),
     color var(--dur);
+}
+/* The `sm` box is 28px, below the --touch-target. A transparent ::before
+   widens the tappable area to 44x44 without changing the visible button; it
+   is centred, so two sm buttons --gap-inline (8px) apart only just meet. */
+.icon-btn::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, var(--touch-target));
+  height: max(100%, var(--touch-target));
+  transform: translate(-50%, -50%);
 }
 .icon-btn__glyph {
   width: 1em;

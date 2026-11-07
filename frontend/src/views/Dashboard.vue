@@ -82,7 +82,7 @@
                   :path="regionPath(elementType)"
                   :photo-rotation-interval="configStore.photoRotationInterval"
                   :parent-direction="layoutDirection"
-                  :active-region-id="activeScreen.activeRegionId"
+                  :active-region-id="activeRegionId"
                   :light-active="lightActive"
                   :controls-visible="configStore.shouldShowUI"
                   :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
@@ -191,6 +191,7 @@ const CalendarView = defineAsyncComponent(() => import("../components/CalendarVi
 import { regionChromeVars } from "@/styles/regionChromeScale";
 import { useConfigStore } from "../stores/config";
 import { useModeStore } from "../stores/mode";
+import { useActiveRegionStore } from "../stores/activeRegion";
 import { useFirstLoadLight } from "../composables/useFirstLoadLight";
 import { useRoute } from "vue-router";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
@@ -212,6 +213,7 @@ import {
 } from "../utils/layout";
 
 const configStore = useConfigStore();
+const activeRegionStore = useActiveRegionStore();
 
 // Press-and-hold in the reveal corner shows the UI while it's hidden. Runs at
 // the window level so the corner visual stays pointer-events:none and content
@@ -241,6 +243,9 @@ const barVisible = computed(
 
 const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
+// Focus/tap moves the session bookmark only; the persisted screen config is
+// written by the editor, not by every interaction.
+const activeRegionId = computed(() => activeRegionStore.getActiveRegionId(activeScreen.value));
 
 // CLV-20: the ordered content regions of the active screen drive the single
 // setup prompt. EmptyState instances report which of them are setup-empty.
@@ -527,7 +532,7 @@ const regionContainsLeaf = (region, leafId) => {
 };
 const isLitSection = elementType => {
   if (!lightActive.value) return false;
-  return regionContainsLeaf(getRegionForElement(elementType), activeScreen.value?.activeRegionId);
+  return regionContainsLeaf(getRegionForElement(elementType), activeRegionId.value);
 };
 
 const startConfigPolling = () => {

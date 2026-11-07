@@ -27,8 +27,9 @@ New to Calvin? Get started quickly:
 6. **[Deployment Topologies](setup/DEPLOYMENT_TOPOLOGIES.md)** - All-in-one Pi vs. remote backend + kiosk Pi
 7. **[Install a Kiosk Pi](setup/KIOSK_INSTALL.md)**: fresh SD card to Calvin kiosk with one command (Mode B)
 8. **[Kiosk Provisioning & Self-Update](setup/KIOSK_PROVISIONING.md)** - Zero-touch Pi provisioning and admin-triggered display-agent updates from the server
-9. **[Unraid Deployment](setup/UNRAID.md)** - Run the backend as an Unraid Docker app
-10. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
+9. **[Kiosk power](setup/KIOSK_POWER.md)** - Fixing under-voltage and touch resets with a USB-powered touch panel
+10. **[Unraid Deployment](setup/UNRAID.md)** - Run the backend as an Unraid Docker app
+11. **[Plugin Development](plugins/PLUGIN_DEVELOPMENT_GUIDE.md)** - Create your first plugin
 
 ## Documentation Structure
 

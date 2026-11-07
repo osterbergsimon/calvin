@@ -1,14 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import api from "@/services/api";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { useConfigStore } from "@/stores/config";
 import { useNotificationsStore } from "@/stores/notifications";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
 
 vi.mock("@/services/api", () => ({
   default: {
     get: vi.fn(),
     put: vi.fn(),
+    patch: vi.fn(),
     post: vi.fn(),
   },
 }));
@@ -55,6 +58,20 @@ describe("useScreenSetting", () => {
     const setting = mountBrowser("auto");
 
     expect(setting.value.value).toBe("off");
+  });
+
+  it("ignores and never writes localStorage when the key has no browser layer", async () => {
+    window.localStorage.setItem("calvin-screen-loadingLight", "pulse");
+    const config = useConfigStore();
+    config.loadingLight = "comet";
+    const setting = useScreenSetting("loadingLight");
+
+    expect(setting.value.value).toBe("comet");
+    expect(setting.overridden.value).toBe(false);
+
+    await setting.set("off");
+    expect(window.localStorage.getItem("calvin-screen-loadingLight")).toBe("pulse");
+    expect(setting.value.value).toBe("comet");
   });
 
   it("falls back to the server value when storage throws", () => {
@@ -115,23 +132,35 @@ describe("useScreenSetting", () => {
     expect(setting.value.value).toBe(false);
   });
 
-  it("round-trips an array choice (photo-frame sources)", async () => {
+  it("follows the household value for a setting without a browser layer", async () => {
+    window.localStorage.setItem("calvin-screen-hotCornerSize", "120");
     const config = useConfigStore();
-    config.photoFrameSourceIds = [];
-    const setting = useScreenSetting("photoFrameSourceIds");
+    config.hotCornerSize = 64;
+
+    const setting = useScreenSetting("hotCornerSize");
+
+    expect(setting.value.value).toBe(64);
+    await setting.set(100);
+    // The write is a no-op; the Settings rows now write the household config or
+    // the screen's overrides instead.
+    expect(window.localStorage.getItem("calvin-screen-hotCornerSize")).toBe("120");
+  });
+
+  it("round-trips an array choice for a key that keeps a browser layer", async () => {
+    const setting = useScreenSetting("demoSourceIds", { serverValue: () => [] });
 
     await setting.set(["src-a", "src-b"]);
 
-    expect(window.localStorage.getItem("calvin-screen-photoFrameSourceIds")).toBe(
-      '["src-a","src-b"]'
-    );
+    expect(window.localStorage.getItem("calvin-screen-demoSourceIds")).toBe('["src-a","src-b"]');
     expect(setting.value.value).toEqual(["src-a", "src-b"]);
   });
 
-  it("merges a kiosk choice into that kiosk's whole overrides object", async () => {
+  it("sends only the changed key to that kiosk's overrides, which the server merges", async () => {
     window.sessionStorage.setItem(KIOSK_KEY, "hallway");
     api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
-    api.put.mockResolvedValue({ data: {} });
+    api.patch.mockResolvedValue({
+      data: { overrides: { orientation: "portrait", onScreenKeyboard: "on" } },
+    });
     const config = useConfigStore();
     config.onScreenKeyboard = "auto";
     const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
@@ -140,9 +169,12 @@ describe("useScreenSetting", () => {
     await setting.set("on");
 
     expect(api.get).toHaveBeenCalledWith("/kiosks/hallway/overrides");
-    expect(api.put).toHaveBeenCalledWith("/kiosks/hallway/overrides", {
-      overrides: { orientation: "portrait", onScreenKeyboard: "on" },
+    // A kiosk without admin may only send what it changes: a full-layer PUT
+    // needs admin and would be refused (F2).
+    expect(api.patch).toHaveBeenCalledWith("/kiosks/hallway/overrides", {
+      overrides: { onScreenKeyboard: "on" },
     });
+    expect(api.put).not.toHaveBeenCalled();
     expect(setting.value.value).toBe("on");
     expect(window.localStorage.getItem("calvin-osk-mode")).toBeNull();
   });
@@ -150,7 +182,7 @@ describe("useScreenSetting", () => {
   it("keeps the kiosk's stored value and warns when the save fails", async () => {
     window.sessionStorage.setItem(KIOSK_KEY, "hallway");
     api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
-    api.put.mockRejectedValue(new Error("offline"));
+    api.patch.mockRejectedValue(new Error("offline"));
     const config = useConfigStore();
     config.onScreenKeyboard = "auto";
     const notifications = useNotificationsStore();
@@ -164,5 +196,149 @@ describe("useScreenSetting", () => {
     expect(notify).toHaveBeenCalledWith(
       expect.objectContaining({ severity: "error", message: expect.stringContaining("unchanged") })
     );
+  });
+
+  describe("optimistic kiosk writes (calvin-g25v)", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      window.sessionStorage.setItem(KIOSK_KEY, "hallway");
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows the chosen value while the save is still pending", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+      api.patch.mockImplementation(() => new Promise(() => {}));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      setting.set("on");
+
+      expect(setting.value.value).toBe("on");
+      expect(api.patch).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(setting.value.value).toBe("on");
+    });
+
+    it("sends one kiosk save with the final value for two quick taps", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+      api.patch.mockResolvedValue({ data: { overrides: {} } });
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const first = setting.set("on");
+      const second = setting.set("off");
+      expect(setting.value.value).toBe("off");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(api.patch).toHaveBeenCalledTimes(1);
+      expect(api.patch).toHaveBeenCalledWith("/kiosks/hallway/overrides", {
+        overrides: { onScreenKeyboard: "off" },
+      });
+
+      await Promise.all([first, second]);
+    });
+
+    it("restores the previous value before reporting a failed save", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { orientation: "portrait" } } });
+      api.patch.mockRejectedValue(new Error("offline"));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const notifications = useNotificationsStore();
+      const notify = vi.spyOn(notifications, "notify");
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const pending = setting.set("on");
+      expect(setting.value.value).toBe("on");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await pending;
+
+      expect(setting.value.value).toBe("auto");
+      expect(config.onScreenKeyboard).toBe("auto");
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: "error",
+          message: expect.stringContaining("unchanged"),
+        })
+      );
+    });
+
+    it("shows a later server change after a failed save", async () => {
+      api.get.mockResolvedValue({ data: { overrides: { onScreenKeyboard: "auto" } } });
+      api.patch.mockRejectedValue(new Error("offline"));
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const pending = setting.set("on");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await pending;
+      expect(setting.value.value).toBe("auto");
+
+      config.onScreenKeyboard = "off";
+      await nextTick();
+      expect(setting.value.value).toBe("off");
+    });
+
+    it("keeps another row's pending value when one row's save fails", async () => {
+      api.get.mockResolvedValue({ data: { overrides: {} } });
+      let rejectFirst;
+      api.patch
+        .mockImplementationOnce(
+          () =>
+            new Promise((_resolve, reject) => {
+              rejectFirst = reject;
+            })
+        )
+        .mockResolvedValueOnce({ data: { overrides: { touchControls: "off" } } });
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      config.touchControls = "auto";
+      const osk = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+      const touch = useScreenSetting("touchControls", { storageKey: "calvin-touch-controls" });
+
+      const first = osk.set("on");
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      const second = touch.set("off");
+      expect(touch.value.value).toBe("off");
+
+      rejectFirst(new Error("offline"));
+      await first;
+      expect(osk.value.value).toBe("auto");
+      expect(touch.value.value).toBe("off");
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await second;
+      expect(api.patch).toHaveBeenLastCalledWith("/kiosks/hallway/overrides", {
+        overrides: { touchControls: "off" },
+      });
+    });
+
+    it("resets a kiosk override with a whole-layer write, which needs admin", async () => {
+      // A partial write cannot delete a key, so "Reset to default" still sends
+      // the layer (PUT). Without admin the server refuses it, as before: only
+      // the allowlisted rows are open to a kiosk (F2).
+      api.get.mockResolvedValue({ data: { overrides: { onScreenKeyboard: "on" } } });
+      api.put.mockResolvedValue({ data: {} });
+      const config = useConfigStore();
+      config.onScreenKeyboard = "auto";
+      const setting = useScreenSetting("onScreenKeyboard", { storageKey: "calvin-osk-mode" });
+
+      const pending = setting.reset();
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await pending;
+
+      expect(api.put).toHaveBeenCalledWith("/kiosks/hallway/overrides", {
+        overrides: {},
+      });
+    });
   });
 });

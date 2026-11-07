@@ -57,8 +57,7 @@ describe("settings registry", () => {
       "dashboard-kiosk",
       "dashboard-kiosk-focus",
       "screen-behaviour",
-      "clock-bar-appearance",
-      "clock-bar-items",
+      "clock-bar",
       "content-calendars",
       "content-calendar-display",
       "content-photos",
@@ -129,21 +128,35 @@ describe("settings registry", () => {
       section: "layout",
       path: "Screens / Default · Display",
     });
+    // Look moved from Dashboard › Appearance to Screens (§7 item 6); the old
+    // deep link and words still land on the new section.
+    expect(getSettingDestinationById("dashboard-ui")).toMatchObject({
+      category: "screens",
+      section: "screen-look",
+      path: "Screens / Default · Look",
+    });
     expect(getSettingDestinationById("dashboard-regions")).toMatchObject({
       category: "dashboard",
       path: "Dashboard / Pages & regions",
     });
     expect(getSettingDestinationById("clock-bar-appearance")).toMatchObject({
+      id: "clock-bar",
       category: "dashboard",
       tab: "clock",
       tabKey: "settings_tab_dashboard",
-      path: "Dashboard / Clock",
+      path: "Dashboard / Clock bar",
     });
     expect(getSettingDestinationById("clock-bar-items")).toMatchObject({
+      id: "clock-bar",
       category: "dashboard",
-      tab: "bar-items",
+      tab: "clock",
       tabKey: "settings_tab_dashboard",
-      path: "Dashboard / Clock bar items",
+      path: "Dashboard / Clock bar",
+    });
+    expect(getSettingDestinationById("clock-bar-layout")).toMatchObject({
+      id: "clock-bar",
+      category: "dashboard",
+      tab: "clock",
     });
     expect(getSettingDestinationById("device-hardware")).toMatchObject({
       category: "maintenance",
@@ -151,11 +164,22 @@ describe("settings registry", () => {
       tabKey: "settings_tab_maintenance",
       path: "System / Versions & status",
     });
-    // Remote & buttons and key-press feedback moved to Dashboard › Focus & remote.
+    // Remote buttons and Hide label after are what is left of Focus & remote.
     expect(getSettingDestinationById("device-notifications")).toMatchObject({
       category: "dashboard",
       section: "kiosk-touch-focus",
-      path: "Dashboard / Focus & remote",
+      path: "Dashboard / Remote buttons",
+    });
+    // The per-screen Controls and Effects & focus groups moved to Screens.
+    expect(getSettingDestinationById("dashboard-kiosk")).toMatchObject({
+      category: "screens",
+      section: "screen-controls",
+      path: "Screens / Default · Controls",
+    });
+    expect(getSettingDestinationById("dashboard-kiosk-focus")).toMatchObject({
+      category: "screens",
+      section: "screen-effects",
+      path: "Screens / Default · Effects & focus",
     });
     expect(getSettingDestinationById("device-power")).toMatchObject({
       category: "screens",
@@ -172,6 +196,40 @@ describe("settings registry", () => {
       section: "device-keyboard",
       path: "Screens / Default · Touch & keyboard",
     });
+  });
+
+  it("finds Look with the old appearance, theme, dark mode and font words", () => {
+    for (const word of ["appearance", "theme", "dark mode", "font", "typeface"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("dashboard-ui");
+    }
+    expect(filterSettingsDestinations("dashboard size").map(item => item.id)).toContain(
+      "dashboard-layout"
+    );
+    expect(filterSettingsDestinations("settings text size").map(item => item.id)).toContain(
+      "dashboard-layout"
+    );
+  });
+
+  it("finds the moved Controls and Effects rows with their old words", () => {
+    for (const word of ["controls", "hot corner", "hide controls", "dashboard"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("dashboard-kiosk");
+    }
+    for (const word of ["focus", "focus light", "dim", "dashboard", "controls"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toContain("dashboard-kiosk-focus");
+    }
+    // Remote buttons and Hide label after stayed in Dashboard.
+    expect(filterSettingsDestinations("hide label after").map(item => item.id)).toContain(
+      "device-notifications"
+    );
   });
 
   it("points the moved behaviour rows at Screens while the old words still find them", () => {
@@ -200,17 +258,14 @@ describe("settings registry", () => {
   });
 
   it("searches labels, paths, and keywords under the new names", () => {
-    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual([
-      "clock-bar-appearance",
-    ]);
-    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar-items"]);
+    expect(filterSettingsDestinations("seconds").map(item => item.id)).toEqual(["clock-bar"]);
+    expect(filterSettingsDestinations("tiles").map(item => item.id)).toEqual(["clock-bar"]);
+    expect(filterSettingsDestinations("two lines").map(item => item.id)).toEqual(["clock-bar"]);
     // "github" is a plugin-install word; the update source now lives in Advanced.
     expect(filterSettingsDestinations("github").map(item => item.id)).toContain("plugins");
 
     // Old names still find their new home.
-    expect(filterSettingsDestinations("clock bar").map(item => item.id)).toContain(
-      "clock-bar-items"
-    );
+    expect(filterSettingsDestinations("clock bar").map(item => item.id)).toContain("clock-bar");
     expect(filterSettingsDestinations("display").map(item => item.id)).toContain(
       "dashboard-layout"
     );

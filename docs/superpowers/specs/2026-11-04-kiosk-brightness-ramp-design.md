@@ -1,0 +1,416 @@
+# Kiosk brightness ramp at sleep/wake, and a display diagnostics helper
+
+Status: design, owner-approved functionality (2026-11-04). UI/UX goes through the design lead. Bead: calvin-29ws.
+Motivation and evidence: calvin-ppiu.
+
+## 1. Why
+
+On the Pi 3B+ kiosk the touch panel (Logicom NOMAD TOUCH) is fed by a Y-cable: USB-C into the panel, the data
+leg into the Pi, the power leg into a PSU. With no power blocker on the data leg, the panel also draws 5 V through
+the Pi. When the panel **wakes from standby at normal brightness** (schedule off, then on; or a manual turn off,
+then on), the surge browns out the Pi. The persistent journal shows `Undervoltage detected!`, then the panel's touch
+controller (`27c0:0859`) resetting every ~2 s, then the Pi resetting, in a loop. The Pi's USB hub also logged
+`over-current change` on its ports. Measured on 2026-11-04:
+
+- At panel-menu brightness 0–1, off → on works (one wake still dipped under-voltage for ~20 s, then recovered).
+- Raising brightness in one DDC step (0 → 50) reset the touch controller. Raising it in steps of 2 every 1.5 s was
+  fine up to DDC 26; at DDC 28 the touch controller reset; the Pi stayed up.
+- DDC and the panel's own menu use different scales: DDC 5 → menu 28, DDC 19 → menu 61, DDC 22 → menu 67
+  (≈ menu 16 + 2.3 × DDC). The panel's DDC read-back is a placeholder: brightness and contrast always read 0.
+
+The hardware fix (a USB power blocker on the data leg) is coming. But other people's kiosks will have the same
+class of problem: a USB-powered panel, a weak supply, a panel whose wake surge is too much. A per-screen ramp makes
+the wake gentle, and a helper lets someone find out what their panel supports and where its limit is.
+
+## 2. Goals
+
+1. A per-screen setting, **Ramp brightness at sleep and wake** (on/off; default off), and a **Brightness** value
+   (DDC 0–100) that Calvin applies after boot and after every wake.
+2. When the ramp is on, the display agent:
+   - before the panel sleeps (schedule boundary, "Turn off now", any off), steps the brightness **down** to 0,
+     then runs the normal off;
+   - after the panel wakes, and after boot, waits until the panel and its USB devices have settled, then steps
+     the brightness **up** to the chosen value.
+3. A **display diagnostics helper**, run from Calvin settings on any device (phone, desktop browser, or the kiosk
+   panel itself once it's onboarded), that:
+   1. checks whether the screen answers over DDC/CI at all (detect, model, VCP version);
+   2. checks whether brightness **writes take effect**, even when reads lie (the owner confirms what they see);
+   3. builds a **DDC → panel-menu conversion** from the owner's readings (set a DDC value, the owner types in the
+      menu value; at least two points), so the UI can show "≈ menu 61" next to the DDC value;
+   4. optionally runs a **careful ramp test** that finds the level where the hardware faults (under-voltage,
+      over-current, a USB device reset) and stores it as this screen's **brightness limit**. Calvin then never
+      steps above it, even if the slider asks for more.
+4. The agent records what it did, so it can be read back. Diagnostics results and each ramp's outcome are visible
+   to the owner in settings, and in the kiosk's journal.
+
+## 3. Non-goals
+
+- Fixing power hardware. The ramp is mitigation; the setup docs should say that a USB-powered touch panel needs a
+  data-only (power-blocked) link to a Pi.
+- Automatic brightness (ambient light, time-of-day curves).
+- DDC power control. Some monitors can't be woken over DDC; the MSI G241 on the Pi 400 is one (see memory
+  `pi400-monitor-freesync`). Power stays with the existing DPMS/fb path.
+- Non-cog display stacks in this round. X11/Wayland kiosks keep today's behaviour; the setting is hidden or
+  disabled there, saying why.
+- Plain browsers (no kiosk agent): the setting and the helper are unavailable there.
+
+## 4. Anti-goals (would be a failure even if it "works")
+
+- **A big brightness step.** Any single write larger than the configured step (default 2 DDC units) is a bug.
+  That's exactly what reset the touch controller on 2026-11-04.
+  Owner exception (2026-11-05): when the agent does not know the panel's level (after an agent start or boot, or
+  after a mid-check reboot) it writes 0 once before off/dim/ramp. A single downward write to 0 is allowed; no upward
+  write may exceed the step.
+- Brightness changes while the panel is asleep or waking, before it has settled.
+- A diagnostics run that can leave the screen dark, or at a level above the limit, if the page or the network
+  goes away mid-run. The agent owns the run and always finishes it in a safe state.
+- Any change in behaviour for screens with the setting off. The agent never touches brightness unless the
+  setting is on, or a diagnostics run is active.
+- Flapping: a ramp must not race another on/off. A new on/off cancels the running ramp cleanly.
+
+## 5. Constraints and facts
+
+- The DDC work runs in the **display agent on the Pi** (`deploy/kiosk-agent/calvin_display_agent.py`): only it can
+  reach the panel. It calls `ddcutil` (already used on the Pi 400; it needs the `ddcutil` package and the `i2c-dev`
+  module, so `install-kiosk.sh` and the updater must provide both). On the 3B+ the bus was `/dev/i2c-2`, connector
+  `card0-HDMI-A-1`. Use `--bus` (or the connector) to stay fast; `ddcutil detect` is slow.
+- Power on/off on cog goes through `calvin-cog-panel.sh on|off` (`apply_on_cog`). The ramp wraps it: down, then
+  `off`; `on`, then settle, then up.
+- Settle signal after wake (my call; the builder may refine it): DRM connector `connected`, plus no new
+  `usb … reset` / `Undervoltage` kernel lines for ~5 s, plus `calvin-cog` active. Cap the wait at ~30 s, then ramp
+  anyway, still with fault checks.
+- Fault detection during any ramp: `vcgencmd get_throttled` bit 0 (under-voltage now), and new kernel lines
+  matching `Undervoltage detected`, `over-current`, `usb .*: reset`. On a fault: stop, step back down by two steps,
+  record the level, and don't retry above it until the next wake.
+- The agent's normal poll is 60 s (`DEFAULT_REFRESH_SECONDS`). Diagnostics need a back-and-forth with the owner,
+  so while a diagnostics run is requested the agent polls every 1–2 s (my call), and falls back afterwards and
+  after a timeout (~10 min).
+- Settings follow the settings-scope spec (`docs/design/2026-11-03-settings-scope.md`). The ramp, the brightness,
+  the conversion and the limit are **per-screen** (device-physical) values with no household default except
+  "ramp off". They're added as per-screen descriptors next to `displayScheduleEnabled` in
+  `frontend/src/utils/screenOverrides.js`, typed on the backend's per-screen write paths.
+- The kiosk config the agent polls is `/api/kiosks/{id}/config` (`backend/app/api/routes/kiosks.py`). The agent
+  already reports `kagent`/`kstat`/`kmsg` on that poll; diagnostics results need a small structured report
+  channel (a POST from the agent, or richer poll params; the builder chooses), stored per kiosk and shown in
+  settings.
+- Kiosk agent self-update ships through the bundle; a backend that offers the setting to an agent too old to
+  honour it must say so ("update the kiosk agent") rather than silently doing nothing.
+- Never run kiosk tests during a sleep window (see memory `pi-kiosk-webdriver-testing`).
+
+## 6. Decided (by the owner)
+
+- Setting shape: **ramp at sleep/wake y/n**; if yes, **which brightness to set once up** (after boot and wake).
+- Brightness is the value set in **Calvin's screen settings**, applied over DDC.
+- A helper to diagnose when DDC and the screen don't match, run from **Calvin settings on a phone, a browser, or
+  the panel itself** if it's onboarded.
+- UI/UX by the design lead; functionality as above.
+
+Answers to the design lead's review (owner, 2026-11-04, all as recommended):
+
+1. **The Brightness slider applies now** while the screen is awake: ramped at the same step to the new value, never
+   above the limit, with "Changing…" feedback. It's also re-applied after boot and every wake.
+2. **The limit-finding ramp test may crash or reboot the kiosk**, so it's offered **only from another device**
+   (phone or desktop), never from the kiosk panel itself. The panel offers the safe steps only (detect, writes,
+   conversion). Warn before starting that the screen may restart; the agent finishes a run safely on its own after
+   a reboot.
+3. **"Turn off now" dims first, then turns off** ("Dimming… then off" in the UI). At a schedule boundary the dim
+   **starts at the boundary**, not early.
+4. **Turning the ramp off while the screen sleeps** (at DDC 0): at the next wake the agent does one last careful
+   step-up to the chosen brightness, then stops touching brightness. This is the only exception to "never touch
+   brightness when the ramp is off".
+5. **With a conversion, the slider reads in the panel's own menu numbers** ("≈ 61 on the screen's menu", with the
+   DDC value in small text); storage stays DDC. Without a conversion it uses DDC units, with a pointer to the helper.
+   This replaces the first item in section 7.
+
+6. **"Dim only" sleep mode** (owner, 2026-11-04 late). Per screen: **At sleep: Standby** (default, today's
+   behaviour) **or Dim only**. With Dim only, a sleep (schedule boundary or "Turn off now") ramps the brightness down
+   to 0 and leaves the panel and the page running: no DPMS power-down, cog keeps running. A wake ramps back up to the
+   chosen brightness. It needs DDC (it's unavailable where DDC isn't). Trade-off shown in the UI: the backlight never
+   fully turns off and the page keeps running. Coordinator calls: dim to DDC 0; the setting lives in the same
+   Brightness group; it doesn't require "Ramp brightness" to be on (Dim only always ramps). Config key: sleepMode =
+   "standby" | "dim".
+
+## 7. My calls (marked; the owner can overturn them)
+
+- The slider is on the **DDC scale (0–100)**, because that's what Calvin controls. With a conversion, the UI also
+  shows the estimated panel-menu value. Without one, it shows the DDC value only and says why.
+- Default step: 2 DDC units every 1.5 s (tonight's proven-safe pace), configurable per screen in advanced settings.
+- Ramp down before sleep goes to DDC 0.
+- The conversion is linear from ≥2 points (the owner can add more); show "estimated".
+- If the helper's ramp test found a limit, the brightness slider's max is the limit minus two steps.
+- With the ramp off, the agent never touches brightness. With it on but DDC unsupported, the setting shows as
+  unavailable for that screen, with the helper's finding.
+
+## 8. Left to the builder
+
+- The diagnostics protocol between backend and agent (job request in the config poll, report endpoint, storage).
+- How the helper's steps look and read (the design lead's mock), within section 2.3.
+- Where the ramp state machine lives in the agent, and its tests (the agent already has `test_display_agent.py`).
+- Packaging `ddcutil` + `i2c-dev` for new installs and existing kiosks through the updater.
+- Docs: a short page on USB-powered touch panels (data-only link), the setting, and the helper.
+
+## 9. Verification (the coordinator, on the real kiosks, outside the sleep window)
+
+- Pi 3B+ without the blocker, ramp on, brightness at the owner's level: turn off, wait more than 1 min, turn on.
+  There are no resets and no `usb … reset` lines; brightness steps up after settle.
+- The same with the schedule boundary as the trigger.
+- The helper on the 3B+ reproduces tonight's findings: writes take effect, reads are placeholders, a conversion of
+  ≈ 16 + 2.3 × DDC, a limit near DDC 26–28.
+- Pi 400 (MSI G241): DDC brightness only, never DDC power; the ramp off leaves it untouched.
+
+
+## 10. Backend API (lane 2)
+
+Status: contract for the frontend lane, written before the code (2026-11-05). The agent
+(`deploy/kiosk-agent/calvin_display_agent.py`, PR #320) is the source of truth for key names, types and payloads.
+All paths are under `/api`. `{id}` is the kiosk id (`[A-Za-z0-9._-]{1,64}`, else 400).
+
+### 10.1 Per-screen settings (override layer, Screens › {screen} › Power)
+
+The eight keys live in the kiosk's existing override layer and are written with the existing endpoints
+(`PATCH /kiosks/{id}/overrides` for single keys, `PUT` to replace the layer; both admin, and `PATCH` returns 403
+`override_needs_admin` without a session because none of these keys is in `KIOSK_SELF_WRITE_KEYS`). **Write camelCase
+only**; the snake_case spellings (`brightness_ramp_enabled`, `brightness_limit`, `brightness_step`,
+`brightness_step_seconds`, `brightness_conversion`, `brightness_floor`, `sleep_mode`) are rejected with 400 `Invalid overrides`.
+`null` clears a key (back to the agent's default). Out-of-range or wrongly typed values are 400.
+
+| Key | Type | Range / values | Agent default when null/absent |
+|---|---|---|---|
+| `brightnessRampEnabled` | bool | | `false` |
+| `brightness` | int | 0–100 (Calvin/DDC scale) | DDC 20 (or `limit − 2 × step`) |
+| `brightnessLimit` | int | 0–100 | none |
+| `brightnessFloor` | int | 0–100, must be `<= brightnessLimit` when both are set (422 `floor_above_limit`) | none (dims to 0) |
+| `brightnessStep` | int | 1–5 | 2 |
+| `brightnessStepSeconds` | number | 0.5–10 | 1.5 |
+| `brightnessConversion` | list of `{ddc: int 0–100, menu: number 0–100}` | at most 20 points, no unknown fields | `[]` |
+| `sleepMode` | `"standby"` \| `"dim"` | | `"standby"` |
+
+`GET /kiosks/{id}/config` delivers them merged with the household layer; as for every override, both spellings are
+present in the body (the agent reads snake_case first). `GET /kiosks` already returns each kiosk's `overrides`, so the
+UI reads the saved values from there. The config `ETag` is a hash of the whole body, so it changes when any of these
+keys or the display-check job changes.
+
+### 10.2 Display check
+
+**One run is one session**, like the agent's: a run (one id) stays active across steps. The dialog starts it once,
+moves it from step to step with `step`, and ends it with `stop` (or closing the dialog). A step's `done` report is a
+**result**, not the end of the run, and the job stays on the config poll until the run ends. One run per kiosk is
+stored (the latest; a new start replaces an ended one). **Run record** (what the UI reads):
+
+```json
+{
+  "id": "run-id", "step": "detect|write|conversion|read", "value": 19, "brightness": 19,
+  "action": "start|stop",
+  "status": "requested|running|done|stopped|timeout|error|interrupted|asleep",
+  "active": true,
+  "level": 19, "limit": 26, "log": [{"at": "ISO-8601", "level": 19, "note": "text"}],
+  "detail": "text", "info": {"bus": 2, "model": "...", "placeholderReads": false},
+  "reason": "power_at_idle|power_trouble|above_ceiling|null",
+  "preflight": {"status": "clean|fault", "faults": ["text"]},
+  "start": {"level": 19, "known": true, "source": "read|last_set|null"},
+  "ceiling": 19, "menuAtStart": 28,
+  "fault": {"step": "write", "level": 12, "kind": "under-voltage", "at": "ISO-8601",
+            "lastGood": 14, "alsoAt": [8]},
+  "steps": {
+    "detect": {"status": "done|error", "value": null, "level": 19, "limit": null, "lastWrite": null,
+               "detail": "text", "info": {"model": "..."}, "finishedAt": "ISO-8601"}
+  },
+  "requestedAt": "ISO-8601", "startedAt": "ISO-8601|null", "finishedAt": "ISO-8601|null",
+  "updatedAt": "ISO-8601|null", "expiresAt": "ISO-8601"
+}
+```
+
+`requested` = asked for, the agent has not reported yet; `running` = the agent is on it (between steps too).
+`active` is true while the status is `requested` or `running` and the run has not expired. **The run ends** (and the
+job leaves the config poll) on `stopped`, `timeout`, `error`, `interrupted`, `asleep`, or on a `done` report that
+arrives after an admin stop (the agent's final report); `finishedAt` is set then. Before that, a `done` report only
+fills `steps[step]` (`step` is the one the backend is offering at that moment, because the agent files every report
+under its first job's step) and updates the findings. A run expires 10 minutes after `requestedAt`, as the agent's
+own timeout does (it is **not** extended by steps or reports): it then reads `timeout` (`active` false) and is no
+longer offered. **`asleep` is surfaced and never retried**: the panel is asleep, nothing was written; the UI shows
+"Turn it on now to check it" and the admin starts a new run when ready. `updatedAt` is the time of the last agent
+report, so the UI can show "Waiting for {screen}…" (no report for 10 s) and "isn't answering" (60 s). While the run
+is `active`, the UI polls the status endpoint every 1–2 s. A **conversion** step stays at its `value` (the job keeps
+being offered unchanged) until the admin changes the step or stops the run.
+
+Admin endpoints (admin session or admin-scope API key, like every per-screen write; 401 otherwise):
+
+- `POST /kiosks/{id}/display-check/start`, body `{"step": "detect|write|conversion|read", "value"?: 0–100, "brightness"?: 0–100}`
+  (extra fields are 422). Returns the run record. 404 unknown kiosk; **409 `display_check_active`** (body carries the
+  active run) when a run is already active, which is how a second device sees the "running from another device" state.
+- `POST /kiosks/{id}/display-check/step`, body `{"step": ..., "value"?: 0–100}` (extra fields are 422). Moves the
+  active run to another step and target (a step without `value` drops the old one) and returns the record; the agent
+  re-runs on the new `(id, step, value)`. Same value cap as `start`. 404 when no run is active; **409
+  `display_check_stopping`** when a stop is already on its way. The agent ignores an unchanged `(step, value)`, so
+  "Show me again" needs a different value or an intermediate step.
+- `POST /kiosks/{id}/display-check/stop`, no body. Marks the active run `action: "stop"`; the agent drops the screen
+  to the floor in one write (v3, §10.2.2) and reports `stopped` (or a final `done`). Returns the run record. 404
+  when there is no active run. Stop stays available to any admin, whichever device started the run.
+- `POST /kiosks/{id}/display-check/save-limit`, no body. Saves the limit a calibration **fault** implies
+  (`faultLimit`, §10.2.1) as the override `brightnessLimit` and returns `{"id", "brightnessLimit", "overrides"}`.
+  Without a usable fault, **409 `no_limit`**. Never automatic. (The v2 `limit`-step source is gone: §10.2.2.)
+
+Public (no session; the kiosk's own traffic, like the config poll):
+
+- `GET /kiosks/{id}/display-check` returns `{"run": <record>|null, "findings": {...}}`. A run that has expired is
+  returned as `timeout`. 404 for an unknown kiosk.
+- `POST /kiosks/{id}/display-check` is the **agent's report** (payload as in PR #320). It is accepted only when `id`
+  matches the stored run (otherwise 409 and the report is dropped; a late report for a replaced run cannot overwrite
+  the new one). Returns `{"accepted": true}`.
+
+The job reaches the agent as `displayCheck` (and `display_check`) on `GET /kiosks/{id}/config`, exactly the shape in
+PR #320 (`id`, `step`, `action`, `value`, `brightness`), present only while the run is `active`. The panel itself can
+call the public endpoints but not the admin ones without signing in.
+
+#### 10.2.1 Calibration v2 (calvin-c805, calvin-u8yn)
+
+Design: [brightness-ramp-ui.md §3](../../design/2026-11-04-brightness-ramp-ui.md). Steps 1-3 (`detect`, `write`,
+`conversion`) are **calibration** and never raise the brightness above the run's start level; `limit` (step 4) is the
+only step that raises.
+
+**Agent report, new optional fields** (all ignored when absent; sent again on every later report of the run):
+
+| Field | Shape | Meaning |
+|---|---|---|
+| `reason` | string | Why a run ended with `status: "error"`: `power_at_idle` (preflight found trouble, nothing was written), `power_trouble` (a fault in steps 1-3), `above_ceiling` (the agent refused a `conversion` value above the ceiling). |
+| `preflight` | `{status: "clean"\|"fault", faults: [text]}` | The 10 s power watch before the first write. `fault` ends the run (`error`, `power_at_idle`) with no write made. |
+| `start` | `{level: int\|null, known: bool, source: "read"\|"last_set"\|null}` | The brightness the screen was at when the run started. `read` = the DDC read-back is real; `last_set` = the last level the agent itself set; `known: false` = neither (a read-back counts only when it equals the last level the agent set, so a constant non-zero read is a placeholder too; the start is read once per run), and `level` stays `null` until the agent has dimmed the screen to the floor (`5`) at the start of step 2, then `level` is `5`. |
+| `fault` | `{step, level, kind, at, lastGood, alsoAt: [int]}` | One incident. `level` = where the fault showed; `lastGood` = the last level written before it with no fault (above `level` while dimming); `kind` = `under-voltage`\|`over-current`\|`touch controller reset`; `alsoAt` = levels of further faults seen while settling (they never start a new step-down). Sent for a fault in any step. |
+| `info.placeholderReads` | bool | On the `detect` report: the DDC read-back is a placeholder (always 0 or `null`). |
+
+**Agent behaviour** (each rule has a test in `deploy/kiosk-agent/test_display_agent.py`):
+
+- Preflight: before the first write the agent watches its fault monitor for 10 s without writing. Trouble ends the run
+  before any write.
+- Steps 1-3 never write above `start.level` (unknown start: one downward write to the floor `5` first).
+  `write` dims `S -> max(0, S-10) -> S`. `conversion` refuses (does not clamp) a value above the job's `ceiling`.
+- A fault in steps 1-3 ends the run: ramp to the floor at the normal pace, settle (5 s of clean power, capped at 30 s),
+  report `error` / `power_trouble` with `fault`. No retry. Faults seen while settling join `fault.alsoAt`.
+- Every ramp step is at most the configured step. The single downward write to `0` (and to the floor from an unknown
+  start) is the only larger write.
+- Ending a run returns to `start.level` when it is known, never above the start on the way out of steps 1-3; with an
+  unknown start the screen stays at the floor.
+
+**Job** (`displayCheck` on the config poll) gains `ceiling`: for a `conversion` job, the most that job's `value` may
+reach (the ceiling below, or the third reading's value when it qualifies); otherwise the ceiling or `null`. It is read
+from every job, not only the first. The agent applies the lower of it and its own start level, and accepts a value above
+the start only for the third reading, which it checks itself against the limit and the saved readings.
+
+**The ceiling.** The backend computes it on every read and puts it in the run record (`null` until the run has
+a start level):
+
+```
+base       = convert(menuAtStart)   when menuAtStart is set and brightnessConversion has >= 2 points,
+             else start.level (the floor 5 when the start is unknown)
+faultLimit = min(fault.lastGood, fault.level) - step          (calibration faults only; none otherwise)
+faultCap   = faultLimit - 2 * step
+ceiling    = min(base, limit - 2 * step, faultCap)             (terms that do not exist are left out)
+```
+
+`limit` is the lower of the saved `brightnessLimit` and the limit this run's `limit` step found. A `fault` from the
+`limit` step is not a calibration fault and adds no term. A known fault or limit always wins over `menuAtStart`, which
+can only raise the base. Values are clamped to >= 0.
+
+**New and changed endpoints**
+
+- `POST /kiosks/{id}/display-check/menu-at-start` (admin), body `{"menu": 0-100}` (a number; extra fields 422). Stores
+  `menuAtStart` on the active run and returns the run record. 404 when there is no active run (or an unknown kiosk).
+- `step` with a `conversion` `value` above the active run's ceiling is refused with **422 `value_above_ceiling`** and
+  `max`. Everything is capped at the `ceiling`. The only value allowed above it is the third reading: `value == limit - 2 * step`
+  with a limit known and at least two saved readings (then the maximum is `min(limit - 2 * step, faultCap)`). `value_above_limit` is unchanged. `start` begins a new run, which has no ceiling yet, so it is not checked; other
+  steps carry no ceiling check. The ceiling is also in the run record's `ceiling` on every read.
+- `save-limit` with no `limit`-step result saves `faultLimit` from the latest run's calibration `fault` (never
+  `lastGood` itself) and returns the same body as before. A limit at or below the floor (5), or from a fault with no level (an idle fault with an unknown start), is never saved: 409 `no_limit`. A `limit`-step result still wins; with neither, 409
+  `no_limit`.
+
+#### 10.2.2 Calibration v3 (calvin-idts, calvin-qkm8)
+
+Replaces the v2 steps 2-4 flow and **removes the limit climb**. The owner sets the panel (with its own buttons) to
+its max, a comfortable level and its min and types the menu number each time; Calvin only **reads** DDC back.
+Design (UI): [brightness-ramp-ui.md](../../design/2026-11-04-brightness-ramp-ui.md).
+
+- **Steps:** `detect`, `read`, `write`, `conversion`. `limit` is gone (422 from `start`/`step`; the agent has no code
+  path for it, so nothing ever ramps up to 100). `findings.limit` stays in the payload and is never set again.
+- **`read`** (any number of times after `detect`): one DDC `getvcp 0x10`, **no write**. Report
+  `{step: "read", status: "done", level: <ddc read>, lastWrite: <level the agent last wrote this run, or null>}`;
+  stored in `steps.read` (`level`, `lastWrite`). `status: "error"` + `detail` when the read fails (that ends the run).
+  A read never changes the run's level, the controller level or `last_set` (many panels answer with a constant, often
+  100). `ddc == lastWrite` (or an unchanged value across reads) tells the UI the read-back does not follow the buttons.
+- **Fallback** for a read-back that does not follow: the existing `write`/`conversion` steps, floor `5` then `1`,
+  never above the run's start (the §10.2.1 rules, unchanged; the third-reading exception is removed).
+- **`brightnessFloor`** (§10.1): the lowest level Calvin dims to. The agent uses it as the dim-only sleep level, as
+  the lower bound of the ramp target (`brightness` never goes under it). Dim sleep and the shutdown write go to
+  `min(floor, ceiling, current level)`, never upward, and the level actually written is remembered. Unset means the
+  old behaviour (0). `floor <= limit` is enforced on the effective (household + override) config (422
+  `floor_above_limit`); `save-limit` clamps a floor above the new limit down to it.
+- **Faults:** a fault at any point of a check (preflight, `read`, `write`, `conversion`) ends the run `error` /
+  `power_trouble` with `fault` recorded (`fault.step` may be `read`; its level and `lastGood` are the last level Calvin
+  wrote). The agent drops the screen in **one write** to `min(5, brightnessFloor, ceiling, run start, level it knows)`,
+  at least 1 while it is lit (a floor of 0 does not black the dialog), then settles as in v2. No slow ramp. With the
+  ramp on, a **Stop** at any time drops the same way, immediately, and does not climb back; with the ramp off it
+  returns to the start level as in v2.
+- **Fault before Stop** (calvin-qkm8): `ramp_brightness` polls faults **before** it checks the Stop, and re-polls once
+  after a Stop, so a fault that arrives in the same poll is recorded (the 2026-11-07 01:21 sequence: the touchscreen
+  USB device reset as Stop was pressed, the fault was dropped and the run ended with `limit` and `powerTrouble` null).
+  Regression test: `test_ramp_records_a_fault_that_arrives_in_the_same_poll_as_a_cancel`.
+- **Ceiling:** unchanged (§10.2.1) minus the found-limit term and the third-reading exception: `limit` is the saved
+  `brightnessLimit` only. `value_above_limit` and `value_above_ceiling` stay.
+- **Shutdown (boot side).** The max can be 100 while the panel is on, but powering the panel on at a high level
+  surges and browns out the Pi. Sleep/wake already covers it (dim before sleep, ramp up after wake). On the boot side
+  the agent handles SIGTERM and, only when `systemctl is-system-running` says `stopping` (a real shutdown or reboot,
+  not an updater restart), with the ramp on and the panel awake, writes the dim target (floor, 0 when unset) in **one**
+  DDC write before exiting. It first sets a shutdown flag that stops any ramp or check from writing, then takes the
+  brightness lock for at most 1.5 s, so the panel powers on low next boot;
+  the first-wake ramp brings it up. The write runs in a thread abandoned after 4 s, and the unit has
+  `TimeoutStopSec=15`, so it can never hold the shutdown up. Skipped when the ramp is off, the agent has not yet
+  reconciled, or the panel is asleep (already at its sleep level). Logged. **Unplanned power cuts are out of scope**
+  (nothing runs then; that is what the owner's power blocker is for).
+
+### 10.3 Findings (kept across runs)
+
+Only the latest run record is stored, so a later run would erase the detect and write verdicts of an earlier one.
+The backend therefore also keeps a per-kiosk **findings** object, updated from each finished run's report and never
+cleared by a later run. It is returned as `displayCheck` on every row of `GET /kiosks` and as `findings` next to `run`
+on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not checked yet.
+
+```json
+{ "checkedAt": "ISO-8601|null", "ddc": true, "writes": true, "model": "NOMAD TOUCH",
+  "connector": "card0-HDMI-A-1", "vcpVersion": "2.1", "limit": 26,
+  "powerTrouble": {"at": "ISO-8601", "step": "write", "level": 12, "kind": "under-voltage"} }
+```
+
+- `powerTrouble` is `null` or the latest incident. A preflight fault sets it with `step: "preflight"`, `level: null`
+  and `kind` from the fault text; a calibration fault (steps 1-3) sets it from `fault`. A later run clears it when its
+  preflight is clean and its `write` step reports `done` with no fault in that run (a later fault sets it again). A fault in the
+  `limit` step does not set it.
+
+- Each step's `done` or `error` report updates these while the run goes on. `detect` done: `ddc` true and `model`, `connector`, `vcpVersion` from the report's `info`; `detect` error: `ddc` false.
+- `write` done: `writes` true; `write` error: `writes` false.
+- `limit` done with a `limit`: `limit` set. A limit step that found none leaves the earlier `limit` alone.
+- `asleep`, `stopped`, `interrupted`, `timeout` and `running` change nothing.
+- `checkedAt` is the finish time of the last run that changed a field.
+- **`writes` is decided by the owner** (step 2). `POST /kiosks/{id}/display-check/verdict` (admin) takes
+  `{"writes": true|false}` ("Yes, it changed" / "No, it looked the same"), sets `findings.writes` and `checkedAt`, and
+  returns the findings object. It overrides the agent's own `write` verdict and leaves the other fields alone. 404
+  for an unknown kiosk, 422 for a missing or non-boolean `writes`.
+- **`placeholderReads`** is passed through in the `detect` result's `info` (calibration v2); older agents omit it.
+
+### 10.4 Rules added in review
+
+- **The report endpoint has no credential.** The agent has none, so `POST /kiosks/{id}/display-check` is guarded only by
+  the run id (accepted by this spec). A caller who knows a live run id can post reports for it; the run ids are random
+  and a report can only propose a limit (and change what the UI shows and the findings): a limit takes effect only
+  after the admin's explicit `save-limit`.
+- **A run that has ended never becomes active again.** After it has ended, or once it has expired, a `running`
+  report is refused with 409 and the job is not offered again. A repeated ending report (the agent's `_finish` can
+  send a second one) and the ending report of a rebooted agent on an expired run are accepted; the first ending
+  status stays, and a `done` on an expired run reads `timeout`.
+- **A start target above `limit - 2 × step` is refused** (422 `value_above_limit`, with `max`), using the screen's
+  merged `brightnessLimit` and `brightnessStep` (default 2), and also the limit this run's `limit` step found but the admin has not saved yet (the lower of the two applies). With no limit, 0–100 is allowed. The agent's conversion
+  step does not apply the limit itself.
+- **Agent reports are tolerant**: unknown fields are ignored, and log notes and `detail` are clipped to 500 characters
+  and the log to its newest 500 entries, so one long error never rejects a report. Admin request bodies stay strict.
+- **Brightness keys are per-screen only.** `POST /config` refuses all seven with 422; write them to a screen's
+  overrides.
+- **Stopping the run of an offline kiosk**: `stop` only marks the run `action: "stop"`. The run stays active until the
+  agent reports or the run expires (at most 10 minutes); the UI should say so.

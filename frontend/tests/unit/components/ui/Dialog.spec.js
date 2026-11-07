@@ -177,6 +177,7 @@ describe("Dialog", () => {
     expect(panel.classes()).not.toContain("dialog--bleed");
     expect(w.find(".dialog__subtitle").text()).toBe("Design the pages your screens display");
     expect(w.find("[aria-label='Close editor']").exists()).toBe(true);
+    // The sheet opts into the blur; DialogScrim only draws it under Full.
     expect(w.findComponent(DialogScrim).props("blur")).toBe(true);
     expect(STYLE).toContain(".dialog--full");
     expect(STYLE).toMatch(/height:\s*min\(820px, 100%\)/);

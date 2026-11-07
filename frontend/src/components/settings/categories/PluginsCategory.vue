@@ -134,7 +134,7 @@ import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import PluginInstaller from "../specialized/PluginInstaller.vue";
 import PluginManager from "../specialized/PluginManager.vue";
-import ConfirmModal from "../shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { pluginKindKey } from "@/utils/pluginKind";
 import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
 import { errorDetailMessage } from "@/utils/apiErrors";
@@ -316,7 +316,7 @@ const afterInstall = async installedIds => {
     eyebrow: "Plugin installed",
     message:
       first.type === "theme"
-        ? `${names} installed — pick it under Dashboard › Appearance.`
+        ? `${names} installed — pick it under Screens › Look.`
         : hasSetup
           ? `${names} installed and enabled — finish its setup below.`
           : `${names} installed and enabled — add a source from Content when you need it.`,

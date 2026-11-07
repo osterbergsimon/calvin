@@ -85,7 +85,7 @@ const props = defineProps({
   dismissible: { type: Boolean, default: true },
   // Accessible name for the close control (the pages editor says "Close editor").
   closeLabel: { type: String, default: "Close" },
-  // Blur the scrim behind a large editor sheet.
+  // Blur the scrim behind a large editor sheet (Full effects only).
   scrimBlur: { type: Boolean, default: false },
   // Optional selector for the control that should take focus first.
   initialFocus: { type: String, default: "" },

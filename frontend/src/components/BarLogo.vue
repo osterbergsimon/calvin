@@ -1,15 +1,25 @@
 <template>
-  <span class="bar-logo" :class="{ 'bar-logo--vertical': vertical }" aria-label="Calvin">
+  <span
+    class="bar-logo"
+    :class="{ 'bar-logo--vertical': vertical }"
+    :style="sizeStyle"
+    aria-label="Calvin"
+  >
     CAL<span class="bar-logo__dot">·</span>VIN
   </span>
 </template>
 
 <script setup>
+import { computed } from "vue";
+
 defineOptions({ name: "BarLogo" });
-defineProps({
+const props = defineProps({
   // Stack the wordmark vertically for the left/right side bars.
   vertical: { type: Boolean, default: false },
+  // A px size from the clock bar design. null keeps the CSS token (today's M).
+  sizePx: { type: Number, default: null },
 });
+const sizeStyle = computed(() => (props.sizePx != null ? { fontSize: `${props.sizePx}px` } : null));
 </script>
 
 <style scoped>

@@ -54,7 +54,8 @@ const toggle = v => {
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   padding: 0 14px;
-  min-height: 44px;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
   cursor: pointer;
 }
 .chip.on {

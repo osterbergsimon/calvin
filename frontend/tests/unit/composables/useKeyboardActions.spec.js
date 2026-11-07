@@ -8,6 +8,7 @@ import { setActivePinia, createPinia } from "pinia";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 import { useModeStore } from "@/stores/mode";
 import { useCalendarStore } from "@/stores/calendar";
+import { useActiveRegionStore } from "@/stores/activeRegion";
 import { normalizeDashboardScreens } from "@/utils/layout";
 
 const mocks = vi.hoisted(() => ({
@@ -428,9 +429,13 @@ describe("useKeyboardActions - Calendar Event Navigation", () => {
 
       // Screen selection is now routed through activateDashboardScreen (not setDashboardScreens).
       expect(mocks.configStore.activateDashboardScreen).toHaveBeenCalledWith("media");
-      // The activeRegionId bookmark is still written to the raw catalog via setDashboardScreens.
-      const nextScreens = mocks.configStore.setDashboardScreens.mock.calls.at(-1)[0];
-      expect(nextScreens.screens[1].activeRegionId).toBe("region-1-b");
+      // The matching leaf becomes the session's active region; the persisted
+      // catalog is untouched.
+      const activeRegion = useActiveRegionStore();
+      expect(activeRegion.getActiveRegionId(mocks.configStore.dashboardScreens.screens[1])).toBe(
+        "region-1-b"
+      );
+      expect(mocks.configStore.dashboardScreens.screens[1].activeRegionId).toBe("region-1-a");
     });
 
     it("resolves the retired mode_photos alias to screen_jump_photos", () => {

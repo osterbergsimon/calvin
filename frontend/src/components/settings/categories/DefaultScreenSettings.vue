@@ -1,6 +1,9 @@
 <!-- frontend/src/components/settings/categories/DefaultScreenSettings.vue -->
 <template>
   <div class="default-screen-settings" data-test="default-screen-page">
+    <ScreensWithOwnSettings :screens="store.kiosks" @open="id => emit('open-screen', id)" />
+    <ScreenSectionIndex :sections="sectionIndex" />
+
     <SettingsSection id="default-pages" title="Pages">
       <SettingRow label="Pages shown">
         <template #description>
@@ -50,6 +53,23 @@
       <InlineNote v-if="pagesMsg" class="screens-saved" tone="err" role="status" aria-live="polite">
         {{ pagesMsg }}
       </InlineNote>
+    </SettingsSection>
+
+    <SettingsSection id="screen-look" title="Look">
+      <template v-for="descriptor in visibleLookDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="look[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <SettingsSection id="layout" title="Display">
@@ -102,6 +122,55 @@
         @change-them-too="changeThemToo"
         @dismiss="dismissNote"
       />
+      <template v-for="descriptor in displaySizeDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="displaySizes[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
+    </SettingsSection>
+
+    <SettingsSection id="screen-effects" title="Effects & focus">
+      <template v-for="descriptor in visibleEffectsDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="effects[descriptor.key]"
+          :show-scope="false"
+          :auto-note="descriptor.key === 'effectsLevel' ? defaultEffectsAutoCopy : ''"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
+    </SettingsSection>
+
+    <SettingsSection id="screen-controls" title="Controls">
+      <template v-for="descriptor in visibleControlDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="controls[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <SettingsSection id="device-power" title="Power">
@@ -163,6 +232,8 @@
         @change-them-too="changeThemToo"
         @dismiss="dismissNote"
       />
+
+      <InlineNote data-test="default-brightness-note">Brightness is set on each screen.</InlineNote>
 
       <!-- The reboot combo restarts the Pi, so it sits under Power (decision C)
            and no screen can override it. -->
@@ -255,16 +326,20 @@
     </SettingsSection>
 
     <SettingsSection id="device-behaviour" title="Behaviour">
-      <ScreenBehaviourRows
-        :photo-frame-enabled="behaviour.photoFrameEnabled"
-        :photo-frame-timeout="behaviour.photoFrameTimeout"
-        :photo-frame-source-ids="behaviour.photoFrameSourceIds"
-        :loading-light="behaviour.loadingLight"
-        :layout-mode="behaviour.layoutMode"
-        :overridden="behaviourOverridden"
-        @set="setBehaviour"
-        @reset="resetBehaviour"
-      />
+      <template v-for="descriptor in visibleBehaviourDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="behaviour[descriptor.key]"
+          :show-scope="false"
+          @set="value => emitChange({ [descriptor.key]: value })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
     </SettingsSection>
 
     <ScreenRegionEditor
@@ -280,9 +355,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { mdiCheck } from "@mdi/js";
-import { useConfigStore } from "@/stores/config";
 import { useKiosksStore } from "@/stores/kiosks";
-import { useScreenSetting } from "@/composables/useScreenSetting";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
@@ -298,12 +371,17 @@ import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
+import ScreenSectionIndex from "@/components/settings/shared/ScreenSectionIndex.vue";
+import ScreensWithOwnSettings from "@/components/settings/shared/ScreensWithOwnSettings.vue";
+import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
+import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
 import { SERVER_TIMEZONE, buildTimezoneOptions } from "@/utils/timezones";
-import { LAYOUT_STORAGE_KEY } from "@/utils/layoutMode";
-import { getKioskId } from "@/utils/kioskId";
 import { normalizeDashboardScreens } from "@/utils/layout";
-import { screensOverriding } from "@/utils/screenOverrides";
+import {
+  descriptorsForSection,
+  screensOverriding,
+  visibleDescriptors,
+} from "@/utils/screenOverrides";
 import { screenLabel } from "@/utils/screenLabel";
 import {
   OSK_LAYOUT_CHANGE_EVENT,
@@ -318,7 +396,25 @@ import {
 const props = defineProps({
   config: { type: Object, required: true },
 });
-const emit = defineEmits(["update:config"]);
+const emit = defineEmits(["update:config", "open-screen"]);
+
+// The section index uses the same `section-<id>` anchors the deep links use.
+const sectionIndex = [
+  { id: "default-pages", label: "Pages" },
+  { id: "screen-look", label: "Look" },
+  { id: "layout", label: "Display" },
+  { id: "screen-effects", label: "Effects & focus" },
+  { id: "screen-controls", label: "Controls" },
+  { id: "device-power", label: "Power" },
+  { id: "device-keyboard", label: "Touch & keyboard" },
+  { id: "device-behaviour", label: "Behaviour" },
+];
+
+// The household Effects row: Auto means Standard on the screens the home has
+// set up, and Full in a plain browser.
+const defaultEffectsAutoCopy = `Auto (${effectsLevelLabel(
+  resolveEffectsLevel({ level: "auto", kiosk: true })
+)} on screens, Full in a browser)`;
 
 const store = useKiosksStore();
 const editorOpen = ref(false);
@@ -504,53 +600,77 @@ onUnmounted(() => window.removeEventListener(OSK_LAYOUT_CHANGE_EVENT, refreshDev
 
 const timezoneOptions = computed(() => buildTimezoneOptions(props.config.timezone));
 
-// --- Behaviour: per screen (moved out of Dashboard › Focus & remote, §4) ----
-// The rows keep their per-screen storage: on a kiosk this screen's overrides,
-// on any other browser localStorage, with the Default values underneath.
-const configStore = useConfigStore();
-// Existing per-screen rows keep following the Settings form value on a kiosk;
-// these want the kiosk's merged config instead (an override may already differ
-// from the global form value).
-const screenServerValue = (key, fallback) => () => (getKioskId() ? configStore[key] : fallback());
+// --- Look: theme, light or dark and font (settings-scope §7 item 6) --------
+// Default is the household value. A screen page writes the same keys into that
+// screen's overrides instead, so choosing a look here reaches every screen that
+// follows Default and no screen that has its own.
+const lookDescriptors = descriptorsForSection("look");
+const look = computed(() =>
+  Object.fromEntries(
+    lookDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleLookDescriptors = computed(() => visibleDescriptors(lookDescriptors, look.value));
 
-const photoFrameSetting = useScreenSetting("photoFrameEnabled", {
-  serverValue: screenServerValue("photoFrameEnabled", () => props.config.photoFrameEnabled),
-});
-const photoFrameTimeoutSetting = useScreenSetting("photoFrameTimeout", {
-  serverValue: screenServerValue("photoFrameTimeout", () => props.config.photoFrameTimeout),
-});
-const photoFrameSourceSetting = useScreenSetting("photoFrameSourceIds", {
-  serverValue: screenServerValue("photoFrameSourceIds", () => props.config.photoFrameSourceIds),
-});
-const loadingLightSetting = useScreenSetting("loadingLight", {
-  serverValue: () => props.config.loadingLight,
-});
-const layoutSetting = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
+// Display sizes moved in from Dashboard (§7 item 6). The other Display rows
+// are older hand-written rows above; these two are descriptor-driven.
+const DISPLAY_SIZE_KEYS = ["touchControlSize", "uiSize"];
+const displaySizeDescriptors = descriptorsForSection("display").filter(descriptor =>
+  DISPLAY_SIZE_KEYS.includes(descriptor.key)
+);
+const displaySizes = computed(() =>
+  Object.fromEntries(
+    displaySizeDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
 
-const behaviourSettings = {
-  photoFrameEnabled: photoFrameSetting,
-  photoFrameTimeout: photoFrameTimeoutSetting,
-  photoFrameSourceIds: photoFrameSourceSetting,
-  loadingLight: loadingLightSetting,
-  layoutMode: layoutSetting,
-};
+// --- Behaviour: household values (settings-scope §7 items 2–3) --------------
+// Default is the household value for these rows. They used to reuse
+// useScreenSetting, so a change here wrote this browser's localStorage (or this
+// kiosk's own override) and the Default page never changed the household at all
+// (F1). Descriptor rows write `update:config` instead; a screen page keeps
+// writing its own overrides.
+const effectsDescriptors = descriptorsForSection("effects");
+const effects = computed(() =>
+  Object.fromEntries(
+    effectsDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleEffectsDescriptors = computed(() =>
+  visibleDescriptors(effectsDescriptors, effects.value)
+);
 
+const controlDescriptors = descriptorsForSection("controls");
+const controls = computed(() =>
+  Object.fromEntries(
+    controlDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleControlDescriptors = computed(() =>
+  visibleDescriptors(controlDescriptors, controls.value)
+);
+
+const behaviourDescriptors = descriptorsForSection("behaviour");
 const behaviour = computed(() => ({
-  photoFrameEnabled: photoFrameSetting.value.value,
-  photoFrameTimeout: photoFrameTimeoutSetting.value.value,
-  photoFrameSourceIds: photoFrameSourceSetting.value.value,
-  loadingLight: loadingLightSetting.value.value,
-  layoutMode: layoutSetting.value.value,
+  photoFrameEnabled: props.config.photoFrameEnabled,
+  photoFrameTimeout: props.config.photoFrameTimeout,
+  photoFrameSourceIds: props.config.photoFrameSourceIds,
+  loadingLight: props.config.loadingLight,
+  layoutMode: props.config.layoutMode ?? "auto",
 }));
-
-const behaviourOverridden = computed(() => ({
-  photoFrameEnabled: photoFrameSetting.overridden.value,
-  photoFrameTimeout: photoFrameTimeoutSetting.overridden.value,
-  photoFrameSourceIds: photoFrameSourceSetting.overridden.value,
-  loadingLight: loadingLightSetting.overridden.value,
-  layoutMode: layoutSetting.overridden.value,
-}));
-
-const setBehaviour = (key, value) => behaviourSettings[key]?.set(value);
-const resetBehaviour = key => behaviourSettings[key]?.reset();
+const visibleBehaviourDescriptors = computed(() =>
+  visibleDescriptors(behaviourDescriptors, behaviour.value)
+);
 </script>

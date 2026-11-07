@@ -16,6 +16,7 @@ import CometIndicator from "./indicators/CometIndicator.vue";
 import PulseIndicator from "./indicators/PulseIndicator.vue";
 import { APP_FRAME, LOADING_LIGHT_STYLES, useProgressStore } from "../stores/progress";
 import { useScreenSetting } from "../composables/useScreenSetting";
+import { useEffectsAttribute } from "../composables/useEffectsAttribute";
 
 /**
  * Engine-facing side of the loading light (CLV-115): reads the progress store
@@ -47,14 +48,15 @@ onBeforeUnmount(() => mediaQuery?.removeEventListener?.("change", onMotionChange
 
 const frame = computed(() => (props.regionId ? "region" : APP_FRAME));
 const active = computed(() => progress.isFrameVisible(props.regionId || APP_FRAME));
+const effectsLevel = useEffectsAttribute();
 
 const styleName = computed(() => {
   const picked = setting.value.value;
   const chosen = LOADING_LIGHT_STYLES.includes(picked) ? picked : "comet";
-  // Off stays off; any moving style becomes the pulse when the device asks
-  // for less motion.
   if (chosen === "off") return "off";
-  return reducedMotion.value ? "pulse" : chosen;
+  // The comet's offset-path orbit is a Full effect. Standard (including a
+  // missing attribute) and reduced motion both use the opacity-only pulse.
+  return reducedMotion.value || effectsLevel.value !== "full" ? "pulse" : chosen;
 });
 
 const indicator = computed(() => {

@@ -2,77 +2,77 @@
   <div
     v-if="shouldShow"
     class="clock-bar-vertical"
-    :class="[`position-${position}`, { 'show-date': showDate }]"
+    :class="[`position-${position}`]"
     :style="{ padding: barPaddingStyle }"
     role="status"
     aria-label="Status bar"
     aria-live="polite"
   >
-    <div class="clock-bar-top">
-      <BarLogo v-if="showLogo" vertical />
-      <ScreenDots
-        v-if="!previewMode"
-        vertical
-        :screens="screens"
-        :active-screen-id="activeScreenId"
-        @select-screen="activateScreen"
-      />
-    </div>
-
-    <div class="clock-bar-middle">
-      <div
-        class="clock-bar-content"
-        :class="{
-          'layout-single-line': layout === 'single-line',
-          'layout-two-lines': layout === 'two-lines',
-          'layout-vertical-compact': isCompactLayout,
-          'layout-compact-date': layout === 'compact-time-date',
-        }"
-      >
-        <template v-if="isCompactLayout">
-          <span class="clock-time compact-time" :style="{ fontSize: `${fontSize}px` }">
-            <span>{{ compactTimeParts.hour }}</span>
-            <span>{{ compactTimeParts.minute }}</span>
-            <span v-if="compactTimeParts.second">{{ compactTimeParts.second }}</span>
-            <span v-if="compactTimeParts.dayPeriod" class="compact-period">{{
-              compactTimeParts.dayPeriod
-            }}</span>
-          </span>
-          <span
-            v-if="showDate && layout === 'compact-time-date' && compactDateParts"
-            class="clock-date compact-date compact-date-stacked"
-            :style="{ fontSize: `${dateFontSize}px` }"
-          >
-            <span v-if="compactDateParts.weekday">{{ compactDateParts.weekday }}</span>
-            <span>
-              {{ compactDateParts.day }}
-              {{ compactDateParts.month }}
-            </span>
-            <span v-if="compactDateParts.year" class="compact-date-year">{{
-              compactDateParts.year
-            }}</span>
-          </span>
-          <span
-            v-else-if="showDate"
-            class="clock-date compact-date"
-            :style="{ fontSize: `${dateFontSize}px` }"
-          >
-            {{ formattedDate }}
-          </span>
-        </template>
-        <template v-else>
-          <span class="clock-time" :style="{ fontSize: `${fontSize}px` }">{{ formattedTime }}</span>
-          <span v-if="showDate" class="clock-date" :style="{ fontSize: `${dateFontSize}px` }">{{
-            formattedDate
-          }}</span>
-        </template>
-      </div>
-    </div>
-
-    <div class="clock-bar-bottom">
-      <PluginStatusbarItems orientation="vertical" :size="pluginItemSize" />
-
-      <BarActionCluster v-if="!previewMode" class="clock-bar-actions" :compact="true" />
+    <div
+      v-for="zoneKey in zoneKeys"
+      :key="zoneKey"
+      class="clock-bar-zone"
+      :class="[`clock-bar-${zoneKey}`, { 'clock-bar-content': zoneKey === 'middle' }]"
+      :data-drop-zone="zoneKey"
+    >
+      <template v-for="item in zoneItems[zoneKey]" :key="itemKey(item)">
+        <div v-if="item.kind === 'pair'" class="clock-bar-time-stack">
+          <ClockBarPart
+            part-id="time"
+            :part="partFor('time')"
+            :orientation="'vertical'"
+            :sample="sample"
+            :editable="editable"
+            :selected="selectedPart === 'time'"
+            :zone="zoneKey"
+            :index="zoneMeta(zoneKey, 'time').index"
+            :count="zoneMeta(zoneKey, 'time').count"
+            :label="partAria('time', zoneKey)"
+            :time-data="timeData"
+            :compact-date="compactDate"
+            @select="$emit('select-part', $event)"
+            @move="$emit('move-part', $event)"
+          />
+          <ClockBarPart
+            part-id="date"
+            :part="partFor('date')"
+            :orientation="'vertical'"
+            :sample="sample"
+            :editable="editable"
+            :selected="selectedPart === 'date'"
+            :zone="zoneKey"
+            :index="zoneMeta(zoneKey, 'date').index"
+            :count="zoneMeta(zoneKey, 'date').count"
+            :label="partAria('date', zoneKey)"
+            :time-data="timeData"
+            :compact-date="compactDate"
+            @select="$emit('select-part', $event)"
+            @move="$emit('move-part', $event)"
+          />
+        </div>
+        <ClockBarPart
+          v-else
+          :part-id="item.id"
+          :part="partFor(item.id)"
+          :tile-ids="item.ids || []"
+          :orientation="'vertical'"
+          :sample="sample"
+          :editable="editable"
+          :selected="selectedPart === item.id"
+          :zone="zoneKey"
+          :index="zoneMeta(zoneKey, item.id).index"
+          :count="zoneMeta(zoneKey, item.id).count"
+          :label="partAria(item.id, zoneKey)"
+          :time-data="timeData"
+          :compact-date="compactDate"
+          :room-label="roomLabel"
+          :screens="screens"
+          :active-screen-id="activeScreenId"
+          @select="$emit('select-part', $event)"
+          @move="$emit('move-part', $event)"
+          @select-screen="activateScreen"
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -80,13 +80,20 @@
 <script setup>
 import { computed } from "vue";
 import { useClockBar } from "../composables/useClockBar";
+import { useBarServices } from "../composables/useBarServices";
 import { useConfigStore } from "../stores/config";
+import { useWebServicesStore } from "../stores/webServices";
 import { useKeyboardActions } from "../composables/useKeyboardActions";
 import { getActiveDashboardScreen } from "../utils/layout";
-import BarActionCluster from "./BarActionCluster.vue";
-import BarLogo from "./BarLogo.vue";
-import ScreenDots from "./ui/ScreenDots.vue";
-import PluginStatusbarItems from "./PluginStatusbarItems.vue";
+import {
+  CLOCK_BAR_TILES,
+  CLOCK_BAR_ZONE_LABELS,
+  isTilePart,
+  partLabel,
+  resolveClockBarDesign,
+  tileInstanceId,
+} from "../utils/clockBarDesign";
+import ClockBarPart from "./ClockBarPart.vue";
 
 defineOptions({
   name: "ClockBarVertical",
@@ -110,67 +117,144 @@ const props = defineProps({
     type: Boolean,
     default: true,
   },
-  previewMode: {
+  alwaysShow: {
     type: Boolean,
     default: false,
   },
-  previewTimeSize: {
-    type: Number,
+  design: {
+    type: Object,
     default: null,
   },
-  previewDateSize: {
-    type: Number,
-    default: null,
+  sample: {
+    type: Boolean,
+    default: false,
   },
-  previewLayout: {
+  editable: {
+    type: Boolean,
+    default: false,
+  },
+  selectedPart: {
     type: String,
-    default: null,
-  },
-  previewPadding: {
-    type: Number,
-    default: null,
-  },
-  previewPluginItemSize: {
-    type: Number,
     default: null,
   },
 });
 
+defineEmits(["select-part", "move-part"]);
+
+const configStore = useConfigStore();
+const webServicesStore = useWebServicesStore();
+const zoneKeys = ["top", "middle", "bottom"];
+
+const bar = computed(
+  () =>
+    props.design ||
+    resolveClockBarDesign(configStore.$state, webServicesStore.services, {
+      servicesLoaded: webServicesStore.loaded,
+    }).vertical
+);
+
 const {
   shouldShow,
-  showDate,
   formattedTime,
   compactTimeParts,
   formattedDate,
   compactDateParts,
-  fontSize,
-  dateFontSize,
-  pluginItemSize,
-  layout,
   barPaddingStyle,
 } = useClockBar({
   enabled: () => props.enabled,
   showInKiosk: () => props.showInKiosk,
   showInNonKiosk: () => props.showInNonKiosk,
-  previewMode: () => props.previewMode,
-  previewTimeSize: () => props.previewTimeSize,
-  previewDateSize: () => props.previewDateSize,
-  previewLayout: () => props.previewLayout,
-  previewPadding: () => props.previewPadding,
-  previewPluginItemSize: () => props.previewPluginItemSize,
+  alwaysShow: () => props.alwaysShow,
   orientation: () => "vertical",
+  design: () => bar.value,
 });
 
-const configStore = useConfigStore();
-const showLogo = computed(() => configStore.clockBarShowLogo !== false);
-const isCompactLayout = computed(
-  () => layout.value === "compact-time" || layout.value === "compact-time-date"
-);
+useBarServices();
+
+const timeData = computed(() => ({
+  formattedTime: formattedTime.value,
+  compactTimeParts: compactTimeParts.value,
+  formattedDate: formattedDate.value,
+  compactDateParts: compactDateParts.value,
+}));
 
 const { activateScreen } = useKeyboardActions();
 const screensConfig = computed(() => configStore.effectiveDashboardScreens);
-const screens = computed(() => screensConfig.value.screens);
+const screens = computed(() =>
+  props.sample
+    ? [
+        { id: "sample-kitchen", name: "Kitchen" },
+        { id: "sample-patio", name: "Patio" },
+      ]
+    : screensConfig.value.screens
+);
 const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
+const roomLabel = computed(() => (props.sample ? "Kitchen" : ""));
+// The side bar draws a non-stacked date vertically when the time is stacked.
+const compactDate = computed(() => bar.value.parts?.time?.style === "stacked");
+
+const visiblePartIds = zoneKey =>
+  (bar.value.zones?.[zoneKey] || []).filter(
+    // "tiles" is the stored placeholder, kept only while services load.
+    partId => partId !== CLOCK_BAR_TILES && (partId !== "room" || roomLabel.value)
+  );
+
+const zoneItems = computed(() => {
+  const result = {};
+  for (const zoneKey of zoneKeys) {
+    const items = [];
+    let tileRun = [];
+    const flushTiles = () => {
+      if (!tileRun.length) return;
+      items.push({ kind: props.editable ? "part" : "tiles", id: "tiles", ids: [...tileRun] });
+      tileRun = [];
+    };
+    for (const partId of visiblePartIds(zoneKey)) {
+      if (isTilePart(partId)) {
+        if (props.editable) {
+          flushTiles();
+          items.push({ kind: "part", id: partId });
+        } else {
+          tileRun.push(tileInstanceId(partId));
+        }
+        continue;
+      }
+      flushTiles();
+      if (partId === "date" && bar.value.parts?.date?.underTime) {
+        const previous = items[items.length - 1];
+        if (previous?.kind === "part" && previous.id === "time") {
+          previous.kind = "pair";
+          continue;
+        }
+      }
+      items.push({ kind: "part", id: partId });
+    }
+    flushTiles();
+    result[zoneKey] = items;
+  }
+  return result;
+});
+
+// Keyed by the part so a reorder moves the element instead of remounting it
+// (a remount drops keyboard focus). A run of tiles is keyed by its first tile.
+const itemKey = item => (item.kind === "tiles" ? `tiles:${item.ids[0]}` : item.id);
+
+const zoneMeta = (zoneKey, partId) => {
+  const ids = visiblePartIds(zoneKey);
+  const index = ids.indexOf(partId);
+  return { index: index < 0 ? 0 : index, count: ids.length };
+};
+
+const partAria = (partId, zoneKey) => {
+  const zoneName = CLOCK_BAR_ZONE_LABELS.vertical[zoneKey] || zoneKey;
+  const { index, count } = zoneMeta(zoneKey, partId);
+  return `${partLabel(partId, webServicesStore.services)}, in ${zoneName}, ${index + 1} of ${count}`;
+};
+
+const partFor = partId => {
+  if (partId === "tiles" || isTilePart(partId)) return { sizePx: bar.value.tileSizePx };
+  return bar.value.parts?.[partId] || {};
+};
 </script>
 
 <style scoped>
@@ -244,82 +328,18 @@ const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.val
   text-align: center;
 }
 
-.clock-bar-content.layout-two-lines {
+.clock-bar-time-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: var(--gap-1);
 }
 
-.clock-bar-content.layout-vertical-compact {
-  flex-direction: column;
-  gap: var(--gap-2);
-  writing-mode: horizontal-tb;
-  text-orientation: mixed;
-}
-
-.compact-time {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  line-height: 0.92;
-  font-variant-numeric: tabular-nums;
-}
-
-.compact-period {
-  margin-top: var(--gap-1);
-  font-size: 0.45em;
-  line-height: 1;
-}
-
-.compact-date {
-  max-height: 35vh;
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.compact-date-stacked {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  max-height: none;
-  writing-mode: horizontal-tb;
-  text-orientation: mixed;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.compact-date-year {
-  font-size: 0.78em;
-  color: var(--ink-2);
-}
-
-.clock-time {
-  font-family: var(--font-display);
-  font-variant-numeric: tabular-nums lining-nums;
-  font-weight: var(--weight-title);
-  color: var(--ink);
-  line-height: 1.1;
-}
-
-.clock-date {
-  font-family: var(--font-data);
-  font-variant-numeric: tabular-nums lining-nums;
-  color: var(--ink-2);
-  line-height: 1.1;
-}
-
-.clock-bar-vertical.position-between .clock-time {
+.clock-bar-vertical.position-between :deep(.clock-time) {
   font-size: var(--text-body);
 }
 
-.clock-bar-vertical.position-between .clock-date {
+.clock-bar-vertical.position-between :deep(.clock-date) {
   font-size: var(--text-caption);
-}
-
-.clock-bar-actions {
-  width: 100%;
-  flex: 0 0 auto;
 }
 </style>

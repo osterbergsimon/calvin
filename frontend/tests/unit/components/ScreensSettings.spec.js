@@ -1,17 +1,35 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mount, flushPromises as flushPromisesNow } from "@vue/test-utils";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import ScreensSettings from "@/components/settings/categories/ScreensSettings.vue";
 import { useKiosksStore } from "@/stores/kiosks";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import RangeSlider from "@/components/ui/RangeSlider.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
+
+// Settings writes are coalesced over a quiet period, so settle the queued save
+// before asserting (the production UI does not wait for it).
+async function flushPromises() {
+  await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+  await flushPromisesNow();
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 const AVAILABLE = "e4f5a6b7c8d9e0f1";
 const OLD = "a1b2c3d4e5f6a7b8";
@@ -80,6 +98,7 @@ function mountScreens({
   store.loadKiosks = vi.fn(async () => {
     store.kiosks = kiosks;
   });
+  store.refreshKiosks = vi.fn(async () => {});
   store.fetchOverrides = vi.fn(async () => overrides);
   store.saveOverrides = vi.fn(async () => {});
   store.setKioskOverrides = vi.fn((id, next) => {
@@ -317,6 +336,139 @@ describe("ScreensSettings — screen list", () => {
   });
 });
 
+describe("ScreensSettings — live kiosk presence", () => {
+  const mounted = [];
+
+  function mountPresence(options) {
+    const result = mountScreens(options);
+    mounted.push(result.wrapper);
+    return result;
+  }
+
+  function setVisibility(value) {
+    Object.defineProperty(document, "visibilityState", { configurable: true, value });
+    document.dispatchEvent(new Event("visibilitychange"));
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-02T12:00:00Z"));
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+  });
+
+  afterEach(() => {
+    mounted.splice(0).forEach(wrapper => wrapper.unmount());
+    delete document.visibilityState;
+    vi.useRealTimers();
+  });
+
+  it("refreshes every 30 seconds while visible, pauses while hidden, and resumes immediately", async () => {
+    const { store } = mountPresence();
+    await flushPromises();
+    expect(store.loadKiosks).toHaveBeenCalledTimes(1);
+    expect(store.refreshKiosks).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+
+    setVisibility("hidden");
+    await vi.advanceTimersByTimeAsync(90000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+
+    setVisibility("visible");
+    await flushPromises();
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(3);
+  });
+
+  it("clears the refresh interval on unmount", async () => {
+    const { wrapper, store } = mountPresence();
+    await flushPromises();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+
+    wrapper.unmount();
+    await vi.advanceTimersByTimeAsync(60000);
+    setVisibility("visible");
+    await flushPromises();
+
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a refreshed kiosk Online past the two-minute presence window", async () => {
+    const { wrapper, store } = mountPresence({
+      kiosks: [kiosk({ lastSeen: new Date().toISOString() })],
+    });
+    await flushPromises();
+    store.refreshKiosks.mockImplementation(async () => {
+      store.kiosks = [kiosk({ lastSeen: new Date().toISOString() })];
+    });
+
+    await vi.advanceTimersByTimeAsync(125000);
+
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(4);
+    expect(wrapper.find("[data-test='screen-status']").text()).toBe("Online");
+  });
+
+  it("re-renders relative last-seen time and the Online tag on the 15-second clock", async () => {
+    const { wrapper } = mountPresence({
+      kiosks: [kiosk({ lastSeen: new Date(Date.now() - 12000).toISOString() })],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    let header = wrapper.findComponent(KioskStatusHeader);
+    expect(header.props("lastSeenLabel")).toBe("12s ago");
+    expect(header.props("online")).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(15000);
+    header = wrapper.findComponent(KioskStatusHeader);
+    expect(header.props("lastSeenLabel")).toBe("27s ago");
+    expect(header.props("online")).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(105000);
+    header = wrapper.findComponent(KioskStatusHeader);
+    expect(header.props("lastSeenLabel")).toBe("2m ago");
+    expect(header.props("online")).toBe(false);
+    expect(wrapper.find("[data-test='screen-status']").text()).toBe("Offline");
+  });
+
+  it("does not reset selected overrides, an unsaved name, or an open editor on refresh", async () => {
+    const original = { displayName: "Original", orientation: "portrait" };
+    const { wrapper, store } = mountPresence({
+      kiosks: [kiosk({ overrides: original })],
+      overrides: original,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    const nameInput = wrapper.find("[data-test='screen-name-input']");
+    await nameInput.setValue("Saved name");
+    await nameInput.trigger("blur");
+    await flushPromises();
+    const savedMessage = wrapper.find("#section-screen-name .screens-saved").text();
+    await nameInput.setValue("Unsaved draft");
+    await wrapper.find("[data-test='edit-pages-btn']").trigger("click");
+    store.refreshKiosks.mockImplementation(async () => {
+      store.kiosks = store.kiosks.map(k => ({
+        ...k,
+        lastSeen: new Date().toISOString(),
+        agentVersion: "new-version",
+      }));
+    });
+
+    await vi.advanceTimersByTimeAsync(30000);
+
+    expect(store.refreshKiosks).toHaveBeenCalledTimes(1);
+    expect(store.fetchOverrides).toHaveBeenCalledTimes(1);
+    expect(wrapper.find("[data-test='screen-name-input']").element.value).toBe("Unsaved draft");
+    expect(wrapper.find("#section-screen-name .screens-saved").text()).toBe(savedMessage);
+    expect(wrapper.findComponent(ScreenRegionEditor).props("open")).toBe(true);
+    expect(store.kiosks[0].overrides).toEqual({ ...original, displayName: "Saved name" });
+  });
+});
+
 describe("ScreensSettings — one screen's page", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -337,7 +489,10 @@ describe("ScreensSettings — one screen's page", () => {
     expect(ids).toEqual([
       "section-screen-name",
       "section-screen-pages",
+      "section-screen-look",
       "section-screen-display",
+      "section-screen-effects",
+      "section-screen-controls",
       "section-screen-power",
       "section-screen-touch",
       "section-screen-behaviour",
@@ -444,6 +599,7 @@ describe("ScreensSettings — Name", () => {
 
     await wrapper.find("[data-test='screen-name-input']").setValue("Hallway");
     await wrapper.find("[data-test='screen-name-input']").trigger("blur");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { displayName: "Hallway" });
   });
@@ -457,6 +613,7 @@ describe("ScreensSettings — Name", () => {
 
     await wrapper.find("[data-test='screen-name-input']").setValue("");
     await wrapper.find("[data-test='screen-name-input']").trigger("blur");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
   });
@@ -488,6 +645,7 @@ describe("ScreensSettings — Pages", () => {
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("true");
     await row.find('[role="switch"]').trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -517,6 +675,7 @@ describe("ScreensSettings — Pages", () => {
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     await row.find('[role="switch"]').trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       availableScreens: ["home", "photos"],
@@ -570,6 +729,7 @@ describe("ScreensSettings — Pages", () => {
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     expect(row.find('[role="switch"]').attributes("aria-checked")).toBe("false");
     await row.find('[role="switch"]').trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
   });
@@ -594,6 +754,7 @@ describe("ScreensSettings — Pages", () => {
 
     const row = wrapper.findAll("[data-test='screen-page-row']")[1];
     await row.find("button[aria-pressed]").trigger("click");
+    await flushPromises();
 
     expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
       orientation: "portrait",
@@ -946,6 +1107,17 @@ describe("ScreensSettings — Power", () => {
   });
 
   it("ignores an expired Screen now override and follows the schedule again", async () => {
+    // Pin the clock to a Friday (day 5) inside the schedule, or this fails on other days.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));
+    try {
+      await expiredScreenNowFollowsSchedule();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  async function expiredScreenNowFollowsSchedule() {
     const { wrapper } = mountScreens({
       cfg: config({
         displayScheduleEnabled: true,
@@ -959,7 +1131,7 @@ describe("ScreensSettings — Power", () => {
     expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
     expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
     expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
-  });
+  }
 });
 
 describe("ScreensSettings — Touch & keyboard", () => {
@@ -1265,8 +1437,9 @@ describe("ScreensSettings — decision C placement", () => {
     expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
     expect(wrapper.find("#section-device-power").text()).toContain("Power");
 
-    // Remote & buttons and key-press feedback are not here any more.
-    expect(rowByLabel(wrapper, "Show button presses")).toBeUndefined();
+    // Button bindings stay in Dashboard; the moved Effects & focus rows live
+    // with the other screen settings now (§7 item 4).
+    expect(rowByLabel(wrapper, "Show button presses")).toBeTruthy();
     expect(rowByLabel(wrapper, "Button bindings")).toBeUndefined();
   });
 });
@@ -1301,7 +1474,10 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
       .filter(id => id !== "section-screens-list");
     expect(ids).toEqual([
       "section-default-pages",
+      "section-screen-look",
       "section-layout",
+      "section-screen-effects",
+      "section-screen-controls",
       "section-device-power",
       "section-device-keyboard",
       "section-device-behaviour",
@@ -1596,6 +1772,489 @@ describe("ScreensSettings — This browser page (§6)", () => {
   });
 });
 
+// calvin-uudb: Effects & focus on a screen's page.
+describe("ScreensSettings — Effects & focus (calvin-uudb)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const effectsControl = wrapper =>
+    wrapper.findAllComponents(SegmentedControl).find(c => c.props("ariaLabel") === "Effects");
+
+  it("shows the Effects row with Auto, Full and Standard, and what Auto picked", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const section = wrapper.find("#section-screen-effects");
+    expect(section.exists()).toBe(true);
+    expect(
+      effectsControl(wrapper)
+        .props("options")
+        .map(o => o.label)
+    ).toEqual(["Auto", "Full", "Standard"]);
+    expect(effectsControl(wrapper).props("modelValue")).toBe("auto");
+    expect(section.text()).toContain("Auto (Standard on this screen)");
+    expect(rowByLabel(wrapper, "Effects").text()).toContain("Same as Default");
+  });
+
+  it("writes the chosen level to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    effectsControl(wrapper).vm.$emit("update:modelValue", "full");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      effectsLevel: "full",
+    });
+    expect(rowByLabel(wrapper, "Effects").text()).toContain("Changed here");
+  });
+
+  it("reads a screen's stored level and resets it to Default", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { effectsLevel: "standard" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(effectsControl(wrapper).props("modelValue")).toBe("standard");
+    expect(rowByLabel(wrapper, "Effects").text()).toContain("Changed here");
+
+    await wrapper.find('[data-test="reset-effects-level"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {});
+  });
+
+  it("reads a stray stored 'performance' as Standard", async () => {
+    const { wrapper } = mountScreens({ overrides: { effectsLevel: "performance" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(effectsControl(wrapper).props("modelValue")).toBe("standard");
+  });
+});
+
+// §7 item 4: the whole Controls section and the rest of Effects & focus moved
+// from Dashboard. A screen page writes each row to that screen's overrides.
+describe("ScreensSettings — moved Controls and Effects & focus (§7 item 4)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const control = (wrapper, kind, label) =>
+    wrapper.findAllComponents(kind).find(c => c.props("ariaLabel") === label);
+
+  it("shows the whole Effects & focus group and Controls on a screen page", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const effects = wrapper.find("#section-screen-effects");
+    expect(effects.exists()).toBe(true);
+    expect(effects.find(".settings-section__eyebrow").text()).toBe("Effects & focus");
+    for (const label of [
+      "Effects",
+      "Focus light",
+      "Dim other regions",
+      "Show button presses",
+      "Label size",
+    ]) {
+      expect(rowByLabel(wrapper, label), label).toBeTruthy();
+    }
+
+    const controls = wrapper.find("#section-screen-controls");
+    expect(controls.exists()).toBe(true);
+    expect(controls.find(".settings-section__eyebrow").text()).toBe("Controls");
+    for (const label of [
+      "Hide controls",
+      "Keep the clock bar when hidden",
+      "Tap anywhere to show controls",
+    ]) {
+      expect(rowByLabel(wrapper, label), label).toBeTruthy();
+    }
+    // The corner rows only matter while the controls are hidden.
+    expect(rowByLabel(wrapper, "Show-controls corner")).toBeUndefined();
+  });
+
+  it("reads the household value for each moved row until this screen overrides it", async () => {
+    const { wrapper } = mountScreens({
+      cfg: config({
+        focusLightMode: "off",
+        focusLightDimOthers: false,
+        keyboardFeedbackEnabled: false,
+        keyboardFeedbackMode: "small",
+        showUI: false,
+        clockBarShowInKiosk: true,
+        tapAnywhereReveal: true,
+        hotCornerPosition: "top-right",
+      }),
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    expect(control(wrapper, SelectPill, "Focus light").props("modelValue")).toBe("off");
+    expect(control(wrapper, ToggleSwitch, "Dim other regions").props("modelValue")).toBe(false);
+    expect(control(wrapper, ToggleSwitch, "Show button presses").props("modelValue")).toBe(false);
+    expect(control(wrapper, SegmentedControl, "Label size").props("modelValue")).toBe("small");
+    // showUI false means the controls are hidden, so Hide controls is on.
+    expect(control(wrapper, ToggleSwitch, "Hide controls").props("modelValue")).toBe(true);
+    expect(
+      control(wrapper, ToggleSwitch, "Keep the clock bar when hidden").props("modelValue")
+    ).toBe(true);
+    expect(
+      control(wrapper, ToggleSwitch, "Tap anywhere to show controls").props("modelValue")
+    ).toBe(true);
+    expect(control(wrapper, SelectPill, "Show-controls corner").props("modelValue")).toBe(
+      "top-right"
+    );
+    expect(rowByLabel(wrapper, "Focus light").text()).toContain("Same as Default");
+  });
+
+  it("writes the Effects & focus rows to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Focus light").vm.$emit("update:modelValue", "always");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      focusLightMode: "always",
+    });
+
+    control(wrapper, ToggleSwitch, "Dim other regions").vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      orientation: "portrait",
+      focusLightMode: "always",
+      focusLightDimOthers: false,
+    });
+  });
+
+  it("writes Hide controls as showUI=false for this screen", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const hide = control(wrapper, ToggleSwitch, "Hide controls");
+    expect(hide.props("modelValue")).toBe(false);
+    hide.vm.$emit("update:modelValue", true);
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { showUI: false });
+    expect(rowByLabel(wrapper, "Hide controls").text()).toContain("Changed here");
+  });
+
+  it("writes keep-clock-bar, tap-anywhere and the corner rows to the override", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { showUI: false } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, ToggleSwitch, "Keep the clock bar when hidden").vm.$emit(
+      "update:modelValue",
+      true
+    );
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+    });
+
+    control(wrapper, ToggleSwitch, "Tap anywhere to show controls").vm.$emit(
+      "update:modelValue",
+      true
+    );
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+      tapAnywhereReveal: true,
+    });
+
+    control(wrapper, SelectPill, "Show-controls corner").vm.$emit("update:modelValue", "top-right");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+      tapAnywhereReveal: true,
+      hotCornerPosition: "top-right",
+    });
+
+    control(wrapper, RangeSlider, "Corner size in pixels").vm.$emit("update:modelValue", 80);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      showUI: false,
+      clockBarShowInKiosk: true,
+      tapAnywhereReveal: true,
+      hotCornerPosition: "top-right",
+      hotCornerSize: 80,
+    });
+  });
+
+  it("resets one moved override without touching the others", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { focusLightMode: "off", hotCornerSize: 80, showUI: true },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    // showUI true means the controls show, so the corner rows are not listed.
+    expect(rowByLabel(wrapper, "Corner size")).toBeUndefined();
+    await wrapper.find('[data-test="reset-focus-light"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      hotCornerSize: 80,
+      showUI: true,
+    });
+  });
+
+  it("opens the Default page at Controls from a deep link on a plain browser", async () => {
+    const { wrapper } = mountScreens({ initialSection: "screen-controls" });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+    expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+  });
+
+  it("opens this screen's own page at Controls from a deep link on a kiosk", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({ initialSection: "screen-controls" });
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+});
+
+// §7 item 6: Look moved from Dashboard › Appearance, and the two sizes moved
+// into Display. A screen page writes every one to that screen's overrides and
+// never to the household config or this browser's own look.
+describe("ScreensSettings — Look and Display sizes (§7 item 6)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const themePicker = wrapper => wrapper.findComponent({ name: "ThemePicker" });
+  const control = (wrapper, kind, label) =>
+    wrapper.findAllComponents(kind).find(c => c.props("ariaLabel") === label);
+
+  it("puts Look after Pages, with Theme, Light or dark and Font", async () => {
+    const { wrapper } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const look = wrapper.find("#section-screen-look");
+    expect(look.exists()).toBe(true);
+    expect(look.find(".settings-section__eyebrow").text()).toBe("Look");
+    for (const label of ["Theme", "Light or dark", "Font"]) {
+      expect(rowByLabel(wrapper, label), label).toBeTruthy();
+    }
+    // The dark hours only matter on a schedule.
+    expect(rowByLabel(wrapper, "Dark from")).toBeUndefined();
+    expect(rowByLabel(wrapper, "Dark to")).toBeUndefined();
+  });
+
+  it("writes Theme to this screen's overrides, not the household config", async () => {
+    const original = { displayName: "Kitchen", orientation: "portrait" };
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides: original })],
+      overrides: original,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    themePicker(wrapper).vm.$emit("select", "ocean");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      ...original,
+      selectedTheme: "ocean",
+    });
+    expect(wrapper.emitted("update:config")).toBeUndefined();
+    expect(wrapper.find("#section-screen-look").text()).toContain(
+      "Kitchen will switch on its next check (about 30 s)"
+    );
+  });
+
+  it("writes the font to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { orientation: "portrait" } });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Font").vm.$emit("update:modelValue", "marquee");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientation: "portrait",
+      typeTheme: "marquee",
+    });
+    expect(rowByLabel(wrapper, "Font").text()).toContain("Changed here");
+  });
+
+  it("writes Light or dark and the dark hours to this screen's overrides", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { themeMode: "time", darkModeStart: 18, darkModeEnd: 6 },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Light or dark").vm.$emit("update:modelValue", "dark");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      themeMode: "dark",
+      darkModeStart: 18,
+      darkModeEnd: 6,
+    });
+
+    control(wrapper, SelectPill, "Light or dark").vm.$emit("update:modelValue", "time");
+    await flushPromises();
+    const pickers = wrapper.find("#section-screen-look").findAll('input[type="time"]');
+    expect(pickers).toHaveLength(2);
+    await pickers[0].setValue("20:00");
+    await flushPromises();
+    expect(store.saveOverrides.mock.calls.at(-1)?.[1]).toMatchObject({ darkModeStart: 20 });
+    await wrapper.find("#section-screen-look").findAll('input[type="time"]')[1].setValue("07:00");
+    await flushPromises();
+    expect(store.saveOverrides.mock.calls.at(-1)?.[1]).toMatchObject({ darkModeEnd: 7 });
+  });
+
+  it("does not change this browser's own look when editing a screen", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+    document.documentElement.classList.add("light");
+
+    themePicker(wrapper).vm.$emit("select", "ocean");
+    await flushPromises();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { selectedTheme: "ocean" });
+    expect(document.documentElement.classList.contains("light")).toBe(true);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(document.documentElement.style.getPropertyValue("--bg-0")).toBe("");
+    expect(wrapper.emitted("update:config")).toBeUndefined();
+    document.documentElement.classList.remove("light", "dark");
+  });
+
+  it("writes Dashboard size and Settings text size to that screen", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    control(wrapper, SelectPill, "Dashboard size").vm.$emit("update:modelValue", "large");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      touchControlSize: "large",
+    });
+
+    control(wrapper, SegmentedControl, "Settings text size").vm.$emit(
+      "update:modelValue",
+      "compact"
+    );
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      touchControlSize: "large",
+      uiSize: "compact",
+    });
+    // The override, not this browser's own calvin-ui-size layer.
+    expect(window.localStorage.getItem("calvin-ui-size")).toBeNull();
+  });
+
+  it("resets one Look row without touching the others", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { selectedTheme: "ocean", typeTheme: "marquee", orientation: "portrait" },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find('[data-test="reset-theme"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      typeTheme: "marquee",
+      orientation: "portrait",
+    });
+  });
+
+  it("Reset everything and Use these as the default cover the new rows", async () => {
+    const overrides = {
+      displayName: "Kitchen",
+      selectedTheme: "ocean",
+      themeMode: "dark",
+      typeTheme: "marquee",
+      touchControlSize: "large",
+      uiSize: "compact",
+    };
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides })],
+      overrides,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='use-as-default']").trigger("click");
+    const modal = wrapper.findComponent({ name: "ConfirmModal" });
+    expect(modal.props("message")).toContain("Theme");
+    expect(modal.props("message")).toContain("Light or dark");
+    expect(modal.props("message")).toContain("Font");
+    expect(modal.props("message")).toContain("Dashboard size");
+    expect(modal.props("message")).toContain("Settings text size");
+    modal.vm.$emit("confirm");
+    await flushPromises();
+
+    expect(wrapper.emitted("update:config")).toContainEqual([
+      {
+        selectedTheme: "ocean",
+        themeMode: "dark",
+        typeTheme: "marquee",
+        touchControlSize: "large",
+        uiSize: "compact",
+      },
+    ]);
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { displayName: "Kitchen" });
+  });
+
+  it("Reset everything drops the new rows and keeps the name", async () => {
+    const overrides = {
+      displayName: "Kitchen",
+      selectedTheme: "ocean",
+      themeMode: "dark",
+      typeTheme: "marquee",
+      touchControlSize: "large",
+      uiSize: "compact",
+    };
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ overrides })],
+      overrides,
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    await wrapper.find("[data-test='reset-everything']").trigger("click");
+    const modal = wrapper.findComponent({ name: "ConfirmModal" });
+    expect(modal.props("message")).toBe(
+      "Its 5 changed settings go back to the default. Its name stays."
+    );
+    modal.vm.$emit("confirm");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { displayName: "Kitchen" });
+  });
+
+  it("opens the Default Look section from the old Appearance deep link", async () => {
+    const { wrapper } = mountScreens({ initialSection: "screen-look" });
+    await flushPromises();
+    expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+    expect(wrapper.find("#section-screen-look").exists()).toBe(true);
+  });
+
+  it("opens this screen's own Look section from the old Appearance deep link on a kiosk", async () => {
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({ initialSection: "screen-look" });
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-look").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+});
+
 // §4: Photo frame, Loading light and Layout live on the screen page now.
 describe("ScreensSettings — Behaviour (§4)", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -1664,5 +2323,176 @@ describe("ScreensSettings — Behaviour (§4)", () => {
     await flushPromises();
     expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
     expect(wrapper.find("#section-device-behaviour").exists()).toBe(true);
+  });
+});
+
+describe("ScreensSettings — optimistic control writes (calvin-g25v)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows toggle, segmented and select values before the save resolves", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    let release;
+    store.saveOverrides = vi.fn(
+      () =>
+        new Promise(resolve => {
+          release = resolve;
+        })
+    );
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await nextTick();
+    expect(orientation.props("modelValue")).toBe("portrait");
+
+    const idle = wrapper
+      .findAllComponents(SelectPill)
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    idle.vm.$emit("update:modelValue", 900);
+    await nextTick();
+    expect(idle.props("modelValue")).toBe(900);
+
+    // None of the three taps is waiting on the save, and they share one write.
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      orientationFlipped: true,
+      orientation: "portrait",
+      displayTimeoutEnabled: true,
+      displayTimeout: 900,
+    });
+
+    release({ data: {} });
+  });
+
+  it("restores the previous value and shows the error when the save rejects", async () => {
+    const { wrapper, store } = mountScreens({
+      overrides: { orientation: "portrait", orientationFlipped: false },
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("offline");
+    });
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    await flushPromises();
+
+    expect(flip.props("modelValue")).toBe(false);
+    expect(wrapper.text()).toContain(
+      "Couldn't save to the server. Check the connection and try again."
+    );
+  });
+
+  it("sends one save with the final value for two quick taps on a select", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const idle = wrapper
+      .findAllComponents(SelectPill)
+      .find(c => c.props("ariaLabel") === "Turn off when idle");
+    idle.vm.$emit("update:modelValue", 300);
+    idle.vm.$emit("update:modelValue", 900);
+    await nextTick();
+    expect(idle.props("modelValue")).toBe(900);
+
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", {
+      displayTimeoutEnabled: true,
+      displayTimeout: 900,
+    });
+  });
+
+  it("keeps a newer tap when an earlier in-flight save fails", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    let rejectFirst;
+    store.saveOverrides = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          })
+      )
+      .mockResolvedValueOnce({ data: {} });
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+
+    const flip = wrapper
+      .findAllComponents(ToggleSwitch)
+      .find(t => t.props("ariaLabel") === "Upside down");
+    await flip.find('[role="switch"]').trigger("click");
+    await nextTick();
+    expect(flip.props("modelValue")).toBe(true);
+
+    rejectFirst(new Error("offline"));
+    await flushPromisesNow();
+    await nextTick();
+
+    // The failed orientation is gone; the newer flip is still shown.
+    expect(flip.props("modelValue")).toBe(true);
+    expect(
+      wrapper
+        .findAllComponents(SegmentedControl)
+        .find(c => c.props("ariaLabel") === "Orientation")
+        .props("modelValue")
+    ).toBe("landscape");
+    expect(wrapper.text()).toContain(
+      "Couldn't save to the server. Check the connection and try again."
+    );
+
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenCalledTimes(2);
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {
+      orientationFlipped: true,
+    });
+  });
+
+  it("flushes a pending save when the page unmounts", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const orientation = wrapper
+      .findAllComponents(SegmentedControl)
+      .find(c => c.props("ariaLabel") === "Orientation");
+    orientation.vm.$emit("update:modelValue", "portrait");
+    await nextTick();
+    expect(store.saveOverrides).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+    await flushPromisesNow();
+    await flushPromisesNow();
+
+    expect(store.saveOverrides).toHaveBeenCalledWith("kitchen", { orientation: "portrait" });
   });
 });

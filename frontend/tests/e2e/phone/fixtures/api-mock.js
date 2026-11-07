@@ -61,6 +61,8 @@ export const sampleConfig = {
   availableScreens: ["page-home", "page-kitchen"],
   defaultScreenId: "page-home",
   showWebServices: true,
+  // One-time display migration already done: boot must not POST on its own.
+  displaySettingsMigrated: true,
   photoFrameEnabled: false,
   photoFrameTimeout: 300,
   photoRotationInterval: 30,
@@ -87,6 +89,7 @@ export const sampleConfig = {
   selectedTheme: null,
   darkModeStart: 18,
   darkModeEnd: 6,
+  typeTheme: null,
   displayScheduleEnabled: false,
   displayTimeoutEnabled: false,
   displayTimeout: 0,
@@ -362,15 +365,60 @@ export async function installApiMock(page, options = {}) {
     // Per-kiosk override layer written by Settings (stateful so a second
     // selection reads back what the first save wrote).
     overridesByKiosk: {},
+    // Bodies of PUT/PATCH /api/kiosks/{id}/overrides, so a test can prove the
+    // exact keys a screen page or the dashboard toggle sent.
+    overridesRequests: [],
     // Flip to true to simulate a server that stopped answering every route.
     down: false,
     requests: [],
+    // Bodies of POST /api/config, so a test can prove which keys were written.
+    configPosts: [],
     unmatched: [],
     // Local photos (calvin-n2my): the browser's own mutable library.
     images: JSON.parse(JSON.stringify(sampleImages)),
     // Share links (calvin-mwqo): what Settings › Content › Photos lists.
     shareLinks: options.shareLinks ? [...options.shareLinks] : [],
     shareFolders: options.shareFolders ? [...options.shareFolders] : ["Guests", "Party"],
+    // The kiosk list, with any extra fields a spec needs (displayStack and the
+    // saved display-check findings, calvin-29ws). Mutable: a test changes it.
+    kiosks: sampleKiosks.map(kiosk => ({ ...kiosk, ...(options.kioskExtras?.[kiosk.id] || {}) })),
+    // Display check (calvin-29ws): the latest run per kiosk. A test plays the
+    // agent with `agentReport`; the backend side is answered here.
+    displayCheckRuns: {},
+    displayCheckCalls: [],
+    // Set a run here to make the next start answer 409 display_check_active.
+    displayCheckBusy: null,
+  };
+  // A step's result: it fills run.steps while the run stays active (spec §10.2).
+  state.agentStep = (id, step, result = {}) => {
+    const run = state.displayCheckRuns[id];
+    if (!run) throw new Error(`no display check run for ${id}`);
+    state.displayCheckClock = (state.displayCheckClock || 0) + 1;
+    run.status = "running";
+    run.updatedAt = new Date().toISOString();
+    run.steps = {
+      ...(run.steps || {}),
+      [step]: {
+        status: "done",
+        value: null,
+        level: null,
+        limit: null,
+        detail: null,
+        info: null,
+        seq: run.seq ?? null,
+        finishedAt: new Date(1800000000000 + state.displayCheckClock * 1000).toISOString(),
+        ...result,
+      },
+    };
+    if (step === "limit" && result.limit != null) run.limit = result.limit;
+  };
+  state.agentReport = (id, patch) => {
+    const run = state.displayCheckRuns[id];
+    if (!run) throw new Error(`no display check run for ${id}`);
+    Object.assign(run, { status: "running", updatedAt: new Date().toISOString() }, patch);
+    if (["done", "error", "stopped", "asleep", "timeout", "interrupted"].includes(run.status)) {
+      run.active = false;
+    }
   };
 
   await page.route("**/api/**", async route => {
@@ -442,7 +490,9 @@ export async function installApiMock(page, options = {}) {
 
     if (path === "/api/config" && method === "GET") return json(route, state.config);
     if (path === "/api/config" && method === "POST") {
-      state.config = { ...state.config, ...request.postDataJSON() };
+      const body = request.postDataJSON();
+      state.configPosts.push(body);
+      state.config = { ...state.config, ...body };
       return json(route, state.config);
     }
     if (path === "/api/config/git/branches") return json(route, { branches: ["main", "develop"] });
@@ -534,20 +584,129 @@ export async function installApiMock(page, options = {}) {
       return json(route, { detail: "not found" }, 404);
     }
 
-    if (path === "/api/kiosks") return json(route, { kiosks: sampleKiosks });
+    if (path === "/api/kiosks") {
+      return json(route, {
+        kiosks: state.kiosks.map(kiosk => ({
+          ...kiosk,
+          overrides: state.overridesByKiosk[kiosk.id] ?? kiosk.overrides,
+        })),
+      });
+    }
+    const displayCheck = path.match(/^\/api\/kiosks\/([^/]+)\/display-check(?:\/([a-z-]+))?$/);
+    if (displayCheck) {
+      const id = decodeURIComponent(displayCheck[1]);
+      const action = displayCheck[2] || "";
+      state.displayCheckCalls.push(`${method} ${action || "status"}`);
+      if (!action && method === "GET") {
+        return json(route, { run: state.displayCheckRuns[id] ?? state.displayCheckBusy ?? null });
+      }
+      if (action === "start") {
+        if (state.displayCheckBusy) {
+          return json(
+            route,
+            { detail: { code: "display_check_active", run: state.displayCheckBusy } },
+            409
+          );
+        }
+        const body = request.postDataJSON() || {};
+        const now = new Date().toISOString();
+        state.displayCheckRuns[id] = {
+          id: `run-${Object.keys(state.displayCheckRuns).length}-${state.displayCheckCalls.length}`,
+          step: body.step,
+          value: body.value ?? null,
+          brightness: body.brightness ?? null,
+          action: "start",
+          status: "requested",
+          active: true,
+          level: null,
+          limit: null,
+          log: [],
+          steps: {},
+          seq: 0,
+          detail: null,
+          info: null,
+          requestedAt: now,
+          startedAt: null,
+          finishedAt: null,
+          updatedAt: null,
+          expiresAt: new Date(Date.now() + 600000).toISOString(),
+        };
+        return json(route, state.displayCheckRuns[id]);
+      }
+      if (action === "step") {
+        const run = state.displayCheckRuns[id];
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        const body = request.postDataJSON() || {};
+        run.step = body.step;
+        run.value = body.value ?? null;
+        run.seq = (run.seq ?? 0) + 1;
+        return json(route, run);
+      }
+      if (action === "stop") {
+        const run = state.displayCheckRuns[id] ?? state.displayCheckBusy;
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        run.action = "stop";
+        run.status = "stopped";
+        run.active = false;
+        return json(route, run);
+      }
+      if (action === "menu-at-start") {
+        const run = state.displayCheckRuns[id];
+        if (!run?.active) return json(route, { detail: "No display check is running" }, 404);
+        run.menuAtStart = (request.postDataJSON() || {}).menu;
+        return json(route, run);
+      }
+      if (action === "save-limit") {
+        // A limit found by step 4, or one step under a calibration fault (calvin-c805).
+        const latest = state.displayCheckRuns[id];
+        const fault = latest?.fault;
+        const faultLimit = fault ? Math.min(fault.lastGood, fault.level) - 2 : null;
+        const limit = latest?.steps?.limit?.limit ?? faultLimit;
+        if (limit == null) return json(route, { detail: { code: "no_limit" } }, 409);
+        state.overridesByKiosk[id] = {
+          ...(state.overridesByKiosk[id] || {}),
+          brightnessLimit: limit,
+        };
+        return json(route, {
+          id,
+          brightnessLimit: limit,
+          overrides: state.overridesByKiosk[id],
+        });
+      }
+      if (action === "verdict") {
+        const kiosk = state.kiosks.find(item => item.id === id);
+        const writes = (request.postDataJSON() || {}).writes;
+        if (kiosk) kiosk.displayCheck = { ...(kiosk.displayCheck || {}), writes };
+        return json(route, kiosk?.displayCheck ?? {});
+      }
+    }
     if (path === "/api/kiosks/agent/manifest") return json(route, { version: "1.6.0" });
     const kioskOverrides = path.match(/^\/api\/kiosks\/([^/]+)\/overrides$/);
     if (kioskOverrides) {
       const id = decodeURIComponent(kioskOverrides[1]);
       if (method === "PUT") {
         const body = request.postDataJSON() || {};
+        state.overridesRequests.push({ method, path, body });
         state.overridesByKiosk[id] = body.overrides || {};
+        return json(route, { id, overrides: state.overridesByKiosk[id] });
+      }
+      if (method === "PATCH") {
+        // A per-screen row merges the keys it changes (F2); every other key stays.
+        const body = request.postDataJSON() || {};
+        state.overridesRequests.push({ method, path, body });
+        state.overridesByKiosk[id] = {
+          ...(state.overridesByKiosk[id] || {}),
+          ...(body.overrides || {}),
+        };
         return json(route, { id, overrides: state.overridesByKiosk[id] });
       }
       return json(route, { id, overrides: state.overridesByKiosk[id] || {} });
     }
     if (/^\/api\/kiosks\/[^/]+\/config$/.test(path)) {
-      return json(route, { deviceConfigVersion: "3" });
+      // The real endpoint returns the household config with the kiosk's
+      // overrides merged in. A spec that needs that merge adds a route of its
+      // own (see settings-scope.spec.js) so other specs keep the plain config.
+      return json(route, { ...state.config, deviceConfigVersion: "3" });
     }
 
     if (path === "/api/security/sealed-mode") {

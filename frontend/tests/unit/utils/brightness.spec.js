@@ -1,0 +1,203 @@
+import { describe, it, expect } from "vitest";
+import {
+  availability,
+  checkSummary,
+  clampBrightness,
+  ddcToMenu,
+  dimSeconds,
+  firstBrightness,
+  fitConversion,
+  fitSentence,
+  maxPickable,
+  menuToDdc,
+  calibrationPoints,
+  faultLimit,
+  thirdReadingPoint,
+  writeTargets,
+  readingsOutlier,
+} from "@/utils/brightness";
+
+const READINGS = [
+  { ddc: 5, menu: 28 },
+  { ddc: 19, menu: 61 },
+];
+
+describe("fitConversion", () => {
+  it("needs two readings at different values", () => {
+    expect(fitConversion([])).toBeNull();
+    expect(fitConversion([{ ddc: 5, menu: 28 }])).toBeNull();
+    expect(
+      fitConversion([
+        { ddc: 5, menu: 28 },
+        { ddc: 5, menu: 30 },
+      ])
+    ).toBeNull();
+  });
+
+  it("fits menu ≈ a + b × Calvin value through two points", () => {
+    const fit = fitConversion(READINGS);
+    expect(fit.slope).toBeCloseTo(33 / 14, 5);
+    expect(ddcToMenu(19, READINGS)).toBe(61);
+    expect(menuToDdc(61, READINGS)).toBe(19);
+  });
+
+  it("describes the fit in words", () => {
+    expect(
+      fitSentence([
+        { ddc: 5, menu: 28 },
+        { ddc: 19, menu: 61 },
+      ])
+    ).toMatch(/^menu ≈ 16 \+ 2\.4 × Calvin value$/);
+    expect(fitSentence([])).toBe("");
+  });
+
+  it("returns null estimates without a fit", () => {
+    expect(ddcToMenu(10, [])).toBeNull();
+    expect(menuToDdc(40, [{ ddc: 5, menu: 28 }])).toBeNull();
+  });
+});
+
+describe("readingsOutlier", () => {
+  it("flags a third reading more than 5 menu units off the line", () => {
+    expect(readingsOutlier([...READINGS, { ddc: 12, menu: 80 }])).toBe(true);
+  });
+  it("accepts a reading near the line and needs three readings", () => {
+    expect(readingsOutlier([...READINGS, { ddc: 12, menu: 46 }])).toBe(false);
+    expect(readingsOutlier(READINGS)).toBe(false);
+  });
+});
+
+describe("limits", () => {
+  it("allows the limit minus two steps", () => {
+    expect(maxPickable(26, 2)).toBe(22);
+    expect(maxPickable(26, 3)).toBe(20);
+    expect(maxPickable(null, 2)).toBe(100);
+    expect(maxPickable(3, 2)).toBe(0);
+  });
+  it("starts at the lower of limit minus two steps and 20", () => {
+    expect(firstBrightness(26, 2)).toBe(20);
+    expect(firstBrightness(22, 2)).toBe(18);
+    expect(firstBrightness(null, 2)).toBe(20);
+  });
+  it("takes the second reading 4 below the start, and has no room at the very bottom", () => {
+    expect(calibrationPoints(19)).toEqual({ first: 19, second: 15, room: true });
+    expect(calibrationPoints(5)).toEqual({ first: 5, second: 1, room: true });
+    expect(calibrationPoints(3)).toEqual({ first: 3, second: 0, room: true });
+    expect(calibrationPoints(1)).toEqual({ first: 1, second: 0, room: false });
+  });
+  it("puts the optional third reading at the limit minus two steps", () => {
+    expect(thirdReadingPoint(26, 2)).toBe(22);
+    expect(thirdReadingPoint(null, 2)).toBeNull();
+  });
+  it("offers the fault limit one step under the lower of the last good level and the fault", () => {
+    expect(faultLimit({ level: 12, lastGood: 14 }, 2)).toBe(10);
+    expect(faultLimit({ level: 12, lastGood: 8 }, 2)).toBe(6);
+    expect(faultLimit({ level: 2, lastGood: 4 }, 2)).toBeNull();
+    expect(faultLimit(null, 2)).toBeNull();
+  });
+  it("alternates the repeat targets of the dim test", () => {
+    expect(writeTargets(19)).toEqual([10, 9]);
+    expect(writeTargets(5)).toEqual([1, 0]);
+  });
+});
+
+describe("dimSeconds", () => {
+  it("estimates the dim from the level and step", () => {
+    expect(dimSeconds(19, 2, 1.5)).toBe(15);
+    expect(dimSeconds(0, 2, 1.5)).toBe(0);
+  });
+});
+
+describe("availability", () => {
+  const found = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
+  it("is available after a good check", () => {
+    expect(availability({ displayStack: "cog" }, found).state).toBe("ok");
+  });
+  it("treats the backend's all-null findings as never checked", () => {
+    const empty = { checkedAt: null, ddc: null, writes: null, limit: null };
+    expect(availability({ displayStack: "cog" }, empty).state).toBe("never");
+    expect(checkSummary(empty, [], null)).toBe("Not checked yet");
+  });
+  it("is never-checked without findings and keeps the toggle usable", () => {
+    const a = availability({ displayStack: "cog" }, null);
+    expect(a.state).toBe("never");
+    expect(a.disabled).toBe(false);
+    expect(a.text).toMatch(/checks the display first/);
+  });
+  it("explains no DDC with Check again", () => {
+    const a = availability({ displayStack: "cog" }, { ...found, ddc: false, writes: null });
+    expect(a.state).toBe("no-ddc");
+    expect(a.disabled).toBe(true);
+    expect(a.action).toBe("check");
+    expect(a.text).toMatch(/DDC\/CI/);
+    expect(a.text).toMatch(/4 Nov/);
+  });
+  it("explains writes that don't take effect", () => {
+    const a = availability({ displayStack: "cog" }, { ...found, writes: false });
+    expect(a.state).toBe("no-writes");
+    expect(a.disabled).toBe(true);
+    expect(a.text).toMatch(/don't change it/);
+  });
+  it("needs cog and names the stack", () => {
+    const a = availability({ displayStack: "x11", displayName: "Hallway" }, found, "Hallway");
+    expect(a.state).toBe("not-cog");
+    expect(a.disabled).toBe(true);
+    expect(a.text).toBe("Needs the Calvin kiosk display (cog). Hallway uses X11.");
+  });
+});
+
+describe("checkSummary", () => {
+  it("says Not checked yet", () => {
+    expect(checkSummary(null, [], null)).toBe("Not checked yet");
+  });
+  it("lists what was found", () => {
+    expect(
+      checkSummary(
+        { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" },
+        [
+          { ddc: 5, menu: 28 },
+          { ddc: 12, menu: 44 },
+          { ddc: 19, menu: 61 },
+        ],
+        26
+      )
+    ).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · limit 26 (4 Nov)"
+    );
+  });
+});
+
+describe("clampBrightness", () => {
+  it("lowers a stored brightness above the limit minus two steps", () => {
+    expect(clampBrightness({ brightness: 25, brightnessLimit: 26 })).toEqual({
+      brightness: 22,
+      brightnessLimit: 26,
+    });
+    expect(
+      clampBrightness({ brightness: 25, brightnessLimit: 26, brightnessStep: 3 }).brightness
+    ).toBe(20);
+  });
+  it("leaves a safe value, no limit or no brightness alone and returns the same object", () => {
+    const safe = { brightness: 20, brightnessLimit: 26 };
+    expect(clampBrightness(safe)).toBe(safe);
+    const none = { brightness: 90 };
+    expect(clampBrightness(none)).toBe(none);
+    const empty = { brightnessLimit: 26 };
+    expect(clampBrightness(empty)).toBe(empty);
+  });
+});
+
+describe("menuToDdcDown", () => {
+  const line = [
+    { ddc: 1, menu: 10 },
+    { ddc: 5, menu: 28 },
+  ];
+  it("rounds down and stays within 0-100", async () => {
+    const { menuToDdcDown } = await import("@/utils/brightness");
+    expect(menuToDdcDown(60, line)).toBe(12);
+    expect(menuToDdcDown(28, line)).toBe(5);
+    expect(menuToDdcDown(1, line)).toBe(0);
+    expect(menuToDdcDown(900, line)).toBe(100);
+    expect(menuToDdcDown(60, [line[0]])).toBeNull();
+  });
+});

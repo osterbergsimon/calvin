@@ -1,18 +1,15 @@
 import { computed, ref, watch } from "vue";
 import { useScreenSetting } from "@/composables/useScreenSetting";
 import { getKioskId } from "@/utils/kioskId";
-import {
-  LAYOUT_STORAGE_KEY,
-  applyLayoutMode as applyLayoutClass,
-  resolveLayoutMode,
-} from "@/utils/layoutMode";
+import { applyLayoutMode as applyLayoutClass, resolveLayoutMode } from "@/utils/layoutMode";
 
 /**
  * Applies this screen's layout choice to <html> (calvin-tnkg).
  *
- * The value comes from the same per-screen setting the Settings row edits:
- * a kiosk's override, or this browser's localStorage choice. Auto leaves the
- * layout classes off, so the viewport decides as it always has.
+ * The value comes from the same per-screen setting the Settings row edits: a
+ * kiosk's override on top of the household config, or the household config in a
+ * plain browser. Auto leaves the layout classes off, so the viewport decides as
+ * it always has.
  *
  * Called once from App.vue's setup, so the class is on <html> before the first
  * paint (a kiosk picks its override up when its merged config arrives).
@@ -27,10 +24,10 @@ export function useLayoutOverride() {
 
   const syncWithConfig = () => {
     const kiosk = Boolean(getKioskId());
-    // Per-key shared ref inside useScreenSetting keeps this watch in step with
-    // a change made in Settings (localStorage for a browser, the kiosk's
-    // override on the server).
-    const { value } = useScreenSetting("layoutMode", { storageKey: LAYOUT_STORAGE_KEY });
+    // The descriptor says layoutMode has no browser layer: on a kiosk this is
+    // the merged config, in a plain browser the household config. A stale
+    // localStorage value from an older version is never read.
+    const { value } = useScreenSetting("layoutMode");
     const effective = computed(() =>
       resolveLayoutMode({
         kiosk,

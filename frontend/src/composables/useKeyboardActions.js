@@ -4,16 +4,14 @@ import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
 import { useConfigStore } from "../stores/config";
+import { useActiveRegionStore } from "../stores/activeRegion";
 import { useProgressStore } from "../stores/progress";
 import { useRouter } from "vue-router";
 import { logInfo, logError, logWarn, logDebug } from "../utils/logger";
 import {
-  cycleActiveDashboardRegion,
   getActiveDashboardRegion,
   getActiveDashboardScreen,
   getLeafRegions,
-  normalizeDashboardScreens,
-  setActiveDashboardRegion,
 } from "../utils/layout";
 import { addMonths } from "../utils/dateMath";
 
@@ -42,17 +40,17 @@ export function useKeyboardActions() {
   const webServicesStore = useWebServicesStore();
   const progressStore = useProgressStore();
   const configStore = useConfigStore();
+  const activeRegionStore = useActiveRegionStore();
   const router = useRouter();
-
-  // RAW global catalog — used for persistence paths (region-view writes).
-  // Never pass this filtered set to a global save; screen selection uses
-  // configStore.activateDashboardScreen / cycleDashboardScreenBy instead.
-  const getDashboardScreens = () => normalizeDashboardScreens(configStore.dashboardScreens);
 
   const getActiveRegion = () => {
     // Use effectiveDashboardScreens so the kiosk-local activeScreenId is respected.
     const screen = getActiveDashboardScreen(configStore.effectiveDashboardScreens);
-    return getActiveDashboardRegion(screen);
+    if (!screen) return null;
+    return getActiveDashboardRegion({
+      ...screen,
+      activeRegionId: activeRegionStore.getActiveRegionId(screen),
+    });
   };
 
   const activeRegionKindIs = kind => getActiveRegion()?.kind === kind;
@@ -62,17 +60,6 @@ export function useKeyboardActions() {
   const activeCalendarViewMode = () => {
     const region = getActiveRegion();
     return region?.kind === "calendar" ? (region.view?.mode ?? "month") : "month";
-  };
-
-  const saveDashboardScreens = screens => {
-    if (typeof configStore.setDashboardScreens === "function") {
-      configStore.setDashboardScreens(screens);
-    }
-    if (typeof configStore.updateConfig === "function") {
-      configStore.updateConfig({ dashboardScreens: screens }).catch(err => {
-        logError("[Keyboard]", "Failed to save dashboard screens:", err);
-      });
-    }
   };
 
   const activateScreenByIndex = index => {
@@ -103,20 +90,9 @@ export function useKeyboardActions() {
     }
     if (matchScreenIndex < 0) return false;
     const screen = screensConfig.screens[matchScreenIndex];
-    // Persist the active-region bookmark on the raw catalog (global write is
-    // correct here: region focus is not kiosk-local). Then activate the screen
-    // through the store's branched action so kiosk stays local-only.
-    const rawScreens = getDashboardScreens();
-    const rawScreen = rawScreens.screens.find(s => s.id === screen.id);
-    if (rawScreen && matchLeafId) {
-      const patchedScreens = {
-        ...rawScreens,
-        screens: rawScreens.screens.map(s =>
-          s.id === screen.id ? { ...s, activeRegionId: matchLeafId } : s
-        ),
-      };
-      saveDashboardScreens(patchedScreens);
-    }
+    // Region focus is session state, not a global write. Activating the screen
+    // goes through the store's branched action so kiosk stays local-only.
+    if (matchLeafId) activeRegionStore.setActiveRegionId(screen, matchLeafId);
     configStore.activateDashboardScreen(screen.id);
     router.push("/");
     return true;
@@ -464,22 +440,10 @@ export function useKeyboardActions() {
         activateScreenByIndex(Number(action.replace("screen_", "")) - 1);
         break;
       case "region_next":
-        saveDashboardScreens(
-          cycleActiveDashboardRegion(
-            getDashboardScreens(),
-            1,
-            configStore.effectiveDashboardScreens.activeScreenId
-          )
-        );
+        cycleActiveRegion(1);
         break;
       case "region_prev":
-        saveDashboardScreens(
-          cycleActiveDashboardRegion(
-            getDashboardScreens(),
-            -1,
-            configStore.effectiveDashboardScreens.activeScreenId
-          )
-        );
+        cycleActiveRegion(-1);
         break;
 
       // Calendar actions - context-aware based on view mode
@@ -1028,19 +992,31 @@ export function useKeyboardActions() {
     return null;
   };
 
+  const cycleActiveRegion = direction => {
+    const screen = getActiveDashboardScreen(configStore.effectiveDashboardScreens);
+    if (!screen) return;
+    const leaves = getLeafRegions(screen.layout);
+    if (leaves.length <= 1) return;
+    const currentId = activeRegionStore.getActiveRegionId(screen);
+    const currentIndex = Math.max(
+      0,
+      leaves.findIndex(leaf => leaf.id === currentId)
+    );
+    const nextIndex = (currentIndex + direction + leaves.length) % leaves.length;
+    activeRegionStore.setActiveRegionId(screen, leaves[nextIndex].id);
+  };
+
   const focusRegion = regionId => {
-    saveDashboardScreens(
-      setActiveDashboardRegion(
-        getDashboardScreens(),
-        regionId,
-        configStore.effectiveDashboardScreens.activeScreenId
-      )
+    activeRegionStore.setActiveRegionId(
+      getActiveDashboardScreen(configStore.effectiveDashboardScreens),
+      regionId
     );
   };
 
   const activateScreen = screenId => {
-    configStore.activateDashboardScreen(screenId);
+    const switched = configStore.activateDashboardScreen(screenId);
     router.push("/");
+    return switched;
   };
 
   return {

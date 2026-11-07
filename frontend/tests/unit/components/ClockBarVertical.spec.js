@@ -6,6 +6,7 @@ import { nextTick } from "vue"; // eslint-disable-line no-unused-vars
 import { setActivePinia, createPinia } from "pinia";
 import ClockBarVertical from "@/components/ClockBarVertical.vue";
 import { useConfigStore } from "@/stores/config";
+import { useWebServicesStore } from "@/stores/webServices";
 
 // Mock window.matchMedia
 Object.defineProperty(window, "matchMedia", {
@@ -150,8 +151,8 @@ describe("ClockBarVertical", () => {
 
     const content = wrapper.find(".clock-bar-content");
     expect(content.exists()).toBe(true);
-    expect(content.classes()).toContain("layout-vertical-compact");
-    expect(content.classes()).toContain("layout-compact-date");
+    expect(wrapper.find(".compact-time").exists()).toBe(true);
+    expect(wrapper.find(".compact-date-stacked").exists()).toBe(true);
     expect(wrapper.find(".clock-time").exists()).toBe(true);
     expect(wrapper.find(".clock-date").exists()).toBe(true);
   });
@@ -244,6 +245,10 @@ describe("ClockBarVertical", () => {
     // Decision C removed the global "Show plugin info" toggle: a stale false
     // value must not hide every tile with no control to bring them back.
     store.clockBarShowPluginItems = false;
+    const webServicesStore = useWebServicesStore();
+    webServicesStore.services = [
+      { id: "weather", name: "Weather", statusbar_schema: { kind: "status" }, config: {} },
+    ];
 
     const wrapper = mount(ClockBarVertical, {
       props: {

@@ -21,240 +21,28 @@
       />
     </SettingsSection>
 
-    <!-- CLOCK BAR (moved from the retired Clock Bar category) -->
-    <ClockBarSections :config="config" @update:config="patch => emit('update:config', patch)" />
-
-    <!-- APPEARANCE -->
-    <SettingsSection id="appearance" title="Appearance">
-      <SettingRow label="Theme">
-        <ThemePicker
-          :selected-theme-id="config.selectedTheme"
-          @select="id => emit('update:config', { selectedTheme: id })"
-        />
-      </SettingRow>
-      <SettingRow label="Light or dark">
-        <SelectPill
-          :model-value="config.themeMode"
-          :options="[
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-            { value: 'auto', label: 'Follow device' },
-            { value: 'time', label: 'On a schedule' },
-          ]"
-          aria-label="Light or dark"
-          @update:model-value="v => emit('update:config', { themeMode: v })"
-        />
-      </SettingRow>
-      <SettingRow v-if="config.themeMode === 'time'" label="Dark from">
-        <TextField
-          label="Dark from"
-          hide-label
-          type="time"
-          step="3600"
-          :model-value="hourToTime(config.darkModeStart, 18)"
-          @update:model-value="v => emit('update:config', { darkModeStart: timeToHour(v) })"
-        />
-      </SettingRow>
-      <SettingRow v-if="config.themeMode === 'time'" label="Dark to">
-        <TextField
-          label="Dark to"
-          hide-label
-          type="time"
-          step="3600"
-          :model-value="hourToTime(config.darkModeEnd, 6)"
-          @update:model-value="v => emit('update:config', { darkModeEnd: timeToHour(v) })"
-        />
-      </SettingRow>
-      <SettingRow label="Font">
-        <TypefacePicker />
-      </SettingRow>
-      <SettingRow
-        label="Settings text size"
-        description="Only changes Settings. The dashboard has its own size below."
-      >
-        <template #label-extra><ScopeChip /></template>
-        <SegmentedControl
-          :model-value="uiSize"
-          :options="UI_SIZE_OPTIONS"
-          aria-label="Settings text size"
-          @update:model-value="setUiSize"
-        />
-      </SettingRow>
+    <!-- CLOCK BAR: one section with a live preview and the design editor. -->
+    <SettingsSection id="clock-bar" title="Clock bar">
+      <ClockBarOverview :config="config" @edit="clockEditorOpen = true" />
+      <ClockBarEditor
+        :config="config"
+        :open="clockEditorOpen"
+        @update:config="patch => emit('update:config', patch)"
+        @close="clockEditorOpen = false"
+      />
     </SettingsSection>
 
-    <!-- TOUCH & CONTROLS — what the wall shows, then what reacts to touches -->
-    <SettingsSection id="kiosk-touch" title="Controls">
-      <SettingRow
-        label="Hide controls"
-        description="Hides the ⋯ menu and region headers for a calm wall display."
-      >
-        <template #label-extra><ScopeChip /></template>
-        <template #description>
-          <span>Hides the ⋯ menu and region headers for a calm wall display.</span>
-          <ScopeLine
-            :overridden="showUISetting.overridden.value"
-            reset-test="reset-hide-controls"
-            @reset="showUISetting.reset()"
-          />
-        </template>
-        <ToggleSwitch
-          :model-value="controlsHidden"
-          aria-label="Hide controls"
-          @update:model-value="v => setControlsHidden(v)"
-        />
-      </SettingRow>
-      <SettingRow label="Keep the clock bar when hidden">
-        <template #label-extra><ScopeChip /></template>
-        <template #description>
-          <ScopeLine
-            :overridden="clockBarInKioskSetting.overridden.value"
-            reset-test="reset-clock-bar-in-kiosk"
-            @reset="clockBarInKioskSetting.reset()"
-          />
-        </template>
-        <ToggleSwitch
-          :model-value="clockBarInKiosk"
-          aria-label="Keep the clock bar when hidden"
-          @update:model-value="v => clockBarInKioskSetting.set(v)"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Tap anywhere to show controls"
-        description="A tap on calendar or photos brings controls back."
-      >
-        <template #label-extra><ScopeChip /></template>
-        <template #description>
-          <span>A tap on calendar or photos brings controls back.</span>
-          <ScopeLine
-            :overridden="tapAnywhereSetting.overridden.value"
-            reset-test="reset-tap-anywhere-reveal"
-            @reset="tapAnywhereSetting.reset()"
-          />
-        </template>
-        <ToggleSwitch
-          :model-value="tapAnywhereReveal"
-          aria-label="Tap anywhere to show controls"
-          @update:model-value="v => tapAnywhereSetting.set(v)"
-        />
-      </SettingRow>
-      <!-- The corner rows only matter while the controls are hidden. -->
-      <template v-if="controlsHidden">
-        <SettingRow
-          label="Show-controls corner"
-          description="Press and hold this corner to bring hidden controls back."
-        >
-          <SelectPill
-            :model-value="config.hotCornerPosition || 'bottom-left'"
-            :options="[
-              { value: 'bottom-left', label: 'Bottom left' },
-              { value: 'bottom-right', label: 'Bottom right' },
-              { value: 'top-left', label: 'Top left' },
-              { value: 'top-right', label: 'Top right' },
-            ]"
-            aria-label="Show-controls corner"
-            @update:model-value="v => emit('update:config', { hotCornerPosition: v })"
-          />
-        </SettingRow>
-        <SettingRow label="Corner visibility" description="At 0 it's invisible but still works.">
-          <NumberStepper
-            :model-value="config.hotCornerOpacity ?? 55"
-            :min="0"
-            :max="100"
-            :step="5"
-            unit="%"
-            aria-label="Corner visibility percentage"
-            @update:model-value="v => emit('update:config', { hotCornerOpacity: v })"
-          />
-        </SettingRow>
-        <SettingRow label="Corner size">
-          <RangeSlider
-            :model-value="config.hotCornerSize ?? 64"
-            :min="40"
-            :max="96"
-            :step="4"
-            unit="px"
-            aria-label="Corner size in pixels"
-            @update:model-value="v => emit('update:config', { hotCornerSize: v })"
-          />
-        </SettingRow>
-        <SettingRow label="Hold for">
-          <RangeSlider
-            :model-value="config.hotCornerLongPressMs ?? 500"
-            :min="200"
-            :max="1200"
-            :step="50"
-            unit="ms"
-            aria-label="Hold for, in milliseconds"
-            @update:model-value="v => emit('update:config', { hotCornerLongPressMs: v })"
-          />
-        </SettingRow>
+    <!-- The moved groups: one line where they used to be (§4). -->
+    <InlineNote class="dashboard-signpost" data-test="dashboard-screen-signpost">
+      Look, focus light and controls are set per screen.
+      <template #action>
+        <Button variant="link" data-test="open-screens-settings" @click="openScreenSettings">
+          Open Screens
+        </Button>
       </template>
-    </SettingsSection>
+    </InlineNote>
 
-    <SettingsSection id="kiosk-touch-focus" title="Focus & remote">
-      <SettingRow
-        label="Focus light"
-        description="Outlines the region the remote or arrow keys will act on."
-      >
-        <SelectPill
-          :model-value="config.focusLightMode"
-          :options="[
-            { value: 'always', label: 'Always' },
-            { value: 'interaction', label: 'Only while controls show' },
-            { value: 'off', label: 'Off' },
-          ]"
-          aria-label="Focus light"
-          @update:model-value="v => emit('update:config', { focusLightMode: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Dim other regions"
-        description="Dims the rest while the focus light is on."
-      >
-        <ToggleSwitch
-          :model-value="config.focusLightDimOthers"
-          aria-label="Dim other regions"
-          @update:model-value="v => emit('update:config', { focusLightDimOthers: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Dashboard size"
-        description="Size of labels and touch buttons on the dashboard."
-      >
-        <SelectPill
-          :model-value="config.touchControlSize"
-          :options="[
-            { value: 'xsmall', label: 'X-Small' },
-            { value: 'small', label: 'Small' },
-            { value: 'medium', label: 'Medium' },
-            { value: 'large', label: 'Large' },
-            { value: 'xlarge', label: 'X-Large' },
-          ]"
-          aria-label="Dashboard size"
-          @update:model-value="v => emit('update:config', { touchControlSize: v })"
-        />
-      </SettingRow>
-      <SettingRow
-        label="Show button presses"
-        description="A short label appears when a remote or keyboard button does something."
-      >
-        <ToggleSwitch
-          :model-value="config.keyboardFeedbackEnabled"
-          aria-label="Show button presses"
-          @update:model-value="v => emit('update:config', { keyboardFeedbackEnabled: v })"
-        />
-      </SettingRow>
-      <SettingRow label="Label size">
-        <SegmentedControl
-          :model-value="config.keyboardFeedbackMode"
-          :options="[
-            { value: 'normal', label: 'Normal' },
-            { value: 'small', label: 'Small' },
-          ]"
-          aria-label="Label size"
-          @update:model-value="v => emit('update:config', { keyboardFeedbackMode: v })"
-        />
-      </SettingRow>
+    <SettingsSection id="kiosk-touch-focus" title="Remote buttons">
       <SettingRow label="Hide label after">
         <NumberStepper
           :model-value="config.modeIndicatorTimeout"
@@ -273,27 +61,16 @@
 <script setup>
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
-import ScopeChip from "@/components/settings/shell/ScopeChip.vue";
-import ScopeLine from "@/components/ui/ScopeLine.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
 import Button from "@/components/ui/Button.vue";
-import SegmentedControl from "@/components/ui/SegmentedControl.vue";
-import TextField from "@/components/ui/TextField.vue";
-import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
-import SelectPill from "@/components/ui/SelectPill.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
-import RangeSlider from "@/components/ui/RangeSlider.vue";
-import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
-import TypefacePicker from "@/components/settings/shell/TypefacePicker.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
-import ClockBarSections from "@/components/settings/categories/ClockBarSections.vue";
+import ClockBarOverview from "@/components/settings/shared/ClockBarOverview.vue";
+import ClockBarEditor from "@/components/settings/shared/ClockBarEditor.vue";
 import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
-import { UI_SIZE_OPTIONS } from "@/styles/uiScale";
 import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
-import { useConfigStore } from "@/stores/config";
+import { useRoute, useRouter } from "vue-router";
 import { normalizeDashboardScreens } from "@/utils/layout";
-import { useScreenSetting } from "@/composables/useScreenSetting";
-import { useUiScale } from "@/composables/useUiScale";
 import { usePlacementRequest } from "@/composables/usePlacementRequest";
 import { useRegionEditorRequest } from "@/composables/useRegionEditorRequest";
 
@@ -307,7 +84,11 @@ const emit = defineEmits(["update:config"]);
 // attribute quoting.
 
 const editorOpen = ref(false);
+// The clock bar editor: opened by its section or by a link from Content /
+// Pages & regions (`?setting=clock-bar&edit=clock-bar`).
+const clockEditorOpen = ref(false);
 const route = useRoute();
+const router = useRouter();
 const { placement, clearPlacement } = usePlacementRequest();
 const { regionRequest, clearRegionRequest } = useRegionEditorRequest();
 
@@ -338,6 +119,15 @@ watch(
   { immediate: true }
 );
 
+// Content › Clock bar info and Pages & regions › Clock bar panel link here.
+watch(
+  () => route?.query?.edit,
+  next => {
+    if (next === "clock-bar") clockEditorOpen.value = true;
+  },
+  { immediate: true }
+);
+
 const closeEditor = () => {
   editorOpen.value = false;
   clearPlacement();
@@ -347,6 +137,12 @@ const closeEditor = () => {
 const handlePlaced = () => {
   clearPlacement();
   clearRegionRequest();
+};
+
+// "Open Screens": the same destination as the old Controls deep link. On a
+// kiosk it opens that screen's page; elsewhere Screens › Default.
+const openScreenSettings = () => {
+  router.push({ path: "/settings", query: { setting: "dashboard-kiosk" } });
 };
 const screenSummary = computed(() => {
   const screens = normalizeDashboardScreens(props.config.dashboardScreens).screens;
@@ -358,53 +154,4 @@ const screenSummary = computed(() => {
   const r = regionCount === 1 ? "" : "s";
   return `${screens.length} page${s} · ${regionCount} region${r}`;
 });
-
-// --- Per-screen rows (settings copy audit §2) ------------------------------
-// These two answer differently on a mouse PC and a wall panel, so the choice
-// lives in this browser (or this kiosk's overrides). The server value is the
-// seed a screen with no choice of its own starts from.
-const uiSizeSetting = useScreenSetting("uiSize", {
-  storageKey: "calvin-ui-size",
-  serverValue: () => props.config.uiSize,
-});
-const uiSize = computed(() => uiSizeSetting.value.value || "default");
-const { applyUiScale } = useUiScale();
-const setUiSize = async value => {
-  await uiSizeSetting.set(value);
-  // Apply immediately, without waiting for the config store to round-trip.
-  applyUiScale(value);
-};
-
-// --- Controls: per screen (calvin-hi6w) ------------------------------------
-// A wall panel hides its controls; a laptop showing the same dashboard keeps
-// them. On a kiosk the choice is that screen's override; any other browser
-// remembers it locally and falls back to the Default value.
-const configStore = useConfigStore();
-const showUISetting = useScreenSetting("showUI", {
-  serverValue: () => props.config.showUI,
-});
-const controlsHidden = computed(() => !showUISetting.value.value);
-const setControlsHidden = async hidden => {
-  // Hiding from Settings is a permanent choice, not a temporary reveal.
-  configStore.clearTemporaryUI();
-  await showUISetting.set(!hidden);
-};
-const clockBarInKioskSetting = useScreenSetting("clockBarShowInKiosk", {
-  serverValue: () => props.config.clockBarShowInKiosk,
-});
-const clockBarInKiosk = computed(() => Boolean(clockBarInKioskSetting.value.value));
-const tapAnywhereSetting = useScreenSetting("tapAnywhereReveal", {
-  serverValue: () => props.config.tapAnywhereReveal,
-});
-const tapAnywhereReveal = computed(() => Boolean(tapAnywhereSetting.value.value));
-
-// --- Dark from: two whole-hour pickers, one row ----------------------------
-const hourToTime = (hour, fallback) => {
-  const value = Number.isFinite(Number(hour)) ? Number(hour) : fallback;
-  return `${String(Math.max(0, Math.min(23, value))).padStart(2, "0")}:00`;
-};
-const timeToHour = value => {
-  const hour = parseInt(String(value).split(":")[0], 10);
-  return Number.isNaN(hour) ? 0 : Math.max(0, Math.min(23, hour));
-};
 </script>

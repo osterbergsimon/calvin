@@ -8,10 +8,7 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi.responses import (
-    FileResponse,  # noqa: E402
-    JSONResponse,  # noqa: E402
-)
+from fastapi.responses import JSONResponse  # noqa: E402
 
 # Configure loguru for better, simpler logging
 from loguru import logger
@@ -141,6 +138,7 @@ from app.api.routes import (  # noqa: E402
 from app.mcp_server.gateway import mcp_gateway  # noqa: E402
 from app.security.install import apply_startup_admin_password, install_security  # noqa: E402
 from app.security.route_policy import enforce_route_policy  # noqa: E402
+from app.services.frontend_static import register_frontend_static_routes  # noqa: E402
 from app.services.scheduler import calendar_scheduler  # noqa: E402
 
 # Plugin classes are auto-discovered by the loader when modules are imported
@@ -682,147 +680,13 @@ app.include_router(share.share_target_router)
 for _mcp_path in ("/api/mcp", "/api/mcp/"):
     app.router.routes.append(Route(_mcp_path, mcp_gateway, methods=["GET", "POST", "DELETE"]))
 
-# Serve static files from frontend dist directory
-# Get the project root (parent of backend directory)
+# Serve the built frontend: pre-compressed assets, public files, share pages
+# and the SPA fallback. Get the project root (parent of backend directory).
 project_root = Path(__file__).parent.parent.parent
 frontend_dist = project_root / "frontend" / "dist"
 
-# Mount static assets (JS, CSS, images, etc.) with cache control headers
-# This must be mounted BEFORE the catch-all route to take precedence
 if frontend_dist.exists():
-    assets_dir = frontend_dist / "assets"
-    if assets_dir.exists():
-        # Use custom static file handler to add cache control headers
-        @app.get("/assets/{file_path:path}", include_in_schema=False)
-        async def serve_asset(file_path: str):
-            """Serve static assets with cache control headers for development."""
-            asset_path = assets_dir / file_path
-            if asset_path.exists() and asset_path.is_file():
-                # In development/debug mode, disable caching to ensure updates are visible
-                # In production, you might want to enable caching with a hash-based filename
-                return FileResponse(
-                    str(asset_path),
-                    headers={
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Pragma": "no-cache",
-                        "Expires": "0",
-                    },
-                )
-            from fastapi import HTTPException
-
-            raise HTTPException(status_code=404, detail="Asset not found")
-
-        logger.info(f"Mounted static assets from: {assets_dir} (with no-cache headers)")
-    else:
-        logger.warning(f"Assets directory not found: {assets_dir}")
-
-    # Serve Vite public/ root assets (favicon, PWA manifest, touch icons) before
-    # the SPA catch-all. Without this, /favicon.svg returns index.html.
-    async def serve_frontend_public_file(file_name: str):
-        public_path = frontend_dist / file_name
-        if public_path.exists() and public_path.is_file():
-            return FileResponse(
-                str(public_path),
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                },
-            )
-
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Not found")
-
-    @app.api_route("/favicon.svg", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_favicon_svg():
-        return await serve_frontend_public_file("favicon.svg")
-
-    @app.api_route("/apple-touch-icon.png", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_apple_touch_icon():
-        return await serve_frontend_public_file("apple-touch-icon.png")
-
-    @app.api_route("/site.webmanifest", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_site_webmanifest():
-        return await serve_frontend_public_file("site.webmanifest")
-
-    @app.api_route("/icon-192.png", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_icon_192():
-        return await serve_frontend_public_file("icon-192.png")
-
-    @app.api_route("/icon-512.png", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_icon_512():
-        return await serve_frontend_public_file("icon-512.png")
-
-    @app.api_route("/sw.js", methods=["GET", "HEAD"], include_in_schema=False)
-    async def serve_service_worker():
-        return await serve_frontend_public_file("sw.js")
-
-    # The guest page of a share link (calvin-mwqo) links its own PWA manifest,
-    # so "Add to Home screen" installs this link and Android's Share menu offers
-    # it. The page itself is the SPA; a dead token is explained there.
-    @app.get("/share/{token}", include_in_schema=False)
-    @app.get("/share/{token}/", include_in_schema=False)
-    async def serve_share_page(token: str):
-        from fastapi import HTTPException
-        from fastapi.responses import HTMLResponse
-
-        index_path = frontend_dist / "index.html"
-        if not index_path.exists():
-            raise HTTPException(status_code=404, detail="Not found")
-        return HTMLResponse(
-            share.share_page_html(index_path.read_text(encoding="utf-8"), token),
-            headers={
-                "Cache-Control": "no-store",
-                "Referrer-Policy": "no-referrer",
-            },
-        )
-
-    # Serve index.html for root path
-    @app.get("/", operation_id="root__get", summary="Root")
-    async def serve_frontend_root():
-        """Root endpoint."""
-        index_path = frontend_dist / "index.html"
-        if index_path.exists():
-            return FileResponse(
-                str(index_path),
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                },
-            )
-        return {"message": "Calvin Dashboard API", "version": __version__}
-
-    # Serve index.html for all other non-API routes (SPA routing)
-    # This must come after API routes and asset mounts to avoid intercepting them
-    # Only handle GET requests for SPA routing - POST requests should only go to API routes
-    @app.get("/{full_path:path}", include_in_schema=False)
-    async def serve_frontend_get(full_path: str):
-        """Serve frontend index.html for SPA routing (GET only)."""
-        # Don't handle API routes, docs, or assets (already handled by mounts/routers)
-        if (
-            full_path.startswith("api/")
-            or full_path.startswith("docs")
-            or full_path.startswith("openapi.json")
-            or full_path.startswith("assets/")
-        ):
-            # Return 404 for API routes that don't exist (let routers handle it)
-            from fastapi import HTTPException
-
-            raise HTTPException(status_code=404, detail="Not found")
-
-        index_path = frontend_dist / "index.html"
-        if index_path.exists():
-            return FileResponse(
-                str(index_path),
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                },
-            )
-        return {"message": "Calvin Dashboard API", "version": __version__}
+    register_frontend_static_routes(app, frontend_dist)
 else:
     # Fallback if frontend dist doesn't exist (development mode)
     @app.get("/")

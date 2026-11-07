@@ -9,7 +9,12 @@ vi.mock("@/utils/logger", () => ({
 }));
 
 import { logError } from "@/utils/logger";
-import { APP_FRAME, PROGRESS_TIMING, useProgressStore } from "@/stores/progress";
+import {
+  APP_FRAME,
+  PROGRESS_TIMING,
+  SCREEN_SWITCH_TIMING,
+  useProgressStore,
+} from "@/stores/progress";
 
 // CLV-115: the loading light's timing and scope live in one engine, so every
 // indicator style behaves the same way (docs/design/2026-11-01-loading-light.md).
@@ -331,6 +336,60 @@ describe("progress store: loading-light engine (CLV-115)", () => {
       expect(store.visibleFrames).toEqual([]);
       vi.advanceTimersByTime(1);
       expect(store.visibleFrames).toEqual([APP_FRAME]);
+    });
+  });
+
+  describe("screen-switch sources (immediate, shorter minimum)", () => {
+    it("names the switch timing next to the engine timing", () => {
+      expect(SCREEN_SWITCH_TIMING).toEqual({ minVisibleMs: 300, fastSettleMs: 150 });
+    });
+
+    it("shows the light synchronously for an immediate source", () => {
+      store.begin("app:screen-switch", {
+        immediate: true,
+        minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+      });
+      expect(store.appVisible).toBe(true);
+      expect(store.isFrameVisible(APP_FRAME)).toBe(true);
+    });
+
+    it("keeps the 400 ms show delay for ordinary sources", () => {
+      store.begin("calendar");
+      vi.advanceTimersByTime(399);
+      expect(store.appVisible).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(store.appVisible).toBe(true);
+    });
+
+    it("promotes a pending delayed source to immediate when a switch begins", () => {
+      store.begin("calendar");
+      vi.advanceTimersByTime(100);
+      expect(store.appVisible).toBe(false);
+      store.begin("app:screen-switch", { immediate: true });
+      expect(store.appVisible).toBe(true);
+    });
+
+    it("uses the switch minimum visible time instead of 800 ms", () => {
+      store.begin("app:screen-switch", {
+        immediate: true,
+        minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+      });
+      vi.advanceTimersByTime(50);
+      store.end("app:screen-switch");
+      // Shown at 0 → the 300 ms minimum (also the linger) ends at 350.
+      vi.advanceTimersByTime(299);
+      expect(store.appVisible).toBe(true);
+      vi.advanceTimersByTime(1);
+      expect(store.appVisible).toBe(false);
+    });
+
+    it("carries the immediate and minimum options through track()", async () => {
+      const work = store.track("app:screen-switch", () => Promise.resolve("ok"), {
+        immediate: true,
+        minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+      });
+      expect(store.appVisible).toBe(true);
+      await expect(work).resolves.toBe("ok");
     });
   });
 

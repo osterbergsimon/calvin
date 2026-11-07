@@ -6,6 +6,8 @@ vi.mock("vue-router", () => ({ useRouter: () => ({ push: pushMock }) }));
 
 import { useConfigStore } from "@/stores/config";
 import { useModeStore } from "@/stores/mode";
+import { useActiveRegionStore } from "@/stores/activeRegion";
+import { getActiveDashboardScreen } from "@/utils/layout";
 import { useKeyboardActions } from "@/composables/useKeyboardActions";
 
 const screens = {
@@ -38,7 +40,7 @@ describe("useKeyboardActions touch helpers", () => {
     pushMock.mockClear();
   });
 
-  it("focusRegion sets the active region and persists", () => {
+  it("focusRegion keeps the active region in the session and writes no config", () => {
     const store = useConfigStore();
     store.setDashboardScreens(screens);
     const updateSpy = vi.spyOn(store, "updateConfig").mockResolvedValue({});
@@ -46,19 +48,36 @@ describe("useKeyboardActions touch helpers", () => {
 
     focusRegion("pho");
 
-    expect(store.dashboardScreens.screens[0].activeRegionId).toBe("pho");
-    expect(updateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ dashboardScreens: expect.any(Object) })
-    );
+    const activeRegion = useActiveRegionStore();
+    const home = getActiveDashboardScreen(store.effectiveDashboardScreens);
+    expect(activeRegion.getActiveRegionId(home)).toBe("pho");
+    // The screen config keeps its persisted bookmark; a focus is not a save.
+    expect(store.dashboardScreens.screens[0].activeRegionId).toBe("cal");
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 
-  it("activateScreen switches active screen and routes home", () => {
+  it("region_next cycles the session region without writing config", () => {
+    const store = useConfigStore();
+    store.setDashboardScreens(screens);
+    const updateSpy = vi.spyOn(store, "updateConfig").mockResolvedValue({});
+    const { handleAction } = useKeyboardActions();
+
+    handleAction("region_next");
+
+    const activeRegion = useActiveRegionStore();
+    const home = getActiveDashboardScreen(store.effectiveDashboardScreens);
+    expect(activeRegion.getActiveRegionId(home)).toBe("pho");
+    expect(store.dashboardScreens.screens[0].activeRegionId).toBe("cal");
+    expect(updateSpy).not.toHaveBeenCalled();
+  });
+
+  it("activateScreen switches active screen and routes home", async () => {
     const store = useConfigStore();
     store.setDashboardScreens(screens);
     vi.spyOn(store, "updateConfig").mockResolvedValue({});
     const { activateScreen } = useKeyboardActions();
 
-    activateScreen("s2");
+    await activateScreen("s2");
 
     expect(store.dashboardScreens.activeScreenId).toBe("s2");
     expect(pushMock).toHaveBeenCalledWith("/");
