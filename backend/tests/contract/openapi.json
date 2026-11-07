@@ -54,6 +54,19 @@
             ],
             "title": "Info"
           },
+          "lastWrite": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastwrite"
+          },
           "level": {
             "anyOf": [
               {
@@ -960,6 +973,19 @@
               }
             ],
             "title": "Brightnessconversion"
+          },
+          "brightnessFloor": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessfloor"
           },
           "brightnessLimit": {
             "anyOf": [
@@ -2507,7 +2533,7 @@
               "detect",
               "write",
               "conversion",
-              "limit"
+              "read"
             ],
             "title": "Step",
             "type": "string"
@@ -2541,7 +2567,7 @@
               "detect",
               "write",
               "conversion",
-              "limit"
+              "read"
             ],
             "title": "Step",
             "type": "string"
@@ -5126,7 +5152,7 @@
     },
     "/api/kiosks/{kiosk_id}/display-check/save-limit": {
       "post": {
-        "description": "Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin).",
+        "description": "Save the limit the latest calibration fault implies as ``brightnessLimit`` (admin).",
         "operationId": "save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post",
         "parameters": [
           {

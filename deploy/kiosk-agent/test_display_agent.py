@@ -6,6 +6,8 @@ import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
 
+from pathlib import Path
+
 import pytest
 
 _MOD = os.path.join(os.path.dirname(__file__), "calvin_display_agent.py")
@@ -3184,53 +3186,8 @@ def test_runner_conversion_sets_the_value_and_waits(tmp_path):
     assert reports[-1]["level"] == 19
 
 
-def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
-    fault = FakeFault()
-    ddc = FakeDdc(
-        on_write=lambda level: fault.faults.append("Under-voltage detected")
-        if level >= 28
-        else None
-    )
-    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
-           "brightness": 19}
-    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path, known=20)
-    runner.controller = agent.BrightnessController(
-        ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
-    )
-    runner.run()
-    final = reports[-1]
-    assert final["status"] == "done"
-    assert final["limit"] == 26  # fault at 28, one step below it
-    assert final["level"] == 20  # returned to the level the check started at
-    assert max(ddc.writes) == 28
-    assert not (tmp_path / agent.DISPLAY_CHECK_STATE).exists()
 
 
-def test_runner_stop_during_the_limit_test_steps_back_safely(tmp_path):
-    fault = FakeFault()
-    ddc = FakeDdc()
-    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
-           "brightness": 19}
-    def poll():
-        # The owner presses Stop once the ramp is underway.
-        action = "stop" if len(ddc.writes) > 5 else "start"
-        return {
-            "displayCheck": {
-                "id": "c1", "step": "limit", "action": action,
-                "value": None, "brightness": 19,
-            }
-        }
-
-    runner, reports, clock = _runner(
-        job, _ramp_cfg(), ddc, tmp_path, poll=poll, known=19
-    )
-    runner.controller = agent.BrightnessController(
-        ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
-    )
-    runner.run()
-    assert reports[-1]["status"] == "stopped"
-    assert ddc.writes[-1] == 19  # back at the chosen brightness
-    assert max(ddc.writes) < 40  # stopped early, not at 100
 
 
 def test_runner_timeout_always_finishes_safely(tmp_path):
@@ -3245,15 +3202,15 @@ def test_runner_timeout_always_finishes_safely(tmp_path):
     )
     runner.run()
     assert reports[-1]["status"] == "timeout"
-    assert runner.level == 19
+    assert runner.level == agent.CHECK_FLOOR  # the end of life drops to the floor
 
 
 def test_recover_display_check_after_a_reboot(tmp_path):
     ddc = FakeDdc()
     path = tmp_path / agent.DISPLAY_CHECK_STATE
     path.write_text(
-        '{"id": "c1", "step": "limit", "status": "running", '
-        '"level": 28, "limit": null, "log": []}'
+        '{"id": "c1", "step": "write", "status": "running", '
+        '"level": 28, "limit": 26, "log": []}'
     )
     reports = []
     payload = agent.recover_display_check(
@@ -3263,7 +3220,7 @@ def test_recover_display_check_after_a_reboot(tmp_path):
         report=reports.append,
     )
     assert payload["status"] == "interrupted"
-    assert payload["limit"] == 26  # the reboot happened at 28
+    assert payload["limit"] == 26  # the state file recorded it
     assert reports[-1]["status"] == "interrupted"
     assert ddc.writes[-1] == 19  # back to the chosen brightness
     assert not path.exists()
@@ -3334,7 +3291,7 @@ def test_display_check_blocks_reconcile_ramps_and_keeps_the_step(tmp_path):
     ddc = FakeDdc(on_write=on_write)
     controller, clock, applied = _controller(ddc=ddc)
     live_apply = _ramp_cfg(brightness=14)  # a lower value ramps *down*
-    job = {"id": "c1", "step": "limit", "action": "start",
+    job = {"id": "c1", "step": "write", "action": "start",
            "value": None, "brightness": 19}
     runner, reports, rclock = _runner(job, _ramp_cfg(), ddc, tmp_path)
     runner.controller = controller
@@ -3342,9 +3299,9 @@ def test_display_check_blocks_reconcile_ramps_and_keeps_the_step(tmp_path):
     # A check is in progress (the runner owns the level until _finish).
     controller.check_running = True
 
-    thread = threading.Thread(target=runner.run)
+    thread = threading.Thread(target=lambda: runner._ramp(30))
     thread.start()
-    assert reached.wait(2), "the limit test never reached level 30"
+    assert reached.wait(2), "the check ramp never reached level 30"
     try:
         # This is the very race: a live-apply poll arrives mid-check.
         controller.reconcile(live_apply, _local(hour=9), True)
@@ -3542,7 +3499,7 @@ def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(
     ddc = FakeDdc(on_write=lambda level: events.append(("w", level)))
     controller, _, _ = _controller(ddc=ddc, fault=Fault())
     controller.state_dir = str(tmp_path)
-    _state(tmp_path)
+    _state(tmp_path, step="write", limit="26")
     cfg = _ramp_cfg(brightness=40)
     monkeypatch.setattr(agent, "now_in", lambda c: _local(hour=9))
     agent.run(
@@ -3752,7 +3709,7 @@ def _cal_job(step, value=None, ceiling=None, action="start"):
 
 
 def _cal_runner(step, tmp_path, *, level=19, ddc=None, fault=None, value=None,
-                ceiling=None, poll=None):
+                ceiling=None, poll=None, cfg_over=None):
     """A runner with a controller, the screen's last set level known (or not)."""
     clock = FakeClock()
     fault = fault or ConsumingFault()
@@ -3763,7 +3720,7 @@ def _cal_runner(step, tmp_path, *, level=19, ddc=None, fault=None, value=None,
     reports = []
     runner = agent.DisplayCheckRunner(
         _cal_job(step, value, ceiling),
-        _ramp_cfg(),
+        _ramp_cfg(**(cfg_over or {})),
         ddc=ddc,
         report=reports.append,
         poll=poll,
@@ -3919,25 +3876,6 @@ def _fault_on_write(fault, ddc_ref, levels):
     return on_write
 
 
-def test_a_fault_while_dimming_ends_the_run_at_the_floor(tmp_path):
-    fault = ConsumingFault()
-    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13, 9]))
-    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
-    runner.run()
-    final = reports[-1]
-    assert final["status"] == "error"
-    assert final["reason"] == "power_trouble"
-    incident = final["fault"]
-    assert incident["step"] == "write"
-    assert incident["level"] == 13
-    assert incident["lastGood"] == 15
-    assert incident["kind"] == "under-voltage"
-    assert incident["alsoAt"] == [9]  # the tail faults join the incident
-    assert ddc.writes[-1] == agent.CHECK_FLOOR  # stays at the floor, no return to 19
-    assert max(ddc.writes) <= 19
-    _assert_small_steps(ddc.writes)
-    assert ddc.writes[0] == 17  # dimming, 2 at a time, from the start 19
-    assert 19 not in ddc.writes  # never returns to the start after trouble
 
 
 def test_after_a_fault_the_run_settles_and_never_retries(tmp_path):
@@ -3995,43 +3933,8 @@ def test_a_fault_while_waiting_on_a_conversion_value_ends_the_run(tmp_path):
     assert ddc.writes[-1] == agent.CHECK_FLOOR
 
 
-def test_a_fault_in_the_limit_step_settles_and_reports_the_incident(tmp_path):
-    fault = ConsumingFault()
-
-    def on_write(level):
-        if level == 28:
-            fault.faults.append("Under-voltage detected!")
-
-    ddc = FakeDdc(on_write=on_write)
-    runner, reports, clock, ddc, fault = _cal_runner(
-        "limit", tmp_path, level=20, ddc=ddc, fault=fault
-    )
-    runner.run()
-    done = [r for r in reports if r["status"] == "done"][0]
-    assert done["limit"] == 26
-    assert done["fault"]["step"] == "limit"
-    assert done["fault"]["level"] == 28
-    assert done["fault"]["kind"] == "under-voltage"
-    assert reports[-1]["status"] == "done" or reports[-1]["status"] == "stopped"
-    assert ddc.writes[-1] == 20  # back at the start level
 
 
-def test_finish_returns_to_a_known_start_but_never_above_it(tmp_path):
-    job = _cal_job("conversion", 10)
-    stop = {"on": False}
-    ddc = FakeDdc(on_write=lambda level: stop.update(on=True) if level == 10 else None)
-
-    def poll():
-        return {"displayCheck": {**job, "action": "stop" if stop["on"] else "start"}}
-
-    runner, reports, clock, ddc, fault = _cal_runner(
-        "conversion", tmp_path, level=19, value=10, poll=poll, ddc=ddc
-    )
-    runner.run()
-    assert reports[-1]["status"] == "stopped"
-    assert ddc.writes[-1] == 19
-    assert max(ddc.writes) <= 19
-    _assert_small_steps(ddc.writes)
 
 
 def test_finish_from_an_unknown_start_stays_at_the_floor(tmp_path):
@@ -4047,7 +3950,7 @@ def test_finish_from_an_unknown_start_stays_at_the_floor(tmp_path):
     )
     runner.run()
     assert reports[-1]["status"] == "stopped"
-    assert ddc.writes[-1] == agent.CHECK_FLOOR  # back up to the floor, no further
+    assert ddc.writes[-1] <= agent.CHECK_FLOOR  # dropped, never climbing back up
     assert max(ddc.writes) <= agent.CHECK_FLOOR
 
 
@@ -4147,17 +4050,6 @@ def test_the_ceiling_never_replaces_the_start_with_a_higher_value(tmp_path):
     assert max(ddc.writes, default=0) <= 5
 
 
-def test_the_third_reading_under_a_known_limit_reaches_the_agent(tmp_path):
-    later = _cal_job("conversion", 22, ceiling=22)  # limit 26 - 2 * 2
-    points = [{"ddc": 5, "menu": 28}, {"ddc": 1, "menu": 18}]
-    runner, reports, clock, ddc = _later_job_runner(
-        tmp_path, later, level=5,
-        cfg_over={"brightness_limit": 26, "brightness_conversion": points},
-    )
-    runner.run()
-    assert 22 in ddc.writes
-    assert all(w <= 22 for w in ddc.writes)
-    _assert_small_steps(ddc.writes)
 
 
 def test_a_value_above_the_start_is_refused_even_if_the_ceiling_allows_it(tmp_path):
@@ -4238,3 +4130,449 @@ def test_recovery_with_an_unknown_start_stays_at_the_floor(tmp_path):
     agent.recover_display_check(str(tmp_path), _ramp_cfg(), ddc=ddc)
     assert max(ddc.writes, default=0) <= agent.CHECK_FLOOR
     assert ddc.writes[-1] == agent.CHECK_FLOOR
+
+
+# -- calibration v3 (calvin-idts, calvin-qkm8) --------------------------------
+def test_ramp_records_a_fault_that_arrives_in_the_same_poll_as_a_cancel():
+    """The 2026-11-07 01:21 sequence: the touchscreen resets as Stop is pressed."""
+    for stop_on_fault in (True, False):
+        state = {"level": 20}
+        writes = []
+
+        def write(level, writes=writes, state=state):
+            writes.append(level)
+            state["level"] = level
+            return True
+
+        outcome = agent.ramp_brightness(
+            20,
+            40,
+            write=write,
+            fault=lambda: state["level"] >= 26,
+            cancel=lambda: state["level"] >= 26,  # both arrive in the same poll
+            sleep=lambda seconds: None,
+            step=2,
+            stop_on_fault=stop_on_fault,
+        )
+        assert outcome["fault"] is not None, stop_on_fault
+        assert outcome["fault_level"] == 26
+        assert outcome["last_good"] == 24
+
+
+def test_a_fault_and_a_stop_in_one_poll_end_the_run_as_power_trouble(tmp_path):
+    fault = ConsumingFault()
+    job = _cal_job("conversion", 10)
+    armed = {"on": False}
+    ddc = FakeDdc(on_write=lambda level: armed.update(on=level <= 15))
+
+    def poll():
+        # Stop is pressed on the very poll the supply browns out.
+        if armed["on"] and not fault.faults:
+            fault.faults.append("usb 1-1.3: reset full-speed USB device")
+        return {"displayCheck": {**job, "action": "stop" if armed["on"] else "start"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=10, fault=fault, poll=poll, ddc=ddc
+    )
+    runner.run()
+    final = reports[-1]
+    assert final["status"] == "error"
+    assert final["reason"] == "power_trouble"
+    assert final["fault"]["step"] == "conversion"
+    assert final["fault"]["kind"] == "touch controller reset"
+
+
+def test_a_fault_drops_to_the_floor_in_one_write(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    runner.run()
+    assert ddc.writes[-2:] == [13, agent.CHECK_FLOOR]  # 13 -> 5 directly, no slow ramp
+    assert reports[-1]["status"] == "error"
+
+
+def test_stop_drops_to_the_floor_in_one_write_and_does_not_climb_back(tmp_path):
+    job = _cal_job("conversion", 10)
+    stop = {"on": False}
+    ddc = FakeDdc(on_write=lambda level: stop.update(on=True) if level == 10 else None)
+
+    def poll():
+        return {"displayCheck": {**job, "action": "stop" if stop["on"] else "start"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=10, poll=poll, ddc=ddc
+    )
+    runner.run()
+    assert reports[-1]["status"] == "stopped"
+    assert ddc.writes[-2:] == [10, agent.CHECK_FLOOR]
+    assert max(ddc.writes) <= 19
+
+
+def test_the_floor_setting_is_the_drop_target(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    runner.live_settings = dict(runner.live_settings, floor=3)
+    runner.run()
+    assert ddc.writes[-1] == 3
+
+
+def test_a_drop_never_goes_above_the_runs_known_start(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, level=2)
+    runner.start = {"level": 2, "known": True, "source": "last_set"}
+    runner._drop_to_floor()
+    assert ddc.writes == [2]  # the floor is 5, the start 2: never brighter than 2
+
+
+def test_brightness_settings_reads_the_floor_both_spellings():
+    assert agent.brightness_settings({"brightnessFloor": 3})["floor"] == 3
+    assert agent.brightness_settings({"brightness_floor": "4"})["floor"] == 4
+    assert agent.brightness_settings({})["floor"] is None
+    assert agent.brightness_settings({"brightnessFloor": 400})["floor"] == 100
+
+
+def test_the_floor_is_the_lowest_target():
+    settings = agent.brightness_settings({"brightness": 2, "brightnessFloor": 6})
+    assert agent.brightness_target(settings) == 6
+    unset = agent.brightness_settings({"brightness": 2})
+    assert agent.brightness_target(unset) == 2
+
+
+def test_dim_only_sleep_dims_to_the_floor_not_zero():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    cfg = _ramp_cfg(sleep_mode="dim", brightnessFloor=4, brightness=10)
+    controller.level = 4 + 6
+    controller.panel_off = False
+    controller.sleeping = False
+    controller.settings = agent.brightness_settings(cfg)
+    controller._sleep_dim(controller.settings, None)
+    assert ddc.writes[-1] == 4
+    assert 0 not in ddc.writes
+
+
+def test_the_limit_step_is_gone_from_the_agent():
+    assert "limit" not in agent.DISPLAY_CHECK_STEPS
+    assert "read" in agent.DISPLAY_CHECK_STEPS
+    assert "read" in agent.CALIBRATION_STEPS
+
+
+def test_the_agent_has_no_limit_step_runner_path(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("limit", tmp_path, level=20)
+    runner.run()
+    assert reports[-1]["status"] == "error"
+    assert max(ddc.writes, default=0) <= 20  # never climbs
+
+
+def test_read_reports_the_ddc_level_without_writing(tmp_path):
+    ddc = ReadingDdc(read=61)
+    runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=5, ddc=ddc)
+    runner.run()
+    done = [r for r in reports if r["status"] == "done"][0]
+    assert done["step"] == "read"
+    assert done["level"] == 61
+    assert done["lastWrite"] is None
+    assert ddc.writes == []
+
+
+def test_read_reports_the_level_the_agent_last_wrote(tmp_path):
+    ddc = ReadingDdc(read=5)
+    runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=19, ddc=ddc)
+    runner._write_level(5)
+    ddc.writes.clear()
+    runner._execute(_cal_job("read"))
+    done = reports[-1]
+    assert (done["status"], done["level"], done["lastWrite"]) == ("done", 5, 5)
+    assert ddc.writes == []
+
+
+def test_a_failed_read_is_an_error_with_a_detail(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=19, ddc=ReadingDdc(read=None))
+    runner.run()
+    assert reports[-1]["status"] == "error"
+    assert reports[-1]["detail"]
+    assert ddc.writes == []
+
+
+def test_a_fault_while_reading_ends_the_run_as_power_trouble(tmp_path):
+    class ReadFaults(ReadingDdc):
+        def read_brightness(self_inner):
+            fault.faults.append("Under-voltage detected!")
+            return 40
+
+    fault = ConsumingFault()
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadFaults(), fault=fault
+    )
+    runner.run()
+    assert reports[-1]["status"] == "error"
+    assert reports[-1]["reason"] == "power_trouble"
+    assert reports[-1]["fault"]["step"] == "read"
+
+
+def test_read_may_repeat_after_the_first(tmp_path):
+    ddc = ReadingDdc(read=61)
+    stage = {"n": 0}
+
+    def poll():
+        stage["n"] += 1
+        step = "read" if stage["n"] < 4 else "detect"
+        return {"displayCheck": {**_cal_job(step, value=stage["n"] // 4), "id": "c1"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner("detect", tmp_path, level=19, ddc=ddc, poll=poll)
+    first = _cal_job("read")
+    runner._execute(first)
+    runner._execute(first)
+    assert len([r for r in reports if r.get("level") == 61]) == 2
+
+
+# -- shutdown: power the panel on low next boot --------------------------------
+def test_shutdown_dim_writes_the_floor_once_when_the_panel_is_lit():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg(brightnessFloor=3))
+    controller.level = 40
+    controller.panel_off = False
+    controller.sleeping = False
+    logs = []
+    assert agent.shutdown_dim(controller, log_fn=logs.append) is True
+    assert ddc.writes == [3]
+    assert any("shutdown" in line for line in logs)
+
+
+def test_shutdown_dim_writes_zero_without_a_floor():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg())
+    controller.level = 40
+    controller.panel_off = False
+    controller.sleeping = False
+    agent.shutdown_dim(controller, log_fn=lambda line: None)
+    assert ddc.writes == [0]
+
+
+def test_shutdown_dim_skips_a_sleeping_panel_and_a_ramp_that_is_off():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg())
+    controller.level = 0
+    controller.panel_off = True
+    controller.sleeping = True
+    assert agent.shutdown_dim(controller, log_fn=lambda line: None) is False
+    controller.panel_off = False
+    controller.sleeping = False
+    controller.level = 40
+    controller.settings = agent.brightness_settings(_ramp_cfg(brightness_ramp_enabled=False))
+    assert agent.shutdown_dim(controller, log_fn=lambda line: None) is False
+    controller.settings = None  # never reconciled yet
+    assert agent.shutdown_dim(controller, log_fn=lambda line: None) is False
+    assert ddc.writes == []
+
+
+def test_shutdown_dim_never_blocks_longer_than_its_bound():
+    import threading
+
+    release = threading.Event()
+
+    class Hung(FakeDdc):
+        def set_brightness(self, level):
+            release.wait(30)
+            return True
+
+    controller, clock, applied = _controller(Hung())
+    controller.settings = agent.brightness_settings(_ramp_cfg())
+    controller.level = 40
+    controller.panel_off = False
+    controller.sleeping = False
+    started = time_module.monotonic()
+    result = agent.shutdown_dim(controller, log_fn=lambda line: None, timeout=0.2)
+    release.set()
+    assert result is False
+    assert time_module.monotonic() - started < 3
+
+
+def test_the_service_unit_allows_the_shutdown_write_time():
+    unit = (
+        Path(__file__).resolve().parents[1] / "systemd" / "calvin-display-agent.service"
+    ).read_text()
+    assert "TimeoutStopSec=" in unit
+
+
+# -- review round: read never moves the level, floor capped, shutdown safety ---
+def test_a_fake_read_back_never_moves_the_runs_level(tmp_path):
+    ddc = ReadingDdc(read=100)  # a panel whose read-back is a constant 100
+    runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=19, ddc=ddc)
+    runner._execute(_cal_job("read"))
+    done = reports[-1]
+    assert done["level"] == 100  # reported as read
+    assert runner.level == 19
+    assert runner.last_set == 19
+    assert runner.controller.get_level() == 19
+    runner._execute(_cal_job("write"))
+    assert ddc.writes and max(ddc.writes) <= 19  # nothing above the start
+    runner._finish("done")
+    assert max(ddc.writes) <= 19
+    assert runner.start["source"] == "last_set"  # 100 is not mistaken for a known start
+
+
+def test_a_fault_during_read_blames_the_last_write_not_the_read(tmp_path):
+    fault = ConsumingFault()
+
+    class ReadFaults(ReadingDdc):
+        def read_brightness(self_inner):
+            fault.faults.append("Under-voltage detected!")
+            return 100
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadFaults(), fault=fault
+    )
+    runner._write_level(9)
+    runner._execute(_cal_job("read"))
+    incident = runner.fault
+    assert incident["step"] == "read"
+    assert incident["level"] == 9
+    assert incident["lastGood"] == 9
+
+
+def _dim_controller(level, **cfg):
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg(**cfg))
+    controller.level = level
+    controller.panel_off = False
+    controller.sleeping = False
+    return controller, ddc
+
+
+def test_dim_only_sleep_is_capped_by_the_ceiling():
+    controller, ddc = _dim_controller(50, brightnessFloor=40, brightness_limit=30)
+    controller._sleep_dim(controller.settings, None)
+    assert ddc.writes[-1] == 26  # limit 30 - 2 * 2, not the floor 40
+    assert controller.dim_level == 26
+
+
+def test_dim_only_sleep_never_goes_up_to_the_floor():
+    controller, ddc = _dim_controller(10, brightnessFloor=40)
+    controller._sleep_dim(controller.settings, None)
+    assert all(w <= 10 for w in ddc.writes)
+    assert controller.dim_level == 10
+
+
+def test_dim_level_remembers_what_was_written_when_the_floor_changes_later():
+    controller, ddc = _dim_controller(30, brightnessFloor=4)
+    controller._sleep_dim(controller.settings, None)
+    assert controller.dim_level == 4
+    controller.settings = agent.brightness_settings(_ramp_cfg(brightnessFloor=9))
+    assert controller.level == controller.dim_level  # still recognised as asleep
+
+
+def test_shutdown_dim_is_capped_and_never_goes_up():
+    controller, ddc = _dim_controller(10, brightnessFloor=40)
+    agent.shutdown_dim(controller, log_fn=lambda line: None)
+    assert all(w <= 10 for w in ddc.writes)
+    controller, ddc = _dim_controller(60, brightnessFloor=40, brightness_limit=30)
+    agent.shutdown_dim(controller, log_fn=lambda line: None)
+    assert ddc.writes == [26]
+
+
+def test_a_check_drop_with_an_unknown_start_never_brightens(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=10, cfg_over={"brightnessFloor": 40}
+    )
+    assert runner.start is None
+    runner._drop_to_floor()
+    assert ddc.writes == [agent.CHECK_FLOOR]  # min(5, floor 40, level 10): never up
+
+
+def test_a_check_drop_with_an_unknown_level_is_the_check_floor(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=None, cfg_over={"brightnessFloor": 40}
+    )
+    runner._drop_to_floor()
+    assert ddc.writes == [agent.CHECK_FLOOR]
+
+
+def test_a_floor_of_zero_does_not_black_the_screen_during_a_check(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=19, cfg_over={"brightnessFloor": 0}
+    )
+    runner._drop_to_floor()
+    assert ddc.writes == [1]
+
+
+def test_stop_with_the_ramp_off_returns_to_the_start_level(tmp_path):
+    job = _cal_job("conversion", 10)
+    stop = {"on": False}
+    ddc = FakeDdc(on_write=lambda level: stop.update(on=True) if level == 10 else None)
+
+    def poll():
+        return {"displayCheck": {**job, "action": "stop" if stop["on"] else "start"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=10, poll=poll, ddc=ddc,
+        cfg_over={"brightness_ramp_enabled": False},
+    )
+    runner.run()
+    assert reports[-1]["status"] == "stopped"
+    assert ddc.writes[-1] == 19
+    assert max(ddc.writes) <= 19
+
+
+def test_writes_stop_once_the_agent_is_shutting_down(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, level=19)
+    runner.controller.stopping.set()
+    assert runner._write_level(5) is False
+    assert ddc.writes == []
+
+
+def test_a_controller_ramp_stops_when_the_agent_is_shutting_down():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg())
+    controller.level = 0
+    controller.stopping.set()
+    controller._ramp(20)
+    assert ddc.writes == []
+
+
+def test_shutdown_dim_waits_for_the_lock_then_writes_once():
+    controller, ddc = _dim_controller(40)
+    order = []
+    ddc.on_write = lambda level: order.append(("write", level))
+    held = threading.Event()
+
+    def holder():
+        with controller.lock:
+            held.set()
+            time_module.sleep(0.2)
+            order.append(("released", None))
+
+    t = threading.Thread(target=holder)
+    t.start()
+    held.wait(2)
+    assert agent.shutdown_dim(controller, log_fn=lambda line: None, lock_timeout=2) is True
+    t.join()
+    assert order == [("released", None), ("write", 0)]
+    assert controller.stopping.is_set()
+
+
+def test_the_sigterm_handler_dims_only_on_a_real_system_shutdown():
+    for stopping, expected in ((True, [0]), (False, [])):
+        controller, ddc = _dim_controller(40)
+        handler = agent.make_shutdown_handler(controller, is_stopping=lambda: stopping)
+        with pytest.raises(SystemExit):
+            handler(15, None)
+        assert ddc.writes == expected
+
+
+def test_system_stopping_reads_systemctl():
+    def fake(out):
+        return lambda argv, **kw: SimpleNamespace(stdout=out, returncode=0)
+
+    assert agent.system_stopping(run=fake("stopping\n")) is True
+    assert agent.system_stopping(run=fake("running\n")) is False
+
+    def boom(argv, **kw):
+        raise OSError("no systemctl")
+
+    assert agent.system_stopping(run=boom) is False
