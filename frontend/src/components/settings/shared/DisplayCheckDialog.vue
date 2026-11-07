@@ -85,6 +85,9 @@
               <li v-for="row in summaryRows" :key="row.label" class="dcheck__summary-row">
                 <span class="dcheck__summary-label">{{ row.label }}</span>
                 <span class="dcheck__pair">Panel {{ row.typed }} · Calvin {{ row.ddc }}</span>
+                <span v-if="row.dropped != null" class="dcheck__sub" data-test="dropped-at">
+                  (it dropped at {{ row.dropped }})
+                </span>
               </li>
             </ul>
             <p v-if="!saved" class="dcheck__sub">
@@ -99,6 +102,14 @@
             <InlineNote v-if="saveError" tone="err" role="alert" data-test="save-error">
               {{ saveError }}
             </InlineNote>
+            <p
+              v-if="summaryRows[0].dropped !== undefined"
+              class="dcheck__sub"
+              data-test="dropped-note"
+            >
+              The highest is approximate: the power dropped there, so Calvin took the level you
+              typed, one step lower, and worked out its Calvin value from your other readings.
+            </p>
             <p v-if="usedFallback" class="dcheck__sub">
               The Calvin values are <strong>approximate</strong>: they come from a line through two
               low readings, and the highest is rounded down.
@@ -160,7 +171,16 @@
             </InlineNote>
           </template>
           <template v-else-if="state === 'fault' || state === 'ask'">
-            <p v-if="state === 'fault'" class="dcheck__sub dcheck__sub--lead">
+            <p
+              v-if="state === 'fault' && step === 2"
+              class="dcheck__sub dcheck__sub--lead"
+              data-test="drop-at-highest"
+            >
+              The power dropped at that level. Calvin dimmed the screen. Type the Brightness the
+              panel's menu showed just before it dropped. Calvin will use one step below it as the
+              highest and won't ask you to set the panel there again.
+            </p>
+            <p v-else-if="state === 'fault'" class="dcheck__sub dcheck__sub--lead">
               The power dropped at that level. Calvin dimmed the screen. Set it back to one step
               below where it was and read it again.
             </p>
@@ -363,6 +383,10 @@ const readingText = ref("");
 const readingInput = ref(null);
 const pendingTyped = ref(null);
 const faulted = ref(false);
+// A brownout at the highest level: the pre-drop level was typed, the panel is
+// not set there again, and the highest Calvin value comes from the other pairs.
+const ackedFaultRun = ref(null); // the run whose drop was dealt with; its banner goes
+const droppedAtHighest = computed(() => levels.value[0]?.dropped !== undefined);
 const stopRequested = ref(false);
 const saved = ref(false);
 const usedFallback = ref(false);
@@ -401,7 +425,7 @@ const run = computed(() => check.run.value);
 const preflightClean = computed(() => run.value?.preflight?.status === "clean");
 const fault = computed(() => {
   const f = run.value?.fault;
-  if (!f) return null;
+  if (!f || run.value.id === ackedFaultRun.value) return null;
   return currentRunId && run.value.id !== currentRunId ? null : f;
 });
 const hasCalibration = computed(
@@ -465,6 +489,7 @@ const behindNote = computed(() => {
     return "That reading doesn't look right: the panel gave no usable number.";
   }
   // Higher than the level before, or the same while the menu number went down.
+  if (!Number.isFinite(before.ddc)) return "";
   const behind = now.ddc > before.ddc || (now.ddc === before.ddc && now.typed < before.typed);
   if (!behind) return "";
   return `That reading looks behind: the panel reported Calvin ${now.ddc}, not below the ${name} level's ${before.ddc}. It may not have caught up with the menu yet.`;
@@ -548,6 +573,36 @@ async function readIt() {
   pendingTyped.value = typedNumber.value;
   await go("read");
 }
+// The highest level dropped the power: keep what the person typed (one panel
+// step lower) as the highest and carry on, without setting the panel there again.
+function useAsHighest() {
+  if (!readingValid.value) return;
+  levels.value[0] = {
+    typed: Math.max(0, typedNumber.value - 1),
+    ddc: null,
+    lastWrite: null,
+    dropped: pendingTyped.value,
+  };
+  faulted.value = false;
+  ackedFaultRun.value = run.value?.id ?? null;
+  nextLevel();
+}
+// The highest Calvin value, from the line through the other readings, rounded down.
+function settleDroppedHighest() {
+  const points = levels.value
+    .slice(1)
+    .map(l => ({ ddc: l.ddc, menu: l.typed }))
+    .filter(p => Number.isFinite(p.ddc));
+  const high = levels.value[0];
+  const ddc = fitConversion(points) ? menuToDdcDown(high.typed, points) : null;
+  if (ddc === null) {
+    startFallback();
+    return;
+  }
+  levels.value[0] = { ...high, ddc: Math.max(ddc, levels.value[1].ddc) };
+  usedFallback.value = false;
+  view.value = "summary";
+}
 async function sameAsHighest() {
   readingText.value = String(levels.value[0].typed);
   await readIt();
@@ -592,6 +647,10 @@ function startFallback() {
   usedFallback.value = true;
 }
 function finishReads() {
+  if (droppedAtHighest.value) {
+    settleDroppedHighest();
+    return;
+  }
   if (panelIgnoresButtons()) {
     startFallback();
     return;
@@ -643,8 +702,9 @@ function convertFromFallback() {
   const clamp = n => Math.max(0, Math.min(100, n));
   const everyday = Math.min(maxDdc, clamp(menuToDdc(mid, points)));
   const lowest = Math.min(everyday, clamp(menuToDdc(low, points)));
+  const dropped = levels.value[0]?.dropped;
   fbResult.value = [
-    { typed: high, ddc: maxDdc },
+    { typed: high, ddc: maxDdc, ...(dropped !== undefined ? { dropped } : {}) },
     { typed: mid, ddc: everyday },
     { typed: low, ddc: lowest },
   ];
@@ -654,7 +714,12 @@ function convertFromFallback() {
 const summaryRows = computed(() => {
   const rows = usedFallback.value ? fbResult.value : levels.value;
   const names = ["Highest", "Everyday", "Lowest"];
-  return (rows ?? [{}, {}, {}]).map((r, i) => ({ label: names[i], typed: r?.typed, ddc: r?.ddc }));
+  return (rows ?? [{}, {}, {}]).map((r, i) => ({
+    label: names[i],
+    typed: r?.typed,
+    ddc: r?.ddc,
+    dropped: r?.dropped,
+  }));
 });
 const sameScale = computed(
   () =>
@@ -672,7 +737,10 @@ const savedPairs = computed(() => {
     return [...fbReadings.value].sort((a, b) => a.ddc - b.ddc);
   }
   const byDdc = new Map();
-  for (const row of summaryRows.value) if (!byDdc.has(row.ddc)) byDdc.set(row.ddc, row.typed);
+  for (const row of summaryRows.value) {
+    if (row.dropped !== undefined) continue; // worked out, not read from the panel
+    if (!byDdc.has(row.ddc)) byDdc.set(row.ddc, row.typed);
+  }
   return [...byDdc.entries()].map(([ddc, menu]) => ({ ddc, menu })).sort((a, b) => a.ddc - b.ddc);
 });
 
@@ -916,6 +984,7 @@ function resetRun() {
   readingText.value = "";
   pendingTyped.value = null;
   faulted.value = false;
+  ackedFaultRun.value = null;
   stopRequested.value = false;
   saved.value = false;
   saving.value = false;
@@ -1123,16 +1192,24 @@ const ui = computed(() => {
       return {
         status: "Power trouble · the panel's power dropped at that level",
         field: true,
-        primary: {
-          label: "Read it again",
-          test: "read-it",
-          disabled: !readingValid.value,
-          run: readIt,
-        },
+        primary:
+          step.value === 2
+            ? {
+                label: "Use as highest",
+                test: "read-it",
+                disabled: !readingValid.value,
+                run: useAsHighest,
+              }
+            : {
+                label: "Read it again",
+                test: "read-it",
+                disabled: !readingValid.value,
+                run: readIt,
+              },
       };
     default: {
       const secondary =
-        step.value === 3
+        step.value === 3 && !droppedAtHighest.value
           ? [{ label: "Same as highest", test: "same-as-highest", run: sameAsHighest }]
           : [];
       return {
