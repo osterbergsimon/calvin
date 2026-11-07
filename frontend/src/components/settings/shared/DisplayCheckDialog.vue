@@ -19,15 +19,12 @@
           :key="item.n"
           class="dcheck__strip-item"
           :class="{
-            'dcheck__strip-item--done': stepNumber > item.n || view === 'finish',
-            'dcheck__strip-item--now': stepNumber === item.n && view !== 'finish',
-            'dcheck__strip-item--optional': item.optional,
+            'dcheck__strip-item--done': stepNumber > item.n || pastReads,
+            'dcheck__strip-item--now': stepNumber === item.n && !pastReads,
           }"
-          :aria-current="stepNumber === item.n && view !== 'finish' ? 'step' : undefined"
+          :aria-current="stepNumber === item.n && !pastReads ? 'step' : undefined"
         >
-          <span class="dcheck__strip-long">
-            {{ item.n }} · {{ item.label }}<template v-if="item.optional"> (optional)</template>
-          </span>
+          <span class="dcheck__strip-long">{{ item.n }} · {{ item.label }}</span>
           <span class="dcheck__strip-short" aria-hidden="true">{{ item.n }} {{ item.short }}</span>
         </li>
       </ol>
@@ -35,8 +32,8 @@
       <div class="dcheck__body" data-test="check-step-body">
         <!-- A power fault seen in any step: one banner for the whole incident -->
         <div v-if="fault" class="dcheck__fault" role="alert" data-test="check-fault">
-          <strong>Power trouble at Calvin {{ fault.level }} · {{ fault.kind }}</strong>
-          <span v-if="view !== 'power-ended'">{{ faultAction }}</span>
+          <strong>Power trouble at {{ faultWhere }} · {{ fault.kind }}</strong>
+          <span>{{ faultAction }}</span>
           <span v-for="at in fault.alsoAt || []" :key="at">also at {{ at }} while settling</span>
         </div>
 
@@ -73,217 +70,104 @@
           <p class="dcheck__sub">{{ FIX_LINE }}</p>
         </template>
 
-        <!-- Calibration ended by power trouble -->
-        <template v-else-if="view === 'power-ended'">
-          <div data-test="check-power-ended">
-            <p class="dcheck__lead">{{ screenName }}'s power supply is too weak</p>
-            <p v-if="!limitSaved" class="dcheck__sub">
-              {{ screenName }} showed power trouble at Calvin {{ fault?.level }}, even at this low
-              brightness. Calvin dimmed it to {{ CHECK_FLOOR }} and stopped. It won't try again on
-              its own.
-            </p>
-            <p class="dcheck__sub">{{ readingsLine }}</p>
-            <p v-if="limitSaved" class="dcheck__sub">
-              Saved. The ramp and the slider stay under {{ pendingLimit }} until you fix the power
-              and check again.
-            </p>
-            <p v-else-if="pendingLimit != null" class="dcheck__sub">
-              Calvin can keep {{ screenName }} at <strong>{{ pendingLimit }}</strong> or below (one
-              step under where the trouble showed).
-            </p>
-            <p class="dcheck__sub">{{ FIX_LINE }}</p>
-          </div>
-        </template>
-
-        <!-- An end state -->
+        <!-- An end state: says exactly what was kept -->
         <template v-else-if="view === 'end'">
           <InlineNote :tone="ending.tone" data-test="check-end">{{ ending.text }}</InlineNote>
           <p v-if="ending.hint" class="dcheck__sub">{{ ending.hint }}</p>
+          <p v-if="ending.kept" class="dcheck__sub" data-test="check-kept">{{ keptLine }}</p>
         </template>
 
-        <!-- Finish -->
-        <template v-else-if="view === 'finish'">
-          <div data-test="check-finish">
-            <p class="dcheck__lead">What Calvin found</p>
-            <ul class="dcheck__found">
-              <li v-if="foundText">✓ Found {{ foundText }}</li>
-              <li v-if="writesVerdict === true">✓ Brightness commands change the screen</li>
-              <li v-if="readings.length >= 2">
-                ✓ Menu match from {{ readings.length }} readings ({{ fitText
-                }}<template v-if="readings.length === 2">, approximate</template>)
+        <!-- Summary -->
+        <template v-else-if="view === 'summary'">
+          <div data-test="check-summary">
+            <p class="dcheck__lead">{{ saved ? "Saved" : "Not saved yet" }}</p>
+            <ul class="dcheck__summary">
+              <li v-for="row in summaryRows" :key="row.label" class="dcheck__summary-row">
+                <span class="dcheck__summary-label">{{ row.label }}</span>
+                <span class="dcheck__pair">Panel {{ row.typed }} · Calvin {{ row.ddc }}</span>
               </li>
-              <li v-else>⚠ No menu match, so the slider stays on Calvin's scale</li>
-              <li v-if="limitFound != null">✓ Limit found: {{ limitFound }}</li>
-              <li v-else>⚠ No limit found, so Calvin has no ceiling for this screen</li>
-              <li v-if="fault">⚠ Power trouble at Calvin {{ fault.level }} · {{ fault.kind }}</li>
             </ul>
-            <p v-if="readings.length >= 2" class="dcheck__sub">
-              The Brightness slider now shows the screen's menu numbers.
+            <p v-if="!saved" class="dcheck__sub">
+              Saving sets the limit to Calvin {{ summaryRows[0].ddc }}, the everyday brightness to
+              {{ summaryRows[1].ddc }} and the lowest to {{ summaryRows[2].ddc }}, and replaces the
+              earlier readings.
             </p>
-            <p v-if="limitFound != null && limitSaved" class="dcheck__sub" data-test="limit-saved">
-              Saved. Brightness can go up to {{ maxAfter }}.
+            <p v-else class="dcheck__sub">
+              Brightness can go from Panel {{ summaryRows[2].typed }} to Panel
+              {{ summaryRows[0].typed }}.
             </p>
-            <template v-else-if="limitFound != null">
-              <p class="dcheck__sub">{{ screenName }} is going back to {{ backTo }}.</p>
-              <p class="dcheck__sub" data-test="limit-pending-note">
-                A found limit only applies once you save it. The old limit stays until you save.
-              </p>
-            </template>
+            <InlineNote v-if="saveError" tone="err" role="alert" data-test="save-error">
+              {{ saveError }}
+            </InlineNote>
+            <p v-if="usedFallback" class="dcheck__sub">
+              The Calvin values are <strong>approximate</strong>: they come from a line through two
+              low readings, and the highest is rounded down.
+            </p>
+            <p v-else-if="sameScale" class="dcheck__sub">
+              Calvin and the panel use the same scale.
+            </p>
+            <p v-if="keptUnderLimit" class="dcheck__sub">
+              Brightness is kept {{ 2 * stepSize }} under the limit.
+            </p>
+            <p class="dcheck__sub">{{ STARTUP_LINE }}</p>
           </div>
+        </template>
+
+        <!-- Fallback: the panel doesn't report its own buttons -->
+        <template v-else-if="view === 'fallback'">
+          <p class="dcheck__lead">This panel doesn't report its own buttons</p>
+          <p v-if="fbPhase === 'explain'" class="dcheck__sub">
+            Its brightness reading didn't change when you changed it with the buttons. Calvin can
+            still match the panel's menu: it will set the brightness low, twice, and ask what the
+            menu shows each time. It won't go above {{ fbLevels[0] }}.
+          </p>
+          <p v-else-if="fbPhase === 'setting'" class="dcheck__sub">
+            Watch the panel. Calvin is setting it to Calvin {{ fbLevels[fbIndex] }}.
+          </p>
+          <p v-else-if="fbPhase === 'level'" class="dcheck__sub">
+            Type the Brightness the panel's own menu showed at the {{ LEVELS[fbLevelIndex].short }}
+            level.
+          </p>
+          <p v-else class="dcheck__sub">Type the Brightness the panel's own menu shows now.</p>
         </template>
 
         <!-- Step 1 -->
         <template v-else-if="step === 1">
-          <template v-if="state === 'preflight'">
-            <p class="dcheck__sub">
-              Calvin watches the power supply for {{ PREFLIGHT_S }} s while the screen stays as it
-              is.
-            </p>
-          </template>
-          <template v-else-if="detected">
-            <p class="dcheck__lead">Find the display</p>
-            <InlineNote tone="ok" data-test="check-found">Found {{ foundText }}.</InlineNote>
-            <p v-if="startKnown" class="dcheck__sub">
-              The check stays at Calvin {{ startLevel }} or below. It only dims.
-            </p>
-            <template v-else>
-              <p class="dcheck__sub">
-                {{ screenName }} always reports brightness 0, so Calvin can't tell how bright it is
-                now. To stay safe, Calvin dims it to {{ CHECK_FLOOR }} first.
-              </p>
-              <label class="dcheck__menu-start">
-                <span>
-                  <strong>Before Calvin changes anything:</strong> what Brightness does
-                  {{ screenName }}'s own menu show now?
-                </span>
-                <input
-                  v-model="menuStartText"
-                  class="dcheck__input"
-                  data-test="menu-start-input"
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[0-9]*"
-                  aria-label="Brightness shown in the screen's menu now"
-                />
-              </label>
-            </template>
-          </template>
-          <p v-else class="dcheck__lead">Find the display</p>
-        </template>
-
-        <!-- Step 2 -->
-        <template v-else-if="step === 2">
-          <p class="dcheck__lead">Does it change?</p>
-          <template v-if="state === 'question'">
-            <p class="dcheck__sub dcheck__sub--lead">
-              Did {{ screenName }} get dimmer for a moment, then come back?
-            </p>
-            <p class="dcheck__sub">
-              Calvin stepped it from {{ writeFrom }} down to {{ writeTo }} and back,
-              {{ stepSize }} at a time.
-            </p>
-          </template>
-          <p v-else class="dcheck__sub">Watch {{ screenName }}'s screen.</p>
-          <p v-if="state === 'testing'" class="dcheck__sub">
-            It should get dimmer, then come back.
+          <p class="dcheck__lead">Find the display</p>
+          <p v-if="state === 'preflight'" class="dcheck__sub">
+            Calvin watches the power supply for {{ PREFLIGHT_S }} s while the screen stays as it is.
           </p>
+          <template v-else-if="detected">
+            <InlineNote tone="ok" data-test="check-found">Found {{ foundText }}.</InlineNote>
+            <p class="dcheck__sub">
+              Next you'll set the panel's brightness with its own buttons, three times, and Calvin
+              will read what it reports. Calvin won't change the brightness.
+            </p>
+          </template>
         </template>
 
-        <!-- Step 3 -->
-        <template v-else-if="step === 3">
-          <p class="dcheck__lead">Match the screen's menu</p>
-          <template v-if="state === 'reading'">
-            <p class="dcheck__sub">
-              <template v-if="readings.length === 0">
-                Open {{ screenName }}'s own menu (the buttons on the screen) and type the Brightness
-                it shows now. Calvin hasn't changed it.
-              </template>
-              <template v-else>Type the Brightness {{ screenName }}'s menu shows now.</template>
+        <!-- Steps 2-4: the panel's own buttons, Calvin reads -->
+        <template v-else>
+          <p class="dcheck__lead">{{ LEVELS[step - 2].heading }}</p>
+          <p class="dcheck__sub">{{ LEVELS[step - 2].body }}</p>
+          <p v-if="step === 2" class="dcheck__sub" data-test="startup-line">{{ STARTUP_LINE }}</p>
+          <template v-if="state === 'read-done'">
+            <p class="dcheck__pair dcheck__pair--big" data-test="level-pair">
+              Panel {{ thisLevel.typed }} · Calvin {{ thisLevel.ddc }}
             </p>
-          </template>
-          <template v-else-if="state === 'matched'">
-            <InlineNote tone="neutral" data-test="check-fit">
-              {{ fitCapital }}.
-              <template v-if="readings.length === 2">
-                <strong>This is approximate:</strong> both readings are low, so near the top it can
-                be off by about 4 on the menu.
-              </template>
-              <template v-if="menuAtStartLine"> {{ menuAtStartLine }}</template>
+            <InlineNote v-if="behindNote" tone="warn" data-test="level-behind">
+              {{ behindNote }}
             </InlineNote>
           </template>
-          <template v-else-if="state === 'off-line'">
-            <InlineNote tone="warn" data-test="check-fit">
-              These readings don't line up: Calvin {{ lastReading?.ddc }} should be about
-              {{ predictedMenu }} on the menu, you typed {{ lastReading?.menu }}. Check the menu and
-              type it again.
-            </InlineNote>
-          </template>
-          <template v-else-if="state === 'noroom'">
-            <p class="dcheck__sub">
-              {{ screenName }} started at Calvin {{ readings[0]?.ddc }}, so there's no room to dim
-              for a second reading. A menu match needs two, so the slider stays on Calvin's scale.
+          <template v-else-if="state === 'fault' || state === 'ask'">
+            <p v-if="state === 'fault'" class="dcheck__sub dcheck__sub--lead">
+              The power dropped at that level. Calvin dimmed the screen. Set it back to one step
+              below where it was and read it again.
             </p>
-          </template>
-          <template v-else-if="menuAtStartLine">
-            <p class="dcheck__sub">{{ menuAtStartLine }}</p>
-          </template>
-
-          <ul v-if="readings.length" class="dcheck__readings" data-test="readings-list">
-            <li v-for="(point, i) in readings" :key="point.ddc" class="dcheck__readings-row">
-              <span>Calvin {{ point.ddc }} · menu {{ point.menu }}</span>
-              <Button variant="link" :data-test="`reading-remove-${i}`" @click="removeReading(i)">
-                Remove
-              </Button>
-            </li>
-          </ul>
-        </template>
-
-        <!-- Step 4 -->
-        <template v-else-if="step === 4">
-          <template v-if="!limitRunning">
-            <p class="dcheck__lead">Find the safe limit</p>
-            <p class="dcheck__sub">
-              Calvin raises the brightness until the power supply shows trouble. Then it steps back
-              down and offers that level as {{ screenName }}'s limit. Once you save it, Calvin never
-              goes above it.
+            <p class="dcheck__sub">Type the Brightness the panel's own menu shows.</p>
+            <p v-if="tooHigh" class="dcheck__sub dcheck__sub--warn" data-test="level-too-high">
+              {{ tooHigh }}
             </p>
-            <InlineNote tone="warn">
-              While it runs, the screen may flicker, its touch may stop for a few seconds, and in
-              the worst case it may restart.
-            </InlineNote>
-            <InlineNote v-if="onPanel" tone="err" data-test="limit-on-panel">
-              You're on {{ screenName }} itself. Run this step from your phone or computer, because
-              the touch screen can stop responding mid-test.
-            </InlineNote>
-          </template>
-          <template v-else>
-            <div class="dcheck__level" data-test="limit-level" aria-live="off">
-              <strong>{{ check.run.value?.level ?? 0 }}</strong>
-              <span class="dcheck__bar-track" aria-hidden="true">
-                <span class="dcheck__bar-fill" :style="{ width: `${barPercent}%` }" />
-                <span
-                  v-if="check.run.value?.limit != null"
-                  class="dcheck__bar-limit"
-                  data-test="limit-marker"
-                  :style="{ left: `${check.run.value.limit}%` }"
-                />
-              </span>
-            </div>
-            <ul class="dcheck__log" data-test="limit-log" aria-label="Test log">
-              <li v-for="(line, i) in logLines" :key="i">{{ line }}</li>
-            </ul>
-            <InlineNote v-if="check.run.value?.limit != null" tone="warn">
-              Limit found: {{ check.run.value.limit }}. {{ screenName }} is going back to
-              {{ backTo }}. If this page closes, {{ screenName }} finishes safely on its own.
-            </InlineNote>
-            <Button
-              class="dcheck__stop"
-              variant="danger"
-              data-test="limit-stop"
-              @click="check.stop()"
-            >
-              Stop now
-            </Button>
           </template>
         </template>
 
@@ -319,16 +203,6 @@
           <span v-if="ui.busy" class="dcheck__spinner" aria-hidden="true" />
           {{ ui.status }}
         </p>
-        <div v-if="ui.answers" class="dcheck__answers">
-          <Button
-            v-for="answer in ui.answers"
-            :key="answer.test"
-            :data-test="answer.test"
-            @click="answer.run"
-          >
-            {{ answer.label }}
-          </Button>
-        </div>
         <div
           v-if="ui.field || ui.primary"
           class="dcheck__primary-row"
@@ -343,7 +217,7 @@
             type="text"
             inputmode="numeric"
             pattern="[0-9]*"
-            aria-label="Brightness shown in the screen's menu"
+            aria-label="Brightness shown in the panel's own menu"
             @keyup.enter="ui.primary?.run()"
           />
           <a
@@ -394,24 +268,21 @@
       </div>
     </div>
 
-    <ConfirmModal
-      :show="confirmLeave"
-      title="Leave without saving?"
-      :message="`Leave without saving limit ${pendingLimit}?`"
-      confirm-text="Save"
-      alternative-text="Leave"
-      @confirm="leaveSaving"
-      @alternative="leaveWithout"
-      @cancel="confirmLeave = false"
-    />
-
     <template #actions>
       <div class="dcheck__actions" :class="{ 'dcheck__actions--full': phone }">
         <span v-if="check.isActive.value" class="dcheck__footer-note" role="status">
           {{ screenName }} is checking every 2 s while this is open.
         </span>
-        <Button v-if="check.isActive.value" data-test="check-stop" @click="check.stop()">
-          Stop the check
+        <Button
+          v-if="check.isActive.value"
+          class="dcheck__stop"
+          :class="{ 'dcheck__stop--pressed': stopRequested }"
+          :aria-pressed="stopRequested ? 'true' : 'false'"
+          data-test="check-stop"
+          @pointerdown="requestStop"
+          @click="onStopClick"
+        >
+          {{ stopRequested ? "Stopping…" : "Stop the check" }}
         </Button>
       </div>
     </template>
@@ -421,30 +292,16 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, ref, toRef, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
-import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import { useDisplayCheck } from "@/composables/useDisplayCheck";
-import {
-  CHECK_FLOOR,
-  calibrationPoints,
-  dimSeconds,
-  ddcToMenu,
-  faultLimit,
-  firstBrightness,
-  fitSentence,
-  maxPickable,
-  menuToDdc,
-  readingsOutlier,
-  thirdReadingPoint,
-  writeTargets,
-} from "@/utils/brightness";
+import { fitConversion, maxPickable, menuToDdc, menuToDdcDown } from "@/utils/brightness";
 
-// The display check dialog (calvin-29ws; calibration v2, calvin-c805 and
-// calvin-u8yn: docs/design/2026-11-04-brightness-ramp-ui.md §3). Every state has
-// one status line and at most one primary action. Calibration (steps 1-3) never
-// brightens; the agent owns the run and always finishes it safely, so closing
-// only has to ask it to stop.
+// The display check dialog (calvin-29ws; calibration v3, calvin-idts, calvin-qkm8,
+// calvin-mvtv: docs/design/2026-11-04-brightness-ramp-ui.md §3). The person sets
+// the panel with its own buttons and Calvin reads what it reports, three times:
+// the highest level, an everyday level and the lowest. Nothing is saved until
+// Save, and Calvin never brightens the panel during the check.
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   kioskId: { type: String, required: true },
@@ -453,21 +310,44 @@ const props = defineProps({
   // This browser is the screen being checked (the touch panel itself).
   onPanel: { type: Boolean, default: false },
   overrides: { type: Object, default: () => ({}) },
-  // 1 detect (default), 3 conversion, 4 limit.
-  startStep: { type: String, default: "detect" },
+  // Saves the calibration and says whether it landed: async (patch) => boolean.
+  // Without it the dialog emits "patch" and trusts the parent.
+  savePatch: { type: Function, default: null },
 });
-const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "saved-limit", "turn-on"]);
+const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "turn-on"]);
 
 const HELP_URL = "https://github.com/osterbergsimon/calvin/blob/main/docs/setup/KIOSK_POWER.md";
 const PREFLIGHT_S = 10;
 const FIX_LINE =
   "The usual fix is to keep the screen's USB data link from also powering it (a USB power blocker on the data leg), or to use a stronger power supply.";
+const STARTUP_LINE =
+  "Calvin starts the screen at the minimum and brings it up to this after it turns on.";
+// The fallback only writes low levels: 5, then 1, held under the run's ceiling
+// and start level so it can never be refused as "above the ceiling".
+const FALLBACK_BASE = [5, 1];
 
 const STEPS = [
   { n: 1, label: "Find the display", short: "Display" },
-  { n: 2, label: "Does it change?", short: "Change" },
-  { n: 3, label: "Match the screen's menu", short: "Menu" },
-  { n: 4, label: "Find the safe limit", short: "Limit", optional: true },
+  { n: 2, label: "Highest level", short: "Highest" },
+  { n: 3, label: "Everyday level", short: "Everyday" },
+  { n: 4, label: "Lowest level", short: "Lowest" },
+];
+const LEVELS = [
+  {
+    heading: "Highest level",
+    short: "highest",
+    body: "Use the panel's own buttons to set Brightness to the highest level that works: its max, or the highest without flicker or the screen cutting out.",
+  },
+  {
+    heading: "Everyday level",
+    short: "everyday",
+    body: "Now set Brightness to a comfortable level for everyday use. It can be the same as the highest.",
+  },
+  {
+    heading: "Lowest level",
+    short: "lowest",
+    body: "Now set Brightness to the lowest level you'd use, the lowest that is still readable.",
+  },
 ];
 
 const check = useDisplayCheck(toRef(props, "kioskId"));
@@ -476,24 +356,25 @@ const step = ref(1);
 const view = ref("step");
 const ending = ref(null);
 const foundText = ref("");
-const placeholderReads = ref(false);
 const detected = ref(false);
-const startLevel = ref(null);
-const startKnown = ref(true);
-const menuStartText = ref("");
-const answerReady = ref(false);
-const writeFrom = ref(0);
-const writeTo = ref(0);
-const writesVerdict = ref(null);
-const pointReady = ref(null);
-const pendingPoint = ref(null);
+// One entry per level read: { typed, ddc, lastWrite }.
+const levels = ref([null, null, null]);
 const readingText = ref("");
 const readingInput = ref(null);
-const limitRunning = ref(false);
-const limitFound = ref(null);
-const limitSaved = ref(false);
-const savingLimit = ref(false);
-const thirdFromFinish = ref(false);
+const pendingTyped = ref(null);
+const faulted = ref(false);
+const stopRequested = ref(false);
+const saved = ref(false);
+const usedFallback = ref(false);
+const fbPhase = ref("explain");
+const fbIndex = ref(0);
+const fbReadings = ref([]);
+const fbResult = ref(null);
+// The menu numbers the fallback converts, and the levels the agent said it wrote.
+const fbTyped = ref([null, null, null]);
+const fbWritten = ref([null, null]);
+const fbLevelIndex = ref(0);
+const behindTries = ref([0, 0, 0]);
 const phone = ref(false);
 const nowMs = ref(Date.now());
 const runStartedMs = ref(Date.now());
@@ -502,23 +383,17 @@ let currentRunId = null;
 let opened = false;
 let clock = null;
 
+const fbLevels = computed(() => {
+  const caps = [run.value?.ceiling, run.value?.start?.level].filter(n => Number.isFinite(n));
+  return FALLBACK_BASE.map(base => Math.max(1, Math.min(base, ...caps)));
+});
+const saving = ref(false);
+const saveError = ref("");
 const stepNumber = computed(() => step.value);
+const pastReads = computed(() => ["summary", "fallback"].includes(view.value));
 const readOnlyView = computed(() => view.value === "readonly");
 const settings = computed(() => props.overrides || {});
 const stepSize = computed(() => settings.value.brightnessStep ?? 2);
-const stepSeconds = computed(() => settings.value.brightnessStepSeconds ?? 1.5);
-const limit = computed(() => settings.value.brightnessLimit ?? null);
-const readings = computed(() => settings.value.brightnessConversion ?? []);
-const fitText = computed(() => fitSentence(readings.value));
-const fitCapital = computed(() => fitText.value.replace(/^./, c => c.toUpperCase()));
-const outlier = computed(() => readingsOutlier(readings.value));
-const lastReading = computed(() => readings.value[readings.value.length - 1] ?? null);
-const predictedMenu = computed(() =>
-  lastReading.value ? ddcToMenu(lastReading.value.ddc, readings.value.slice(0, -1)) : null
-);
-const backTo = computed(
-  () => settings.value.brightness ?? firstBrightness(limit.value, stepSize.value)
-);
 const run = computed(() => check.run.value);
 const preflightClean = computed(() => run.value?.preflight?.status === "clean");
 const fault = computed(() => {
@@ -526,74 +401,77 @@ const fault = computed(() => {
   if (!f) return null;
   return currentRunId && run.value.id !== currentRunId ? null : f;
 });
-const faultLim = computed(() => faultLimit(fault.value, stepSize.value));
-const pendingLimit = computed(() =>
-  view.value === "power-ended" ? faultLim.value : limitFound.value
+const hasCalibration = computed(
+  () =>
+    (settings.value.brightnessConversion ?? []).length > 0 ||
+    settings.value.brightnessLimit != null ||
+    settings.value.brightnessFloor != null
 );
-
-// Where calibration starts: the known start level, or the floor when the screen
-// can't say how bright it is. A direct entry (no detect) uses the saved level.
-const effectiveStart = computed(() => {
-  if (detected.value) return startKnown.value ? (startLevel.value ?? CHECK_FLOOR) : CHECK_FLOOR;
-  return settings.value.brightness ?? CHECK_FLOOR;
-});
-const writeSeconds = computed(() =>
-  dimSeconds(writeFrom.value - writeTo.value, stepSize.value, stepSeconds.value)
+const keptLine = computed(() =>
+  hasCalibration.value
+    ? "Nothing changed; the previous calibration is still in place."
+    : "Nothing changed; no calibration is saved yet."
 );
-const readingValid = computed(() => {
-  const n = Number(readingText.value);
-  return readingText.value.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 100;
-});
-const menuStartValid = computed(() => {
-  const n = Number(menuStartText.value);
-  return menuStartText.value.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 100;
-});
-const barPercent = computed(() => Math.max(0, Math.min(100, run.value?.level ?? 0)));
-const knownLimit = computed(() => limit.value ?? (limitSaved.value ? limitFound.value : null));
-const maxAfter = computed(() => {
-  const ddc = maxPickable(limit.value ?? limitFound.value, stepSize.value);
-  return readings.value.length >= 2 ? ddcToMenu(ddc, readings.value) : ddc;
-});
-const thirdPoint = computed(() => {
-  const point = thirdReadingPoint(knownLimit.value, stepSize.value);
-  if (point === null || readings.value.length < 2 || readings.value.length > 2) return null;
-  const top = Math.max(...readings.value.map(r => Number(r.ddc)));
-  return point > top ? point : null;
-});
-const menuAtStartLine = computed(() => {
-  const menu = run.value?.menuAtStart;
-  if (menu == null) return "";
-  const ddc = menuToDdc(menu, readings.value);
-  const about = ddc == null ? "" : ` (about Calvin ${ddc})`;
-  return `${props.screenName} was at menu ${menu} when you started${about}. Calvin stays at or below that.`;
-});
-const readingsLine = computed(() => {
-  const n = readings.value.length;
-  if (n >= 2) return `Your ${n} readings are saved, so the menu match is kept.`;
-  if (n === 1) {
-    return "Your 1 reading is saved. A menu match needs 2, so the slider stays on Calvin's scale.";
-  }
-  return "No readings were saved, so the slider stays on Calvin's scale.";
-});
 const logLines = computed(() =>
   (run.value?.log ?? []).map(entry => `${entry.level ?? ""} · ${entry.note ?? ""}`.trim())
 );
-const faultAction = computed(() => {
-  const name = props.screenName;
-  if (view.value === "power-ended") return `Calvin dimmed ${name} to ${CHECK_FLOOR} and stopped.`;
-  if (step.value < 4) {
-    return `Calvin is dimming ${name} to ${CHECK_FLOOR} and waiting for the power to settle.`;
-  }
-  return `Calvin is stepping ${name} back down.`;
+const faultWhere = computed(() => {
+  const level = fault.value?.level;
+  if (Number.isFinite(level)) return `Calvin ${level}`;
+  return pendingTyped.value != null ? `Panel ${pendingTyped.value}` : "this level";
 });
+const faultAction = computed(() =>
+  check.isActive.value
+    ? "Calvin is bringing the brightness down and waiting for the power to settle."
+    : "Calvin ended the check safely."
+);
 
 const stepLabel = name =>
   ({
     detect: "Find the display",
-    write: "Does it change?",
-    conversion: "Match the screen's menu",
-    limit: "Find the safe limit",
+    read: "Reading the panel",
+    conversion: "Low level",
   })[name] || "Display check";
+
+// --- the level being read ------------------------------------------------------
+const levelIndex = computed(() => step.value - 2);
+const thisLevel = computed(() => levels.value[levelIndex.value] ?? null);
+const typedNumber = computed(() => {
+  const text = readingText.value.trim();
+  if (!/^\d{1,3}$/.test(text)) return null;
+  const n = Number(text);
+  return n <= 100 ? n : null;
+});
+// A level can't be higher than the one before it.
+const previousTyped = computed(() =>
+  levelIndex.value > 0 ? (levels.value[levelIndex.value - 1]?.typed ?? null) : null
+);
+const tooHigh = computed(() => {
+  if (typedNumber.value === null || previousTyped.value === null) return "";
+  if (typedNumber.value <= previousTyped.value) return "";
+  const before = levelIndex.value === 1 ? "the highest" : "the everyday level";
+  return `The ${LEVELS[levelIndex.value].short} level can't be higher than ${before}, ${previousTyped.value}.`;
+});
+// Reads can lag the panel's menu by a step: a lower level must not read higher.
+const behindNote = computed(() => {
+  const now = thisLevel.value;
+  const before = levelIndex.value > 0 ? levels.value[levelIndex.value - 1] : null;
+  if (!now || !before) return "";
+  const name = levelIndex.value === 1 ? "highest" : "everyday";
+  if (!Number.isFinite(now.ddc)) {
+    return "That reading doesn't look right: the panel gave no usable number.";
+  }
+  // Higher than the level before, or the same while the menu number went down.
+  const behind = now.ddc > before.ddc || (now.ddc === before.ddc && now.typed < before.typed);
+  if (!behind) return "";
+  return `That reading looks behind: the panel reported Calvin ${now.ddc}, not below the ${name} level's ${before.ddc}. It may not have caught up with the menu yet.`;
+});
+// Still out of order after one more read: offer Calvin's own low levels instead.
+const offerOwnLevels = computed(
+  () => Boolean(behindNote.value) && behindTries.value[levelIndex.value] >= 1
+);
+const readingValid = computed(() => typedNumber.value !== null && !tooHigh.value);
+const fbValid = computed(() => typedNumber.value !== null);
 
 // --- the session -------------------------------------------------------------
 // One run lasts the whole check. The first step starts it; every later step
@@ -603,14 +481,14 @@ const stepLabel = name =>
 const stepStamp = result =>
   result ? `${result.status}|${result.value ?? ""}|${result.finishedAt ?? ""}` : "";
 let awaiting = null;
-// The step that has been asked for and not answered yet.
 const inFlightStep = ref(null);
 const inFlight = computed(() => inFlightStep.value !== null);
 
-function expectResult(name, value) {
+function expectResult(name, value, seq = null) {
   awaiting = {
     step: name,
     value: value ?? null,
+    seq: Number.isFinite(seq) ? seq : null,
     baseline: stepStamp(run.value?.steps?.[name]),
   };
   inFlightStep.value = name;
@@ -620,9 +498,12 @@ function clearAwaiting() {
   inFlightStep.value = null;
 }
 
-// Ask the agent for a step: start the session, or move the running one.
+// Ask the agent for a step: start the session, or move the running one. When the
+// agent ended the last session (a fault ends it), this starts a new one.
 async function go(name, value) {
+  faulted.value = false;
   const current = run.value;
+  let sentSeq = null;
   if (current?.active && check.ownsRun.value) {
     const result = await check.changeStep(name, value);
     if (result.gone) {
@@ -630,7 +511,9 @@ async function go(name, value) {
       return false;
     }
     if (!result.ok) return false;
+    sentSeq = result.run?.seq ?? null;
   } else {
+    if (!check.isActive.value) stopRequested.value = false;
     const started = await check.start(name, value === undefined ? {} : { value });
     if (!started) {
       if (check.readOnly.value) view.value = "readonly";
@@ -638,8 +521,10 @@ async function go(name, value) {
     }
     currentRunId = started.id;
     runStartedMs.value = Date.now();
+    sentSeq = started.seq ?? null;
   }
-  expectResult(name, value);
+  // Stop stays pressed until the agent reports the run finished.
+  expectResult(name, value, sentSeq);
   return true;
 }
 
@@ -649,158 +534,191 @@ async function startDetect() {
   detected.value = false;
   await go("detect");
 }
-let writeAgain = 0;
-async function startWrite(again = false) {
+function nextFromFound() {
   step.value = 2;
-  const wasReady = answerReady.value;
-  answerReady.value = false;
-  const start = effectiveStart.value;
-  writeFrom.value = start;
-  writeTo.value = Math.max(0, start - 10);
-  // The kiosk ignores a repeat of the same step and value, so "Show me again"
-  // alternates the target it sends.
-  let value;
-  if (again) {
-    const targets = writeTargets(start);
-    value = targets[writeAgain % 2];
-    writeAgain += 1;
-  }
-  const ok = await go("write", value);
-  if (!ok) answerReady.value = wasReady;
-}
-async function nextFromFound(saveMenu = true) {
-  if (!startKnown.value && saveMenu && menuStartValid.value) {
-    const saved = await check.recordMenuAtStart(Number(menuStartText.value));
-    if (!saved) return;
-  }
-  await startWrite();
-}
-// Asks the screen to sit at a Calvin value so the owner can read its menu.
-async function askPoint(point) {
-  step.value = 3;
-  const previous = pointReady.value;
-  pointReady.value = null;
   readingText.value = "";
-  pendingPoint.value = point;
-  const current = run.value;
-  if (
-    current?.active &&
-    check.ownsRun.value &&
-    current.step === "conversion" &&
-    current.value === point &&
-    current.steps?.conversion?.status === "done"
-  ) {
-    // Already at this point (a reading was removed and asked for again).
-    pointReady.value = point;
+  nextTick(() => readingInput.value?.focus());
+}
+async function readIt() {
+  if (!readingValid.value) return;
+  pendingTyped.value = typedNumber.value;
+  await go("read");
+}
+async function sameAsHighest() {
+  readingText.value = String(levels.value[0].typed);
+  await readIt();
+}
+function readAgain() {
+  const typed = thisLevel.value?.typed;
+  if (behindNote.value) behindTries.value[levelIndex.value] += 1;
+  levels.value[levelIndex.value] = null;
+  readingText.value = typed == null ? "" : String(typed);
+}
+function nextLevel() {
+  readingText.value = "";
+  if (step.value < 4) {
+    step.value += 1;
+    nextTick(() => readingInput.value?.focus());
     return;
   }
-  const ok = await go("conversion", point);
-  if (!ok) pointReady.value = previous;
-}
-function enterStep3() {
-  step.value = 3;
-  if (readings.value.length === 0) return askPoint(effectiveStart.value);
-}
-async function startLimit() {
-  limitRunning.value = true;
-  const ok = await go("limit");
-  if (!ok) limitRunning.value = false;
-}
-function goStep4() {
-  step.value = 4;
-  limitRunning.value = false;
-}
-function goFinish() {
-  view.value = "finish";
+  finishReads();
 }
 
-function again() {
-  startWrite(true);
+// The DDC value didn't follow the buttons: every read is equal, or a read equals
+// the agent's last write while the typed number differs from it.
+function panelIgnoresButtons() {
+  const done = levels.value;
+  const typedDiffer = new Set(done.map(l => l.typed)).size > 1;
+  const allEqual = new Set(done.map(l => l.ddc)).size === 1;
+  if (allEqual && typedDiffer) return true;
+  return done.some(l => l.lastWrite != null && l.ddc === l.lastWrite && l.typed !== l.ddc);
 }
-async function retry() {
-  // Try again while a run is still live: end it first, or the start is refused.
-  if (check.isActive.value) await check.stop();
-  ending.value = null;
-  view.value = "step";
-  clearAwaiting();
-  if (step.value === 3) enterStep3();
-  else if (step.value === 4) {
-    limitRunning.value = false;
-  } else if (step.value === 2) startWrite();
-  else startDetect();
+function startFallback() {
+  // Too low to test two levels safely: say so plainly and change nothing.
+  if (Math.min(...fbLevels.value) <= 1 && fbLevels.value[0] <= fbLevels.value[1]) {
+    end("no-fallback");
+    return;
+  }
+  view.value = "fallback";
+  fbPhase.value = "explain";
+  fbIndex.value = 0;
+  fbReadings.value = [];
+  fbWritten.value = [null, null];
+  fbTyped.value = levels.value.map(l => l?.typed ?? null);
+  usedFallback.value = true;
+}
+function finishReads() {
+  if (panelIgnoresButtons()) {
+    startFallback();
+    return;
+  }
+  usedFallback.value = false;
+  view.value = "summary";
+}
+async function askLow(index) {
+  fbIndex.value = index;
+  fbPhase.value = "setting";
+  readingText.value = "";
+  const ok = await go("conversion", fbLevels.value[index]);
+  if (!ok) fbPhase.value = index === 0 ? "explain" : "ask";
+}
+async function saveLow() {
+  if (!fbValid.value) return;
+  // The pair uses the level the agent said it wrote, not the one asked for.
+  const wrote = fbWritten.value[fbIndex.value] ?? fbLevels.value[fbIndex.value];
+  fbReadings.value = [...fbReadings.value, { ddc: wrote, menu: typedNumber.value }];
+  if (fbIndex.value === 0) return askLow(1);
+  askMissingLevel();
+}
+// A fallback started midway has not asked for every level's menu number yet.
+function askMissingLevel() {
+  const missing = fbTyped.value.findIndex(n => n === null);
+  if (missing === -1) return convertFromFallback();
+  fbLevelIndex.value = missing;
+  fbPhase.value = "level";
+  readingText.value = "";
+  nextTick(() => readingInput.value?.focus());
+}
+function saveLevel() {
+  if (!fbValid.value) return;
+  fbTyped.value = fbTyped.value.map((n, i) => (i === fbLevelIndex.value ? typedNumber.value : n));
+  askMissingLevel();
+}
+function convertFromFallback() {
+  const points = fbReadings.value;
+  if (!fitConversion(points)) {
+    end("same-low");
+    return;
+  }
+  const [high, mid, low] = fbTyped.value;
+  const maxDdc = menuToDdcDown(high, points);
+  if (maxDdc === null) {
+    end("same-low");
+    return;
+  }
+  const clamp = n => Math.max(0, Math.min(100, n));
+  const everyday = Math.min(maxDdc, clamp(menuToDdc(mid, points)));
+  const lowest = Math.min(everyday, clamp(menuToDdc(low, points)));
+  fbResult.value = [
+    { typed: high, ddc: maxDdc },
+    { typed: mid, ddc: everyday },
+    { typed: low, ddc: lowest },
+  ];
+  view.value = "summary";
 }
 
-async function answerWrites(changed) {
-  const saved = await check.recordVerdict(changed);
-  // The answer wasn't saved: stay on the question so the owner can answer again.
-  if (!saved) return;
-  writesVerdict.value = changed;
-  if (!changed) {
-    end("no-writes");
+const summaryRows = computed(() => {
+  const rows = usedFallback.value ? fbResult.value : levels.value;
+  const names = ["Highest", "Everyday", "Lowest"];
+  return (rows ?? [{}, {}, {}]).map((r, i) => ({ label: names[i], typed: r?.typed, ddc: r?.ddc }));
+});
+const sameScale = computed(
+  () =>
+    !usedFallback.value &&
+    summaryRows.value.every(row => row.typed != null && row.typed === row.ddc)
+);
+const keptUnderLimit = computed(
+  () =>
+    summaryRows.value[1].ddc != null &&
+    summaryRows.value[1].ddc > maxPickable(summaryRows.value[0].ddc, stepSize.value)
+);
+// The pairs Save stores: this run's readings, replacing the old ones.
+const savedPairs = computed(() => {
+  if (usedFallback.value) {
+    return [...fbReadings.value].sort((a, b) => a.ddc - b.ddc);
+  }
+  const byDdc = new Map();
+  for (const row of summaryRows.value) if (!byDdc.has(row.ddc)) byDdc.set(row.ddc, row.typed);
+  return [...byDdc.entries()].map(([ddc, menu]) => ({ ddc, menu })).sort((a, b) => a.ddc - b.ddc);
+});
+
+// One PATCH: nothing from an unfinished run is ever saved.
+async function saveAll() {
+  if (saving.value) return;
+  const [highest, everyday, lowest] = summaryRows.value;
+  const patch = {
+    brightnessConversion: savedPairs.value,
+    brightnessLimit: highest.ddc,
+    brightness: everyday.ddc,
+    brightnessFloor: lowest.ddc,
+  };
+  saving.value = true;
+  saveError.value = "";
+  let landed = true;
+  try {
+    if (props.savePatch) landed = (await props.savePatch(patch)) !== false;
+    else emit("patch", patch);
+  } catch {
+    landed = false;
+  } finally {
+    saving.value = false;
+  }
+  if (!landed) {
+    saveError.value = "Couldn't save to the server. Check the connection and try again.";
     return;
   }
   emit("writes-ok");
-  enterStep3();
+  saved.value = true;
 }
 
-function saveReading(ddc = Number(pendingPoint.value)) {
-  if (!readingValid.value) return;
-  const menu = Number(readingText.value);
-  const others = readings.value.filter(point => Number(point.ddc) !== ddc);
-  const next = [...others, { ddc, menu }].sort((a, b) => a.ddc - b.ddc);
-  emit("patch", { brightnessConversion: next });
-  readingText.value = "";
+// --- stop --------------------------------------------------------------------
+// Stop answers at once (pressed on pointerdown) and keeps saying so until the
+// agent reports the run finished. Taps repeat safely.
+function requestStop() {
+  stopRequested.value = true;
+  return check.stop();
 }
-function removeReading(index) {
-  emit("patch", { brightnessConversion: readings.value.filter((_, i) => i !== index) });
+function onStopClick(event) {
+  // A pointer press already asked; a keyboard click (detail 0) asks here.
+  if (!event || event.detail === 0) requestStop();
 }
-async function typeAgain() {
-  if (readingValid.value) return saveReading(Number(lastReading.value.ddc));
-  await nextTick();
-  readingInput.value?.focus();
-}
-function skipReading() {
-  if (thirdFromFinish.value) {
-    thirdFromFinish.value = false;
-    pointReady.value = null;
-    view.value = "finish";
-    return;
-  }
-  goStep4();
-}
-async function addThird() {
-  const point = thirdPoint.value;
-  if (point == null) return;
-  thirdFromFinish.value = view.value === "finish";
-  view.value = "step";
-  await askPoint(point);
-}
-// A third reading taken from the finish screen goes back there once it fits.
+
 watch(
-  () => [readings.value, pointReady.value],
-  () => {
-    if (!thirdFromFinish.value || pointReady.value == null) return;
-    const saved = readings.value.some(r => Number(r.ddc) === pointReady.value);
-    if (saved && !outlier.value) {
-      thirdFromFinish.value = false;
-      pointReady.value = null;
-      view.value = "finish";
-    }
+  () => check.isActive.value,
+  active => {
+    if (!active) stopRequested.value = false;
   }
 );
-
-// A found limit is only a proposal: a report can be forged on the LAN, so it
-// takes effect only when the owner saves it. The old limit stays until then.
-// A calibration fault offers its own limit the same way.
-async function saveLimit() {
-  if (pendingLimit.value == null) return;
-  savingLimit.value = true;
-  const saved = await check.saveLimit();
-  savingLimit.value = false;
-  if (!saved) return;
-  limitSaved.value = true;
-  emit("saved-limit", saved.brightnessLimit);
-}
 
 // --- end states -------------------------------------------------------------
 
@@ -812,39 +730,60 @@ function end(kind, detail = "") {
       status: "Check ended · no brightness control",
       closeFirst: true,
       text: `Not available: ${name}'s screen doesn't answer brightness commands (DDC/CI).`,
-      hint: "Often the adapter or cable doesn't carry DDC, or DDC/CI is off in the screen's menu.",
+      hint: "Often the adapter or cable doesn't carry DDC, or DDC/CI is off in the panel's own menu.",
     },
-    "no-writes": {
-      tone: "err",
-      status: "Check ended · brightness commands don't take effect",
-      closeFirst: true,
-      text: "Not available: brightness commands reach the screen but don't change it.",
+    "same-low": {
+      tone: "warn",
+      status: "Check ended · the panel showed the same Brightness",
+      kept: true,
+      text: "The panel showed the same Brightness at both low levels, so Calvin can't match its menu.",
+    },
+    "no-fallback": {
+      tone: "warn",
+      status: "Check ended · too low to test",
+      kept: true,
+      text: "This screen is already at its lowest safe level, so Calvin can't test two low levels to match the panel's menu.",
+    },
+    "old-agent": {
+      tone: "warn",
+      status: "Check not started · update this screen first",
+      noRetry: true,
+      text: "Update this screen first: Settings > update.",
+      hint: `${name} is running an older version of the display agent that can't do this check.`,
     },
     timeout: {
       tone: "warn",
       status: "Check ended · timed out",
-      text: "The check timed out. Nothing was left changed.",
+      kept: true,
+      text: "The check timed out.",
     },
     interrupted: {
       tone: "warn",
       status: `Check ended · ${name} restarted`,
+      kept: true,
       text: `${name} restarted. That's the limit at work. If it comes back, check its Display check line for the result.`,
     },
     error: {
       tone: "err",
       status: "Check ended",
+      kept: true,
       text: detail || "The check couldn't finish.",
     },
     stopped: {
       tone: "warn",
       status: "Check stopped",
-      text: startKnown.value
-        ? `The check was stopped. ${name} is going back to its brightness.`
-        : `The check was stopped. ${name} stays at ${CHECK_FLOOR}. Set its brightness with the slider or its own menu.`,
+      kept: true,
+      text: `The check was stopped and ${name} is going back to its brightness.`,
+    },
+    watched: {
+      tone: "warn",
+      status: "Check ended",
+      text: "The check on the other device ended.",
     },
     gone: {
       tone: "warn",
       status: "Check ended",
+      kept: true,
       text: "The check ended before this step could start.",
     },
   };
@@ -857,32 +796,38 @@ function end(kind, detail = "") {
 function onStepResult(name, result, asked) {
   const failed = result.status === "error";
   switch (name) {
-    case "detect": {
+    case "detect":
       if (failed) return end("no-ddc");
+      // An agent older than the seq fix would answer repeated reads wrongly.
+      if (result.seq == null) {
+        check.stop();
+        return end("old-agent");
+      }
       foundText.value = result.detail || result.info?.model || "a display";
-      placeholderReads.value = Boolean(result.info?.placeholderReads);
-      const start = run.value?.start;
-      startKnown.value = start ? Boolean(start.known) : !placeholderReads.value;
-      startLevel.value = start?.level ?? settings.value.brightness ?? null;
       detected.value = true;
       step.value = 1;
       return;
-    }
-    case "write":
-      if (failed) return end("no-writes");
-      answerReady.value = true;
+    case "read":
+      if (failed) return end("error", result.detail);
+      levels.value[levelIndex.value] = {
+        typed: pendingTyped.value,
+        ddc: result.level == null ? Number.NaN : Number(result.level),
+        lastWrite: result.lastWrite ?? null,
+      };
       return;
     case "conversion":
       if (failed) return end("error", result.detail);
-      pointReady.value = result.value ?? asked;
-      return;
-    case "limit":
-      limitRunning.value = true;
-      if (failed) return end("error", result.detail);
-      limitFound.value = result.limit ?? null;
-      view.value = "finish";
+      if (Number.isFinite(Number(result.level))) {
+        fbWritten.value = fbWritten.value.map((n, i) =>
+          i === fbIndex.value ? Number(result.level) : n
+        );
+      }
+      fbPhase.value = "ask";
+      readingText.value = "";
+      nextTick(() => readingInput.value?.focus());
       return;
     default:
+      void asked;
   }
 }
 
@@ -895,13 +840,17 @@ function onRunEnded(current) {
     view.value = "asleep";
     return;
   }
-  if (view.value === "finish") return;
+  if (saved.value) return;
   if (current.reason === "power_at_idle") {
     view.value = "idle";
     return;
   }
   if (current.status === "error" && current.reason === "power_trouble") {
-    view.value = "power-ended";
+    if (view.value === "fallback") {
+      end("error", "The power dropped while Calvin set a low level.");
+      return;
+    }
+    faulted.value = true;
     return;
   }
   if (current.status === "timeout") return end("timeout");
@@ -909,7 +858,9 @@ function onRunEnded(current) {
   if (current.status === "error") {
     return current.step === "detect" ? end("no-ddc") : end("error", current.detail);
   }
-  if (current.status === "stopped" && view.value === "step") end("stopped");
+  if (current.status === "stopped" && ["step", "summary", "fallback"].includes(view.value)) {
+    end("stopped");
+  }
 }
 
 function onRun(current) {
@@ -923,7 +874,13 @@ function onRun(current) {
   if (!current.active) return onRunEnded(current);
   if (!awaiting) return;
   const result = current.steps?.[awaiting.step];
-  if (!result || stepStamp(result) === awaiting.baseline) return;
+  if (!result) return;
+  // A report that carries a seq answers only the request with that seq: the same
+  // step asked twice must not be satisfied by the first answer. An old agent
+  // reports no seq, so those match by step and a changed result, as before.
+  if (awaiting.seq !== null && result.seq != null) {
+    if (result.seq !== awaiting.seq) return;
+  } else if (stepStamp(result) === awaiting.baseline) return;
   if (
     awaiting.step === "conversion" &&
     awaiting.value !== null &&
@@ -938,57 +895,76 @@ function onRun(current) {
 
 watch(() => check.run.value, onRun);
 
+// A run another device started is only watched: when it ends, say so.
+watch(
+  () => check.run.value,
+  current => {
+    if (view.value !== "readonly" || current?.active) return;
+    end("watched");
+  }
+);
+
+function resetRun() {
+  ending.value = null;
+  foundText.value = "";
+  detected.value = false;
+  levels.value = [null, null, null];
+  readingText.value = "";
+  pendingTyped.value = null;
+  faulted.value = false;
+  stopRequested.value = false;
+  saved.value = false;
+  saving.value = false;
+  saveError.value = "";
+  usedFallback.value = false;
+  fbPhase.value = "explain";
+  fbIndex.value = 0;
+  fbReadings.value = [];
+  fbResult.value = null;
+  fbTyped.value = [null, null, null];
+  fbWritten.value = [null, null];
+  behindTries.value = [0, 0, 0];
+  step.value = 1;
+  view.value = "step";
+  clearAwaiting();
+}
+
+async function retry() {
+  // Try again while a run is still live: end it first, or the start is refused.
+  if (check.isActive.value) await check.stop();
+  resetRun();
+  await startDetect();
+}
+
 // --- what the dialog shows --------------------------------------------------
 
-const stoppingSafely = computed(
-  () => fault.value && check.isActive.value && step.value < 4 && view.value === "step"
-);
-const floorPhase = computed(() => {
-  const level = run.value?.level;
-  return level == null || level > CHECK_FLOOR;
-});
 const preflightLeft = computed(() =>
   Math.max(0, PREFLIGHT_S - Math.floor((nowMs.value - runStartedMs.value) / 1000))
 );
 
 const state = computed(() => {
-  if (["readonly", "asleep", "idle", "power-ended", "end", "finish"].includes(view.value)) {
-    return view.value;
+  if (stopRequested.value && check.isActive.value) return "stopping";
+  if (["readonly", "asleep", "idle", "end", "summary"].includes(view.value)) return view.value;
+  if (view.value === "fallback") {
+    return fbPhase.value === "explain" ? "fb-explain" : `fb-${fbPhase.value}`;
   }
-  if (stoppingSafely.value) return "stopping";
+  if (fault.value && check.isActive.value) return "settling";
   if (step.value === 1) {
     if (!detected.value) return preflightClean.value ? "asking" : "preflight";
-    return startKnown.value ? "found-known" : "found-unknown";
+    return "found";
   }
-  if (step.value === 2) {
-    if (answerReady.value) return "question";
-    return !startKnown.value && floorPhase.value ? "floor" : "testing";
-  }
-  if (step.value === 3) {
-    const n = readings.value.length;
-    if (inFlightStep.value === "conversion") return "dimming3";
-    if (pointReady.value != null && !readings.value.some(r => Number(r.ddc) === pointReady.value)) {
-      return "reading";
-    }
-    if (n === 0) return "after0";
-    if (n === 1) return calibrationPoints(readings.value[0].ddc).room ? "after1" : "noroom";
-    return outlier.value ? "off-line" : "matched";
-  }
-  return limitRunning.value ? "limit-running" : "limit-ready";
+  if (inFlightStep.value === "read") return "reading";
+  if (thisLevel.value) return "read-done";
+  return faulted.value ? "fault" : "ask";
 });
 
-const skipFirst = () => ({
-  label: "Skip the menu match",
-  test: "check-skip",
-  run: skipReading,
-});
-const fixLink = () => ({ label: "How to fix the power", test: "fix-link", href: HELP_URL });
+const stepOf = () => `Step ${step.value} of 4 · ${STEPS[step.value - 1].label}`;
 
 const ui = computed(() => {
   const name = props.screenName;
-  const n = readings.value.length;
-  const point = pointReady.value;
   switch (state.value) {
+    case "stopping":
+      return { status: "Stopping, bringing brightness down", busy: true };
     case "readonly":
       return {
         status: `A check is running from another device · ${stepLabel(run.value?.step)}`,
@@ -1010,218 +986,145 @@ const ui = computed(() => {
           { label: "Close", test: "check-close", run: close },
         ],
       };
-    case "stopping":
-      return { status: "Stopping safely · waiting for 5 s of clean power", busy: true };
-    case "power-ended":
-      if (limitSaved.value) {
+    case "end": {
+      const retryItem = { label: "Try again", test: "check-retry", run: retry, plain: true };
+      if (ending.value.noRetry) {
         return {
-          status: `Calvin stays at or below ${pendingLimit.value} on ${name}`,
+          status: ending.value.status,
           primary: { label: "Done", test: "check-done", run: close },
-          secondary: [fixLink()],
         };
       }
-      return {
-        status: `Calibration stopped · power trouble at Calvin ${fault.value?.level}`,
-        primary:
-          pendingLimit.value != null
-            ? {
-                label: `Save ${pendingLimit.value} as ${name}'s limit`,
-                test: "limit-save",
-                loading: savingLimit.value,
-                run: saveLimit,
-              }
-            : { label: "Done", test: "check-done", run: close },
-        secondary:
-          pendingLimit.value != null
-            ? [fixLink(), { label: "Done", test: "check-done", run: close }]
-            : [fixLink()],
-      };
-    case "end": {
-      const retryItem = { label: "Try again", test: "check-retry", run: retry };
       if (ending.value.closeFirst) {
         return {
           status: ending.value.status,
           primary: { label: "Close", test: "check-close", run: close },
-          secondary: [{ ...retryItem, plain: true }],
+          secondary: [retryItem],
         };
-      }
-      return { status: ending.value.status, primary: retryItem };
-    }
-    case "finish": {
-      if (limitFound.value != null && !limitSaved.value) {
-        return {
-          status: `Limit found · ${limitFound.value} is not saved yet`,
-          primary: {
-            label: `Save ${limitFound.value} as ${name}'s limit`,
-            test: "limit-save",
-            loading: savingLimit.value,
-            run: saveLimit,
-          },
-          secondary: [{ label: "Done", test: "check-done", run: close }],
-        };
-      }
-      const secondary = [];
-      if (thirdPoint.value != null) {
-        secondary.push({
-          label: `Add a reading near the top (Calvin ${thirdPoint.value}) for a closer match`,
-          test: "check-third",
-          run: addThird,
-        });
       }
       return {
-        status: limitSaved.value ? `Saved · ${name} stays under its limit` : "Check finished",
+        status: ending.value.status,
         primary: { label: "Done", test: "check-done", run: close },
-        secondary,
+        secondary: [retryItem],
       };
     }
+    case "summary":
+      if (saved.value) {
+        return {
+          status: "Saved",
+          primary: { label: "Done", test: "check-done", run: close },
+        };
+      }
+      return {
+        status: saving.value ? "Saving…" : "Check finished · not saved yet",
+        primary: {
+          label: "Save",
+          test: "check-save",
+          run: saveAll,
+          disabled: saving.value,
+          loading: saving.value,
+        },
+        secondary: [{ label: "Try again", test: "check-retry", run: retry }],
+      };
+    case "fb-explain":
+      return {
+        status: "This panel doesn't report its own buttons",
+        primary: {
+          label: `Set ${fbLevels.value[0]} and ask`,
+          test: "fallback-start",
+          run: () => askLow(0),
+        },
+      };
+    case "fb-setting":
+      return {
+        status: `Low level ${fbIndex.value + 1} of 2 · Setting Calvin ${fbLevels.value[fbIndex.value]}…`,
+        busy: true,
+      };
+    case "fb-ask":
+      return {
+        status: `Low level ${fbIndex.value + 1} of 2 · Calvin ${fbLevels.value[fbIndex.value]} · type what the panel's menu shows`,
+        field: true,
+        primary: {
+          label: "Save reading",
+          test: "reading-save",
+          disabled: !fbValid.value,
+          run: saveLow,
+        },
+      };
+    case "fb-level":
+      return {
+        status: `Type what the panel's menu showed at the ${LEVELS[fbLevelIndex.value].short} level`,
+        field: true,
+        primary: {
+          label: "Save reading",
+          test: "reading-save",
+          disabled: !fbValid.value,
+          run: saveLevel,
+        },
+      };
     case "preflight":
       return {
         status: `Checking ${name}'s power before changing anything · ${preflightLeft.value} s`,
         busy: true,
       };
     case "asking":
-      return { status: `Step 1 of 3 · Asking ${name}'s screen…`, busy: true };
-    case "found-known":
+      return { status: `Step 1 of 4 · Asking ${name}'s screen…`, busy: true };
+    case "found":
       return {
-        status: `Step 1 of 3 · Found · ${name} is at Calvin ${startLevel.value}`,
-        primary: { label: "Next", test: "check-next", run: () => nextFromFound() },
+        status: "Step 1 of 4 · Found the display",
+        primary: { label: "Next", test: "check-next", run: nextFromFound },
       };
-    case "found-unknown":
+    case "settling":
+      return { status: "Stopping safely · waiting for 5 s of clean power", busy: true };
+    case "reading":
+      return { status: `${stepOf()} · Reading…`, busy: true };
+    case "read-done":
       return {
-        status: `Step 1 of 3 · Found · ${name} can't report its brightness`,
-        primary: {
-          label: `Next: dim to ${CHECK_FLOOR}`,
-          test: "check-next",
-          run: () => nextFromFound(),
-        },
-        secondary: [
-          {
-            label: "I can't reach the menu now",
-            test: "menu-start-skip",
-            run: () => nextFromFound(false),
-          },
-        ],
+        status: `${stepOf()} · Panel ${thisLevel.value.typed} · Calvin ${thisLevel.value.ddc}`,
+        primary: behindNote.value
+          ? { label: "Read it again", test: "read-again", run: readAgain }
+          : {
+              label: step.value === 4 ? "See the summary" : "Next",
+              test: "check-next",
+              run: nextLevel,
+            },
+        secondary: behindNote.value
+          ? offerOwnLevels.value
+            ? [
+                {
+                  label: "Use Calvin's own levels instead",
+                  test: "use-own-levels",
+                  run: startFallback,
+                },
+              ]
+            : []
+          : [{ label: "Read it again", test: "read-again", run: readAgain }],
       };
-    case "floor":
-      return { status: `Step 2 of 3 · Dimming ${name} to ${CHECK_FLOOR}…`, busy: true };
-    case "testing":
+    case "fault":
       return {
-        status: `Step 2 of 3 · Dimming ${writeFrom.value} → ${writeTo.value} and back · about ${writeSeconds.value} s`,
-        busy: true,
-      };
-    case "question":
-      return {
-        status: "Step 2 of 3 · Your answer decides whether Calvin can set the brightness",
-        answers: [
-          { label: "Yes, it changed", test: "writes-yes", run: () => answerWrites(true) },
-          { label: "No, it looked the same", test: "writes-no", run: () => answerWrites(false) },
-        ],
-        secondary: [{ label: "Show me again", test: "writes-again", run: again }],
-      };
-    case "dimming3":
-      return {
-        status:
-          n === 0
-            ? `Reading 1 of 2 · Keeping ${name} at Calvin ${pendingPoint.value}…`
-            : n === 1
-              ? `1 of 2 readings · Dimming to ${pendingPoint.value}…`
-              : `${n} readings · Moving to Calvin ${pendingPoint.value}…`,
-        busy: true,
-      };
-    case "reading": {
-      const label =
-        n === 0
-          ? `Reading 1 of 2 · ${name} is at Calvin ${point}, unchanged`
-          : n === 1
-            ? `Reading 2 of 2 · ${name} is at Calvin ${point}`
-            : `Reading 3 · ${name} is at Calvin ${point}`;
-      return {
-        status: label,
+        status: "Power trouble · the panel's power dropped at that level",
         field: true,
         primary: {
-          label: "Save reading",
-          test: "reading-save",
+          label: "Read it again",
+          test: "read-it",
           disabled: !readingValid.value,
-          run: () => saveReading(Number(point)),
+          run: readIt,
         },
-        secondary: n === 0 ? [skipFirst()] : n >= 2 ? [{ ...skipFirst(), label: "Skip" }] : [],
-      };
-    }
-    case "after0":
-      return {
-        status: `Reading 1 of 2 · ${name} is at Calvin ${effectiveStart.value}`,
-        primary: {
-          label: "Take reading 1",
-          test: "check-add",
-          run: () => askPoint(effectiveStart.value),
-        },
-        secondary: [skipFirst()],
-      };
-    case "after1": {
-      const second = calibrationPoints(readings.value[0].ddc).second;
-      return {
-        status: `1 of 2 readings · Next, Calvin dims to ${second}`,
-        primary: {
-          label: `Dim to ${second} for reading 2`,
-          test: "check-add",
-          run: () => askPoint(second),
-        },
-        secondary: [skipFirst()],
-      };
-    }
-    case "noroom":
-      return {
-        status: `1 reading · ${name} is already at its lowest`,
-        primary: { label: "Go on with 1 reading", test: "check-next", run: goStep4 },
-      };
-    case "matched": {
-      const secondary = [];
-      if (thirdPoint.value != null && limit.value != null) {
-        secondary.push({
-          label: `Add a reading near the top (Calvin ${thirdPoint.value}) for a closer match`,
-          test: "check-third",
-          run: addThird,
-        });
-      }
-      return {
-        status:
-          n === 2
-            ? "2 of 2 readings · enough for a menu match"
-            : `${n} readings · enough for a menu match`,
-        primary: { label: "Next: safe limit (optional)", test: "check-next", run: goStep4 },
-        secondary,
-      };
-    }
-    case "off-line":
-      return {
-        status: `${n} readings · the last one doesn't line up`,
-        field: true,
-        primary: { label: "Type it again", test: "check-retype", run: typeAgain },
-        secondary: [
-          {
-            label: "Remove it",
-            test: "check-remove-last",
-            run: () => removeReading(n - 1),
-          },
-        ],
-      };
-    case "limit-ready":
-      return {
-        status: "Step 4 · optional · raises the brightness until the power shows trouble",
-        primary: props.onPanel
-          ? { label: "Skip, finish", test: "limit-skip", run: goFinish }
-          : { label: "Start the test", test: "limit-start", run: startLimit },
-        secondary: props.onPanel
-          ? []
-          : [{ label: "Skip, finish", test: "limit-skip", run: goFinish, plain: true }],
       };
     default: {
-      const level = run.value?.level ?? 0;
+      const secondary =
+        step.value === 3
+          ? [{ label: "Same as highest", test: "same-as-highest", run: sameAsHighest }]
+          : [];
       return {
-        status: `Raising ${stepSize.value} every ${stepSeconds.value} s · Calvin ${level} · ${
-          fault.value ? `trouble at ${fault.value.level}` : "no trouble yet"
-        }`,
-        busy: true,
+        status: `${stepOf()} · type what the panel's menu shows`,
+        field: true,
+        primary: {
+          label: "Read it",
+          test: "read-it",
+          disabled: !readingValid.value,
+          run: readIt,
+        },
+        secondary,
       };
     }
   }
@@ -1232,25 +1135,9 @@ const ui = computed(() => {
 async function onOpen() {
   opened = true;
   phone.value = typeof window !== "undefined" && window.matchMedia?.("(max-width: 640px)").matches;
-  ending.value = null;
-  foundText.value = "";
-  detected.value = false;
-  startLevel.value = null;
-  startKnown.value = true;
-  menuStartText.value = "";
-  answerReady.value = false;
-  pointReady.value = null;
-  limitRunning.value = false;
-  limitFound.value = null;
-  limitSaved.value = false;
-  writesVerdict.value = null;
-  thirdFromFinish.value = false;
+  resetRun();
   handled.clear();
   currentRunId = null;
-  clearAwaiting();
-  writeAgain = 0;
-  pendingPoint.value = null;
-  view.value = "step";
   nowMs.value = Date.now();
   runStartedMs.value = Date.now();
   clock = setInterval(() => (nowMs.value = Date.now()), 1000);
@@ -1260,13 +1147,13 @@ async function onOpen() {
     view.value = "readonly";
     return;
   }
+  // A reload left our own run active: carry on with it.
+  if (check.isActive.value && check.ownsRun.value) currentRunId = check.run.value.id;
   if (props.asleep) {
     view.value = "asleep";
     return;
   }
-  if (props.startStep === "conversion") await enterStep3();
-  else if (props.startStep === "limit") goStep4();
-  else await startDetect();
+  await startDetect();
 }
 
 async function onClosed() {
@@ -1294,44 +1181,16 @@ watch(
   }
 );
 
-// A limit nobody saved yet (found in step 4, or offered after a power fault):
-// leaving would lose it, so ask first.
-const confirmLeave = ref(false);
-const unsavedLimit = computed(
-  () =>
-    ["finish", "power-ended"].includes(view.value) &&
-    pendingLimit.value != null &&
-    !limitSaved.value
-);
-
+// Closing the dialog before Save keeps the previous calibration, so it never
+// needs to ask: the stopped view says what was kept.
 function onDialogModel(value) {
-  if (value === false && unsavedLimit.value) {
-    confirmLeave.value = true;
-    return;
-  }
   emit("update:modelValue", value);
 }
 
 // Done ends the session itself; closing the dialog any other way does too.
-async function endAndClose() {
-  confirmLeave.value = false;
+async function close() {
   if (check.isActive.value && check.ownsRun.value) await check.stop();
   emit("update:modelValue", false);
-}
-function close() {
-  if (unsavedLimit.value) {
-    confirmLeave.value = true;
-    return;
-  }
-  return endAndClose();
-}
-async function leaveSaving() {
-  await saveLimit();
-  if (limitSaved.value) await endAndClose();
-  else confirmLeave.value = false;
-}
-function leaveWithout() {
-  return endAndClose();
 }
 </script>
 
@@ -1424,38 +1283,6 @@ function leaveWithout() {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
-.dcheck__level {
-  display: flex;
-  align-items: center;
-  gap: var(--gap-3);
-}
-.dcheck__level strong {
-  font-family: var(--font-data);
-  font-size: var(--text-display);
-  min-width: 3ch;
-}
-.dcheck__bar-track {
-  position: relative;
-  flex: 1;
-  height: 0.75rem;
-  overflow: hidden;
-  background: var(--bg-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-round);
-}
-.dcheck__bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--focus);
-  transition: width var(--dur-fast) linear;
-}
-.dcheck__bar-limit {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--err);
-}
 .dcheck__actions {
   display: flex;
   flex: 1 1 auto;
@@ -1481,23 +1308,47 @@ function leaveWithout() {
   border-radius: var(--radius-control);
 }
 .dcheck__stop {
-  width: 100%;
   min-height: 3rem;
+  min-width: 8.5rem;
+  transition:
+    transform var(--dur-fast),
+    background-color var(--dur-fast);
 }
-.dcheck__found {
+.dcheck__stop:active,
+.dcheck__stop--pressed {
+  transform: scale(0.97);
+  box-shadow: inset 0 0 0 2px var(--err);
+}
+.dcheck__summary {
   margin: 0;
   padding: 0;
   list-style: none;
+}
+.dcheck__summary-row {
   display: flex;
-  flex-direction: column;
-  gap: var(--gap-1);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--gap-3);
+  min-height: var(--touch-target);
+  border-bottom: 1px solid var(--line);
+}
+.dcheck__summary-label {
+  font-weight: var(--weight-strong);
+}
+.dcheck__pair {
+  font-variant-numeric: tabular-nums;
+}
+.dcheck__pair--big {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
+}
+.dcheck__sub--warn {
+  color: var(--err-text);
 }
 
 .dcheck__strip-short {
   display: none;
-}
-.dcheck__strip-item--optional {
-  border-top-style: dashed;
 }
 .dcheck__fault {
   display: flex;
@@ -1513,12 +1364,6 @@ function leaveWithout() {
 .dcheck__sub--lead {
   font-size: var(--text-body);
   color: var(--ink);
-}
-.dcheck__menu-start {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-2);
-  font-size: var(--text-meta);
 }
 .dcheck__bar {
   display: flex;
@@ -1547,11 +1392,6 @@ function leaveWithout() {
   to {
     transform: rotate(360deg);
   }
-}
-.dcheck__answers {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--gap-2);
 }
 .dcheck__primary-row {
   display: flex;
@@ -1589,19 +1429,6 @@ function leaveWithout() {
   text-decoration: none;
   background: var(--focus);
   border-radius: var(--radius-control);
-}
-.dcheck__readings {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--text-meta);
-}
-.dcheck__readings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: var(--touch-target);
-  border-bottom: 1px solid var(--line);
 }
 @media (--bp-phone) {
   .dcheck__strip {

@@ -1,6 +1,8 @@
 # Brightness ramp and display check: UI
 
 **Date:** 2026-11-04 · **Bead:** calvin-29ws · **Status:** design, for build
+**v3 (2026-11-07, calvin-idts / calvin-qkm8 / calvin-mvtv):** §3 rewritten: the owner sets the panel with its own
+buttons and Calvin reads. §2 gains a lowest-brightness line and **Clear calibration**.
 **v2 (2026-11-06, calvin-c805 / calvin-u8yn):** §3 calibration and power-trouble states rewritten after the first real
 Pi 3B+ run; §3.7 lists what the backend and agent need.
 **Functional spec:** [../superpowers/specs/2026-11-04-kiosk-brightness-ramp-design.md](../superpowers/specs/2026-11-04-kiosk-brightness-ramp-design.md).
@@ -35,12 +37,12 @@ Rows, in order:
      menu", with "Calvin value 19 · estimated" in small text. The track runs from the menu value of DDC 0 to the
      menu value of the limit.
    - **Without a menu match**, the slider is on Calvin's scale (DDC 0–100): "19 (Calvin's scale)", with a link,
-     "Match it to your screen's menu", that opens the check at step 3.
+     "Match it to the panel's own menu", that opens the display check.
    - **The highest value you can pick** is the limit minus two steps. The range between that and the limit is drawn
      hatched and can't be reached, with the limit marked and labelled. The note under the slider says "You can go up
      to 67 on the screen's menu (Calvin 22). Above that is too close to the limit the display check found on 4 Nov."
-     When no limit has been found, there is no hatch, and the note says "No limit found yet. Run the safe-limit step
-     to find one" (a link to step 4).
+     When no limit has been found, there is no hatch, and the note says "No limit found yet. Run the display check to
+     set one" (a link that opens it).
    - **Moving the slider applies now** (owner answer 1). The note changes to "Changing… 61 → 67 on the screen's menu,
      2 at a time" until the agent reports it is done. While the screen is asleep, it says "Applies when Kitchen wakes".
      Save the value when the knob is released, not while it is dragged, so a drag never queues a series of ramps.
@@ -54,6 +56,11 @@ Rows, in order:
 4. **Display check.** One line summarising the latest check: "Answers brightness commands · changes take effect · menu
    match from 3 readings · limit 26 (4 Nov)". The button is **Check this display…**. Before any check has run, the line
    says "Not checked yet".
+   - **Lowest.** A second line shows the floor the check found: "Lowest: Panel 10 (Calvin 2)", the lowest Calvin dims
+     to, including the dim sleep. It shows only while a floor is saved.
+   - **Clear calibration** sits next to the limit's note and replaces the old "Clear limit". It clears the readings,
+     the limit and the floor together (`brightnessConversion`, `brightnessLimit`, `brightnessFloor`). The brightness
+     keeps its value, and the slider falls back to Calvin's scale.
 5. **Ramp speed.** "2 every 1.5 s · the pace that worked on this screen", with **Change**. Change reveals two steppers:
    step size (1–5) and interval (1–5 s). It also shows a warning: "Bigger steps are what reset the touch screen. Keep
    the default unless the check says otherwise." This row is shown only while the ramp is on.
@@ -90,282 +97,187 @@ Live states:
   at its lowest brightness. At its next wake it brightens to 61 once, carefully, then Calvin stops changing its
   brightness." After that wake it goes back to the normal off description.
 
-## 3. The display check (figs. 3–6; calibration v2)
+## 3. The display check (figs. 3–6; calibration v3)
 
-> **v2, 2026-11-06 (calvin-c805, calvin-u8yn).** This version rewrites steps 1–3 and the fault states after the first
-> run on the real Pi 3B+. On that run:
-> - Step 2 assumed the panel was at 20, because its read-back is a placeholder 0. It brightened the panel from 5 to 20,
->   which browned it out (under-voltage, touch controller reset).
-> - The dialog showed none of this.
-> - Step 3 left the owner with three equal buttons: "Nothing tells me if I should add another reading, skip or stop."
->
-> Figs. 3–4 in the mock show v1 and are replaced by the state tables below. Figs. 5–6 (the limit step) still apply.
+> **v3, 2026-11-07 (calvin-idts, calvin-qkm8, calvin-mvtv).** Rewrites §3 after the second real run on the Pi 3B+.
+> v2 wrote brightness values to the panel to find a menu match, and its limit climb browned the panel out.
+> **v3 changes who does the work.** The owner sets the panel with its own buttons and Calvin only *reads*.
+> - The "does it change?" test (v2 step 2), the two-reading menu match (v2 step 3) and the limit climb (v2 step 4)
+>   are gone. The climb is removed from the UI entirely; Calvin never brightens during a check.
+> - The run has three readings: the **highest** level that works, an **everyday** level, and the **lowest**.
+> - Only **Save** changes anything. A run that doesn't finish keeps the previous calibration.
+> - The last v2 text stays in git history (`docs/design/` at `b5827671`), and the mocks' figs. 3–6 are historical.
 
-It is a dialog titled **Check the {screen} display**, with four steps shown as a progress strip:
+It is a dialog titled **Check the {screen} display**. The strip shows four steps:
 
 - **1 Find the display**
-- **2 Does it change?**
-- **3 Match the screen's menu**
-- **4 Find the safe limit (optional)**
+- **2 Highest level**
+- **3 Everyday level**
+- **4 Lowest level**
 
-Steps 1–3 are **calibration**. Step 4 is the only step that ever raises the brightness, and it is a separate opt-in.
+Then a summary, which is not a numbered step. The three levels are always all taken, even when the first reading
+matches what was typed.
 
-### 3.1 The rules calibration follows (owner, 2026-11-06)
+### 3.1 The rules the check follows
 
-1. **Calibration never brightens.**
-   - Steps 1–3 stay at or below the **start level**: the brightness the screen was at when the check started.
-   - Dimming is always safe.
-2. **The start level is either known or not.**
-   - **Known:** the screen's read-back is real, or the agent knows the last level it set itself.
-   - **Unknown:** the read-back is a placeholder and the agent has never set a level. Calvin first dims the screen to
-     the **floor** (Calvin 5) and uses that as the start level.
-3. **Two readings make the menu match**, taken at the start level and a little below it (start − 4, never below 0).
-   - The match is shown as approximate.
-   - A third reading near the top is an optional refinement, offered only once a limit is known.
-4. **Power trouble is surfaced, never retried.**
-   - **Trouble at idle** before anything changes means the check doesn't start.
-   - **Trouble during steps 1–3** ends calibration safely, and the dialog says what happened.
-   - **Settling:** after any trouble, Calvin waits for 5 s of clean power before it judges or steps again, so the tail
-     of one fault isn't counted as several.
-5. **Every state has one primary action and a status line.**
-   - The status line sits directly above the primary button and says where you are and what comes next: "1 of 2
-     readings · Next, Calvin dims to 15".
-   - States where Calvin is busy show the status line with a spinner and have no primary button. **Stop the check**
-     stays in the footer throughout.
-   - **The exception is a question.** "Did it change?" gets two answer buttons of equal weight, so the design doesn't
-     lean the owner towards an answer.
-
-The examples below use a known start of Calvin 19 unless they say otherwise.
+1. **Calvin only reads.** In steps 2–4 it asks the panel what it reports, never writes a level. The one exception is
+   the fallback (§3.4), and it only writes low (5, then 1).
+2. **The words are "the panel's own menu".** Never put the screen's name in this copy ({screen} names the kiosk in
+   the title and in status lines only). A screen named "calvin" must not read as "Calvin's menu" (calvin-mvtv).
+   Where a number is shown in two scales it reads **Panel 60 · Calvin 20**: the panel's number first, because that is
+   what the person just typed.
+3. **Every state has one primary action and a status line.** The status line sits directly above the primary
+   button. Busy states have a spinner and no primary button. The footer's **Stop the check** stays throughout.
+   There are two exceptions: the number field in a step counts as part of its primary (field + button on one row), and
+   **Same as highest** in step 3 is a secondary text button.
+4. **Nothing is saved until Save.** Readings live in the dialog. The old calibration is replaced only by **Save**,
+   and only with this run's three levels (`brightnessConversion` is *replaced*, not added to).
+5. **Power trouble is surfaced, never retried** (§3.5). It never ends the whole check.
+6. **Stop always answers at once** (§3.6, calvin-qkm8).
 
 ### 3.2 States, copy and the primary action
 
-Each table gives the status line, the body copy, then the **primary** action and the secondary actions. A secondary
-action is a plain button or a text link, never a second filled button.
+**Before step 1: power check (preflight).** Unchanged from v2: it runs when the dialog opens, writes nothing, and
+shows "Checking {screen}'s power before changing anything · 7 s". Trouble at idle shows the v2 "has power trouble
+already" state with **How to fix the power** as the primary and **Check again** / **Close** as secondaries.
 
-**Before step 1: power check (preflight).** It runs as soon as the dialog opens, and nothing is written yet.
-
-| State | Status line | Body | Primary | Secondary |
-|---|---|---|---|---|
-| Watching | "Checking Kitchen's power before changing anything · 7 s" (counts down from 10) | "Calvin watches the power supply for 10 s while the screen stays as it is." | — (busy) | — |
-| Clean | goes straight on to step 1 | — | — | — |
-| **Trouble at idle** | "Check not started · power trouble at idle" | **Title** "Kitchen has power trouble already". "Its power supply reported under-voltage while the screen was idle, before Calvin changed anything. A brightness test would only make it worse, so Calvin didn't start." Then the fix line (§3.3) | **How to fix the power** (opens the help page in a new tab) | **Check again** (runs the 10 s power check again; it never repeats on its own) · Close |
-
-**Step 1: Find the display**
+**Step 1: Find the display** (detect)
 
 | State | Status line | Body | Primary | Secondary |
 |---|---|---|---|---|
-| Asking | "Step 1 of 3 · Asking Kitchen's screen…" | — | — (busy) | — |
-| Found, start known | "Step 1 of 3 · Found · Kitchen is at Calvin 19" | "Found NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1." "The check stays at Calvin 19 or below. It only dims." | **Next** | — |
-| Found, start unknown | "Step 1 of 3 · Found · Kitchen can't report its brightness" | "Found NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1." "Kitchen always reports brightness 0, so Calvin can't tell how bright it is now. To stay safe, Calvin dims it to 5 first." Then an optional field: "**Before Calvin changes anything:** what Brightness does Kitchen's own menu show now?" with `[ number ]` | **Next: dim to 5** (saves the menu value if one was typed) | "I can't reach the menu now" (text link; same as Next with no value) |
+| Asking | "Step 1 of 4 · Asking {screen}'s screen…" | — | — (busy) | — |
+| Found | "Step 1 of 4 · Found the display" | "Found NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1." "Next you'll set the panel's brightness with its own buttons, three times, and Calvin will read what it reports. Calvin won't change the brightness." | **Next** | — |
 | No DDC | "Check ended · no brightness control" | The No DDC text from §2 | **Close** | **Try again** |
 
-**Why the unknown-start menu question is in step 1** (my call): the owner asked for step 3 to open with the menu value
-as it is now. With a known start, step 3 still does, because step 2 returns the screen to the start level. With an
-unknown start, step 2 begins by dimming to the floor, which would lose the original value. So the question is asked
-once, before that dim.
-- **What the answer becomes:** the run's **menu at start**.
-- **How it's used:** once two readings exist, Calvin converts it to a Calvin value. The result raises the run's
-  ceiling above the floor, so a later third reading can be offered.
-- **What the dialog says:** "Kitchen was at menu 28 when you started (about Calvin 5). Calvin stays at or below that."
+**Steps 2–4: a level is read.** All three steps share one layout; only the question changes.
 
-**Step 2: Does it change?**
+| Step | Heading | Body |
+|---|---|---|
+| 2 | Highest level | "Use the panel's own buttons to set Brightness to the highest level that works: its max, or the highest without flicker or the screen cutting out." |
+| 3 | Everyday level | "Now set Brightness to a comfortable level for everyday use. It can be the same as the highest." |
+| 4 | Lowest level | "Now set Brightness to the lowest level you'd use, the lowest that is still readable." |
 
-| State | Status line | Body | Primary | Secondary |
-|---|---|---|---|---|
-| Dimming to floor (unknown start only) | "Step 2 of 3 · Dimming Kitchen to 5…" | "Watch Kitchen's screen." | — (busy) | — |
-| Testing | "Step 2 of 3 · Dimming 19 → 9 and back · about 8 s" | "Watch Kitchen's screen. It should get dimmer, then come back." | — (busy) | — |
-| Question | "Step 2 of 3 · Your answer decides whether Calvin can set the brightness" | "Did Kitchen get dimmer for a moment, then come back?" Below that, small: "Calvin stepped it from 19 down to 9 and back, 2 at a time." | **Yes, it changed** · **No, it looked the same** (two equal answer buttons) | "Show me again" (text link) |
-| No | "Check ended · brightness commands don't take effect" | The Writes don't take effect text from §2 | **Close** | **Try again** |
+Below the body: "Type the Brightness the panel's own menu shows." and a number field (`inputmode="numeric"`, 6 ch wide).
 
-Notes on step 2:
-- **The test dims from the start level by up to 10 and back** (start S → max(0, S − 10) → S). With an unknown start,
-  that is 5 → 0 → 5.
-- **"Show me again" repeats the same dim.** Because the agent ignores an unchanged step, the UI sends it as a new
-  target: S − 9 instead of S − 10.
+| State | Status line | Primary | Secondary |
+|---|---|---|---|
+| Waiting for a number | "Step 2 of 4 · Highest level · type what the panel's menu shows" | **Read it** (disabled until the field holds 0–100) | Step 3 only: **Same as highest** (fills the field with the highest level and reads at once) |
+| Reading | "Step 2 of 4 · Reading…" | — (busy) | — |
+| Read | "Step 2 of 4 · Highest level · Panel 60 · Calvin 20" | **Next** (step 4: **See the summary**) | **Read it again** (text link) |
 
-**Step 3: Match the screen's menu.** Readings are saved as they are taken, as today.
+Notes:
+- **The pair is the result.** After the read the body shows it large, in tabular figures: "Panel 60 · Calvin 20". The
+  number field is hidden so nothing looks editable but **Read it again**.
+- **A level can't be higher than the one before.** The field refuses a number above the previous level ("The
+  everyday level can't be higher than the highest, 60"). It fits the owner's order and keeps the saved floor ≤
+  brightness ≤ limit.
+- **Same scale.** After step 4, when all three Calvin values equal the typed numbers, the summary says "Calvin and the
+  panel use the same scale." Nothing else changes.
+- **The first read is not special.** Even when the typed number equals the DDC value, the user does steps 3 and 4.
 
-| State | Status line | Body | Primary | Secondary |
-|---|---|---|---|---|
-| Reading 1 | "Reading 1 of 2 · Kitchen is at Calvin 19, unchanged" | "Open Kitchen's own menu (the buttons on the screen) and type the Brightness it shows now. Calvin hasn't changed it." `[ number ]` | **Save reading** | "Skip: finish without a menu match" (text link) |
-| After reading 1 | "1 of 2 readings · Next, Calvin dims to 15" | The readings list (1 row) | **Dim to 15 for reading 2** | "Skip: finish without a menu match" |
-| Dimming | "1 of 2 readings · Dimming to 15…" | — | — (busy) | — |
-| Reading 2 | "Reading 2 of 2 · Kitchen is at Calvin 15" | "Type the Brightness Kitchen's menu shows now." `[ number ]` | **Save reading** | — |
-| Matched | "2 of 2 readings · enough for a menu match" | "Menu ≈ 16 + 2.4 × Calvin value. **This is approximate:** both readings are low, so near the top it can be off by about 4 on the menu." With a menu at start, add: "Kitchen was at menu 28 when you started (about Calvin 5). Calvin stays at or below that." | **Next: safe limit (optional)** | Only when a limit is known: "Add a reading near the top (Calvin 22) for a closer match" |
-| Room for one reading only | "1 reading · Kitchen is already at its lowest" | "Kitchen started at Calvin 1, so there's no room to dim for a second reading. A menu match needs two, so the slider stays on Calvin's scale." | **Finish with 1 reading** | — |
-| Third reading (optional) | "Reading 3 · Kitchen is at Calvin 22" | "Type the Brightness Kitchen's menu shows now." `[ number ]` | **Save reading** | "Skip" |
-| Third reading off the line | "3 readings · the last one doesn't line up" | "These readings don't line up: Calvin 22 should be about 69 on the menu, you typed 52. Check the menu and type it again." | **Type it again** (focuses the field for that row) | "Remove it" |
+### 3.3 Fallback: this panel doesn't report its own buttons
 
-Notes on step 3:
-- **The readings list stays visible below the body** in every state after the first save. Each row reads "Calvin 19 ·
-  menu 61" with **Remove**. Removing a reading returns to the matching state above.
-- **Where the third reading is offered:**
-  - in step 3, when a saved limit already exists;
-  - on the finish screen, after step 4 has found a limit (§3.4).
-- **Its point is limit − 2 × step.** This is the only calibration point above the start level, and it is allowed
-  because it is under a known limit.
-
-**Step 4: Find the safe limit.** This step is unchanged from v1 (figs. 5–6): the warning, the on-panel block, **Start
-the test** as the primary, the live bar and log, and the full-width **Stop now**. Its status lines:
-- **Before it starts:** "Step 4 · optional · raises the brightness until the power shows trouble".
-- **While it runs:** "Raising 2 every 1.5 s · Calvin 24 · no trouble yet".
-
-Step 4 also follows the settling rule. It shows faults the same way as §3.3.
-
-### 3.3 Power trouble during the check
-
-**Showing it.** When the agent reports a fault in any step:
-- **Banner:** a red banner appears at the top of the body, under the strip. It stays until the dialog closes.
-  - Line 1: "**Power trouble at Calvin 12** · under-voltage".
-  - Line 2 says what Calvin did: "Calvin is dimming Kitchen to 5 and waiting for the power to settle."
-- **One incident:** faults reported while Calvin is still settling join the same incident. The banner keeps the first
-  level, and the log adds "also at 8 while settling".
-- **Announced once:** the banner is announced once with `role="alert"`.
-
-**A fault in steps 1–3 ends calibration.**
+After step 4 Calvin checks whether the DDC value followed the buttons. It didn't when **all three reads are equal**, or
+when **a read equals the agent's `lastWrite` while the typed number differs from it**.
 
 | State | Status line | Body | Primary | Secondary |
 |---|---|---|---|---|
-| Stopping safely | "Stopping safely · waiting for 5 s of clean power" | The banner | — (busy) | — |
-| Ended by power trouble | "Calibration stopped · power trouble at Calvin 12" | **Title** "Kitchen's power supply is too weak". "Kitchen showed power trouble at Calvin 12, even at this low brightness. Calvin dimmed it to 5 and stopped. It won't try again on its own." Then the readings line, then the limit line, then the fix line | **Save 10 as Kitchen's limit** | "How to fix the power" (link) · Done |
-| …after saving | "Calvin stays at or below 10 on Kitchen" | "Saved. The ramp and the slider stay under 10 until you fix the power and check again." | **Done** | "How to fix the power" |
+| Explaining | "This panel doesn't report its own buttons" | "Its brightness reading didn't change when you changed it with the buttons. Calvin can still match the panel's menu: it will set the brightness low, twice, and ask what the menu shows each time. It won't go above 5." | **Set 5 and ask** | — |
+| Setting 5 / 1 | "Low level 1 of 2 · Setting Calvin 5…" | — | — (busy) | — |
+| Question 5 | "Low level 1 of 2 · Calvin 5 · type what the panel's menu shows" | "Type the Brightness the panel's own menu shows now." `[ number ]` | **Save reading** | — |
+| Set 1 | "Low level 2 of 2 · Setting Calvin 1…" (busy) then the same question for Calvin 1 | | **Save reading** | — |
 
-The lines in the body:
-- **Readings line.** Either "Your 1 reading is saved. A menu match needs 2, so the slider stays on Calvin's scale." or
-  "Your 2 readings are saved, so the menu match is kept."
-- **Limit line** (my call): "Calvin can keep Kitchen at **10** or below (one step under where the trouble showed)."
-  - The offered value is **`faultLimit = min(lastGood, fault.level) − step`** (fault at 12, step 2 → 10). In steps
-    1–3 the panel is dimming, so the last clean level is *above* the fault; taking the minimum keeps the offer under
-    the fault. Step 4 is unchanged: it is rising, so its last good level is already below the fault.
-  - The fault level gives a real limit, and saving it is the one thing in this dialog that protects the screen now.
-    So it is the primary action, and the power fix is a link.
-  - It follows the same explicit-save rule as step 4: the old limit stays until it is saved, and Done with it unsaved
-    asks "Leave without saving limit 10?".
-- **Fix line**, used in the preflight state too: "The usual fix is to keep the screen's USB data link from also
-  powering it (a USB power blocker on the data leg), or to use a stronger power supply." It ends with **How to fix
-  the power**.
+Then the summary. The typed highest, everyday and lowest levels are converted with the line fitted through the two low
+readings, and **the highest rounds down** (never up). The summary labels the line **approximate**, because the fit
+rests on two low points and may be off near the top by a few menu units. If the two typed numbers are equal the fit
+is impossible, and the check says "The panel showed the same Brightness at 5 and at 1, so Calvin can't match it. Nothing was
+changed." with **Done** and **Try again**.
 
-**After the dialog.** The Display check row (§2) shows "Power trouble at Calvin 12 (6 Nov) · How to fix the power" in
-amber. A later run that passes the power check and steps 1–3 cleanly clears it. The ramp toggle stays available,
-because the ramp is the software help for exactly this problem.
+What is saved in the fallback is the two low pairs as `brightnessConversion` (they are what the line is made of),
+plus the three converted values.
 
-### 3.4 Finish screen
+### 3.4 Summary
 
-It lists what was found, with a tick (✓) or a warning (⚠) per line:
-- the display;
-- whether changes take effect;
-- the menu match, "approximate";
-- the limit;
-- any power trouble.
+| Status line | Body | Primary | Secondary |
+|---|---|---|---|
+| "Check finished · not saved yet" | Three rows: **Highest** Panel 60 · Calvin 20; **Everyday** Panel 40 · Calvin 12; **Lowest** Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." The same-scale or approximate note when it applies. | **Save** | **Try again** |
+| "Saved" | "Saved. Brightness can go from Panel 10 to Panel 60." | **Done** | — |
 
-It also says what changes because of it: "The Brightness slider now shows the screen's menu numbers".
+- **Not saved yet, until it is.** The summary's lead reads "Not saved yet" until Save succeeds. **Save** waits for the
+  write to land: the button shows a spinner, and "Saved" appears only after the server accepted it. On failure the
+  dialog shows the error ("Couldn't save to the server. Check the connection and try again.") and keeps the three
+  readings, so **Save** can be tapped again.
+- **Order check.** Each read must be no higher (in Calvin values) than the one before: highest ≥ everyday ≥ lowest.
+  If it is higher, the panel's reading probably lags the menu by a step. The step says "That reading looks behind"
+  and offers **Read it again** as the primary action instead of **Next**.
+- **One write.** Save sends a single PATCH of overrides:
+  `brightnessConversion` = this run's pairs, `brightnessLimit` = the highest Calvin value, `brightness` = the everyday
+  Calvin value, `brightnessFloor` = the lowest Calvin value.
+- **The everyday value is held under the limit.** The brightness is never stored above the limit minus two steps
+  (§2). When everyday equals highest, the summary says so: "Brightness is kept 4 under the limit."
+- **Done before Save asks nothing.** There is no "Leave without saving?" modal; the stopped view (§3.6) says what was kept.
 
-**The limit is saved explicitly.**
-- A limit found in step 4 is only offered. The primary button is **Save 26 as Kitchen's limit**, with a quiet note
-  that the old limit stays until it is saved.
-- Once it is saved, the screen says "Brightness can go up to 67". The primary then becomes **Done**, with a secondary
-  "Add a reading near the top (Calvin 22) for a closer match" when the menu match came from two low readings.
-- With an unsaved limit, Done (and ×) asks "Leave without saving limit 26?", with **Save** / **Leave** (Cancel
-  stays).
+### 3.5 Power trouble during a level
 
-Saved results are per screen and appear in the Display check row and in History.
+A fault in any of steps 2–4 (or the fallback) shows the red banner from v2 ("Power trouble at Calvin 12 ·
+under-voltage", `role="alert"`, announced once, with later faults joining as "also at … while settling").
 
-### 3.5 Rules for the whole dialog
+| State | Status line | Body | Primary | Secondary |
+|---|---|---|---|---|
+| Fault | "Power trouble · the panel's power dropped at that level" | "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again." The field is kept with what was typed. | **Read it again** | — |
 
-- **Closing the dialog, or Stop the check in the footer, ends the run.**
-  - **Calibration never brightens on the way out.** The agent returns the screen to the start level when it is
-    known, at the normal pace. When the start was unknown, the screen stays at the floor, and the dialog says on
-    close: "Kitchen stays at 5. Set its brightness with the slider or its own menu."
-  - **After step 4,** the agent returns to the start level.
-- **Footer.**
-  - It says "Kitchen is checking every 2 s while this is open".
-  - When the agent hasn't answered for 10 s: "Waiting for Kitchen…".
-  - After 60 s: "Kitchen isn't answering. Is it on and online?", with **Try again**.
-- **One check per screen at a time.** If another device is already running one, the dialog opens read-only: "A check
-  is running from another device", with the live progress and Stop. Stop stays available, because it is a safety
-  action. Fault banners show there too.
-- **The check can't start while the screen is asleep or in a sleep window.** The button is disabled, with "Kitchen is
-  asleep. Turn it on now to check it.", and **Turn on now** is the primary.
-- **The check needs admin, like every per-screen write.** Without admin, the dialog shows the sign-in prompt first.
+- **The banner names the panel's level** the person typed ("Power trouble at Panel 60 · under-voltage") when the
+  agent reports no Calvin level, and never prints "Calvin" with no number.
+- **The agent ends the run itself** (touch may be dead). The dialog does not wait for a tap: the next **Read it again**
+  starts a new session if the old one has ended, or reuses it if it hasn't.
+- **Nothing from the faulted level is kept.** Pairs already read in this dialog stay on screen, but only Save writes.
+- **The limit step never raises the brightness**, so there is no "save the fault level as the limit" offer any more.
 
-### 3.6 Phone layout
+### 3.6 Stop (calvin-qkm8) and an unfinished run
 
-- **Full-screen dialog with the 16 px gutter** (no bleed).
-- **The status line and the primary button sit in a sticky footer bar.**
-  - The order is the status line, then the primary at full width.
-  - Secondary actions sit underneath as text buttons.
-  - **Stop the check** is the bar's top-right text button.
-  - The bar clears the bottom safe area.
-  - The answer pair in step 2 sits side by side at 50/50. Below 360 px it stacks, with "Yes" first.
-- **The strip uses short labels** below 480 px: "1 Display · 2 Change · 3 Menu · 4 Limit". The current step is bold,
-  and the optional step is dashed.
-- **The number field and Save reading sit on one row.** The field is 6 ch wide, with `inputmode="numeric"`.
-- **The readings list is a stacked list** ("Calvin 19 · menu 61", then **Remove** right-aligned, 44 px high), not a
-  table.
-- **The fault banner scrolls with the body** and isn't sticky, so it never covers the footer. The status line repeats
-  its key fact ("power trouble at Calvin 12").
+**Stop the check** (footer, ≥ 48 px high) has a **visible pressed state at once**, on `pointerdown`, before the
+request returns: the button darkens, shows a spinner and reads "Stopping…" (`aria-pressed="true"`). Then, in **every
+step** until the agent reports the run finished:
 
-### 3.7 Needs from backend/agent
+- **Status line:** "Stopping, bringing brightness down". It is busy, with no primary button.
+- **Repeated taps are safe.** Each tap sends Stop again; the dialog shows no error and keeps the same text.
+- **Touch may drop during a fault.** The agent ends the run on its own at the first fault, so Stop is a backstop.
 
-Everything below is new unless it says otherwise. The names are suggestions; the lane can rename them.
+**The stopped / ended view says exactly what was kept.** It replaces v2's "Check stopped" + "Try again" only:
 
-**Agent (`deploy/kiosk-agent/calvin_display_agent.py`)**
+| Ending | Status line | Body | Primary | Secondary |
+|---|---|---|---|---|
+| Stopped | "Check stopped" | "Nothing changed; the previous calibration is still in place." (With no earlier calibration: "Nothing changed; no calibration is saved yet.") | **Done** | **Try again** |
+| Timed out, restarted, error | "Check ended" | The reason, then the same "Nothing changed…" line | **Done** | **Try again** |
+| No DDC / no control | as §3.2 | | **Close** | **Try again** |
 
-1. **Preflight.**
-   - Before the first write of a run, watch the existing fault monitor for 10 s. Report it as
-     `preflight: {status: "clean"|"fault", faults: [...]}`.
-   - A fault means: end the run with `status: "error"` and `reason: "power_at_idle"`, and write nothing.
-2. **Start level.**
-   - Report `start: {level, known, source: "read"|"last_set"|null}`.
-   - Add `placeholderReads: true|false` to the detect `info` (the read-back is always 0, or doesn't follow a write).
-   - **Unknown start:** ramp down to `CHECK_FLOOR = 5` before step 2, and use that as the start.
-3. **Calibration ceiling.**
-   - Steps 1–3 never write above the run's `ceiling` (defined once, in point 9). The third
-     reading's limit − 2 × step point is the only exception (rule 3).
-   - `write` steps S → max(0, S − 10) → S. It no longer uses `self.level or brightness_target(...)`, which was the 5 →
-     20 jump.
-   - `conversion` refuses a value above the ceiling (`error`, `reason: "above_ceiling"`). It doesn't clamp silently.
-4. **Fault in steps 1–3.**
-   - Stop the step, ramp down to the floor at the normal pace, then settle: 5 s without new faults, capped at 30 s, as
-     `wait_for_settle` does.
-   - Report `status: "error"`, `reason: "power_trouble"`,
-     `fault: {step, level, kind, at, lastGood, alsoAt: [...]}`. `level` is where the fault showed; `lastGood` is the
-     last level written before it with no fault (above `level` while dimming). `kind` is one of `under-voltage`,
-     `over-current`, `touch controller reset`.
-   - The run ends there, with no retry.
-5. **Settling in every step, step 4 included.** Faults seen while settling join the incident's `alsoAt`; they never
-   start a new step-down.
-6. **Ending a run.** Return to `start.level` when it is known; otherwise stay at the floor. Never go above the start on
-   the way out of steps 1–3.
+Nothing is saved from an unfinished run.
 
-**Backend (`display_check.py`, `kiosks.py`)**
+### 3.7 Rules for the whole dialog
 
-7. **Run record fields:** `preflight`, `start`, `ceiling`, `fault` (the incident), `menuAtStart`, and `reason` on
-   ending states. These are pass-through from the report, with `ceiling` recomputed from point 9.
-8. **`POST /kiosks/{id}/display-check/menu-at-start`**, body `{menu: 0–100}`, admin only. It stores `menuAtStart` on
-   the active run (404 when there is no active run).
-9. **Ceiling enforcement.**
-   - `step`/`start` with `conversion` refuses a value above the run's ceiling: 422 `value_above_ceiling`, with `max`.
-     This extends today's `value_above_limit`.
-   - The ceiling, used by both the backend and the agent:
-     - `base = convert(menuAtStart)` once the fit has 2 points, else `start.level`;
-     - `faultLimit = min(fault.lastGood, fault.level) − step` (none when there is no fault);
-     - `faultCap = faultLimit − 2×step`;
-     - `ceiling = min(base, limit − 2×step, faultCap)`, leaving out the terms that don't exist.
-     A known fault or limit always wins over `menuAtStart`; `menuAtStart` can only raise the base, never a cap.
-   - The third reading (limit − 2 × step) passes this check because it is under a known limit.
-10. **`save-limit` accepts a calibration fault.** With no `steps.limit` result, it saves `faultLimit` (point 9) from
-    the latest run's `fault`, never `lastGood` itself. Otherwise it is unchanged, including 409 `no_limit` when there is neither.
-11. **Findings gain `powerTrouble: {at, step, level, kind}|null`.**
-    - It is set by a preflight fault (`level: null`) or a calibration fault.
-    - It is cleared by a later run whose preflight is clean and whose steps 1–3 finish without one.
-    - The Display check row reads it.
+- **Watching another device.** When the watched run ends, the read-only view gives way to an ended state
+  ("The check on the other device ended"), with **Done** and **Try again**. A reloaded browser recognises its own
+  run again (the run ids it started are kept in the tab's session storage).
+- **Fallback levels never dead-end.** The two low writes are min(5, the run's ceiling, the start level) and then
+  min(1, …), at least 1.
+- **Closing the dialog, or Stop the check, ends the run.** Closing before Save keeps the previous calibration. The
+  agent returns the screen to where it was.
+- **Footer**, **one check per screen**, **asleep**, **admin**: unchanged from v2 (§3.5 there). A read-only dialog (a
+  run from another device) keeps Stop.
+- **Phone layout** is unchanged from v2: full-screen, sticky bar with the status line then the primary at full width,
+  secondaries under it as text buttons, and Stop the check at the bar's top right. The number field and **Read it**
+  share one row. The strip uses short labels below 480 px: "1 Display · 2 Highest · 3 Everyday · 4 Lowest".
 
-**Docs**
+### 3.8 Needs from backend/agent (lane A)
 
-12. **A help page, `docs/setup/KIOSK_POWER.md`.** It covers how to tell under-voltage happened, a USB power blocker on
-    the screen's data leg, and choosing a stronger power supply. **How to fix the power** links to its GitHub URL until
-    the app serves docs.
+- Step **`read`** returns `{level, lastWrite}`: `level` is the DDC reading; `lastWrite` is the last value the agent
+  wrote, or `null`. It writes nothing.
+- Every step request carries a per-run **`seq`** that the agent echoes in its result, so the dialog matches each
+  read to the request it sent (three reads in a row each resolve).
+- Step **`limit`** is removed. A run has `detect`, `read`, `conversion` (the fallback, low only) and `write` is no longer asked for.
+- A per-screen key **`brightnessFloor`** (0–100, no higher than `brightnessLimit`).
+- The agent ends a run itself on the first fault and reports `fault` as in v2.
+- `value_above_ceiling` etc. for the fallback stay as they are.
 
 ## 4. Words
 
@@ -396,7 +308,7 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
 - The first-time brightness is the lower of "limit minus two steps" and DDC 20.
 - Calibration (steps 1–3) never brightens above the start level (owner, v2). Step 2 dims from the start and back.
   Step 3 reads at the start and start − 4; a third point near limit − 2 × step only once a limit is known.
-- v2: the unknown-start menu question is asked in step 1, before the dim to the floor (§3.2).
+- v2: the unknown-start menu question is asked in step 1, before the dim (§3.2).
 - v2: a calibration fault offers its last good level as the limit, as the primary action (§3.3).
 - The check can't run while the screen is asleep.
 - If a check is already running, the dialog opens read-only, with Stop still available.

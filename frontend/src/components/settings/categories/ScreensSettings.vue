@@ -521,11 +521,10 @@
           :asleep="!desiredOnNow"
           :on-panel="Boolean(kioskId) && kioskId === selectedId"
           :overrides="overrides"
-          :start-step="checkStep"
+          :save-patch="patchBrightness"
           @patch="patchBrightness"
           @writes-ok="onWritesOk"
           @turn-on="setScreenNow('on')"
-          @saved-limit="refreshKiosksAfterCheck"
         />
         <InlineNote
           v-if="powerMsg"
@@ -1171,14 +1170,12 @@ function patchBrightness(change) {
     else next[key] = value;
   }
   // A brightness above the limit minus two steps is never stored.
-  persistPower(clampBrightness(next));
+  return persistPower(clampBrightness(next));
 }
 
 const checkOpen = ref(false);
-const checkStep = ref("detect");
 const enableAfterCheck = ref(false);
-function openCheck({ step = "detect", enableAfter = false } = {}) {
-  checkStep.value = step;
+function openCheck({ enableAfter = false } = {}) {
   enableAfterCheck.value = enableAfter;
   checkOpen.value = true;
 }
@@ -1192,15 +1189,6 @@ function onWritesOk() {
   }
   patchBrightness(change);
 }
-// The backend saved the limit itself: tell the queue it is confirmed, and
-// re-read the kiosk list so the saved findings refresh.
-function refreshKiosksAfterCheck(limit) {
-  overridesQueue.value?.confirmKey("brightnessLimit", limit);
-  const clamped = clampBrightness(overrides.value);
-  if (clamped !== overrides.value) persistPower(clamped);
-  store.refreshKiosks?.();
-}
-
 function followSchedule() {
   const next = { ...overrides.value };
   delete next.screenNow;
@@ -1448,7 +1436,7 @@ function resetApply() {
 }
 
 function persistPower(next) {
-  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+  return persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 function setScheduleEnabled(value) {
   persistPower({ ...overrides.value, displayScheduleEnabled: value });

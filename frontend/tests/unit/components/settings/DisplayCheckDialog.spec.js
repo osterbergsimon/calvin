@@ -9,8 +9,8 @@ const backend = vi.hoisted(() => ({
   seq: 0,
   clock: 0,
   activeOnStart: null,
-  failSaveLimit: false,
-  failVerdict: false,
+  stopKeepsActive: false,
+  stopCalls: 0,
   capMax: null,
   ceilingMax: null,
 }));
@@ -39,6 +39,7 @@ vi.mock("@/services/api", () => ({
           limit: null,
           log: [],
           steps: {},
+          seq: 0,
           requestedAt: new Date().toISOString(),
           updatedAt: null,
         };
@@ -62,24 +63,20 @@ vi.mock("@/services/api", () => ({
             },
           };
         }
-        backend.run = { ...backend.run, step: body.step, value: body.value ?? null };
+        backend.run = {
+          ...backend.run,
+          step: body.step,
+          value: body.value ?? null,
+          seq: (backend.run.seq ?? 0) + 1,
+        };
         return { data: backend.run };
       }
       if (action === "stop") {
-        backend.run = { ...backend.run, action: "stop", status: "stopped", active: false };
+        backend.stopCalls += 1;
+        backend.run = backend.stopKeepsActive
+          ? { ...backend.run, action: "stop", status: "stopping", active: true }
+          : { ...backend.run, action: "stop", status: "stopped", active: false };
         return { data: backend.run };
-      }
-      if (action === "menu-at-start") {
-        backend.run = { ...backend.run, menuAtStart: body.menu };
-        return { data: backend.run };
-      }
-      if (action === "verdict" && backend.failVerdict) throw { response: { status: 500 } };
-      if (action === "save-limit" && backend.failSaveLimit) throw { response: { status: 500 } };
-      if (action === "save-limit") {
-        const faultLimit = backend.run?.fault
-          ? Math.min(backend.run.fault.lastGood, backend.run.fault.level) - 2
-          : 26;
-        return { data: { id: "kitchen", brightnessLimit: faultLimit, overrides: {} } };
       }
       return { data: {} };
     }),
@@ -119,6 +116,7 @@ const agentStep = (step, result = {}) => {
         limit: null,
         detail: null,
         info: null,
+        seq: backend.run.seq ?? null,
         finishedAt: new Date(1800000000000 + ++backend.clock * 1000).toISOString(),
         ...result,
       },
@@ -156,27 +154,27 @@ const click = async (wrapper, name) => {
 let wrapper;
 beforeEach(() => {
   vi.useFakeTimers();
+  window.sessionStorage.clear();
   Object.assign(backend, {
     run: null,
     posts: [],
     seq: 0,
     clock: 0,
     activeOnStart: null,
-    failSaveLimit: false,
-    failVerdict: false,
+    stopKeepsActive: false,
+    stopCalls: 0,
     capMax: null,
     ceilingMax: null,
   });
 });
 afterEach(() => {
+  window.sessionStorage.clear();
   wrapper?.unmount();
   document.body.innerHTML = "";
   vi.useRealTimers();
 });
 
 const CLEAN = { status: "clean", faults: [] };
-const KNOWN = { level: 19, known: true, source: "read" };
-const UNKNOWN = { level: null, known: false, source: null };
 const DETECT = { detail: "NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1" };
 const status = w => find(w, "check-status").text();
 const primary = w => w.find("[data-primary]");
@@ -185,29 +183,40 @@ const clickPrimary = async w => {
   await flushPromises();
 };
 
-async function toFound(start = KNOWN, props) {
+async function toFound(props) {
   wrapper = mountDialog(props);
   await flushPromises();
-  agent({ preflight: CLEAN, start });
+  agent({ preflight: CLEAN, start: { level: 19, known: true, source: "read" } });
   agentStep("detect", DETECT);
   await settle();
 }
-async function toQuestion(start = KNOWN, props) {
-  await toFound(start, props);
+// Type what the panel's menu shows and press Read it; the agent answers.
+async function readLevel(typed, ddc, lastWrite = null) {
+  await find(wrapper, "reading-input").setValue(String(typed));
   await clickPrimary(wrapper);
-  agentStep("write", { level: start.level ?? 5 });
+  agentStep("read", { level: ddc, lastWrite });
   await settle();
 }
-async function toReading1(props) {
-  await toQuestion(KNOWN, props);
-  await click(wrapper, "writes-yes");
-  agentStep("conversion", { value: 19, level: 19 });
-  await settle();
+async function toStep2(props) {
+  await toFound(props);
+  await clickPrimary(wrapper);
 }
-
-async function throughDetectAndWrite(props) {
-  await toQuestion(KNOWN, props);
+async function toStep3(props) {
+  await toStep2(props);
+  await readLevel(60, 20);
+  await clickPrimary(wrapper);
 }
+async function toStep4(props) {
+  await toStep3(props);
+  await readLevel(40, 12);
+  await clickPrimary(wrapper);
+}
+async function toSummary(props) {
+  await toStep4(props);
+  await readLevel(10, 2);
+  await clickPrimary(wrapper);
+}
+const patches = () => wrapper.emitted("patch") || [];
 
 describe("power check before step 1", () => {
   it("watches the power for 10 s first and counts down, with no primary action", async () => {
@@ -231,299 +240,157 @@ describe("power check before step 1", () => {
     await settle();
     expect(status(wrapper)).toContain("Check not started · power trouble at idle");
     expect(wrapper.text()).toContain("Kitchen has power trouble already");
-    expect(wrapper.text()).toContain("before Calvin changed anything");
-    expect(wrapper.text()).toContain("USB power blocker");
     expect(primary(wrapper).text()).toBe("How to fix the power");
-    expect(primary(wrapper).attributes("href")).toContain("KIOSK_POWER.md");
-    expect(primary(wrapper).attributes("target")).toBe("_blank");
-    expect(find(wrapper, "check-close").exists()).toBe(true);
     expect(posts("step")).toHaveLength(0);
-  });
-
-  it("Check again runs the power check again, only on the click", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    agent({ preflight: { status: "fault", faults: [] }, status: "error", reason: "power_at_idle" });
-    await settle();
-    await settle(20000);
-    expect(posts("start")).toHaveLength(1);
-    await click(wrapper, "check-again");
-    expect(posts("start")).toHaveLength(2);
-    expect(status(wrapper)).toContain("Checking Kitchen's power");
   });
 });
 
 describe("step 1: find the display", () => {
-  it("is titled for the screen and starts the detect step on its own", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    expect(wrapper.text()).toContain("Check the Kitchen display");
+  it("starts with detect and shows what it found, with Next as the only primary", async () => {
+    await toFound();
     expect(lastStart()).toEqual({ step: "detect" });
+    expect(status(wrapper)).toContain("Step 1 of 4 · Found the display");
+    expect(wrapper.text()).toContain("NOMAD TOUCH");
+    expect(wrapper.text()).toContain("Calvin won't change the brightness");
+    expect(primary(wrapper).text()).toBe("Next");
   });
 
-  it("asks the screen once the power check is clean", async () => {
+  it("ends when the screen has no brightness control", async () => {
     wrapper = mountDialog();
     await flushPromises();
     agent({ preflight: CLEAN });
-    await settle();
-    expect(status(wrapper)).toContain("Step 1 of 3 · Asking Kitchen's screen…");
-    expect(primary(wrapper).exists()).toBe(false);
-  });
-
-  it("ends with Close and Try again when the screen has no brightness control", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    agent({ preflight: CLEAN });
-    agentStep("detect", { status: "error", detail: "no display answered DDC/CI" });
+    agentStep("detect", { status: "error", detail: "no ddc" });
     await settle();
     expect(status(wrapper)).toContain("Check ended · no brightness control");
-    expect(find(wrapper, "check-end").text()).toContain(
-      "doesn't answer brightness commands (DDC/CI)"
+    expect(primary(wrapper).text()).toBe("Close");
+  });
+
+  it("has no safe-limit climb, write test or menu-at-start question anywhere", async () => {
+    await toFound();
+    for (const gone of ["limit-start", "limit-stop", "writes-yes", "menu-start-input"]) {
+      expect(find(wrapper, gone).exists()).toBe(false);
+    }
+    expect(wrapper.text()).not.toMatch(/safe limit|Does it change|dims it to 5/i);
+  });
+});
+
+describe("steps 2-4: the panel's own buttons, Calvin reads", () => {
+  it("asks for the highest level in the owner's words, with a number field and Read it", async () => {
+    await toStep2();
+    expect(status(wrapper)).toContain("Step 2 of 4 · Highest level");
+    expect(wrapper.text()).toContain(
+      "Use the panel's own buttons to set Brightness to the highest level that works: its max, or the highest without flicker or the screen cutting out."
     );
-    expect(primary(wrapper).text()).toBe("Close");
-    await click(wrapper, "check-retry");
-    expect(posts("stop")).toHaveLength(1);
-    expect(posts("start")).toHaveLength(2);
-  });
-
-  it("with a known start: found, stays at or below it, Next is the one action", async () => {
-    await toFound();
-    expect(status(wrapper)).toContain("Step 1 of 3 · Found · Kitchen is at Calvin 19");
-    expect(wrapper.text()).toContain("Found NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1.");
-    expect(wrapper.text()).toContain("The check stays at Calvin 19 or below. It only dims.");
-    expect(primary(wrapper).text()).toBe("Next");
-    expect(find(wrapper, "menu-start-input").exists()).toBe(false);
-    expect(posts("step")).toHaveLength(0);
-  });
-
-  it("with an unknown start: explains, asks the menu value, and saves it before dimming", async () => {
-    await toFound(UNKNOWN);
-    expect(status(wrapper)).toContain("Kitchen can't report its brightness");
-    expect(wrapper.text()).toContain("Kitchen always reports brightness 0");
-    expect(wrapper.text()).toContain("dims it to 5 first");
-    expect(primary(wrapper).text()).toBe("Next: dim to 5");
-    await find(wrapper, "menu-start-input").setValue("28");
-    await clickPrimary(wrapper);
-    expect(posts("menu-at-start").at(-1)[1]).toEqual({ menu: 28 });
-    expect(lastStep()).toEqual({ step: "write" });
-  });
-
-  it("I can't reach the menu now dims without saving a value", async () => {
-    await toFound(UNKNOWN);
-    await click(wrapper, "menu-start-skip");
-    expect(posts("menu-at-start")).toHaveLength(0);
-    expect(lastStep()).toEqual({ step: "write" });
-  });
-});
-
-describe("step 2: does it change?", () => {
-  it("dims to the floor first when the start is unknown", async () => {
-    await toFound(UNKNOWN);
-    await clickPrimary(wrapper);
-    expect(status(wrapper)).toContain("Step 2 of 3 · Dimming Kitchen to 5…");
-    expect(wrapper.text()).toContain("Watch Kitchen's screen.");
-    expect(primary(wrapper).exists()).toBe(false);
-  });
-
-  it("tests by dimming from the start level and back, with two equal answers", async () => {
-    await toFound();
-    await clickPrimary(wrapper);
-    expect(status(wrapper)).toContain("Step 2 of 3 · Dimming 19 → 9 and back");
-    expect(primary(wrapper).exists()).toBe(false);
-    agentStep("write", { level: 19 });
-    await settle();
-    expect(status(wrapper)).toContain("Your answer decides whether Calvin can set the brightness");
-    expect(wrapper.text()).toContain("Did Kitchen get dimmer for a moment, then come back?");
-    expect(wrapper.text()).toContain("Calvin stepped it from 19 down to 9 and back, 2 at a time.");
-    expect(primary(wrapper).exists()).toBe(false);
-    expect(find(wrapper, "writes-yes").classes()).toEqual(find(wrapper, "writes-no").classes());
-    expect(find(wrapper, "writes-again").exists()).toBe(true);
-  });
-
-  it("with an unknown start, the test is 5 → 0 and back", async () => {
-    await toQuestion(UNKNOWN);
-    expect(wrapper.text()).toContain("from 5 down to 0 and back");
-  });
-
-  it("Show me again sends S − 9, then S − 10, because a repeat is ignored", async () => {
-    await toQuestion();
-    await click(wrapper, "writes-again");
-    expect(lastStep()).toEqual({ step: "write", value: 10 });
-    agentStep("write", { level: 19 });
-    await settle();
-    await click(wrapper, "writes-again");
-    expect(lastStep()).toEqual({ step: "write", value: 9 });
-    expect(posts("start")).toHaveLength(1);
-  });
-
-  it("ends on No with the writes-don't-take-effect text and Close as the one action", async () => {
-    await toQuestion();
-    await click(wrapper, "writes-no");
-    expect(find(wrapper, "check-end").text()).toContain("don't change it");
-    expect(status(wrapper)).toContain("brightness commands don't take effect");
-    expect(posts("verdict").at(-1)[1]).toEqual({ writes: false });
-    expect(primary(wrapper).text()).toBe("Close");
-  });
-
-  it("keeps the question and shows an error when the answer cannot be saved", async () => {
-    await toQuestion();
-    backend.failVerdict = true;
-    await click(wrapper, "writes-yes");
-    expect(wrapper.text()).toContain("Couldn't save your answer");
-    expect(find(wrapper, "writes-yes").exists()).toBe(true);
-    expect(wrapper.emitted("writes-ok")).toBeUndefined();
-  });
-});
-
-describe("step 3: match the screen's menu", () => {
-  it("reading 1 is taken where the screen is, unchanged, and Calvin does not change it", async () => {
-    await toQuestion();
-    await click(wrapper, "writes-yes");
-    expect(wrapper.emitted("writes-ok")).toHaveLength(1);
-    expect(lastStep()).toEqual({ step: "conversion", value: 19 });
-    agentStep("conversion", { value: 19, level: 19 });
-    await settle();
-    expect(status(wrapper)).toContain("Reading 1 of 2 · Kitchen is at Calvin 19, unchanged");
-    expect(wrapper.text()).toContain("Calvin hasn't changed it.");
     expect(find(wrapper, "reading-input").attributes("inputmode")).toBe("numeric");
-    expect(primary(wrapper).text()).toBe("Save reading");
-    expect(find(wrapper, "check-skip").text()).toContain("Skip the menu match");
+    expect(primary(wrapper).text()).toBe("Read it");
+    expect(primary(wrapper).attributes("disabled")).toBeDefined();
+    expect(find(wrapper, "same-as-highest").exists()).toBe(false);
   });
 
-  it("saves a reading as a patch", async () => {
-    await toReading1();
-    await find(wrapper, "reading-input").setValue("61");
-    await clickPrimary(wrapper);
-    expect(wrapper.emitted("patch").at(-1)[0]).toEqual({
-      brightnessConversion: [{ ddc: 19, menu: 61 }],
-    });
-  });
-
-  it("after reading 1 the one action is dimming for reading 2, 4 below", async () => {
-    await toReading1();
-    await wrapper.setProps({
-      overrides: { brightness: 19, brightnessConversion: [{ ddc: 19, menu: 61 }] },
-    });
-    expect(status(wrapper)).toContain("1 of 2 readings · Next, Calvin dims to 15");
-    expect(primary(wrapper).text()).toBe("Dim to 15 for reading 2");
-    expect(wrapper.text()).toContain("Calvin 19 · menu 61");
-    await clickPrimary(wrapper);
-    expect(lastStep()).toEqual({ step: "conversion", value: 15 });
-    expect(status(wrapper)).toContain("1 of 2 readings · Dimming to 15…");
-    expect(primary(wrapper).exists()).toBe(false);
-    agentStep("conversion", { value: 15, level: 15 });
-    await settle();
-    expect(status(wrapper)).toContain("Reading 2 of 2 · Kitchen is at Calvin 15");
-  });
-
-  it("two readings are enough: the fit is approximate and Next goes to the limit", async () => {
-    await toReading1();
-    await wrapper.setProps({
-      overrides: {
-        brightness: 19,
-        brightnessConversion: [
-          { ddc: 15, menu: 52 },
-          { ddc: 19, menu: 61 },
-        ],
-      },
-    });
-    expect(status(wrapper)).toContain("2 of 2 readings · enough for a menu match");
-    expect(find(wrapper, "check-fit").text()).toContain("This is approximate");
-    expect(find(wrapper, "check-fit").text()).toContain("off by about 4 on the menu");
-    expect(find(wrapper, "check-third").exists()).toBe(false);
-    expect(primary(wrapper).text()).toBe("Next: safe limit (optional)");
-  });
-
-  it("offers a third reading near limit − 2 × step only when a limit is saved", async () => {
-    await toReading1({
-      overrides: {
-        brightness: 19,
-        brightnessLimit: 26,
-        brightnessConversion: [
-          { ddc: 15, menu: 52 },
-          { ddc: 19, menu: 61 },
-        ],
-      },
-    });
-    expect(find(wrapper, "check-third").text()).toContain(
-      "Add a reading near the top (Calvin 22) for a closer match"
+  it("tells the person Calvin brings the screen up to the highest level after it turns on", async () => {
+    await toStep2();
+    expect(wrapper.text()).toContain(
+      "Calvin starts the screen at the minimum and brings it up to this after it turns on."
     );
-    await click(wrapper, "check-third");
-    expect(lastStep()).toEqual({ step: "conversion", value: 22 });
-    agentStep("conversion", { value: 22, level: 22 });
-    await settle();
-    expect(status(wrapper)).toContain("Reading 3 · Kitchen is at Calvin 22");
-    expect(find(wrapper, "check-skip").exists()).toBe(true);
-  });
-
-  it("flags a third reading that is off the line and offers to type it again or remove it", async () => {
-    await toReading1({
-      overrides: {
-        brightness: 19,
-        brightnessLimit: 26,
-        brightnessConversion: [
-          { ddc: 15, menu: 52 },
-          { ddc: 19, menu: 61 },
-          { ddc: 22, menu: 52 },
-        ],
-      },
-    });
-    expect(status(wrapper)).toContain("3 readings · the last one doesn't line up");
-    expect(wrapper.text()).toContain("Calvin 22 should be about 68 on the menu, you typed 52");
-    expect(primary(wrapper).text()).toBe("Type it again");
-    await find(wrapper, "reading-remove-2").trigger("click");
-    expect(wrapper.emitted("patch").at(-1)[0]).toEqual({
-      brightnessConversion: [
-        { ddc: 15, menu: 52 },
-        { ddc: 19, menu: 61 },
-      ],
-    });
-  });
-
-  it("with no room to dim, finishes with one reading", async () => {
-    await toQuestion({ level: 1, known: true, source: "read" });
-    await click(wrapper, "writes-yes");
-    agentStep("conversion", { value: 1, level: 1 });
-    await settle();
-    await wrapper.setProps({
-      overrides: { brightness: 1, brightnessConversion: [{ ddc: 1, menu: 30 }] },
-    });
-    expect(status(wrapper)).toContain("1 reading · Kitchen is already at its lowest");
-    expect(wrapper.text()).toContain("so the slider stays on Calvin's scale");
-    expect(primary(wrapper).text()).toBe("Go on with 1 reading");
-  });
-
-  it("removes a reading", async () => {
-    await toReading1();
-    await wrapper.setProps({
-      overrides: {
-        brightness: 19,
-        brightnessConversion: [
-          { ddc: 15, menu: 52 },
-          { ddc: 19, menu: 61 },
-        ],
-      },
-    });
-    await find(wrapper, "reading-remove-0").trigger("click");
-    expect(wrapper.emitted("patch").at(-1)[0]).toEqual({
-      brightnessConversion: [{ ddc: 19, menu: 61 }],
-    });
-  });
-
-  it("shows the ceiling inline when the agent refuses a point above it", async () => {
-    await toReading1();
-    await wrapper.setProps({
-      overrides: { brightness: 19, brightnessConversion: [{ ddc: 19, menu: 61 }] },
-    });
-    backend.ceilingMax = 12;
+    await readLevel(60, 20);
     await clickPrimary(wrapper);
-    expect(wrapper.text()).toContain("The most Calvin can set is 12.");
+    expect(wrapper.text()).not.toContain("brings it up to this after");
   });
 
-  it("shows what the menu said at the start once there is a fit", async () => {
-    await toReading1();
-    backend.run = { ...backend.run, menuAtStart: 28 };
-    await wrapper.setProps({
+  it("sends a read step (no value, no write) and shows the pair", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    expect(primary(wrapper).attributes("disabled")).toBeUndefined();
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "read" });
+    expect(status(wrapper)).toContain("Reading…");
+    expect(primary(wrapper).exists()).toBe(false);
+    agentStep("read", { level: 20, lastWrite: null });
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+    expect(status(wrapper)).toContain("Step 2 of 4 · Highest level · Panel 60 · Calvin 20");
+    expect(primary(wrapper).text()).toBe("Next");
+    expect(find(wrapper, "read-again").exists()).toBe(true);
+  });
+
+  it("reads again on request", async () => {
+    await toStep2();
+    await readLevel(60, 20);
+    await click(wrapper, "read-again");
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+    expect(find(wrapper, "reading-input").element.value).toBe("60");
+    await clickPrimary(wrapper);
+    expect(posts("step")).toHaveLength(2);
+  });
+
+  it("asks for the everyday level next, and offers Same as highest only there", async () => {
+    await toStep3();
+    expect(status(wrapper)).toContain("Step 3 of 4 · Everyday level");
+    expect(wrapper.text()).toContain("comfortable level for everyday use");
+    expect(find(wrapper, "same-as-highest").exists()).toBe(true);
+  });
+
+  it("Same as highest fills in the highest level and reads at once", async () => {
+    await toStep3();
+    await click(wrapper, "same-as-highest");
+    expect(posts("step")).toHaveLength(2);
+    agentStep("read", { level: 20, lastWrite: null });
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+  });
+
+  it("asks for the lowest level last, without Same as highest", async () => {
+    await toStep4();
+    expect(status(wrapper)).toContain("Step 4 of 4 · Lowest level");
+    expect(find(wrapper, "same-as-highest").exists()).toBe(false);
+  });
+
+  it("refuses a level higher than the one before it", async () => {
+    await toStep3();
+    await find(wrapper, "reading-input").setValue("70");
+    expect(primary(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("can't be higher than the highest, 60");
+  });
+
+  it("does all three steps even when the first pair matches", async () => {
+    await toStep2();
+    await readLevel(60, 60);
+    expect(primary(wrapper).text()).toBe("Next");
+    expect(find(wrapper, "check-save").exists()).toBe(false);
+  });
+
+  it("never puts the screen name in menu copy", async () => {
+    await toStep2({ screenName: "calvin" });
+    expect(wrapper.text().toLowerCase()).not.toContain("calvin's own menu");
+    expect(wrapper.text()).toContain("the panel's own menu");
+  });
+});
+
+describe("the summary and Save", () => {
+  it("lists highest, everyday and lowest in panel numbers with Calvin values beside", async () => {
+    await toSummary();
+    expect(status(wrapper)).toContain("Check finished · not saved yet");
+    const text = find(wrapper, "check-summary").text();
+    expect(text).toContain("Highest");
+    expect(text).toContain("Panel 60 · Calvin 20");
+    expect(text).toContain("Everyday");
+    expect(text).toContain("Panel 40 · Calvin 12");
+    expect(text).toContain("Lowest");
+    expect(text).toContain("Panel 10 · Calvin 2");
+    expect(primary(wrapper).text()).toBe("Save");
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("repeats the startup line once in the summary", async () => {
+    await toSummary();
+    const text = find(wrapper, "check-summary").text();
+    expect(text).toContain(
+      "Calvin starts the screen at the minimum and brings it up to this after it turns on."
+    );
+  });
+
+  it("Save patches once: this run's pairs replace the old readings, limit, brightness and floor", async () => {
+    await toSummary({
       overrides: {
         brightness: 19,
         brightnessConversion: [
@@ -532,470 +399,554 @@ describe("step 3: match the screen's menu", () => {
         ],
       },
     });
-    await settle();
-    expect(find(wrapper, "check-fit").text()).toContain(
-      "Kitchen was at menu 28 when you started (about Calvin 5). Calvin stays at or below that."
-    );
-  });
-});
-
-describe("power trouble during the check", () => {
-  const FAULT = {
-    step: "write",
-    level: 12,
-    kind: "under-voltage",
-    at: "x",
-    lastGood: 14,
-    alsoAt: [],
-  };
-
-  it("shows one red banner and stops safely while it settles", async () => {
-    await toQuestion();
-    agent({ fault: FAULT });
-    await settle();
-    const banner = find(wrapper, "check-fault");
-    expect(banner.attributes("role")).toBe("alert");
-    expect(banner.text()).toContain("Power trouble at Calvin 12 · under-voltage");
-    expect(banner.text()).toContain(
-      "Calvin is dimming Kitchen to 5 and waiting for the power to settle."
-    );
-    expect(status(wrapper)).toContain("Stopping safely · waiting for 5 s of clean power");
-    expect(primary(wrapper).exists()).toBe(false);
-  });
-
-  it("adds later faults to the same incident", async () => {
-    await toQuestion();
-    agent({ fault: { ...FAULT, alsoAt: [8] } });
-    await settle();
-    expect(wrapper.findAll('[data-test="check-fault"]')).toHaveLength(1);
-    expect(find(wrapper, "check-fault").text()).toContain("Power trouble at Calvin 12");
-    expect(find(wrapper, "check-fault").text()).toContain("also at 8 while settling");
-  });
-
-  async function ended(readingsCount = 1) {
-    await toReading1();
-    const readings = [
-      { ddc: 19, menu: 61 },
-      { ddc: 15, menu: 52 },
-    ].slice(0, readingsCount);
-    await wrapper.setProps({ overrides: { brightness: 19, brightnessConversion: readings } });
-    agent({ fault: FAULT, status: "error", reason: "power_trouble" });
-    await settle();
-  }
-
-  it("ends calibration with the limit, one step under the fault, as the primary action", async () => {
-    await ended();
-    expect(status(wrapper)).toContain("Calibration stopped · power trouble at Calvin 12");
-    expect(wrapper.text()).toContain("Kitchen's power supply is too weak");
-    expect(wrapper.text()).toContain("It won't try again on its own");
-    expect(wrapper.text()).toContain(
-      "Your 1 reading is saved. A menu match needs 2, so the slider stays on Calvin's scale."
-    );
-    expect(wrapper.text()).toContain("keep Kitchen at 10 or below");
-    expect(wrapper.text()).toContain("USB power blocker");
-    expect(primary(wrapper).text()).toBe("Save 10 as Kitchen's limit");
-    expect(find(wrapper, "fix-link").attributes("href")).toContain("KIOSK_POWER.md");
-    expect(find(wrapper, "check-done").exists()).toBe(true);
-  });
-
-  it("does not repeat itself: one fix link and no second banner line once it ended", async () => {
-    await ended();
-    expect(wrapper.findAll('[data-test="fix-link"]')).toHaveLength(1);
-    expect(find(wrapper, "check-fault").text()).toContain("Power trouble at Calvin 12");
-    expect(find(wrapper, "check-fault").text()).not.toContain("Calvin dimmed");
-    expect(find(wrapper, "check-fault").text()).not.toContain("waiting for the power to settle");
-  });
-
-  it("keeps a two-reading match", async () => {
-    await ended(2);
-    expect(wrapper.text()).toContain("Your 2 readings are saved, so the menu match is kept.");
-  });
-
-  it("saves the fault limit on the click and then offers Done", async () => {
-    await ended();
     await clickPrimary(wrapper);
-    expect(posts("save-limit")).toHaveLength(1);
-    expect(wrapper.emitted("saved-limit")[0][0]).toBe(10);
-    expect(status(wrapper)).toContain("Calvin stays at or below 10 on Kitchen");
-    expect(wrapper.text()).toContain("stay under 10 until you fix the power");
+    expect(patches()).toHaveLength(1);
+    expect(patches()[0][0]).toEqual({
+      brightnessConversion: [
+        { ddc: 2, menu: 10 },
+        { ddc: 12, menu: 40 },
+        { ddc: 20, menu: 60 },
+      ],
+      brightnessLimit: 20,
+      brightness: 12,
+      brightnessFloor: 2,
+    });
+    expect(status(wrapper)).toContain("Saved");
     expect(primary(wrapper).text()).toBe("Done");
   });
 
-  it("asks before leaving with the limit unsaved", async () => {
-    await ended();
-    await click(wrapper, "check-done");
-    expect(wrapper.text()).toContain("Leave without saving limit 10?");
-    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  it("says Calvin and the panel use the same scale when every pair is equal", async () => {
+    await toStep2();
+    await readLevel(60, 60);
+    await clickPrimary(wrapper);
+    await readLevel(40, 40);
+    await clickPrimary(wrapper);
+    await readLevel(10, 10);
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain(
+      "Calvin and the panel use the same scale."
+    );
+  });
+
+  it("does not claim the same scale when the numbers differ", async () => {
+    await toSummary();
+    expect(find(wrapper, "check-summary").text()).not.toContain("same scale");
+  });
+
+  it("emits writes-ok before the patch so the ramp default never overwrites the everyday level", async () => {
+    await toSummary();
+    await clickPrimary(wrapper);
+    expect(wrapper.emitted("writes-ok")).toHaveLength(1);
   });
 });
 
-describe("DisplayCheckDialog step 4: safe limit", () => {
-  const toStep4 = async props => {
-    wrapper = mountDialog({ startStep: "limit", ...props });
-    await flushPromises();
-  };
-
-  it("warns plainly before starting and offers Start and Skip", async () => {
-    await toStep4();
-    expect(wrapper.text()).toContain("it may restart");
-    expect(find(wrapper, "limit-start").exists()).toBe(true);
-    expect(find(wrapper, "limit-skip").exists()).toBe(true);
-    expect(posts("start")).toHaveLength(0);
-  });
-
-  it("replaces Start with a red note on the panel itself", async () => {
-    await toStep4({ onPanel: true });
-    expect(find(wrapper, "limit-start").exists()).toBe(false);
-    expect(primary(wrapper).text()).toBe("Skip, finish");
-    expect(find(wrapper, "limit-on-panel").text()).toContain(
-      "You're on Kitchen itself. Run this step from your phone or computer"
-    );
-  });
-
-  it("says in the status line what step 4 is, and what it is doing while it runs", async () => {
-    await toStep4();
-    expect(status(wrapper)).toContain(
-      "Step 4 · optional · raises the brightness until the power shows trouble"
-    );
-    await click(wrapper, "limit-start");
-    agent({ level: 24, log: [] });
-    await settle();
-    expect(status(wrapper)).toContain("Raising 2 every 1.5 s · Calvin 24 · no trouble yet");
-  });
-
-  it("shows a power banner in step 4 the same way", async () => {
-    await toStep4();
-    await click(wrapper, "limit-start");
-    agent({
-      level: 28,
-      fault: { step: "limit", level: 28, kind: "under-voltage", at: "x", lastGood: 26, alsoAt: [] },
-    });
-    await settle();
-    expect(find(wrapper, "check-fault").text()).toContain("Power trouble at Calvin 28");
-  });
-
-  it("after saving, offers a third reading near the top when the match came from two low readings", async () => {
-    await toStep4({
-      overrides: {
-        brightness: 19,
-        brightnessConversion: [
-          { ddc: 15, menu: 52 },
-          { ddc: 19, menu: 61 },
-        ],
-      },
-    });
-    await click(wrapper, "limit-start");
-    agentStep("limit", { level: 19, limit: 26 });
-    await settle();
-    await click(wrapper, "limit-save");
-    expect(find(wrapper, "limit-saved").text()).toContain("Brightness can go up to");
-    expect(find(wrapper, "check-third").text()).toContain("Calvin 22");
-    expect(find(wrapper, "check-done").exists()).toBe(true);
-  });
-
-  it("shows the live level, a plain log and an always-visible Stop now while it runs", async () => {
-    await toStep4();
-    await click(wrapper, "limit-start");
-    expect(lastStart()).toEqual({ step: "limit" });
-    agent({
-      level: 28,
-      log: [
-        { at: "x", level: 24, note: "fine" },
-        { at: "x", level: 28, note: "touch controller reset" },
-      ],
-    });
-    await settle();
-    expect(find(wrapper, "limit-level").text()).toContain("28");
-    expect(find(wrapper, "limit-log").text()).toContain("24 · fine");
-    expect(find(wrapper, "limit-log").text()).toContain("28 · touch controller reset");
-    expect(find(wrapper, "limit-stop").exists()).toBe(true);
-    await click(wrapper, "limit-stop");
-    expect(posts("stop")).toHaveLength(1);
-  });
-
-  it("moves an already running session to the limit step instead of starting again", async () => {
-    await throughDetectAndWrite();
-    await click(wrapper, "writes-yes");
-    agentStep("conversion", { value: 19, level: 19 });
-    await settle();
-    await click(wrapper, "check-skip");
-    await click(wrapper, "limit-start");
-    expect(lastStep()).toEqual({ step: "limit" });
-    expect(posts("start")).toHaveLength(1);
-  });
-
-  it("only proposes the found limit: nothing is saved until the owner clicks", async () => {
-    await toStep4();
-    await click(wrapper, "limit-start");
-    agentStep("limit", { level: 19, limit: 26, detail: "limit found: 26" });
-    await settle();
-    await settle(6000);
-    expect(find(wrapper, "check-finish").text()).toContain("Limit found: 26");
-    expect(find(wrapper, "limit-save").text()).toBe("Save 26 as Kitchen's limit");
-    expect(find(wrapper, "limit-pending-note").text()).toContain("stays until you save");
-    expect(posts("save-limit")).toHaveLength(0);
-    expect(wrapper.emitted("saved-limit")).toBeUndefined();
-    expect(wrapper.emitted("patch")).toBeUndefined();
-    // The session is still open until Done or Stop.
-    expect(posts("stop")).toHaveLength(0);
-  });
-
-  it("saves the limit once, on the click, and says so", async () => {
-    await toStep4();
-    await click(wrapper, "limit-start");
-    agentStep("limit", { level: 19, limit: 26 });
-    await settle();
-    await click(wrapper, "limit-save");
-    expect(posts("save-limit")).toHaveLength(1);
-    expect(wrapper.emitted("saved-limit")[0][0]).toBe(26);
-    expect(find(wrapper, "limit-saved").text()).toContain("Saved");
-    expect(find(wrapper, "limit-save").exists()).toBe(false);
-    expect(find(wrapper, "limit-pending-note").exists()).toBe(false);
-  });
-
-  async function toUnsavedLimit() {
-    await toStep4();
-    await click(wrapper, "limit-start");
-    agentStep("limit", { level: 19, limit: 26 });
-    await settle();
+describe("the fallback: the panel doesn't report its own buttons", () => {
+  async function toFallback(reads) {
+    await toStep2();
+    await readLevel(60, reads[0][0], reads[0][1]);
+    await clickPrimary(wrapper);
+    await readLevel(40, reads[1][0], reads[1][1]);
+    await clickPrimary(wrapper);
+    await readLevel(10, reads[2][0], reads[2][1]);
+    await clickPrimary(wrapper);
   }
 
-  it("Done with an unsaved limit asks before leaving, and nothing happens yet", async () => {
-    await toUnsavedLimit();
-    await click(wrapper, "check-done");
-    expect(wrapper.text()).toContain("Leave without saving limit 26?");
-    expect(posts("stop")).toHaveLength(0);
-    expect(posts("save-limit")).toHaveLength(0);
-    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  // A panel that ignores the buttons: reads stay at 30. The second equal read is
+  // "behind"; after one more read it offers Calvin's own levels.
+  async function toOwnLevels() {
+    await toStep2();
+    await readLevel(60, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await clickPrimary(wrapper); // Read it again
+    await readLevel(40, 30);
+    await click(wrapper, "use-own-levels");
+  }
+  // Both low levels, answered; the lowest menu number is still to come.
+  async function answerLows(first = 28, second = 10) {
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: lastStep().value, level: lastStep().value });
+    await settle();
+    await find(wrapper, "reading-input").setValue(String(first));
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: lastStep().value, level: lastStep().value });
+    await settle();
+    await find(wrapper, "reading-input").setValue(String(second));
+    await clickPrimary(wrapper);
+  }
+
+  it("counts a read equal to the one before as behind when the typed number went down (100/60/10 reads 100/100/60)", async () => {
+    await toStep2();
+    await readLevel(100, 100);
+    await clickPrimary(wrapper);
+    await readLevel(60, 100);
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+    expect(primary(wrapper).text()).toBe("Read it again");
+    expect(find(wrapper, "use-own-levels").exists()).toBe(false);
   });
 
-  it("Save in that question saves the limit, ends the session and closes", async () => {
-    await toUnsavedLimit();
-    await click(wrapper, "check-done");
-    await click(wrapper, "confirm-accept");
-    expect(posts("save-limit")).toHaveLength(1);
-    expect(wrapper.emitted("saved-limit")[0][0]).toBe(26);
-    expect(posts("stop")).toHaveLength(1);
-    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
+  it("offers Calvin's own levels once Read it again is still out of order", async () => {
+    await toStep2();
+    await readLevel(100, 100);
+    await clickPrimary(wrapper);
+    await readLevel(60, 100);
+    await clickPrimary(wrapper); // Read it again
+    await readLevel(60, 100);
+    expect(find(wrapper, "use-own-levels").text()).toBe("Use Calvin's own levels instead");
+    await click(wrapper, "use-own-levels");
+    expect(status(wrapper)).toContain("This panel doesn't report its own buttons");
   });
 
-  it("Leave in that question ends the session without saving and keeps the old limit", async () => {
-    await toUnsavedLimit();
-    await click(wrapper, "check-done");
-    await click(wrapper, "confirm-alternative");
-    expect(posts("save-limit")).toHaveLength(0);
-    expect(posts("stop")).toHaveLength(1);
-    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
+  it("treats an unusable read as behind", async () => {
+    await toStep3();
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: null });
+    await settle();
+    expect(find(wrapper, "level-behind").text()).toContain("doesn't look right");
   });
 
-  it("Cancel in that question stays on the finish screen", async () => {
-    await toUnsavedLimit();
-    await click(wrapper, "check-done");
-    await click(wrapper, "confirm-cancel");
-    expect(find(wrapper, "limit-save").exists()).toBe(true);
-    expect(posts("stop")).toHaveLength(0);
-    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
+  it("is triggered when the reads stay equal and the person chooses Calvin's own levels", async () => {
+    await toOwnLevels();
+    expect(status(wrapper)).toContain("This panel doesn't report its own buttons");
+    expect(find(wrapper, "check-summary").exists()).toBe(false);
   });
 
-  it("the × asks the same question", async () => {
-    await toUnsavedLimit();
-    wrapper.findComponent({ name: "Dialog" }).vm.$emit("update:modelValue", false);
+  it("uses the level the agent reports writing, not the one asked for", async () => {
+    await toOwnLevels();
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 5, level: 4 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("28");
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    // The lowest level's menu number is asked for last.
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await clickPrimary(wrapper);
+    expect(patches()[0][0].brightnessConversion).toEqual([
+      { ddc: 1, menu: 10 },
+      { ddc: 4, menu: 28 },
+    ]);
+  });
+
+  it("skips the two-level fallback with a plain message when the cap is 1 or less", async () => {
+    await toStep2();
+    backend.run = { ...backend.run, ceiling: 1 };
+    await readLevel(60, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await click(wrapper, "use-own-levels");
+    expect(find(wrapper, "check-end").text()).toContain("already at its lowest safe level");
+    expect(posts("step").filter(([, b]) => b.step === "conversion")).toHaveLength(0);
+  });
+
+  it("does not start the read steps on an agent that reports no seq", async () => {
+    wrapper = mountDialog();
     await flushPromises();
-    expect(wrapper.text()).toContain("Leave without saving limit 26?");
-    expect(wrapper.emitted("update:modelValue")).toBeUndefined();
-  });
-
-  it("closes without asking once the limit is saved", async () => {
-    await toUnsavedLimit();
-    await click(wrapper, "limit-save");
-    await click(wrapper, "check-done");
-    expect(wrapper.text()).not.toContain("Leave without saving");
-    expect(posts("stop")).toHaveLength(1);
-    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
-  });
-
-  it("Done with no limit found closes without asking", async () => {
-    await toStep4();
-    await click(wrapper, "limit-skip");
-    await click(wrapper, "check-done");
-    expect(wrapper.text()).not.toContain("Leave without saving");
-    expect(wrapper.emitted("update:modelValue").at(-1)).toEqual([false]);
-  });
-
-  it("explains the limit as offered, and applied once saved", async () => {
-    await toStep4();
-    expect(wrapper.text()).toContain(
-      "Then it steps back down and offers that level as Kitchen's limit. Once you save it, Calvin never goes above it."
+    agent({ preflight: CLEAN, start: { level: 19, known: true, source: "read" } });
+    agentStep("detect", { ...DETECT, seq: null });
+    await settle();
+    expect(find(wrapper, "check-end").text()).toContain(
+      "Update this screen first: Settings > update"
     );
+    expect(primary(wrapper).text()).toBe("Done");
+    expect(find(wrapper, "check-retry").exists()).toBe(false);
+    expect(find(wrapper, "reading-input").exists()).toBe(false);
+    expect(backend.stopCalls).toBeGreaterThan(0);
   });
 
-  it("keeps the button and shows an error when saving fails, without changing any setting", async () => {
-    backend.failSaveLimit = true;
-    await toStep4();
-    await click(wrapper, "limit-start");
-    agentStep("limit", { level: 19, limit: 26 });
-    await settle();
-    await click(wrapper, "limit-save");
-    expect(wrapper.text()).toContain("Couldn't save the limit");
-    expect(find(wrapper, "limit-save").exists()).toBe(true);
-    expect(wrapper.emitted("patch")).toBeUndefined();
+  it("is triggered when a read equals the last write while the typed number differs", async () => {
+    await toFallback([
+      [20, null],
+      [12, null],
+      [5, 5],
+    ]);
+    expect(status(wrapper)).toContain("This panel doesn't report its own buttons");
   });
 
-  it("says Kitchen restarted when the agent reports an interrupted run", async () => {
-    await toStep4();
-    await click(wrapper, "limit-start");
-    agent({ status: "interrupted" });
+  it("writes only low levels, 5 then 1, asking the menu each time", async () => {
+    await toOwnLevels();
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "conversion", value: 5 });
+    agentStep("conversion", { value: 5, level: 5 });
     await settle();
-    expect(find(wrapper, "check-end").text()).toContain("Kitchen restarted");
+    expect(status(wrapper)).toContain("Low level 1 of 2");
+    await find(wrapper, "reading-input").setValue("16");
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "conversion", value: 1 });
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    expect(status(wrapper)).toContain("Low level 2 of 2");
+  });
+
+  it("fits the line, labels it approximate and rounds the highest level down", async () => {
+    await toOwnLevels();
+    // Calvin 5 -> menu 28, Calvin 1 -> menu 10: menu = 5.5 + 4.5 x ddc.
+    await answerLows(28, 10);
+    // The lowest level's menu number was not read yet: it is asked last.
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    const text = find(wrapper, "check-summary").text();
+    expect(text).toContain("approximate");
+    // menu 60 -> 12.1 -> rounded down to 12; menu 40 -> 7.7 -> 8; menu 10 -> 1.
+    expect(text).toContain("Panel 60 · Calvin 12");
+    expect(text).toContain("Panel 40 · Calvin 8");
+    expect(text).toContain("Panel 10 · Calvin 1");
+    await clickPrimary(wrapper);
+    expect(patches()[0][0]).toMatchObject({
+      brightnessLimit: 12,
+      brightness: 8,
+      brightnessFloor: 1,
+      brightnessConversion: [
+        { ddc: 1, menu: 10 },
+        { ddc: 5, menu: 28 },
+      ],
+    });
   });
 });
 
-describe("DisplayCheckDialog rules", () => {
-  it("stops the run when the dialog is closed", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    await wrapper.setProps({ modelValue: false });
-    await flushPromises();
-    expect(posts("stop")).toHaveLength(1);
-  });
-
-  it("stops the run from the footer", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    await click(wrapper, "check-stop");
-    expect(posts("stop")).toHaveLength(1);
-  });
-
-  it("says the check ended when the session is gone while changing step", async () => {
-    await throughDetectAndWrite();
-    backend.run = { ...backend.run, active: false, status: "timeout" };
-    await click(wrapper, "writes-again");
-    expect(find(wrapper, "check-end").text()).toContain("The check ended");
-  });
-
-  it("says Waiting… after 10 s of silence and not answering after 60 s", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    await settle(12000);
-    expect(find(wrapper, "check-silence").text()).toContain("Waiting for Kitchen…");
-    await settle(50000);
-    expect(find(wrapper, "check-silence").text()).toContain(
-      "Kitchen isn't answering. Is it on and online?"
-    );
-  });
-
-  it("does not call the owner's time on the reading step silence", async () => {
-    wrapper = mountDialog({ startStep: "conversion" });
-    await flushPromises();
-    agentStep("conversion", { value: 19, level: 19 });
+describe("power trouble in a step", () => {
+  it("tells the person to lower the level on the panel and read it again", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agent({
+      status: "error",
+      reason: "power_trouble",
+      fault: { step: "read", level: 20, kind: "under-voltage", lastGood: 20, alsoAt: [] },
+    });
     await settle();
-    await settle(30000);
-    expect(find(wrapper, "check-silence").exists()).toBe(false);
+    expect(find(wrapper, "check-fault").exists()).toBe(true);
+    expect(wrapper.text()).toContain(
+      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
+    );
+    expect(primary(wrapper).text()).toBe("Read it again");
+    expect(patches()).toHaveLength(0);
   });
 
-  it("opens read-only when another device runs a check, with Stop available", async () => {
+  it("Read it again starts a new session when the agent ended the first", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agent({
+      status: "error",
+      reason: "power_trouble",
+      fault: { step: "read", level: 20, kind: "under-voltage", lastGood: 20 },
+    });
+    await settle();
+    await find(wrapper, "reading-input").setValue("55");
+    await clickPrimary(wrapper);
+    expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
+    expect(find(wrapper, "check-fault").exists()).toBe(false);
+  });
+});
+
+describe("Stop", () => {
+  it("shows the pressed state on pointerdown, before anything comes back", async () => {
+    await toStep2();
+    backend.stopKeepsActive = true;
+    const stop = find(wrapper, "check-stop");
+    await stop.trigger("pointerdown");
+    expect(stop.attributes("aria-pressed")).toBe("true");
+    expect(stop.classes()).toContain("dcheck__stop--pressed");
+  });
+
+  it.each([
+    ["step 1", async () => toFound()],
+    ["step 2", async () => toStep2()],
+    ["step 3", async () => toStep3()],
+    ["step 4", async () => toStep4()],
+    ["the summary", async () => toSummary()],
+  ])("says Stopping, bringing brightness down in %s until the agent finishes", async (_n, go) => {
+    await go();
+    backend.stopKeepsActive = true;
+    await find(wrapper, "check-stop").trigger("pointerdown");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+    expect(primary(wrapper).exists()).toBe(false);
+    await settle();
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+    agent({ status: "stopped" });
+    await settle();
+    expect(status(wrapper)).not.toContain("Stopping, bringing brightness down");
+  });
+
+  it("is safe to tap again and again", async () => {
+    await toStep2();
+    backend.stopKeepsActive = true;
+    const stop = find(wrapper, "check-stop");
+    await stop.trigger("pointerdown");
+    await stop.trigger("pointerdown");
+    await stop.trigger("click");
+    await flushPromises();
+    expect(backend.stopCalls).toBeGreaterThanOrEqual(2);
+    expect(wrapper.find("[role='alert']").exists()).toBe(false);
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+  });
+});
+
+describe("an unfinished run", () => {
+  it("says exactly what was kept, with Done primary and Try again secondary", async () => {
+    await toStep3({
+      overrides: { brightnessConversion: [{ ddc: 5, menu: 28 }], brightnessLimit: 26 },
+    });
+    await find(wrapper, "check-stop").trigger("click");
+    await flushPromises();
+    await settle();
+    expect(status(wrapper)).toContain("Check stopped");
+    expect(wrapper.text()).toContain(
+      "Nothing changed; the previous calibration is still in place."
+    );
+    expect(primary(wrapper).text()).toBe("Done");
+    expect(find(wrapper, "check-retry").text()).toBe("Try again");
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("says no calibration is saved yet when there was none", async () => {
+    await toStep3({ overrides: { brightness: 19 } });
+    await find(wrapper, "check-stop").trigger("click");
+    await flushPromises();
+    await settle();
+    expect(wrapper.text()).toContain("Nothing changed; no calibration is saved yet.");
+  });
+
+  it("Stop from the summary saves nothing", async () => {
+    await toSummary();
+    await find(wrapper, "check-stop").trigger("click");
+    await flushPromises();
+    await settle();
+    expect(wrapper.text()).toContain("Nothing changed");
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("Try again restarts at the highest level with nothing carried over", async () => {
+    await toStep3();
+    await find(wrapper, "check-stop").trigger("click");
+    await flushPromises();
+    await settle();
+    await click(wrapper, "check-retry");
+    agent({ preflight: CLEAN });
+    agentStep("detect", DETECT);
+    await settle();
+    await clickPrimary(wrapper);
+    expect(status(wrapper)).toContain("Step 2 of 4 · Highest level");
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+  });
+});
+
+describe("other dialog states", () => {
+  it("shows the asleep state with Turn on now", async () => {
+    wrapper = mountDialog({ asleep: true });
+    await flushPromises();
+    expect(status(wrapper)).toContain("Kitchen is asleep");
+    expect(primary(wrapper).text()).toBe("Turn on now");
+  });
+
+  it("opens read-only when another device owns the run", async () => {
     backend.run = {
-      id: "elsewhere",
-      step: "limit",
+      id: "other",
+      step: "read",
       status: "running",
       active: true,
-      level: 22,
-      log: [],
       steps: {},
-      requestedAt: new Date().toISOString(),
+      log: [],
       updatedAt: new Date().toISOString(),
     };
     wrapper = mountDialog();
     await flushPromises();
-    expect(wrapper.text()).toContain("A check is running from another device");
-    expect(posts("start")).toHaveLength(0);
+    expect(find(wrapper, "check-readonly").exists()).toBe(true);
     expect(find(wrapper, "check-stop").exists()).toBe(true);
   });
+});
 
-  it("will not start while the screen is asleep", async () => {
-    wrapper = mountDialog({ asleep: true });
+describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
+  it("matches each read to the seq it sent: three identical reads in a row each resolve", async () => {
+    await toStep2();
+    const same = { level: 20, finishedAt: "2027-01-01T00:00:00Z" };
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", same);
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    // The step 2 result is still stored with the old seq: it must not answer this read.
+    await settle();
+    expect(status(wrapper)).toContain("Reading…");
+    agentStep("read", same);
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 40 · Calvin 20");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await settle();
+    expect(status(wrapper)).toContain("Reading…");
+    agentStep("read", same);
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 10 · Calvin 20");
+  });
+
+  it("falls back to matching by step when an old agent reports no seq", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 20, seq: null });
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+  });
+
+  it("waits for the save to land: Not saved yet until it succeeds, then Saved", async () => {
+    let finish;
+    const savePatch = vi.fn(() => new Promise(resolve => (finish = resolve)));
+    await toSummary({ savePatch });
+    expect(find(wrapper, "check-summary").text()).toContain("Not saved yet");
+    await clickPrimary(wrapper);
+    expect(savePatch).toHaveBeenCalledTimes(1);
+    expect(status(wrapper)).not.toContain("Saved");
+    expect(find(wrapper, "check-summary").text()).toContain("Not saved yet");
+    finish(true);
     await flushPromises();
-    expect(find(wrapper, "check-asleep").text()).toContain(
-      "Kitchen is asleep. Turn it on now to check it."
+    expect(status(wrapper)).toContain("Saved");
+    expect(primary(wrapper).text()).toBe("Done");
+  });
+
+  it("shows a failed save in the dialog, keeps the readings and saves again on retry", async () => {
+    const savePatch = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    await toSummary({ savePatch });
+    await clickPrimary(wrapper);
+    expect(wrapper.text()).toContain("Couldn't save to the server");
+    expect(status(wrapper)).not.toBe("Saved");
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 60 · Calvin 20");
+    expect(primary(wrapper).text()).toBe("Save");
+    await clickPrimary(wrapper);
+    expect(savePatch).toHaveBeenCalledTimes(2);
+    expect(savePatch.mock.calls[1][0]).toEqual(savePatch.mock.calls[0][0]);
+    expect(status(wrapper)).toContain("Saved");
+    expect(wrapper.text()).not.toContain("Couldn't save to the server");
+  });
+
+  it("says a reading looks behind when a lower level reads higher, and offers Read it again", async () => {
+    await toStep3();
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 25 });
+    await settle();
+    expect(find(wrapper, "level-behind").text()).toContain("looks behind");
+    expect(primary(wrapper).text()).toBe("Read it again");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+    expect(find(wrapper, "reading-input").element.value).toBe("40");
+  });
+
+  it("gives the dimmed-screen advice after a fault, and never prints Calvin with no number", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agent({
+      status: "error",
+      reason: "power_trouble",
+      fault: { step: "read", level: null, kind: "under-voltage", lastGood: null },
+    });
+    await settle();
+    expect(wrapper.text()).toContain(
+      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
     );
-    expect(posts("start")).toHaveLength(0);
+    const banner = find(wrapper, "check-fault").text();
+    expect(banner).toContain("Power trouble at Panel 60");
+    expect(banner).not.toMatch(/Calvin\s+·/);
   });
 
-  it("shows the asleep refusal when the agent refuses a run", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    agent({ status: "asleep" });
-    await settle();
-    expect(find(wrapper, "check-asleep").text()).toContain("Turn it on now to check it");
-  });
-
-  it("says that turning the screen off waits until the check ends", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    expect(wrapper.text()).toContain("Turn off now");
-    expect(wrapper.text()).toContain("waits until the check ends");
-    expect(wrapper.text()).toContain("10 min");
-  });
-
-  it("shows a timeout as an end state with Try again", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    agent({ status: "timeout" });
-    await settle();
-    expect(find(wrapper, "check-end").text()).toContain("timed out");
-    expect(find(wrapper, "check-retry").exists()).toBe(true);
-  });
-
-  it("keeps the question and shows an error when the answer cannot be saved", async () => {
-    await throughDetectAndWrite();
-    backend.failVerdict = true;
-    await click(wrapper, "writes-yes");
-    expect(wrapper.text()).toContain("Couldn't save your answer");
-    expect(find(wrapper, "writes-yes").exists()).toBe(true);
-    expect(wrapper.emitted("writes-ok")).toBeUndefined();
-  });
-
-  it("Try again after silence stops the old run before starting a new one", async () => {
-    wrapper = mountDialog();
-    await flushPromises();
-    await settle(62000);
-    backend.posts = [];
-    await click(wrapper, "check-silence-retry");
-    expect(backend.posts.map(([u]) => u.split("/").pop())).toEqual(["stop", "start"]);
-  });
-
-  it("offers Turn on now when asleep, and starts the check once the screen wakes", async () => {
-    wrapper = mountDialog({ asleep: true });
-    await flushPromises();
-    await click(wrapper, "check-turn-on");
-    expect(wrapper.emitted("turn-on")).toHaveLength(1);
-    expect(posts("start")).toHaveLength(0);
-    await wrapper.setProps({ asleep: false });
-    await flushPromises();
-    expect(lastStart()).toEqual({ step: "detect" });
-  });
-
-  it("resumes polling when reopened while another run is active", async () => {
+  it("leaves read-only and shows an ended state when the watched run ends", async () => {
     backend.run = {
-      id: "elsewhere",
-      step: "limit",
+      id: "other",
+      step: "read",
       status: "running",
       active: true,
-      level: 22,
-      log: [],
       steps: {},
-      requestedAt: new Date().toISOString(),
+      log: [],
       updatedAt: new Date().toISOString(),
     };
     wrapper = mountDialog();
     await flushPromises();
-    await wrapper.setProps({ modelValue: false });
-    await flushPromises();
-    await wrapper.setProps({ modelValue: true });
-    await flushPromises();
-    backend.run = { ...backend.run, level: 24 };
-    await settle(2100);
     expect(find(wrapper, "check-readonly").exists()).toBe(true);
-    expect(wrapper.text()).toContain("level 24");
+    backend.run = { ...backend.run, status: "done", active: false };
+    await settle();
+    expect(find(wrapper, "check-readonly").exists()).toBe(false);
+    expect(find(wrapper, "check-end").text()).toContain("other device");
+    expect(primary(wrapper).text()).toBe("Done");
+  });
+
+  it("leaves read-only when the watched run comes back empty or expired", async () => {
+    backend.run = {
+      id: "other",
+      step: "read",
+      status: "running",
+      active: true,
+      steps: {},
+      log: [],
+      updatedAt: new Date().toISOString(),
+    };
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(find(wrapper, "check-readonly").exists()).toBe(true);
+    backend.run = null;
+    await settle();
+    expect(find(wrapper, "check-readonly").exists()).toBe(false);
+    expect(find(wrapper, "check-end").text()).toContain("other device");
+  });
+
+  it("recognises its own run after a reload and moves it instead of opening read-only", async () => {
+    backend.run = {
+      id: "mine",
+      step: "read",
+      status: "running",
+      active: true,
+      steps: {},
+      seq: 4,
+      log: [],
+      updatedAt: new Date().toISOString(),
+    };
+    window.sessionStorage.setItem("calvin_display_check_own_runs", JSON.stringify(["mine"]));
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(find(wrapper, "check-readonly").exists()).toBe(false);
+    expect(posts("step").at(-1)?.[1]).toEqual({ step: "detect" });
+  });
+
+  it("keeps the fallback's low writes under the run ceiling and the start level", async () => {
+    await toStep2();
+    backend.run = { ...backend.run, ceiling: 3, start: { level: 2, known: true } };
+    await readLevel(60, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await click(wrapper, "use-own-levels");
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "conversion", value: 2 });
+    backend.run = { ...backend.run, ceiling: 0 };
+    agentStep("conversion", { value: 2, level: 2 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("12");
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "conversion", value: 1 });
+  });
+
+  it("keeps saying Stopping when Stop is pressed while a step is being sent", async () => {
+    await toStep2();
+    backend.stopKeepsActive = true;
+    await find(wrapper, "reading-input").setValue("60");
+    primary(wrapper).trigger("click");
+    await find(wrapper, "check-stop").trigger("pointerdown");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+    expect(find(wrapper, "check-stop").text()).toBe("Stopping…");
   });
 });
