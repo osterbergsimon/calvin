@@ -292,7 +292,7 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
 - The first-time brightness is the lower of "limit minus two steps" and DDC 20.
 - Calibration (steps 1–3) never brightens above the start level (owner, v2). Step 2 dims from the start and back.
   Step 3 reads at the start and start − 4; a third point near limit − 2 × step only once a limit is known.
-- v2: the unknown-start menu question is asked in step 1, before the dim to the floor (§3.2).
+- v2: the unknown-start menu question is asked in step 1, before the dim (§3.2).
 - v2: a calibration fault offers its last good level as the limit, as the primary action (§3.3).
 - The check can't run while the screen is asleep.
 - If a check is already running, the dialog opens read-only, with Stop still available.
