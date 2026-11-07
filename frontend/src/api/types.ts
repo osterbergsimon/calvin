@@ -1176,7 +1176,7 @@ export interface paths {
     put?: never;
     /**
      * Save Display Check Limit
-     * @description Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin).
+     * @description Save the limit the latest calibration fault implies as ``brightnessLimit`` (admin).
      */
     post: operations["save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post"];
     delete?: never;
@@ -2396,6 +2396,8 @@ export interface components {
       info?: {
         [key: string]: unknown;
       } | null;
+      /** Lastwrite */
+      lastWrite?: number | null;
       /** Level */
       level?: number | null;
       /** Limit */
@@ -2747,6 +2749,8 @@ export interface components {
       brightness?: number | null;
       /** Brightnessconversion */
       brightnessConversion?: components["schemas"]["BrightnessPoint"][] | null;
+      /** Brightnessfloor */
+      brightnessFloor?: number | null;
       /** Brightnesslimit */
       brightnessLimit?: number | null;
       /** Brightnessrampenabled */
@@ -3187,7 +3191,7 @@ export interface components {
        * Step
        * @enum {string}
        */
-      step: "detect" | "write" | "conversion" | "limit";
+      step: "detect" | "write" | "conversion" | "read";
       /** Value */
       value?: number | null;
     };
@@ -3200,7 +3204,7 @@ export interface components {
        * Step
        * @enum {string}
        */
-      step: "detect" | "write" | "conversion" | "limit";
+      step: "detect" | "write" | "conversion" | "read";
       /** Value */
       value?: number | null;
     };
