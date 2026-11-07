@@ -178,7 +178,7 @@ Notes:
 ### 3.3 Fallback: this panel doesn't report its own buttons
 
 After step 4 Calvin checks whether the DDC value followed the buttons. It didn't when **all three reads are equal**, or
-when **a read equals the agent's `lastWrite` while the typed numbers differ**.
+when **a read equals the agent's `lastWrite` while the typed number differs from it**.
 
 | State | Status line | Body | Primary | Secondary |
 |---|---|---|---|---|
