@@ -521,6 +521,7 @@
           :asleep="!desiredOnNow"
           :on-panel="Boolean(kioskId) && kioskId === selectedId"
           :overrides="overrides"
+          :save-patch="patchBrightness"
           @patch="patchBrightness"
           @writes-ok="onWritesOk"
           @turn-on="setScreenNow('on')"
@@ -1169,7 +1170,7 @@ function patchBrightness(change) {
     else next[key] = value;
   }
   // A brightness above the limit minus two steps is never stored.
-  persistPower(clampBrightness(next));
+  return persistPower(clampBrightness(next));
 }
 
 const checkOpen = ref(false);
@@ -1435,7 +1436,7 @@ function resetApply() {
 }
 
 function persistPower(next) {
-  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+  return persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 function setScheduleEnabled(value) {
   persistPower({ ...overrides.value, displayScheduleEnabled: value });

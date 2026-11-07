@@ -39,6 +39,7 @@ vi.mock("@/services/api", () => ({
           limit: null,
           log: [],
           steps: {},
+          seq: 1,
           requestedAt: new Date().toISOString(),
           updatedAt: null,
         };
@@ -62,7 +63,12 @@ vi.mock("@/services/api", () => ({
             },
           };
         }
-        backend.run = { ...backend.run, step: body.step, value: body.value ?? null };
+        backend.run = {
+          ...backend.run,
+          step: body.step,
+          value: body.value ?? null,
+          seq: (backend.run.seq ?? 0) + 1,
+        };
         return { data: backend.run };
       }
       if (action === "stop") {
@@ -110,6 +116,7 @@ const agentStep = (step, result = {}) => {
         limit: null,
         detail: null,
         info: null,
+        seq: backend.run.seq ?? null,
         finishedAt: new Date(1800000000000 + ++backend.clock * 1000).toISOString(),
         ...result,
       },
@@ -147,6 +154,7 @@ const click = async (wrapper, name) => {
 let wrapper;
 beforeEach(() => {
   vi.useFakeTimers();
+  window.sessionStorage.clear();
   Object.assign(backend, {
     run: null,
     posts: [],
@@ -160,6 +168,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => {
+  window.sessionStorage.clear();
   wrapper?.unmount();
   document.body.innerHTML = "";
   vi.useRealTimers();
@@ -516,7 +525,7 @@ describe("power trouble in a step", () => {
     await settle();
     expect(find(wrapper, "check-fault").exists()).toBe(true);
     expect(wrapper.text()).toContain(
-      "The power dropped at that level. Lower it a step on the panel and read it again."
+      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
     );
     expect(primary(wrapper).text()).toBe("Read it again");
     expect(patches()).toHaveLength(0);
@@ -654,5 +663,172 @@ describe("other dialog states", () => {
     await flushPromises();
     expect(find(wrapper, "check-readonly").exists()).toBe(true);
     expect(find(wrapper, "check-stop").exists()).toBe(true);
+  });
+});
+
+describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
+  it("matches each read to the seq it sent: three identical reads in a row each resolve", async () => {
+    await toStep2();
+    const same = { level: 20, finishedAt: "2027-01-01T00:00:00Z" };
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", same);
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    // The step 2 result is still stored with the old seq: it must not answer this read.
+    await settle();
+    expect(status(wrapper)).toContain("Reading…");
+    agentStep("read", same);
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 40 · Calvin 20");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await settle();
+    expect(status(wrapper)).toContain("Reading…");
+    agentStep("read", same);
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 10 · Calvin 20");
+  });
+
+  it("falls back to matching by step when an old agent reports no seq", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 20, seq: null });
+    await settle();
+    expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+  });
+
+  it("waits for the save to land: Not saved yet until it succeeds, then Saved", async () => {
+    let finish;
+    const savePatch = vi.fn(() => new Promise(resolve => (finish = resolve)));
+    await toSummary({ savePatch });
+    expect(find(wrapper, "check-summary").text()).toContain("Not saved yet");
+    await clickPrimary(wrapper);
+    expect(savePatch).toHaveBeenCalledTimes(1);
+    expect(status(wrapper)).not.toContain("Saved");
+    expect(find(wrapper, "check-summary").text()).toContain("Not saved yet");
+    finish(true);
+    await flushPromises();
+    expect(status(wrapper)).toContain("Saved");
+    expect(primary(wrapper).text()).toBe("Done");
+  });
+
+  it("shows a failed save in the dialog, keeps the readings and saves again on retry", async () => {
+    const savePatch = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    await toSummary({ savePatch });
+    await clickPrimary(wrapper);
+    expect(wrapper.text()).toContain("Couldn't save to the server");
+    expect(status(wrapper)).not.toBe("Saved");
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 60 · Calvin 20");
+    expect(primary(wrapper).text()).toBe("Save");
+    await clickPrimary(wrapper);
+    expect(savePatch).toHaveBeenCalledTimes(2);
+    expect(savePatch.mock.calls[1][0]).toEqual(savePatch.mock.calls[0][0]);
+    expect(status(wrapper)).toContain("Saved");
+    expect(wrapper.text()).not.toContain("Couldn't save to the server");
+  });
+
+  it("says a reading looks behind when a lower level reads higher, and offers Read it again", async () => {
+    await toStep3();
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 25 });
+    await settle();
+    expect(find(wrapper, "level-behind").text()).toContain("looks behind");
+    expect(primary(wrapper).text()).toBe("Read it again");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+    expect(find(wrapper, "reading-input").element.value).toBe("40");
+  });
+
+  it("gives the dimmed-screen advice after a fault, and never prints Calvin with no number", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agent({
+      status: "error",
+      reason: "power_trouble",
+      fault: { step: "read", level: null, kind: "under-voltage", lastGood: null },
+    });
+    await settle();
+    expect(wrapper.text()).toContain(
+      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
+    );
+    const banner = find(wrapper, "check-fault").text();
+    expect(banner).toContain("Power trouble at Panel 60");
+    expect(banner).not.toMatch(/Calvin\s+·/);
+  });
+
+  it("leaves read-only and shows an ended state when the watched run ends", async () => {
+    backend.run = {
+      id: "other",
+      step: "read",
+      status: "running",
+      active: true,
+      steps: {},
+      log: [],
+      updatedAt: new Date().toISOString(),
+    };
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(find(wrapper, "check-readonly").exists()).toBe(true);
+    backend.run = { ...backend.run, status: "done", active: false };
+    await settle();
+    expect(find(wrapper, "check-readonly").exists()).toBe(false);
+    expect(find(wrapper, "check-end").text()).toContain("other device");
+    expect(primary(wrapper).text()).toBe("Done");
+  });
+
+  it("recognises its own run after a reload and moves it instead of opening read-only", async () => {
+    backend.run = {
+      id: "mine",
+      step: "read",
+      status: "running",
+      active: true,
+      steps: {},
+      seq: 4,
+      log: [],
+      updatedAt: new Date().toISOString(),
+    };
+    window.sessionStorage.setItem("calvin_display_check_own_runs", JSON.stringify(["mine"]));
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(find(wrapper, "check-readonly").exists()).toBe(false);
+    expect(posts("step").at(-1)?.[1]).toEqual({ step: "detect" });
+  });
+
+  it("keeps the fallback's low writes under the run ceiling and the start level", async () => {
+    await toStep2();
+    backend.run = { ...backend.run, ceiling: 3, start: { level: 2, known: true } };
+    await readLevel(60, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await clickPrimary(wrapper);
+    await readLevel(10, 30);
+    await clickPrimary(wrapper);
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "conversion", value: 2 });
+    backend.run = { ...backend.run, ceiling: 0 };
+    agentStep("conversion", { value: 2, level: 2 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("12");
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "conversion", value: 1 });
+  });
+
+  it("keeps saying Stopping when Stop is pressed while a step is being sent", async () => {
+    await toStep2();
+    backend.stopKeepsActive = true;
+    await find(wrapper, "reading-input").setValue("60");
+    primary(wrapper).trigger("click");
+    await find(wrapper, "check-stop").trigger("pointerdown");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+    expect(find(wrapper, "check-stop").text()).toBe("Stopping…");
   });
 });

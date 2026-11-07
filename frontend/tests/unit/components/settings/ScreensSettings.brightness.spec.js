@@ -201,6 +201,20 @@ describe("Screens › Power › Brightness limit safety", () => {
     expect(wrapper.find("[data-test='brightness-slider']").attributes("max")).toBe("52"); // 22 on Calvin's scale is 52 on the panel's menu
   });
 
+  it("tells the dialog whether the calibration save landed", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { brightnessRampEnabled: true } });
+    await flushPromises();
+    await open(wrapper);
+    const save = wrapper.findComponent(DisplayCheckDialog).props("savePatch");
+    const ok = save({ brightnessLimit: 26, brightnessFloor: 2 });
+    await flush();
+    expect(await ok).toBe(true);
+    store.saveOverrides.mockRejectedValueOnce(new Error("offline"));
+    const failed = save({ brightnessLimit: 24 });
+    await flush();
+    expect(await failed).toBe(false);
+  });
+
   it("clamps a stored brightness when a patch changes the step", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { brightnessRampEnabled: true, brightness: 22, brightnessLimit: 26 },

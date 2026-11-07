@@ -174,6 +174,30 @@ describe("useDisplayCheck", () => {
     expect(api.get.mock.calls.length).toBeGreaterThanOrEqual(5);
   });
 
+  it("remembers the runs it started across a reload", async () => {
+    window.sessionStorage.clear();
+    api.post.mockResolvedValue({ data: run({ id: "mine", status: "requested" }) });
+    const first = make();
+    await first.start("detect");
+    scope.stop();
+    api.get.mockResolvedValue({ data: { run: run({ id: "mine" }) } });
+    const second = make();
+    await second.load();
+    expect(second.ownsRun.value).toBe(true);
+    expect(second.readOnly.value).toBe(false);
+  });
+
+  it("works when session storage is blocked", async () => {
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    api.post.mockResolvedValue({ data: run({ id: "mine", status: "requested" }) });
+    const check = make();
+    await check.start("detect");
+    expect(check.ownsRun.value).toBe(true);
+    spy.mockRestore();
+  });
+
   it("resume does nothing without an active run", async () => {
     api.get.mockResolvedValue({ data: { run: run({ active: false, status: "done" }) } });
     const check = make();
@@ -202,7 +226,8 @@ describe("useDisplayCheck", () => {
       step: "conversion",
       value: 5,
     });
-    expect(result).toEqual({ ok: true });
+    expect(result.ok).toBe(true);
+    expect(result.run.step).toBe("conversion");
     expect(check.run.value.step).toBe("conversion");
   });
 

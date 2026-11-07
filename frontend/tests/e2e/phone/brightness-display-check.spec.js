@@ -293,7 +293,7 @@ for (const [size, viewport] of SIZES) {
         { timeout: 8000 }
       );
       await expect(body(page)).toContainText(
-        "The power dropped at that level. Lower it a step on the panel and read it again."
+        /The power dropped at that level\. Calvin dimmed the screen\. Set it back to one step below where it was and read it again\./
       );
       await expect(dialog(page).getByRole("button", { name: "Read it again" })).toBeVisible();
       await shot(page, size, "check-fault");

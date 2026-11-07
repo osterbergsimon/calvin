@@ -10,6 +10,26 @@ export const POLL_MS = 2000;
 export const WAITING_AFTER_S = 10;
 export const SILENT_AFTER_S = 60;
 
+// The run ids this browser started survive a reload, so the dialog still knows
+// its own run and does not treat it as another device's. Storage can be
+// blocked or empty: every access is guarded.
+const OWN_RUNS_KEY = "calvin_display_check_own_runs";
+function readOwnRuns() {
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(OWN_RUNS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(id => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+function writeOwnRuns(ids) {
+  try {
+    window.sessionStorage.setItem(OWN_RUNS_KEY, JSON.stringify(ids.slice(-20)));
+  } catch {
+    // Storage is blocked: the run is simply not remembered after a reload.
+  }
+}
+
 const path = (id, tail = "") => `/kiosks/${encodeURIComponent(unref(id))}/display-check${tail}`;
 
 export function useDisplayCheck(kioskId) {
@@ -20,12 +40,12 @@ export function useDisplayCheck(kioskId) {
   // When this browser last asked the agent for something. A step is the agent's
   // turn to answer, and a long wait between steps is the owner's, not silence.
   const askedAt = ref(0);
-  const ownRunIds = new Set();
+  const ownRunIds = ref(readOwnRuns());
   let timer = null;
   let polling = false;
 
   const isActive = computed(() => Boolean(run.value?.active));
-  const ownsRun = computed(() => Boolean(run.value && ownRunIds.has(run.value.id)));
+  const ownsRun = computed(() => Boolean(run.value && ownRunIds.value.includes(run.value.id)));
   // A run another device started: watch it, and keep Stop (a safety action).
   const readOnly = computed(() => isActive.value && !ownsRun.value);
 
@@ -67,7 +87,10 @@ export function useDisplayCheck(kioskId) {
     try {
       const response = await api.post(path(kioskId, "/start"), { step, ...extra });
       run.value = response.data;
-      ownRunIds.add(response.data.id);
+      if (!ownRunIds.value.includes(response.data.id)) {
+        ownRunIds.value = [...ownRunIds.value, response.data.id];
+        writeOwnRuns(ownRunIds.value);
+      }
       now.value = Date.now();
       askedAt.value = now.value;
       return response.data;
@@ -102,7 +125,7 @@ export function useDisplayCheck(kioskId) {
       run.value = response.data ?? run.value;
       now.value = Date.now();
       askedAt.value = now.value;
-      return { ok: true };
+      return { ok: true, run: response.data ?? null };
     } catch (err) {
       const status = err?.response?.status;
       const detail = err?.response?.data?.detail;

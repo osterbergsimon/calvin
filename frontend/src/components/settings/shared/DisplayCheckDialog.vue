@@ -32,7 +32,7 @@
       <div class="dcheck__body" data-test="check-step-body">
         <!-- A power fault seen in any step: one banner for the whole incident -->
         <div v-if="fault" class="dcheck__fault" role="alert" data-test="check-fault">
-          <strong>Power trouble at Calvin {{ fault.level }} · {{ fault.kind }}</strong>
+          <strong>Power trouble at {{ faultWhere }} · {{ fault.kind }}</strong>
           <span>{{ faultAction }}</span>
           <span v-for="at in fault.alsoAt || []" :key="at">also at {{ at }} while settling</span>
         </div>
@@ -80,7 +80,7 @@
         <!-- Summary -->
         <template v-else-if="view === 'summary'">
           <div data-test="check-summary">
-            <p class="dcheck__lead">{{ saved ? "Saved" : "What Calvin found" }}</p>
+            <p class="dcheck__lead">{{ saved ? "Saved" : "Not saved yet" }}</p>
             <ul class="dcheck__summary">
               <li v-for="row in summaryRows" :key="row.label" class="dcheck__summary-row">
                 <span class="dcheck__summary-label">{{ row.label }}</span>
@@ -96,6 +96,9 @@
               Brightness can go from Panel {{ summaryRows[2].typed }} to Panel
               {{ summaryRows[0].typed }}.
             </p>
+            <InlineNote v-if="saveError" tone="err" role="alert" data-test="save-error">
+              {{ saveError }}
+            </InlineNote>
             <p v-if="usedFallback" class="dcheck__sub">
               The Calvin values are <strong>approximate</strong>: they come from a line through two
               low readings, and the highest is rounded down.
@@ -116,10 +119,10 @@
           <p v-if="fbPhase === 'explain'" class="dcheck__sub">
             Its brightness reading didn't change when you changed it with the buttons. Calvin can
             still match the panel's menu: it will set the brightness low, twice, and ask what the
-            menu shows each time. It won't go above {{ FALLBACK_LEVELS[0] }}.
+            menu shows each time. It won't go above {{ fbLevels[0] }}.
           </p>
           <p v-else-if="fbPhase === 'setting'" class="dcheck__sub">
-            Watch the panel. Calvin is setting it to Calvin {{ FALLBACK_LEVELS[fbIndex] }}.
+            Watch the panel. Calvin is setting it to Calvin {{ fbLevels[fbIndex] }}.
           </p>
           <p v-else class="dcheck__sub">Type the Brightness the panel's own menu shows now.</p>
         </template>
@@ -148,10 +151,14 @@
             <p class="dcheck__pair dcheck__pair--big" data-test="level-pair">
               Panel {{ thisLevel.typed }} · Calvin {{ thisLevel.ddc }}
             </p>
+            <InlineNote v-if="behindNote" tone="warn" data-test="level-behind">
+              {{ behindNote }}
+            </InlineNote>
           </template>
           <template v-else-if="state === 'fault' || state === 'ask'">
             <p v-if="state === 'fault'" class="dcheck__sub dcheck__sub--lead">
-              The power dropped at that level. Lower it a step on the panel and read it again.
+              The power dropped at that level. Calvin dimmed the screen. Set it back to one step
+              below where it was and read it again.
             </p>
             <p class="dcheck__sub">Type the Brightness the panel's own menu shows.</p>
             <p v-if="tooHigh" class="dcheck__sub dcheck__sub--warn" data-test="level-too-high">
@@ -299,6 +306,9 @@ const props = defineProps({
   // This browser is the screen being checked (the touch panel itself).
   onPanel: { type: Boolean, default: false },
   overrides: { type: Object, default: () => ({}) },
+  // Saves the calibration and says whether it landed: async (patch) => boolean.
+  // Without it the dialog emits "patch" and trusts the parent.
+  savePatch: { type: Function, default: null },
 });
 const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "turn-on"]);
 
@@ -308,8 +318,9 @@ const FIX_LINE =
   "The usual fix is to keep the screen's USB data link from also powering it (a USB power blocker on the data leg), or to use a stronger power supply.";
 const STARTUP_LINE =
   "Calvin starts the screen at the minimum and brings it up to this after it turns on.";
-// The only levels the fallback ever writes, both low.
-const FALLBACK_LEVELS = [5, 1];
+// The fallback only writes low levels: 5, then 1, held under the run's ceiling
+// and start level so it can never be refused as "above the ceiling".
+const FALLBACK_BASE = [5, 1];
 
 const STEPS = [
   { n: 1, label: "Find the display", short: "Display" },
@@ -363,6 +374,12 @@ let currentRunId = null;
 let opened = false;
 let clock = null;
 
+const fbLevels = computed(() => {
+  const caps = [run.value?.ceiling, run.value?.start?.level].filter(n => Number.isFinite(n));
+  return FALLBACK_BASE.map(base => Math.max(1, Math.min(base, ...caps)));
+});
+const saving = ref(false);
+const saveError = ref("");
 const stepNumber = computed(() => step.value);
 const pastReads = computed(() => ["summary", "fallback"].includes(view.value));
 const readOnlyView = computed(() => view.value === "readonly");
@@ -389,6 +406,11 @@ const keptLine = computed(() =>
 const logLines = computed(() =>
   (run.value?.log ?? []).map(entry => `${entry.level ?? ""} · ${entry.note ?? ""}`.trim())
 );
+const faultWhere = computed(() => {
+  const level = fault.value?.level;
+  if (Number.isFinite(level)) return `Calvin ${level}`;
+  return pendingTyped.value != null ? `Panel ${pendingTyped.value}` : "this level";
+});
 const faultAction = computed(() =>
   check.isActive.value
     ? "Calvin is bringing the brightness down and waiting for the power to settle."
@@ -421,6 +443,14 @@ const tooHigh = computed(() => {
   const before = levelIndex.value === 1 ? "the highest" : "the everyday level";
   return `The ${LEVELS[levelIndex.value].short} level can't be higher than ${before}, ${previousTyped.value}.`;
 });
+// Reads can lag the panel's menu by a step: a lower level must not read higher.
+const behindNote = computed(() => {
+  const now = thisLevel.value;
+  const before = levelIndex.value > 0 ? levels.value[levelIndex.value - 1] : null;
+  if (!now || !before || now.ddc <= before.ddc) return "";
+  const name = levelIndex.value === 1 ? "highest" : "everyday";
+  return `That reading looks behind: the panel reported Calvin ${now.ddc}, above the ${name} level's ${before.ddc}. It may not have caught up with the menu yet.`;
+});
 const readingValid = computed(() => typedNumber.value !== null && !tooHigh.value);
 const fbValid = computed(() => typedNumber.value !== null);
 
@@ -435,10 +465,11 @@ let awaiting = null;
 const inFlightStep = ref(null);
 const inFlight = computed(() => inFlightStep.value !== null);
 
-function expectResult(name, value) {
+function expectResult(name, value, seq = null) {
   awaiting = {
     step: name,
     value: value ?? null,
+    seq: Number.isFinite(seq) ? seq : null,
     baseline: stepStamp(run.value?.steps?.[name]),
   };
   inFlightStep.value = name;
@@ -453,6 +484,7 @@ function clearAwaiting() {
 async function go(name, value) {
   faulted.value = false;
   const current = run.value;
+  let sentSeq = null;
   if (current?.active && check.ownsRun.value) {
     const result = await check.changeStep(name, value);
     if (result.gone) {
@@ -460,7 +492,9 @@ async function go(name, value) {
       return false;
     }
     if (!result.ok) return false;
+    sentSeq = result.run?.seq ?? null;
   } else {
+    if (!check.isActive.value) stopRequested.value = false;
     const started = await check.start(name, value === undefined ? {} : { value });
     if (!started) {
       if (check.readOnly.value) view.value = "readonly";
@@ -468,9 +502,10 @@ async function go(name, value) {
     }
     currentRunId = started.id;
     runStartedMs.value = Date.now();
+    sentSeq = started.seq ?? null;
   }
-  stopRequested.value = false;
-  expectResult(name, value);
+  // Stop stays pressed until the agent reports the run finished.
+  expectResult(name, value, sentSeq);
   return true;
 }
 
@@ -534,14 +569,14 @@ async function askLow(index) {
   fbIndex.value = index;
   fbPhase.value = "setting";
   readingText.value = "";
-  const ok = await go("conversion", FALLBACK_LEVELS[index]);
+  const ok = await go("conversion", fbLevels.value[index]);
   if (!ok) fbPhase.value = index === 0 ? "explain" : "ask";
 }
 async function saveLow() {
   if (!fbValid.value) return;
   fbReadings.value = [
     ...fbReadings.value,
-    { ddc: FALLBACK_LEVELS[fbIndex.value], menu: typedNumber.value },
+    { ddc: fbLevels.value[fbIndex.value], menu: typedNumber.value },
   ];
   if (fbIndex.value === 0) return askLow(1);
   convertFromFallback();
@@ -595,15 +630,31 @@ const savedPairs = computed(() => {
 });
 
 // One PATCH: nothing from an unfinished run is ever saved.
-function saveAll() {
+async function saveAll() {
+  if (saving.value) return;
   const [highest, everyday, lowest] = summaryRows.value;
-  emit("writes-ok");
-  emit("patch", {
+  const patch = {
     brightnessConversion: savedPairs.value,
     brightnessLimit: highest.ddc,
     brightness: everyday.ddc,
     brightnessFloor: lowest.ddc,
-  });
+  };
+  saving.value = true;
+  saveError.value = "";
+  let landed = true;
+  try {
+    if (props.savePatch) landed = (await props.savePatch(patch)) !== false;
+    else emit("patch", patch);
+  } catch {
+    landed = false;
+  } finally {
+    saving.value = false;
+  }
+  if (!landed) {
+    saveError.value = "Couldn't save to the server. Check the connection and try again.";
+    return;
+  }
+  emit("writes-ok");
   saved.value = true;
 }
 
@@ -642,7 +693,7 @@ function end(kind, detail = "") {
       tone: "warn",
       status: "Check ended · the panel showed the same Brightness",
       kept: true,
-      text: "The panel showed the same Brightness at Calvin 5 and at Calvin 1, so Calvin can't match its menu.",
+      text: "The panel showed the same Brightness at both low levels, so Calvin can't match its menu.",
     },
     timeout: {
       tone: "warn",
@@ -667,6 +718,11 @@ function end(kind, detail = "") {
       status: "Check stopped",
       kept: true,
       text: `The check was stopped and ${name} is going back to its brightness.`,
+    },
+    watched: {
+      tone: "warn",
+      status: "Check ended",
+      text: "The check on the other device ended.",
     },
     gone: {
       tone: "warn",
@@ -752,7 +808,13 @@ function onRun(current) {
   if (!current.active) return onRunEnded(current);
   if (!awaiting) return;
   const result = current.steps?.[awaiting.step];
-  if (!result || stepStamp(result) === awaiting.baseline) return;
+  if (!result) return;
+  // A report that carries a seq answers only the request with that seq: the same
+  // step asked twice must not be satisfied by the first answer. An old agent
+  // reports no seq, so those match by step and a changed result, as before.
+  if (awaiting.seq !== null && result.seq != null) {
+    if (result.seq !== awaiting.seq) return;
+  } else if (stepStamp(result) === awaiting.baseline) return;
   if (
     awaiting.step === "conversion" &&
     awaiting.value !== null &&
@@ -767,6 +829,15 @@ function onRun(current) {
 
 watch(() => check.run.value, onRun);
 
+// A run another device started is only watched: when it ends, say so.
+watch(
+  () => check.run.value,
+  current => {
+    if (view.value !== "readonly" || !current || current.active) return;
+    end("watched");
+  }
+);
+
 function resetRun() {
   ending.value = null;
   foundText.value = "";
@@ -777,6 +848,8 @@ function resetRun() {
   faulted.value = false;
   stopRequested.value = false;
   saved.value = false;
+  saving.value = false;
+  saveError.value = "";
   usedFallback.value = false;
   fbPhase.value = "explain";
   fbIndex.value = 0;
@@ -867,27 +940,33 @@ const ui = computed(() => {
         };
       }
       return {
-        status: "Check finished · not saved yet",
-        primary: { label: "Save", test: "check-save", run: saveAll },
+        status: saving.value ? "Saving…" : "Check finished · not saved yet",
+        primary: {
+          label: "Save",
+          test: "check-save",
+          run: saveAll,
+          disabled: saving.value,
+          loading: saving.value,
+        },
         secondary: [{ label: "Try again", test: "check-retry", run: retry }],
       };
     case "fb-explain":
       return {
         status: "This panel doesn't report its own buttons",
         primary: {
-          label: `Set ${FALLBACK_LEVELS[0]} and ask`,
+          label: `Set ${fbLevels.value[0]} and ask`,
           test: "fallback-start",
           run: () => askLow(0),
         },
       };
     case "fb-setting":
       return {
-        status: `Low level ${fbIndex.value + 1} of 2 · Setting Calvin ${FALLBACK_LEVELS[fbIndex.value]}…`,
+        status: `Low level ${fbIndex.value + 1} of 2 · Setting Calvin ${fbLevels.value[fbIndex.value]}…`,
         busy: true,
       };
     case "fb-ask":
       return {
-        status: `Low level ${fbIndex.value + 1} of 2 · Calvin ${FALLBACK_LEVELS[fbIndex.value]} · type what the panel's menu shows`,
+        status: `Low level ${fbIndex.value + 1} of 2 · Calvin ${fbLevels.value[fbIndex.value]} · type what the panel's menu shows`,
         field: true,
         primary: {
           label: "Save reading",
@@ -915,12 +994,16 @@ const ui = computed(() => {
     case "read-done":
       return {
         status: `${stepOf()} · Panel ${thisLevel.value.typed} · Calvin ${thisLevel.value.ddc}`,
-        primary: {
-          label: step.value === 4 ? "See the summary" : "Next",
-          test: "check-next",
-          run: nextLevel,
-        },
-        secondary: [{ label: "Read it again", test: "read-again", run: readAgain }],
+        primary: behindNote.value
+          ? { label: "Read it again", test: "read-again", run: readAgain }
+          : {
+              label: step.value === 4 ? "See the summary" : "Next",
+              test: "check-next",
+              run: nextLevel,
+            },
+        secondary: behindNote.value
+          ? []
+          : [{ label: "Read it again", test: "read-again", run: readAgain }],
       };
     case "fault":
       return {
@@ -970,6 +1053,8 @@ async function onOpen() {
     view.value = "readonly";
     return;
   }
+  // A reload left our own run active: carry on with it.
+  if (check.isActive.value && check.ownsRun.value) currentRunId = check.run.value.id;
   if (props.asleep) {
     view.value = "asleep";
     return;
