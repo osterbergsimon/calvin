@@ -74,6 +74,7 @@ def test_start_offers_the_job_on_the_config_poll(test_client: TestClient, kiosk)
         "value": 19,
         "brightness": 15,
         "ceiling": None,
+        "seq": 0,
     }
     assert after.json()["display_check"] == job
     # The ETag covers the job (calvin-fufd): the old tag must not give a 304.
@@ -134,6 +135,7 @@ def test_a_step_done_report_is_a_result_not_the_end_of_the_run(test_client: Test
         "level": 19,
         "limit": None,
         "lastWrite": None,
+        "seq": None,
         "detail": "NOMAD TOUCH",
         "info": {"bus": 2, "model": "NOMAD TOUCH"},
         "finishedAt": "2026-11-05T10:00:05+00:00",
@@ -190,6 +192,7 @@ def test_step_change_re_offers_the_job_with_the_new_step_and_value(test_client: 
         "value": 9,
         "brightness": 15,
         "ceiling": None,
+        "seq": 1,
     }
     # A step with no value drops the old one.
     assert _step(test_client, "write").json()["value"] is None
