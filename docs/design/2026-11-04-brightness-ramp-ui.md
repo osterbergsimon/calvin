@@ -203,6 +203,13 @@ plus the three converted values.
 | "Check finished · not saved yet" | Three rows: **Highest** Panel 60 · Calvin 20; **Everyday** Panel 40 · Calvin 12; **Lowest** Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." The same-scale or approximate note when it applies. | **Save** | **Try again** |
 | "Saved" | "Saved. Brightness can go from Panel 10 to Panel 60." | **Done** | — |
 
+- **Not saved yet, until it is.** The summary's lead reads "Not saved yet" until Save succeeds. **Save** waits for the
+  write to land: the button shows a spinner, and "Saved" appears only after the server accepted it. On failure the
+  dialog shows the error ("Couldn't save to the server. Check the connection and try again.") and keeps the three
+  readings, so **Save** can be tapped again.
+- **Order check.** Each read must be no higher (in Calvin values) than the one before: highest ≥ everyday ≥ lowest.
+  If it is higher, the panel's reading probably lags the menu by a step. The step says "That reading looks behind"
+  and offers **Read it again** as the primary action instead of **Next**.
 - **One write.** Save sends a single PATCH of overrides:
   `brightnessConversion` = this run's pairs, `brightnessLimit` = the highest Calvin value, `brightness` = the everyday
   Calvin value, `brightnessFloor` = the lowest Calvin value.
@@ -217,8 +224,10 @@ under-voltage", `role="alert"`, announced once, with later faults joining as "al
 
 | State | Status line | Body | Primary | Secondary |
 |---|---|---|---|---|
-| Fault | "Power trouble · the panel's power dropped at that level" | "The power dropped at that level. Lower it a step on the panel and read it again." The field is kept with what was typed. | **Read it again** | — |
+| Fault | "Power trouble · the panel's power dropped at that level" | "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again." The field is kept with what was typed. | **Read it again** | — |
 
+- **The banner names the panel's level** the person typed ("Power trouble at Panel 60 · under-voltage") when the
+  agent reports no Calvin level, and never prints "Calvin" with no number.
 - **The agent ends the run itself** (touch may be dead). The dialog does not wait for a tap: the next **Read it again**
   starts a new session if the old one has ended, or reuses it if it hasn't.
 - **Nothing from the faulted level is kept.** Pairs already read in this dialog stay on screen, but only Save writes.
@@ -246,6 +255,11 @@ Nothing is saved from an unfinished run.
 
 ### 3.7 Rules for the whole dialog
 
+- **Watching another device.** When the watched run ends, the read-only view gives way to an ended state
+  ("The check on the other device ended"), with **Done** and **Try again**. A reloaded browser recognises its own
+  run again (the run ids it started are kept in the tab's session storage).
+- **Fallback levels never dead-end.** The two low writes are min(5, the run's ceiling, the start level) and then
+  min(1, …), at least 1.
 - **Closing the dialog, or Stop the check, ends the run.** Closing before Save keeps the previous calibration. The
   agent returns the screen to where it was.
 - **Footer**, **one check per screen**, **asleep**, **admin**: unchanged from v2 (§3.5 there). A read-only dialog (a
@@ -258,6 +272,8 @@ Nothing is saved from an unfinished run.
 
 - Step **`read`** returns `{level, lastWrite}`: `level` is the DDC reading; `lastWrite` is the last value the agent
   wrote, or `null`. It writes nothing.
+- Every step request carries a per-run **`seq`** that the agent echoes in its result, so the dialog matches each
+  read to the request it sent (three reads in a row each resolve).
 - Step **`limit`** is removed. A run has `detect`, `read`, `conversion` (the fallback, low only) and `write` is no longer asked for.
 - A per-screen key **`brightnessFloor`** (0–100, no higher than `brightnessLimit`).
 - The agent ends a run itself on the first fault and reports `fault` as in v2.
