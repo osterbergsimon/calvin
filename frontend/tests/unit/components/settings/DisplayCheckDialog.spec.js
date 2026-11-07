@@ -592,7 +592,9 @@ describe("an unfinished run", () => {
     await flushPromises();
     await settle();
     expect(status(wrapper)).toContain("Check stopped");
-    expect(wrapper.text()).toContain("Nothing changed; the previous calibration is still in place.");
+    expect(wrapper.text()).toContain(
+      "Nothing changed; the previous calibration is still in place."
+    );
     expect(primary(wrapper).text()).toBe("Done");
     expect(find(wrapper, "check-retry").text()).toBe("Try again");
     expect(patches()).toHaveLength(0);

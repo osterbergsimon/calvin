@@ -284,12 +284,7 @@ import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import { useDisplayCheck } from "@/composables/useDisplayCheck";
-import {
-  fitConversion,
-  maxPickable,
-  menuToDdc,
-  menuToDdcDown,
-} from "@/utils/brightness";
+import { fitConversion, maxPickable, menuToDdc, menuToDdcDown } from "@/utils/brightness";
 
 // The display check dialog (calvin-29ws; calibration v3, calvin-idts, calvin-qkm8,
 // calvin-mvtv: docs/design/2026-11-04-brightness-ramp-ui.md §3). The person sets
@@ -821,7 +816,6 @@ const state = computed(() => {
   return faulted.value ? "fault" : "ask";
 });
 
-const fixLink = () => ({ label: "How to fix the power", test: "fix-link", href: HELP_URL });
 const stepOf = () => `Step ${step.value} of 4 · ${STEPS[step.value - 1].label}`;
 
 const ui = computed(() => {
@@ -1138,14 +1132,13 @@ async function close() {
   min-height: 3rem;
   min-width: 8.5rem;
   transition:
-    transform 80ms ease-out,
-    background-color 80ms ease-out;
+    transform var(--dur-fast),
+    background-color var(--dur-fast);
 }
 .dcheck__stop:active,
 .dcheck__stop--pressed {
   transform: scale(0.97);
-  background: var(--danger-soft, var(--surface-2, #3a1f1f));
-  box-shadow: inset 0 0 0 2px var(--danger, #e5484d);
+  box-shadow: inset 0 0 0 2px var(--err);
 }
 .dcheck__summary {
   margin: 0;
@@ -1161,18 +1154,18 @@ async function close() {
   border-bottom: 1px solid var(--line);
 }
 .dcheck__summary-label {
-  font-weight: 600;
+  font-weight: var(--weight-strong);
 }
 .dcheck__pair {
   font-variant-numeric: tabular-nums;
 }
 .dcheck__pair--big {
   margin: 0;
-  font-size: var(--text-title, 1.5rem);
-  font-weight: 600;
+  font-size: var(--text-title);
+  font-weight: var(--weight-strong);
 }
 .dcheck__sub--warn {
-  color: var(--warn, inherit);
+  color: var(--err-text);
 }
 
 .dcheck__strip-short {

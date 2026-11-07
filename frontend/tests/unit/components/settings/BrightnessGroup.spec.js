@@ -204,13 +204,13 @@ describe("BrightnessGroup slider", () => {
     expect(Number(input.value)).toBe(61);
   });
 
-  it("falls back to Calvin's scale with a link to the match step", async () => {
+  it("falls back to Calvin's scale with a link to the display check", async () => {
     const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
     expect(find(wrapper, "brightness-value").text().replace(/\s+/g, " ")).toContain(
       "19 (Calvin's scale)"
     );
     await find(wrapper, "match-link").trigger("click");
-    expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "conversion" });
+    expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
   it("cannot go past the limit minus two steps", () => {
@@ -222,17 +222,17 @@ describe("BrightnessGroup slider", () => {
   it("explains the limit on the menu scale", () => {
     const wrapper = mountGroup({ overrides: withMenu });
     expect(find(wrapper, "limit-note").text()).toContain(
-      "You can go up to 68 on the screen's menu (Calvin 22)."
+      "You can go up to 68 on the panel's own menu (Calvin 22)."
     );
     expect(find(wrapper, "limit-note").text()).toContain("limit the display check found on 4 Nov");
   });
 
-  it("without a limit there is no hatch and a link to the limit step", async () => {
+  it("without a limit there is no hatch and a link that opens the display check", async () => {
     const wrapper = mountGroup({ overrides: ramp });
     expect(find(wrapper, "limit-hatch").exists()).toBe(false);
     expect(find(wrapper, "limit-note").text()).toContain("No limit found yet");
     await find(wrapper, "limit-link").trigger("click");
-    expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "limit" });
+    expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
   it("saves once on release, not during the drag", async () => {
@@ -333,14 +333,50 @@ describe("BrightnessGroup ramp speed range and the limit", () => {
     expect(interval.props()).toMatchObject({ min: 0.5, max: 10, step: 0.5 });
   });
 
-  it("lets the owner clear a saved limit", async () => {
-    const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
-    await find(wrapper, "limit-clear").trigger("click");
-    expect(wrapper.emitted("patch")[0][0]).toEqual({ brightnessLimit: null });
+  it("lets the owner clear the whole calibration next to the limit", async () => {
+    const wrapper = mountGroup({
+      overrides: {
+        ...ramp,
+        brightnessLimit: 26,
+        brightnessFloor: 2,
+        brightnessConversion: READINGS,
+      },
+    });
+    expect(find(wrapper, "limit-clear").exists()).toBe(false);
+    await find(wrapper, "calibration-clear").trigger("click");
+    expect(wrapper.emitted("patch")[0][0]).toEqual({
+      brightnessConversion: null,
+      brightnessLimit: null,
+      brightnessFloor: null,
+    });
   });
 
-  it("offers no clear link without a limit", () => {
+  it("offers Clear calibration when only readings are saved", () => {
+    const wrapper = mountGroup({ overrides: { ...ramp, brightnessConversion: READINGS } });
+    expect(find(wrapper, "calibration-clear").exists()).toBe(true);
+  });
+
+  it("offers no clear link with nothing to clear", () => {
     const wrapper = mountGroup({ overrides: ramp });
-    expect(find(wrapper, "limit-clear").exists()).toBe(false);
+    expect(find(wrapper, "calibration-clear").exists()).toBe(false);
+  });
+
+  it("shows the lowest level the check found, on the menu scale when there is a match", () => {
+    const wrapper = mountGroup({
+      overrides: {
+        ...ramp,
+        brightnessLimit: 26,
+        brightnessFloor: 5,
+        brightnessConversion: READINGS,
+      },
+    });
+    expect(find(wrapper, "floor-note").text()).toContain("Lowest: Panel 28 (Calvin 5)");
+  });
+
+  it("shows the lowest level on Calvin's scale without a match, and hides it when unset", () => {
+    expect(
+      find(mountGroup({ overrides: { ...ramp, brightnessFloor: 3 } }), "floor-note").text()
+    ).toContain("Lowest: Calvin 3");
+    expect(find(mountGroup({ overrides: ramp }), "floor-note").exists()).toBe(false);
   });
 });

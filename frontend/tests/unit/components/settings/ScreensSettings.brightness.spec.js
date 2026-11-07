@@ -115,16 +115,15 @@ describe("Screens › {screen} › Power › Brightness", () => {
     expect(wrapper.find("[data-test='changed-here-line']").exists()).toBe(true);
   });
 
-  it("opens the display check at the step the group asks for", async () => {
+  it("opens the display check when the group asks for it", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
     await open(wrapper);
     expect(wrapper.findComponent(DisplayCheckDialog).props("modelValue")).toBe(false);
-    wrapper.findComponent(BrightnessGroup).vm.$emit("open-check", { step: "limit" });
+    wrapper.findComponent(BrightnessGroup).vm.$emit("open-check", { step: "detect" });
     await flushPromises();
     const dialog = wrapper.findComponent(DisplayCheckDialog);
     expect(dialog.props("modelValue")).toBe(true);
-    expect(dialog.props("startStep")).toBe("limit");
     expect(dialog.props("kioskId")).toBe("kitchen");
   });
 
@@ -177,20 +176,29 @@ describe("Screens › {screen} › Power › Brightness", () => {
 });
 
 describe("Screens › Power › Brightness limit safety", () => {
-  it("a limit saved by the check caps the slider at once and lowers a brightness above it", async () => {
+  it("a calibration saved by the check caps the slider at once and keeps brightness under the limit", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { brightnessRampEnabled: true, brightness: 25 },
     });
     await flushPromises();
     await open(wrapper);
-    wrapper.findComponent(DisplayCheckDialog).vm.$emit("saved-limit", 26);
+    wrapper.findComponent(DisplayCheckDialog).vm.$emit("patch", {
+      brightnessConversion: [
+        { ddc: 2, menu: 10 },
+        { ddc: 26, menu: 60 },
+      ],
+      brightnessLimit: 26,
+      brightness: 26,
+      brightnessFloor: 2,
+    });
     await flush();
     expect(wrapper.findComponent(BrightnessGroup).props("overrides").brightnessLimit).toBe(26);
     expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
       brightness: 22,
       brightnessLimit: 26,
+      brightnessFloor: 2,
     });
-    expect(wrapper.find("[data-test='brightness-slider']").attributes("max")).toBe("22");
+    expect(wrapper.find("[data-test='brightness-slider']").attributes("max")).toBe("52"); // 22 on Calvin's scale is 52 on the panel's menu
   });
 
   it("clamps a stored brightness when a patch changes the step", async () => {

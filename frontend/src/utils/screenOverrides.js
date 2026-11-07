@@ -636,6 +636,18 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     keywords: ["brightness", "menu match", "display check", "conversion"],
   },
   {
+    key: "brightnessFloor",
+    label: "Lowest brightness",
+    section: "brightness",
+    perScreenOnly: true,
+    control: { kind: "number", min: 0, max: 100 },
+    defaultValue: null,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-brightness-floor",
+    keywords: ["brightness", "lowest", "minimum", "floor", "display check"],
+  },
+  {
     key: "touchControls",
     label: "Touchscreen",
     section: "touch",
@@ -839,6 +851,7 @@ const SCREEN_PAGE_ROW_ORDER = [
   "sleepMode",
   "brightnessLimit",
   "brightnessConversion",
+  "brightnessFloor",
   "touchControls",
   "onScreenKeyboard",
   "photoFrameEnabled",
@@ -978,7 +991,12 @@ export const withoutPromotedSettings = overrides => {
 // "Reset everything to default" keeps the name and drops every other override.
 // The display check's findings (limit, menu match) survive: they describe the
 // hardware, not a preference (calvin-29ws).
-const KEPT_ON_RESET = new Set(["displayName", "brightnessLimit", "brightnessConversion"]);
+const KEPT_ON_RESET = new Set([
+  "displayName",
+  "brightnessLimit",
+  "brightnessConversion",
+  "brightnessFloor",
+]);
 
 export const withoutAllOverrides = overrides => {
   const next = { ...(overrides || {}) };

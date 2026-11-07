@@ -66,9 +66,9 @@
             v-if="!fit"
             variant="link"
             data-test="match-link"
-            @click="emit('open-check', { step: 'conversion' })"
+            @click="emit('open-check', { step: 'detect' })"
           >
-            Match it to your screen's menu
+            Match it to the panel's own menu
           </Button>
         </div>
         <div class="brightness-slider__track">
@@ -100,28 +100,34 @@
         <p class="brightness-group__note" data-test="limit-note">
           <template v-if="limit !== null">
             You can go up to {{ unit(maxDdc) }}
-            {{ fit ? `on the screen's menu (Calvin ${maxDdc})` : "(Calvin's scale)" }}. Above that
-            is too close to the limit the display check found{{
+            {{ fit ? `on the panel's own menu (Calvin ${maxDdc})` : "(Calvin's scale)" }}. Above
+            that is too close to the limit the display check found{{
               limitDate ? ` on ${limitDate}` : ""
             }}.
-            <Button
-              variant="link"
-              data-test="limit-clear"
-              @click="patch({ brightnessLimit: null })"
-            >
-              Clear limit
-            </Button>
           </template>
           <template v-else>
             No limit found yet.
             <Button
               variant="link"
               data-test="limit-link"
-              @click="emit('open-check', { step: 'limit' })"
+              @click="emit('open-check', { step: 'detect' })"
             >
-              Run the safe-limit step to find one
+              Run the display check to set one
             </Button>
           </template>
+          <Button
+            v-if="hasCalibration"
+            variant="link"
+            data-test="calibration-clear"
+            @click="
+              patch({ brightnessConversion: null, brightnessLimit: null, brightnessFloor: null })
+            "
+          >
+            Clear calibration
+          </Button>
+        </p>
+        <p v-if="floor !== null" class="brightness-group__note" data-test="floor-note">
+          Lowest: {{ fit ? `Panel ${unit(floor)} (Calvin ${floor})` : `Calvin ${floor}` }}
         </p>
         <p
           v-if="brightnessNote"
@@ -256,6 +262,10 @@ const brightness = computed(() =>
 );
 
 // The slider's own unit: the screen's menu number with a match, else Calvin's.
+const floor = computed(() => props.overrides.brightnessFloor ?? null);
+const hasCalibration = computed(
+  () => limit.value !== null || floor.value !== null || readings.value.length > 0
+);
 const unit = ddc => (fit.value ? ddcToMenu(ddc, readings.value) : ddc);
 const sliderMin = computed(() => (fit.value ? unit(0) : 0));
 const sliderMax = computed(() => unit(maxDdc.value));
