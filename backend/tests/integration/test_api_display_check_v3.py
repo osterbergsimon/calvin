@@ -166,3 +166,56 @@ def test_saving_a_fault_limit_clamps_a_floor_above_it(test_client: TestClient, k
     assert saved.status_code == 200, saved.text
     assert saved.json()["brightnessLimit"] == 10
     assert saved.json()["overrides"]["brightnessFloor"] == 10  # clamped down to the new limit
+
+
+@pytest.mark.integration
+def test_every_step_request_bumps_the_runs_seq(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    assert run["seq"] == 0
+    assert _config(test_client)["displayCheck"]["seq"] == 0
+    for expected in (1, 2, 3):
+        stepped = _step(test_client, "read").json()  # the very same step again
+        assert stepped["seq"] == expected
+        assert _config(test_client)["displayCheck"]["seq"] == expected
+    assert test_client.get(BASE).json()["run"]["seq"] == 3
+
+
+@pytest.mark.integration
+def test_a_result_carries_the_seq_the_agent_echoed(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _step(test_client, "read")
+    _report(test_client, run["id"], "done", level=61, seq=1)
+    assert test_client.get(BASE).json()["run"]["steps"]["read"]["seq"] == 1
+    _step(test_client, "read")
+    _report(test_client, run["id"], "done", level=62, seq=2)
+    result = test_client.get(BASE).json()["run"]["steps"]["read"]
+    assert (result["level"], result["seq"]) == (62, 2)
+
+
+@pytest.mark.integration
+def test_a_report_without_seq_stores_null(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "done", level=19)
+    assert test_client.get(BASE).json()["run"]["steps"]["detect"]["seq"] is None
+
+
+@pytest.mark.integration
+def test_a_late_result_for_an_older_seq_is_not_filed_as_the_current_step(
+    test_client: TestClient, kiosk
+):
+    run = _start(test_client, "detect").json()
+    _step(test_client, "read")  # seq 1
+    _step(test_client, "conversion", value=10)  # seq 2
+    log = [{"at": "2026-11-07T10:00:00+00:00", "level": 61, "note": "read DDC 61"}]
+    late = _report(test_client, run["id"], "done", level=61, seq=1, log=log, info={"model": "M"})
+    assert late.status_code == 200
+    seen = test_client.get(BASE).json()
+    record = seen["run"]
+    assert record["log"] == log  # the progress lines are kept
+    assert "read" not in record["steps"]  # not filed
+    assert record["level"] is None  # run.level not moved
+    assert record["status"] == "running"
+    assert seen["findings"]["ddc"] is None  # no findings applied
+    # The current seq still files normally.
+    _report(test_client, run["id"], "done", level=10, seq=2)
+    assert test_client.get(BASE).json()["run"]["steps"]["conversion"]["seq"] == 2

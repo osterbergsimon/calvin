@@ -1213,7 +1213,7 @@ def display_check_job(cfg):
     """A diagnostics job from the config poll, or None.
 
     Proposed config shape (backend lane matches this):
-      "displayCheck": {"id", "step": detect|write|conversion|limit,
+      "displayCheck": {"id", "step": detect|write|conversion|read, "seq": <int>,
                        "action": "start"|"stop", "value": <DDC level>,
                        "brightness": <return-to level>}
     """
@@ -1231,8 +1231,17 @@ def display_check_job(cfg):
         "value": _as_int(raw.get("value")),
         "brightness": _as_int(raw.get("brightness")),
         "ceiling": _as_int(raw.get("ceiling")),
+        # Bumped by the backend on every step request; None from an old backend.
+        "seq": _as_int(raw.get("seq")),
     }
     return job
+
+
+def _job_signature(job):
+    """What makes a job new: (id, seq), else the old (id, step, value) tuple."""
+    if job.get("seq") is not None:
+        return (job["id"], job["seq"])
+    return (job["id"], job["step"], job.get("value"))
 
 
 def display_check_report_url(backend_url, kiosk_id):
@@ -1373,6 +1382,7 @@ class DisplayCheckRunner:
         self.fault = None  # the incident
         self.reason = None
         self.current_step = job.get("step")
+        self.current_seq = job.get("seq")
         self.live_settings = self.settings  # refreshed from every config poll
         self._placeholder = None
         self.limit = None  # kept in the payload (null): v3 finds no limit
@@ -1788,6 +1798,7 @@ class DisplayCheckRunner:
             "status": status,
             "level": self.level,
             "limit": self.limit,
+            "seq": self.current_seq,
             "log": self.log_entries,
             "startedAt": self.started_at,
             "finishedAt": datetime.now(timezone.utc).isoformat(),
@@ -1869,10 +1880,11 @@ class DisplayCheckRunner:
                     return self._finish("timeout")
                 if current.get("action") == "stop":
                     return self._finish("stopped")
-                signature = (current["id"], current["step"], current.get("value"))
+                signature = _job_signature(current)
                 if signature not in self._seen:
                     self._seen.add(signature)
                     self.current_step = current["step"]
+                    self.current_seq = current.get("seq")
                     self._save()
                     try:
                         self._execute(current)
@@ -1909,7 +1921,7 @@ class DisplayCheckRunner:
                         return self._finish("done")
                     if nxt["action"] == "stop":
                         return self._finish("stopped")
-                    if (nxt["id"], nxt["step"], nxt.get("value")) != signature:
+                    if _job_signature(nxt) != signature:
                         current = nxt
                         break
                     self.sleep(DISPLAY_CHECK_POLL_SECONDS)

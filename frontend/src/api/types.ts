@@ -2407,6 +2407,8 @@ export interface components {
       preflight?: components["schemas"]["Preflight"] | null;
       /** Reason */
       reason?: string | null;
+      /** Seq */
+      seq?: number | null;
       start?: components["schemas"]["StartLevel"] | null;
       /** Startedat */
       startedAt?: string | null;

@@ -3081,6 +3081,7 @@ def test_display_check_job_parses_the_proposed_config_shape():
         "value": 19,
         "brightness": 19,
         "ceiling": None,
+        "seq": None,
     }
     assert agent.display_check_job({"display_check": {"id": "x", "step": "limit"}})[
         "step"
@@ -4576,3 +4577,51 @@ def test_system_stopping_reads_systemctl():
         raise OSError("no systemctl")
 
     assert agent.system_stopping(run=boom) is False
+
+
+# -- every step request runs, even a repeated one (seq) ------------------------
+def test_display_check_job_carries_seq():
+    cfg = {"displayCheck": {"id": "c1", "step": "read", "seq": 3}}
+    assert agent.display_check_job(cfg)["seq"] == 3
+    assert agent.display_check_job({"displayCheck": {"id": "c1", "step": "read"}})["seq"] is None
+
+
+def test_two_identical_reads_both_run_and_report_their_seq(tmp_path):
+    ddc = ReadingDdc(read=61)
+    jobs = [
+        {**_cal_job("detect"), "seq": 0},
+        {**_cal_job("read"), "seq": 1},
+        {**_cal_job("read"), "seq": 2},  # the very same step and value again
+        {**_cal_job("read"), "seq": 3},
+    ]
+
+    def poll():
+        # The next request arrives once the current job has reported done.
+        finished = len([r for r in reports if r["status"] == "done"])
+        if finished >= len(jobs):
+            return {"displayCheck": {**jobs[-1], "action": "stop"}}
+        return {"displayCheck": dict(jobs[finished])}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "detect", tmp_path, level=19, ddc=ddc, poll=poll
+    )
+    runner.job = jobs[0]
+    runner.run()
+    reads = [r for r in reports if r["status"] == "done" and r["step"] == "read"]
+    assert [r["seq"] for r in reads] == [1, 2, 3]
+    assert ddc.writes == [agent.CHECK_FLOOR] or max(ddc.writes, default=0) <= 19
+
+
+def test_without_seq_the_old_signature_still_dedupes(tmp_path):
+    ddc = ReadingDdc(read=61)
+    n = {"polls": 0}
+
+    def poll():
+        n["polls"] += 1
+        action = "stop" if n["polls"] > 12 else "start"
+        return {"displayCheck": {**_cal_job("read"), "action": action}}
+
+    job = _cal_job("read")
+    runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=19, ddc=ddc, poll=poll)
+    runner.run()
+    assert len([r for r in reports if r["status"] == "done" and r["step"] == "read"]) == 1
