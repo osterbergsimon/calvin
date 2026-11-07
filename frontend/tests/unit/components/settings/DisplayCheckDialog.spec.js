@@ -39,7 +39,7 @@ vi.mock("@/services/api", () => ({
           limit: null,
           log: [],
           steps: {},
-          seq: 1,
+          seq: 0,
           requestedAt: new Date().toISOString(),
           updatedAt: null,
         };

@@ -405,6 +405,7 @@ export async function installApiMock(page, options = {}) {
         limit: null,
         detail: null,
         info: null,
+        seq: run.seq ?? null,
         finishedAt: new Date(1800000000000 + state.displayCheckClock * 1000).toISOString(),
         ...result,
       },
@@ -621,6 +622,7 @@ export async function installApiMock(page, options = {}) {
           limit: null,
           log: [],
           steps: {},
+          seq: 0,
           detail: null,
           info: null,
           requestedAt: now,
@@ -637,6 +639,7 @@ export async function installApiMock(page, options = {}) {
         const body = request.postDataJSON() || {};
         run.step = body.step;
         run.value = body.value ?? null;
+        run.seq = (run.seq ?? 0) + 1;
         return json(route, run);
       }
       if (action === "stop") {
