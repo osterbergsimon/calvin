@@ -276,6 +276,8 @@ DDC_BUS_STATE = "ddc-bus.json"
 DISPLAY_CHECK_STATE = "display-check.json"
 DISPLAY_CHECK_STEPS = ("detect", "write", "conversion", "read")
 DISPLAY_CHECK_POLL_SECONDS = 1.5
+# After readings: config polls to wait for the one carrying the saved values.
+RESTORE_CONFIG_POLLS = 4
 # Calibration v2 (calvin-c805): steps 1-3 never brighten the screen.
 CHECK_FLOOR = 5  # where an unknown start is dimmed to
 PREFLIGHT_SECONDS = 10.0  # the power watch before the first write
@@ -393,10 +395,15 @@ def brightness_settings(cfg):
 
 
 def brightness_ceiling(settings, fault_ceiling=None):
-    """Highest level the agent may ramp to: the limit minus two steps."""
+    """Highest level the agent may ramp to: the limit itself.
+
+    The limit already carries its margin (a reading-based limit is the highest
+    level read, one step under the cut-out; a fault-derived limit has the
+    margin applied once when it is stored), so nothing is subtracted here.
+    """
     ceiling = BRIGHTNESS_MAX
     if settings.get("limit") is not None:
-        ceiling = min(ceiling, max(0, settings["limit"] - 2 * settings["step"]))
+        ceiling = min(ceiling, max(0, settings["limit"]))
     if fault_ceiling is not None:
         ceiling = min(ceiling, max(0, int(fault_ceiling)))
     return ceiling
@@ -1233,6 +1240,8 @@ def display_check_job(cfg):
         "ceiling": _as_int(raw.get("ceiling")),
         # Bumped by the backend on every step request; None from an old backend.
         "seq": _as_int(raw.get("seq")),
+        # What the owner typed from the panel's own buttons for a read step.
+        "panelLevel": _as_int(raw.get("panelLevel")),
     }
     return job
 
@@ -1321,7 +1330,7 @@ def _fault_kind(lines):
 def _safe_target(settings, limit=None):
     target = brightness_target(settings)
     if limit is not None:
-        target = min(target, max(0, int(limit) - 2 * settings["step"]))
+        target = min(target, max(0, int(limit)))
     return max(0, target)
 
 
@@ -1387,6 +1396,7 @@ class DisplayCheckRunner:
         self._placeholder = None
         self.limit = None  # kept in the payload (null): v3 finds no limit
         self.last_write = None  # the level this run last wrote (None: none yet)
+        self._read_done = False  # a v3 read succeeded: the panel was moved by hand
         # The level is known once the controller had one or this run wrote one;
         # a DDC read never makes it known (read-backs can be fakes).
         self._level_known = controller is not None and controller.get_level() is not None
@@ -1649,7 +1659,7 @@ class DisplayCheckRunner:
                 return False
             self.sleep(SETTLE_POLL_SECONDS)
 
-    def _fault_incident(self, step, level, last_good, lines):
+    def _fault_incident(self, step, level, last_good, lines, panel_level=None):
         self.fault = {
             "step": step,
             "level": level,
@@ -1658,13 +1668,15 @@ class DisplayCheckRunner:
             "lastGood": last_good,
             "alsoAt": [],
         }
+        if panel_level is not None:
+            self.fault["panelLevel"] = panel_level
         self.reason = "power_trouble"
         where = "an unknown level" if level is None else str(level)
         self._entry(f"power trouble at {where}: {'; '.join(lines)}")
 
-    def _calibration_fault(self, step, level, last_good, lines):
+    def _calibration_fault(self, step, level, last_good, lines, panel_level=None):
         """A fault in any check step ends the run: one write to the floor, settle, no retry."""
-        self._fault_incident(step, level, last_good, lines)
+        self._fault_incident(step, level, last_good, lines, panel_level)
         self.report(self._payload("running"))
         self._drop_to_floor()
         self._entry("waiting for the power to settle")
@@ -1769,8 +1781,12 @@ class DisplayCheckRunner:
                 read = None
             lines = self._polled_faults()
             if lines:
-                # Blame the last level Calvin wrote, never the read value.
-                self._calibration_fault("read", self.last_write, self.last_write, lines)
+                # The panel was set with its own buttons: Calvin's level (stale)
+                # is not where this happened. Level unknown; keep what the
+                # owner typed for it.
+                self._calibration_fault(
+                    "read", None, None, lines, panel_level=job.get("panelLevel")
+                )
                 return
             if read is None:
                 self.reason = "read_failed"
@@ -1778,6 +1794,7 @@ class DisplayCheckRunner:
                 self._entry("the display did not answer a brightness read")
                 self._stop_reason = "error"
                 return
+            self._read_done = True
             self._entry(f"read DDC {read}; last written {self.last_write}", level=read)
             self.report(
                 self._payload(
@@ -1826,8 +1843,50 @@ class DisplayCheckRunner:
         start = self._start_level()
         return CHECK_FLOOR if start is None else start
 
+    def _fresh_settings(self):
+        """The settings from the config poll that carries the saved values.
+
+        Save runs just before Done; wait (bounded) until a poll differs from the
+        settings the run last saw, else use the newest poll.
+        """
+        if self.poll is None:
+            return self.live_settings
+        before = self.live_settings
+        for attempt in range(RESTORE_CONFIG_POLLS):
+            try:
+                cfg = self.poll()
+            except Exception:
+                cfg = None
+            if cfg is not None:
+                self.live_settings = brightness_settings(cfg)
+                if self.live_settings != before:
+                    break
+            if attempt + 1 < RESTORE_CONFIG_POLLS:
+                self.sleep(DISPLAY_CHECK_POLL_SECONDS)
+        return self.live_settings
+
+    def _restore_everyday(self):
+        """After readings the panel sits wherever the owner's buttons left it.
+
+        Ramp once to the saved everyday level (capped by the new ceiling) from
+        0, even when the ramp feature is off. Returns the target.
+        """
+        settings = self._fresh_settings()
+        caps = self.controller._ceiling() if self.controller is not None else None
+        target = brightness_target(settings, caps)
+        lock = self.controller.lock if self.controller is not None else threading.Lock()
+        with lock:
+            self._entry(f"restoring the everyday brightness {target}")
+            if not self._write_level(0):
+                return target
+            if target > 0:
+                self._ramp(target, cancel_missing=None)
+        return target
+
     def _finish(self, status):
-        if (
+        if self._read_done and self.fault is None and self.panel_on():
+            target = self._restore_everyday()
+        elif (
             status in ("stopped", "timeout")
             and self.fault is None
             and self.settings["enabled"]
@@ -1947,7 +2006,7 @@ def interrupted_check_cap(state_dir, cfg):
     limit = _interrupted_limit(state, settings)
     if limit is None:
         return None
-    return max(0, int(limit) - 2 * settings["step"])
+    return max(0, int(limit))
 
 
 def recover_display_check(
