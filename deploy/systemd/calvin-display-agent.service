@@ -15,6 +15,9 @@ ExecStart=/usr/bin/python3 /usr/local/bin/calvin_display_agent.py
 RuntimeDirectory=calvin
 Restart=always
 RestartSec=10
+# SIGTERM runs one bounded (4 s) DDC write that dims the panel before the
+# shutdown/reboot, so it powers on low next boot. Allow it, never hang.
+TimeoutStopSec=15
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=calvin-display-agent
