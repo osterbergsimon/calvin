@@ -10,21 +10,27 @@ from tests.integration.test_api_display_check import (
     _report,
     _start,
     _step,
-    kiosk,  # noqa: F401  (fixture)
 )
 
 OVERRIDES = f"/api/kiosks/{KIOSK}/overrides"
 
 
+@pytest.fixture
+def kiosk(test_client: TestClient) -> str:
+    """Register the kiosk the way the agent does: with a config poll."""
+    assert test_client.get(f"/api/kiosks/{KIOSK}/config").status_code == 200
+    return KIOSK
+
+
 @pytest.mark.integration
-def test_the_limit_step_is_gone(test_client: TestClient, kiosk):  # noqa: F811
+def test_the_limit_step_is_gone(test_client: TestClient, kiosk):
     assert _start(test_client, "limit").status_code == 422
     _start(test_client, "detect")
     assert _step(test_client, "limit").status_code == 422
 
 
 @pytest.mark.integration
-def test_read_is_offered_any_number_of_times_after_detect(test_client: TestClient, kiosk):  # noqa: F811
+def test_read_is_offered_any_number_of_times_after_detect(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     for _ in range(3):
         stepped = _step(test_client, "read")
@@ -35,7 +41,7 @@ def test_read_is_offered_any_number_of_times_after_detect(test_client: TestClien
 
 
 @pytest.mark.integration
-def test_a_read_result_keeps_the_level_and_the_last_write(test_client: TestClient, kiosk):  # noqa: F811
+def test_a_read_result_keeps_the_level_and_the_last_write(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     _step(test_client, "read")
     _report(test_client, run["id"], "done", level=61, lastWrite=5, detail="read 61")
@@ -46,7 +52,7 @@ def test_a_read_result_keeps_the_level_and_the_last_write(test_client: TestClien
 
 
 @pytest.mark.integration
-def test_a_read_without_a_last_write_stores_null(test_client: TestClient, kiosk):  # noqa: F811
+def test_a_read_without_a_last_write_stores_null(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     _step(test_client, "read")
     _report(test_client, run["id"], "done", level=61)
@@ -54,7 +60,7 @@ def test_a_read_without_a_last_write_stores_null(test_client: TestClient, kiosk)
 
 
 @pytest.mark.integration
-def test_a_failed_read_is_recorded_with_its_detail(test_client: TestClient, kiosk):  # noqa: F811
+def test_a_failed_read_is_recorded_with_its_detail(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     _step(test_client, "read")
     _report(test_client, run["id"], "error", detail="the display did not answer")
@@ -64,7 +70,7 @@ def test_a_failed_read_is_recorded_with_its_detail(test_client: TestClient, kios
 
 
 @pytest.mark.integration
-def test_a_read_fault_is_power_trouble(test_client: TestClient, kiosk):  # noqa: F811
+def test_a_read_fault_is_power_trouble(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     _step(test_client, "read")
     fault = {"step": "read", "level": 12, "kind": "touch controller reset", "lastGood": 12}
@@ -76,14 +82,14 @@ def test_a_read_fault_is_power_trouble(test_client: TestClient, kiosk):  # noqa:
 
 
 @pytest.mark.integration
-def test_a_limit_step_report_no_longer_saves_a_limit(test_client: TestClient, kiosk):  # noqa: F811
+def test_a_limit_step_report_no_longer_saves_a_limit(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     _report(test_client, run["id"], "done", limit=30)
     assert test_client.post(f"{BASE}/save-limit").status_code == 409
 
 
 @pytest.mark.integration
-def test_the_floor_is_a_per_screen_key(test_client: TestClient, kiosk):  # noqa: F811
+def test_the_floor_is_a_per_screen_key(test_client: TestClient, kiosk):
     ok = test_client.put(OVERRIDES, json={"overrides": {"brightnessFloor": 3}})
     assert ok.status_code == 200, ok.text
     assert _config(test_client)["brightnessFloor"] == 3
@@ -93,7 +99,7 @@ def test_the_floor_is_a_per_screen_key(test_client: TestClient, kiosk):  # noqa:
 
 
 @pytest.mark.integration
-def test_the_floor_may_not_exceed_the_limit(test_client: TestClient, kiosk):  # noqa: F811
+def test_the_floor_may_not_exceed_the_limit(test_client: TestClient, kiosk):
     refused = test_client.put(
         OVERRIDES, json={"overrides": {"brightnessFloor": 30, "brightnessLimit": 20}}
     )
@@ -105,7 +111,7 @@ def test_the_floor_may_not_exceed_the_limit(test_client: TestClient, kiosk):  # 
 
 
 @pytest.mark.integration
-def test_a_patch_is_checked_against_the_saved_limit(test_client: TestClient, kiosk):  # noqa: F811
+def test_a_patch_is_checked_against_the_saved_limit(test_client: TestClient, kiosk):
     test_client.put(OVERRIDES, json={"overrides": {"brightnessLimit": 20}})
     assert (
         test_client.patch(OVERRIDES, json={"overrides": {"brightnessFloor": 21}}).status_code == 422
@@ -131,7 +137,7 @@ def test_the_household_config_refuses_the_floor_like_the_other_brightness_keys(
 def test_the_floor_is_checked_against_the_effective_limit(
     test_client: TestClient,
     kiosk,
-    monkeypatch,  # noqa: F811
+    monkeypatch,
 ):
     """A limit that only the household layer carries still bounds the floor."""
     from app.api.routes import kiosks as routes
@@ -151,7 +157,7 @@ def test_the_floor_is_checked_against_the_effective_limit(
 
 
 @pytest.mark.integration
-def test_saving_a_fault_limit_clamps_a_floor_above_it(test_client: TestClient, kiosk):  # noqa: F811
+def test_saving_a_fault_limit_clamps_a_floor_above_it(test_client: TestClient, kiosk):
     test_client.put(OVERRIDES, json={"overrides": {"brightnessFloor": 12, "brightnessLimit": 40}})
     run = _start(test_client, "write").json()
     fault = {"step": "write", "level": 12, "kind": "under-voltage", "lastGood": 14, "alsoAt": []}
