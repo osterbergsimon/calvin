@@ -187,7 +187,7 @@ export function availability(kiosk, findings, screenName = "This screen") {
       disabled: true,
       action: "check",
       text: `Not available: this screen doesn't answer brightness commands (DDC/CI).${checked}`,
-      hint: "Check the adapter or cable, or turn DDC/CI on in the screen's own menu.",
+      hint: "Check the adapter or cable, or turn DDC/CI on in the panel's own menu.",
     };
   }
   if (findings.writes === false) {

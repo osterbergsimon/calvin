@@ -283,12 +283,12 @@ const shownDdc = computed(() =>
 );
 const scaleLabel = computed(() =>
   fit.value
-    ? `on the screen's menu · Calvin value ${shownDdc.value} · estimated`
+    ? `on the panel's own menu · Calvin value ${shownDdc.value} · estimated`
     : "(Calvin's scale)"
 );
 const valueText = computed(() =>
   fit.value
-    ? `${shownValue.value} on the screen's menu, Calvin value ${shownDdc.value}`
+    ? `${shownValue.value} on the panel's own menu, Calvin value ${shownDdc.value}`
     : `${shownValue.value} on Calvin's scale`
 );
 const limitDate = computed(() => checkedDate(findings.value?.checkedAt));
@@ -381,7 +381,7 @@ const brightnessNote = computed(() => {
   if (props.asleep) return `Applies when ${props.screenName} wakes`;
   if (pending.value) {
     const { from, to } = pending.value;
-    const where = fit.value ? " on the screen's menu" : "";
+    const where = fit.value ? " on the panel's own menu" : "";
     return `Changing… ${unit(from)} → ${unit(to)}${where}, ${step.value} at a time`;
   }
   return "";

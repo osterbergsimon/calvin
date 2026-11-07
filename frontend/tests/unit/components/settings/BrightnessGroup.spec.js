@@ -195,10 +195,10 @@ describe("BrightnessGroup unavailable states", () => {
 describe("BrightnessGroup slider", () => {
   const withMenu = { ...ramp, brightnessLimit: 26, brightnessConversion: READINGS };
 
-  it("reads in the screen's menu numbers when a menu match exists", () => {
+  it("reads in the panel's menu numbers when a menu match exists", () => {
     const wrapper = mountGroup({ overrides: withMenu });
     expect(find(wrapper, "brightness-value").text()).toContain("61");
-    expect(find(wrapper, "brightness-value").text()).toContain("on the screen's menu");
+    expect(find(wrapper, "brightness-value").text()).toContain("on the panel's own menu");
     expect(find(wrapper, "brightness-value").text()).toContain("Calvin value 19 · estimated");
     const input = find(wrapper, "brightness-slider").element;
     expect(Number(input.value)).toBe(61);
@@ -265,7 +265,7 @@ describe("BrightnessGroup slider", () => {
     await input.trigger("change");
     await wrapper.setProps({ overrides: { ...withMenu, brightness: 22 } });
     expect(find(wrapper, "brightness-note").text()).toContain(
-      "Changing… 61 → 68 on the screen's menu, 2 at a time"
+      "Changing… 61 → 68 on the panel's own menu, 2 at a time"
     );
     await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
     expect(find(wrapper, "brightness-note").exists()).toBe(false);
@@ -279,7 +279,7 @@ describe("BrightnessGroup slider", () => {
   it("has an accessible value text", () => {
     const wrapper = mountGroup({ overrides: withMenu });
     expect(find(wrapper, "brightness-slider").attributes("aria-valuetext")).toBe(
-      "61 on the screen's menu, Calvin value 19"
+      "61 on the panel's own menu, Calvin value 19"
     );
   });
 });
