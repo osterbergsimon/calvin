@@ -42,6 +42,17 @@ export function menuToDdc(menu, readings) {
   return Math.round((Number(menu) - fit.intercept) / fit.slope);
 }
 
+/**
+ * Like menuToDdc, but rounds DOWN and stays within 0-100. Used for the highest
+ * level, which must never come out above what the panel can take.
+ */
+export function menuToDdcDown(menu, readings) {
+  const fit = fitConversion(readings);
+  if (!fit || fit.slope <= 0) return null;
+  const raw = (Number(menu) - fit.intercept) / fit.slope;
+  return Math.max(0, Math.min(100, Math.floor(raw + 1e-9)));
+}
+
 const oneDecimal = value => String(Math.round(value * 10) / 10);
 
 /** "menu ≈ 16 + 2.3 × Calvin value", or "" until there are two readings. */

@@ -186,3 +186,18 @@ describe("clampBrightness", () => {
     expect(clampBrightness(empty)).toBe(empty);
   });
 });
+
+describe("menuToDdcDown", () => {
+  const line = [
+    { ddc: 1, menu: 10 },
+    { ddc: 5, menu: 28 },
+  ];
+  it("rounds down and stays within 0-100", async () => {
+    const { menuToDdcDown } = await import("@/utils/brightness");
+    expect(menuToDdcDown(60, line)).toBe(12);
+    expect(menuToDdcDown(28, line)).toBe(5);
+    expect(menuToDdcDown(1, line)).toBe(0);
+    expect(menuToDdcDown(900, line)).toBe(100);
+    expect(menuToDdcDown(60, [line[0]])).toBeNull();
+  });
+});
