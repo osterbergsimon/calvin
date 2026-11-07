@@ -108,8 +108,15 @@
             <p v-else-if="sameScale" class="dcheck__sub">
               Calvin and the panel use the same scale.
             </p>
-            <p v-if="keptUnderLimit" class="dcheck__sub">
-              Brightness is kept {{ 2 * stepSize }} under the limit.
+            <p class="dcheck__sub" data-test="never-above">
+              Calvin never goes above {{ summaryRows[0].ddc }}.
+            </p>
+            <label v-if="!saved" class="dcheck__wake">
+              <input v-model="useOnWake" type="checkbox" data-test="use-on-wake" />
+              Use these levels when the screen wakes and starts
+            </label>
+            <p v-else class="dcheck__sub" data-test="bringing-back">
+              Calvin is bringing the screen back to your everyday level.
             </p>
             <p class="dcheck__sub">{{ STARTUP_LINE }}</p>
           </div>
@@ -302,7 +309,7 @@ import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import { useDisplayCheck } from "@/composables/useDisplayCheck";
-import { fitConversion, maxPickable, menuToDdc, menuToDdcDown } from "@/utils/brightness";
+import { fitConversion, menuToDdc, menuToDdcDown } from "@/utils/brightness";
 
 // The display check dialog (calvin-29ws; calibration v3, calvin-idts, calvin-qkm8,
 // calvin-mvtv: docs/design/2026-11-04-brightness-ramp-ui.md §3). The person sets
@@ -403,7 +410,6 @@ const stepNumber = computed(() => step.value);
 const pastReads = computed(() => ["summary", "fallback"].includes(view.value));
 const readOnlyView = computed(() => view.value === "readonly");
 const settings = computed(() => props.overrides || {});
-const stepSize = computed(() => settings.value.brightnessStep ?? 2);
 const run = computed(() => check.run.value);
 const preflightClean = computed(() => run.value?.preflight?.status === "clean");
 // The incident the person has dealt with by pressing Read it: the run keeps its
@@ -703,11 +709,8 @@ const sameScale = computed(
     !usedFallback.value &&
     summaryRows.value.every(row => row.typed != null && row.typed === row.ddc)
 );
-const keptUnderLimit = computed(
-  () =>
-    summaryRows.value[1].ddc != null &&
-    summaryRows.value[1].ddc > maxPickable(summaryRows.value[0].ddc, stepSize.value)
-);
+// Save also turns the wake/start ramp on, unless the person unticks it.
+const useOnWake = ref(true);
 // The pairs Save stores: this run's readings, replacing the old ones.
 const savedPairs = computed(() => {
   if (usedFallback.value) {
@@ -728,6 +731,7 @@ async function saveAll() {
     brightness: everyday.ddc,
     brightnessFloor: lowest.ddc,
   };
+  if (useOnWake.value) patch.brightnessRampEnabled = true;
   saving.value = true;
   saveError.value = "";
   let landed = true;
@@ -969,6 +973,7 @@ function resetRun() {
   faulted.value = false;
   stopRequested.value = false;
   saved.value = false;
+  useOnWake.value = true;
   saving.value = false;
   saveError.value = "";
   usedFallback.value = false;
@@ -1303,6 +1308,12 @@ async function close() {
   margin: 0;
   font-size: var(--text-meta);
   color: var(--ink-2);
+}
+.dcheck__wake {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-2);
+  min-height: 44px;
 }
 .dcheck__buttons {
   display: flex;

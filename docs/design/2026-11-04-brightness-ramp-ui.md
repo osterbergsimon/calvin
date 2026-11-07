@@ -205,8 +205,8 @@ plus the three converted values.
 
 | Status line | Body | Primary | Secondary |
 |---|---|---|---|
-| "Check finished · not saved yet" | Three rows: **Highest** Panel 60 · Calvin 20; **Everyday** Panel 40 · Calvin 12; **Lowest** Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." The same-scale or approximate note when it applies. | **Save** | **Try again** |
-| "Saved" | "Saved. Brightness can go from Panel 10 to Panel 60." | **Done** | — |
+| "Check finished · not saved yet" | Three rows: **Highest** Panel 60 · Calvin 20; **Everyday** Panel 40 · Calvin 12; **Lowest** Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." "Calvin never goes above 20." The same-scale or approximate note when it applies. A checkbox, ticked by default: "Use these levels when the screen wakes and starts" (Save then also turns the ramp on, in the same save; unticked, the ramp setting is left alone). | **Save** | **Try again** |
+| "Saved" | "Saved. Brightness can go from Panel 10 to Panel 60." "Calvin never goes above 20." "Calvin is bringing the screen back to your everyday level." (the agent does the ramp; the checkbox is gone) | **Done** | — |
 
 - **Not saved yet, until it is.** The summary's lead reads "Not saved yet" until Save succeeds. **Save** waits for the
   write to land: the button shows a spinner, and "Saved" appears only after the server accepted it. On failure the
@@ -217,10 +217,10 @@ plus the three converted values.
   and offers **Read it again** as the primary action instead of **Next**.
 - **One write.** Save sends a single PATCH of overrides:
   `brightnessConversion` = this run's pairs, `brightnessLimit` = the highest Calvin value, `brightness` = the everyday
-  Calvin value, `brightnessFloor` = the lowest Calvin value.
-- **The everyday value is held under the limit.** The brightness is never stored above the limit minus two steps
-  (§2). When everyday equals highest, the summary says so: "Brightness is kept 4 under the limit."
-- **Done before Save asks nothing.** There is no "Leave without saving?" modal; the stopped view (§3.6) says what was kept.
+  Calvin value, `brightnessFloor` = the lowest Calvin value, and `brightnessRampEnabled: true` when "Use these levels when the screen wakes and starts" is ticked.
+- **The limit is the ceiling itself.** There is no margin under it any more: the highest reading is already one step
+  below where the panel cut out (§3.5), so the summary says "Calvin never goes above {highest Calvin value}." The
+  everyday level is never above the highest (the order check in §3.2 already enforces this).
 
 ### 3.5 Power trouble during a level (calvin-tzzx)
 

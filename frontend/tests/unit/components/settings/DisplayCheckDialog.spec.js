@@ -435,8 +435,46 @@ describe("the summary and Save", () => {
       brightnessLimit: 20,
       brightness: 12,
       brightnessFloor: 2,
+      brightnessRampEnabled: true,
     });
     expect(status(wrapper)).toContain("Saved");
+    expect(primary(wrapper).text()).toBe("Done");
+  });
+
+  it("says Calvin never goes above the highest value, and no longer talks of a margin under the limit", async () => {
+    await toSummary();
+    const text = find(wrapper, "check-summary").text();
+    expect(text).toContain("Calvin never goes above 20.");
+    expect(text).not.toContain("under the limit");
+  });
+
+  it("offers to use the levels when the screen wakes and starts, on by default, in the same save", async () => {
+    await toSummary();
+    const box = find(wrapper, "use-on-wake");
+    expect(find(wrapper, "check-summary").text()).toContain(
+      "Use these levels when the screen wakes and starts"
+    );
+    expect(box.element.checked).toBe(true);
+    await clickPrimary(wrapper);
+    expect(patches()).toHaveLength(1);
+    expect(patches()[0][0].brightnessRampEnabled).toBe(true);
+  });
+
+  it("leaves the ramp setting alone when the wake option is turned off", async () => {
+    await toSummary();
+    await find(wrapper, "use-on-wake").setValue(false);
+    await clickPrimary(wrapper);
+    expect(patches()[0][0]).not.toHaveProperty("brightnessRampEnabled");
+  });
+
+  it("after a successful save says Calvin is bringing the screen back to the everyday level", async () => {
+    await toSummary();
+    expect(wrapper.text()).not.toContain("bringing the screen back");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain(
+      "Calvin is bringing the screen back to your everyday level."
+    );
+    expect(find(wrapper, "use-on-wake").exists()).toBe(false);
     expect(primary(wrapper).text()).toBe("Done");
   });
 
