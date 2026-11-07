@@ -268,6 +268,9 @@ Nothing is saved from an unfinished run.
 
 ### 3.7 Rules for the whole dialog
 
+- **No fine print about turning the screen off.** The dialog does not say that "Turn off now" or a schedule off waits
+  until the check ends (up to 10 min). If that needs saying, it goes in the Screen now and schedule controls while a
+  check runs, not here.
 - **Watching another device.** When the watched run ends, the read-only view gives way to an ended state
   ("The check on the other device ended"), with **Done** and **Try again**. A reloaded browser recognises its own
   run again (the run ids it started are kept in the tab's session storage).

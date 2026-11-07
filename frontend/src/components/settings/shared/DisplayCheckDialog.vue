@@ -210,11 +210,6 @@
         <InlineNote v-if="check.error.value" tone="err" role="alert">
           {{ check.error.value }}
         </InlineNote>
-
-        <p class="dcheck__fine">
-          "Turn off now" or a schedule off while a check is running waits until the check ends (up
-          to 10 min).
-        </p>
       </div>
 
       <!-- The status line and the one primary action, always together -->
@@ -1335,7 +1330,6 @@ async function close() {
   font-weight: var(--weight-strong);
 }
 .dcheck__sub,
-.dcheck__fine,
 .dcheck__footer-note {
   margin: 0;
   font-size: var(--text-meta);

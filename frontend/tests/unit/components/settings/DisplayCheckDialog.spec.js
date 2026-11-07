@@ -219,6 +219,13 @@ async function toSummary(props) {
 const patches = () => wrapper.emitted("patch") || [];
 
 describe("power check before step 1", () => {
+  it("carries no fine print about Turn off now or a schedule off", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Turn off now");
+    expect(wrapper.text()).not.toContain("up to 10 min");
+  });
+
   it("waits for the screen to pick up the check, with no countdown, and keeps Stop", async () => {
     wrapper = mountDialog();
     await flushPromises();
