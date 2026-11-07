@@ -1107,6 +1107,17 @@ describe("ScreensSettings — Power", () => {
   });
 
   it("ignores an expired Screen now override and follows the schedule again", async () => {
+    // Pin the clock to a Friday (day 5) inside the schedule, or this fails on other days.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-06T12:00:00Z"));
+    try {
+      await expiredScreenNowFollowsSchedule();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  async function expiredScreenNowFollowsSchedule() {
     const { wrapper } = mountScreens({
       cfg: config({
         displayScheduleEnabled: true,
@@ -1120,7 +1131,7 @@ describe("ScreensSettings — Power", () => {
     expect(wrapper.find("[data-test='screen-now-state']").text()).toBe("On now");
     expect(wrapper.find("[data-test='screen-now-until']").exists()).toBe(false);
     expect(wrapper.find("[data-test='screen-now-follow']").exists()).toBe(false);
-  });
+  }
 });
 
 describe("ScreensSettings — Touch & keyboard", () => {
