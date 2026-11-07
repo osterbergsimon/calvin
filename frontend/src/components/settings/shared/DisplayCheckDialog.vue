@@ -377,7 +377,10 @@ const fbLevelIndex = ref(0);
 const behindTries = ref([0, 0, 0]);
 const phone = ref(false);
 const nowMs = ref(Date.now());
-const runStartedMs = ref(Date.now());
+// When this browser first saw the agent report for the current run. The 10 s
+// power watch starts here, not at Start: the agent only picks the job up on its
+// next config poll (calvin-elko). Arrival time, so a skewed screen clock can't matter.
+const firstReportMs = ref(null);
 const handled = new Set();
 let currentRunId = null;
 let opened = false;
@@ -520,7 +523,8 @@ async function go(name, value) {
       return false;
     }
     currentRunId = started.id;
-    runStartedMs.value = Date.now();
+    firstReportMs.value = null;
+    noteReport();
     sentSeq = started.seq ?? null;
   }
   // Stop stays pressed until the agent reports the run finished.
@@ -938,8 +942,16 @@ async function retry() {
 
 // --- what the dialog shows --------------------------------------------------
 
+function noteReport() {
+  const r = run.value;
+  if (firstReportMs.value !== null || !r?.updatedAt) return;
+  if (r.id !== currentRunId && !check.ownsRun.value) return;
+  firstReportMs.value = Date.now();
+}
+watch(() => [run.value?.id, run.value?.updatedAt], noteReport);
+
 const preflightLeft = computed(() =>
-  Math.max(0, PREFLIGHT_S - Math.floor((nowMs.value - runStartedMs.value) / 1000))
+  Math.max(0, PREFLIGHT_S - Math.floor((nowMs.value - (firstReportMs.value ?? nowMs.value)) / 1000))
 );
 
 const state = computed(() => {
@@ -950,7 +962,10 @@ const state = computed(() => {
   }
   if (fault.value && check.isActive.value) return "settling";
   if (step.value === 1) {
-    if (!detected.value) return preflightClean.value ? "asking" : "preflight";
+    if (!detected.value) {
+      if (preflightClean.value) return "asking";
+      return firstReportMs.value === null ? "pickup" : "preflight";
+    }
     return "found";
   }
   if (inFlightStep.value === "read") return "reading";
@@ -1061,9 +1076,14 @@ const ui = computed(() => {
           run: saveLevel,
         },
       };
+    case "pickup":
+      return {
+        status: "Waiting for the screen to pick up the check. It checks in about once a minute.",
+        busy: true,
+      };
     case "preflight":
       return {
-        status: `Checking ${name}'s power before changing anything · ${preflightLeft.value} s`,
+        status: `Checking the power before changing anything · ${preflightLeft.value} s`,
         busy: true,
       };
     case "asking":
@@ -1139,7 +1159,7 @@ async function onOpen() {
   handled.clear();
   currentRunId = null;
   nowMs.value = Date.now();
-  runStartedMs.value = Date.now();
+  firstReportMs.value = null;
   clock = setInterval(() => (nowMs.value = Date.now()), 1000);
   await check.load();
   check.resume();

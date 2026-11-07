@@ -219,14 +219,32 @@ async function toSummary(props) {
 const patches = () => wrapper.emitted("patch") || [];
 
 describe("power check before step 1", () => {
-  it("watches the power for 10 s first and counts down, with no primary action", async () => {
+  it("waits for the screen to pick up the check, with no countdown, and keeps Stop", async () => {
     wrapper = mountDialog();
     await flushPromises();
-    expect(status(wrapper)).toContain("Checking Kitchen's power before changing anything · 10 s");
+    expect(status(wrapper)).toBe(
+      "Waiting for the screen to pick up the check. It checks in about once a minute."
+    );
+    expect(wrapper.text()).not.toContain("watches the power supply");
+    expect(primary(wrapper).exists()).toBe(false);
+    await settle(25000);
+    expect(status(wrapper)).toContain("Waiting for the screen to pick up the check");
+    expect(status(wrapper)).not.toMatch(/\d+ s/);
+    expect(wrapper.find("[data-test='check-stop']").exists()).toBe(true);
+  });
+
+  it("starts the 10 s power watch from the agent's first report, without the screen name", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    await settle(25000);
+    agent({});
+    await settle();
+    // Counted from when the report arrived (the 2 s poll), so 10 s or just under.
+    expect(status(wrapper)).toMatch(/^Checking the power before changing anything · (10|9) s$/);
     expect(wrapper.text()).toContain("watches the power supply for 10 s");
     expect(primary(wrapper).exists()).toBe(false);
     await settle(3000);
-    expect(status(wrapper)).toContain("· 7 s");
+    expect(status(wrapper)).toMatch(/· [67] s$/);
   });
 
   it("refuses to start when the power already shows trouble at idle", async () => {

@@ -150,11 +150,17 @@ for (const [size, viewport] of SIZES) {
       await group.getByRole("switch", { name: "Ramp brightness at sleep and wake" }).click();
       await expect(dialog(page)).toBeVisible();
       await expect(dialog(page)).toContainText(
-        "Checking hallway-pi's power before changing anything"
+        "Waiting for the screen to pick up the check. It checks in about once a minute."
       );
 
-      // Power check, then step 1: the agent finds the display.
+      // The screen picks the check up: the power watch starts, without its name.
       await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
+      api.agentReport("hallway", {});
+      await expect(dialog(page)).toContainText("Checking the power before changing anything", {
+        timeout: 8000,
+      });
+
+      // Then step 1: the agent finds the display.
       api.agentReport("hallway", {
         preflight: { status: "clean", faults: [] },
         start: { level: 20, known: true, source: "read" },

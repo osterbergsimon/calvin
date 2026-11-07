@@ -137,8 +137,13 @@ matches what was typed.
 
 ### 3.2 States, copy and the primary action
 
-**Before step 1: power check (preflight).** Unchanged from v2: it runs when the dialog opens, writes nothing, and
-shows "Checking {screen}'s power before changing anything · 7 s". Trouble at idle shows the v2 "has power trouble
+**Before step 1: waiting for the screen (calvin-elko).** The agent only picks a check up on its next config poll
+(up to about a minute), so the dialog first shows "Waiting for the screen to pick up the check. It checks in about
+once a minute." with no countdown and Stop available. The power check below starts when the agent's first report for
+this run arrives (arrival time in the browser, not the screen's clock).
+
+**Before step 1: power check (preflight).** Unchanged from v2 apart from when it starts: it writes nothing, and
+shows "Checking the power before changing anything · 7 s" (no screen name), counting 10 s from the first report. Trouble at idle shows the v2 "has power trouble
 already" state with **How to fix the power** as the primary and **Check again** / **Close** as secondaries.
 
 **Step 1: Find the display** (detect)
