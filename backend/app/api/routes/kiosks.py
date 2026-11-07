@@ -57,9 +57,32 @@ async def get_kiosk_overrides(kiosk_id: str):
 async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     """Replace a kiosk's override layer (upsert). Validated + size-capped."""
     _valid_id_or_400(kiosk_id)
+    _check_floor_under_limit(body.overrides)
     _checked_overrides(body.overrides)
     await set_overrides(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": body.overrides}
+
+
+def _check_floor_under_limit(layer: dict) -> None:
+    """422 when the layer's ``brightnessFloor`` is above its ``brightnessLimit``."""
+
+    def pick(*keys):
+        for key in keys:
+            value = layer.get(key)
+            if isinstance(value, int) and not isinstance(value, bool):
+                return value
+        return None
+
+    floor = pick("brightnessFloor", "brightness_floor")
+    limit = pick("brightnessLimit", "brightness_limit")
+    if floor is not None and limit is not None and floor > limit:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "floor_above_limit",
+                "message": f"The lowest level ({floor}) cannot be above the limit ({limit}).",
+            },
+        )
 
 
 def _checked_overrides(overrides: dict) -> None:
@@ -98,6 +121,9 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
                     ),
                 },
             )
+    stored = await get_overrides(kiosk_id)
+    if stored is not None:
+        _check_floor_under_limit({**stored, **body.overrides})
     _checked_overrides(body.overrides)
     merged = await merge_into_overrides(kiosk_id, body.overrides)
     if merged is None:
@@ -166,15 +192,9 @@ async def _check_value_under_limit(
         return  # unknown kiosk: start_run answers 404
     merged = merge_overrides(await build_global_config(), overrides)
     saved = merged.get("brightnessLimit", merged.get("brightness_limit"))
-    limits = [saved] if isinstance(saved, int) and not isinstance(saved, bool) else []
-    try:
-        # A limit this run found but the admin has not saved yet counts too.
-        limits.append(await display_check.found_limit(kiosk_id))
-    except display_check.NoLimitError:
-        pass
-    if not limits:
+    if not isinstance(saved, int) or isinstance(saved, bool):
         return
-    limit = min(limits)
+    limit = saved
     step = merged.get("brightnessStep", merged.get("brightness_step"))
     step = step if isinstance(step, int) and not isinstance(step, bool) else 2
     top = max(0, limit - 2 * min(max(step, 1), 5))
@@ -264,16 +284,13 @@ async def stop_display_check(kiosk_id: str):
 
 @router.post("/kiosks/{kiosk_id}/display-check/save-limit")
 async def save_display_check_limit(kiosk_id: str):
-    """Save the limit the latest limit run found as the screen's ``brightnessLimit`` (admin)."""
+    """Save the limit the latest calibration fault implies as ``brightnessLimit`` (admin)."""
     _valid_id_or_400(kiosk_id)
     try:
-        try:
-            limit = await display_check.found_limit(kiosk_id)
-        except display_check.NoLimitError:
-            # No limit-step result: a calibration fault implies one (calvin-c805).
-            limit = await display_check.fault_limit_for_save(
-                kiosk_id, display_check._settings(await _screen_settings(kiosk_id))[1]
-            )
+        # A calibration fault implies a limit (calvin-c805).
+        limit = await display_check.fault_limit_for_save(
+            kiosk_id, display_check._settings(await _screen_settings(kiosk_id))[1]
+        )
     except display_check.UnknownKioskError:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     except display_check.NoLimitError:

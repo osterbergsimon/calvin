@@ -45,6 +45,7 @@ BRIGHTNESS_KEYS = frozenset(
         "brightnessRampEnabled",
         "brightness",
         "brightnessLimit",
+        "brightnessFloor",
         "brightnessStep",
         "brightnessStepSeconds",
         "brightnessConversion",
@@ -57,6 +58,7 @@ BRIGHTNESS_SNAKE_KEYS = frozenset(
     {
         "brightness_ramp_enabled",
         "brightness_limit",
+        "brightness_floor",
         "brightness_step",
         "brightness_step_seconds",
         "brightness_conversion",
@@ -226,6 +228,13 @@ class ConfigUpdate(BaseModel):
                 raise ValueError("send clockBarDesign, not clock_bar_design")
         return data
 
+    @model_validator(mode="after")
+    def _check_floor_under_limit(self) -> ConfigUpdate:
+        floor, limit = self.brightnessFloor, self.brightnessLimit
+        if floor is not None and limit is not None and floor > limit:
+            raise ValueError("brightnessFloor must not exceed brightnessLimit")
+        return self
+
     @field_validator("gitRepoUrl")
     @classmethod
     def _check_git_repo_url(cls, value: str | None) -> str | None:
@@ -281,6 +290,9 @@ class ConfigUpdate(BaseModel):
     brightnessRampEnabled: StrictBool | None = None
     brightness: StrictInt | None = Field(None, ge=0, le=100)
     brightnessLimit: StrictInt | None = Field(None, ge=0, le=100)
+    # The lowest level Calvin dims to (dim-only sleep, the ramp's lower bound);
+    # never above the limit (calvin-idts).
+    brightnessFloor: StrictInt | None = Field(None, ge=0, le=100)
     brightnessStep: StrictInt | None = Field(None, ge=1, le=5)
     brightnessStepSeconds: float | None = Field(None, ge=0.5, le=10)
     brightnessConversion: list[BrightnessPoint] | None = Field(None, max_length=20)
