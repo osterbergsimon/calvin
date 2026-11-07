@@ -57,14 +57,14 @@ async def get_kiosk_overrides(kiosk_id: str):
 async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     """Replace a kiosk's override layer (upsert). Validated + size-capped."""
     _valid_id_or_400(kiosk_id)
-    _check_floor_under_limit(body.overrides)
+    _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
     _checked_overrides(body.overrides)
     await set_overrides(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": body.overrides}
 
 
 def _check_floor_under_limit(layer: dict) -> None:
-    """422 when the layer's ``brightnessFloor`` is above its ``brightnessLimit``."""
+    """422 when the EFFECTIVE (household + override) floor is above the limit."""
 
     def pick(*keys):
         for key in keys:
@@ -123,7 +123,8 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
             )
     stored = await get_overrides(kiosk_id)
     if stored is not None:
-        _check_floor_under_limit({**stored, **body.overrides})
+        layer = {**stored, **body.overrides}
+        _check_floor_under_limit(merge_overrides(await build_global_config(), layer))
     _checked_overrides(body.overrides)
     merged = await merge_into_overrides(kiosk_id, body.overrides)
     if merged is None:
@@ -301,7 +302,12 @@ async def save_display_check_limit(kiosk_id: str):
                 "message": "The latest display check did not find a limit.",
             },
         )
-    overrides = await merge_into_overrides(kiosk_id, {"brightnessLimit": limit})
+    update: dict = {"brightnessLimit": limit}
+    stored = await get_overrides(kiosk_id) or {}
+    floor = stored.get("brightnessFloor", stored.get("brightness_floor"))
+    if isinstance(floor, int) and not isinstance(floor, bool) and floor > limit:
+        update["brightnessFloor"] = limit  # the floor never sits above the limit
+    overrides = await merge_into_overrides(kiosk_id, update)
     if overrides is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
     logger.info(f"Saved brightness limit {limit} for kiosk {kiosk_id!r}")

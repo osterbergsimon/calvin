@@ -334,16 +334,21 @@ Design (UI): [brightness-ramp-ui.md](../../design/2026-11-04-brightness-ramp-ui.
 - **`read`** (any number of times after `detect`): one DDC `getvcp 0x10`, **no write**. Report
   `{step: "read", status: "done", level: <ddc read>, lastWrite: <level the agent last wrote this run, or null>}`;
   stored in `steps.read` (`level`, `lastWrite`). `status: "error"` + `detail` when the read fails (that ends the run).
-  `ddc == lastWrite` (or an unchanged value across reads) tells the UI the read-back does not follow the buttons.
+  A read never changes the run's level, the controller level or `last_set` (many panels answer with a constant, often
+  100). `ddc == lastWrite` (or an unchanged value across reads) tells the UI the read-back does not follow the buttons.
 - **Fallback** for a read-back that does not follow: the existing `write`/`conversion` steps, floor `5` then `1`,
   never above the run's start (the §10.2.1 rules, unchanged; the third-reading exception is removed).
 - **`brightnessFloor`** (§10.1): the lowest level Calvin dims to. The agent uses it as the dim-only sleep level, as
-  the lower bound of the ramp target (`brightness` never goes under it) and as the drop target below. Unset means
-  the old behaviour (0 for sleep, no bound).
+  the lower bound of the ramp target (`brightness` never goes under it). Dim sleep and the shutdown write go to
+  `min(floor, ceiling, current level)`, never upward, and the level actually written is remembered. Unset means the
+  old behaviour (0). `floor <= limit` is enforced on the effective (household + override) config (422
+  `floor_above_limit`); `save-limit` clamps a floor above the new limit down to it.
 - **Faults:** a fault at any point of a check (preflight, `read`, `write`, `conversion`) ends the run `error` /
-  `power_trouble` with `fault` recorded (`fault.step` may be `read`). The agent drops the screen to the floor
-  (`brightnessFloor`, else `5`; never above the run's known start) in **one write**, then settles as in v2. No slow
-  ramp. A **Stop** at any time drops the same way, immediately, and does not climb back to the start.
+  `power_trouble` with `fault` recorded (`fault.step` may be `read`; its level and `lastGood` are the last level Calvin
+  wrote). The agent drops the screen in **one write** to `min(5, brightnessFloor, ceiling, run start, level it knows)`,
+  at least 1 while it is lit (a floor of 0 does not black the dialog), then settles as in v2. No slow ramp. With the
+  ramp on, a **Stop** at any time drops the same way, immediately, and does not climb back; with the ramp off it
+  returns to the start level as in v2.
 - **Fault before Stop** (calvin-qkm8): `ramp_brightness` polls faults **before** it checks the Stop, and re-polls once
   after a Stop, so a fault that arrives in the same poll is recorded (the 2026-11-07 01:21 sequence: the touchscreen
   USB device reset as Stop was pressed, the fault was dropped and the run ended with `limit` and `powerTrouble` null).
@@ -352,8 +357,10 @@ Design (UI): [brightness-ramp-ui.md](../../design/2026-11-04-brightness-ramp-ui.
   `brightnessLimit` only. `value_above_limit` and `value_above_ceiling` stay.
 - **Shutdown (boot side).** The max can be 100 while the panel is on, but powering the panel on at a high level
   surges and browns out the Pi. Sleep/wake already covers it (dim before sleep, ramp up after wake). On the boot side
-  the agent handles SIGTERM (systemd stopping it for a shutdown or reboot): with the ramp on and the panel awake it
-  writes `brightnessFloor` (0 when unset) in **one** DDC write before exiting, so the panel powers on low next boot;
+  the agent handles SIGTERM and, only when `systemctl is-system-running` says `stopping` (a real shutdown or reboot,
+  not an updater restart), with the ramp on and the panel awake, writes the dim target (floor, 0 when unset) in **one**
+  DDC write before exiting. It first sets a shutdown flag that stops any ramp or check from writing, then takes the
+  brightness lock for at most 1.5 s, so the panel powers on low next boot;
   the first-wake ramp brings it up. The write runs in a thread abandoned after 4 s, and the unit has
   `TimeoutStopSec=15`, so it can never hold the shutdown up. Skipped when the ramp is off, the agent has not yet
   reconciled, or the panel is asleep (already at its sleep level). Logged. **Unplanned power cuts are out of scope**

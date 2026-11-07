@@ -900,6 +900,25 @@ class BrightnessController:
         # The level a dim-only sleep stopped at (the screen's floor); None when
         # the panel sleeps at 0 or is awake.
         self.dim_level = None
+        # Set once the agent is shutting down: no ramp or check may write after.
+        self.stopping = threading.Event()
+
+    def _write(self, level):
+        if self.stopping.is_set():
+            return False
+        return self.ddc.set_brightness(level)
+
+    def dim_target(self, settings):
+        """Where a sleep or shutdown dim goes: the floor, capped, never upward.
+
+        min(floor, ceiling, current level); an unknown level dims to 0.
+        """
+        if self.level is None:
+            return 0
+        target = min(
+            floor_level(settings), brightness_ceiling(settings, self._ceiling())
+        )
+        return max(0, min(target, self.level))
 
     def get_level(self):
         with self.lock:
@@ -943,7 +962,7 @@ class BrightnessController:
             if self.level is None:
                 # Never trust the value the panel held before the restart: the
                 # first write is 0, then the ramp goes on from there.
-                if not self.ddc.set_brightness(0):
+                if not self._write(0):
                     self.log("brightness: could not write 0 from an unknown level")
                     return {
                         "level": None,
@@ -958,7 +977,7 @@ class BrightnessController:
             outcome = ramp_brightness(
                 self.level,
                 target,
-                write=self.ddc.set_brightness,
+                write=self._write,
                 fault=self.fault,
                 sleep=self.sleep,
                 step=self.settings["step"],
@@ -1006,7 +1025,7 @@ class BrightnessController:
 
     def _sleep_dim(self, settings, cancel):
         """Dim only: stay powered and running, take the backlight to the floor."""
-        floor = floor_level(settings)
+        floor = self.dim_target(settings)
         if self.level != floor:
             outcome = self._ramp(floor, cancel=cancel)
             if outcome.get("cancelled"):
@@ -1019,8 +1038,10 @@ class BrightnessController:
                 return "failed"
         self.panel_off = False
         self.sleeping = True
-        self.dim_level = floor
-        self.log(f"brightness: dim-only sleep at {floor}; panel stays powered")
+        # What was actually written, so a later floor change cannot make the
+        # sleeping panel look awake.
+        self.dim_level = self.level if self.level is not None else floor
+        self.log(f"brightness: dim-only sleep at {self.dim_level}; panel stays powered")
         return "ok"
 
     def reconcile(self, cfg, now, last_on, cancel=None):
@@ -1356,6 +1377,9 @@ class DisplayCheckRunner:
         self._placeholder = None
         self.limit = None  # kept in the payload (null): v3 finds no limit
         self.last_write = None  # the level this run last wrote (None: none yet)
+        # The level is known once the controller had one or this run wrote one;
+        # a DDC read never makes it known (read-backs can be fakes).
+        self._level_known = controller is not None and controller.get_level() is not None
         self.settled = False
         self._touched = False
         self._seen = set()
@@ -1394,8 +1418,11 @@ class DisplayCheckRunner:
         self._save()
 
     def _write_level(self, level):
+        if self.controller is not None and self.controller.stopping.is_set():
+            return False  # the agent is shutting down
         if not self.ddc.set_brightness(level):
             return False
+        self._level_known = True
         self.level = level
         self.last_write = level
         self._touched = True
@@ -1558,22 +1585,34 @@ class DisplayCheckRunner:
         if self.fault is not None and level not in self.fault["alsoAt"]:
             self.fault["alsoAt"].append(level)
 
-    def _floor(self):
-        """Where a fault or a Stop takes the screen: the floor setting, else 5."""
-        floor = self.live_settings.get("floor")
-        return CHECK_FLOOR if floor is None else floor
+    def _drop_target(self):
+        """The level a fault or Stop takes the screen to; never above the current one.
+
+        min(check floor 5, the floor setting, the ceiling, the run's start, the
+        level the agent knows). At least 1 while the screen is lit, so a floor
+        of 0 cannot black the dialog the owner is looking at.
+        """
+        live = self.live_settings
+        candidates = [CHECK_FLOOR, brightness_ceiling(live)]
+        if live.get("floor") is not None:
+            candidates.append(live["floor"])
+        if self._start_level() is not None:
+            candidates.append(self._start_level())
+        current = self.level if self._level_known else None
+        if current is not None:
+            candidates.append(current)
+        target = max(0, min(candidates))
+        if target < 1 and (current is None or current >= 1):
+            target = 1
+        return target
 
     def _drop_to_floor(self):
-        """ONE write to the floor (no slow ramp, no polling).
+        """ONE write to the drop target (no slow ramp, no polling).
 
-        Always written, even when the agent's own record says it is already
-        there: the owner moves the panel with its own buttons between reads, so
-        that record can be stale-low. Never above the run's known start.
+        Written even when the agent's record says it is already there: the
+        owner moves the panel with its own buttons between reads.
         """
-        target = self._floor()
-        start = self._start_level()
-        if start is not None:
-            target = min(target, start)
+        target = self._drop_target()
         lock = self.controller.lock if self.controller is not None else threading.Lock()
         with lock:
             self._entry(f"dropping to {target} in one step")
@@ -1711,16 +1750,17 @@ class DisplayCheckRunner:
             )
             return
         if step == "read":
-            # Calibration v3: read the level the panel is at now. No write, ever.
+            # Calibration v3: report what the panel answers. No write, and the
+            # answer never moves the level, the controller level or last_set:
+            # many panels answer with a constant (often 100).
             try:
                 read = self.ddc.read_brightness()
             except Exception:
                 read = None
             lines = self._polled_faults()
             if lines:
-                self._calibration_fault(
-                    "read", read if read is not None else self.level, self.level, lines
-                )
+                # Blame the last level Calvin wrote, never the read value.
+                self._calibration_fault("read", self.last_write, self.last_write, lines)
                 return
             if read is None:
                 self.reason = "read_failed"
@@ -1728,10 +1768,7 @@ class DisplayCheckRunner:
                 self._entry("the display did not answer a brightness read")
                 self._stop_reason = "error"
                 return
-            self.level = read  # what the panel really shows now
-            if self.controller is not None:
-                self.controller.set_level(read)
-            self._entry(f"read DDC {read}; last written {self.last_write}")
+            self._entry(f"read DDC {read}; last written {self.last_write}", level=read)
             self.report(
                 self._payload(
                     "done",
@@ -1779,9 +1816,16 @@ class DisplayCheckRunner:
         return CHECK_FLOOR if start is None else start
 
     def _finish(self, status):
-        if status in ("stopped", "timeout") and self.fault is None and self.panel_on():
-            # A Stop (or the run's end of life) takes the screen down at once:
-            # one write, no climb back to the start (calvin-qkm8).
+        if (
+            status in ("stopped", "timeout")
+            and self.fault is None
+            and self.settings["enabled"]
+            and self.panel_on()
+        ):
+            # With the ramp on, a Stop (or the run's end of life) takes the
+            # screen down at once: one write, no climb back (calvin-qkm8).
+            # With the ramp off the agent does not own brightness: it returns
+            # to the start level as before.
             target = None
             self._drop_to_floor()
         else:
@@ -3374,15 +3418,19 @@ def watchdog_applies(stack):
     return stack != "cog"
 
 
-def shutdown_dim(controller, *, log_fn=None, timeout=SHUTDOWN_DIM_SECONDS):
-    """On SIGTERM (shutdown/reboot): ONE write of the floor (0 when unset).
+def shutdown_dim(controller, *, log_fn=None, timeout=SHUTDOWN_DIM_SECONDS, lock_timeout=1.5):
+    """On a real shutdown/reboot: ONE write of the floor (0 when unset).
 
     Powering the panel on at a high level surges and browns out the Pi, so it
     must come up low next boot; the first-wake ramp then brings it up. Skipped
-    when the ramp is off, the agent never reconciled, or the panel is asleep
-    (already at its sleep level). The write runs in a daemon thread and is
-    abandoned after `timeout` seconds so it can never hold the shutdown up.
-    Returns True when the write succeeded.
+    when the ramp is off, the agent never reconciled, the panel is asleep, or
+    the panel is already at or below the target. The target is
+    min(floor, ceiling, current level): never upward.
+
+    Sets `controller.stopping` first so no ramp or check starts another write,
+    takes the brightness lock for at most `lock_timeout`, then writes. The whole
+    thing runs in a daemon thread abandoned after `timeout` seconds so it can
+    never hold the shutdown up. Returns True when the write succeeded.
     """
     log_fn = log_fn or log
     settings = getattr(controller, "settings", None)
@@ -3390,14 +3438,23 @@ def shutdown_dim(controller, *, log_fn=None, timeout=SHUTDOWN_DIM_SECONDS):
         return False
     if controller.sleeping is True or controller.panel_off:
         return False
-    target = floor_level(settings)
+    controller.stopping.set()
+    target = controller.dim_target(settings)
+    if controller.level is not None and controller.level <= target:
+        return False
     result = {"ok": False}
 
     def write():
+        locked = controller.lock.acquire(timeout=lock_timeout)
         try:
+            if not locked:
+                log_fn("brightness: shutdown could not take the lock in time; writing anyway")
             result["ok"] = bool(controller.ddc.set_brightness(target))
         except Exception as e:
             log_fn(f"brightness: shutdown write failed ({e})")
+        finally:
+            if locked:
+                controller.lock.release()
 
     thread = threading.Thread(target=write, daemon=True, name="calvin-shutdown-dim")
     thread.start()
@@ -3413,14 +3470,39 @@ def shutdown_dim(controller, *, log_fn=None, timeout=SHUTDOWN_DIM_SECONDS):
     return result["ok"]
 
 
-def install_shutdown_handler(controller):
-    """SIGTERM: dim once (bounded), then exit cleanly."""
+def system_stopping(run=subprocess.run):
+    """True while systemd is taking the whole system down (shutdown/reboot).
+
+    A plain service restart (the updater's) leaves the system 'running', so the
+    agent does not dim then.
+    """
+    try:
+        r = run(
+            ["systemctl", "is-system-running"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return (getattr(r, "stdout", "") or "").strip() == "stopping"
+
+
+def make_shutdown_handler(controller, is_stopping=system_stopping):
+    """The SIGTERM handler: dim once on a real shutdown (bounded), then exit."""
 
     def handler(signum, frame):
-        shutdown_dim(controller)
-        sys.exit(0)
+        try:
+            if is_stopping():
+                shutdown_dim(controller)
+        finally:
+            sys.exit(0)
 
-    signal.signal(signal.SIGTERM, handler)
+    return handler
+
+
+def install_shutdown_handler(controller):
+    signal.signal(signal.SIGTERM, make_shutdown_handler(controller))
 
 
 def main():

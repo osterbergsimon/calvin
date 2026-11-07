@@ -125,3 +125,38 @@ def test_the_household_config_refuses_the_floor_like_the_other_brightness_keys(
 ):
     resp = test_client.post("/api/config", json={"brightnessFloor": 3})
     assert resp.status_code == 422
+
+
+@pytest.mark.integration
+def test_the_floor_is_checked_against_the_effective_limit(
+    test_client: TestClient,
+    kiosk,
+    monkeypatch,  # noqa: F811
+):
+    """A limit that only the household layer carries still bounds the floor."""
+    from app.api.routes import kiosks as routes
+
+    async def household():
+        return {"brightness_limit": 20}
+
+    monkeypatch.setattr(routes, "build_global_config", household)
+    over = test_client.patch(OVERRIDES, json={"overrides": {"brightnessFloor": 21}})
+    assert over.status_code == 422
+    assert (
+        test_client.put(OVERRIDES, json={"overrides": {"brightnessFloor": 21}}).status_code == 422
+    )
+    assert (
+        test_client.patch(OVERRIDES, json={"overrides": {"brightnessFloor": 20}}).status_code == 200
+    )
+
+
+@pytest.mark.integration
+def test_saving_a_fault_limit_clamps_a_floor_above_it(test_client: TestClient, kiosk):  # noqa: F811
+    test_client.put(OVERRIDES, json={"overrides": {"brightnessFloor": 12, "brightnessLimit": 40}})
+    run = _start(test_client, "write").json()
+    fault = {"step": "write", "level": 12, "kind": "under-voltage", "lastGood": 14, "alsoAt": []}
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=fault)
+    saved = test_client.post(f"{BASE}/save-limit")
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["brightnessLimit"] == 10
+    assert saved.json()["overrides"]["brightnessFloor"] == 10  # clamped down to the new limit

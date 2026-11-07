@@ -3709,7 +3709,7 @@ def _cal_job(step, value=None, ceiling=None, action="start"):
 
 
 def _cal_runner(step, tmp_path, *, level=19, ddc=None, fault=None, value=None,
-                ceiling=None, poll=None):
+                ceiling=None, poll=None, cfg_over=None):
     """A runner with a controller, the screen's last set level known (or not)."""
     clock = FakeClock()
     fault = fault or ConsumingFault()
@@ -3720,7 +3720,7 @@ def _cal_runner(step, tmp_path, *, level=19, ddc=None, fault=None, value=None,
     reports = []
     runner = agent.DisplayCheckRunner(
         _cal_job(step, value, ceiling),
-        _ramp_cfg(),
+        _ramp_cfg(**(cfg_over or {})),
         ddc=ddc,
         report=reports.append,
         poll=poll,
@@ -3950,7 +3950,7 @@ def test_finish_from_an_unknown_start_stays_at_the_floor(tmp_path):
     )
     runner.run()
     assert reports[-1]["status"] == "stopped"
-    assert ddc.writes[-1] == agent.CHECK_FLOOR  # back up to the floor, no further
+    assert ddc.writes[-1] <= agent.CHECK_FLOOR  # dropped, never climbing back up
     assert max(ddc.writes) <= agent.CHECK_FLOOR
 
 
@@ -4396,3 +4396,183 @@ def test_the_service_unit_allows_the_shutdown_write_time():
         Path(__file__).resolve().parents[1] / "systemd" / "calvin-display-agent.service"
     ).read_text()
     assert "TimeoutStopSec=" in unit
+
+
+# -- review round: read never moves the level, floor capped, shutdown safety ---
+def test_a_fake_read_back_never_moves_the_runs_level(tmp_path):
+    ddc = ReadingDdc(read=100)  # a panel whose read-back is a constant 100
+    runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=19, ddc=ddc)
+    runner._execute(_cal_job("read"))
+    done = reports[-1]
+    assert done["level"] == 100  # reported as read
+    assert runner.level == 19
+    assert runner.last_set == 19
+    assert runner.controller.get_level() == 19
+    runner._execute(_cal_job("write"))
+    assert ddc.writes and max(ddc.writes) <= 19  # nothing above the start
+    runner._finish("done")
+    assert max(ddc.writes) <= 19
+    assert runner.start["source"] == "last_set"  # 100 is not mistaken for a known start
+
+
+def test_a_fault_during_read_blames_the_last_write_not_the_read(tmp_path):
+    fault = ConsumingFault()
+
+    class ReadFaults(ReadingDdc):
+        def read_brightness(self_inner):
+            fault.faults.append("Under-voltage detected!")
+            return 100
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadFaults(), fault=fault
+    )
+    runner._write_level(9)
+    runner._execute(_cal_job("read"))
+    incident = runner.fault
+    assert incident["step"] == "read"
+    assert incident["level"] == 9
+    assert incident["lastGood"] == 9
+
+
+def _dim_controller(level, **cfg):
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg(**cfg))
+    controller.level = level
+    controller.panel_off = False
+    controller.sleeping = False
+    return controller, ddc
+
+
+def test_dim_only_sleep_is_capped_by_the_ceiling():
+    controller, ddc = _dim_controller(50, brightnessFloor=40, brightness_limit=30)
+    controller._sleep_dim(controller.settings, None)
+    assert ddc.writes[-1] == 26  # limit 30 - 2 * 2, not the floor 40
+    assert controller.dim_level == 26
+
+
+def test_dim_only_sleep_never_goes_up_to_the_floor():
+    controller, ddc = _dim_controller(10, brightnessFloor=40)
+    controller._sleep_dim(controller.settings, None)
+    assert all(w <= 10 for w in ddc.writes)
+    assert controller.dim_level == 10
+
+
+def test_dim_level_remembers_what_was_written_when_the_floor_changes_later():
+    controller, ddc = _dim_controller(30, brightnessFloor=4)
+    controller._sleep_dim(controller.settings, None)
+    assert controller.dim_level == 4
+    controller.settings = agent.brightness_settings(_ramp_cfg(brightnessFloor=9))
+    assert controller.level == controller.dim_level  # still recognised as asleep
+
+
+def test_shutdown_dim_is_capped_and_never_goes_up():
+    controller, ddc = _dim_controller(10, brightnessFloor=40)
+    agent.shutdown_dim(controller, log_fn=lambda line: None)
+    assert all(w <= 10 for w in ddc.writes)
+    controller, ddc = _dim_controller(60, brightnessFloor=40, brightness_limit=30)
+    agent.shutdown_dim(controller, log_fn=lambda line: None)
+    assert ddc.writes == [26]
+
+
+def test_a_check_drop_with_an_unknown_start_never_brightens(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=10, cfg_over={"brightnessFloor": 40}
+    )
+    assert runner.start is None
+    runner._drop_to_floor()
+    assert ddc.writes == [agent.CHECK_FLOOR]  # min(5, floor 40, level 10): never up
+
+
+def test_a_check_drop_with_an_unknown_level_is_the_check_floor(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=None, cfg_over={"brightnessFloor": 40}
+    )
+    runner._drop_to_floor()
+    assert ddc.writes == [agent.CHECK_FLOOR]
+
+
+def test_a_floor_of_zero_does_not_black_the_screen_during_a_check(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "write", tmp_path, level=19, cfg_over={"brightnessFloor": 0}
+    )
+    runner._drop_to_floor()
+    assert ddc.writes == [1]
+
+
+def test_stop_with_the_ramp_off_returns_to_the_start_level(tmp_path):
+    job = _cal_job("conversion", 10)
+    stop = {"on": False}
+    ddc = FakeDdc(on_write=lambda level: stop.update(on=True) if level == 10 else None)
+
+    def poll():
+        return {"displayCheck": {**job, "action": "stop" if stop["on"] else "start"}}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=10, poll=poll, ddc=ddc,
+        cfg_over={"brightness_ramp_enabled": False},
+    )
+    runner.run()
+    assert reports[-1]["status"] == "stopped"
+    assert ddc.writes[-1] == 19
+    assert max(ddc.writes) <= 19
+
+
+def test_writes_stop_once_the_agent_is_shutting_down(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path, level=19)
+    runner.controller.stopping.set()
+    assert runner._write_level(5) is False
+    assert ddc.writes == []
+
+
+def test_a_controller_ramp_stops_when_the_agent_is_shutting_down():
+    ddc = FakeDdc()
+    controller, clock, applied = _controller(ddc)
+    controller.settings = agent.brightness_settings(_ramp_cfg())
+    controller.level = 0
+    controller.stopping.set()
+    controller._ramp(20)
+    assert ddc.writes == []
+
+
+def test_shutdown_dim_waits_for_the_lock_then_writes_once():
+    controller, ddc = _dim_controller(40)
+    order = []
+    ddc.on_write = lambda level: order.append(("write", level))
+    held = threading.Event()
+
+    def holder():
+        with controller.lock:
+            held.set()
+            time_module.sleep(0.2)
+            order.append(("released", None))
+
+    t = threading.Thread(target=holder)
+    t.start()
+    held.wait(2)
+    assert agent.shutdown_dim(controller, log_fn=lambda line: None, lock_timeout=2) is True
+    t.join()
+    assert order == [("released", None), ("write", 0)]
+    assert controller.stopping.is_set()
+
+
+def test_the_sigterm_handler_dims_only_on_a_real_system_shutdown():
+    for stopping, expected in ((True, [0]), (False, [])):
+        controller, ddc = _dim_controller(40)
+        handler = agent.make_shutdown_handler(controller, is_stopping=lambda: stopping)
+        with pytest.raises(SystemExit):
+            handler(15, None)
+        assert ddc.writes == expected
+
+
+def test_system_stopping_reads_systemctl():
+    def fake(out):
+        return lambda argv, **kw: SimpleNamespace(stdout=out, returncode=0)
+
+    assert agent.system_stopping(run=fake("stopping\n")) is True
+    assert agent.system_stopping(run=fake("running\n")) is False
+
+    def boom(argv, **kw):
+        raise OSError("no systemctl")
+
+    assert agent.system_stopping(run=boom) is False
