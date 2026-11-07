@@ -636,39 +636,136 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
   });
 });
 
+// A power drop on the highest step (calvin-tzzx): the dialog shows only the
+// post-drop text; the next reading is the highest reading.
+const FAULT = { step: "read", level: 5, kind: "under-voltage", lastGood: 20, alsoAt: [] };
+async function dropAtHighest({ ends = true, typed = 74 } = {}) {
+  await toStep2();
+  await find(wrapper, "reading-input").setValue(String(typed));
+  await clickPrimary(wrapper);
+  if (ends) agent({ status: "error", reason: "power_trouble", fault: FAULT });
+  else agent({ fault: FAULT });
+  await settle();
+}
+
 describe("power trouble in a step", () => {
-  it("tells the person to lower the level on the panel and read it again", async () => {
-    await toStep2();
+  for (const ends of [true, false]) {
+    it(`shows only the post-drop text when the agent ${ends ? "ends" : "keeps"} the run`, async () => {
+      await dropAtHighest({ ends });
+      const body = find(wrapper, "check-step-body").text();
+      expect(body).toContain("The power dropped. Calvin dimmed the screen to keep it safe.");
+      expect(body).toContain(
+        "Use the panel's buttons to set Brightness one step below where it cut out. Then type the number its menu shows now."
+      );
+      // Not the normal step text, not a banner naming Calvin's dim level, no "ended".
+      expect(body).not.toContain("Use the panel's own buttons to set Brightness to the highest");
+      expect(body).not.toContain("Calvin starts the screen at the minimum");
+      expect(body).not.toContain("Power trouble at");
+      expect(body).not.toContain("ended the check");
+      expect(find(wrapper, "check-fault").exists()).toBe(false);
+      expect(find(wrapper, "reading-input").exists()).toBe(true);
+      expect(primary(wrapper).text()).toBe("Read it");
+      expect(find(wrapper, "check-back").text()).toBe("Back");
+      expect(patches()).toHaveLength(0);
+    });
+  }
+
+  it("takes the next reading as the highest, with the typed panel number, and goes to Everyday", async () => {
+    await dropAtHighest({ typed: 74 });
     await find(wrapper, "reading-input").setValue("60");
     await clickPrimary(wrapper);
-    agent({
-      status: "error",
-      reason: "power_trouble",
-      fault: { step: "read", level: 20, kind: "under-voltage", lastGood: 20, alsoAt: [] },
-    });
+    expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
+    agentStep("read", { level: 18, lastWrite: null });
     await settle();
-    expect(find(wrapper, "check-fault").exists()).toBe(true);
+    expect(status(wrapper)).toContain("Step 3 of 4");
+    expect(find(wrapper, "check-fault").exists()).toBe(false);
+    await readLevel(40, 12);
+    await clickPrimary(wrapper);
+    await readLevel(10, 2);
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 60 · Calvin 18");
+    expect(find(wrapper, "check-summary").text()).not.toContain("74");
+    await clickPrimary(wrapper);
+    expect(patches().at(-1)[0]).toMatchObject({
+      brightnessLimit: 18,
+      brightnessConversion: [
+        { ddc: 2, menu: 10 },
+        { ddc: 12, menu: 40 },
+        { ddc: 18, menu: 60 },
+      ],
+    });
+  });
+
+  it("works with a run the agent kept open: Read it moves that run to a read", async () => {
+    await dropAtHighest({ ends: false });
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    expect(lastStep()).toEqual({ step: "read" });
+    expect(find(wrapper, "check-fault").exists()).toBe(false);
+    expect(status(wrapper)).toContain("Reading");
+  });
+
+  it("at a later level shows the same post-drop text and reads that level", async () => {
+    await toStep3();
+    await find(wrapper, "reading-input").setValue("30");
+    await clickPrimary(wrapper);
+    agent({ status: "error", reason: "power_trouble", fault: FAULT });
+    await settle();
     expect(wrapper.text()).toContain(
-      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
+      "The power dropped. Calvin dimmed the screen to keep it safe."
     );
-    expect(primary(wrapper).text()).toBe("Read it again");
+    await find(wrapper, "reading-input").setValue("25");
+    await clickPrimary(wrapper);
+    expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
+  });
+});
+
+describe("Back and Remove", () => {
+  it("Back from the post-drop state returns to the first step", async () => {
+    await dropAtHighest();
+    await find(wrapper, "check-back").trigger("click");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Step 1 of 4");
+    expect(find(wrapper, "check-fault").exists()).toBe(false);
+  });
+
+  it("Back from an unread step retakes the previous reading and discards it", async () => {
+    await toStep3();
+    expect(status(wrapper)).toContain("Step 3 of 4");
+    await find(wrapper, "check-back").trigger("click");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Step 2 of 4");
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+    expect(find(wrapper, "reading-input").element.value).toBe("60");
+  });
+
+  it("Back from a finished reading goes to the step before and keeps nothing for both", async () => {
+    await toStep3();
+    await readLevel(40, 12);
+    await find(wrapper, "check-back").trigger("click");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Step 2 of 4");
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+  });
+
+  it("the summary lists a Remove per reading; removing one retakes just that step", async () => {
+    await toSummary();
+    for (const i of [0, 1, 2]) expect(find(wrapper, `remove-reading-${i}`).exists()).toBe(true);
+    await find(wrapper, "remove-reading-1").trigger("click");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Step 3 of 4");
+    await readLevel(35, 10);
+    await clickPrimary(wrapper);
+    // The other readings are kept: straight back to the summary.
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 35 · Calvin 10");
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 60 · Calvin 20");
     expect(patches()).toHaveLength(0);
   });
 
-  it("Read it again starts a new session when the agent ended the first", async () => {
-    await toStep2();
-    await find(wrapper, "reading-input").setValue("60");
+  it("offers no Remove once saved", async () => {
+    await toSummary();
     await clickPrimary(wrapper);
-    agent({
-      status: "error",
-      reason: "power_trouble",
-      fault: { step: "read", level: 20, kind: "under-voltage", lastGood: 20 },
-    });
-    await settle();
-    await find(wrapper, "reading-input").setValue("55");
-    await clickPrimary(wrapper);
-    expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
-    expect(find(wrapper, "check-fault").exists()).toBe(false);
+    expect(find(wrapper, "remove-reading-0").exists()).toBe(false);
   });
 });
 
@@ -868,24 +965,6 @@ describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
     await clickPrimary(wrapper);
     expect(find(wrapper, "level-pair").exists()).toBe(false);
     expect(find(wrapper, "reading-input").element.value).toBe("40");
-  });
-
-  it("gives the dimmed-screen advice after a fault, and never prints Calvin with no number", async () => {
-    await toStep2();
-    await find(wrapper, "reading-input").setValue("60");
-    await clickPrimary(wrapper);
-    agent({
-      status: "error",
-      reason: "power_trouble",
-      fault: { step: "read", level: null, kind: "under-voltage", lastGood: null },
-    });
-    await settle();
-    expect(wrapper.text()).toContain(
-      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
-    );
-    const banner = find(wrapper, "check-fault").text();
-    expect(banner).toContain("Power trouble at Panel 60");
-    expect(banner).not.toMatch(/Calvin\s+·/);
   });
 
   it("leaves read-only and shows an ended state when the watched run ends", async () => {

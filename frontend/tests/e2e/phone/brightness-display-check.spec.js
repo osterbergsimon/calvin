@@ -273,7 +273,7 @@ for (const [size, viewport] of SIZES) {
       expect(api.displayCheckCalls).not.toContain("POST step");
     });
 
-    test("a fault in a step asks for a lower level; Stop answers at once", async ({ page }) => {
+    test("a power drop asks for one step below where it cut out", async ({ page }) => {
       const api = await installApiMock(page, {
         kioskExtras: { hallway: { displayStack: "cog", displayCheck: FOUND } },
       });
@@ -294,14 +294,18 @@ for (const [size, viewport] of SIZES) {
         reason: "power_trouble",
         fault: { step: "read", level: 20, kind: "under-voltage", at: "x", lastGood: 20 },
       });
-      await expect(dialog(page).locator('[data-test="check-fault"]')).toContainText(
-        "Power trouble at Calvin 20 · under-voltage",
+      await expect(body(page)).toContainText(
+        "The power dropped. Calvin dimmed the screen to keep it safe.",
         { timeout: 8000 }
       );
       await expect(body(page)).toContainText(
-        /The power dropped at that level\. Calvin dimmed the screen\. Set it back to one step below where it was and read it again\./
+        "Use the panel's buttons to set Brightness one step below where it cut out. Then type the number its menu shows now."
       );
-      await expect(dialog(page).getByRole("button", { name: "Read it again" })).toBeVisible();
+      await expect(body(page)).not.toContainText("Power trouble at");
+      await expect(
+        dialog(page).getByRole("button", { name: "Read it", exact: true })
+      ).toBeVisible();
+      await expect(dialog(page).getByRole("button", { name: "Back", exact: true })).toBeVisible();
       await shot(page, size, "check-fault");
       await expectPhoneLayout(page, `fault in a step (${size})`);
       expect(api.overridesByKiosk.hallway?.brightnessLimit).toBeUndefined();

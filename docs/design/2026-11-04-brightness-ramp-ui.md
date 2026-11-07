@@ -222,21 +222,30 @@ plus the three converted values.
   (§2). When everyday equals highest, the summary says so: "Brightness is kept 4 under the limit."
 - **Done before Save asks nothing.** There is no "Leave without saving?" modal; the stopped view (§3.6) says what was kept.
 
-### 3.5 Power trouble during a level
+### 3.5 Power trouble during a level (calvin-tzzx)
 
-A fault in any of steps 2–4 (or the fallback) shows the red banner from v2 ("Power trouble at Calvin 12 ·
-under-voltage", `role="alert"`, announced once, with later faults joining as "also at … while settling").
+After a power drop in step 2–4 the dialog shows **only** this, in place of the step's normal text, with no red banner
+(the banner used to name Calvin's dim level as the fault level and said the check had ended while the dialog went on):
 
 | State | Status line | Body | Primary | Secondary |
 |---|---|---|---|---|
-| Fault | "Power trouble · the panel's power dropped at that level" | "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again." The field is kept with what was typed. | **Read it again** | — |
+| After a drop | "Step 2 of 4 · Highest level · type what the panel's menu shows" | "The power dropped. Calvin dimmed the screen to keep it safe." / "Use the panel's buttons to set Brightness one step below where it cut out. Then type the number its menu shows now." and the number field | **Read it** | **Back** |
 
-- **The banner names the panel's level** the person typed ("Power trouble at Panel 60 · under-voltage") when the
-  agent reports no Calvin level, and never prints "Calvin" with no number.
-- **The agent ends the run itself** (touch may be dead). The dialog does not wait for a tap: the next **Read it again**
-  starts a new session if the old one has ended, or reuses it if it hasn't.
-- **Nothing from the faulted level is kept.** Pairs already read in this dialog stay on screen, but only Save writes.
-- **The limit step never raises the brightness**, so there is no "save the fault level as the limit" offer any more.
+- **That reading is the level's reading.** The typed panel number and a real Calvin read at **Read it** are stored as
+  the reading for the step; nothing is computed, estimated or excluded. After a drop on the **highest** step the check
+  goes **straight to the Everyday step** (no reading screen, no re-asking the highest). A drop on step 3 or 4 shows
+  the normal reading screen for that level.
+- **No delay for the dim.** Calvin dims at once; it never waits to read a value during the brownout.
+- **Works whether or not the agent ends the run.** If it ended, **Read it** starts a new session; if it kept it open,
+  the read moves that run on. A read that was waiting when the drop came is dropped (it can't be answered).
+- **Nothing from the faulted level is kept** other than the new reading. Only Save writes.
+- **The limit step never raises the brightness**, so there is no "save the fault level as the limit" offer.
+
+**Back and Remove.** Every step 2–4 has **Back** (text button, last secondary). It leaves the step, drops its reading
+and the previous step's, and returns to the previous step so that one is taken again (from step 2 it returns to
+"Found the display"). The summary lists each reading with **Remove**; Remove takes that one step again, keeps the
+other readings, and returns to the summary after the retake. Remove is gone once the readings are saved; nothing is
+saved until **Save**.
 
 ### 3.6 Stop (calvin-qkm8) and an unfinished run
 

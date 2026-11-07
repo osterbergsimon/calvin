@@ -30,13 +30,6 @@
       </ol>
 
       <div class="dcheck__body" data-test="check-step-body">
-        <!-- A power fault seen in any step: one banner for the whole incident -->
-        <div v-if="fault" class="dcheck__fault" role="alert" data-test="check-fault">
-          <strong>Power trouble at {{ faultWhere }} · {{ fault.kind }}</strong>
-          <span>{{ faultAction }}</span>
-          <span v-for="at in fault.alsoAt || []" :key="at">also at {{ at }} while settling</span>
-        </div>
-
         <!-- Read-only: another device owns the run -->
         <template v-if="view === 'readonly'">
           <p class="dcheck__lead" data-test="check-readonly">
@@ -82,9 +75,18 @@
           <div data-test="check-summary">
             <p class="dcheck__lead">{{ saved ? "Saved" : "Not saved yet" }}</p>
             <ul class="dcheck__summary">
-              <li v-for="row in summaryRows" :key="row.label" class="dcheck__summary-row">
+              <li v-for="(row, index) in summaryRows" :key="row.label" class="dcheck__summary-row">
                 <span class="dcheck__summary-label">{{ row.label }}</span>
                 <span class="dcheck__pair">Panel {{ row.typed }} · Calvin {{ row.ddc }}</span>
+                <Button
+                  v-if="!saved"
+                  variant="link"
+                  :data-test="`remove-reading-${index}`"
+                  :aria-label="`Remove the ${row.label.toLowerCase()} reading and take it again`"
+                  @click="removeReading(index)"
+                >
+                  Remove
+                </Button>
               </li>
             </ul>
             <p v-if="!saved" class="dcheck__sub">
@@ -146,6 +148,20 @@
           </template>
         </template>
 
+        <!-- A power drop in a level: only what to do now (calvin-tzzx) -->
+        <template v-else-if="state === 'fault'">
+          <p class="dcheck__lead" data-test="drop-lead">
+            The power dropped. Calvin dimmed the screen to keep it safe.
+          </p>
+          <p class="dcheck__sub" data-test="drop-sub">
+            Use the panel's buttons to set Brightness one step below where it cut out. Then type the
+            number its menu shows now.
+          </p>
+          <p v-if="tooHigh" class="dcheck__sub dcheck__sub--warn" data-test="level-too-high">
+            {{ tooHigh }}
+          </p>
+        </template>
+
         <!-- Steps 2-4: the panel's own buttons, Calvin reads -->
         <template v-else>
           <p class="dcheck__lead">{{ LEVELS[step - 2].heading }}</p>
@@ -159,11 +175,7 @@
               {{ behindNote }}
             </InlineNote>
           </template>
-          <template v-else-if="state === 'fault' || state === 'ask'">
-            <p v-if="state === 'fault'" class="dcheck__sub dcheck__sub--lead">
-              The power dropped at that level. Calvin dimmed the screen. Set it back to one step
-              below where it was and read it again.
-            </p>
+          <template v-else-if="state === 'ask'">
             <p class="dcheck__sub">Type the Brightness the panel's own menu shows.</p>
             <p v-if="tooHigh" class="dcheck__sub dcheck__sub--warn" data-test="level-too-high">
               {{ tooHigh }}
@@ -394,9 +406,13 @@ const settings = computed(() => props.overrides || {});
 const stepSize = computed(() => settings.value.brightnessStep ?? 2);
 const run = computed(() => check.run.value);
 const preflightClean = computed(() => run.value?.preflight?.status === "clean");
+// The incident the person has dealt with by pressing Read it: the run keeps its
+// fault object, so the dialog must not show the same drop again.
+const ackedFault = ref(null);
+const faultKey = r => `${r.id}|${r.fault?.at ?? ""}|${r.fault?.level ?? ""}`;
 const fault = computed(() => {
   const f = run.value?.fault;
-  if (!f) return null;
+  if (!f || (run.value.id !== undefined && faultKey(run.value) === ackedFault.value)) return null;
   return currentRunId && run.value.id !== currentRunId ? null : f;
 });
 const hasCalibration = computed(
@@ -413,17 +429,6 @@ const keptLine = computed(() =>
 const logLines = computed(() =>
   (run.value?.log ?? []).map(entry => `${entry.level ?? ""} · ${entry.note ?? ""}`.trim())
 );
-const faultWhere = computed(() => {
-  const level = fault.value?.level;
-  if (Number.isFinite(level)) return `Calvin ${level}`;
-  return pendingTyped.value != null ? `Panel ${pendingTyped.value}` : "this level";
-});
-const faultAction = computed(() =>
-  check.isActive.value
-    ? "Calvin is bringing the brightness down and waiting for the power to settle."
-    : "Calvin ended the check safely."
-);
-
 const stepLabel = name =>
   ({
     detect: "Find the display",
@@ -468,6 +473,7 @@ const behindNote = computed(() => {
 const offerOwnLevels = computed(
   () => Boolean(behindNote.value) && behindTries.value[levelIndex.value] >= 1
 );
+const moreToRead = computed(() => levels.value.some((l, i) => i > levelIndex.value && !l));
 const readingValid = computed(() => typedNumber.value !== null && !tooHigh.value);
 const fbValid = computed(() => typedNumber.value !== null);
 
@@ -538,10 +544,49 @@ function nextFromFound() {
   readingText.value = "";
   nextTick(() => readingInput.value?.focus());
 }
+// After a drop on the highest step the next reading IS the highest reading, and
+// the check goes straight on to the Everyday level.
+let afterDrop = false;
 async function readIt() {
   if (!readingValid.value) return;
+  const fromDrop = state.value === "fault";
   pendingTyped.value = typedNumber.value;
-  await go("read");
+  if (fromDrop) {
+    if (run.value?.fault) ackedFault.value = faultKey(run.value);
+    faulted.value = false;
+    afterDrop = step.value === 2;
+  }
+  const ok = await go("read");
+  if (!ok) afterDrop = false;
+}
+// Back leaves this step and retakes the one before it; both readings are dropped.
+function back() {
+  afterDrop = false;
+  faulted.value = false;
+  if (run.value?.fault) ackedFault.value = faultKey(run.value);
+  const index = step.value - 2;
+  levels.value[index] = null;
+  if (index === 0) {
+    step.value = 1;
+    readingText.value = "";
+    return;
+  }
+  const previous = levels.value[index - 1];
+  levels.value[index - 1] = null;
+  step.value -= 1;
+  readingText.value = previous?.typed == null ? "" : String(previous.typed);
+  nextTick(() => readingInput.value?.focus());
+}
+// Remove on the summary: take that one step again, keep the other readings.
+function removeReading(index) {
+  if (saved.value) return;
+  usedFallback.value = false;
+  fbResult.value = null;
+  levels.value[index] = null;
+  step.value = index + 2;
+  view.value = "step";
+  readingText.value = "";
+  nextTick(() => readingInput.value?.focus());
 }
 async function sameAsHighest() {
   readingText.value = String(levels.value[0].typed);
@@ -555,8 +600,10 @@ function readAgain() {
 }
 function nextLevel() {
   readingText.value = "";
-  if (step.value < 4) {
-    step.value += 1;
+  // The next level not yet read; none left means all three are in.
+  const next = levels.value.findIndex((l, i) => i > levelIndex.value && !l);
+  if (next !== -1) {
+    step.value = next + 2;
     nextTick(() => readingInput.value?.focus());
     return;
   }
@@ -813,6 +860,10 @@ function onStepResult(name, result, asked) {
         ddc: result.level == null ? Number.NaN : Number(result.level),
         lastWrite: result.lastWrite ?? null,
       };
+      if (afterDrop) {
+        afterDrop = false;
+        nextLevel();
+      }
       return;
     case "conversion":
       if (failed) return end("error", result.detail);
@@ -869,6 +920,11 @@ function onRun(current) {
     view.value = "idle";
     handled.add(current.id);
     return;
+  }
+  // A drop in a level: the read in flight will never be answered. The person
+  // is asked to set the panel again, whether or not the agent ended the run.
+  if (current.fault && step.value >= 2 && faultKey(current) !== ackedFault.value) {
+    clearAwaiting();
   }
   if (!current.active) return onRunEnded(current);
   if (!awaiting) return;
@@ -955,7 +1011,6 @@ const state = computed(() => {
   if (view.value === "fallback") {
     return fbPhase.value === "explain" ? "fb-explain" : `fb-${fbPhase.value}`;
   }
-  if (fault.value && check.isActive.value) return "settling";
   if (step.value === 1) {
     if (!detected.value) {
       if (preflightClean.value) return "asking";
@@ -965,7 +1020,7 @@ const state = computed(() => {
   }
   if (inFlightStep.value === "read") return "reading";
   if (thisLevel.value) return "read-done";
-  return faulted.value ? "fault" : "ask";
+  return faulted.value || fault.value ? "fault" : "ask";
 });
 
 const stepOf = () => `Step ${step.value} of 4 · ${STEPS[step.value - 1].label}`;
@@ -1088,8 +1143,6 @@ const ui = computed(() => {
         status: "Step 1 of 4 · Found the display",
         primary: { label: "Next", test: "check-next", run: nextFromFound },
       };
-    case "settling":
-      return { status: "Stopping safely · waiting for 5 s of clean power", busy: true };
     case "reading":
       return { status: `${stepOf()} · Reading…`, busy: true };
     case "read-done":
@@ -1098,38 +1151,31 @@ const ui = computed(() => {
         primary: behindNote.value
           ? { label: "Read it again", test: "read-again", run: readAgain }
           : {
-              label: step.value === 4 ? "See the summary" : "Next",
+              label: moreToRead.value ? "Next" : "See the summary",
               test: "check-next",
               run: nextLevel,
             },
-        secondary: behindNote.value
-          ? offerOwnLevels.value
-            ? [
-                {
-                  label: "Use Calvin's own levels instead",
-                  test: "use-own-levels",
-                  run: startFallback,
-                },
-              ]
-            : []
-          : [{ label: "Read it again", test: "read-again", run: readAgain }],
-      };
-    case "fault":
-      return {
-        status: "Power trouble · the panel's power dropped at that level",
-        field: true,
-        primary: {
-          label: "Read it again",
-          test: "read-it",
-          disabled: !readingValid.value,
-          run: readIt,
-        },
+        secondary: [
+          ...(behindNote.value
+            ? offerOwnLevels.value
+              ? [
+                  {
+                    label: "Use Calvin's own levels instead",
+                    test: "use-own-levels",
+                    run: startFallback,
+                  },
+                ]
+              : []
+            : [{ label: "Read it again", test: "read-again", run: readAgain }]),
+          { label: "Back", test: "check-back", run: back },
+        ],
       };
     default: {
-      const secondary =
-        step.value === 3
-          ? [{ label: "Same as highest", test: "same-as-highest", run: sameAsHighest }]
-          : [];
+      const secondary = [];
+      if (step.value === 3 && state.value !== "fault") {
+        secondary.push({ label: "Same as highest", test: "same-as-highest", run: sameAsHighest });
+      }
+      secondary.push({ label: "Back", test: "check-back", run: back });
       return {
         status: `${stepOf()} · type what the panel's menu shows`,
         field: true,
