@@ -124,6 +124,10 @@
           <p v-else-if="fbPhase === 'setting'" class="dcheck__sub">
             Watch the panel. Calvin is setting it to Calvin {{ fbLevels[fbIndex] }}.
           </p>
+          <p v-else-if="fbPhase === 'level'" class="dcheck__sub">
+            Type the Brightness the panel's own menu showed at the {{ LEVELS[fbLevelIndex].short }}
+            level.
+          </p>
           <p v-else class="dcheck__sub">Type the Brightness the panel's own menu shows now.</p>
         </template>
 
@@ -366,6 +370,11 @@ const fbPhase = ref("explain");
 const fbIndex = ref(0);
 const fbReadings = ref([]);
 const fbResult = ref(null);
+// The menu numbers the fallback converts, and the levels the agent said it wrote.
+const fbTyped = ref([null, null, null]);
+const fbWritten = ref([null, null]);
+const fbLevelIndex = ref(0);
+const behindTries = ref([0, 0, 0]);
 const phone = ref(false);
 const nowMs = ref(Date.now());
 const runStartedMs = ref(Date.now());
@@ -447,10 +456,20 @@ const tooHigh = computed(() => {
 const behindNote = computed(() => {
   const now = thisLevel.value;
   const before = levelIndex.value > 0 ? levels.value[levelIndex.value - 1] : null;
-  if (!now || !before || now.ddc <= before.ddc) return "";
+  if (!now || !before) return "";
   const name = levelIndex.value === 1 ? "highest" : "everyday";
-  return `That reading looks behind: the panel reported Calvin ${now.ddc}, above the ${name} level's ${before.ddc}. It may not have caught up with the menu yet.`;
+  if (!Number.isFinite(now.ddc)) {
+    return "That reading doesn't look right: the panel gave no usable number.";
+  }
+  // Higher than the level before, or the same while the menu number went down.
+  const behind = now.ddc > before.ddc || (now.ddc === before.ddc && now.typed < before.typed);
+  if (!behind) return "";
+  return `That reading looks behind: the panel reported Calvin ${now.ddc}, not below the ${name} level's ${before.ddc}. It may not have caught up with the menu yet.`;
 });
+// Still out of order after one more read: offer Calvin's own low levels instead.
+const offerOwnLevels = computed(
+  () => Boolean(behindNote.value) && behindTries.value[levelIndex.value] >= 1
+);
 const readingValid = computed(() => typedNumber.value !== null && !tooHigh.value);
 const fbValid = computed(() => typedNumber.value !== null);
 
@@ -531,6 +550,7 @@ async function sameAsHighest() {
 }
 function readAgain() {
   const typed = thisLevel.value?.typed;
+  if (behindNote.value) behindTries.value[levelIndex.value] += 1;
   levels.value[levelIndex.value] = null;
   readingText.value = typed == null ? "" : String(typed);
 }
@@ -553,13 +573,23 @@ function panelIgnoresButtons() {
   if (allEqual && typedDiffer) return true;
   return done.some(l => l.lastWrite != null && l.ddc === l.lastWrite && l.typed !== l.ddc);
 }
+function startFallback() {
+  // Too low to test two levels safely: say so plainly and change nothing.
+  if (Math.min(...fbLevels.value) <= 1 && fbLevels.value[0] <= fbLevels.value[1]) {
+    end("no-fallback");
+    return;
+  }
+  view.value = "fallback";
+  fbPhase.value = "explain";
+  fbIndex.value = 0;
+  fbReadings.value = [];
+  fbWritten.value = [null, null];
+  fbTyped.value = levels.value.map(l => l?.typed ?? null);
+  usedFallback.value = true;
+}
 function finishReads() {
   if (panelIgnoresButtons()) {
-    view.value = "fallback";
-    fbPhase.value = "explain";
-    fbIndex.value = 0;
-    fbReadings.value = [];
-    usedFallback.value = true;
+    startFallback();
     return;
   }
   usedFallback.value = false;
@@ -574,12 +604,25 @@ async function askLow(index) {
 }
 async function saveLow() {
   if (!fbValid.value) return;
-  fbReadings.value = [
-    ...fbReadings.value,
-    { ddc: fbLevels.value[fbIndex.value], menu: typedNumber.value },
-  ];
+  // The pair uses the level the agent said it wrote, not the one asked for.
+  const wrote = fbWritten.value[fbIndex.value] ?? fbLevels.value[fbIndex.value];
+  fbReadings.value = [...fbReadings.value, { ddc: wrote, menu: typedNumber.value }];
   if (fbIndex.value === 0) return askLow(1);
-  convertFromFallback();
+  askMissingLevel();
+}
+// A fallback started midway has not asked for every level's menu number yet.
+function askMissingLevel() {
+  const missing = fbTyped.value.findIndex(n => n === null);
+  if (missing === -1) return convertFromFallback();
+  fbLevelIndex.value = missing;
+  fbPhase.value = "level";
+  readingText.value = "";
+  nextTick(() => readingInput.value?.focus());
+}
+function saveLevel() {
+  if (!fbValid.value) return;
+  fbTyped.value = fbTyped.value.map((n, i) => (i === fbLevelIndex.value ? typedNumber.value : n));
+  askMissingLevel();
 }
 function convertFromFallback() {
   const points = fbReadings.value;
@@ -587,7 +630,7 @@ function convertFromFallback() {
     end("same-low");
     return;
   }
-  const [high, mid, low] = levels.value.map(l => l.typed);
+  const [high, mid, low] = fbTyped.value;
   const maxDdc = menuToDdcDown(high, points);
   if (maxDdc === null) {
     end("same-low");
@@ -695,6 +738,19 @@ function end(kind, detail = "") {
       kept: true,
       text: "The panel showed the same Brightness at both low levels, so Calvin can't match its menu.",
     },
+    "no-fallback": {
+      tone: "warn",
+      status: "Check ended · too low to test",
+      kept: true,
+      text: "This screen is already at its lowest safe level, so Calvin can't test two low levels to match the panel's menu.",
+    },
+    "old-agent": {
+      tone: "warn",
+      status: "Check not started · update this screen first",
+      noRetry: true,
+      text: "Update this screen first: Settings > update.",
+      hint: `${name} is running an older version of the display agent that can't do this check.`,
+    },
     timeout: {
       tone: "warn",
       status: "Check ended · timed out",
@@ -742,6 +798,11 @@ function onStepResult(name, result, asked) {
   switch (name) {
     case "detect":
       if (failed) return end("no-ddc");
+      // An agent older than the seq fix would answer repeated reads wrongly.
+      if (result.seq == null) {
+        check.stop();
+        return end("old-agent");
+      }
       foundText.value = result.detail || result.info?.model || "a display";
       detected.value = true;
       step.value = 1;
@@ -750,12 +811,17 @@ function onStepResult(name, result, asked) {
       if (failed) return end("error", result.detail);
       levels.value[levelIndex.value] = {
         typed: pendingTyped.value,
-        ddc: Number(result.level),
+        ddc: result.level == null ? Number.NaN : Number(result.level),
         lastWrite: result.lastWrite ?? null,
       };
       return;
     case "conversion":
       if (failed) return end("error", result.detail);
+      if (Number.isFinite(Number(result.level))) {
+        fbWritten.value = fbWritten.value.map((n, i) =>
+          i === fbIndex.value ? Number(result.level) : n
+        );
+      }
       fbPhase.value = "ask";
       readingText.value = "";
       nextTick(() => readingInput.value?.focus());
@@ -833,7 +899,7 @@ watch(() => check.run.value, onRun);
 watch(
   () => check.run.value,
   current => {
-    if (view.value !== "readonly" || !current || current.active) return;
+    if (view.value !== "readonly" || current?.active) return;
     end("watched");
   }
 );
@@ -855,6 +921,9 @@ function resetRun() {
   fbIndex.value = 0;
   fbReadings.value = [];
   fbResult.value = null;
+  fbTyped.value = [null, null, null];
+  fbWritten.value = [null, null];
+  behindTries.value = [0, 0, 0];
   step.value = 1;
   view.value = "step";
   clearAwaiting();
@@ -919,6 +988,12 @@ const ui = computed(() => {
       };
     case "end": {
       const retryItem = { label: "Try again", test: "check-retry", run: retry, plain: true };
+      if (ending.value.noRetry) {
+        return {
+          status: ending.value.status,
+          primary: { label: "Done", test: "check-done", run: close },
+        };
+      }
       if (ending.value.closeFirst) {
         return {
           status: ending.value.status,
@@ -975,6 +1050,17 @@ const ui = computed(() => {
           run: saveLow,
         },
       };
+    case "fb-level":
+      return {
+        status: `Type what the panel's menu showed at the ${LEVELS[fbLevelIndex.value].short} level`,
+        field: true,
+        primary: {
+          label: "Save reading",
+          test: "reading-save",
+          disabled: !fbValid.value,
+          run: saveLevel,
+        },
+      };
     case "preflight":
       return {
         status: `Checking ${name}'s power before changing anything · ${preflightLeft.value} s`,
@@ -1002,7 +1088,15 @@ const ui = computed(() => {
               run: nextLevel,
             },
         secondary: behindNote.value
-          ? []
+          ? offerOwnLevels.value
+            ? [
+                {
+                  label: "Use Calvin's own levels instead",
+                  test: "use-own-levels",
+                  run: startFallback,
+                },
+              ]
+            : []
           : [{ label: "Read it again", test: "read-again", run: readAgain }],
       };
     case "fault":

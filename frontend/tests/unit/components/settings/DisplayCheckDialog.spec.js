@@ -451,10 +451,114 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
     await clickPrimary(wrapper);
   }
 
-  it("is triggered when all three reads are equal but the typed numbers differ", async () => {
-    await toFallback([[30], [30], [30]]);
+  // A panel that ignores the buttons: reads stay at 30. The second equal read is
+  // "behind"; after one more read it offers Calvin's own levels.
+  async function toOwnLevels() {
+    await toStep2();
+    await readLevel(60, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await clickPrimary(wrapper); // Read it again
+    await readLevel(40, 30);
+    await click(wrapper, "use-own-levels");
+  }
+  // Both low levels, answered; the lowest menu number is still to come.
+  async function answerLows(first = 28, second = 10) {
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: lastStep().value, level: lastStep().value });
+    await settle();
+    await find(wrapper, "reading-input").setValue(String(first));
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: lastStep().value, level: lastStep().value });
+    await settle();
+    await find(wrapper, "reading-input").setValue(String(second));
+    await clickPrimary(wrapper);
+  }
+
+  it("counts a read equal to the one before as behind when the typed number went down (100/60/10 reads 100/100/60)", async () => {
+    await toStep2();
+    await readLevel(100, 100);
+    await clickPrimary(wrapper);
+    await readLevel(60, 100);
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+    expect(primary(wrapper).text()).toBe("Read it again");
+    expect(find(wrapper, "use-own-levels").exists()).toBe(false);
+  });
+
+  it("offers Calvin's own levels once Read it again is still out of order", async () => {
+    await toStep2();
+    await readLevel(100, 100);
+    await clickPrimary(wrapper);
+    await readLevel(60, 100);
+    await clickPrimary(wrapper); // Read it again
+    await readLevel(60, 100);
+    expect(find(wrapper, "use-own-levels").text()).toBe("Use Calvin's own levels instead");
+    await click(wrapper, "use-own-levels");
+    expect(status(wrapper)).toContain("This panel doesn't report its own buttons");
+  });
+
+  it("treats an unusable read as behind", async () => {
+    await toStep3();
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: null });
+    await settle();
+    expect(find(wrapper, "level-behind").text()).toContain("doesn't look right");
+  });
+
+  it("is triggered when the reads stay equal and the person chooses Calvin's own levels", async () => {
+    await toOwnLevels();
     expect(status(wrapper)).toContain("This panel doesn't report its own buttons");
     expect(find(wrapper, "check-summary").exists()).toBe(false);
+  });
+
+  it("uses the level the agent reports writing, not the one asked for", async () => {
+    await toOwnLevels();
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 5, level: 4 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("28");
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    // The lowest level's menu number is asked for last.
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await clickPrimary(wrapper);
+    expect(patches()[0][0].brightnessConversion).toEqual([
+      { ddc: 1, menu: 10 },
+      { ddc: 4, menu: 28 },
+    ]);
+  });
+
+  it("skips the two-level fallback with a plain message when the cap is 1 or less", async () => {
+    await toStep2();
+    backend.run = { ...backend.run, ceiling: 1 };
+    await readLevel(60, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await click(wrapper, "use-own-levels");
+    expect(find(wrapper, "check-end").text()).toContain("already at its lowest safe level");
+    expect(posts("step").filter(([, b]) => b.step === "conversion")).toHaveLength(0);
+  });
+
+  it("does not start the read steps on an agent that reports no seq", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    agent({ preflight: CLEAN, start: { level: 19, known: true, source: "read" } });
+    agentStep("detect", { ...DETECT, seq: null });
+    await settle();
+    expect(find(wrapper, "check-end").text()).toContain(
+      "Update this screen first: Settings > update"
+    );
+    expect(primary(wrapper).text()).toBe("Done");
+    expect(find(wrapper, "check-retry").exists()).toBe(false);
+    expect(find(wrapper, "reading-input").exists()).toBe(false);
+    expect(backend.stopCalls).toBeGreaterThan(0);
   });
 
   it("is triggered when a read equals the last write while the typed number differs", async () => {
@@ -467,7 +571,7 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
   });
 
   it("writes only low levels, 5 then 1, asking the menu each time", async () => {
-    await toFallback([[30], [30], [30]]);
+    await toOwnLevels();
     await clickPrimary(wrapper);
     expect(lastStep()).toEqual({ step: "conversion", value: 5 });
     agentStep("conversion", { value: 5, level: 5 });
@@ -482,15 +586,10 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
   });
 
   it("fits the line, labels it approximate and rounds the highest level down", async () => {
-    await toFallback([[30], [30], [30]]);
-    await clickPrimary(wrapper);
-    agentStep("conversion", { value: 5, level: 5 });
-    await settle();
+    await toOwnLevels();
     // Calvin 5 -> menu 28, Calvin 1 -> menu 10: menu = 5.5 + 4.5 x ddc.
-    await find(wrapper, "reading-input").setValue("28");
-    await clickPrimary(wrapper);
-    agentStep("conversion", { value: 1, level: 1 });
-    await settle();
+    await answerLows(28, 10);
+    // The lowest level's menu number was not read yet: it is asked last.
     await find(wrapper, "reading-input").setValue("10");
     await clickPrimary(wrapper);
     const text = find(wrapper, "check-summary").text();
@@ -784,6 +883,25 @@ describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
     expect(primary(wrapper).text()).toBe("Done");
   });
 
+  it("leaves read-only when the watched run comes back empty or expired", async () => {
+    backend.run = {
+      id: "other",
+      step: "read",
+      status: "running",
+      active: true,
+      steps: {},
+      log: [],
+      updatedAt: new Date().toISOString(),
+    };
+    wrapper = mountDialog();
+    await flushPromises();
+    expect(find(wrapper, "check-readonly").exists()).toBe(true);
+    backend.run = null;
+    await settle();
+    expect(find(wrapper, "check-readonly").exists()).toBe(false);
+    expect(find(wrapper, "check-end").text()).toContain("other device");
+  });
+
   it("recognises its own run after a reload and moves it instead of opening read-only", async () => {
     backend.run = {
       id: "mine",
@@ -809,8 +927,8 @@ describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
     await clickPrimary(wrapper);
     await readLevel(40, 30);
     await clickPrimary(wrapper);
-    await readLevel(10, 30);
-    await clickPrimary(wrapper);
+    await readLevel(40, 30);
+    await click(wrapper, "use-own-levels");
     await clickPrimary(wrapper);
     expect(lastStep()).toEqual({ step: "conversion", value: 2 });
     backend.run = { ...backend.run, ceiling: 0 };
