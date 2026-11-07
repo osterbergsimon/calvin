@@ -197,3 +197,25 @@ def test_a_report_without_seq_stores_null(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     _report(test_client, run["id"], "done", level=19)
     assert test_client.get(BASE).json()["run"]["steps"]["detect"]["seq"] is None
+
+
+@pytest.mark.integration
+def test_a_late_result_for_an_older_seq_is_not_filed_as_the_current_step(
+    test_client: TestClient, kiosk
+):
+    run = _start(test_client, "detect").json()
+    _step(test_client, "read")  # seq 1
+    _step(test_client, "conversion", value=10)  # seq 2
+    log = [{"at": "2026-11-07T10:00:00+00:00", "level": 61, "note": "read DDC 61"}]
+    late = _report(test_client, run["id"], "done", level=61, seq=1, log=log, info={"model": "M"})
+    assert late.status_code == 200
+    seen = test_client.get(BASE).json()
+    record = seen["run"]
+    assert record["log"] == log  # the progress lines are kept
+    assert "read" not in record["steps"]  # not filed
+    assert record["level"] is None  # run.level not moved
+    assert record["status"] == "running"
+    assert seen["findings"]["ddc"] is None  # no findings applied
+    # The current seq still files normally.
+    _report(test_client, run["id"], "done", level=10, seq=2)
+    assert test_client.get(BASE).json()["run"]["steps"]["conversion"]["seq"] == 2

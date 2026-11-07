@@ -603,6 +603,22 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
         return
 
+    current_seq = run.get("seq")
+    if (
+        status in ("running", "done", "error")
+        and report.seq is not None
+        and isinstance(current_seq, int)
+        and report.seq < current_seq
+    ):
+        # A late report for an older request: keep its log lines, but it is not
+        # the current step's result and moves neither the level nor findings.
+        run["updatedAt"] = _iso(utcnow())
+        run["status"] = "running"  # the agent is alive
+        if report.log is not None:
+            run["log"] = [entry.model_dump() for entry in report.log]
+        await _save(row, run)
+        return
+
     _merge_progress(run, report)
     findings = None
     ended = status in ENDING_STATUSES or (status == "done" and stored["action"] == "stop")
