@@ -636,96 +636,36 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
   });
 });
 
-// The highest step browns the panel out: the typed pre-drop level becomes the
-// highest, one panel step lower, and the check moves on (calvin-tzzx).
-const FAULT = { step: "read", level: 20, kind: "under-voltage", lastGood: 20, alsoAt: [] };
-async function dropAtHighest(droppedAt = 62) {
-  await toStep2();
-  await find(wrapper, "reading-input").setValue(String(droppedAt));
-  await clickPrimary(wrapper);
-  agent({ status: "error", reason: "power_trouble", fault: FAULT });
-  await settle();
-}
-
 describe("power trouble in a step", () => {
-  it("at the highest level asks for the pre-drop level and does not ask to set the panel there again", async () => {
-    await dropAtHighest();
-    expect(find(wrapper, "check-fault").exists()).toBe(true);
-    expect(wrapper.text()).toContain("The power dropped at that level. Calvin dimmed the screen.");
-    expect(wrapper.text()).toContain("won't ask you to set the panel there again");
-    expect(primary(wrapper).text()).toBe("Use as highest");
-    expect(patches()).toHaveLength(0);
-  });
-
-  it("records the typed level one step lower as the highest and moves on without another read", async () => {
-    await dropAtHighest();
-    const starts = posts("start").length;
-    const steps = posts("step").length;
-    await find(wrapper, "reading-input").setValue("61");
+  it("tells the person to lower the level on the panel and read it again", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
     await clickPrimary(wrapper);
-    expect(posts("start")).toHaveLength(starts);
-    expect(posts("step")).toHaveLength(steps);
-    expect(status(wrapper)).toContain("Step 3 of 4");
-    expect(find(wrapper, "check-fault").exists()).toBe(false);
-  });
-
-  it("works out the highest Calvin value from the other pairs, rounded down, and says it dropped", async () => {
-    await dropAtHighest(62);
-    await find(wrapper, "reading-input").setValue("61");
-    await clickPrimary(wrapper);
-    await readLevel(40, 12);
-    await clickPrimary(wrapper);
-    await readLevel(10, 2);
-    await clickPrimary(wrapper);
-    const summary = find(wrapper, "check-summary").text();
-    // Line through (2, 10) and (12, 40): menu = 4 + 3 × Calvin, so 60 is 18.67, down to 18.
-    expect(summary).toContain("Panel 60 · Calvin 18");
-    expect(summary).toContain("it dropped at 62");
-    await clickPrimary(wrapper);
-    expect(patches().at(-1)[0]).toMatchObject({
-      brightnessLimit: 18,
-      brightness: 12,
-      brightnessFloor: 2,
-      brightnessConversion: [
-        { ddc: 2, menu: 10 },
-        { ddc: 12, menu: 40 },
-      ],
+    agent({
+      status: "error",
+      reason: "power_trouble",
+      fault: { step: "read", level: 20, kind: "under-voltage", lastGood: 20, alsoAt: [] },
     });
-  });
-
-  it("uses Calvin's own low levels when the other readings give no line", async () => {
-    await dropAtHighest();
-    await find(wrapper, "reading-input").setValue("61");
-    await clickPrimary(wrapper);
-    await readLevel(40, 12);
-    await clickPrimary(wrapper);
-    // The panel keeps reporting 12: it looks behind twice, then offers Calvin's own levels.
-    await readLevel(10, 12);
-    await clickPrimary(wrapper);
-    await readLevel(10, 12);
-    await find(wrapper, "use-own-levels").trigger("click");
-    await flushPromises();
-    expect(wrapper.text()).toContain("This panel doesn't report its own buttons");
-  });
-
-  it("does not offer Same as highest after a drop at the highest level", async () => {
-    await dropAtHighest();
-    await find(wrapper, "reading-input").setValue("61");
-    await clickPrimary(wrapper);
-    expect(find(wrapper, "same-as-highest").exists()).toBe(false);
-  });
-
-  it("at a later level still asks to set the panel lower and read it again", async () => {
-    await toStep3();
-    await find(wrapper, "reading-input").setValue("30");
-    await clickPrimary(wrapper);
-    agent({ status: "error", reason: "power_trouble", fault: FAULT });
     await settle();
+    expect(find(wrapper, "check-fault").exists()).toBe(true);
     expect(wrapper.text()).toContain(
       "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
     );
     expect(primary(wrapper).text()).toBe("Read it again");
-    await find(wrapper, "reading-input").setValue("25");
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("Read it again starts a new session when the agent ended the first", async () => {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agent({
+      status: "error",
+      reason: "power_trouble",
+      fault: { step: "read", level: 20, kind: "under-voltage", lastGood: 20 },
+    });
+    await settle();
+    await find(wrapper, "reading-input").setValue("55");
     await clickPrimary(wrapper);
     expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
     expect(find(wrapper, "check-fault").exists()).toBe(false);
@@ -940,7 +880,9 @@ describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
       fault: { step: "read", level: null, kind: "under-voltage", lastGood: null },
     });
     await settle();
-    expect(wrapper.text()).toContain("The power dropped at that level. Calvin dimmed the screen.");
+    expect(wrapper.text()).toContain(
+      "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again."
+    );
     const banner = find(wrapper, "check-fault").text();
     expect(banner).toContain("Power trouble at Panel 60");
     expect(banner).not.toMatch(/Calvin\s+·/);

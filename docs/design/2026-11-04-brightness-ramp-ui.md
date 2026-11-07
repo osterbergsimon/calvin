@@ -231,14 +231,6 @@ under-voltage", `role="alert"`, announced once, with later faults joining as "al
 |---|---|---|---|---|
 | Fault | "Power trouble · the panel's power dropped at that level" | "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again." The field is kept with what was typed. | **Read it again** | — |
 
-- **A drop at the highest level (step 2, calvin-tzzx)** does not ask the person to set the panel there again (that
-  would brown it out again). The body reads "…Type the Brightness the panel's menu showed just before it dropped.
-  Calvin will use one step below it as the highest and won't ask you to set the panel there again." and the primary
-  is **Use as highest**. The typed level minus one panel step becomes the highest; the banner goes and the check moves
-  on to the everyday level (no "Same as highest" there). After the lowest level the highest's Calvin value comes from
-  the line through the everyday and lowest pairs, rounded down; with no usable line the low-level fallback supplies
-  it. The summary shows "Highest: Panel 60 · Calvin 18 (it dropped at 62)" and says it is approximate. The worked-out
-  pair is not saved as a reading. A drop at the everyday or lowest level keeps **Read it again**.
 - **The banner names the panel's level** the person typed ("Power trouble at Panel 60 · under-voltage") when the
   agent reports no Calvin level, and never prints "Calvin" with no number.
 - **The agent ends the run itself** (touch may be dead). The dialog does not wait for a tap: the next **Read it again**
