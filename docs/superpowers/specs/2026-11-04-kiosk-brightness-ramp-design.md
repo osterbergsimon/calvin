@@ -167,11 +167,11 @@ All paths are under `/api`. `{id}` is the kiosk id (`[A-Za-z0-9._-]{1,64}`, else
 
 ### 10.1 Per-screen settings (override layer, Screens › {screen} › Power)
 
-The seven keys live in the kiosk's existing override layer and are written with the existing endpoints
+The eight keys live in the kiosk's existing override layer and are written with the existing endpoints
 (`PATCH /kiosks/{id}/overrides` for single keys, `PUT` to replace the layer; both admin, and `PATCH` returns 403
 `override_needs_admin` without a session because none of these keys is in `KIOSK_SELF_WRITE_KEYS`). **Write camelCase
 only**; the snake_case spellings (`brightness_ramp_enabled`, `brightness_limit`, `brightness_step`,
-`brightness_step_seconds`, `brightness_conversion`, `sleep_mode`) are rejected with 400 `Invalid overrides`.
+`brightness_step_seconds`, `brightness_conversion`, `brightness_floor`, `sleep_mode`) are rejected with 400 `Invalid overrides`.
 `null` clears a key (back to the agent's default). Out-of-range or wrongly typed values are 400.
 
 | Key | Type | Range / values | Agent default when null/absent |
@@ -179,6 +179,7 @@ only**; the snake_case spellings (`brightness_ramp_enabled`, `brightness_limit`,
 | `brightnessRampEnabled` | bool | | `false` |
 | `brightness` | int | 0–100 (Calvin/DDC scale) | DDC 20 (or `limit − 2 × step`) |
 | `brightnessLimit` | int | 0–100 | none |
+| `brightnessFloor` | int | 0–100, must be `<= brightnessLimit` when both are set (422 `floor_above_limit`) | none (dims to 0) |
 | `brightnessStep` | int | 1–5 | 2 |
 | `brightnessStepSeconds` | number | 0.5–10 | 1.5 |
 | `brightnessConversion` | list of `{ddc: int 0–100, menu: number 0–100}` | at most 20 points, no unknown fields | `[]` |
@@ -198,7 +199,7 @@ stored (the latest; a new start replaces an ended one). **Run record** (what the
 
 ```json
 {
-  "id": "run-id", "step": "detect|write|conversion|limit", "value": 19, "brightness": 19,
+  "id": "run-id", "step": "detect|write|conversion|read", "value": 19, "brightness": 19,
   "action": "start|stop",
   "status": "requested|running|done|stopped|timeout|error|interrupted|asleep",
   "active": true,
@@ -211,7 +212,7 @@ stored (the latest; a new start replaces an ended one). **Run record** (what the
   "fault": {"step": "write", "level": 12, "kind": "under-voltage", "at": "ISO-8601",
             "lastGood": 14, "alsoAt": [8]},
   "steps": {
-    "detect": {"status": "done|error", "value": null, "level": 19, "limit": null,
+    "detect": {"status": "done|error", "value": null, "level": 19, "limit": null, "lastWrite": null,
                "detail": "text", "info": {"model": "..."}, "finishedAt": "ISO-8601"}
   },
   "requestedAt": "ISO-8601", "startedAt": "ISO-8601|null", "finishedAt": "ISO-8601|null",
@@ -234,7 +235,7 @@ being offered unchanged) until the admin changes the step or stops the run.
 
 Admin endpoints (admin session or admin-scope API key, like every per-screen write; 401 otherwise):
 
-- `POST /kiosks/{id}/display-check/start`, body `{"step": "detect|write|conversion|limit", "value"?: 0–100, "brightness"?: 0–100}`
+- `POST /kiosks/{id}/display-check/start`, body `{"step": "detect|write|conversion|read", "value"?: 0–100, "brightness"?: 0–100}`
   (extra fields are 422). Returns the run record. 404 unknown kiosk; **409 `display_check_active`** (body carries the
   active run) when a run is already active, which is how a second device sees the "running from another device" state.
 - `POST /kiosks/{id}/display-check/step`, body `{"step": ..., "value"?: 0–100}` (extra fields are 422). Moves the
@@ -242,14 +243,12 @@ Admin endpoints (admin session or admin-scope API key, like every per-screen wri
   re-runs on the new `(id, step, value)`. Same value cap as `start`. 404 when no run is active; **409
   `display_check_stopping`** when a stop is already on its way. The agent ignores an unchanged `(step, value)`, so
   "Show me again" needs a different value or an intermediate step.
-- `POST /kiosks/{id}/display-check/stop`, no body. Marks the active run `action: "stop"`; the agent returns the
-  screen to its brightness at the normal pace and reports `stopped` (or a final `done`). Returns the run record. 404
+- `POST /kiosks/{id}/display-check/stop`, no body. Marks the active run `action: "stop"`; the agent drops the screen
+  to the floor in one write (v3, §10.2.2) and reports `stopped` (or a final `done`). Returns the run record. 404
   when there is no active run. Stop stays available to any admin, whichever device started the run.
-- `POST /kiosks/{id}/display-check/save-limit`, no body. Saves the `limit` found by the `limit` step of the latest
-  run (`steps.limit`, available as soon as that step reports `done`, even while the run is still active) as the
-  override `brightnessLimit` and returns `{"id", "brightnessLimit", "overrides"}`. Without such a result, **409
-  `no_limit`**. **A found limit is never saved automatically**; the finish screen calls this (and it can be offered
-  again from the Display check row).
+- `POST /kiosks/{id}/display-check/save-limit`, no body. Saves the limit a calibration **fault** implies
+  (`faultLimit`, §10.2.1) as the override `brightnessLimit` and returns `{"id", "brightnessLimit", "overrides"}`.
+  Without a usable fault, **409 `no_limit`**. Never automatic. (The v2 `limit`-step source is gone: §10.2.2.)
 
 Public (no session; the kiosk's own traffic, like the config poll):
 
@@ -323,6 +322,49 @@ can only raise the base. Values are clamped to >= 0.
 - `save-limit` with no `limit`-step result saves `faultLimit` from the latest run's calibration `fault` (never
   `lastGood` itself) and returns the same body as before. A limit at or below the floor (5), or from a fault with no level (an idle fault with an unknown start), is never saved: 409 `no_limit`. A `limit`-step result still wins; with neither, 409
   `no_limit`.
+
+#### 10.2.2 Calibration v3 (calvin-idts, calvin-qkm8)
+
+Replaces the v2 steps 2-4 flow and **removes the limit climb**. The owner sets the panel (with its own buttons) to
+its max, a comfortable level and its min and types the menu number each time; Calvin only **reads** DDC back.
+Design (UI): [brightness-ramp-ui.md](../../design/2026-11-04-brightness-ramp-ui.md).
+
+- **Steps:** `detect`, `read`, `write`, `conversion`. `limit` is gone (422 from `start`/`step`; the agent has no code
+  path for it, so nothing ever ramps up to 100). `findings.limit` stays in the payload and is never set again.
+- **`read`** (any number of times after `detect`): one DDC `getvcp 0x10`, **no write**. Report
+  `{step: "read", status: "done", level: <ddc read>, lastWrite: <level the agent last wrote this run, or null>}`;
+  stored in `steps.read` (`level`, `lastWrite`). `status: "error"` + `detail` when the read fails (that ends the run).
+  A read never changes the run's level, the controller level or `last_set` (many panels answer with a constant, often
+  100). `ddc == lastWrite` (or an unchanged value across reads) tells the UI the read-back does not follow the buttons.
+- **Fallback** for a read-back that does not follow: the existing `write`/`conversion` steps, floor `5` then `1`,
+  never above the run's start (the §10.2.1 rules, unchanged; the third-reading exception is removed).
+- **`brightnessFloor`** (§10.1): the lowest level Calvin dims to. The agent uses it as the dim-only sleep level, as
+  the lower bound of the ramp target (`brightness` never goes under it). Dim sleep and the shutdown write go to
+  `min(floor, ceiling, current level)`, never upward, and the level actually written is remembered. Unset means the
+  old behaviour (0). `floor <= limit` is enforced on the effective (household + override) config (422
+  `floor_above_limit`); `save-limit` clamps a floor above the new limit down to it.
+- **Faults:** a fault at any point of a check (preflight, `read`, `write`, `conversion`) ends the run `error` /
+  `power_trouble` with `fault` recorded (`fault.step` may be `read`; its level and `lastGood` are the last level Calvin
+  wrote). The agent drops the screen in **one write** to `min(5, brightnessFloor, ceiling, run start, level it knows)`,
+  at least 1 while it is lit (a floor of 0 does not black the dialog), then settles as in v2. No slow ramp. With the
+  ramp on, a **Stop** at any time drops the same way, immediately, and does not climb back; with the ramp off it
+  returns to the start level as in v2.
+- **Fault before Stop** (calvin-qkm8): `ramp_brightness` polls faults **before** it checks the Stop, and re-polls once
+  after a Stop, so a fault that arrives in the same poll is recorded (the 2026-11-07 01:21 sequence: the touchscreen
+  USB device reset as Stop was pressed, the fault was dropped and the run ended with `limit` and `powerTrouble` null).
+  Regression test: `test_ramp_records_a_fault_that_arrives_in_the_same_poll_as_a_cancel`.
+- **Ceiling:** unchanged (§10.2.1) minus the found-limit term and the third-reading exception: `limit` is the saved
+  `brightnessLimit` only. `value_above_limit` and `value_above_ceiling` stay.
+- **Shutdown (boot side).** The max can be 100 while the panel is on, but powering the panel on at a high level
+  surges and browns out the Pi. Sleep/wake already covers it (dim before sleep, ramp up after wake). On the boot side
+  the agent handles SIGTERM and, only when `systemctl is-system-running` says `stopping` (a real shutdown or reboot,
+  not an updater restart), with the ramp on and the panel awake, writes the dim target (floor, 0 when unset) in **one**
+  DDC write before exiting. It first sets a shutdown flag that stops any ramp or check from writing, then takes the
+  brightness lock for at most 1.5 s, so the panel powers on low next boot;
+  the first-wake ramp brings it up. The write runs in a thread abandoned after 4 s, and the unit has
+  `TimeoutStopSec=15`, so it can never hold the shutdown up. Skipped when the ramp is off, the agent has not yet
+  reconciled, or the panel is asleep (already at its sleep level). Logged. **Unplanned power cuts are out of scope**
+  (nothing runs then; that is what the owner's power blocker is for).
 
 ### 10.3 Findings (kept across runs)
 

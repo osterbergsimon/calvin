@@ -29,7 +29,7 @@ from app.utils.utc import as_utc, utcnow
 # The agent times a run out after about 10 minutes (deploy/kiosk-agent).
 RUN_TTL = timedelta(minutes=10)
 
-Step = Literal["detect", "write", "conversion", "limit"]
+Step = Literal["detect", "write", "conversion", "read"]
 ReportStatus = Literal["running", "done", "stopped", "timeout", "error", "interrupted", "asleep"]
 # What ends a run. ``done`` is a step result while the run is active; it ends the
 # run only after an admin stop (the agent's final report) or past the expiry.
@@ -68,7 +68,7 @@ class NoActiveRunError(Exception):
 
 
 class NoLimitError(Exception):
-    """The latest run did not find a limit."""
+    """The latest run has no fault to derive a limit from."""
 
 
 class StartRequest(BaseModel):
@@ -172,6 +172,9 @@ class AgentReport(BaseModel):
     status: ReportStatus
     level: int | None = Field(None, ge=0, le=100)
     limit: int | None = Field(None, ge=0, le=100)
+    # Calibration v3 (calvin-idts): a ``read`` step reports the DDC level it read
+    # in ``level`` and the level the agent last wrote this run (or null) here.
+    lastWrite: int | None = Field(None, ge=0, le=100)
     log: Annotated[list[LogEntry] | None, BeforeValidator(_newest(_MAX_LOG_ENTRIES))] = None
     startedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
     finishedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
@@ -195,7 +198,7 @@ EMPTY_FINDINGS: dict[str, Any] = {
     "powerTrouble": None,
 }
 
-CALIBRATION_STEPS = frozenset({"detect", "write", "conversion"})
+CALIBRATION_STEPS = frozenset({"detect", "write", "conversion", "read"})
 # The level the agent dims an unknown start to (CHECK_FLOOR in the agent).
 CHECK_FLOOR = 5
 
@@ -210,7 +213,6 @@ def _apply_findings(
     *,
     step: str,
     status: str,
-    limit: int | None,
     info: dict | None,
     finished_at: str,
 ) -> dict[str, Any] | None:
@@ -232,9 +234,6 @@ def _apply_findings(
         if status in ("done", "error"):
             findings["writes"] = status == "done"
             changed = True
-    elif step == "limit" and status == "done" and isinstance(limit, int):
-        findings["limit"] = limit
-        changed = True
     if not changed:
         return None
     findings["checkedAt"] = finished_at
@@ -329,13 +328,8 @@ def job_for_config(run: dict | None, settings: dict | None = None) -> dict | Non
         "action": view["action"],
         "value": view["value"],
         "brightness": view["brightness"],
-        # What this job's value may reach: the third reading is the only one
-        # allowed above the base, so the agent can check it against the job.
-        "ceiling": (
-            allowed_max(view, settings, view["value"])
-            if view["step"] == "conversion"
-            else ceiling_for(view, settings)
-        ),
+        # What this job's value may reach (calibration never brightens).
+        "ceiling": ceiling_for(view, settings),
     }
 
 
@@ -379,14 +373,6 @@ def _settings(settings: dict | None) -> tuple[int | None, int, Any]:
     )
 
 
-def _known_limit(run: dict, saved: int | None) -> int | None:
-    found = (run.get("steps") or {}).get("limit") or {}
-    limits = [saved] if saved is not None else []
-    if found.get("status") == "done" and _is_int(found.get("limit")):
-        limits.append(found["limit"])
-    return min(limits) if limits else None
-
-
 def fault_limit(run: dict | None, step: int) -> int | None:
     """``min(lastGood, level) - step`` of a calibration fault, never below 0."""
     fault = (run or {}).get("fault")
@@ -417,44 +403,20 @@ def ceiling_for(run: dict, settings: dict | None) -> int | None:
         if converted is not None:
             base = converted
     caps = [base]
-    limit = _known_limit(run, saved)
-    if limit is not None:
-        caps.append(max(0, limit - 2 * step))
+    if saved is not None:
+        caps.append(max(0, saved - 2 * step))
     fault_cap = _fault_cap(run, step)
     if fault_cap is not None:
         caps.append(fault_cap)
     return min(caps)
 
 
-def _reading_count(points: Any) -> int:
-    return sum(
-        1
-        for p in (points or [])
-        if isinstance(p, dict)
-        and isinstance(p.get("ddc"), int | float)
-        and isinstance(p.get("menu"), int | float)
-    )
-
-
 def allowed_max(run: dict, settings: dict | None, value: int | None = None) -> int | None:
-    """The highest ``conversion`` value this run may be asked for.
+    """The highest ``conversion`` value this run may be asked for: the ceiling.
 
-    Everything is capped at the ceiling. The only write above it is the third
-    reading offer (``value == limit - 2*step``, after two saved readings); a
-    calibration fault's cap still binds it.
+    Calibration v3 never brightens, so there is no exception above it.
     """
-    ceiling = ceiling_for(run, settings)
-    if ceiling is None:
-        return None
-    saved, step, points = _settings(settings)
-    limit = _known_limit(run, saved)
-    if limit is None or value is None or _reading_count(points) < 2:
-        return ceiling
-    third = max(0, limit - 2 * step)
-    if value != third:
-        return ceiling
-    fault_cap = _fault_cap(run, step)
-    return third if fault_cap is None else min(third, fault_cap)
+    return ceiling_for(run, settings)
 
 
 def with_ceiling(view: dict | None, settings: dict | None) -> dict | None:
@@ -645,6 +607,7 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
             "value": run.get("value"),
             "level": report.level if report.level is not None else run.get("level"),
             "limit": report.limit,
+            "lastWrite": report.lastWrite,
             "detail": report.detail,
             "info": report.info,
             "finishedAt": finished_at,
@@ -654,7 +617,6 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
             row.display_check_findings,
             step=step,
             status=status,
-            limit=report.limit,
             info=report.info,
             finished_at=finished_at,
         )
@@ -669,18 +631,6 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
     await _save(row, run, findings)
     if ended:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
-
-
-async def found_limit(kiosk_id: str) -> int:
-    """The limit the ``limit`` step found in the latest run, else :class:`NoLimitError`."""
-    row = await _row(kiosk_id)
-    if row is None:
-        raise UnknownKioskError(kiosk_id)
-    result = ((row.display_check or {}).get("steps") or {}).get("limit") or {}
-    limit = result.get("limit")
-    if result.get("status") != "done" or not isinstance(limit, int):
-        raise NoLimitError(kiosk_id)
-    return limit
 
 
 async def fault_limit_for_save(kiosk_id: str, step: int) -> int:
