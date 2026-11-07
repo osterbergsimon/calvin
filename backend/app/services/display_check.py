@@ -175,6 +175,9 @@ class AgentReport(BaseModel):
     # Calibration v3 (calvin-idts): a ``read`` step reports the DDC level it read
     # in ``level`` and the level the agent last wrote this run (or null) here.
     lastWrite: int | None = Field(None, ge=0, le=100)
+    # The job's ``seq`` the agent was running, echoed so the UI can match a
+    # result to its request (an older agent omits it).
+    seq: int | None = Field(None, ge=0)
     log: Annotated[list[LogEntry] | None, BeforeValidator(_newest(_MAX_LOG_ENTRIES))] = None
     startedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
     finishedAt: Annotated[str | None, BeforeValidator(_clip(64))] = None
@@ -312,6 +315,7 @@ def _view(run: dict | None) -> dict | None:
     view.setdefault("steps", {})
     for key in ("reason", "preflight", "start", "fault", "menuAtStart"):
         view.setdefault(key, None)
+    view.setdefault("seq", 0)
     view["ceiling"] = None
     view["expiresAt"] = _iso(_expires_at(run))
     return view
@@ -328,6 +332,8 @@ def job_for_config(run: dict | None, settings: dict | None = None) -> dict | Non
         "action": view["action"],
         "value": view["value"],
         "brightness": view["brightness"],
+        # Bumped by every step request, so a repeated step is a new job.
+        "seq": view["seq"],
         # What this job's value may reach (calibration never brightens).
         "ceiling": ceiling_for(view, settings),
     }
@@ -475,6 +481,7 @@ async def start_run(kiosk_id: str, request: StartRequest) -> dict:
         "value": request.value,
         "brightness": request.brightness,
         "action": "start",
+        "seq": 0,
         "status": "requested",
         "level": None,
         "limit": None,
@@ -521,6 +528,7 @@ async def change_step(kiosk_id: str, request: StepRequest) -> dict:
     run = dict(row.display_check)
     run["step"] = request.step
     run["value"] = request.value
+    run["seq"] = int(run.get("seq") or 0) + 1
     await _save(row, run)
     logger.info(f"Display check {run['id']} for {kiosk_id!r} moved to {request.step}")
     return _view(run)  # type: ignore[return-value]
@@ -595,6 +603,22 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
         return
 
+    current_seq = run.get("seq")
+    if (
+        status in ("running", "done", "error")
+        and report.seq is not None
+        and isinstance(current_seq, int)
+        and report.seq < current_seq
+    ):
+        # A late report for an older request: keep its log lines, but it is not
+        # the current step's result and moves neither the level nor findings.
+        run["updatedAt"] = _iso(utcnow())
+        run["status"] = "running"  # the agent is alive
+        if report.log is not None:
+            run["log"] = [entry.model_dump() for entry in report.log]
+        await _save(row, run)
+        return
+
     _merge_progress(run, report)
     findings = None
     ended = status in ENDING_STATUSES or (status == "done" and stored["action"] == "stop")
@@ -608,6 +632,7 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
             "level": report.level if report.level is not None else run.get("level"),
             "limit": report.limit,
             "lastWrite": report.lastWrite,
+            "seq": report.seq,
             "detail": report.detail,
             "info": report.info,
             "finishedAt": finished_at,
