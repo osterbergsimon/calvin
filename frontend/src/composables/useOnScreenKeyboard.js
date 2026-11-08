@@ -697,8 +697,12 @@ export function useOnScreenKeyboard() {
     const isNewPointer = !activePointers.has(event.pointerId);
     if (isNewPointer) activePointers.add(event.pointerId);
     // A touch tap's compatibility mouse events must not overwrite the element
-    // the touch started on; a real mouse pointer is a new gesture.
-    if (event.pointerType === "mouse" || !touchGesture) {
+    // the touch started on; a real mouse pointer is a new gesture. So is a
+    // touch pointer we have not seen go down yet: touchGesture is still true for
+    // up to GESTURE_RESET_DELAY_MS after the previous tap ended, and gating on it
+    // alone let that tap's pending reset fire in the middle of this one, wiping
+    // its origin so its own click counted as a tap outside (calvin-6zkk).
+    if (event.pointerType === "mouse" || isNewPointer || !touchGesture) {
       cancelGestureReset();
       // A mouse press is always a new gesture: its pointerup may have been
       // lost outside the window, leaving a stale id in the set.

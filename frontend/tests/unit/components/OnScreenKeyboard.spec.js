@@ -355,6 +355,52 @@ describe("OnScreenKeyboard", () => {
       expect(isShown()).toBe(false);
     });
 
+    // calvin-6zkk: a tap that begins while the previous tap's 350 ms gesture
+    // reset is still pending must not inherit that reset. It used to fire in the
+    // middle of the new tap, wipe the tap's origin, and the tap's own click was
+    // then read as a tap outside: the keyboard hid and the field blurred.
+    it("keeps the keyboard for a tap that starts just after an outside tap", async () => {
+      setTouchPoints(5);
+      mountOsk();
+      const input = addInput();
+      const title = addContainer({ "data-test": "title" });
+      await focus(input);
+      expect(isShown()).toBe(true);
+
+      // Tap 1, outside: pointer + touch events, no click (WebKit does not
+      // always send one), so the keyboard hides from its touchend timer.
+      dispatchPointer(title, "pointerdown", { pointerType: "touch", pointerId: 1 });
+      touchTap(title);
+      dispatchPointer(title, "pointerup", { pointerType: "touch", pointerId: 1 });
+      await waitForOutsideHide();
+      expect(isShown()).toBe(false);
+      input.blur();
+      await waitForFrame();
+
+      // Tap 2 on the field starts 300 ms after tap 1 ended: tap 1's reset is
+      // due about 50 ms into it.
+      await new Promise(resolve => setTimeout(resolve, 300 - 160 - 30));
+      dispatchPointer(input, "pointerdown", { pointerType: "touch", pointerId: 2 });
+      const start = new Event("touchstart", { bubbles: true, cancelable: true });
+      Object.defineProperty(start, "touches", { value: [{ clientX: 10, clientY: 10 }] });
+      input.dispatchEvent(start);
+      await new Promise(resolve => setTimeout(resolve, 90)); // tap 1's reset fires here
+      dispatchPointer(input, "pointerup", { pointerType: "touch", pointerId: 2 });
+      const end = new Event("touchend", { bubbles: true, cancelable: true });
+      Object.defineProperty(end, "changedTouches", { value: [{ clientX: 10, clientY: 10 }] });
+      input.dispatchEvent(end);
+      // The compatibility mouse events: focus, then a click on whatever slid
+      // under the finger once the keyboard appeared.
+      await focus(input);
+      expect(isShown()).toBe(true);
+      const moved = addContainer({ "data-test": "moved-under-finger" });
+      moved.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForOutsideHide();
+
+      expect(isShown()).toBe(true);
+      expect(document.activeElement).toBe(input);
+    });
+
     it("keeps the keyboard when the compatibility click arrives late after a tap", async () => {
       mountOsk();
       const input = addInput();
