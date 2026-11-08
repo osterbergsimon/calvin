@@ -3180,11 +3180,13 @@ export interface components {
     Preflight: {
       /** Faults */
       faults?: string[];
+      /** Settleleft */
+      settleLeft?: number | null;
       /**
        * Status
        * @enum {string}
        */
-      status: "clean" | "fault";
+      status: "clean" | "fault" | "settling";
     };
     /** SealedModeBody */
     SealedModeBody: {

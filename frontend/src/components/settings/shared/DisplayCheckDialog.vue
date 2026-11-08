@@ -353,14 +353,13 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "turn-on"]);
 
-const HELP_URL = "https://github.com/osterbergsimon/calvin/blob/main/docs/setup/KIOSK_POWER.md";
+const HELP_URL = "https://osterbergsimon.github.io/calvin/setup/KIOSK_POWER/";
 const PREFLIGHT_S = 10;
 const FIX_LINE =
   "The usual fix is to keep the screen's USB data link from also powering it (a USB power blocker on the data leg), or to use a stronger power supply.";
 // Item copy (calvin-2pgk): the ramp climbs to the everyday level, never to the highest.
 const NEVER_ABOVE_LINE = "Calvin never goes above this.";
-const EVERYDAY_LINE =
-  "Calvin starts the screen low and brings it up to this after it turns on.";
+const EVERYDAY_LINE = "Calvin starts the screen low and brings it up to this after it turns on.";
 const STARTUP_LINE =
   "Calvin starts the screen at the lowest level and brings it up to your everyday level after it turns on.";
 // After Read it on the highest step the power is watched this long (calvin-puiw).

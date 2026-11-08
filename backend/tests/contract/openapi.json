@@ -2437,10 +2437,24 @@
             "title": "Faults",
             "type": "array"
           },
+          "settleLeft": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settleleft"
+          },
           "status": {
             "enum": [
               "clean",
-              "fault"
+              "fault",
+              "settling"
             ],
             "title": "Status",
             "type": "string"

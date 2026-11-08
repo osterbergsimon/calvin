@@ -76,6 +76,7 @@ nav:
     - setup/SETUP_LINUX.md
     - setup/KIOSK_INSTALL.md
     - setup/KIOSK_PROVISIONING.md
+    - setup/KIOSK_POWER.md
     - setup/UNRAID.md
     - setup/QUICKSTART_DEVELOP.md
     - setup/QUICKSTART_WINDOWS.md

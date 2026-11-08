@@ -257,7 +257,11 @@ describe("Screens › Power › Brightness limit safety", () => {
     await flushPromises();
     const dialog = wrapper.findComponent(DisplayCheckDialog);
     const saved = dialog.props("savePatch")({
-      brightnessConversion: [{ ddc: 0, menu: 0 }, { ddc: 18, menu: 60 }, { ddc: 20, menu: 63 }],
+      brightnessConversion: [
+        { ddc: 0, menu: 0 },
+        { ddc: 18, menu: 60 },
+        { ddc: 20, menu: 63 },
+      ],
       brightnessLimit: 20,
       brightness: 18,
       brightnessFloor: 0,
