@@ -320,3 +320,70 @@ test.describe("link behavior on a kiosk (links never leave Calvin)", () => {
     await expect(embed(page)).toHaveCount(0);
   });
 });
+
+test.describe("design review: nothing hugs the top of a tall surface", () => {
+  test("Mealie rows spread inside tall cards and line up across days", async ({ page }) => {
+    await openWidget(page, "mealie", "large");
+    const rows = await page.locator(".card-grid__card").evaluateAll(cards =>
+      cards.map(card => {
+        const items = [...card.querySelectorAll(".card-grid__item")].map(el =>
+          el.getBoundingClientRect()
+        );
+        const box = card.getBoundingClientRect();
+        return {
+          top: items[0].top - box.top,
+          bottom: box.bottom - items.at(-1).bottom,
+          tops: items.map(r => Math.round(r.top - box.top)),
+        };
+      })
+    );
+    for (const row of rows) {
+      // The last row reaches the foot of the card, not mid-way down it.
+      expect(row.bottom, "last meal row reaches the card foot").toBeLessThan(60);
+    }
+    // Breakfast / Lunch rows share one baseline across days (Dinner may wrap).
+    expect(new Set(rows.map(r => r.tops[0])).size).toBe(1);
+    expect(new Set(rows.map(r => r.tops[1])).size).toBe(1);
+  });
+
+  test("Yr at large: facts sit directly above the forecast, hero takes the spare height", async ({
+    page,
+  }) => {
+    await openWidget(page, "yr", "large");
+    const g = await page.evaluate(() => {
+      const r = sel => document.querySelector(sel).getBoundingClientRect();
+      return {
+        details: r(".weather-forecast-renderer__details"),
+        forecast: r(".weather-forecast-renderer__forecast"),
+        main: r(".weather-forecast-renderer__main"),
+      };
+    });
+    expect(g.forecast.top - g.details.bottom, "gap between facts and forecast").toBeLessThan(60);
+    expect(g.main.height, "hero is the tall part").toBeGreaterThan(300);
+  });
+
+  test("Yr at 800x480 shows the forecast without scrolling", async ({ page }) => {
+    await openWidget(page, "yr", "small");
+    const g = await page.evaluate(() => {
+      const r = sel => document.querySelector(sel).getBoundingClientRect();
+      return {
+        body: r(".dashboard-panel__body"),
+        item: r(".weather-forecast-renderer__item"),
+        temp: r(".weather-forecast-renderer__temp"),
+      };
+    });
+    expect(g.item.top).toBeGreaterThanOrEqual(g.body.top);
+    expect(g.item.bottom, "forecast tile fully visible").toBeLessThanOrEqual(g.body.bottom + 1);
+    expect(g.temp.bottom, "temperature visible").toBeLessThan(g.item.top);
+  });
+
+  test("card labels stay readable at the smallest Card size", async ({ page }) => {
+    await openWidget(page, "mealie", "medium", { view: { cardSize: "xsmall" } });
+    const sizes = await page.evaluate(() =>
+      [".card-grid__title", ".card-grid__item-label"].map(sel =>
+        parseFloat(getComputedStyle(document.querySelector(sel)).fontSize)
+      )
+    );
+    for (const px of sizes) expect(px).toBeGreaterThanOrEqual(9.9);
+  });
+});

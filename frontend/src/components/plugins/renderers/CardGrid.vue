@@ -177,7 +177,8 @@ function itemKey(item, idx) {
 /* card title = the readout microlabel: one label voice everywhere */
 .card-grid__title {
   font-family: var(--font-ui);
-  font-size: 0.7em;
+  /* The floor keeps the smallest Card size legible on a wall display. */
+  font-size: max(0.7em, var(--text-caption));
   font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -186,9 +187,16 @@ function itemKey(item, idx) {
   border-bottom: 1px solid var(--line-soft);
 }
 
+/* Meal rows share the card's spare height equally (never below their own
+   height), so a tall card reads as a planner and the rows line up across days. */
+.card-grid__items {
+  flex: 1 1 auto;
+}
+
 .card-grid__item {
+  flex: 1 1 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--gap-3);
   border-radius: 2px;
 }
@@ -199,7 +207,7 @@ function itemKey(item, idx) {
 
 .card-grid__item-label {
   font-family: var(--font-ui);
-  font-size: 0.7em;
+  font-size: max(0.7em, var(--text-caption));
   font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
