@@ -174,6 +174,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+const HOLD_MS = 10100;
 const CLEAN = { status: "clean", faults: [] };
 const DETECT = { detail: "NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1" };
 const status = w => find(w, "check-status").text();
@@ -196,6 +197,8 @@ async function readLevel(typed, ddc, lastWrite = null) {
   await clickPrimary(wrapper);
   agentStep("read", { level: ddc, lastWrite });
   await settle();
+  // The highest reading is power-watched for 10 s before Next works.
+  if (find(wrapper, "hold-note").exists()) await settle(HOLD_MS);
 }
 async function toStep2(props) {
   await toFound(props);
@@ -312,14 +315,25 @@ describe("steps 2-4: the panel's own buttons, Calvin reads", () => {
     expect(find(wrapper, "same-as-highest").exists()).toBe(false);
   });
 
-  it("tells the person Calvin brings the screen up to the highest level after it turns on", async () => {
+  it("says on the highest step that Calvin never goes above it, not that the screen comes up to it", async () => {
     await toStep2();
-    expect(wrapper.text()).toContain(
-      "Calvin starts the screen at the minimum and brings it up to this after it turns on."
-    );
-    await readLevel(60, 20);
-    await clickPrimary(wrapper);
+    expect(find(wrapper, "never-line").text()).toBe("Calvin never goes above this.");
     expect(wrapper.text()).not.toContain("brings it up to this after");
+    expect(find(wrapper, "startup-line").exists()).toBe(false);
+  });
+
+  it("says on the everyday step that the screen comes up to it after it turns on", async () => {
+    await toStep3();
+    expect(find(wrapper, "startup-line").text()).toBe(
+      "Calvin starts the screen low and brings it up to this after it turns on."
+    );
+    expect(find(wrapper, "never-line").exists()).toBe(false);
+  });
+
+  it("asks for the lowest the panel goes, not the lowest you'd use", async () => {
+    await toStep4();
+    expect(wrapper.text()).toContain("Now set Brightness as low as the panel goes (usually 0).");
+    expect(wrapper.text()).not.toContain("lowest level you'd use");
   });
 
   it("sends a read step (no value, no write) and shows the pair", async () => {
@@ -333,8 +347,13 @@ describe("steps 2-4: the panel's own buttons, Calvin reads", () => {
     agentStep("read", { level: 20, lastWrite: null });
     await settle();
     expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+    // The highest reading is power-watched first; Next waits for it.
+    expect(status(wrapper)).toContain("Checking the power at this level");
+    expect(primary(wrapper).attributes("disabled")).toBeDefined();
+    await settle(HOLD_MS);
     expect(status(wrapper)).toContain("Step 2 of 4 · Highest level · Panel 60 · Calvin 20");
     expect(primary(wrapper).text()).toBe("Next");
+    expect(primary(wrapper).attributes("disabled")).toBeUndefined();
     expect(find(wrapper, "read-again").exists()).toBe(true);
   });
 
@@ -410,7 +429,7 @@ describe("the summary and Save", () => {
     await toSummary();
     const text = find(wrapper, "check-summary").text();
     expect(text).toContain(
-      "Calvin starts the screen at the minimum and brings it up to this after it turns on."
+      "Calvin starts the screen at the lowest level and brings it up to your everyday level after it turns on."
     );
   });
 
@@ -845,7 +864,7 @@ describe("power trouble in a step", () => {
       );
       // Not the normal step text, not a banner naming Calvin's dim level, no "ended".
       expect(body).not.toContain("Use the panel's own buttons to set Brightness to the highest");
-      expect(body).not.toContain("Calvin starts the screen at the minimum");
+      expect(body).not.toContain("Calvin starts the screen");
       expect(body).not.toContain("Power trouble at");
       expect(body).not.toContain("ended the check");
       expect(find(wrapper, "check-fault").exists()).toBe(false);
@@ -879,6 +898,9 @@ describe("power trouble in a step", () => {
     expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
     agentStep("read", { level: 18, lastWrite: null });
     await settle();
+    // The retaken highest is power-watched too, then goes straight on.
+    expect(status(wrapper)).toContain("Checking the power at this level");
+    await settle(HOLD_MS + 2100);
     expect(status(wrapper)).toContain("Step 3 of 4");
     expect(find(wrapper, "check-fault").exists()).toBe(false);
     await readLevel(40, 12);
@@ -919,6 +941,115 @@ describe("power trouble in a step", () => {
     await find(wrapper, "reading-input").setValue("25");
     await clickPrimary(wrapper);
     expect(posts("start").at(-1)[1]).toEqual({ step: "read" });
+  });
+});
+
+describe("a power drop just after Read it (calvin-puiw)", () => {
+  const KEPT_LEAD = "The power dropped after that reading, so Calvin didn't keep it.";
+  const KEPT_SUB =
+    "Calvin dimmed the screen to keep it safe. Use the panel's buttons to set Brightness one step lower. Then type the number its menu shows now.";
+
+  async function readHighest() {
+    await toStep2();
+    await find(wrapper, "reading-input").setValue("74");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 24, lastWrite: null });
+    await settle();
+  }
+
+  it("holds the highest reading for about 10 s with Next disabled", async () => {
+    await readHighest();
+    expect(status(wrapper)).toMatch(/Checking the power at this level · \d+ s/);
+    expect(primary(wrapper).text()).toBe("Next");
+    expect(primary(wrapper).attributes("disabled")).toBeDefined();
+    await settle(HOLD_MS);
+    expect(primary(wrapper).attributes("disabled")).toBeUndefined();
+  });
+
+  it("does not hold the everyday or lowest readings", async () => {
+    await toStep3();
+    await readLevel(40, 12);
+    expect(find(wrapper, "hold-note").exists()).toBe(false);
+    expect(primary(wrapper).attributes("disabled")).toBeUndefined();
+  });
+
+  for (const ends of [true, false]) {
+    it(`discards the reading when a fault comes in the hold and the agent ${ends ? "ends" : "keeps"} the run`, async () => {
+      await readHighest();
+      if (ends) agent({ status: "error", reason: "power_trouble", fault: FAULT });
+      else agent({ fault: FAULT });
+      await settle();
+      const body = find(wrapper, "check-step-body").text();
+      expect(body).toContain(KEPT_LEAD);
+      expect(body).toContain(KEPT_SUB);
+      expect(find(wrapper, "level-pair").exists()).toBe(false);
+      expect(find(wrapper, "reading-input").exists()).toBe(true);
+      expect(status(wrapper)).toContain("Step 2 of 4");
+      await settle(HOLD_MS);
+      expect(status(wrapper)).not.toContain("Step 3 of 4");
+    });
+  }
+
+  it("discards the reading when the run ends in an error inside the hold", async () => {
+    await readHighest();
+    agent({ status: "error", reason: "read_failed", detail: "the display did not answer" });
+    await settle();
+    expect(find(wrapper, "check-step-body").text()).toContain(KEPT_LEAD);
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+  });
+
+  it("a fault after moving on discards the previous reading and returns to it", async () => {
+    await readHighest();
+    await settle(HOLD_MS);
+    await clickPrimary(wrapper);
+    expect(status(wrapper)).toContain("Step 3 of 4");
+    agent({ fault: FAULT });
+    await settle();
+    expect(status(wrapper)).toContain("Step 2 of 4");
+    expect(find(wrapper, "check-step-body").text()).toContain(KEPT_LEAD);
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+    // The retaken reading is the new highest and goes on to Everyday once watched.
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 18, lastWrite: null });
+    await settle(HOLD_MS + 2100);
+    expect(status(wrapper)).toContain("Step 3 of 4");
+  });
+
+  it("a drop while the next level is being read is that level's own drop", async () => {
+    await readHighest();
+    await settle(HOLD_MS);
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("40");
+    await clickPrimary(wrapper);
+    agent({ fault: FAULT });
+    await settle();
+    expect(status(wrapper)).toContain("Step 3 of 4");
+    expect(find(wrapper, "check-step-body").text()).toContain("The power dropped.");
+    expect(find(wrapper, "check-step-body").text()).not.toContain(KEPT_LEAD);
+  });
+});
+
+describe("waiting for the touch controller after a drop (calvin-v996)", () => {
+  it("says it is waiting, with a countdown and a way out, instead of showing the power check", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    agent({ preflight: { status: "settling", faults: [], settleLeft: 14 } });
+    await settle();
+    expect(status(wrapper)).toContain("Waiting for the touch controller to settle · 14 s");
+    expect(find(wrapper, "settling-note").text()).toContain("Stop the check");
+    expect(find(wrapper, "check-stop").exists()).toBe(true);
+    expect(find(wrapper, "check-step-body").text()).not.toContain("Calvin watches the power");
+  });
+
+  it("goes on to the power check once the agent stops waiting", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    agent({ preflight: { status: "settling", faults: [], settleLeft: 3 } });
+    await settle();
+    agent({ preflight: CLEAN });
+    await settle();
+    expect(find(wrapper, "settling-note").exists()).toBe(false);
   });
 });
 
@@ -1156,6 +1287,7 @@ describe("review fixes: reads, Save, copy, watching, fallback, Stop", () => {
     agentStep("read", same);
     await settle();
     expect(find(wrapper, "level-pair").text()).toBe("Panel 60 · Calvin 20");
+    await settle(HOLD_MS);
     await clickPrimary(wrapper);
     await find(wrapper, "reading-input").setValue("40");
     await clickPrimary(wrapper);
