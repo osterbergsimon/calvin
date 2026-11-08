@@ -526,7 +526,6 @@
           :overrides="overrides"
           :save-patch="patchBrightness"
           @patch="patchBrightness"
-          @writes-ok="onWritesOk"
           @turn-on="setScreenNow('on')"
         />
         <InlineNote
@@ -1216,23 +1215,10 @@ function patchBrightness(change) {
 }
 
 const checkOpen = ref(false);
-const enableAfterCheck = ref(false);
-function openCheck({ enableAfter = false } = {}) {
-  enableAfterCheck.value = enableAfter;
+// The first check turns the ramp on with Save itself: Save writes the levels and the
+// ramp in one patch (the dialog's wake option), so the page makes no second write.
+function openCheck() {
   checkOpen.value = true;
-}
-// The first check passing the writes step is what turns the ramp on.
-// The dialog passes the person's choice: unticking "Use these levels when the
-// screen wakes and starts" must not turn the ramp on behind their back.
-function onWritesOk(choice) {
-  if (!enableAfterCheck.value) return;
-  enableAfterCheck.value = false;
-  if (choice?.rampEnabled === false) return;
-  const change = { brightnessRampEnabled: true };
-  if (overrides.value.brightness == null) {
-    change.brightness = firstBrightness(overrides.value.brightnessLimit ?? null);
-  }
-  patchBrightness(change);
 }
 function followSchedule() {
   const next = { ...overrides.value };

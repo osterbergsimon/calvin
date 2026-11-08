@@ -4893,3 +4893,203 @@ def test_a_waiting_fault_is_recorded_before_the_drop_is_written(tmp_path):
     fault.faults.append("Under-voltage detected!")
     runner._finish("stopped")
     assert seen and seen[0] is True  # the incident existed before the first write
+
+
+# -- after a drop: wait for the touch controller to go quiet (calvin-v996) ------
+def _second_run(step, tmp_path, runner, fault, *, job_id="c2", cfg_over=None):
+    """A new run on the same controller and clock, as the dialog's Try again makes."""
+    reports = []
+    clock = runner.clock
+    second = agent.DisplayCheckRunner(
+        dict(_cal_job(step), id=job_id),
+        _ramp_cfg(**(cfg_over or {})),
+        ddc=runner.ddc,
+        report=reports.append,
+        poll=None,
+        clock=clock,
+        sleep=runner.sleep,
+        state_dir=str(tmp_path),
+        controller=runner.controller,
+    )
+    return second, reports
+
+
+def test_a_run_right_after_a_drop_waits_for_the_touch_controller_to_go_quiet(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    assert first.reason == "power_trouble"
+
+    second, reports = _second_run("write", tmp_path, first, fault)
+    began = clock.t
+    # The touch controller resets again 10 s and 30 s into the next run, as seen on a 3B+.
+    resets = [began + 10, began + 30]
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if resets and clock.t >= resets[0]:
+            resets.pop(0)
+            fault.faults.append("usb 1-1.1: reset full-speed USB device")
+
+    second.sleep = sleep
+    second.run()
+    settling = [r for r in reports if (r.get("preflight") or {}).get("status") == "settling"]
+    assert settling, "the dialog needs a waiting state to show"
+    assert all(r["preflight"]["settleLeft"] >= 0 for r in settling)
+    # Not failed by the resets it waited out: the power check then ran clean.
+    assert second.reason != "power_at_idle"
+    assert reports[-1]["preflight"] == {"status": "clean", "faults": []}
+    assert clock.t - began >= 30 + agent.AFTER_DROP_QUIET_SECONDS
+
+
+def test_waiting_after_a_drop_is_bounded_and_can_be_stopped(tmp_path):
+    class Stubborn(ConsumingFault):
+        def new_faults(self):
+            return ["usb 1-1.1: reset full-speed USB device"]
+
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    second, reports = _second_run("write", tmp_path, first, fault)
+    second.controller.fault = Stubborn()
+    began = clock.t
+    second.run()
+    waited = clock.t - began
+    assert agent.AFTER_DROP_TIMEOUT_SECONDS <= waited < agent.AFTER_DROP_TIMEOUT_SECONDS + 15
+    # Out of patience it checks the power honestly, so the verdict is the real one.
+    assert second.reason == "power_at_idle"
+
+
+def test_a_stop_while_waiting_after_a_drop_ends_the_run(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    second, reports = _second_run("write", tmp_path, first, fault)
+    stop = {"job": dict(_cal_job("write"), id="c2", action="stop")}
+    second.poll = lambda: {"displayCheck": stop["job"]}
+    second.run()
+    assert reports[-1]["status"] == "stopped"
+    assert reports[-1].get("reason") != "power_at_idle"
+
+
+def test_a_first_run_does_not_wait(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path)
+    runner.run()
+    assert not [r for r in reports if (r.get("preflight") or {}).get("status") == "settling"]
+
+
+# -- the power watch between steps reacts within a second or so (calvin-puiw) ---
+def test_a_fault_between_steps_is_noticed_within_a_second(tmp_path):
+    fault = ConsumingFault()
+
+    def poll():
+        # The dialog is waiting for the owner's next step (the read already answered).
+        return {"displayCheck": dict(_cal_job("read"), id="c1")}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadingDdc(read=40), fault=fault, poll=poll
+    )
+    fault_at = {}
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if "t" not in fault_at and clock.t >= agent.PREFLIGHT_SECONDS + 4:
+            fault_at["t"] = clock.t
+            fault.faults.append("usb 1-1.1: reset full-speed USB device")
+
+    first_report = {}
+
+    def report(payload):
+        if payload.get("fault") and "t" not in first_report:
+            first_report["t"] = clock.t
+        reports.append(payload)
+
+    runner.sleep = sleep
+    runner.report = report
+    runner.run()
+    assert reports[-1]["reason"] == "power_trouble"
+    assert first_report["t"] - fault_at["t"] <= 1.0
+
+
+# -- coordinator review of #337 -------------------------------------------------
+def _after_a_drop(tmp_path, cfg_over=None):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    second, reports = _second_run("write", tmp_path, first, fault, cfg_over=cfg_over)
+    return first, second, reports, clock, fault, ddc
+
+
+def test_real_under_voltage_while_waiting_ends_the_run_and_drops_at_once(tmp_path):
+    first, second, reports, clock, fault, ddc = _after_a_drop(
+        tmp_path, cfg_over={"brightness_floor": 0}
+    )
+    began = clock.t
+    original = clock.sleep
+    fired = {}
+
+    def sleep(seconds):
+        original(seconds)
+        if "t" not in fired and clock.t >= began + 3:
+            fired["t"] = clock.t
+            fault.faults.append("Under-voltage detected!")
+
+    second.sleep = sleep
+    writes_before = len(ddc.writes)
+    second.run()
+    assert second.reason == "power_at_idle"
+    assert reports[-1]["status"] == "error"
+    assert reports[-1]["preflight"]["status"] == "fault"
+    new_writes = ddc.writes[writes_before:]
+    assert new_writes, "the screen was dimmed"
+    # Dimmed once and left there: nothing climbs back up after real under-voltage.
+    assert max(new_writes) <= new_writes[0]
+    assert new_writes[-1] == new_writes[0]
+    assert clock.t - fired["t"] < 10, "did not sit out the whole wait"
+
+
+def test_touch_only_resets_21_and_19_seconds_apart_do_not_fail_the_next_power_check(tmp_path):
+    first, second, reports, clock, fault, ddc = _after_a_drop(tmp_path)
+    began = clock.t
+    resets = [began + 5, began + 26, began + 45]  # gaps of 21 s and 19 s, as on the 3B+
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if resets and clock.t >= resets[0]:
+            resets.pop(0)
+            fault.faults.append("usb 1-1.1: reset full-speed USB device")
+
+    second.sleep = sleep
+    second.run()
+    assert second.reason != "power_at_idle"
+    assert agent.AFTER_DROP_QUIET_SECONDS >= 30
+
+
+def test_after_waiting_the_report_says_watching_so_the_dialog_stops_showing_settling(tmp_path):
+    first, second, reports, clock, fault, ddc = _after_a_drop(tmp_path)
+    second.run()
+    kinds = [(r.get("preflight") or {}).get("status") for r in reports]
+    assert "settling" in kinds
+    last_settling = max(i for i, k in enumerate(kinds) if k == "settling")
+    assert kinds[last_settling + 1] == "watching"
+
+
+def test_the_drop_is_written_before_the_blocking_report(tmp_path):
+    order = []
+    fault = ConsumingFault()
+    ddc = ReadingDdc(read=40, on_write=lambda level: order.append(("write", level)))
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ddc, fault=fault
+    )
+    runner.report = lambda payload: order.append(("report", bool(payload.get("fault"))))
+    fault.faults.append("Under-voltage detected!")
+    runner._calibration_fault("read", 19, 19, ["Under-voltage detected!"])
+    kinds = [k for k, _ in order]
+    assert kinds.index("write") < kinds.index("report")

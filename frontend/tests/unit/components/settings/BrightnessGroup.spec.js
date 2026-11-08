@@ -131,7 +131,9 @@ describe("BrightnessGroup rows", () => {
     expect(note.text()).toContain("Power trouble at Calvin 12 (6 Nov)");
     const link = find(wrapper, "power-fix-link");
     expect(link.text()).toBe("How to fix the power");
-    expect(link.attributes("href")).toContain("KIOSK_POWER.md");
+    expect(link.attributes("href")).toBe(
+      "https://osterbergsimon.github.io/calvin/setup/KIOSK_POWER/"
+    );
     expect(link.attributes("target")).toBe("_blank");
   });
 

@@ -157,13 +157,24 @@
 
         <!-- A power drop in a level: only what to do now (calvin-tzzx) -->
         <template v-else-if="state === 'fault'">
-          <p class="dcheck__lead" data-test="drop-lead">
-            The power dropped. Calvin dimmed the screen to keep it safe.
-          </p>
-          <p class="dcheck__sub" data-test="drop-sub">
-            Use the panel's buttons to set Brightness one step below where it cut out. Then type the
-            number its menu shows now.
-          </p>
+          <template v-if="droppedAfterRead">
+            <p class="dcheck__lead" data-test="drop-lead">
+              The power dropped after that reading, so Calvin didn't keep it.
+            </p>
+            <p class="dcheck__sub" data-test="drop-sub">
+              Calvin dimmed the screen to keep it safe. Use the panel's buttons to set Brightness
+              one step lower. Then type the number its menu shows now.
+            </p>
+          </template>
+          <template v-else>
+            <p class="dcheck__lead" data-test="drop-lead">
+              The power dropped. Calvin dimmed the screen to keep it safe.
+            </p>
+            <p class="dcheck__sub" data-test="drop-sub">
+              Use the panel's buttons to set Brightness one step below where it cut out. Then type
+              the number its menu shows now.
+            </p>
+          </template>
           <p v-if="tooHigh" class="dcheck__sub dcheck__sub--warn" data-test="level-too-high">
             {{ tooHigh }}
           </p>
@@ -173,14 +184,21 @@
         <template v-else>
           <p class="dcheck__lead">{{ LEVELS[step - 2].heading }}</p>
           <p class="dcheck__sub">{{ LEVELS[step - 2].body }}</p>
-          <p v-if="step === 2" class="dcheck__sub" data-test="startup-line">{{ STARTUP_LINE }}</p>
-          <template v-if="state === 'read-done'">
+          <p v-if="step === 2" class="dcheck__sub" data-test="never-line">{{ NEVER_ABOVE_LINE }}</p>
+          <p v-else-if="step === 3" class="dcheck__sub" data-test="startup-line">
+            {{ EVERYDAY_LINE }}
+          </p>
+          <template v-if="state === 'read-done' || state === 'holding'">
             <p class="dcheck__pair dcheck__pair--big" data-test="level-pair">
               Panel {{ thisLevel.typed }} · Calvin {{ thisLevel.ddc }}
             </p>
             <InlineNote v-if="behindNote" tone="warn" data-test="level-behind">
               {{ behindNote }}
             </InlineNote>
+            <p v-if="state === 'holding'" class="dcheck__sub" data-test="hold-note">
+              Calvin keeps watching the power for {{ holdLeft }} s before you go on. Leave the panel
+              as it is.
+            </p>
           </template>
           <template v-else-if="state === 'ask'">
             <p class="dcheck__sub">Type the Brightness the panel's own menu shows.</p>
@@ -190,8 +208,13 @@
           </template>
         </template>
 
+        <InlineNote v-if="state === 'settling'" data-test="settling-note">
+          The power dropped a moment ago and the touch controller is still resetting. Calvin waits
+          until it has been quiet for {{ SETTLE_QUIET_S }} s before it starts, so this run isn't
+          failed by the last one. Stop the check if you'd rather not wait.
+        </InlineNote>
         <InlineNote
-          v-if="inFlight && view !== 'readonly' && check.silence.value === 'waiting'"
+          v-else-if="inFlight && view !== 'readonly' && check.silence.value === 'waiting'"
           data-test="check-silence"
         >
           Waiting for {{ screenName }}…
@@ -330,12 +353,18 @@ const props = defineProps({
 });
 const emit = defineEmits(["update:modelValue", "patch", "writes-ok", "turn-on"]);
 
-const HELP_URL = "https://github.com/osterbergsimon/calvin/blob/main/docs/setup/KIOSK_POWER.md";
+const HELP_URL = "https://osterbergsimon.github.io/calvin/setup/KIOSK_POWER/";
 const PREFLIGHT_S = 10;
 const FIX_LINE =
   "The usual fix is to keep the screen's USB data link from also powering it (a USB power blocker on the data leg), or to use a stronger power supply.";
+// Item copy (calvin-2pgk): the ramp climbs to the everyday level, never to the highest.
+const NEVER_ABOVE_LINE = "Calvin never goes above this.";
+const EVERYDAY_LINE = "Calvin starts the screen low and brings it up to this after it turns on.";
 const STARTUP_LINE =
-  "Calvin starts the screen at the minimum and brings it up to this after it turns on.";
+  "Calvin starts the screen at the lowest level and brings it up to your everyday level after it turns on.";
+// After Read it on the highest step the power is watched this long (calvin-puiw).
+const HOLD_S = 10;
+const SETTLE_QUIET_S = 35;
 // The fallback only writes low levels: 5, then 1, held under the run's ceiling
 // and start level so it can never be refused as "above the ceiling".
 const FALLBACK_BASE = [5, 1];
@@ -360,7 +389,7 @@ const LEVELS = [
   {
     heading: "Lowest level",
     short: "lowest",
-    body: "Now set Brightness to the lowest level you'd use, the lowest that is still readable.",
+    body: "Now set Brightness as low as the panel goes (usually 0).",
   },
 ];
 
@@ -377,6 +406,13 @@ const readingText = ref("");
 const readingInput = ref(null);
 const pendingTyped = ref(null);
 const faulted = ref(false);
+// A power drop came after a reading was taken: the reading was discarded and the
+// person is asked again with the "didn't keep it" wording (calvin-puiw).
+const droppedAfterRead = ref(false);
+// The reading on the highest step is held, power-watched, until this instant.
+const holdEndsMs = ref(null);
+// The drop already acted on, so a repeated poll of the same fault does nothing twice.
+let dropHandledKey = null;
 const stopRequested = ref(false);
 const saved = ref(false);
 const usedFallback = ref(false);
@@ -445,6 +481,17 @@ const stepLabel = name =>
 // --- the level being read ------------------------------------------------------
 const levelIndex = computed(() => step.value - 2);
 const thisLevel = computed(() => levels.value[levelIndex.value] ?? null);
+const holding = computed(
+  () =>
+    holdEndsMs.value !== null &&
+    levelIndex.value === 0 &&
+    view.value === "step" &&
+    thisLevel.value !== null &&
+    nowMs.value < holdEndsMs.value
+);
+const holdLeft = computed(() =>
+  holdEndsMs.value === null ? 0 : Math.max(0, Math.ceil((holdEndsMs.value - nowMs.value) / 1000))
+);
 const typedNumber = computed(() => {
   const text = readingText.value.trim();
   if (!/^\d{1,3}$/.test(text)) return null;
@@ -581,6 +628,7 @@ async function readIt() {
   if (fromDrop) {
     if (run.value?.fault) ackedFault.value = faultKey(run.value);
     faulted.value = false;
+    droppedAfterRead.value = false;
     afterDrop = step.value === 2;
   }
   const ok = await go("read");
@@ -590,6 +638,8 @@ async function readIt() {
 // A drop the person has moved past must not come back on another step.
 function dismissFault() {
   faulted.value = false;
+  droppedAfterRead.value = false;
+  holdEndsMs.value = null;
   if (run.value?.fault) ackedFault.value = faultKey(run.value);
 }
 function back() {
@@ -650,6 +700,8 @@ async function sameAsHighest() {
   await readIt();
 }
 function readAgain() {
+  holdEndsMs.value = null;
+  afterDrop = false;
   const typed = thisLevel.value?.typed;
   if (behindNote.value) behindTries.value[levelIndex.value] += 1;
   levels.value[levelIndex.value] = null;
@@ -798,7 +850,7 @@ async function saveAll() {
     saveError.value = "Couldn't save to the server. Check the connection and try again.";
     return;
   }
-  emit("writes-ok", { rampEnabled: useOnWake.value });
+  emit("writes-ok", { rampEnabled: useOnWake.value, saved: true });
   saved.value = true;
 }
 
@@ -915,10 +967,10 @@ function onStepResult(name, result, asked) {
         ddc: result.level == null ? Number.NaN : Number(result.level),
         lastWrite: result.lastWrite ?? null,
       };
-      if (afterDrop) {
-        afterDrop = false;
-        // A stale read must go through the same out-of-order check as any other.
-        if (!behindNote.value) nextLevel();
+      // The highest reading is power-watched before the person goes on.
+      if (levelIndex.value === 0) {
+        nowMs.value = Date.now();
+        holdEndsMs.value = nowMs.value + HOLD_S * 1000;
       }
       return;
     case "conversion":
@@ -934,6 +986,45 @@ function onStepResult(name, result, asked) {
       return;
     default:
       void asked;
+  }
+}
+
+// A power drop arrived while a reading stood or the person was typing the next one:
+// a reading taken at a level that just browned out is never kept. Within the hold
+// (or before moving on) it discards this step's reading; after moving on it discards
+// the previous one and returns to it. A read still in flight is the level that
+// dropped, so that step simply asks again.
+function discardForDrop(wasReading) {
+  if (view.value === "summary" && !saved.value && !usedFallback.value) {
+    // The last reading is the one just taken: it is not kept, and its step asks again.
+    const last = levelIndex.value;
+    if (!levels.value[last]) return;
+    levels.value[last] = null;
+    view.value = "step";
+    droppedAfterRead.value = true;
+    readingText.value = "";
+    afterDrop = last === 0;
+    nextTick(() => readingInput.value?.focus());
+    return;
+  }
+  if (view.value !== "step" || step.value < 2) return;
+  const index = levelIndex.value;
+  afterDrop = false;
+  holdEndsMs.value = null;
+  if (levels.value[index]) {
+    levels.value[index] = null;
+    droppedAfterRead.value = true;
+    readingText.value = "";
+    if (index === 0) afterDrop = true;
+    return;
+  }
+  if (index > 0 && !wasReading) {
+    levels.value[index - 1] = null;
+    step.value -= 1;
+    droppedAfterRead.value = true;
+    readingText.value = "";
+    if (step.value === 2) afterDrop = true;
+    nextTick(() => readingInput.value?.focus());
   }
 }
 
@@ -956,6 +1047,19 @@ function onRunEnded(current) {
       end("error", "The power dropped while Calvin set a low level.");
       return;
     }
+    faulted.value = true;
+    if (current.fault && faultKey(current) !== dropHandledKey) {
+      dropHandledKey = faultKey(current);
+      discardForDrop(false);
+    } else if (holding.value) {
+      discardForDrop(false);
+    }
+    return;
+  }
+  // Any other error that ends the run inside the hold means the reading can't be
+  // trusted either: keep nothing and ask again.
+  if (current.status === "error" && holding.value) {
+    discardForDrop(false);
     faulted.value = true;
     return;
   }
@@ -980,7 +1084,12 @@ function onRun(current) {
   // A drop in a level: the read in flight will never be answered. The person
   // is asked to set the panel again, whether or not the agent ended the run.
   if (current.fault && step.value >= 2 && faultKey(current) !== ackedFault.value) {
+    const wasReading = inFlightStep.value === "read";
     clearAwaiting();
+    if (faultKey(current) !== dropHandledKey) {
+      dropHandledKey = faultKey(current);
+      discardForDrop(wasReading);
+    }
   }
   if (!current.active) return onRunEnded(current);
   if (!awaiting) return;
@@ -1006,6 +1115,17 @@ function onRun(current) {
 
 watch(() => check.run.value, onRun);
 
+// After a drop the retaken highest reading goes straight on to the Everyday level,
+// once its power check has passed. A stale read goes through the same out-of-order
+// check as any other.
+watch(holding, (now, before) => {
+  // Only while the person is still on this step: a Stop, an end state or the
+  // summary has taken over, and the reading is unproven.
+  if (!before || now || !afterDrop || view.value !== "step" || stopRequested.value) return;
+  afterDrop = false;
+  if (thisLevel.value && !behindNote.value) nextLevel();
+});
+
 // A run another device started is only watched: when it ends, say so.
 watch(
   () => check.run.value,
@@ -1023,6 +1143,10 @@ function resetRun() {
   readingText.value = "";
   pendingTyped.value = null;
   faulted.value = false;
+  droppedAfterRead.value = false;
+  holdEndsMs.value = null;
+  dropHandledKey = null;
+  afterDrop = false;
   stopRequested.value = false;
   saved.value = false;
   useOnWake.value = true;
@@ -1090,9 +1214,24 @@ function noteReport() {
   firstReportMs.value = Date.now();
 }
 watch(() => [run.value?.id, run.value?.updatedAt], noteReport);
+// After waiting out a drop the agent starts its 10 s power watch: count it from here.
+watch(
+  () => run.value?.preflight?.status,
+  statusNow => {
+    if (statusNow === "watching") firstReportMs.value = Date.now();
+  }
+);
 
 const preflightLeft = computed(() =>
   Math.max(0, PREFLIGHT_S - Math.floor((nowMs.value - (firstReportMs.value ?? nowMs.value)) / 1000))
+);
+
+// The agent is waiting for the touch controller to go quiet after a power drop.
+const settlingNow = computed(
+  () =>
+    Boolean(run.value?.active) &&
+    run.value.id === currentRunId &&
+    run.value.preflight?.status === "settling"
 );
 
 const state = computed(() => {
@@ -1101,6 +1240,7 @@ const state = computed(() => {
   if (view.value === "fallback") {
     return fbPhase.value === "explain" ? "fb-explain" : `fb-${fbPhase.value}`;
   }
+  if (settlingNow.value) return "settling";
   if (step.value === 1) {
     if (!detected.value) {
       if (preflightClean.value) return "asking";
@@ -1109,7 +1249,7 @@ const state = computed(() => {
     return "found";
   }
   if (inFlightStep.value === "read") return "reading";
-  if (thisLevel.value) return "read-done";
+  if (thisLevel.value) return holding.value ? "holding" : "read-done";
   return faulted.value || fault.value ? "fault" : "ask";
 });
 
@@ -1226,6 +1366,11 @@ const ui = computed(() => {
         status: `Checking the power before changing anything · ${preflightLeft.value} s`,
         busy: true,
       };
+    case "settling":
+      return {
+        status: `Waiting for the touch controller to settle · ${run.value.preflight.settleLeft ?? 0} s`,
+        busy: true,
+      };
     case "asking":
       return { status: `Step 1 of 4 · Asking ${name}'s screen…`, busy: true };
     case "found":
@@ -1235,6 +1380,20 @@ const ui = computed(() => {
       };
     case "reading":
       return { status: `${stepOf()} · Reading…`, busy: true };
+    case "holding":
+      return {
+        status: `Checking the power at this level · ${holdLeft.value} s`,
+        busy: true,
+        primary: {
+          label: moreToRead.value ? "Next" : "See the summary",
+          test: "check-next",
+          disabled: true,
+        },
+        secondary: [
+          { label: "Read it again", test: "read-again", run: readAgain },
+          { label: "Back", test: "check-back", run: back },
+        ],
+      };
     case "read-done":
       return {
         status: `${stepOf()} · Panel ${thisLevel.value.typed} · Calvin ${thisLevel.value.ddc}`,

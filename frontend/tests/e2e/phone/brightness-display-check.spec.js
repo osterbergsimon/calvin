@@ -186,9 +186,7 @@ for (const [size, viewport] of SIZES) {
         await expect(body(page)).toContainText(heading);
         await expect(body(page)).toContainText("the panel's own menu");
         if (i === 0) {
-          await expect(body(page)).toContainText(
-            "Calvin starts the screen at the minimum and brings it up to this after it turns on."
-          );
+          await expect(body(page)).toContainText("Calvin never goes above this.");
           await shot(page, size, "check-highest");
         }
         await page.locator('[data-test="reading-input"]').fill(String(typed));
@@ -199,7 +197,14 @@ for (const [size, viewport] of SIZES) {
           `Panel ${typed} · Calvin ${ddc}`,
           { timeout: 8000 }
         );
-        if (i === 0) await shot(page, size, "check-read");
+        if (i === 0) {
+          // The highest reading is power-watched for 10 s; Next waits for it.
+          await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+            "Checking the power at this level"
+          );
+          await expect(page.getByRole("button", { name: "Next", exact: true })).toBeDisabled();
+          await shot(page, size, "check-read");
+        }
         await page
           .getByRole("button", { name: i === 2 ? "See the summary" : "Next", exact: true })
           .click();
@@ -309,6 +314,40 @@ for (const [size, viewport] of SIZES) {
       await shot(page, size, "check-fault");
       await expectPhoneLayout(page, `fault in a step (${size})`);
       expect(api.overridesByKiosk.hallway?.brightnessLimit).toBeUndefined();
+    });
+
+    test("a drop just after Read it throws the reading away", async ({ page }) => {
+      const api = await installApiMock(page, {
+        kioskExtras: { hallway: { displayStack: "cog", displayCheck: FOUND } },
+      });
+      const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
+      await group.locator('[data-test="check-open"]').click();
+      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("detect");
+      api.agentReport("hallway", {
+        preflight: { status: "clean", faults: [] },
+        start: { level: 19, known: true, source: "read" },
+      });
+      api.agentStep("hallway", "detect", { detail: "NOMAD TOUCH" });
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.locator('[data-test="reading-input"]').fill("74");
+      await page.getByRole("button", { name: "Read it", exact: true }).click();
+      await expect.poll(() => api.displayCheckRuns.hallway?.step).toBe("read");
+      api.agentStep("hallway", "read", { level: 24, lastWrite: null });
+      await expect(dialog(page).locator('[data-test="check-status"]')).toContainText(
+        "Checking the power at this level",
+        { timeout: 8000 }
+      );
+      api.agentReport("hallway", {
+        fault: { step: "read", level: null, kind: "under-voltage", at: "y", lastGood: null },
+      });
+      await expect(body(page)).toContainText(
+        "The power dropped after that reading, so Calvin didn't keep it.",
+        { timeout: 8000 }
+      );
+      await expect(body(page)).toContainText("one step lower");
+      await expect(body(page).locator('[data-test="level-pair"]')).toHaveCount(0);
+      await shot(page, size, "check-fault-after-read");
+      await expectPhoneLayout(page, `drop after read (${size})`);
     });
 
     test("Stop shows it is stopping, and an unfinished run says what was kept", async ({

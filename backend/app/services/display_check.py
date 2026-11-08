@@ -133,8 +133,12 @@ class Preflight(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    status: Literal["clean", "fault"]
+    # ``settling``: after a power drop the agent waits for the touch controller to
+    # go quiet before the watch (calvin-v996); ``settleLeft`` is the seconds to go.
+    # ``watching``: the wait is over and the 10 s power watch has begun.
+    status: Literal["clean", "fault", "settling", "watching"]
     faults: Annotated[list[str], BeforeValidator(_newest(20))] = Field(default_factory=list)
+    settleLeft: int | None = Field(None, ge=0, le=3600)
 
 
 class StartLevel(BaseModel):
@@ -252,6 +256,15 @@ def _apply_findings(
 
 
 _UNCHANGED: Any = object()
+
+POWER_REASONS = frozenset({"power_at_idle", "power_trouble"})
+
+
+def _ended_on_power(run: dict, report: AgentReport) -> bool:
+    """The report ends the run on a power fault, not on what the panel answered."""
+    if (report.reason or run.get("reason")) in POWER_REASONS:
+        return True
+    return report.preflight is not None and report.preflight.status == "fault"
 
 
 def _power_trouble(run: dict, report: AgentReport, status: str, now: str) -> Any:
@@ -572,7 +585,7 @@ def _merge_progress(run: dict, report: AgentReport) -> None:
     if report.reason is not None:
         run["reason"] = report.reason
     if report.preflight is not None:
-        run["preflight"] = report.preflight.model_dump()
+        run["preflight"] = report.preflight.model_dump(exclude_none=True)
     if report.start is not None:
         run["start"] = report.start.model_dump()
     if report.fault is not None:
@@ -659,13 +672,16 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
             "finishedAt": finished_at,
         }
         run["steps"] = steps
-        findings = _apply_findings(
-            row.display_check_findings,
-            step=step,
-            status=status,
-            info=report.info,
-            finished_at=finished_at,
-        )
+        # A run that ends on power trouble says nothing about DDC or writes: the
+        # panel was never asked, so an earlier successful check stands (calvin-v996).
+        if status != "error" or not _ended_on_power(run, report):
+            findings = _apply_findings(
+                row.display_check_findings,
+                step=step,
+                status=status,
+                info=report.info,
+                finished_at=finished_at,
+            )
     trouble = _power_trouble(run, report, status, now)
     if trouble is not _UNCHANGED:
         findings = findings or findings_view(row.display_check_findings)

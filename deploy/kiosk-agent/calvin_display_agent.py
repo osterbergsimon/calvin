@@ -281,6 +281,19 @@ DISPLAY_CHECK_POLL_SECONDS = 1.5
 CHECK_FLOOR = 5  # where an unknown start is dimmed to
 PREFLIGHT_SECONDS = 10.0  # the power watch before the first write
 PREFLIGHT_POLL_SECONDS = 1.0
+# After a power drop the touch controller can keep resetting for a minute or so
+# (calvin-v996). A run that starts inside AFTER_DROP_WINDOW waits until it has
+# been quiet for AFTER_DROP_QUIET, giving up after AFTER_DROP_TIMEOUT so a screen
+# that never settles still gets its honest power check. The quiet period is clearly
+# longer than the 19-21 s gaps between resets seen on a 3B+ (2026-11-08 14:11-14:12).
+AFTER_DROP_WINDOW_SECONDS = 300.0
+AFTER_DROP_QUIET_SECONDS = 35.0
+AFTER_DROP_TIMEOUT_SECONDS = 90.0
+# Between steps the power is checked this often (the config poll stays at 1.5 s),
+# instead of once per config poll (calvin-puiw). Each check runs journalctl and
+# vcgencmd, so it is kept at about a second to avoid adding load to a supply that
+# is already marginal.
+FAULT_WATCH_SECONDS = 1.0
 CALIBRATION_STEPS = ("detect", "write", "conversion", "read")
 DISPLAY_CHECK_TIMEOUT_SECONDS = 600
 DISPLAY_CHECK_REPORT_PATH = "/api/kiosks/{kiosk_id}/display-check"
@@ -889,6 +902,8 @@ class BrightnessController:
         # loop's reconcile skips all DDC work for the duration of a check.
         self.lock = threading.RLock()
         self.check_running = False
+        # When the last check run ended on power trouble (this clock), or None.
+        self.last_drop_at = None
         # None = unknown: after an agent restart the panel keeps whatever DDC
         # value it had, so the first write the agent makes is always a 0.
         self.level = None
@@ -1408,6 +1423,7 @@ class DisplayCheckRunner:
         self.settled = False
         self._touched = False
         self._seen = set()
+        self._pending_fault = None
         self._stop_reason = None
         self._deadline = self.clock() + DISPLAY_CHECK_TIMEOUT_SECONDS
         self.log_entries = []
@@ -1525,11 +1541,63 @@ class DisplayCheckRunner:
             return []
         return _poll_faults(self.controller.fault)
 
+    def _note_drop(self):
+        if self.controller is not None:
+            self.controller.last_drop_at = self.clock()
+
+    def _wait_after_drop(self):
+        """After a recent drop, wait until the touch controller has been quiet.
+
+        Bounded; False only when the owner stopped the run while it waited.
+        """
+        last = getattr(self.controller, "last_drop_at", None)
+        if last is None or self.clock() - last > AFTER_DROP_WINDOW_SECONDS:
+            return True
+        arm = getattr(self.controller.fault, "arm", None)
+        if arm is not None:
+            arm()
+        begin = quiet_since = self.clock()
+        self._entry("waiting for the touch controller to settle after the power drop")
+        while True:
+            now = self.clock()
+            lines = self._polled_faults()
+            if lines and _fault_kind(lines) != "touch controller reset":
+                # Real under-voltage (or over-current): the level just set is not
+                # safe. Only a touch-only reset may extend the wait.
+                self.preflight = {"status": "fault", "faults": lines}
+                self.reason = "power_at_idle"
+                self._note_drop()
+                self._entry(f"power trouble while waiting: {'; '.join(lines)}")
+                self._drop_to_floor()
+                self._stop_reason = "error"
+                return False
+            if lines:
+                quiet_since = now
+            if now - quiet_since >= AFTER_DROP_QUIET_SECONDS:
+                self._entry(f"quiet for {int(AFTER_DROP_QUIET_SECONDS)} s; checking the power")
+                break
+            if now - begin >= AFTER_DROP_TIMEOUT_SECONDS:
+                self._entry("the touch controller is still resetting; checking the power anyway")
+                break
+            left = int(AFTER_DROP_QUIET_SECONDS - (now - quiet_since) + 0.999)
+            self.preflight = {"status": "settling", "faults": [], "settleLeft": max(0, left)}
+            self.report(self._payload("running"))
+            if self._cancel():
+                return False
+            self.sleep(PREFLIGHT_POLL_SECONDS)
+        # Say so: an omitted preflight would leave the backend showing "settling"
+        # through the whole 10 s watch.
+        self.preflight = {"status": "watching", "faults": []}
+        self.report(self._payload("running"))
+        return True
+
     def _watch_power(self):
         """The 10 s power watch before the first write; False on trouble or stop."""
         if self.controller is None:
             self.preflight = {"status": "clean", "faults": []}
             return True
+        if not self._wait_after_drop():
+            return False
         arm = getattr(self.controller.fault, "arm", None)
         if arm is not None:
             arm()
@@ -1545,6 +1613,7 @@ class DisplayCheckRunner:
         if faults:
             self.preflight = {"status": "fault", "faults": faults}
             self.reason = "power_at_idle"
+            self._note_drop()
             self._entry(f"power trouble at idle before any change: {'; '.join(faults)}")
             self._stop_reason = "error"
             return False
@@ -1677,14 +1746,17 @@ class DisplayCheckRunner:
         if panel_level is not None:
             self.fault["panelLevel"] = panel_level
         self.reason = "power_trouble"
+        self._note_drop()
         where = "an unknown level" if level is None else str(level)
         self._entry(f"power trouble at {where}: {'; '.join(lines)}")
 
     def _calibration_fault(self, step, level, last_good, lines, panel_level=None):
         """A fault in any check step ends the run: one write to the floor, settle, no retry."""
         self._fault_incident(step, level, last_good, lines, panel_level)
-        self.report(self._payload("running"))
+        # Dim first: the report below is a network call (up to HTTP_TIMEOUT), and
+        # on a 3B+ the Ethernet port shares the USB bus that is resetting.
         self._drop_to_floor()
+        self.report(self._payload("running"))
         self._entry("waiting for the power to settle")
         self._settle()
         self._stop_reason = "error"
@@ -1846,6 +1918,10 @@ class DisplayCheckRunner:
         """
         if self.fault is not None and self.fault["step"] in CALIBRATION_STEPS:
             return None
+        # A run that ended on power trouble without a fault incident (the wait or
+        # the idle watch) dimmed the screen too; it must not climb back up.
+        if self.reason in ("power_at_idle", "power_trouble"):
+            return None
         start = self._start_level()
         return CHECK_FLOOR if start is None else start
 
@@ -1949,6 +2025,22 @@ class DisplayCheckRunner:
         )
         return payload
 
+    def _sleep_watching(self, seconds, watch):
+        """Sleep `seconds`, looking at the power every FAULT_WATCH_SECONDS.
+
+        Returns the fault lines found (the caller handles them) or None.
+        """
+        remaining = seconds
+        while remaining > 0:
+            part = min(FAULT_WATCH_SECONDS, remaining)
+            self.sleep(part)
+            remaining -= part
+            if watch:
+                lines = self._polled_faults()
+                if lines:
+                    return lines
+        return None
+
     def run(self):
         """Poll every 1.5 s while the job is active; always finish safely."""
         controller = self.controller
@@ -1994,7 +2086,8 @@ class DisplayCheckRunner:
                     if self.poll is None:
                         return self._finish("done")
                     if current["step"] in CALIBRATION_STEPS:
-                        lines = self._polled_faults()
+                        lines = self._polled_faults() or self._pending_fault
+                        self._pending_fault = None
                         if lines:
                             # With an unknown start the level is a guess (0):
                             # report none, so no limit is ever derived from it.
@@ -2022,7 +2115,9 @@ class DisplayCheckRunner:
                     if _job_signature(nxt) != signature:
                         current = nxt
                         break
-                    self.sleep(DISPLAY_CHECK_POLL_SECONDS)
+                    self._pending_fault = self._sleep_watching(
+                        DISPLAY_CHECK_POLL_SECONDS, current["step"] in CALIBRATION_STEPS
+                    )
         finally:
             if controller is not None:
                 controller.check_running = False

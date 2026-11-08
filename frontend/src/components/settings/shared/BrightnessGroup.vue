@@ -292,8 +292,7 @@ const valueText = computed(() =>
     : `${shownValue.value} on Calvin's scale`
 );
 const limitDate = computed(() => checkedDate(findings.value?.checkedAt));
-const POWER_HELP_URL =
-  "https://github.com/osterbergsimon/calvin/blob/main/docs/setup/KIOSK_POWER.md";
+const POWER_HELP_URL = "https://osterbergsimon.github.io/calvin/setup/KIOSK_POWER/";
 // Power trouble a check saw (calvin-c805): kept until a later clean check clears it.
 const troubleText = computed(() => {
   const trouble = findings.value?.powerTrouble;
