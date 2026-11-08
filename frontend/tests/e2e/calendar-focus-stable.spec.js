@@ -3,7 +3,7 @@
  * (Today, view switch, nav, fullscreen) only render while the region is focused;
  * on a narrow calendar they used to wrap onto a second row, so the grid lost a
  * row's height on focus and regained it on blur (a full relayout per tap).
- * The controls now overlay the header strip, so the grid keeps its box.
+ * The controls now keep their row (hidden until focused), so the grid keeps its box.
  */
 
 import { expect } from "@playwright/test";

@@ -8,11 +8,23 @@
       :class="{ 'iframe-renderer__frame--error': error }"
       frameborder="0"
       referrerpolicy="no-referrer"
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      :sandbox="sandbox"
       allowfullscreen
       @load="handleLoad"
       @error="handleError"
     />
+
+    <!-- A refusing site fires load, not error, so a failure cannot be detected
+         reliably: on a kiosk the QR handoff is always one tap away. -->
+    <Button
+      v-if="url && onKiosk"
+      class="iframe-renderer__qr"
+      variant="secondary"
+      data-test="show-qr-always"
+      @click="showQr = true"
+    >
+      Show QR code
+    </Button>
 
     <div v-if="error" class="iframe-renderer__fallback">
       <Card class="iframe-renderer__fallback-card" title="This site won't embed">
@@ -51,23 +63,35 @@ import Button from "../../ui/Button.vue";
 import Card from "../../ui/Card.vue";
 import InlineNote from "../../ui/InlineNote.vue";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
-import { getKioskId } from "../../../utils/kioskId";
+import { isKioskDisplay } from "../../../utils/kioskId";
+import { isHttpUrl } from "../../../utils/safeUrl";
+import { KIOSK_SANDBOX } from "../../../utils/kioskSandbox";
 
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array, null], default: null },
 });
 
+// A kiosk has no way back from an opened tab: offer the QR handoff instead.
+const onKiosk = isKioskDisplay();
+const showQr = ref(false);
+
+// A kiosk has no way back from a popup or a top-level navigation, so its frame
+// gets neither allow-popups nor allow-top-navigation (calvin-eugy review S2).
+const sandbox = onKiosk ? KIOSK_SANDBOX : `${KIOSK_SANDBOX} allow-popups`;
+
 const url = computed(() => {
   if (props.schema.url_path) {
-    return resolvePath(props.data, props.schema.url_path) || "";
+    return safe(resolvePath(props.data, props.schema.url_path));
   }
-  return props.schema.url || "";
+  return safe(props.schema.url);
 });
 
-// A kiosk has no way back from an opened tab: offer the QR handoff instead.
-const onKiosk = Boolean(getKioskId());
-const showQr = ref(false);
+// Only http(s) is ever framed (a plugin or feed may carry javascript: or data:).
+function safe(value) {
+  return isHttpUrl(value) ? value : "";
+}
+
 const iframe = ref(null);
 const error = ref(false);
 let loadTimer = null;
@@ -134,6 +158,14 @@ onUnmounted(clearTimer);
   height: 100%;
   border: none;
   background: var(--bg-1);
+}
+
+.iframe-renderer__qr {
+  position: absolute;
+  right: var(--gap-3);
+  bottom: var(--gap-3);
+  z-index: var(--z-raised);
+  box-shadow: var(--elev-1);
 }
 
 .iframe-renderer__frame--error {

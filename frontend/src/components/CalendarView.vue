@@ -22,7 +22,7 @@
                the whole calendar (calvin-mbze). visibility:hidden also drops them
                from the tab order and the accessibility tree. -->
           <RegionHeaderControls
-            v-if="hasPointer"
+            v-if="controlsReserved"
             class="calendar-header__controls"
             :class="{ 'calendar-header__controls--hidden': !showControls }"
             :aria-hidden="showControls ? null : 'true'"
@@ -338,6 +338,17 @@ const props = defineProps({
 const configStore = useConfigStore();
 const { hasPointer } = useTouchCapability();
 const showControls = computed(() => props.controlsVisible ?? props.focused);
+// The controls' row is reserved only while they can actually appear: a pointer
+// exists and the UI is shown, or a tap anywhere will reveal it. With the UI
+// hidden and only the hot corner to reveal it, an empty row would just waste
+// space (calvin-mbze review S5). Standalone use (no controlsVisible) always can.
+const controlsReserved = computed(
+  () =>
+    hasPointer.value &&
+    (props.controlsVisible === null ||
+      configStore.shouldShowUI ||
+      configStore.effectiveTapAnywhereReveal)
+);
 const sourceKey = computed(() =>
   [
     ...new Set(

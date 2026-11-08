@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { isHttpUrl } from "../utils/safeUrl";
 
 // Region overrides may disable a link; a plugin hint never does.
 const REGION_ACTIONS = ["handoff", "embed", "off"];
@@ -23,10 +24,10 @@ export function useLinkOpen(getRegionAction) {
   const overlay = ref(null);
 
   const isClickable = (url, itemAction) =>
-    Boolean(url) && resolveLinkAction(getRegionAction(), itemAction) !== "off";
+    isHttpUrl(url) && resolveLinkAction(getRegionAction(), itemAction) !== "off";
 
   const openLink = (url, itemAction) => {
-    if (!url) return;
+    if (!isHttpUrl(url)) return;
     const action = resolveLinkAction(getRegionAction(), itemAction);
     if (action === "off") return;
     overlay.value = { kind: action, url };

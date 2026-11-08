@@ -18,6 +18,7 @@ vi.mock("@/composables/useTouchCapability", () => ({
 
 import CalendarView from "@/components/CalendarView.vue";
 import { useCalendarStore } from "@/stores/calendar";
+import { useConfigStore } from "@/stores/config";
 
 const stubs = {
   DashboardPanel: {
@@ -92,5 +93,36 @@ describe("CalendarView touch controls", () => {
     touch.hasPointer.value = false;
     const w = mountCal({ focused: true });
     expect(w.find(".calendar-header__controls").exists()).toBe(false);
+  });
+
+  describe("the controls row is reserved only while controls can appear (calvin-mbze S5)", () => {
+    const withUi = async ({ showUI, tapAnywhere }) => {
+      setActivePinia(createPinia());
+      const config = useConfigStore();
+      config.showUI = showUI;
+      config.tapAnywhereReveal = tapAnywhere;
+      const cal = useCalendarStore();
+      cal.fetchSources = vi.fn().mockResolvedValue();
+      cal.fetchEvents = vi.fn().mockResolvedValue();
+      return mount(CalendarView, {
+        props: { view: { mode: "month" }, regionId: "r1", controlsVisible: false },
+        global: { stubs },
+      });
+    };
+
+    it("UI hidden, hot corner only: no empty row", async () => {
+      const w = await withUi({ showUI: false, tapAnywhere: false });
+      expect(w.find(".calendar-header__controls").exists()).toBe(false);
+    });
+
+    it("UI hidden but a tap anywhere reveals it: the row is reserved", async () => {
+      const w = await withUi({ showUI: false, tapAnywhere: true });
+      expect(w.find(".calendar-header__controls").exists()).toBe(true);
+    });
+
+    it("UI shown: the row is reserved while unfocused", async () => {
+      const w = await withUi({ showUI: true, tapAnywhere: false });
+      expect(w.find(".calendar-header__controls--hidden").exists()).toBe(true);
+    });
   });
 });

@@ -61,6 +61,28 @@ export function captureKioskIdentity() {
   }
 }
 
+// Link handling only (calvin-eugy): which displays have no tabs, address bar or
+// back button, so a link must never navigate them. That is every registered
+// kiosk (?kiosk=) and the all-in-one Pi's own display, whose unit opens
+// http://localhost:PORT with no ?kiosk= (deploy/systemd/calvin-kiosk.service).
+// It does NOT register a kiosk or add KIOSK_ROOT_CLASS. The all-in-one display
+// is recognised two ways: an explicit ?display=kiosk (captured like the id),
+// or, for units installed before that param existed, a loopback origin in a
+// fullscreen window (Chromium --kiosk). A developer's localhost tab is not
+// fullscreen, so it keeps opening links in a new tab.
+const DISPLAY_KEY = "calvin_display_mode";
+
+export function isKioskDisplay() {
+  if (getKioskId()) return true;
+  if (captured("display", DISPLAY_KEY) === "kiosk") return true;
+  try {
+    const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname);
+    return loopback && window.matchMedia("(display-mode: fullscreen)").matches;
+  } catch {
+    return false;
+  }
+}
+
 export function getKioskId() {
   // khost travels with the id, so capture it whenever the id is read too.
   captured("khost", KIOSK_HOST_KEY);

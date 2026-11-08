@@ -257,17 +257,15 @@
             aria-label="Brightness shown in the panel's own menu"
             @keyup.enter="ui.primary?.run()"
           />
-          <a
+          <ExternalLink
             v-if="ui.primary?.href"
             class="dcheck__fix dcheck__fix--primary"
             data-primary="true"
             :data-test="ui.primary.test || 'check-primary'"
             :href="ui.primary.href"
-            target="_blank"
-            rel="noopener"
           >
             {{ ui.primary.label }}
-          </a>
+          </ExternalLink>
           <Button
             v-else-if="ui.primary"
             variant="primary"
@@ -282,16 +280,14 @@
         </div>
         <div v-if="ui.secondary?.length" class="dcheck__secondary">
           <template v-for="item in ui.secondary" :key="item.test">
-            <a
+            <ExternalLink
               v-if="item.href"
               class="dcheck__fix"
               :data-test="item.test"
               :href="item.href"
-              target="_blank"
-              rel="noopener"
             >
               {{ item.label }}
-            </a>
+            </ExternalLink>
             <Button
               v-else
               :variant="item.plain ? 'secondary' : 'link'"
@@ -327,6 +323,7 @@
 </template>
 
 <script setup>
+import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { computed, nextTick, onBeforeUnmount, ref, toRef, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";

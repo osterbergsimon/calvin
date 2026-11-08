@@ -401,6 +401,27 @@ describe("OnScreenKeyboard", () => {
       expect(document.activeElement).toBe(input);
     });
 
+    it("ignores a second finger: it does not overwrite the tap origin", async () => {
+      setTouchPoints(5);
+      mountOsk();
+      const input = addInput();
+      const other = addContainer({ "data-test": "other" });
+      await focus(input);
+
+      // Finger 1 goes down on the field; finger 2 lands elsewhere meanwhile.
+      dispatchPointer(input, "pointerdown", { pointerType: "touch", pointerId: 1 });
+      dispatchPointer(other, "pointerdown", { pointerType: "touch", pointerId: 2 });
+      dispatchPointer(other, "pointerup", { pointerType: "touch", pointerId: 2 });
+      dispatchPointer(input, "pointerup", { pointerType: "touch", pointerId: 1 });
+      // The click that ends finger 1's tap lands on a moved element: the tap
+      // began on the field, so it is not a tap outside.
+      const moved = addContainer({ "data-test": "moved" });
+      moved.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      await waitForFrame();
+
+      expect(isShown()).toBe(true);
+    });
+
     it("keeps the keyboard when the compatibility click arrives late after a tap", async () => {
       mountOsk();
       const input = addInput();

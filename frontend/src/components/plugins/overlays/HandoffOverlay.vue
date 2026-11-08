@@ -19,7 +19,8 @@ import QRCode from "qrcode";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
-import { getKioskId } from "@/utils/kioskId";
+import { isKioskDisplay } from "@/utils/kioskId";
+import { isHttpUrl } from "@/utils/safeUrl";
 
 const props = defineProps({
   url: { type: String, required: true },
@@ -31,7 +32,7 @@ const emit = defineEmits(["close", "embed"]);
 // A kiosk browser has no tabs or back button, so a tapped link must never leave
 // Calvin: Open shows the page in the embed overlay instead, and disappears once
 // the site refuses embedding (the QR code is then the only way out).
-const onKiosk = Boolean(getKioskId());
+const onKiosk = isKioskDisplay();
 const showOpen = computed(() => !(onKiosk && props.embedRefused));
 
 const qr = ref("");
@@ -54,6 +55,7 @@ watch(() => props.url, renderQr, { immediate: true });
 
 const emitClose = () => emit("close");
 const openNow = () => {
+  if (!isHttpUrl(props.url)) return;
   if (onKiosk) {
     emit("embed");
     return;

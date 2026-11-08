@@ -105,12 +105,10 @@
                 <template v-if="codePrefilled">{{ codePrefillHint }}</template>
                 <template v-else>
                   Calvin printed it in its log when it first started.
-                  <a
+                  <ExternalLink
                     class="auth-card__hint-link"
                     href="https://osterbergsimon.github.io/calvin/setup/GETTING_STARTED/#first-sign-in"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    >Where to find it</a
+                    >Where to find it</ExternalLink
                   >
                 </template>
               </template>
@@ -203,6 +201,7 @@
 </template>
 
 <script setup>
+import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { isPhone as isPhoneViewport } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";

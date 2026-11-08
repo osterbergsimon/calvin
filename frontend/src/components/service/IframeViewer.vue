@@ -2,7 +2,8 @@
   <div class="iframe-viewer">
     <iframe
       ref="iframe"
-      :src="url"
+      :src="frameSrc"
+      :sandbox="onKiosk ? KIOSK_SANDBOX : undefined"
       class="service-iframe"
       :class="{ 'iframe-error': iframeError }"
       frameborder="0"
@@ -43,10 +44,12 @@
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from "vue";
+import { computed, ref, watch, onUnmounted } from "vue";
 import { mdiAlert } from "@mdi/js";
 import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
-import { getKioskId } from "../../utils/kioskId";
+import { isKioskDisplay } from "../../utils/kioskId";
+import { isHttpUrl } from "../../utils/safeUrl";
+import { KIOSK_SANDBOX } from "../../utils/kioskSandbox";
 
 const props = defineProps({
   url: {
@@ -58,7 +61,9 @@ const props = defineProps({
 const emit = defineEmits(["error"]);
 
 // A kiosk has no way back from an opened tab: offer the QR handoff instead.
-const onKiosk = Boolean(getKioskId());
+const onKiosk = isKioskDisplay();
+// Only http(s) is ever framed (a plugin or feed may carry javascript: or data:).
+const frameSrc = computed(() => (isHttpUrl(props.url) ? props.url : "about:blank"));
 const showQr = ref(false);
 const iframe = ref(null);
 const iframeError = ref(false);
@@ -85,7 +90,7 @@ const retryLoad = () => {
   iframeError.value = false;
   if (iframe.value) {
     // Force reload by setting src again
-    const url = props.url;
+    const url = frameSrc.value;
     iframe.value.src = "";
     setTimeout(() => {
       if (iframe.value) {

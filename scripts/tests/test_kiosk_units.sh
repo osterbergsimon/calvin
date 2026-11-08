@@ -22,6 +22,11 @@ assert_not_contains "$f" 'localhost:8000' "calvin-kiosk.service still hard-codes
 assert_contains "$f" 'localhost:\$\{CALVIN_PORT:-8000\}' "calvin-kiosk.service does not use CALVIN_PORT"
 pass "calvin-kiosk.service uses CALVIN_PORT"
 
+# The all-in-one display has no ?kiosk= id, so the page is told it is a kiosk
+# for link handling (calvin-eugy): links there must never navigate the wall.
+assert_contains "$f" '/\?display=kiosk"' "calvin-kiosk.service does not mark the display as a kiosk for links"
+pass "calvin-kiosk.service marks its display for kiosk link handling"
+
 # The generated openbox autostart (Chromium-launching variant) too.
 assert_not_contains "$REPO/scripts/setup-common.sh" 'localhost:8000/api/health' "openbox autostart hard-codes port 8000"
 pass "openbox autostart has no hard-coded port"

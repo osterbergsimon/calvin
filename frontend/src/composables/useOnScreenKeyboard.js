@@ -695,14 +695,18 @@ export function useOnScreenKeyboard() {
   const onPointerDown = event => {
     cancelOutsideHide();
     const isNewPointer = !activePointers.has(event.pointerId);
+    // Only the first finger down starts a gesture; a second finger must not
+    // overwrite the origin of the tap already in progress.
+    const isFirstContact = activePointers.size === 0;
     if (isNewPointer) activePointers.add(event.pointerId);
-    // A touch tap's compatibility mouse events must not overwrite the element
-    // the touch started on; a real mouse pointer is a new gesture. So is a
-    // touch pointer we have not seen go down yet: touchGesture is still true for
-    // up to GESTURE_RESET_DELAY_MS after the previous tap ended, and gating on it
-    // alone let that tap's pending reset fire in the middle of this one, wiping
+    // A real mouse pointer is a new gesture, and so is the first finger down. A
+    // touch tap's compatibility mouse events come after its pointerup, so they
+    // take the mouse branch; a second finger never overwrites the tap in
+    // progress. The first finger must not be gated on touchGesture: that stays
+    // true for up to GESTURE_RESET_DELAY_MS after the previous tap, and the
+    // previous tap's pending reset then fired in the middle of this one, wiping
     // its origin so its own click counted as a tap outside (calvin-6zkk).
-    if (event.pointerType === "mouse" || isNewPointer || !touchGesture) {
+    if (event.pointerType === "mouse" || isFirstContact) {
       cancelGestureReset();
       // A mouse press is always a new gesture: its pointerup may have been
       // lost outside the window, leaving a stale id in the set.
