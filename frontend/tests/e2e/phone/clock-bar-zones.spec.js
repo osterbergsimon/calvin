@@ -197,6 +197,17 @@ const timeIsWhole = page =>
   });
 
 // The owner's own bar (SL and Yr) and a crowded one with several wide tiles.
+// One tile whose rows are very uneven: a long name beside a long value, and a
+// short pair.
+const UNEVEN_TILE = {
+  id: "uneven",
+  name: "Departures",
+  items: [
+    row("Departures from Stockholms central station", "Pendeltåg 41 · 3 min · spår 12"),
+    row("Yr", "2", "°"),
+  ],
+};
+
 const SCENARIOS = [
   { name: "owner", tiles: ALL_TILES.slice(0, 2) },
   { name: "crowded", tiles: ALL_TILES },
@@ -294,7 +305,7 @@ const cutFlags = page =>
       .map(el => el.textContent.trim());
     const nameWhole = cells
       .map(cell => cell.querySelector(".status__cell-text"))
-      .filter(el => el && el.clientWidth > 0 && !cut(el))
+      .filter(el => el && el.clientWidth > 2)
       .map(el => el.textContent.trim());
     const nameCut = cells
       .map(cell => cell.querySelector(".status__cell-text"))
@@ -358,6 +369,34 @@ const expectOrderly = async page => {
 };
 
 test.describe("what gives way in a crowded live bar", () => {
+  // A sweep of widths, tiles in the Centre or the Right zone, tiles of several
+  // rows: at no width may a value be cut while any name still shows.
+  for (const [where, config, tiles] of [
+    ["Right zone", {}, ALL_TILES],
+    ["Centre zone", CENTRE_TILES, ALL_TILES],
+    ["Right zone, with uneven rows", {}, [...ALL_TILES, UNEVEN_TILE]],
+    ["Centre zone, with uneven rows", CENTRE_TILES, [...ALL_TILES, UNEVEN_TILE]],
+  ]) {
+    test(`multi-row tiles in the ${where}: names before values at every width`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 1500, height: 800 });
+      await openLive(page, { tiles, config });
+      for (let width = 1500; width >= 500; width -= 50) {
+        await page.setViewportSize({ width, height: 800 });
+        await page.waitForTimeout(120);
+        const { valueCut, nameWhole } = await cutFlags(page);
+        expect({
+          width,
+          valueCut: valueCut.length && nameWhole.length ? [valueCut, nameWhole] : [],
+        }).toEqual({
+          width,
+          valueCut: [],
+        });
+      }
+    });
+  }
+
   for (const [width, label] of [
     [1280, "four tiles in the Centre zone, 1280 px"],
     [390, "the owner's tiles in the Centre zone, 390 px"],

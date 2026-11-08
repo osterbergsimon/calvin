@@ -149,8 +149,15 @@ function applyShrink() {
     const value = cell.querySelector(".status__cell-value");
     const labelWidth = text ? naturalWidth(text) + (label.clientWidth - text.clientWidth) : 0;
     const gap = label && value ? parseFloat(style.columnGap) || 0 : 0;
+    const cellWidth = chrome + labelWidth + gap + naturalWidth(value);
     names += labelWidth;
-    total += chrome + labelWidth + gap + naturalWidth(value);
+    total += cellWidth;
+    // The same weighting between the cells of one tile, so a name in any cell
+    // goes before a value in any other.
+    const cellFactor = cellWidth > 0 ? Math.max((labelWidth / cellWidth) * 100, 1).toFixed(2) : "1";
+    if (cell.style.getPropertyValue("--cell-shrink") !== cellFactor) {
+      cell.style.setProperty("--cell-shrink", cellFactor);
+    }
   }
   // Scaled to 1-100: only the ratio between tiles matters, but flex-shrink
   // factors that sum to less than 1 make the browser squeeze only part of the
@@ -210,7 +217,7 @@ function readoutClass(item) {
   padding: 0 0.65rem;
   white-space: nowrap;
   min-width: 0;
-  flex: 0 1 auto;
+  flex: 0 var(--cell-shrink, 1) auto;
 }
 
 .status__cell-label {
