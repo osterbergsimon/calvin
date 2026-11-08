@@ -96,32 +96,6 @@ describe("Web Services Store", () => {
       expect(store.error).toBe(null);
     });
 
-    it("lists service plugins that are turned off but still have instances (calvin-zbcg)", async () => {
-      api.get.mockImplementation(async url => {
-        if (url === "/plugins") {
-          return {
-            data: {
-              plugins: [
-                { id: "mealie", name: "Mealie", type: "service", enabled: false },
-                { id: "empty", name: "Empty", type: "service", enabled: false },
-              ],
-            },
-          };
-        }
-        if (url === "/plugins/mealie/instances") {
-          return { data: { instances: [{ id: "mealie-1", name: "Mat", enabled: true }] } };
-        }
-        if (url === "/plugins/empty/instances") return { data: { instances: [] } };
-        throw new Error(`unexpected ${url}`);
-      });
-
-      const store = useWebServicesStore();
-      await store.fetchServices();
-
-      expect(store.services).toEqual([]);
-      expect(store.disabledPlugins).toEqual([{ id: "mealie", name: "Mealie" }]);
-    });
-
     it("should filter to enabled services only", async () => {
       const mockPlugins = {
         plugins: [
@@ -675,6 +649,75 @@ describe("Web Services Store", () => {
       store.setServiceIndex(-1);
 
       expect(store.currentServiceIndex).toBe(0);
+    });
+  });
+
+  describe("turned-off service plugins for the screen editor (calvin-zbcg)", () => {
+    // Earlier tests may leave queued one-off results behind; start from nothing.
+    beforeEach(() => {
+      api.get.mockReset();
+    });
+
+    const route = instancesByPlugin => async url => {
+      if (url === "/plugins") {
+        return {
+          data: {
+            plugins: Object.keys(instancesByPlugin).map(id => ({
+              id,
+              name: id[0].toUpperCase() + id.slice(1),
+              type: "service",
+              enabled: false,
+            })),
+          },
+        };
+      }
+      const match = url.match(/^\/plugins\/(.+)\/instances$/);
+      if (match) return { data: { instances: instancesByPlugin[match[1]] } };
+      throw new Error(`unexpected ${url}`);
+    };
+
+    it("offers a turn-on only for off plugins with at least one enabled instance", async () => {
+      api.get.mockImplementation(
+        route({
+          mealie: [{ id: "m1", enabled: true }],
+          allpaused: [{ id: "a1", enabled: false }],
+          empty: [],
+        })
+      );
+      const store = useWebServicesStore();
+      await store.loadDisabledPlugins();
+      expect(store.disabledPlugins).toEqual([{ id: "mealie", name: "Mealie" }]);
+    });
+
+    it("fetchServices on a cold load makes no request for off plugins' instances", async () => {
+      api.get.mockImplementation(route({ mealie: [{ id: "m1", enabled: true }] }));
+      const store = useWebServicesStore();
+      await store.fetchServices();
+      expect(api.get.mock.calls.map(([url]) => url)).toEqual(["/plugins"]);
+    });
+
+    it("turnOnPlugin refreshes even when the toggle throws, and returns the reason", async () => {
+      api.get.mockImplementation(route({ mealie: [{ id: "m1", enabled: true }] }));
+      const store = useWebServicesStore();
+      const toggle = vi.fn().mockRejectedValue({
+        response: { data: { detail: "Cannot enable while sealed mode is on." } },
+      });
+
+      const outcome = await store.turnOnPlugin("mealie", toggle);
+
+      expect(outcome).toEqual({ ok: false, message: "Cannot enable while sealed mode is on." });
+      expect(api.get).toHaveBeenCalledWith("/plugins", { params: { plugin_type: "service" } });
+    });
+
+    it("turnOnPlugin says so when only some instances started", async () => {
+      api.get.mockImplementation(route({}));
+      const store = useWebServicesStore();
+      const toggle = vi.fn().mockResolvedValue({ started: 1, failed: 2 });
+
+      const outcome = await store.turnOnPlugin("mealie", toggle);
+
+      expect(outcome.ok).toBe(false);
+      expect(outcome.message).toMatch(/2 of 3/);
     });
   });
 });

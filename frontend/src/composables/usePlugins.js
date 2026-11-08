@@ -720,6 +720,7 @@ export function usePlugins() {
 
   // Toggle plugin enabled state
   const togglePlugin = async (pluginId, enabled) => {
+    let outcome = null;
     try {
       await pluginsApi.updatePluginConfig(pluginId, { enabled });
 
@@ -729,18 +730,34 @@ export function usePlugins() {
         plugin.enabled = enabled;
       }
 
-      // If enabling and there are instances, start them all
-      if (
-        enabled &&
-        pluginInstances.value[pluginId] &&
-        pluginInstances.value[pluginId].length > 0
-      ) {
-        const instances = pluginInstances.value[pluginId];
-        const promises = instances.map(instance => pluginsApi.startPluginInstance(instance.id));
-        await Promise.all(promises);
+      // Turning on starts the instances that are themselves enabled (a paused one
+      // would answer /start with a 400), working from a fresh list because the
+      // cached one may not be loaded yet. A failed start does not undo the turn-on:
+      // the plugin stays on and the caller is told how many instances did not start
+      // (calvin-zbcg).
+      if (enabled) {
+        let instances = pluginInstances.value[pluginId] || [];
+        try {
+          instances = (await pluginsApi.getPluginInstances(pluginId)).instances || instances;
+        } catch (error) {
+          logError("[usePlugins]", `Failed to list instances of ${pluginId}:`, error);
+        }
+        const startable = instances.filter(instance => instance.enabled !== false);
+        const results = await Promise.allSettled(
+          startable.map(instance => pluginsApi.startPluginInstance(instance.id))
+        );
+        outcome = {
+          started: results.filter(r => r.status === "fulfilled").length,
+          failed: results.filter(r => r.status === "rejected").length,
+        };
+        results.forEach(r => {
+          if (r.status === "rejected") {
+            logError("[usePlugins]", `Failed to start an instance of ${pluginId}:`, r.reason);
+          }
+        });
       }
       // If disabling and there are instances, stop them all
-      else if (
+      if (
         !enabled &&
         pluginInstances.value[pluginId] &&
         pluginInstances.value[pluginId].length > 0
@@ -758,6 +775,7 @@ export function usePlugins() {
       } catch (error) {
         logError("[usePlugins]", `Failed to reload instances for plugin ${pluginId}:`, error);
       }
+      return outcome;
     } catch (error) {
       logError("[usePlugins]", "Failed to toggle plugin:", error);
       // Revert optimistic update on error

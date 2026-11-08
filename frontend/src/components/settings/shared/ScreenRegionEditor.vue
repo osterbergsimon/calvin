@@ -417,6 +417,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useNotificationsStore } from "@/stores/notifications";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { useKiosksStore } from "@/stores/kiosks";
@@ -1356,8 +1357,14 @@ const addSubToSelected = () => {
 // "Turn on" for a plugin the picker listed as turned off: switch it on, then
 // reload services so its instances become pickable.
 const enableServicePlugin = async pluginId => {
-  await togglePlugin(pluginId, true);
-  await webServicesStore.fetchServices();
+  const outcome = await webServicesStore.turnOnPlugin(pluginId, togglePlugin);
+  if (!outcome.ok) {
+    useNotificationsStore().notify({
+      severity: "error",
+      eyebrow: "Turn on",
+      message: outcome.message,
+    });
+  }
 };
 const setSelectedComponent = option => {
   const p = selectedPath.value;
@@ -1581,6 +1588,7 @@ onMounted(async () => {
   clockTimer = setInterval(() => (now.value = new Date()), 30000);
   if (webServicesStore.services.length === 0 && !webServicesStore.loading)
     webServicesStore.fetchServices();
+  void webServicesStore.loadDisabledPlugins();
   if (calendarStore.sources.length === 0 && !calendarStore.loading) calendarStore.fetchSources();
   if (plugins.value.length === 0 && !loadingPlugins.value) loadPlugins();
   if (kiosksStore.kiosks.length === 0) kiosksStore.loadKiosks();

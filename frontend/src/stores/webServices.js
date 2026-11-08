@@ -14,9 +14,11 @@ import { friendlyError } from "../utils/friendlyError";
 
 export const useWebServicesStore = defineStore("webServices", () => {
   const services = ref([]);
-  // Service plugins that are turned off yet still own instances. Their tiles
-  // are not loaded, so the screen editor lists them as "turned off" with a
-  // way to switch them on instead of omitting them (calvin-zbcg).
+  // Service plugins that are turned off yet own instances that could run. Their
+  // tiles are not loaded, so the screen editor lists them as "turned off" with a
+  // way to switch them on instead of omitting them (calvin-zbcg). Filled by
+  // loadDisabledPlugins(), only in Settings contexts: a kiosk cold load must not
+  // pay one request per off plugin.
   const disabledPlugins = ref([]);
   // True once a services list (live or cached) has been applied, so "no tile
   // with that id" can be told apart from "not loaded yet".
@@ -33,7 +35,6 @@ export const useWebServicesStore = defineStore("webServices", () => {
   const applyServices = responseData => {
     const allServices = responseData?.services || [];
     hasLoaded.value = true;
-    disabledPlugins.value = responseData?.disabled_plugins || [];
     services.value = allServices.filter(s => s.enabled);
     // Sort by display_order
     services.value.sort((a, b) => a.display_order - b.display_order);
@@ -60,19 +61,8 @@ export const useWebServicesStore = defineStore("webServices", () => {
 
     // Get instances for each service plugin
     const allInstances = [];
-    const disabled = [];
     let complete = true;
     for (const plugin of plugins) {
-      if (!plugin.enabled) {
-        try {
-          const off = await api.get(`/plugins/${plugin.id}/instances`);
-          if ((off.data.instances || []).length > 0) {
-            disabled.push({ id: plugin.id, name: plugin.name });
-          }
-        } catch (err) {
-          logWarn("[WebServicesStore]", `Failed to check instances of ${plugin.id}:`, err);
-        }
-      }
       if (plugin.enabled) {
         try {
           // Get plugin details to access display_schema
@@ -110,7 +100,6 @@ export const useWebServicesStore = defineStore("webServices", () => {
     // Format as services for compatibility
     // Need to preserve both old format (url) and new format (config.url)
     const responseData = {
-      disabled_plugins: disabled,
       services: allInstances.map(instance => ({
         id: instance.id,
         name: instance.name,
@@ -126,6 +115,53 @@ export const useWebServicesStore = defineStore("webServices", () => {
       })),
     };
     return { responseData, complete };
+  };
+
+  const loadDisabledPlugins = async () => {
+    try {
+      const response = await api.get("/plugins", { params: { plugin_type: "service" } });
+      const off = (response.data?.plugins || []).filter(plugin => !plugin.enabled);
+      const found = await Promise.all(
+        off.map(async plugin => {
+          try {
+            const instances = (await api.get(`/plugins/${plugin.id}/instances`)).data.instances;
+            // Offering a turn-on that would leave nothing to pick helps nobody.
+            const runnable = (instances || []).some(instance => instance.enabled !== false);
+            return runnable ? { id: plugin.id, name: plugin.name } : null;
+          } catch (err) {
+            logWarn("[WebServicesStore]", `Failed to check instances of ${plugin.id}:`, err);
+            return null;
+          }
+        })
+      );
+      disabledPlugins.value = found.filter(Boolean);
+    } catch (err) {
+      logWarn("[WebServicesStore]", "Failed to list turned-off plugins:", err);
+    }
+  };
+
+  // "Turn on" from the screen editor. `toggle` is usePlugins().togglePlugin. The
+  // lists are refreshed whatever happens, and the outcome is told plainly:
+  // a refusal (sealed mode, 403) or a partial start is a message, not silence.
+  const turnOnPlugin = async (pluginId, toggle) => {
+    let outcome = { ok: true, message: "" };
+    try {
+      const result = await toggle(pluginId, true);
+      if (result?.failed > 0) {
+        const total = result.started + result.failed;
+        outcome = {
+          ok: false,
+          message: `Turned on, but ${result.failed} of ${total} sources did not start.`,
+        };
+      }
+    } catch (err) {
+      outcome = {
+        ok: false,
+        message: err?.response?.data?.detail || friendlyError(err, "turn this plugin on"),
+      };
+    }
+    await Promise.allSettled([fetchServices(), loadDisabledPlugins()]);
+    return outcome;
   };
 
   const clearError = () => {
@@ -276,6 +312,8 @@ export const useWebServicesStore = defineStore("webServices", () => {
   return {
     services,
     disabledPlugins,
+    loadDisabledPlugins,
+    turnOnPlugin,
     loaded,
     currentServiceIndex,
     loading,

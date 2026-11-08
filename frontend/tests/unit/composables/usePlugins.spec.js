@@ -288,4 +288,55 @@ describe("usePlugins", () => {
       expect(logErrorMock).toHaveBeenCalledWith("[usePlugins]", "Failed to load plugins:", err);
     });
   });
+
+  describe("togglePlugin turning a plugin on (calvin-zbcg)", () => {
+    const setup = async instances => {
+      pluginsApi.getPlugins.mockResolvedValue({
+        plugins: [{ id: "mealie", name: "Mealie", type: "service", enabled: false }],
+      });
+      pluginsApi.updatePluginConfig.mockResolvedValue({});
+      pluginsApi.getPluginInstances.mockResolvedValue({ instances });
+      const api = usePlugins();
+      await api.loadPlugins();
+      return api;
+    };
+
+    it("starts only the instances that are enabled", async () => {
+      pluginsApi.startPluginInstance.mockResolvedValue({});
+      const api = await setup([
+        { id: "m1", enabled: true },
+        { id: "m2", enabled: false },
+      ]);
+
+      const result = await api.togglePlugin("mealie", true);
+
+      expect(pluginsApi.startPluginInstance).toHaveBeenCalledTimes(1);
+      expect(pluginsApi.startPluginInstance).toHaveBeenCalledWith("m1");
+      expect(result).toEqual({ started: 1, failed: 0 });
+    });
+
+    it("keeps the plugin on and reports a partial start instead of throwing", async () => {
+      pluginsApi.startPluginInstance
+        .mockResolvedValueOnce({})
+        .mockRejectedValueOnce(new Error("boom"));
+      const api = await setup([
+        { id: "m1", enabled: true },
+        { id: "m2", enabled: true },
+      ]);
+
+      const result = await api.togglePlugin("mealie", true);
+
+      expect(result).toEqual({ started: 1, failed: 1 });
+      expect(api.plugins.value.find(p => p.id === "mealie").enabled).toBe(true);
+    });
+
+    it("still throws, and reverts, when the plugin itself cannot be turned on", async () => {
+      const api = await setup([{ id: "m1", enabled: true }]);
+      pluginsApi.updatePluginConfig.mockRejectedValue(new Error("sealed"));
+
+      await expect(api.togglePlugin("mealie", true)).rejects.toThrow("sealed");
+      expect(api.plugins.value.find(p => p.id === "mealie").enabled).toBe(false);
+      expect(pluginsApi.startPluginInstance).not.toHaveBeenCalled();
+    });
+  });
 });
