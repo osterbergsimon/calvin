@@ -1140,9 +1140,11 @@ export interface paths {
      *     reported at load and on resize) so the layout editor can preview a screen at
      *     its real aspect ratio (CLV-36).
      *
-     *     Only a real poll registers a NEW kiosk: one that carries ``khost`` (the kiosk
-     *     browser) or ``kagent`` (the display agent). A bare fetch (curl, a typo'd id)
-     *     gets the config but leaves no registry row (calvin-7aqu).
+     *     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
+     *     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
+     *     A bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the
+     *     config but changes nothing, so it can neither create a ghost nor make a dead
+     *     screen look online (calvin-7aqu).
      */
     get: operations["get_kiosk_config_api_kiosks__kiosk_id__config_get"];
     put?: never;

@@ -242,7 +242,9 @@ async def list_kiosks() -> list[dict]:
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
             "displayCheck": display_check.findings_view(row.display_check_findings),
-            "displayCheckActive": bool((display_check.view_of(row.display_check) or {}).get("active")),
+            "displayCheckActive": bool(
+                (display_check.view_of(row.display_check) or {}).get("active")
+            ),
         }
         for row in rows
     ]
