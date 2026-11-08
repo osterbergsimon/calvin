@@ -108,8 +108,9 @@
                   <ExternalLink
                     class="auth-card__hint-link"
                     href="https://osterbergsimon.github.io/calvin/setup/GETTING_STARTED/#first-sign-in"
-                    >Where to find it</ExternalLink
                   >
+                    Where to find it
+                  </ExternalLink>
                 </template>
               </template>
             </PasswordField>

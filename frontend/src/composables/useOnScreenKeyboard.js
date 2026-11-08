@@ -295,7 +295,6 @@ export function useOnScreenKeyboard() {
   // under the finger, so the tap's click can land on another element; the
   // gesture that opened it must never be read as a tap outside.
   let gestureTarget = null;
-  let touchGesture = false;
   let touchStart = null;
   let outsideHideTimer = null;
   // A fresh gesture (touchstart, or a non-compat pointerdown) has its own
@@ -625,7 +624,6 @@ export function useOnScreenKeyboard() {
   const resetGesture = () => {
     cancelGestureReset();
     gestureTarget = null;
-    touchGesture = false;
   };
 
   // A drag or scroll never produces a click, so the gesture that started it
@@ -637,7 +635,6 @@ export function useOnScreenKeyboard() {
     gestureResetTimer = setTimeout(() => {
       gestureResetTimer = null;
       gestureTarget = null;
-      touchGesture = false;
     }, GESTURE_RESET_DELAY_MS);
   };
 
@@ -702,9 +699,9 @@ export function useOnScreenKeyboard() {
     // A real mouse pointer is a new gesture, and so is the first finger down. A
     // touch tap's compatibility mouse events come after its pointerup, so they
     // take the mouse branch; a second finger never overwrites the tap in
-    // progress. The first finger must not be gated on touchGesture: that stays
-    // true for up to GESTURE_RESET_DELAY_MS after the previous tap, and the
-    // previous tap's pending reset then fired in the middle of this one, wiping
+    // progress. The first finger must not be gated on the previous tap's state: that
+    // lasts up to GESTURE_RESET_DELAY_MS after the tap, and its pending reset
+    // then fired in the middle of this one, wiping
     // its origin so its own click counted as a tap outside (calvin-6zkk).
     if (event.pointerType === "mouse" || isFirstContact) {
       cancelGestureReset();
@@ -731,7 +728,6 @@ export function useOnScreenKeyboard() {
       gestureSerial += 1;
       gestureTarget = el;
     }
-    touchGesture = true;
     const touch = event.touches?.[0];
     touchStart = touch ? { x: touch.clientX, y: touch.clientY, el } : { el };
     if (isTargetElement(gestureTarget)) dismissedTarget.value = null;
@@ -995,7 +991,6 @@ export function useOnScreenKeyboard() {
     cancelGestureReset();
     activePointers.clear();
     touchStart = null;
-    touchGesture = false;
     gestureTarget = null;
     dismissedGesture = null;
     stopRouteWatch?.();
