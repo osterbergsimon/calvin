@@ -288,7 +288,7 @@
               {{ orientationBadge }}
             </Tag>
             <p v-if="sizeClass === 'wide'" class="sre-stage-caption" data-test="stage-caption">
-              Drag regions to swap them, dividers to resize, the clock bar to reposition
+              Drag dividers to resize, the clock bar to reposition
             </p>
           </div>
 
