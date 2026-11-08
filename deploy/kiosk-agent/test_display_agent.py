@@ -4896,13 +4896,13 @@ def test_a_waiting_fault_is_recorded_before_the_drop_is_written(tmp_path):
 
 
 # -- after a drop: wait for the touch controller to go quiet (calvin-v996) ------
-def _second_run(step, tmp_path, runner, fault, *, job_id="c2"):
+def _second_run(step, tmp_path, runner, fault, *, job_id="c2", cfg_over=None):
     """A new run on the same controller and clock, as the dialog's Try again makes."""
     reports = []
     clock = runner.clock
     second = agent.DisplayCheckRunner(
         dict(_cal_job(step), id=job_id),
-        _ramp_cfg(),
+        _ramp_cfg(**(cfg_over or {})),
         ddc=runner.ddc,
         report=reports.append,
         poll=None,
@@ -5017,17 +5017,19 @@ def test_a_fault_between_steps_is_noticed_within_a_second(tmp_path):
 
 
 # -- coordinator review of #337 -------------------------------------------------
-def _after_a_drop(tmp_path):
+def _after_a_drop(tmp_path, cfg_over=None):
     fault = ConsumingFault()
     ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
     first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
     first.run()
-    second, reports = _second_run("write", tmp_path, first, fault)
+    second, reports = _second_run("write", tmp_path, first, fault, cfg_over=cfg_over)
     return first, second, reports, clock, fault, ddc
 
 
 def test_real_under_voltage_while_waiting_ends_the_run_and_drops_at_once(tmp_path):
-    first, second, reports, clock, fault, ddc = _after_a_drop(tmp_path)
+    first, second, reports, clock, fault, ddc = _after_a_drop(
+        tmp_path, cfg_over={"brightness_floor": 0}
+    )
     began = clock.t
     original = clock.sleep
     fired = {}
@@ -5044,7 +5046,11 @@ def test_real_under_voltage_while_waiting_ends_the_run_and_drops_at_once(tmp_pat
     assert second.reason == "power_at_idle"
     assert reports[-1]["status"] == "error"
     assert reports[-1]["preflight"]["status"] == "fault"
-    assert len(ddc.writes) > writes_before, "the screen was dimmed"
+    new_writes = ddc.writes[writes_before:]
+    assert new_writes, "the screen was dimmed"
+    # Dimmed once and left there: nothing climbs back up after real under-voltage.
+    assert max(new_writes) <= new_writes[0]
+    assert new_writes[-1] == new_writes[0]
     assert clock.t - fired["t"] < 10, "did not sit out the whole wait"
 
 

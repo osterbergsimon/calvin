@@ -1918,6 +1918,10 @@ class DisplayCheckRunner:
         """
         if self.fault is not None and self.fault["step"] in CALIBRATION_STEPS:
             return None
+        # A run that ended on power trouble without a fault incident (the wait or
+        # the idle watch) dimmed the screen too; it must not climb back up.
+        if self.reason in ("power_at_idle", "power_trouble"):
+            return None
         start = self._start_level()
         return CHECK_FLOOR if start is None else start
 
