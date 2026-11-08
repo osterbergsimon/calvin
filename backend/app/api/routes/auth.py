@@ -99,7 +99,13 @@ async def _session_for_login(
     cannot be edited into a longer one either.
     """
     peer = request.client.host if request.client else None
-    from_address = await kiosk_registry.kiosk_for_peer(peer)
+    try:
+        from_address = await kiosk_registry.kiosk_for_peer(peer)
+    except Exception as exc:  # signing in must not depend on the registry being readable
+        logger.warning(
+            "Could not look up the kiosk for {}: {}; using the page's claim only", peer, exc
+        )
+        from_address = None
     claim = claimed.strip() if claimed and claimed.strip() else None
     if claim is not None and not kiosk_registry.valid_kiosk_id(claim):
         claim = "?"  # junk still means "I am a kiosk": shorter, with no id to lock
