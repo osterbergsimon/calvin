@@ -20,7 +20,7 @@
   </ul>
 
   <!-- row: inline instrument strip with hairline dividers (statusbar default) -->
-  <span v-else-if="layout === 'row'" class="status status--row">
+  <span v-else-if="layout === 'row'" ref="rowEl" class="status status--row">
     <span v-for="(item, i) in items" :key="i" class="status__cell" :class="readoutClass(item)">
       <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
       <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
@@ -66,7 +66,7 @@
 //   item: { icon, label, value, unit, status } — each key also accepts a
 //         `<key>_path` variant resolved against the item, plus `value_format`.
 //         status values: "ok" (renders monochrome) | "warn" | "error"
-import { computed } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, onUpdated, ref } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
 
@@ -121,6 +121,59 @@ function isAlert(item) {
   return s === "warn" || s === "error";
 }
 
+// Names before values, across every tile on a bar (calvin-r7lb). Flex shrinks
+// each item in proportion to its shrink factor times its width, so a tile whose
+// factor is (width of its names / width of the tile) gives up exactly its names'
+// worth first. Measured from the natural (unclipped) content, so it does not
+// move while the tile is being squeezed.
+const rowEl = ref(null);
+let observer = null;
+
+function naturalWidth(el) {
+  return el ? el.scrollWidth : 0;
+}
+
+function applyShrink() {
+  const row = rowEl.value;
+  if (!row) return;
+  let names = 0;
+  let total = 0;
+  for (const cell of row.querySelectorAll(".status__cell")) {
+    const style = getComputedStyle(cell);
+    const chrome =
+      parseFloat(style.paddingLeft) +
+      parseFloat(style.paddingRight) +
+      parseFloat(style.borderLeftWidth);
+    const label = cell.querySelector(".status__cell-label");
+    const text = cell.querySelector(".status__cell-text");
+    const value = cell.querySelector(".status__cell-value");
+    const labelWidth = text ? naturalWidth(text) + (label.clientWidth - text.clientWidth) : 0;
+    const gap = label && value ? parseFloat(style.columnGap) || 0 : 0;
+    names += labelWidth;
+    total += chrome + labelWidth + gap + naturalWidth(value);
+  }
+  // Scaled to 1-100: only the ratio between tiles matters, but flex-shrink
+  // factors that sum to less than 1 make the browser squeeze only part of the
+  // overflow.
+  const factor = total > 0 ? Math.max((names / total) * 100, 1).toFixed(2) : "1";
+  if (row.style.getPropertyValue("--tile-shrink") !== factor) {
+    row.style.setProperty("--tile-shrink", factor);
+    // In the editor a tile is a chip that is itself the flex item.
+    row.closest(".clock-bar-chip")?.style.setProperty("--tile-shrink", factor);
+  }
+}
+
+onMounted(() => {
+  applyShrink();
+  if (typeof ResizeObserver !== "undefined" && rowEl.value) {
+    observer = new ResizeObserver(applyShrink);
+    observer.observe(rowEl.value);
+  }
+  document.fonts?.ready?.then(applyShrink);
+});
+onUpdated(() => nextTick(applyShrink));
+onBeforeUnmount(() => observer?.disconnect());
+
 function readoutClass(item) {
   const s = statusFor(item);
   if (s === "warn") return "calvin-plugin-readout--warn";
@@ -144,6 +197,7 @@ function readoutClass(item) {
   align-items: center;
   min-width: 0;
   max-width: 100%;
+  flex-shrink: var(--tile-shrink, 1);
 }
 
 /* A row in a bar gives way before it overlaps its neighbour: every cell can

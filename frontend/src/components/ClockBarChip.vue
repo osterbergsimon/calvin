@@ -64,7 +64,7 @@ defineEmits(["select", "move"]);
 .clock-bar-chip[data-part-id^="tile:"] {
   min-width: 0;
   max-width: 100%;
-  flex: 0 1 auto;
+  flex: 0 var(--tile-shrink, 1) auto;
 }
 
 .clock-bar-chip.is-selected {

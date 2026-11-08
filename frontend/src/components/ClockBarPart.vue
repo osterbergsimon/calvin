@@ -16,9 +16,9 @@
       :size-px="renderedSizePx"
     />
 
-    <span v-else-if="partId === 'room'" class="clock-bar-room" :style="roomStyle">{{
-      roomLabel
-    }}</span>
+    <span v-else-if="partId === 'room'" class="clock-bar-room" :style="roomStyle"
+      ><span class="clock-bar-room__text">{{ roomLabel }}</span></span
+    >
 
     <ScreenDots
       v-else-if="partId === 'pageDots'"
@@ -172,15 +172,22 @@ const dotsActiveId = computed(() => (props.sample ? SAMPLE_SCREENS[0].id : props
   line-height: 1.1;
 }
 
+/* A grid of one minmax(0, max-content) column: the room is as wide as its name
+   when there is room, but adds nothing to the zone's floor, so a long name ends
+   in an ellipsis instead of pushing the zone into its neighbour (calvin-r7lb). */
 .clock-bar-room {
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, max-content);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-family: var(--font-ui);
   color: var(--ink-3);
   font-size: var(--text-body);
+}
+
+.clock-bar-room__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .compact-time {

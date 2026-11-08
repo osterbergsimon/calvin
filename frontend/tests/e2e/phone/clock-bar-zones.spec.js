@@ -136,10 +136,22 @@ const measure = (page, barSelector) =>
         key: zone.dataset.dropZone,
         box: rectOf(zone),
         chips: chips.map(el => ({ name: name(el), box: rectOf(el) })),
-        leaves: leaves.map(el => ({
-          name: `${name(el)}:${el.textContent.trim()}`,
-          box: rectOf(el),
-        })),
+        // What is actually painted: a leaf clipped by an overflow:hidden
+        // ancestor (a squeezed tile) draws only the part inside it.
+        leaves: leaves
+          .map(el => {
+            const box = rectOf(el);
+            for (let a = el.parentElement; a && a !== zone.parentElement; a = a.parentElement) {
+              if (getComputedStyle(a).overflow === "visible") continue;
+              const c = rectOf(a);
+              box.left = Math.max(box.left, c.left);
+              box.right = Math.min(box.right, c.right);
+              box.top = Math.max(box.top, c.top);
+              box.bottom = Math.min(box.bottom, c.bottom);
+            }
+            return { name: `${name(el)}:${el.textContent.trim()}`, box };
+          })
+          .filter(leaf => leaf.box.right - leaf.box.left >= 1),
       };
     });
     return { bar: rectOf(bar), zones, scrollOverflow: bar.scrollWidth - bar.clientWidth };
@@ -269,19 +281,139 @@ for (const scenario of SCENARIOS) {
   }
 }
 
-// The departure time is what people read: where the owner's two tiles fit, the
-// SL value is whole and only the name gives way (calvin-r7lb).
+// What gives way, in order (calvin-r7lb): every tile name goes before any tile
+// value loses a character; the room name ends in an ellipsis; nothing, the
+// menu included, is ever drawn past the screen edge.
+const cutFlags = page =>
+  page.evaluate(() => {
+    const cells = [...document.querySelectorAll(".clock-bar-horizontal .status__cell")];
+    const cut = el => el.scrollWidth > el.clientWidth + 1;
+    const valueCut = cells
+      .map(cell => cell.querySelector(".status__cell-value"))
+      .filter(el => el && cut(el))
+      .map(el => el.textContent.trim());
+    const nameWhole = cells
+      .map(cell => cell.querySelector(".status__cell-text"))
+      .filter(el => el && el.clientWidth > 0 && !cut(el))
+      .map(el => el.textContent.trim());
+    const nameCut = cells
+      .map(cell => cell.querySelector(".status__cell-text"))
+      .filter(el => el && cut(el)).length;
+    return { valueCut, nameWhole, nameCut };
+  });
+
+const pastScreenEdge = page =>
+  page.evaluate(() => {
+    const width = document.documentElement.clientWidth;
+    const bad = [];
+    const bar = document.querySelector(".clock-bar-horizontal");
+    for (const el of bar.querySelectorAll("*")) {
+      const r = el.getBoundingClientRect();
+      const text = [...el.childNodes].some(n => n.nodeType === 3 && n.textContent.trim());
+      const isMenu = el.classList.contains("bar-action-cluster");
+      if (r.width < 1) continue;
+      if ((text || isMenu) && r.right > width + 0.5) {
+        bad.push(`${el.className || el.tagName} ends at ${Math.round(r.right)} of ${width}`);
+      }
+    }
+    return bad;
+  });
+
+const CENTRE_TILES = {
+  clockBarDesign: {
+    horizontal: {
+      zones: {
+        left: ["logo", "room", "pageDots"],
+        center: ["time", "date", "tiles"],
+        right: ["status"],
+      },
+    },
+  },
+};
+
+const openLive = async (page, { tiles, config = {}, kiosk = null, kioskExtras = null }) => {
+  const api = await installApiMock(page, {
+    overrides: tileOverrides(tiles),
+    ...(kioskExtras ? { kioskExtras } : {}),
+    config: {
+      clockBarMode: "horizontal",
+      clockBarPosition: "top",
+      clockBarShowInKiosk: true,
+      ...config,
+    },
+  });
+  await page.goto(kiosk ? `/?kiosk=${kiosk}` : "/");
+  await expect(page.locator(".clock-bar-horizontal").first()).toBeVisible();
+  await expect(page.locator(".plugin-statusbar-items .status--row").first()).toBeAttached();
+  await page.waitForTimeout(500);
+  return api;
+};
+
+const expectOrderly = async page => {
+  expect(collisions(await measure(page, ".clock-bar-horizontal"))).toEqual([]);
+  expect(await pastScreenEdge(page)).toEqual([]);
+  const { valueCut, nameWhole } = await cutFlags(page);
+  // A value may only be cut once every name is already gone.
+  if (valueCut.length) expect({ valueCut, nameWhole }).toEqual({ valueCut, nameWhole: [] });
+};
+
+test.describe("what gives way in a crowded live bar", () => {
+  for (const [width, label] of [
+    [1280, "four tiles in the Centre zone, 1280 px"],
+    [390, "the owner's tiles in the Centre zone, 390 px"],
+  ]) {
+    test(`${label}: nothing is drawn past the screen, the menu included`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await openLive(page, {
+        tiles: width === 1280 ? ALL_TILES : ALL_TILES.slice(0, 2),
+        config: CENTRE_TILES,
+      });
+      await expectOrderly(page);
+    });
+  }
+
+  for (const [width, count] of [
+    [590, 2],
+    [1400, 4],
+  ]) {
+    test(`${count} tiles at ${width} px: every name goes before any value`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 });
+      await openLive(page, { tiles: ALL_TILES.slice(0, count) });
+      await expectOrderly(page);
+    });
+  }
+
+  test("a 75-character room name ends in an ellipsis at 800 px", async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 480 });
+    const room = "The long hall at the far end of the house past the garden gate and the old barn";
+    await openLive(page, {
+      tiles: ALL_TILES.slice(0, 2),
+      kiosk: "hallway",
+      kioskExtras: { hallway: { overrides: { displayName: room } } },
+    });
+    const roomCut = await page
+      .locator(".clock-bar-horizontal .clock-bar-room")
+      .evaluate(
+        el =>
+          el.scrollWidth > el.clientWidth + 1 ||
+          el.children[0]?.scrollWidth > el.children[0]?.clientWidth + 1
+      );
+    expect(roomCut).toBe(true);
+    await expectOrderly(page);
+  });
+});
+
+// The departure time is what people read: where the owner's two tiles are
+// squeezed, the name gives way and the SL value stays whole. (On the old code
+// nothing was cut at all, so this fails there.)
 test.describe("owner tiles keep their values whole", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test("editor preview, top/bottom bar, landscape", async ({ page }) => {
     await installApiMock(page, { overrides: tileOverrides(ALL_TILES.slice(0, 2)) });
     const editor = await openEditor(page, { shape: "horizontal", orientation: "landscape" });
-    const cut = await editor
-      .locator(".clock-bar-horizontal .status__cell-value")
-      .evaluateAll(els =>
-        els.filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.textContent.trim())
-      );
-    expect(cut).toEqual([]);
+    const flags = await cutFlags(page);
+    expect(flags.nameCut).toBeGreaterThan(0);
+    expect(flags.valueCut).toEqual([]);
   });
 });

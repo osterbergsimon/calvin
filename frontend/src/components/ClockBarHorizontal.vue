@@ -384,11 +384,12 @@ onMounted(() => {
    because everything in them that can be wide can also truncate. */
 
 /* The centred clock keeps its full width: the side groups yield instead of
-   the time being squeezed under the screen dots (CLV-91). */
+   the time being squeezed under the screen dots (CLV-91). Plugin tiles placed
+   here give way like those in the side zones, down to the time and date. */
 .clock-bar-content {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   justify-content: center;
   gap: var(--gap-4);
-  min-width: 0;
+  min-width: min-content;
 }
 </style>
