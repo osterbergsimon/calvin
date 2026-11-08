@@ -779,6 +779,23 @@ def test_a_failed_power_preflight_keeps_an_earlier_successful_findings(
 
 
 @pytest.mark.integration
+def test_a_settling_preflight_is_shown_and_is_not_a_power_fault(test_client: TestClient, kiosk):
+    """calvin-v996: the agent waits for the touch controller; the run says so."""
+    run = _start(test_client, "detect").json()
+    resp = _report(
+        test_client,
+        run["id"],
+        "running",
+        preflight={"status": "settling", "faults": [], "settleLeft": 12},
+    )
+    assert resp.status_code == 200, resp.text
+    view = test_client.get(BASE).json()["run"]
+    assert view["preflight"]["status"] == "settling"
+    assert view["preflight"]["settleLeft"] == 12
+    assert _findings(test_client)["powerTrouble"] is None
+
+
+@pytest.mark.integration
 def test_findings_power_trouble_from_a_calibration_fault(test_client: TestClient, kiosk):
     run = _start(test_client, "write").json()
     _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)

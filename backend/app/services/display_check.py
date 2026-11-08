@@ -133,8 +133,11 @@ class Preflight(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    status: Literal["clean", "fault"]
+    # ``settling``: after a power drop the agent waits for the touch controller to
+    # go quiet before the watch (calvin-v996); ``settleLeft`` is the seconds to go.
+    status: Literal["clean", "fault", "settling"]
     faults: Annotated[list[str], BeforeValidator(_newest(20))] = Field(default_factory=list)
+    settleLeft: int | None = Field(None, ge=0, le=3600)
 
 
 class StartLevel(BaseModel):
@@ -581,7 +584,7 @@ def _merge_progress(run: dict, report: AgentReport) -> None:
     if report.reason is not None:
         run["reason"] = report.reason
     if report.preflight is not None:
-        run["preflight"] = report.preflight.model_dump()
+        run["preflight"] = report.preflight.model_dump(exclude_none=True)
     if report.start is not None:
         run["start"] = report.start.model_dump()
     if report.fault is not None:

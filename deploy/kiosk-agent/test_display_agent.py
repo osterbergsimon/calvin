@@ -4893,3 +4893,124 @@ def test_a_waiting_fault_is_recorded_before_the_drop_is_written(tmp_path):
     fault.faults.append("Under-voltage detected!")
     runner._finish("stopped")
     assert seen and seen[0] is True  # the incident existed before the first write
+
+
+# -- after a drop: wait for the touch controller to go quiet (calvin-v996) ------
+def _second_run(step, tmp_path, runner, fault, *, job_id="c2"):
+    """A new run on the same controller and clock, as the dialog's Try again makes."""
+    reports = []
+    clock = runner.clock
+    second = agent.DisplayCheckRunner(
+        dict(_cal_job(step), id=job_id),
+        _ramp_cfg(),
+        ddc=runner.ddc,
+        report=reports.append,
+        poll=None,
+        clock=clock,
+        sleep=runner.sleep,
+        state_dir=str(tmp_path),
+        controller=runner.controller,
+    )
+    return second, reports
+
+
+def test_a_run_right_after_a_drop_waits_for_the_touch_controller_to_go_quiet(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    assert first.reason == "power_trouble"
+
+    second, reports = _second_run("write", tmp_path, first, fault)
+    began = clock.t
+    # The touch controller resets again 10 s and 30 s into the next run, as seen on a 3B+.
+    resets = [began + 10, began + 30]
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if resets and clock.t >= resets[0]:
+            resets.pop(0)
+            fault.faults.append("usb 1-1.1: reset full-speed USB device")
+
+    second.sleep = sleep
+    second.run()
+    settling = [r for r in reports if (r.get("preflight") or {}).get("status") == "settling"]
+    assert settling, "the dialog needs a waiting state to show"
+    assert all(r["preflight"]["settleLeft"] >= 0 for r in settling)
+    # Not failed by the resets it waited out: the power check then ran clean.
+    assert second.reason != "power_at_idle"
+    assert reports[-1]["preflight"] == {"status": "clean", "faults": []}
+    assert clock.t - began >= 30 + agent.AFTER_DROP_QUIET_SECONDS
+
+
+def test_waiting_after_a_drop_is_bounded_and_can_be_stopped(tmp_path):
+    class Stubborn(ConsumingFault):
+        def new_faults(self):
+            return ["usb 1-1.1: reset full-speed USB device"]
+
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    second, reports = _second_run("write", tmp_path, first, fault)
+    second.controller.fault = Stubborn()
+    began = clock.t
+    second.run()
+    waited = clock.t - began
+    assert agent.AFTER_DROP_TIMEOUT_SECONDS <= waited < agent.AFTER_DROP_TIMEOUT_SECONDS + 15
+    # Out of patience it checks the power honestly, so the verdict is the real one.
+    assert second.reason == "power_at_idle"
+
+
+def test_a_stop_while_waiting_after_a_drop_ends_the_run(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    second, reports = _second_run("write", tmp_path, first, fault)
+    stop = {"job": dict(_cal_job("write"), id="c2", action="stop")}
+    second.poll = lambda: {"displayCheck": stop["job"]}
+    second.run()
+    assert reports[-1]["status"] == "stopped"
+    assert reports[-1].get("reason") != "power_at_idle"
+
+
+def test_a_first_run_does_not_wait(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner("write", tmp_path)
+    runner.run()
+    assert not [r for r in reports if (r.get("preflight") or {}).get("status") == "settling"]
+
+
+# -- the power watch between steps reacts within a second or so (calvin-puiw) ---
+def test_a_fault_between_steps_is_noticed_within_a_second(tmp_path):
+    fault = ConsumingFault()
+
+    def poll():
+        # The dialog is waiting for the owner's next step (the read already answered).
+        return {"displayCheck": dict(_cal_job("read"), id="c1")}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadingDdc(read=40), fault=fault, poll=poll
+    )
+    fault_at = {}
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if "t" not in fault_at and clock.t >= agent.PREFLIGHT_SECONDS + 4:
+            fault_at["t"] = clock.t
+            fault.faults.append("usb 1-1.1: reset full-speed USB device")
+
+    first_report = {}
+
+    def report(payload):
+        if payload.get("fault") and "t" not in first_report:
+            first_report["t"] = clock.t
+        reports.append(payload)
+
+    runner.sleep = sleep
+    runner.report = report
+    runner.run()
+    assert reports[-1]["reason"] == "power_trouble"
+    assert first_report["t"] - fault_at["t"] <= 1.0
