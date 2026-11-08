@@ -70,7 +70,11 @@ describe("clock bar at phone width", () => {
   });
 
   it("never lets the side groups squeeze the centred clock", () => {
-    expect(rule(css, ".clock-bar-content")).toMatch(/flex:\s*0\s+0\s+auto/);
+    // The centre zone may shrink (plugin tiles placed there truncate) but only
+    // down to the time and date themselves (calvin-r7lb).
+    const centre = rule(css, ".clock-bar-content");
+    expect(centre).toMatch(/flex:\s*0\s+1\s+auto/);
+    expect(centre).toMatch(/min-width:\s*min-content/);
   });
 
   it("hides the screen dots so they cannot run under the time", () => {
