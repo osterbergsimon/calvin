@@ -97,7 +97,13 @@ and ask for a private channel rather than posting details publicly.
   page you would have to frame yourself.
 - Issues that only reproduce on an unsupported version.
 - Kiosk screen/browser escape that requires the kiosk's own keyboard and an
-  unlocked admin session.
+  unlocked admin session. (A kiosk session is short on purpose: it ends after
+  about 5 minutes without touch and when the screen sleeps, so that window is
+  minutes, not months. A phone or desktop session lasts about 30 days and is
+  renewed while in use. The server enforces both; see
+  [docs/configuration/ADMIN_AUTH.md](docs/configuration/ADMIN_AUTH.md#sessions).
+  A way to keep a kiosk session alive longer, or to turn it into a long one, is
+  in scope.)
 
 ## Testing rules
 
