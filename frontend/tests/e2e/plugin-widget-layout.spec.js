@@ -235,3 +235,36 @@ test.describe("Card size steps are all visible", () => {
     }
   });
 });
+
+test.describe("the region's options follow the widget into fullscreen", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("Card size and Link behavior still apply when the region goes fullscreen", async ({
+    page,
+  }) => {
+    await openWidget(page, "mealie", "medium", { view: { cardSize: "xlarge", linkAction: "off" } });
+    await page.getByRole("button", { name: "Enter Fullscreen" }).click();
+    await expect(page.locator(".web-service-viewer.fullscreen")).toBeVisible();
+    const card = page.locator(".web-service-viewer.fullscreen .card-grid__card").first();
+    await expect(card).toBeVisible();
+    expect(await card.evaluate(el => parseFloat(getComputedStyle(el).paddingTop))).toBeCloseTo(
+      22.4,
+      0
+    );
+    await expect(
+      page.locator(".web-service-viewer.fullscreen .card-grid__item--clickable")
+    ).toHaveCount(0);
+  });
+});
+
+test.describe("item lists take Link behavior too", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("Link behavior Off makes feed rows inert", async ({ page }) => {
+    await openWidget(page, "list", "medium");
+    await expect(page.locator(".item-list__row--clickable").first()).toBeVisible();
+    await page.locator(".region-view-options__trigger").click();
+    await page.getByRole("dialog").getByText("Off", { exact: true }).click();
+    await expect(page.locator(".item-list__row--clickable")).toHaveCount(0);
+  });
+});

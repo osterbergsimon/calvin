@@ -161,11 +161,16 @@ describe("WebServiceViewer", () => {
     const enterSpy = vi.spyOn(modeStore, "enterFullscreen");
     // currentServiceIndex is 0 ("Weather") — the buggy path would fullscreen
     // that instead of the region's own "meals" service.
-    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals", focused: true });
+    const view = { cardSize: "large", linkAction: "off" };
+    const wrapper = mountViewer({ isFullscreen: false, serviceId: "meals", focused: true, view });
 
     await wrapper.get('[title="Enter Fullscreen"]').trigger("click");
 
-    expect(enterSpy).toHaveBeenCalledWith(modeStore.MODES.WEB_SERVICES, { serviceId: "meals" });
+    // The region's view rides along so its options still apply fullscreen.
+    expect(enterSpy).toHaveBeenCalledWith(modeStore.MODES.WEB_SERVICES, {
+      serviceId: "meals",
+      view,
+    });
   });
 
   it("shows an unavailable state for a missing explicit service id", () => {
