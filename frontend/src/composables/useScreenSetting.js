@@ -146,11 +146,15 @@ export function useScreenSetting(
     const flush = () => {
       void kioskQueue.flush();
     };
-    window.addEventListener("beforeunload", flush);
-    window.addEventListener("pagehide", flush);
+    // On a page close the request must outlive the page (fetch keepalive).
+    const flushOnPageClose = () => {
+      void kioskQueue.flush({ keepalive: true });
+    };
+    window.addEventListener("beforeunload", flushOnPageClose);
+    window.addEventListener("pagehide", flushOnPageClose);
     onUnmounted(() => {
-      window.removeEventListener("beforeunload", flush);
-      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flushOnPageClose);
+      window.removeEventListener("pagehide", flushOnPageClose);
       flush();
     });
   }

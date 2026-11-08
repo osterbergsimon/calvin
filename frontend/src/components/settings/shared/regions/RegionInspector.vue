@@ -239,6 +239,7 @@ const props = defineProps({
 const emit = defineEmits([
   "patch-view",
   "set-component",
+  "enable-plugin",
   "toggle-source",
   "clear-sources",
   "toggle-split",
@@ -261,7 +262,9 @@ const addService = () => {
 };
 const filtered = computed(() => filterComponentOptions(props.componentOptions, search.value));
 const choose = opt => {
-  emit("set-component", opt);
+  // A turned-off plugin is not a component yet: ask the editor to switch it on.
+  if (opt.kind === "disabled-plugin") emit("enable-plugin", opt.pluginId);
+  else emit("set-component", opt);
   pickerOpen.value = false;
   search.value = "";
 };
@@ -274,7 +277,15 @@ const pickerItems = computed(() => {
   const items = filtered.value.map(opt => ({
     key: opt.value,
     label: opt.label,
-    meta: opt.pluginName && opt.pluginName !== opt.label ? opt.pluginName : "",
+    // A plugin the host will not turn on (sealed mode) shows why instead of a
+    // Turn on that could only answer 403.
+    disabled: opt.kind === "disabled-plugin" && !!opt.blockedReason,
+    meta:
+      opt.kind === "disabled-plugin"
+        ? opt.blockedReason || "Turned off · Turn on"
+        : opt.pluginName && opt.pluginName !== opt.label
+          ? opt.pluginName
+          : "",
   }));
   if (!hasServices.value) {
     items.push({

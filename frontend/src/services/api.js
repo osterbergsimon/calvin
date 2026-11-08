@@ -13,6 +13,31 @@ export const LONG_REQUEST_TIMEOUT = 10 * 60 * 1000;
 // Header the service worker adds to API responses it replays from its cache.
 export const SW_CACHE_HEADER = "x-calvin-sw-cache";
 
+/**
+ * Request options for a save made while the page is closing: the fetch adapter
+ * with `keepalive`, so the browser may finish the request after the page is gone
+ * (an XHR is cancelled with it). Pass as the last argument of `api.post/put/patch`.
+ */
+export const KEEPALIVE_REQUEST = Object.freeze({
+  adapter: "fetch",
+  fetchOptions: Object.freeze({ keepalive: true }),
+});
+
+// Browsers refuse a keepalive request whose body is over 64 KiB, which would
+// reject the save and roll it back. Stay safely under and send those normally.
+const KEEPALIVE_MAX_BODY = 60 * 1024;
+
+/** KEEPALIVE_REQUEST for a body small enough for it, otherwise no options. */
+export function keepaliveOptionsFor(body) {
+  try {
+    return JSON.stringify(body ?? null).length <= KEEPALIVE_MAX_BODY
+      ? KEEPALIVE_REQUEST
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // No default Content-Type: axios sets JSON for plain objects itself, and a
 // forced application/json would make axios serialize FormData uploads to JSON.
 const api = axios.create({

@@ -429,6 +429,7 @@ async def handle_plugin_config_update_generic(
         # Update in database. This is the write that runs while other plugin
         # operations hold the SQLite write lock, so it retries (audit R11).
         db_instance.config = instance_config
+        was_enabled = bool(db_instance.enabled)
         db_instance.enabled = final_enabled
 
         from app.utils.db_retry import retry_on_db_locked
@@ -439,8 +440,18 @@ async def handle_plugin_config_update_generic(
             if db_type and hasattr(db_type, "save_with_timestamp"):
                 # Only update if it's a real Ormar model (not a mock in tests)
                 try:
-                    db_type.enabled = final_enabled
-                    await db_type.save_with_timestamp()
+                    if final_enabled:
+                        # Only a real off -> on transition of the instance turns the
+                        # type on, under the same sealed-mode rule as every other
+                        # enable path; an edit of an enabled instance leaves a
+                        # deliberate type off alone.
+                        if not was_enabled and not db_type.enabled:
+                            from app.plugins.registry.enable_policy import turn_type_on
+
+                            await turn_type_on(db_type.type_id)
+                    else:
+                        db_type.enabled = final_enabled
+                        await db_type.save_with_timestamp()
                 except (AttributeError, TypeError):
                     # Fallback for mocks or if save_with_timestamp doesn't exist
                     if hasattr(db_type, "update"):

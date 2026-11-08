@@ -46,4 +46,19 @@ describe("KeyboardHandler reboot-combo config (F1)", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/config");
     wrapper.unmount();
   });
+
+  it("makes one config request on a cold mount (calvin-hwjz)", async () => {
+    setLocation("?kiosk=kitchen&khost=pi-k");
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const wrapper = mount(KeyboardHandler, {
+      global: { stubs: { NotificationSystem: true } },
+    });
+    await flushPromises();
+
+    const configCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/config"));
+    expect(configCalls).toHaveLength(1);
+    wrapper.unmount();
+  });
 });

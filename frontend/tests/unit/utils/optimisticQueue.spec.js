@@ -241,4 +241,65 @@ describe("createOptimisticQueue", () => {
     expect(save.mock.calls[0][0].snapshot).toEqual({ x: "mine", y: "kept" });
     expect(queue.display.value).toEqual({ x: "mine", y: "kept" });
   });
+
+  describe("page close (calvin-msa8)", () => {
+    it("tells save to use keepalive only for a flush made on page close", async () => {
+      const save = vi.fn(async () => {});
+      const queue = createOptimisticQueue({ initial: {}, save });
+
+      queue.setPartial({ x: 1 });
+      await queue.flush({ keepalive: true });
+      queue.setPartial({ x: 2 });
+      await queue.flush();
+
+      expect(save.mock.calls[0][1]).toEqual({ keepalive: true });
+      expect(save.mock.calls[1][1]).toEqual({ keepalive: false });
+    });
+
+    it("settles a multi-key caller when only one of its keys is re-tapped in flight", async () => {
+      const first = deferred();
+      const save = vi
+        .fn()
+        .mockImplementationOnce(() => first.promise)
+        .mockResolvedValueOnce();
+      const queue = createOptimisticQueue({ initial: {}, save });
+      let settled = false;
+
+      const both = queue.setPartial({ x: 1, y: 1 }).then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      void queue.setPartial({ x: 2 });
+
+      first.resolve();
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+      await both;
+
+      expect(settled).toBe(true);
+      expect(save.mock.calls[1][0].changes).toEqual({ x: 2 });
+    });
+
+    it("keeps a caller waiting while its key is re-tapped, until the newer value saves", async () => {
+      const first = deferred();
+      const save = vi
+        .fn()
+        .mockImplementationOnce(() => first.promise)
+        .mockResolvedValueOnce();
+      const queue = createOptimisticQueue({ initial: {}, save });
+      const settled = [];
+
+      const early = queue.setPartial({ x: 1 }).then(() => settled.push("early"));
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      // x is tapped again while the first save is in flight.
+      const late = queue.setPartial({ x: 2 }).then(() => settled.push("late"));
+
+      first.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toEqual([]);
+
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      await Promise.all([early, late]);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(save.mock.calls[1][0].changes).toEqual({ x: 2 });
+      expect(settled.sort()).toEqual(["early", "late"]);
+    });
+  });
 });

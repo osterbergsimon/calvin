@@ -7,6 +7,7 @@ from loguru import logger
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
+from app.plugins.registry.enable_policy import turn_type_on
 
 
 async def register_plugin(
@@ -64,6 +65,12 @@ async def register_plugin(
     async def _save_plugin_to_db():
         db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
         plugin_type = db_type.plugin_type if db_type else "unknown"
+
+        # An enabled instance under an off type is a contradiction: the host loads
+        # no instances for an off type. Creating an enabled instance turns its type
+        # on (calvin-zbcg).
+        if enabled and db_type and not db_type.enabled:
+            await turn_type_on(type_id)
 
         await PluginDB.objects.create(
             id=plugin_id,

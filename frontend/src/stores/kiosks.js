@@ -52,18 +52,24 @@ export const useKiosksStore = defineStore("kiosks", () => {
     }
   }
 
-  async function saveOverrides(id, overrides) {
-    await api.put(`/kiosks/${encodeURIComponent(id)}/overrides`, { overrides });
+  async function saveOverrides(id, overrides, requestOptions) {
+    await api.put(
+      `/kiosks/${encodeURIComponent(id)}/overrides`,
+      { overrides },
+      ...(requestOptions ? [requestOptions] : [])
+    );
   }
 
   // A screen without an admin session may only merge the keys it is changing
   // into its own layer (F2, settings-scope §7.9). Nothing else in the layer is
   // touched, and the server answers with the merged layer. Returns null when
   // the response carries no layer, so callers keep their last known copy.
-  async function mergeOverrides(id, partial) {
-    const response = await api.patch(`/kiosks/${encodeURIComponent(id)}/overrides`, {
-      overrides: partial,
-    });
+  async function mergeOverrides(id, partial, requestOptions) {
+    const response = await api.patch(
+      `/kiosks/${encodeURIComponent(id)}/overrides`,
+      { overrides: partial },
+      ...(requestOptions ? [requestOptions] : [])
+    );
     return response.data?.overrides ?? null;
   }
 

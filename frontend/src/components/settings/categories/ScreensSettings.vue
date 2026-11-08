@@ -1818,9 +1818,13 @@ async function refreshDesiredVersion(id) {
 const flushQueuedOverrides = () => {
   void flushKioskOverridesQueues();
 };
+// On a page close the request must outlive the page (fetch keepalive).
+const flushQueuedOverridesOnPageClose = () => {
+  void flushKioskOverridesQueues({ keepalive: true });
+};
 if (typeof window !== "undefined") {
-  window.addEventListener("beforeunload", flushQueuedOverrides);
-  window.addEventListener("pagehide", flushQueuedOverrides);
+  window.addEventListener("beforeunload", flushQueuedOverridesOnPageClose);
+  window.addEventListener("pagehide", flushQueuedOverridesOnPageClose);
 }
 
 onMounted(async () => {
@@ -1842,8 +1846,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   clearLookNote();
-  window.removeEventListener("beforeunload", flushQueuedOverrides);
-  window.removeEventListener("pagehide", flushQueuedOverrides);
+  window.removeEventListener("beforeunload", flushQueuedOverridesOnPageClose);
+  window.removeEventListener("pagehide", flushQueuedOverridesOnPageClose);
   flushQueuedOverrides();
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
