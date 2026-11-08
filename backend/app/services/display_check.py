@@ -86,6 +86,8 @@ class StepRequest(BaseModel):
 
     step: Step
     value: int | None = Field(None, ge=0, le=100)
+    # The level the owner typed from the panel's own buttons (a ``read`` step).
+    panelLevel: int | None = Field(None, ge=0, le=100)
 
 
 class MenuAtStartRequest(BaseModel):
@@ -155,6 +157,8 @@ class FaultIncident(BaseModel):
     kind: Annotated[str | None, BeforeValidator(_clip(64))] = None
     at: Annotated[str | None, BeforeValidator(_clip(64))] = None
     lastGood: int | None = Field(None, ge=0, le=100)
+    # A read-step fault happens at the owner's own button level, not Calvin's.
+    panelLevel: int | None = Field(None, ge=0, le=100)
     alsoAt: Annotated[list[int], BeforeValidator(_newest(50))] = Field(default_factory=list)
 
 
@@ -233,6 +237,10 @@ def _apply_findings(
         elif status == "error":
             findings["ddc"] = False
             changed = True
+    elif step == "read":
+        if status == "done":
+            findings["ddc"] = True  # a read-back came from the panel itself
+            changed = True
     elif step == "write":
         if status in ("done", "error"):
             findings["writes"] = status == "done"
@@ -262,6 +270,8 @@ def _power_trouble(run: dict, report: AgentReport, status: str, now: str) -> Any
             "at": fault.at or report.finishedAt or now,
             "step": fault.step,
             "level": fault.level,
+            # Only the level typed for THIS fault, never the previous reading's.
+            "panelLevel": fault.panelLevel,
             "kind": fault.kind or "under-voltage",
         }
     clean = (run.get("preflight") or {}).get("status") == "clean"
@@ -313,7 +323,7 @@ def _view(run: dict | None) -> dict | None:
         view["status"] = "timeout"
     view["active"] = view["status"] in ("requested", "running")
     view.setdefault("steps", {})
-    for key in ("reason", "preflight", "start", "fault", "menuAtStart"):
+    for key in ("reason", "preflight", "start", "fault", "menuAtStart", "panelLevel"):
         view.setdefault(key, None)
     view.setdefault("seq", 0)
     view["ceiling"] = None
@@ -337,6 +347,10 @@ def job_for_config(run: dict | None, settings: dict | None = None) -> dict | Non
         "brightness": view["brightness"],
         # Bumped by every step request, so a repeated step is a new job.
         "seq": view["seq"],
+        "panelLevel": view["panelLevel"],
+        # Set only by a Stop that says this calibration's Save landed: the
+        # agent's end-of-run restore trusts nothing else.
+        "saved": bool(view.get("saved")),
         # What this job's value may reach (calibration never brightens).
         "ceiling": ceiling_for(view, settings),
     }
@@ -383,7 +397,11 @@ def _settings(settings: dict | None) -> tuple[int | None, int, Any]:
 
 
 def fault_limit(run: dict | None, step: int) -> int | None:
-    """``min(lastGood, level) - step`` of a calibration fault, never below 0."""
+    """``min(lastGood, level) - step`` of a calibration fault, never below 0.
+
+    The margin is applied here, once, when the limit is stored; the limit is
+    then the ceiling as it stands.
+    """
     fault = (run or {}).get("fault")
     if not isinstance(fault, dict) or fault.get("step") not in CALIBRATION_STEPS:
         return None
@@ -393,13 +411,8 @@ def fault_limit(run: dict | None, step: int) -> int | None:
     return max(0, min(levels) - step)
 
 
-def _fault_cap(run: dict, step: int) -> int | None:
-    limit = fault_limit(run, step)
-    return None if limit is None else max(0, limit - 2 * step)
-
-
 def ceiling_for(run: dict, settings: dict | None) -> int | None:
-    """``min(base, limit - 2*step, faultCap)``; None until the run has a start."""
+    """``min(base, limit, faultLimit)``; None until the run has a start."""
     start = run.get("start")
     if not isinstance(start, dict):
         return None
@@ -413,8 +426,8 @@ def ceiling_for(run: dict, settings: dict | None) -> int | None:
             base = converted
     caps = [base]
     if saved is not None:
-        caps.append(max(0, saved - 2 * step))
-    fault_cap = _fault_cap(run, step)
+        caps.append(max(0, saved))
+    fault_cap = fault_limit(run, step)
     if fault_cap is not None:
         caps.append(fault_cap)
     return min(caps)
@@ -503,7 +516,7 @@ async def start_run(kiosk_id: str, request: StartRequest) -> dict:
 
 
 @_serialised
-async def stop_run(kiosk_id: str) -> dict:
+async def stop_run(kiosk_id: str, saved: bool = False) -> dict:
     row = await _row(kiosk_id)
     if row is None:
         raise UnknownKioskError(kiosk_id)
@@ -512,6 +525,10 @@ async def stop_run(kiosk_id: str) -> dict:
         raise NoActiveRunError(kiosk_id)
     run = dict(row.display_check)
     run["action"] = "stop"
+    if saved:
+        # The dialog says this calibration's Save landed: the agent restores the
+        # everyday level on it. Nothing else sets it.
+        run["saved"] = True
     await _save(row, run)
     logger.info(f"Display check {run['id']} stop requested for {kiosk_id!r}")
     return _view(run)  # type: ignore[return-value]
@@ -531,6 +548,7 @@ async def change_step(kiosk_id: str, request: StepRequest) -> dict:
     run = dict(row.display_check)
     run["step"] = request.step
     run["value"] = request.value
+    run["panelLevel"] = request.panelLevel
     run["seq"] = int(run.get("seq") or 0) + 1
     await _save(row, run)
     logger.info(f"Display check {run['id']} for {kiosk_id!r} moved to {request.step}")

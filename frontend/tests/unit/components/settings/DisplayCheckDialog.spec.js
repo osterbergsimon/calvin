@@ -971,6 +971,64 @@ describe("Back and Remove", () => {
   });
 });
 
+describe("telling the agent the Save landed", () => {
+  const stopBody = () => posts("stop").at(-1)?.[1];
+
+  it("Done after a successful Save stops with saved: true", async () => {
+    await toSummary({ savePatch: vi.fn().mockResolvedValue(true) });
+    await clickPrimary(wrapper); // Save
+    await clickPrimary(wrapper); // Done
+    expect(posts("stop")).toHaveLength(1);
+    expect(stopBody()).toEqual({ saved: true });
+  });
+
+  it("closing (X) after a successful Save stops with saved: true", async () => {
+    await toSummary({ savePatch: vi.fn().mockResolvedValue(true) });
+    await clickPrimary(wrapper);
+    await wrapper.setProps({ modelValue: false });
+    await flushPromises();
+    expect(stopBody()).toEqual({ saved: true });
+  });
+
+  it("Done or close without a Save, or after a failed one, never says saved", async () => {
+    await toSummary({ savePatch: vi.fn().mockResolvedValue(false) });
+    await clickPrimary(wrapper); // Save fails
+    await wrapper.setProps({ modelValue: false });
+    await flushPromises();
+    expect(posts("stop")).toHaveLength(1);
+    expect(stopBody()).toBeUndefined();
+  });
+});
+
+describe("Try again during a live run", () => {
+  it("waits, saying Stopping, until the old run ends, then starts once", async () => {
+    await toStep3();
+    const starts = posts("start").length;
+    backend.stopKeepsActive = true;
+    const pending = wrapper.vm.retry();
+    await flushPromises();
+    expect(posts("stop")).toHaveLength(1);
+    expect(posts("start")).toHaveLength(starts); // not while the agent is still stopping
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+    agent({ status: "stopped" });
+    await settle();
+    await pending;
+    await flushPromises();
+    expect(posts("start")).toHaveLength(starts + 1);
+  });
+
+  it("gives up after a bounded wait and says so when the old run never reports", async () => {
+    await toStep3();
+    const starts = posts("start").length;
+    backend.stopKeepsActive = true;
+    const pending = wrapper.vm.retry();
+    await settle(21000);
+    await pending;
+    expect(posts("start")).toHaveLength(starts);
+    expect(wrapper.text()).toContain("still stopping");
+  });
+});
+
 describe("Stop", () => {
   it("shows the pressed state on pointerdown, before anything comes back", async () => {
     await toStep2();

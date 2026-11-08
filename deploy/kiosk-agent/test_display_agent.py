@@ -2485,11 +2485,11 @@ def test_brightness_settings_clamp_unsafe_values():
     assert settings["sleep_mode"] == "standby"
 
 
-def test_brightness_target_is_capped_at_limit_minus_two_steps():
+def test_brightness_target_is_capped_at_the_limit():
     settings = agent.brightness_settings(
         {"brightness_ramp_enabled": True, "brightness": 50, "brightness_limit": 26}
     )
-    assert agent.brightness_target(settings) == 22
+    assert agent.brightness_target(settings) == 26
     # Slider asks above the cap: the agent never steps above it.
     assert agent.brightness_target(settings, fault_ceiling=20) == 20
 
@@ -2500,7 +2500,7 @@ def test_brightness_target_defaults_to_ddc_twenty():
     low = agent.brightness_settings(
         {"brightness_ramp_enabled": True, "brightness_limit": 18}
     )
-    assert agent.brightness_target(low) == 14  # limit 18 - two steps of 2
+    assert agent.brightness_target(low) == 18  # the limit is the ceiling
 
 
 def test_menu_estimate_fits_the_owner_readings():
@@ -2864,13 +2864,13 @@ def test_wake_with_ramp_settles_then_ramps_up():
     assert controller.level == 19
 
 
-def test_wake_ramp_never_exceeds_the_limit_minus_two_steps():
+def test_wake_ramp_never_exceeds_the_limit():
     ddc = FakeDdc()
     controller, clock, applied = _controller(ddc=ddc)
     controller.reconcile(
         _ramp_cfg(brightness=50, brightness_limit=26), _local(hour=9), False
     )
-    assert ddc.writes[-1] == 22  # 26 - 2 * 2, not the chosen 50
+    assert ddc.writes[-1] == 26  # the limit is the ceiling, not the chosen 50
 
 
 def test_live_brightness_change_ramps_to_the_new_value_now():
@@ -3082,6 +3082,8 @@ def test_display_check_job_parses_the_proposed_config_shape():
         "brightness": 19,
         "ceiling": None,
         "seq": None,
+        "panelLevel": None,
+        "saved": False,
     }
     assert agent.display_check_job({"display_check": {"id": "x", "step": "limit"}})[
         "step"
@@ -3507,12 +3509,12 @@ def test_recovery_runs_after_the_first_reconcile_with_an_armed_monitor(
         "http://x", 900, fetch=lambda url: cfg, sleep=lambda s: None,
         iterations=1, apply_device=lambda c: None, brightness=controller,
     )
-    # the persisted run's limit (28 - 2 = 26) caps the wake ramp at 22
+    # the persisted run's limit (26) caps the wake ramp at 26
     # BEFORE it starts: it never rises above the limit and comes back down
-    assert ddc.writes == [0] + list(range(2, 23, 2))
+    assert ddc.writes == [0] + list(range(2, 27, 2))
     assert ("arm", len(ddc.writes)) in events
     assert max(_steps(ddc.writes)) <= 2
-    assert controller.level == 22
+    assert controller.level == 26
     assert not (tmp_path / agent.DISPLAY_CHECK_STATE).exists()
 
 
@@ -4268,7 +4270,7 @@ def test_the_agent_has_no_limit_step_runner_path(tmp_path):
 def test_read_reports_the_ddc_level_without_writing(tmp_path):
     ddc = ReadingDdc(read=61)
     runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=5, ddc=ddc)
-    runner.run()
+    runner._execute(runner.job)
     done = [r for r in reports if r["status"] == "done"][0]
     assert done["step"] == "read"
     assert done["level"] == 61
@@ -4431,8 +4433,8 @@ def test_a_fault_during_read_blames_the_last_write_not_the_read(tmp_path):
     runner._execute(_cal_job("read"))
     incident = runner.fault
     assert incident["step"] == "read"
-    assert incident["level"] == 9
-    assert incident["lastGood"] == 9
+    assert incident["level"] is None  # the agent's level is not where the panel was
+    assert incident["lastGood"] is None
 
 
 def _dim_controller(level, **cfg):
@@ -4448,8 +4450,8 @@ def _dim_controller(level, **cfg):
 def test_dim_only_sleep_is_capped_by_the_ceiling():
     controller, ddc = _dim_controller(50, brightnessFloor=40, brightness_limit=30)
     controller._sleep_dim(controller.settings, None)
-    assert ddc.writes[-1] == 26  # limit 30 - 2 * 2, not the floor 40
-    assert controller.dim_level == 26
+    assert ddc.writes[-1] == 30  # the limit is the ceiling, not the floor 40
+    assert controller.dim_level == 30
 
 
 def test_dim_only_sleep_never_goes_up_to_the_floor():
@@ -4473,7 +4475,7 @@ def test_shutdown_dim_is_capped_and_never_goes_up():
     assert all(w <= 10 for w in ddc.writes)
     controller, ddc = _dim_controller(60, brightnessFloor=40, brightness_limit=30)
     agent.shutdown_dim(controller, log_fn=lambda line: None)
-    assert ddc.writes == [26]
+    assert ddc.writes == [30]
 
 
 def test_a_check_drop_with_an_unknown_start_never_brightens(tmp_path):
@@ -4609,7 +4611,8 @@ def test_two_identical_reads_both_run_and_report_their_seq(tmp_path):
     runner.run()
     reads = [r for r in reports if r["status"] == "done" and r["step"] == "read"]
     assert [r["seq"] for r in reads] == [1, 2, 3]
-    assert ddc.writes == [agent.CHECK_FLOOR] or max(ddc.writes, default=0) <= 19
+    # the reads wrote nothing; the only writes are the end-of-run restore
+    assert max(ddc.writes, default=0) <= agent.DEFAULT_BRIGHTNESS
 
 
 def test_without_seq_the_old_signature_still_dedupes(tmp_path):
@@ -4625,3 +4628,268 @@ def test_without_seq_the_old_signature_still_dedupes(tmp_path):
     runner, reports, clock, ddc, fault = _cal_runner("read", tmp_path, level=19, ddc=ddc, poll=poll)
     runner.run()
     assert len([r for r in reports if r["status"] == "done" and r["step"] == "read"]) == 1
+
+
+# -- calvin-rjyn: limit is the ceiling, restore after calibration, fault level --
+def test_the_limit_is_the_ceiling_with_no_subtraction():
+    settings = agent.brightness_settings({"brightness_limit": 21, "brightness": 18})
+    assert agent.brightness_ceiling(settings) == 21
+    assert agent.brightness_target(settings) == 18
+
+
+def test_a_fault_during_read_records_no_level(tmp_path):
+    fault = ConsumingFault()
+
+    class ReadFaults(ReadingDdc):
+        def read_brightness(self_inner):
+            fault.faults.append("Under-voltage detected!")
+            return 100
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadFaults(), fault=fault
+    )
+    job = dict(_cal_job("read"), panelLevel=74)
+    runner._execute(job)
+    assert runner.fault["level"] is None
+    assert runner.fault["lastGood"] is None
+    assert runner.fault["panelLevel"] == 74
+
+
+def test_display_check_job_carries_the_panel_level():
+    cfg = {"displayCheck": {"id": "c1", "step": "read", "panelLevel": 74}}
+    assert agent.display_check_job(cfg)["panelLevel"] == 74
+    assert agent.display_check_job({"displayCheck": {"id": "c1", "step": "read"}})["panelLevel"] is None
+
+
+def _restore_runner(tmp_path, *, level, new_cfg, ramp=False):
+    cfg_over = {"brightness_ramp_enabled": ramp, "brightness_limit": 17, "brightness": 17}
+    polls = []
+
+    def poll():
+        polls.append(1)
+        return new_cfg if len(polls) >= 2 else _ramp_cfg(**cfg_over)
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=level, ddc=ReadingDdc(read=21), poll=poll, cfg_over=cfg_over
+    )
+    return runner, reports, ddc, polls
+
+
+def _the_stop_says_saved(runner, new_cfg):
+    """What the poll that carries Stop-after-Save gives the runner."""
+    runner.live_settings = agent.brightness_settings(new_cfg)
+    runner._note_job({**_cal_job("read", action="stop"), "saved": True})
+
+
+def test_a_run_that_took_readings_restores_the_saved_everyday_level(tmp_path):
+    new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18)
+    runner, reports, ddc, polls = _restore_runner(tmp_path, level=None, new_cfg=new_cfg)
+    runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, new_cfg)
+    runner._finish("done")
+    assert ddc.writes[0] == 5  # dropped at once
+    assert ddc.writes[1] == 0  # then the restore starts from 0
+    assert ddc.writes[-1] == 18  # the NEW saved level, not the stale 17
+    assert max(ddc.writes) <= 21
+
+
+def test_the_restore_is_capped_by_the_new_ceiling(tmp_path):
+    new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=50)
+    runner, reports, ddc, polls = _restore_runner(tmp_path, level=5, new_cfg=new_cfg)
+    runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, new_cfg)
+    runner._finish("stopped")
+    assert ddc.writes[-1] == 21
+
+
+def test_no_restore_without_readings(tmp_path):
+    new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18)
+    runner, reports, ddc, polls = _restore_runner(tmp_path, level=5, new_cfg=new_cfg)
+    runner._finish("done")
+    assert ddc.writes == []
+
+
+def test_no_restore_after_power_trouble(tmp_path):
+    fault = ConsumingFault()
+
+    class ReadFaults(ReadingDdc):
+        def read_brightness(self_inner):
+            fault.faults.append("Under-voltage detected!")
+            return 21
+
+    new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadFaults(), fault=fault,
+        poll=lambda: new_cfg,
+    )
+    runner._execute(_cal_job("read"))
+    ddc.writes.clear()
+    runner._finish("error")
+    assert 18 not in ddc.writes and max(ddc.writes, default=0) <= 5
+
+
+# -- calvin-rjyn review: restore only after a Save, waits record no level ------
+@pytest.mark.parametrize("status", ["stopped", "error", "timeout", "done"])
+def test_no_restore_without_a_save_never_uses_the_default_or_an_old_value(tmp_path, status):
+    unchanged = _ramp_cfg(brightness_ramp_enabled=False, brightness=60)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
+        poll=lambda: unchanged, cfg_over={"brightness_ramp_enabled": False, "brightness": 60},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish(status)
+    assert max(ddc.writes, default=0) <= 5  # no 20, no old 60
+    assert reports[-1]["status"] == status
+
+
+def test_no_restore_when_nothing_was_ever_saved_and_no_brightness_exists(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
+        poll=lambda: _ramp_cfg(brightness=None), cfg_over={"brightness": None},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("stopped")
+    assert agent.DEFAULT_BRIGHTNESS not in ddc.writes
+
+
+def test_a_fault_waiting_when_the_run_ends_is_recorded_before_any_write(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadingDdc(read=21), poll=lambda: {},
+    )
+    runner._execute(_cal_job("read"))
+    fault.faults.append("Under-voltage detected!")
+    n = len(ddc.writes)
+    runner._finish("stopped")
+    assert runner.fault is not None and runner.fault["level"] is None
+    assert reports[-1]["status"] == "error"
+    assert 21 not in ddc.writes[n:]
+
+
+@pytest.mark.parametrize("step", ["read", "detect"])
+def test_a_fault_in_the_wait_between_panel_steps_records_no_level(tmp_path, step):
+    fault = ConsumingFault()
+    holder = {}
+
+    def poll():
+        # Once the step has reported, the owner is moving the panel by hand.
+        if any(r["status"] == "done" for r in holder["reports"]) and not holder.get("sent"):
+            holder["sent"] = True
+            fault.faults.append("Under-voltage detected!")
+        return {"displayCheck": dict(_cal_job(step), panelLevel=74)}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        step, tmp_path, level=19, ddc=ReadingDdc(read=19), fault=fault, poll=poll
+    )
+    holder["reports"] = reports
+    runner.run()
+    incident = runner.fault
+    assert incident["step"] == step
+    assert incident["level"] is None and incident["lastGood"] is None
+    assert "panelLevel" not in incident  # the typed level belongs to the earlier read
+    assert reports[-1]["status"] == "error"
+
+
+def test_a_fault_during_the_restore_is_recorded_dropped_and_capped(tmp_path):
+    fault = ConsumingFault()
+
+    def on_write(level):
+        if level == 12:
+            fault.faults.append("Under-voltage detected!")
+
+    new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21, on_write=on_write), fault=fault,
+        poll=lambda: new_cfg, cfg_over={"brightness_ramp_enabled": False},
+    )
+    runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, new_cfg)
+    runner._finish("done")
+    assert runner.fault is not None and runner.fault["level"] == 12
+    assert reports[-1]["status"] == "error"
+    assert max(ddc.writes) == 12  # never went on climbing
+    assert ddc.writes[-1] <= 5  # dropped
+    assert runner.controller.fault_ceiling is not None and runner.controller.fault_ceiling < 12
+    assert agent.brightness_target(
+        agent.brightness_settings(new_cfg), runner.controller._ceiling()
+    ) < 12  # reconcile cannot climb to the same target
+
+
+# -- calvin-rjyn re-review: an identical Save, the guards ----------------------
+def _run_ending(tmp_path, *, saved, cfg_over, ended_cfg=None):
+    """A whole run: one read, then the dialog ends it (Stop/Done/close) with `saved`."""
+    holder = {}
+    base = _ramp_cfg(**cfg_over)
+
+    def poll():
+        done = any(r["status"] == "done" for r in holder["reports"])
+        job = {**_cal_job("read", action="stop" if done else "start"), "saved": saved and done}
+        return {**(ended_cfg if done and ended_cfg else base), "displayCheck": job}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21), poll=poll, cfg_over=cfg_over
+    )
+    holder["reports"] = reports
+    runner.run()
+    return ddc
+
+
+SAME = {"brightness_ramp_enabled": False, "brightness_limit": 21, "brightness": 18}
+
+
+def test_done_after_a_save_restores_even_with_identical_values(tmp_path):
+    ddc = _run_ending(tmp_path, saved=True, cfg_over=SAME)
+    assert ddc.writes[-1] == 18
+
+
+def test_close_after_a_save_restores_too(tmp_path):
+    # X sends the same Stop-with-saved as Done: the agent cannot tell them apart.
+    ddc = _run_ending(tmp_path, saved=True, cfg_over={**SAME, "brightness": 17},
+                      ended_cfg=_ramp_cfg(**SAME))
+    assert ddc.writes[-1] == 18
+
+
+def test_a_whole_layer_write_or_changed_brightness_without_a_save_does_not_restore(tmp_path):
+    changed = _ramp_cfg(brightness_ramp_enabled=False, brightness=60, brightness_limit=None)
+    ddc = _run_ending(
+        tmp_path, saved=False, cfg_over={"brightness_ramp_enabled": False, "brightness": 40},
+        ended_cfg=changed,
+    )
+    assert max(ddc.writes, default=0) <= 5  # no 60, no 40, no default 20
+
+
+def test_display_check_job_carries_the_saved_flag():
+    assert agent.display_check_job({"displayCheck": {"id": "c1", "step": "read", "saved": True}})["saved"] is True
+    assert agent.display_check_job({"displayCheck": {"id": "c1", "step": "read"}})["saved"] is False
+
+
+def test_a_save_with_no_brightness_chosen_never_ramps_to_the_default(tmp_path):
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness=None)
+    cfg["displayCheck"] = {**_cal_job("read"), "saved": True}
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21), poll=lambda: cfg,
+        cfg_over={"brightness_ramp_enabled": False, "brightness": None},
+    )
+    runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, cfg)
+    runner._finish("stopped")
+    assert agent.DEFAULT_BRIGHTNESS not in ddc.writes
+    assert max(ddc.writes, default=0) <= 5
+
+
+def test_a_waiting_fault_is_recorded_before_the_drop_is_written(tmp_path):
+    seen = []
+    holder = {}
+
+    def on_write(level):
+        seen.append(holder["runner"].fault is not None)
+
+    ddc = ReadingDdc(read=21, on_write=on_write)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ddc, poll=lambda: {},
+    )
+    holder["runner"] = runner
+    runner._execute(_cal_job("read"))
+    seen.clear()
+    fault.faults.append("Under-voltage detected!")
+    runner._finish("stopped")
+    assert seen and seen[0] is True  # the incident existed before the first write

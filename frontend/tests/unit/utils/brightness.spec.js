@@ -69,10 +69,10 @@ describe("readingsOutlier", () => {
 
 describe("limits", () => {
   it("allows the limit itself, whatever the step", () => {
-    expect(maxPickable(26, 2)).toBe(26);
-    expect(maxPickable(26, 3)).toBe(26);
-    expect(maxPickable(null, 2)).toBe(100);
-    expect(maxPickable(3, 2)).toBe(3);
+    expect(maxPickable(26)).toBe(26);
+    expect(maxPickable(26)).toBe(26);
+    expect(maxPickable(null)).toBe(100);
+    expect(maxPickable(3)).toBe(3);
   });
   it("starts at the lower of the limit and 20", () => {
     expect(firstBrightness(26, 2)).toBe(20);
@@ -86,8 +86,8 @@ describe("limits", () => {
     expect(calibrationPoints(1)).toEqual({ first: 1, second: 0, room: false });
   });
   it("puts the optional third reading at the limit", () => {
-    expect(thirdReadingPoint(26, 2)).toBe(26);
-    expect(thirdReadingPoint(null, 2)).toBeNull();
+    expect(thirdReadingPoint(26)).toBe(26);
+    expect(thirdReadingPoint(null)).toBeNull();
   });
   it("offers the fault limit one step under the lower of the last good level and the fault", () => {
     expect(faultLimit({ level: 12, lastGood: 14 }, 2)).toBe(10);
@@ -109,6 +109,12 @@ describe("dimSeconds", () => {
 });
 
 describe("availability", () => {
+  it("a v3 run with successful reads (ddc true, no write step) makes the ramp available", () => {
+    const v3 = { checkedAt: "2026-11-07T10:00:00Z", ddc: true, writes: null, powerTrouble: null };
+    const a = availability({ displayStack: "cog" }, v3);
+    expect(a.state).toBe("ok");
+    expect(a.disabled).toBe(false);
+  });
   const found = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
   it("is available after a good check", () => {
     expect(availability({ displayStack: "cog" }, found).state).toBe("ok");

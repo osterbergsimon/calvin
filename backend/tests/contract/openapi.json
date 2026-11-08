@@ -1983,6 +1983,19 @@
             ],
             "title": "Level"
           },
+          "panelLevel": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panellevel"
+          },
           "step": {
             "anyOf": [
               {
@@ -2574,6 +2587,19 @@
         "additionalProperties": false,
         "description": "Move the active run to another step (and target value).",
         "properties": {
+          "panelLevel": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panellevel"
+          },
           "step": {
             "enum": [
               "detect",
@@ -2602,6 +2628,17 @@
           "step"
         ],
         "title": "StepRequest",
+        "type": "object"
+      },
+      "StopBody": {
+        "properties": {
+          "saved": {
+            "default": false,
+            "title": "Saved",
+            "type": "boolean"
+          }
+        },
+        "title": "StopBody",
         "type": "object"
       },
       "UpdateLinkBody": {
@@ -5361,6 +5398,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/StopBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

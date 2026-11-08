@@ -145,9 +145,13 @@ export function useDisplayCheck(kioskId) {
     }
   }
 
-  async function stop() {
+  // `saved: true` tells the backend this calibration's Save landed, so the agent
+  // restores the everyday level when the run ends. Nothing else sends it.
+  async function stop({ saved = false } = {}) {
     try {
-      const response = await api.post(path(kioskId, "/stop"));
+      const response = saved
+        ? await api.post(path(kioskId, "/stop"), { saved: true })
+        : await api.post(path(kioskId, "/stop"));
       run.value = response.data ?? run.value;
     } catch (err) {
       // 404: nothing is running any more, which is what Stop wanted.

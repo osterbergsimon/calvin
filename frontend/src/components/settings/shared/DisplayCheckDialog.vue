@@ -807,7 +807,7 @@ async function saveAll() {
 // agent reports the run finished. Taps repeat safely.
 function requestStop() {
   stopRequested.value = true;
-  return check.stop();
+  return check.stop({ saved: saved.value });
 }
 function onStopClick(event) {
   // A pointer press already asked; a keyboard click (detail 0) asks here.
@@ -1041,9 +1041,42 @@ function resetRun() {
   clearAwaiting();
 }
 
+// How long Try again waits for the old run's agent to report it ended.
+const RETRY_WAIT_MS = 20000;
+
+function whenRunEnds() {
+  return new Promise(resolve => {
+    if (!check.isActive.value) return resolve();
+    let timer = null;
+    const finish = () => {
+      clearTimeout(timer);
+      stopWatch();
+      resolve();
+    };
+    const stopWatch = watch(
+      () => check.isActive.value,
+      active => {
+        if (!active) finish();
+      }
+    );
+    timer = setTimeout(finish, RETRY_WAIT_MS);
+  });
+}
+
 async function retry() {
-  // Try again while a run is still live: end it first, or the start is refused.
-  if (check.isActive.value) await check.stop();
+  // Try again while a run is still live: end it first and wait (bounded, showing
+  // the Stopping state) until the agent reports it over, or the start is refused.
+  if (check.isActive.value) {
+    stopRequested.value = true;
+    await check.stop();
+    await whenRunEnds();
+    if (check.isActive.value) {
+      // Still not over: starting now would be refused (or move the stopping run).
+      check.error.value = "The last check is still stopping. Try again in a moment.";
+      return;
+    }
+    stopRequested.value = false;
+  }
   resetRun();
   await startDetect();
 }
@@ -1280,7 +1313,9 @@ async function onClosed() {
   clearInterval(clock);
   clock = null;
   // Closing ends our own run; a run another device started is left alone.
-  if (check.isActive.value && check.ownsRun.value) await check.stop();
+  if (check.isActive.value && check.ownsRun.value) {
+    await check.stop({ saved: saved.value });
+  }
   check.dispose();
 }
 
@@ -1307,7 +1342,7 @@ function onDialogModel(value) {
 
 // Done ends the session itself; closing the dialog any other way does too.
 async function close() {
-  if (check.isActive.value && check.ownsRun.value) await check.stop();
+  if (check.isActive.value && check.ownsRun.value) await check.stop({ saved: saved.value });
   emit("update:modelValue", false);
 }
 </script>

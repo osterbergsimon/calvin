@@ -2983,6 +2983,8 @@ export interface components {
       lastGood?: number | null;
       /** Level */
       level?: number | null;
+      /** Panellevel */
+      panelLevel?: number | null;
       /** Step */
       step?: string | null;
     };
@@ -3236,6 +3238,8 @@ export interface components {
      * @description Move the active run to another step (and target value).
      */
     StepRequest: {
+      /** Panellevel */
+      panelLevel?: number | null;
       /**
        * Step
        * @enum {string}
@@ -3243,6 +3247,14 @@ export interface components {
       step: "detect" | "write" | "conversion" | "read";
       /** Value */
       value?: number | null;
+    };
+    /** StopBody */
+    StopBody: {
+      /**
+       * Saved
+       * @default false
+       */
+      saved: boolean;
     };
     /** UpdateLinkBody */
     UpdateLinkBody: {
@@ -5210,7 +5222,11 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["StopBody"] | null;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {

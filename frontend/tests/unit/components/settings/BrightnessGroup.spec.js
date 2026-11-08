@@ -68,6 +68,49 @@ describe("BrightnessGroup rows", () => {
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
+  it("words a read-step power trouble by the panel's own buttons, not Calvin's level", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: {
+          ...FINDINGS,
+          powerTrouble: {
+            at: "2026-11-06T17:33:00Z",
+            step: "read",
+            level: null,
+            panelLevel: 74,
+            kind: "under-voltage",
+          },
+        },
+      },
+    });
+    expect(find(wrapper, "power-trouble").text()).toContain(
+      "Power trouble while set with the panel's buttons (panel 74) (6 Nov)"
+    );
+  });
+
+  it("words a fault with no panel level just as set with the panel's buttons", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: {
+          ...FINDINGS,
+          powerTrouble: {
+            at: "2026-11-06T17:33:00Z",
+            step: "read",
+            level: null,
+            kind: "under-voltage",
+          },
+        },
+      },
+    });
+    const text = find(wrapper, "power-trouble").text();
+    expect(text).toContain("Power trouble while set with the panel's buttons (6 Nov)");
+    expect(text).not.toContain("panel undefined");
+  });
+
   it("shows saved power trouble in amber with a link to the fix", () => {
     const wrapper = mountGroup({
       kiosk: {

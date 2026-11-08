@@ -234,7 +234,7 @@ describe("Screens › Power › Brightness limit safety", () => {
 
   it("clamps a stored brightness to the limit itself when a patch lowers the limit", async () => {
     const { wrapper, store } = mountScreens({
-      overrides: { brightnessRampEnabled: true, brightness: 22, brightnessLimit: 26 },
+      overrides: { brightnessRampEnabled: true, brightness: 30, brightnessLimit: 26 },
     });
     await flushPromises();
     await open(wrapper);

@@ -212,7 +212,7 @@ async def get_display_check(kiosk_id: str):
 async def _check_value_under_limit(
     kiosk_id: str, body: display_check.StartRequest | display_check.StepRequest
 ) -> None:
-    """Refuse a target above ``limit - 2 * step``: the agent's conversion step does
+    """Refuse a target above the limit (the ceiling): the agent's conversion step does
     not apply the limit itself, so 100 on a limited screen would ramp past it."""
     if body.value is None:
         return
@@ -223,10 +223,7 @@ async def _check_value_under_limit(
     saved = merged.get("brightnessLimit", merged.get("brightness_limit"))
     if not isinstance(saved, int) or isinstance(saved, bool):
         return
-    limit = saved
-    step = merged.get("brightnessStep", merged.get("brightness_step"))
-    step = step if isinstance(step, int) and not isinstance(step, bool) else 2
-    top = max(0, limit - 2 * min(max(step, 1), 5))
+    top = max(0, saved)
     if body.value > top:
         raise HTTPException(
             status_code=422,
@@ -301,12 +298,18 @@ async def change_display_check_step(kiosk_id: str, body: display_check.StepReque
         )
 
 
+class StopBody(BaseModel):
+    # True when this calibration's Save landed before the stop (Done, or close).
+    saved: bool = False
+
+
 @router.post("/kiosks/{kiosk_id}/display-check/stop")
-async def stop_display_check(kiosk_id: str):
+async def stop_display_check(kiosk_id: str, body: StopBody | None = None):
     """Ask the agent to end the active run safely (admin)."""
     _valid_id_or_400(kiosk_id)
     try:
-        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id))
+        saved = bool(body and body.saved)
+        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id, saved))
     except (display_check.UnknownKioskError, display_check.NoActiveRunError):
         raise HTTPException(status_code=404, detail="No display check is running")
 
