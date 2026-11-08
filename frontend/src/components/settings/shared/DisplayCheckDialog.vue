@@ -798,7 +798,7 @@ async function saveAll() {
     saveError.value = "Couldn't save to the server. Check the connection and try again.";
     return;
   }
-  emit("writes-ok", { rampEnabled: useOnWake.value });
+  emit("writes-ok", { rampEnabled: useOnWake.value, saved: true });
   saved.value = true;
 }
 

@@ -246,6 +246,36 @@ describe("Screens › Power › Brightness limit safety", () => {
     });
   });
 
+  it("keeps the everyday level Save sent even when a stale list row lands before the ramp step", async () => {
+    const { wrapper, store } = mountScreens({ displayCheck: null });
+    await flushPromises();
+    await open(wrapper);
+    wrapper.findComponent(BrightnessGroup).vm.$emit("open-check", {
+      step: "detect",
+      enableAfter: true,
+    });
+    await flushPromises();
+    const dialog = wrapper.findComponent(DisplayCheckDialog);
+    const saved = dialog.props("savePatch")({
+      brightnessConversion: [{ ddc: 0, menu: 0 }, { ddc: 18, menu: 60 }, { ddc: 20, menu: 63 }],
+      brightnessLimit: 20,
+      brightness: 18,
+      brightnessFloor: 0,
+      brightnessRampEnabled: true,
+    });
+    await flush();
+    await saved;
+    // a list refresh that was already in flight before Save lands now
+    store.kiosks[0].overrides = { brightnessLimit: 20, brightnessFloor: 0 };
+    await flushPromises();
+    dialog.vm.$emit("writes-ok", { rampEnabled: true, saved: true });
+    await flush();
+    await vi.advanceTimersByTimeAsync(5000);
+    await flushPromises();
+    expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({ brightness: 18 });
+    expect(store.saveOverrides.mock.calls).toHaveLength(1);
+  });
+
   it("does not turn the ramp on after a check when the wake option was unticked", async () => {
     const { wrapper, store } = mountScreens({ displayCheck: null });
     await flushPromises();

@@ -1228,6 +1228,10 @@ function onWritesOk(choice) {
   if (!enableAfterCheck.value) return;
   enableAfterCheck.value = false;
   if (choice?.rampEnabled === false) return;
+  // Save already sent the ramp with the levels in one write. Do not build a second
+  // write from the page's copy: a list refresh can land between the two and make
+  // it look like there is no everyday level yet, which then resets it to the default.
+  if (choice?.saved) return;
   const change = { brightnessRampEnabled: true };
   if (overrides.value.brightness == null) {
     change.brightness = firstBrightness(overrides.value.brightnessLimit ?? null);

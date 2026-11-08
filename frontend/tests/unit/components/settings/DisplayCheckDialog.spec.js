@@ -496,18 +496,18 @@ describe("the summary and Save", () => {
     expect(find(wrapper, "check-summary").text()).not.toContain("same scale");
   });
 
-  it("emits writes-ok before the patch so the ramp default never overwrites the everyday level", async () => {
+  it("emits writes-ok after the one write that already holds the everyday level", async () => {
     await toSummary();
     await clickPrimary(wrapper);
     expect(wrapper.emitted("writes-ok")).toHaveLength(1);
-    expect(wrapper.emitted("writes-ok")[0][0]).toEqual({ rampEnabled: true });
+    expect(wrapper.emitted("writes-ok")[0][0]).toEqual({ rampEnabled: true, saved: true });
   });
 
   it("passes the unticked wake choice on with writes-ok", async () => {
     await toSummary();
     await find(wrapper, "use-on-wake").setValue(false);
     await clickPrimary(wrapper);
-    expect(wrapper.emitted("writes-ok")[0][0]).toEqual({ rampEnabled: false });
+    expect(wrapper.emitted("writes-ok")[0][0]).toEqual({ rampEnabled: false, saved: true });
   });
 });
 
