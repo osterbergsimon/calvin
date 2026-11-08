@@ -913,7 +913,9 @@ configure_openbox_autostart() {
             echo "    --autoplay-policy=no-user-gesture-required \\"
             echo "    --disable-features=TranslateUI \\"
             echo "    --disable-ipc-flooding-protection \\"
-            echo "    ${frontend_url} &"
+            # display=kiosk tells the page this display has no tabs or back button,
+            # so links open inside Calvin (it registers no kiosk).
+            echo "    ${frontend_url%/}/?display=kiosk &"
             echo ""
         else
             echo "# Chromium is managed by systemd service (calvin-kiosk.service)"

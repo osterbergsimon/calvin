@@ -74,7 +74,7 @@ ExecStart=/bin/bash -c 'exec /usr/bin/chromium \
     --disable-background-downloads \
     --disk-cache-size=0 \
     --media-cache-size=0 \
-    "http://localhost:${CALVIN_PORT:-8000}"'
+    "http://localhost:${CALVIN_PORT:-8000}/?display=kiosk"'
 Restart=always
 RestartSec=10
 StandardOutput=journal

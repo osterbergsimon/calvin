@@ -301,6 +301,11 @@ describe("settings registry", () => {
     );
   });
 
+  it("does not advertise holiday highlighting that does not exist (calvin-awvd)", () => {
+    expect(filterSettingsDestinations("holidays")).toEqual([]);
+    expect(filterSettingsDestinations("red days")).toEqual([]);
+  });
+
   it("limits search results", () => {
     expect(filterSettingsDestinations("display", 2)).toHaveLength(2);
   });
