@@ -256,6 +256,27 @@ describe("createOptimisticQueue", () => {
       expect(save.mock.calls[1][1]).toEqual({ keepalive: false });
     });
 
+    it("settles a multi-key caller when only one of its keys is re-tapped in flight", async () => {
+      const first = deferred();
+      const save = vi
+        .fn()
+        .mockImplementationOnce(() => first.promise)
+        .mockResolvedValueOnce();
+      const queue = createOptimisticQueue({ initial: {}, save });
+      let settled = false;
+
+      const both = queue.setPartial({ x: 1, y: 1 }).then(() => (settled = true));
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS);
+      void queue.setPartial({ x: 2 });
+
+      first.resolve();
+      await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2);
+      await both;
+
+      expect(settled).toBe(true);
+      expect(save.mock.calls[1][0].changes).toEqual({ x: 2 });
+    });
+
     it("keeps a caller waiting while its key is re-tapped, until the newer value saves", async () => {
       const first = deferred();
       const save = vi

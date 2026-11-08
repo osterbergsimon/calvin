@@ -92,15 +92,20 @@ export function createOptimisticQueue({
   // flight has not had its latest value saved: it keeps waiting for the save that
   // carries it instead of resolving with the earlier one (calvin-msa8).
   const settleSent = (batchWaiters, outcome, sentVersions) => {
-    const superseded = batchWaiters.filter(waiter =>
-      [...waiter.keys].some(key => versionOf(key) !== sentVersions.get(key))
-    );
+    const superseded = [];
+    const done = [];
+    for (const waiter of batchWaiters) {
+      const retapped = [...waiter.keys].filter(key => versionOf(key) !== sentVersions.get(key));
+      if (retapped.length === 0) {
+        done.push(waiter);
+      } else {
+        // Wait only for the re-tapped keys: the next save carries just those, and
+        // a waiter naming keys it never sends would not be picked up again.
+        superseded.push({ ...waiter, keys: retapped });
+      }
+    }
     if (superseded.length > 0) waiters = [...superseded, ...waiters];
-    settle(
-      batchWaiters.filter(waiter => !superseded.includes(waiter)),
-      true,
-      outcome
-    );
+    settle(done, true, outcome);
   };
 
   const performSave = async () => {
