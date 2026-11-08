@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import sqlite3
+import time
 from datetime import datetime
 from typing import Any
 
@@ -100,24 +101,58 @@ def _normalized_wifi_power_save(value: str | None) -> str | None:
     return state if state in WIFI_POWER_SAVE_STATES else None
 
 
-# How many addresses are remembered per kiosk. A few cover a DHCP change or a
-# Wi-Fi/Ethernet switch; the cap stops one caller filling the column.
+# How many addresses are remembered per kiosk, and for how long. A few cover a
+# DHCP change or a Wi-Fi/Ethernet switch; the cap stops one caller filling the
+# column, and the lifetime keeps a stale lease from naming the wrong kiosk. A
+# live kiosk polls every few seconds, so its address is refreshed far inside it.
 _MAX_PEER_IPS = 4
+PEER_IP_TTL_S = 2 * 3600
+_PEER_IP_REFRESH_S = 15 * 60
 
 
-async def kiosk_for_peer(peer_ip: str | None) -> str | None:
-    """The kiosk whose polls came from this address, if any (calvin-q4o8).
+def _now() -> float:
+    return time.time()
+
+
+def _live_peers(raw: object, now: float) -> dict[str, float]:
+    """The stored ``{address: last seen}`` minus anything past its lifetime."""
+    if not isinstance(raw, dict):
+        return {}
+    return {
+        ip: float(seen)
+        for ip, seen in raw.items()
+        if isinstance(ip, str) and isinstance(seen, (int, float)) and now - seen <= PEER_IP_TTL_S
+    }
+
+
+def _with_peer(raw: object, peer_ip: str, now: float) -> dict[str, float] | None:
+    """The peer map after seeing ``peer_ip`` now, or ``None`` when nothing needs writing."""
+    live = _live_peers(raw, now)
+    seen = live.get(peer_ip)
+    if seen is not None and now - seen < _PEER_IP_REFRESH_S and live == raw:
+        return None
+    live[peer_ip] = now
+    newest = sorted(live.items(), key=lambda item: item[1])[-_MAX_PEER_IPS:]
+    return dict(newest)
+
+
+async def kiosk_for_peer(peer_ip: str | None, now: float | None = None) -> str | None:
+    """The kiosk whose polls most recently came from this address, if any (calvin-q4o8).
 
     Used to decide that a sign-in happens AT a kiosk. The address is the TCP
-    peer, never ``X-Forwarded-*``. A wrong match (a reused DHCP lease, a reverse
-    proxy that fronts everything) only makes a session shorter, never longer.
+    peer, never ``X-Forwarded-*``, and callers skip it for proxied requests. When
+    two kiosks have had the same address (a reused lease) the newer one wins, and
+    an address nobody has used for two hours is forgotten.
     """
     if not peer_ip:
         return None
-    for row in await KioskDB.objects.order_by("-last_seen").all():
-        if peer_ip in (row.peer_ips or []):
-            return row.id
-    return None
+    current = _now() if now is None else now
+    best: tuple[float, str] | None = None
+    for row in await KioskDB.objects.all():
+        seen = _live_peers(row.peer_ips, current).get(peer_ip)
+        if seen is not None and (best is None or seen > best[0]):
+            best = (seen, row.id)
+    return best[1] if best else None
 
 
 async def kiosk_exists(kiosk_id: str) -> bool:
@@ -196,7 +231,7 @@ async def record_kiosk(
                 viewport=viewport,
                 display_stack=display_stack,
                 wifi_power_save=wifi_power_save,
-                peer_ips=[peer_ip] if peer_ip else None,
+                peer_ips={peer_ip: _now()} if peer_ip else None,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             await _adopt_global_settings()
@@ -231,9 +266,11 @@ async def record_kiosk(
     if display_stack is not None and existing.display_stack != display_stack:
         existing.display_stack = display_stack
         changed = True
-    if peer_ip and peer_ip not in (existing.peer_ips or []):
-        existing.peer_ips = [*(existing.peer_ips or [])[-(_MAX_PEER_IPS - 1) :], peer_ip]
-        changed = True
+    if peer_ip:
+        peers = _with_peer(existing.peer_ips, peer_ip, _now())
+        if peers is not None:
+            existing.peer_ips = peers
+            changed = True
     if wifi_power_save is not None and existing.wifi_power_save != wifi_power_save:
         existing.wifi_power_save = wifi_power_save
         changed = True

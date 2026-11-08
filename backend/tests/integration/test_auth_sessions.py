@@ -15,6 +15,9 @@ COOKIE = "calvin_admin"
 
 @pytest.fixture(autouse=True)
 def _clean():
+    from app.security import admin_auth
+
+    admin_auth._kiosk_locks.clear()
     login_limiter._failures.clear()
     login_limiter._lockouts.clear()
     yield
@@ -51,7 +54,7 @@ def test_a_device_login_lasts_about_30_days(test_client: TestClient):
 
 def test_a_login_that_names_a_kiosk_gets_a_5_minute_session(test_client: TestClient):
     response = _login(test_client, kiosk="hall-1")
-    assert "Max-Age=300" in response.headers["set-cookie"]
+    assert "Max-Age=330" in response.headers["set-cookie"]
     assert _cookie_value(response).startswith("v2.k.")
 
 
@@ -61,7 +64,7 @@ def test_a_login_from_a_registered_kiosk_address_is_a_kiosk_session_even_if_it_c
     """The kiosk's own address is something a visitor at the kiosk cannot change."""
     assert test_client.get("/api/kiosks/hall-1/config?khost=pi").status_code == 200
     response = _login(test_client)  # no `kiosk` in the body: the claim was dropped
-    assert "Max-Age=300" in response.headers["set-cookie"]
+    assert "Max-Age=330" in response.headers["set-cookie"]
     assert _cookie_value(response).startswith("v2.k.")
 
 
@@ -76,13 +79,13 @@ def test_touch_keeps_a_kiosk_session_alive(test_client: TestClient):
     _hold(test_client, SessionKind.KIOSK, "hall-1", age=250)
     touched = test_client.post("/api/auth/touch")
     assert touched.status_code == 200
-    assert touched.json() == {"authenticated": True}
-    assert "Max-Age=300" in touched.headers["set-cookie"]
+    assert touched.json()["authenticated"] is True
+    assert "Max-Age=330" in touched.headers["set-cookie"]
     assert _authenticated(test_client) is True
 
 
 def test_an_idle_kiosk_session_is_gone_and_touch_cannot_revive_it(test_client: TestClient):
-    _hold(test_client, SessionKind.KIOSK, "hall-1", age=301)
+    _hold(test_client, SessionKind.KIOSK, "hall-1", age=331)
     assert _authenticated(test_client) is False
     touched = test_client.post("/api/auth/touch")
     assert touched.json() == {"authenticated": False}
@@ -132,7 +135,8 @@ def test_a_cookie_from_before_this_change_signs_out_once_without_a_loop(test_cli
     test_client.cookies.set(COOKIE, f"{issued}.{data['generation']}.{mac}")
 
     status = test_client.get("/api/auth/status")
-    assert status.json() == {"configured": True, "authenticated": False}
+    assert status.json()["configured"] is True
+    assert status.json()["authenticated"] is False
     assert "Max-Age=0" in status.headers["set-cookie"]  # cleared, so it is not sent again
 
     assert _login(test_client).status_code == 200
@@ -170,7 +174,7 @@ def test_changing_the_password_keeps_the_session_kind(test_client: TestClient):
     )
     assert response.status_code == 200
     assert _cookie_value(response).startswith("v2.k.")
-    assert "Max-Age=300" in response.headers["set-cookie"]
+    assert "Max-Age=330" in response.headers["set-cookie"]
     get_admin_store().set_password(PASSWORD)  # restore for the other tests
 
 
@@ -202,3 +206,59 @@ def test_a_loopback_caller_gets_no_admin_session_for_free(test_client: TestClien
     assert local.get("/api/auth/status").json()["authenticated"] is False
     assert local.get("/api/share/links").status_code == 401
     assert local.post("/api/calendar/sources", json={}).status_code == 401
+
+
+def _cookie_kiosk_id(response) -> str:
+    return bytes.fromhex(_cookie_value(response).split(".")[2]).decode()
+
+
+def test_an_all_in_one_kiosk_display_gets_a_kiosk_session_with_no_id(test_client: TestClient):
+    """Mode A: no kiosk id, no polls to learn an address from. The page says display=kiosk."""
+    response = _login(test_client, display="kiosk")
+    assert _cookie_value(response).startswith("v2.k.-.")
+    assert "Max-Age=330" in response.headers["set-cookie"]
+
+
+def test_the_address_signal_is_ignored_behind_a_proxy(test_client: TestClient):
+    """Behind a proxy or NAT every visitor shares the proxy's address."""
+    assert test_client.get("/api/kiosks/hall-1/config?khost=pi").status_code == 200
+    proxied = test_client.post(
+        "/api/auth/login",
+        json={"password": PASSWORD},
+        headers={"X-Forwarded-For": "192.0.2.7"},
+    )
+    assert _cookie_value(proxied).startswith("v2.d.")
+
+
+def test_a_proxied_poll_does_not_register_its_address(test_client: TestClient):
+    test_client.get("/api/kiosks/hall-2/config?khost=pi", headers={"X-Forwarded-For": "192.0.2.7"})
+    response = _login(test_client)
+    assert _cookie_value(response).startswith("v2.d.")
+
+
+def test_the_page_claim_beats_a_stale_address(test_client: TestClient):
+    assert test_client.get("/api/kiosks/hall-1/config?khost=pi").status_code == 200
+    response = _login(test_client, kiosk="den")
+    assert _cookie_kiosk_id(response) == "den"
+
+
+def test_status_says_what_kind_of_session_this_is(test_client: TestClient):
+    _login(test_client, kiosk="hall-1")
+    body = test_client.get("/api/auth/status").json()
+    assert (body["session"], body["idleSeconds"]) == ("kiosk", 300)
+    _login(test_client)  # nothing names a kiosk: a device session
+    body = test_client.get("/api/auth/status").json()
+    assert (body["session"], body["idleSeconds"]) == ("device", None)
+    test_client.cookies.clear()
+    assert test_client.get("/api/auth/status").json()["session"] is None
+
+
+def test_the_local_screen_going_to_sleep_ends_the_id_less_sessions(test_client: TestClient):
+    local = _login(test_client, display="kiosk")
+    named = get_admin_store().issue_cookie(SessionKind.KIOSK, "hall-1", now=int(time.time()) - 5)
+    time.sleep(1.1)
+    assert test_client.post("/api/screen-sleep").status_code == 200
+    test_client.cookies.set(COOKIE, _cookie_value(local))
+    assert _authenticated(test_client) is False
+    test_client.cookies.set(COOKIE, named)
+    assert _authenticated(test_client) is True

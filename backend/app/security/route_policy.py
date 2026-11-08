@@ -45,6 +45,7 @@ PUBLIC_WRITES = frozenset(
         ("POST", "/api/auth/touch"),
         # The display agent: the screen went to sleep, so end that kiosk's sessions.
         ("POST", "/api/kiosks/{kiosk_id}/screen-sleep"),
+        ("POST", "/api/screen-sleep"),
     }
 )
 
@@ -131,6 +132,25 @@ KIOSK_SELF_WRITE_KEYS = frozenset(
         "showUI",  # the dashboard's ⋯ Hide controls toggle
     }
 )
+
+
+# A local reverse proxy makes every visitor's peer its own address. A request
+# carrying any proxy header came through one (or a client tried to look like it
+# did), so its peer address says nothing about the person behind it.
+PROXY_HEADERS = (
+    "forwarded",
+    "x-forwarded-for",
+    "x-forwarded-host",
+    "x-forwarded-proto",
+    "x-real-ip",
+)
+
+
+def direct_peer_ip(request: Request) -> str | None:
+    """The TCP peer, or ``None`` when the request came through a proxy."""
+    if any(header in request.headers for header in PROXY_HEADERS):
+        return None
+    return request.client.host if request.client else None
 
 
 def bearer_secret(request: Request) -> str | None:

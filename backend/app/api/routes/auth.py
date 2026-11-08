@@ -16,11 +16,14 @@ from app.security.admin_auth import (
     PasswordTooShort,
     SessionKind,
     get_admin_store,
+    kiosk_idle_seconds,
     login_limiter,
 )
 from app.security.api_keys import MAX_NAME_LEN, DuplicateKeyName, get_api_key_store
 from app.security.route_policy import (
+    PROXY_HEADERS,
     admin_error,
+    direct_peer_ip,
     is_admin_session,
     renew_admin_cookie,
     request_api_key,
@@ -44,6 +47,9 @@ class PasswordBody(BaseModel):
     # The kiosk id when the page runs on a kiosk (?kiosk=). A claim can only make
     # the session shorter; see ``_session_for_login``.
     kiosk: str | None = None
+    # "kiosk" when the page runs on an all-in-one kiosk's own display (no kiosk
+    # id, ``?display=kiosk``). Like ``kiosk`` it can only shorten a session.
+    display: Literal["kiosk"] | None = None
 
 
 class SetupBody(BaseModel):
@@ -51,6 +57,7 @@ class SetupBody(BaseModel):
     # Required: a body without a code is a 422, before anything can be claimed.
     code: str
     kiosk: str | None = None
+    display: Literal["kiosk"] | None = None
 
 
 class ChangePasswordBody(BaseModel):
@@ -80,51 +87,47 @@ def _set_admin_cookie(response: Response, value: str, kind: SessionKind) -> None
 
 
 async def _session_for_login(
-    request: Request, claimed: str | None
+    request: Request, claimed: str | None, display: str | None = None
 ) -> tuple[SessionKind, str | None]:
     """Which kind of session a sign-in gets (calvin-q4o8).
 
     A kiosk is a wall screen anyone can walk up to, so its session is minutes. The
-    server decides, from two signals, and either one is enough:
+    server decides, from three signals, and any one is enough:
 
-    * the TCP peer address is one a kiosk's polls came from. A visitor at the
-      kiosk cannot change it from the touchscreen: it is not in the URL, the page,
-      storage or a header.
-    * the page says it is a kiosk (``kiosk`` = the ``?kiosk=`` id). A visitor could
-      lose that (a link that opens a fresh tab), which is why it is not the only signal.
+    * the page says it is a kiosk: ``kiosk`` (the ``?kiosk=`` id) or ``display``
+      (``?display=kiosk``, which an all-in-one kiosk's own display opens). This is
+      how the all-in-one kiosk, which has no kiosk id and no polls to learn an
+      address from, gets one;
+    * the TCP peer address is one a kiosk's polls came from, and was seen lately.
+      A visitor at the kiosk cannot change it from the touchscreen. It is skipped
+      for a proxied request: behind a reverse proxy or NAT the peer is the proxy
+      for every visitor, so it says nothing about the person.
 
-    Both signals can only shorten a session. Nobody gains a longer session by lying,
-    and a wrong address match (a reused DHCP lease, a proxy in front of everything)
-    just means more sign-ins. The kind is then inside the signed cookie, so it
-    cannot be edited into a longer one either.
+    All of them can only shorten a session. Nobody gains a longer session by
+    lying, and a wrong match just means more sign-ins. The kind is then inside the
+    signed cookie, so it cannot be edited into a longer one either. A page's own
+    kiosk id wins over the address: the address is only a stand-in for a page that
+    names nothing.
     """
-    peer = request.client.host if request.client else None
-    try:
-        from_address = await kiosk_registry.kiosk_for_peer(peer)
-    except Exception as exc:  # signing in must not depend on the registry being readable
-        logger.warning(
-            "Could not look up the kiosk for {}: {}; using the page's claim only", peer, exc
-        )
-        from_address = None
     claim = claimed.strip() if claimed and claimed.strip() else None
     if claim is not None and not kiosk_registry.valid_kiosk_id(claim):
         claim = "?"  # junk still means "I am a kiosk": shorter, with no id to lock
-    if from_address is not None or claim is not None:
-        kiosk_id = from_address or (None if claim == "?" else claim)
-        return SessionKind.KIOSK, kiosk_id
+    if claim is not None and claim != "?":
+        return SessionKind.KIOSK, claim
+    peer = direct_peer_ip(request)
+    from_address: str | None = None
+    if peer is not None:
+        try:
+            from_address = await kiosk_registry.kiosk_for_peer(peer)
+        except Exception as exc:  # signing in must not depend on the registry being readable
+            logger.warning(
+                "Could not look up the kiosk for {}: {}; using the page's claim only", peer, exc
+            )
+    if from_address is not None:
+        return SessionKind.KIOSK, from_address
+    if claim is not None or display == "kiosk":
+        return SessionKind.KIOSK, None
     return SessionKind.DEVICE, None
-
-
-# A local reverse proxy makes every visitor's peer loopback. If the request
-# carries any proxy header it came through (or a client tried to look like it
-# did), so it is never a trusted loopback caller.
-_PROXY_HEADERS = (
-    "forwarded",
-    "x-forwarded-for",
-    "x-forwarded-host",
-    "x-forwarded-proto",
-    "x-real-ip",
-)
 
 
 def _is_loopback(request: Request) -> bool:
@@ -134,7 +137,7 @@ def _is_loopback(request: Request) -> bool:
     rewrite ``request.client`` from ``X-Forwarded-For`` when a local proxy is
     trusted, so the header check comes first and does not depend on that.
     """
-    if any(header in request.headers for header in _PROXY_HEADERS):
+    if any(header in request.headers for header in PROXY_HEADERS):
         return False
     host = request.client.host if request.client else ""
     if not host:
@@ -162,7 +165,21 @@ async def auth_status(request: Request, response: Response):
             renew_admin_cookie(request, response)
     elif request.cookies.get(COOKIE_NAME) and request_api_key(request) is None:
         response.delete_cookie(COOKIE_NAME, path="/")
-    return {"configured": store.is_configured(), "authenticated": authenticated}
+    return {
+        "configured": store.is_configured(),
+        "authenticated": authenticated,
+        **_session_info(request),
+    }
+
+
+def _session_info(request: Request) -> dict:
+    """The caller's session kind and idle limit, which drive the page's own timer."""
+    session = get_admin_store().read_session(request.cookies.get(COOKIE_NAME))
+    if session is None or request_api_key(request) is not None:
+        return {"session": None, "idleSeconds": None}
+    if session.kind is SessionKind.KIOSK:
+        return {"session": "kiosk", "idleSeconds": kiosk_idle_seconds()}
+    return {"session": "device", "idleSeconds": None}
 
 
 @router.post("/auth/touch")
@@ -182,7 +199,7 @@ async def auth_touch(request: Request, response: Response):
     renewed = store.renew_cookie(value, force=True)
     if renewed is not None:
         _set_admin_cookie(response, renewed, session.kind)
-    return {"authenticated": True}
+    return {"authenticated": True, **_session_info(request)}
 
 
 @router.get("/auth/setup-code")
@@ -264,7 +281,7 @@ async def auth_setup(body: SetupBody, request: Request, response: Response):
     invalidate_setup_code()
     login_limiter.record_success(ip)
     logger.info("Admin password configured (first run); setup code invalidated")
-    kind, kiosk_id = await _session_for_login(request, body.kiosk)
+    kind, kiosk_id = await _session_for_login(request, body.kiosk, body.display)
     _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
     return {"ok": True}
 
@@ -287,7 +304,7 @@ async def auth_login(body: PasswordBody, request: Request, response: Response):
             detail={"code": "bad_password", "message": "Wrong admin password."},
         )
     login_limiter.record_success(ip)
-    kind, kiosk_id = await _session_for_login(request, body.kiosk)
+    kind, kiosk_id = await _session_for_login(request, body.kiosk, body.display)
     _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
     return {"ok": True}
 

@@ -2072,6 +2072,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/screen-sleep": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Local Screen Sleep
+     * @description The all-in-one kiosk's screen went to sleep: end its admin sessions.
+     *
+     *     The all-in-one display has no kiosk id; its sign-ins are id-less kiosk
+     *     sessions. Same trust as the per-kiosk route: it can only sign a screen out.
+     */
+    post: operations["local_screen_sleep_api_screen_sleep_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/security/allowed-origins": {
     parameters: {
       query?: never;
@@ -3083,6 +3106,8 @@ export interface components {
     };
     /** PasswordBody */
     PasswordBody: {
+      /** Display */
+      display?: "kiosk" | null;
       /** Kiosk */
       kiosk?: string | null;
       /** Password */
@@ -3250,6 +3275,8 @@ export interface components {
     SetupBody: {
       /** Code */
       code: string;
+      /** Display */
+      display?: "kiosk" | null;
       /** Kiosk */
       kiosk?: string | null;
       /** Password */
@@ -6502,6 +6529,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  local_screen_sleep_api_screen_sleep_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
         };
       };
     };

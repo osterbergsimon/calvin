@@ -26,6 +26,11 @@ COOKIE_NAME = "calvin_admin"
 # A kiosk is a wall screen anyone can walk up to, so its session is minutes;
 # a phone or desktop is the owner's own, so it lasts about a month.
 KIOSK_IDLE_SECONDS = 300
+# The page throttles its touches, so the server's last-use time can trail the
+# screen's by a little. The server waits this much longer than the page does,
+# so the page always signs out first and what it says is true.
+KIOSK_TOUCH_GRACE = 30
+_MIN_KIOSK_IDLE = 30
 DEVICE_SESSION_SECONDS = 30 * 24 * 3600
 # A session is only re-signed when its last use is at least this old, so an
 # ordinary burst of requests does not rewrite the cookie every time.
@@ -60,21 +65,49 @@ class Session:
 
     @property
     def idle_limit(self) -> int:
-        return KIOSK_IDLE_SECONDS if self.kind is SessionKind.KIOSK else DEVICE_SESSION_SECONDS
+        if self.kind is SessionKind.KIOSK:
+            return kiosk_idle_seconds() + KIOSK_TOUCH_GRACE
+        return DEVICE_SESSION_SECONDS
+
+
+_kiosk_idle_override: int | None = None
+
+
+def set_kiosk_idle_seconds(display_timeout: int | None) -> None:
+    """Follow the display timeout: a kiosk session never outlives the screen's sleep.
+
+    ``None`` (timeout off) restores the default. Never longer than 5 minutes, never
+    shorter than 30 seconds.
+    """
+    global _kiosk_idle_override
+    if display_timeout is None or display_timeout <= 0:
+        _kiosk_idle_override = None
+    else:
+        _kiosk_idle_override = max(_MIN_KIOSK_IDLE, min(KIOSK_IDLE_SECONDS, int(display_timeout)))
+
+
+def kiosk_idle_seconds() -> int:
+    """How long a kiosk may go without a touch before it is signed out."""
+    return _kiosk_idle_override or KIOSK_IDLE_SECONDS
 
 
 def cookie_max_age(kind: SessionKind) -> int:
     """The browser-side lifetime that matches a session kind's idle limit."""
-    return KIOSK_IDLE_SECONDS if kind is SessionKind.KIOSK else DEVICE_SESSION_SECONDS
+    if kind is SessionKind.KIOSK:
+        return kiosk_idle_seconds() + KIOSK_TOUCH_GRACE
+    return DEVICE_SESSION_SECONDS
 
 
 # kiosk id -> when its screen last went to sleep. In memory on purpose: a restart
 # loses it, but a kiosk session still lapses on its own 5-minute idle limit.
-_kiosk_locks: dict[str, int] = {}
+_kiosk_locks: dict[str | None, int] = {}
 
 
-def lock_kiosk_sessions(kiosk_id: str, now: int | None = None) -> None:
-    """End every session of this kiosk issued or used up to now (screen went to sleep)."""
+def lock_kiosk_sessions(kiosk_id: str | None, now: int | None = None) -> None:
+    """End every session of this kiosk used up to now (its screen went to sleep).
+
+    ``None`` is the all-in-one kiosk, whose page has no kiosk id.
+    """
     _kiosk_locks[kiosk_id] = int(time.time() if now is None else now)
 
 
@@ -271,7 +304,7 @@ class AdminAuthStore:
             return None
         if current_time - last_active > session.idle_limit:
             return None
-        if kind is SessionKind.KIOSK and kiosk_id is not None:
+        if kind is SessionKind.KIOSK:
             locked_at = _kiosk_locks.get(kiosk_id)
             if locked_at is not None and last_active <= locked_at:
                 return None

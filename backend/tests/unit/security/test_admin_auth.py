@@ -8,11 +8,23 @@ import pytest
 from app.security.admin_auth import (
     DEVICE_SESSION_SECONDS,
     KIOSK_IDLE_SECONDS,
+    KIOSK_TOUCH_GRACE,
     AdminAuthStore,
     PasswordTooShort,
     SessionKind,
+    kiosk_idle_seconds,
     lock_kiosk_sessions,
+    set_kiosk_idle_seconds,
 )
+
+
+@pytest.fixture(autouse=True)
+def _no_leftover_locks():
+    from app.security import admin_auth
+
+    admin_auth._kiosk_locks.clear()
+    yield
+    admin_auth._kiosk_locks.clear()
 
 
 @pytest.fixture
@@ -76,11 +88,14 @@ def test_device_session_is_renewed_while_in_use(store: AdminAuthStore):
 
 
 def test_kiosk_session_ends_after_5_minutes_without_touch(store: AdminAuthStore):
+    """The page signs out at 300 s; the server allows the touch throttle on top, so the
+    page always acts first and its message is the true one."""
     store.set_password("correct horse")
     value = store.issue_cookie(SessionKind.KIOSK, "hall", now=1000)
     assert KIOSK_IDLE_SECONDS == 300
-    assert store.verify_cookie(value, now=1000 + 300) is True
-    assert store.verify_cookie(value, now=1000 + 301) is False
+    limit = KIOSK_IDLE_SECONDS + KIOSK_TOUCH_GRACE
+    assert store.verify_cookie(value, now=1000 + limit) is True
+    assert store.verify_cookie(value, now=1000 + limit + 1) is False
 
 
 def test_kiosk_session_is_renewed_by_touch_but_not_once_idle(store: AdminAuthStore):
@@ -90,7 +105,7 @@ def test_kiosk_session_is_renewed_by_touch_but_not_once_idle(store: AdminAuthSto
     assert touched is not None
     assert store.verify_cookie(touched, now=1250 + 300) is True
     # A cookie that already went idle cannot be revived by a late touch.
-    assert store.renew_cookie(value, now=1000 + 301) is None
+    assert store.renew_cookie(value, now=1000 + 400) is None
 
 
 def test_session_kind_cannot_be_edited_into_a_longer_one(store: AdminAuthStore):
@@ -159,3 +174,32 @@ def test_reset_deletes_file_and_kills_cookies(store: AdminAuthStore):
     assert store.path.exists() is False
     assert store.is_configured() is False
     assert store.verify_cookie(cookie) is False
+
+
+def test_a_sleep_with_no_kiosk_id_ends_the_id_less_sessions_only(store: AdminAuthStore):
+    """An all-in-one kiosk has no kiosk id; its sleep must still end its sessions."""
+    store.set_password("correct horse")
+    local = store.issue_cookie(SessionKind.KIOSK, None, now=1000)
+    hall = store.issue_cookie(SessionKind.KIOSK, "hall", now=1000)
+    lock_kiosk_sessions(None, now=1100)
+    assert store.verify_cookie(local, now=1101) is False
+    assert store.verify_cookie(hall, now=1101) is True
+
+
+def test_a_display_timeout_shortens_the_kiosk_idle_limit(store: AdminAuthStore):
+    """The screen sleeps after the display timeout; a session must not outlive that."""
+    store.set_password("correct horse")
+    try:
+        assert kiosk_idle_seconds() == 300
+        set_kiosk_idle_seconds(90)
+        assert kiosk_idle_seconds() == 90
+        value = store.issue_cookie(SessionKind.KIOSK, "hall", now=1000)
+        assert store.verify_cookie(value, now=1000 + 90 + KIOSK_TOUCH_GRACE) is True
+        assert store.verify_cookie(value, now=1000 + 90 + KIOSK_TOUCH_GRACE + 1) is False
+        set_kiosk_idle_seconds(10)  # never below 30 s, or the screen would be unusable
+        assert kiosk_idle_seconds() == 30
+        set_kiosk_idle_seconds(3600)  # a longer timeout never lengthens the limit
+        assert kiosk_idle_seconds() == 300
+    finally:
+        set_kiosk_idle_seconds(None)
+    assert kiosk_idle_seconds() == 300

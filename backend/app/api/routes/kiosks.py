@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
 from app.security.admin_auth import lock_kiosk_sessions
-from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, is_admin
+from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, direct_peer_ip, is_admin
 from app.services import display_check, kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
@@ -457,6 +457,18 @@ async def kiosk_screen_sleep(kiosk_id: str):
     return {"ok": True}
 
 
+@router.post("/screen-sleep")
+async def local_screen_sleep():
+    """The all-in-one kiosk's screen went to sleep: end its admin sessions.
+
+    The all-in-one display has no kiosk id; its sign-ins are id-less kiosk
+    sessions. Same trust as the per-kiosk route: it can only sign a screen out.
+    """
+    lock_kiosk_sessions(None)
+    logger.info("Local screen asleep: its admin sessions ended")
+    return {"ok": True}
+
+
 @router.get("/kiosks/{kiosk_id}/config")
 async def get_kiosk_config(
     kiosk_id: str,
@@ -503,7 +515,7 @@ async def get_kiosk_config(
                 viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
                 display_stack=kstack,
                 wifi_power_save=kwifi,
-                peer_ip=request.client.host if request.client else None,
+                peer_ip=direct_peer_ip(request),
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
