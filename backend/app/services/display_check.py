@@ -323,7 +323,14 @@ def _iso(dt: datetime) -> str:
 
 
 def _expires_at(run: dict) -> datetime:
-    return as_utc(datetime.fromisoformat(run["requestedAt"])) + RUN_TTL
+    """Ten minutes from pickup, or from the request while nobody has picked it up.
+
+    The agent's own deadline starts when it picks the run up, so counting from the
+    request would time a late pickup out while the agent still works (calvin-8ck0).
+    A request no agent ever takes still lapses ten minutes after it was made.
+    """
+    started = run.get("pickedUpAt") or run["requestedAt"]
+    return as_utc(datetime.fromisoformat(started)) + RUN_TTL
 
 
 def _view(run: dict | None) -> dict | None:
@@ -650,6 +657,8 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
         return
 
+    if not run.get("pickedUpAt"):
+        run["pickedUpAt"] = now  # the agent has the run: its ten minutes start here
     current_seq = run.get("seq")
     if (
         status in ("running", "done", "error")

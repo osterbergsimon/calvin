@@ -1700,6 +1700,36 @@ class DisplayCheckRunner:
             cap = min(cap, ceiling)
         return cap
 
+    def _recap(self, job):
+        """A limit lowered while a step is offered: bring a level above it back down.
+
+        The ceiling arrives with every poll. The check never brightens, but a level it
+        already set can sit above a limit the owner has since lowered (calvin-8ck0).
+        Returns True when the run must end (a fault or a write that did not take).
+        """
+        ceiling = job.get("ceiling")
+        if (
+            ceiling is None
+            or self.current_step not in ("write", "conversion")
+            or not self._level_known
+            or self.level <= ceiling
+        ):
+            return False
+        self._entry(f"limit lowered to {ceiling}: bringing the level down from {self.level}")
+        outcome = self._calibration_ramp(ceiling, cancel_missing=False)
+        if outcome.get("fault"):
+            self._calibration_fault(
+                self.current_step, outcome["fault_level"], outcome["last_good"], [outcome["fault"]]
+            )
+            self._stop_reason = None
+            return True
+        if outcome.get("write_failed"):
+            self._entry("brightness writes did not take effect")
+            self._stop_reason = "error"
+            return True
+        self.report(self._payload("running", level=self.level))
+        return False
+
     def _calibration_ramp(self, target, *, cancel_missing=True):
         """A calibration ramp: any fault stops it where it is."""
         return self._ramp(target, cancel_missing=cancel_missing, stop_on_fault=True)
@@ -2143,6 +2173,10 @@ class DisplayCheckRunner:
                     if _job_signature(nxt) != signature:
                         current = nxt
                         break
+                    if self._recap(nxt):
+                        status = self._stop_reason or "error"
+                        self._stop_reason = None
+                        return self._finish(status)
                     self._pending_fault = self._sleep_watching(
                         DISPLAY_CHECK_POLL_SECONDS, current["step"] in CALIBRATION_STEPS
                     )
