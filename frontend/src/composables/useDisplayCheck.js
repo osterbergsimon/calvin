@@ -149,8 +149,13 @@ export function useDisplayCheck(kioskId) {
   // restores the everyday level when the run ends. Nothing else sends it.
   async function stop({ saved = false } = {}) {
     try {
-      const response = saved
-        ? await api.post(path(kioskId, "/stop"), { saved: true })
+      // The run id makes a late stop harmless: the backend ignores it when
+      // another run has become the active one (calvin-hn1e).
+      const body = {};
+      if (run.value?.id) body.runId = run.value.id;
+      if (saved) body.saved = true;
+      const response = Object.keys(body).length
+        ? await api.post(path(kioskId, "/stop"), body)
         : await api.post(path(kioskId, "/stop"));
       run.value = response.data ?? run.value;
     } catch (err) {

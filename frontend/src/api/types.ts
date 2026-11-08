@@ -3252,6 +3252,8 @@ export interface components {
     };
     /** StopBody */
     StopBody: {
+      /** Runid */
+      runId?: string | null;
       /**
        * Saved
        * @default false

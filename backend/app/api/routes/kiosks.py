@@ -301,6 +301,9 @@ async def change_display_check_step(kiosk_id: str, body: display_check.StepReque
 class StopBody(BaseModel):
     # True when this calibration's Save landed before the stop (Done, or close).
     saved: bool = False
+    # The run this stop is for (calvin-hn1e). Omitted by older callers: then the
+    # active run is stopped. A different id is ignored.
+    runId: str | None = None  # noqa: N815 - wire name, like the other display-check bodies
 
 
 @router.post("/kiosks/{kiosk_id}/display-check/stop")
@@ -309,7 +312,10 @@ async def stop_display_check(kiosk_id: str, body: StopBody | None = None):
     _valid_id_or_400(kiosk_id)
     try:
         saved = bool(body and body.saved)
-        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id, saved))
+        return await _ceilinged(
+            kiosk_id,
+            await display_check.stop_run(kiosk_id, saved, body.runId if body else None),
+        )
     except (display_check.UnknownKioskError, display_check.NoActiveRunError):
         raise HTTPException(status_code=404, detail="No display check is running")
 

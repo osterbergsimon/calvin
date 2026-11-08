@@ -2647,6 +2647,17 @@
       },
       "StopBody": {
         "properties": {
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
           "saved": {
             "default": false,
             "title": "Saved",

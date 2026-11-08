@@ -110,7 +110,10 @@ describe("useDisplayCheck", () => {
     const check = make();
     await check.load();
     await check.stop();
-    expect(api.post).toHaveBeenCalledWith("/kiosks/kitchen/display-check/stop");
+    // It names the run it means, so a late stop cannot hit a later run (calvin-hn1e).
+    expect(api.post).toHaveBeenCalledWith("/kiosks/kitchen/display-check/stop", {
+      runId: "elsewhere",
+    });
   });
 
   it("stop ignores a 404 (the run already ended)", async () => {
