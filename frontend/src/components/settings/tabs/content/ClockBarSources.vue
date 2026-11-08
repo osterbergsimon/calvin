@@ -84,10 +84,11 @@ const isClockBarShown = instance => {
   return value === true || value === 1;
 };
 
+// Every service plugin that declares a clock-bar tile, including those that also
+// have a page (calvin-shsj): a source with both shows here and under Web pages &
+// apps, one instance with one state.
 const clockPlugins = computed(() =>
-  plugins.value.filter(
-    plugin => plugin.type === "service" && !!plugin.statusbar_schema && !plugin.display_schema
-  )
+  plugins.value.filter(plugin => plugin.type === "service" && !!plugin.statusbar_schema)
 );
 
 const rows = computed(() =>

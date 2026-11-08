@@ -97,8 +97,8 @@ const matchesKind = plugin => {
   if (props.kind === "calendar") return plugin.type === "calendar";
   if (props.kind === "photos") return plugin.type === "image";
   if (props.kind === "services") return plugin.type === "service" && !!plugin.display_schema;
-  // Clock-bar-only services have a tile and no page of their own (§3.1).
-  return plugin.type === "service" && !!plugin.statusbar_schema && !plugin.display_schema;
+  // Any service with a clock-bar tile, with or without a page (§3.1, calvin-shsj).
+  return plugin.type === "service" && !!plugin.statusbar_schema;
 };
 
 const pluginProviders = computed(() =>

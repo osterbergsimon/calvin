@@ -70,6 +70,30 @@ describe("Clock bar info section", () => {
     expect(w.find(".sl-row").text()).toContain("In the clock bar");
   });
 
+  it("also lists sources of a plugin that has both a page and a clock-bar tile (calvin-shsj)", async () => {
+    pluginsRef.value = [
+      weather,
+      {
+        id: "sl_departures",
+        name: "SL departures",
+        type: "service",
+        enabled: true,
+        display_schema: { kind: "item-list" },
+        statusbar_schema: { kind: "status" },
+      },
+      { id: "mealie", name: "Mealie", type: "service", enabled: true, display_schema: {} },
+    ];
+    instancesRef.value = {
+      sl_departures: [{ id: "sl1", name: "Home stop", config: {} }],
+      mealie: [{ id: "m1", name: "Menu", config: {} }],
+    };
+    const w = await mountSection();
+
+    const text = w.findAll(".sl-row").map(r => r.text());
+    expect(text).toHaveLength(1);
+    expect(text[0]).toContain("Home stop");
+  });
+
   it("opens the add flow when Clock bar items links here to add the first tile", async () => {
     route.query = { setting: "content-clock-bar", add: "clock" };
     await mountSection();

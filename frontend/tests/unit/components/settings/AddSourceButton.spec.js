@@ -145,7 +145,7 @@ describe("AddSourceButton provider picker", () => {
     expect(w.emitted("upload")?.length).toBe(1);
   });
 
-  it("lists only clock-bar-only services for clock bar info", async () => {
+  it("lists every service with a clock-bar tile for clock bar info, page or not (calvin-shsj)", async () => {
     pluginsRef.value = [
       service({
         id: "weather",
@@ -154,13 +154,19 @@ describe("AddSourceButton provider picker", () => {
         statusbar_schema: { kind: "status" },
       }),
       iframe,
+      service({
+        id: "sl_departures",
+        name: "SL departures",
+        display_schema: { kind: "item-list" },
+        statusbar_schema: { kind: "status" },
+      }),
     ];
     const w = await mountButton({ kind: "clock" });
     w.vm.open();
     await flushPromises();
 
     const providers = w.findComponent({ name: "ProviderPicker" }).props("providers");
-    expect(providers.map(p => p.id)).toEqual(["weather"]);
+    expect(providers.map(p => p.id).sort()).toEqual(["sl_departures", "weather"]);
   });
 
   it("deep-links to Plugins › Install with the kind filter", async () => {

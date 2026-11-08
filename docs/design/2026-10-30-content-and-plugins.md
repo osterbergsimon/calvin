@@ -47,9 +47,11 @@ Content sections become one per thing you see, in this order:
 2. **Photos**: photo sources (Local photos with **Add photos** upload, Immich, …) + the photo rows (Show each photo
    for, Fit photos, Shuffle, Photo frame when idle).
 3. **Web pages & apps**: every service source (iframe pages, Mealie, Home Assistant cards, …).
-4. **Clock bar info**: sources whose plugin only has a clock-bar tile (weather, …). The Dashboard › Clock bar items
-   list stays as the *show/hide and order* control and links here for adding. (A service source with both a page
-   and a tile lists under Web pages & apps, and its tile shows in Clock bar items.)
+4. **Clock bar info**: every source whose plugin has a clock-bar tile (weather, departures, …), whether or not the
+   plugin also has a page. The Dashboard › Clock bar items list stays as the *show/hide and order* control and links
+   here for adding. (A service source with both a page and a tile lists under Web pages & apps **and** here: one
+   instance, one state, and its tile also shows in Clock bar items. Only a plugin with a tile and no page is filed
+   under the "Clock bar" kind in Plugins.)
 
 **Every section has the same list** (mock P1), built as one component, `SourceList.vue`, for all four:
 - A row per source:
