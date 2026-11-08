@@ -324,3 +324,56 @@ async def test_the_toggle_clears_the_reason_when_it_turns_the_type_on(test_clien
     row = await _row()
     assert row.enabled is True
     assert row.error_message is None
+
+
+# --- calvin-7xxf: the recorded reason must not outlive sealed mode ----------------------------
+
+
+async def _blocked_type():
+    from app.plugins.registry.enable_policy import SEALED_REASON
+
+    await _off_type()
+    row = await _row()
+    row.error_message = SEALED_REASON
+    await row.save_with_timestamp()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_a_refresh_after_sealed_mode_went_off_drops_the_reason():
+    """keeps_reason used to ignore the current sealed state."""
+    await _blocked_type()
+    with (
+        patch("app.plugins.registry.loader.plugin_loader") as loader,
+        patch(SEALED, new=AsyncMock(return_value=False)),
+    ):
+        loader.get_plugin_types.return_value = [_meta(["cast.example.com"])]
+        await load_plugin_types()
+    row = await _row()
+    assert row.error_message is None
+    assert row.enabled is False  # still off: unsealing never switches a plugin on by itself
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_turning_sealed_mode_off_clears_the_reason_at_once(test_client):
+    await _blocked_type()
+    assert (
+        test_client.put("/api/security/sealed-mode", json={"sealed_mode": False}).status_code == 200
+    )
+    row = await _row()
+    assert row.error_message is None
+    assert row.enabled is False
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_turning_sealed_mode_on_leaves_other_errors_alone(test_client):
+    await _off_type()
+    row = await _row()
+    row.error_message = "ImportError: boom"
+    await row.save_with_timestamp()
+    assert (
+        test_client.put("/api/security/sealed-mode", json={"sealed_mode": False}).status_code == 200
+    )
+    assert (await _row()).error_message == "ImportError: boom"

@@ -81,7 +81,7 @@ async def load_plugin_types() -> None:
                     db_type.plugin_type = plugin_type_value
                     # Clear error message on successful load, except the recorded
                     # reason a type was left off (sealed mode)
-                    if not keeps_reason(db_type):
+                    if not await keeps_reason(db_type):
                         db_type.error_message = None
                     await db_type.save_with_timestamp()
 
@@ -179,7 +179,7 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
             existing_schema = db_type.common_config_schema or {}
             db_type.common_config_schema = {**metadata_schema, **existing_schema}
             db_type.plugin_type = plugin_type_value
-            if not keeps_reason(db_type):
+            if not await keeps_reason(db_type):
                 db_type.error_message = None
             await db_type.save_with_timestamp()
 
