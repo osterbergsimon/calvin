@@ -423,10 +423,11 @@ the frontend slider/clamp). A `read` step's `panelLevel` (optional, 0-100: the l
 buttons) is carried in the job and the run view; a fault during a read step records `level: null` and that
 `panelLevel`. A successful `read` sets `findings.ddc` to true. After a run that took readings ends without power
 trouble, the agent ramps once from 0 to the saved everyday brightness (capped by the new ceiling, even with the ramp
-off), after waiting a bounded few config polls for the one that carries the saved values.
+off), when the stop that ended the run says the Save landed.
 
-The restore runs only when the config poll shows this calibration's values were saved (brightness, limit or floor
-differ from what the run started with); otherwise a run's end after readings only drops (one write, no default and no
-old saved level). The drop is written first, the wait for the saved config is short (at most 6 s), and a power fault
+The restore runs only on an explicit signal: `POST /display-check/stop` with `{"saved": true}` (sent by the dialog's
+Done, Stop or close after its Save landed) sets `run.saved`, which the config poll carries as `job.saved`. Changed or
+identical config values, and any overrides write from another device, prove nothing. Without the flag a run's end after
+readings only drops (one write; no default and no old saved level). The drop is written first, and a power fault
 anywhere in that window, or during the restore ramp, is recorded, the screen dropped and the ceiling held below it. A
 fault while waiting for the owner's next panel step (`read`, `detect`) records no level and no `panelLevel`.
