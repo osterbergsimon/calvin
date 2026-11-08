@@ -78,10 +78,10 @@ const { clampStyle, shadeClass } = useFitScroll(gridEl, {
   data: () => props.data,
 });
 
-// A region's card-size control sets --card-pad (styles/cardSizeScale.js); the
-// card block owns its inset otherwise. This is the one geometry a plugin panel
-// may override, so it stays an inline var rather than a local card style.
-const cardPadStyle = { padding: "var(--card-pad, var(--gap-4))" };
+// A region's card-size control sets --card-pad and --card-fs (styles/cardSizeScale.js);
+// the card block owns its inset and text size otherwise. This is the one geometry a
+// plugin panel may override, so it stays an inline var rather than a local card style.
+const cardPadStyle = { padding: "var(--card-pad, var(--gap-4))", fontSize: "var(--card-fs, 1em)" };
 
 const itemLinkAction = computed(() => itemSpec().link_action);
 

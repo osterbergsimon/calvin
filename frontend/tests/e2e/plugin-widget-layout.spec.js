@@ -202,3 +202,36 @@ test.describe("link behavior reaches a tapped Mealie item", () => {
     });
   }
 });
+
+test.describe("Card size steps are all visible", () => {
+  // At a region wider than its cards every step leaves the card width alone, so
+  // the text size must be what changes.
+  test.use({ viewport: { width: 2560, height: 1440 } });
+
+  test("each size step changes the card text, padding and never the default", async ({ page }) => {
+    const sizes = ["xsmall", "small", "medium", "large", "xlarge"];
+    const seen = [];
+    for (const cardSize of sizes) {
+      await openWidget(page, "mealie", "large", { view: { cardSize } });
+      seen.push(
+        await page
+          .locator(".card-grid__card")
+          .first()
+          .evaluate(card => ({
+            text: parseFloat(
+              getComputedStyle(card.querySelector(".card-grid__item-value")).fontSize
+            ),
+            pad: parseFloat(getComputedStyle(card).paddingTop),
+          }))
+      );
+    }
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i].text, `${sizes[i]} text is larger than ${sizes[i - 1]}`).toBeGreaterThan(
+        seen[i - 1].text
+      );
+      expect(seen[i].pad, `${sizes[i]} padding is larger than ${sizes[i - 1]}`).toBeGreaterThan(
+        seen[i - 1].pad
+      );
+    }
+  });
+});

@@ -8,12 +8,24 @@ describe("cardSizeScale", () => {
   });
 
   it("medium is the current-default no-op (220px / 1rem)", () => {
-    expect(cardSizeVars("medium")).toEqual({ "--card-min": "220px", "--card-pad": "1rem" });
+    expect(cardSizeVars("medium")).toEqual({
+      "--card-min": "220px",
+      "--card-pad": "1rem",
+      "--card-fs": "1em",
+    });
   });
 
   it("returns min-width + padding for each size", () => {
-    expect(cardSizeVars("xsmall")).toEqual({ "--card-min": "160px", "--card-pad": "0.6rem" });
-    expect(cardSizeVars("xlarge")).toEqual({ "--card-min": "300px", "--card-pad": "1.4rem" });
+    expect(cardSizeVars("xsmall")).toEqual({
+      "--card-min": "160px",
+      "--card-pad": "0.6rem",
+      "--card-fs": "0.8em",
+    });
+    expect(cardSizeVars("xlarge")).toEqual({
+      "--card-min": "300px",
+      "--card-pad": "1.4rem",
+      "--card-fs": "1.25em",
+    });
   });
 
   it("falls back to medium for unknown input", () => {
