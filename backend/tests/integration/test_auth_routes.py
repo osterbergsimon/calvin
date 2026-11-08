@@ -165,4 +165,4 @@ def test_cookie_attributes(test_client):
     assert "httponly" in header
     assert "samesite=strict" in header
     assert "path=/" in header
-    assert "max-age=34560000" in header
+    assert "max-age=2592000" in header  # a device session: 30 days (calvin-q4o8)
