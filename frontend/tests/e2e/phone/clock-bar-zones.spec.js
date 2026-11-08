@@ -268,3 +268,20 @@ for (const scenario of SCENARIOS) {
     });
   }
 }
+
+// The departure time is what people read: where the owner's two tiles fit, the
+// SL value is whole and only the name gives way (calvin-r7lb).
+test.describe("owner tiles keep their values whole", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("editor preview, top/bottom bar, landscape", async ({ page }) => {
+    await installApiMock(page, { overrides: tileOverrides(ALL_TILES.slice(0, 2)) });
+    const editor = await openEditor(page, { shape: "horizontal", orientation: "landscape" });
+    const cut = await editor
+      .locator(".clock-bar-horizontal .status__cell-value")
+      .evaluateAll(els =>
+        els.filter(el => el.scrollWidth > el.clientWidth + 1).map(el => el.textContent.trim())
+      );
+    expect(cut).toEqual([]);
+  });
+});

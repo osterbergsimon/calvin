@@ -136,6 +136,8 @@ onMounted(() => {
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, max-content);
   align-items: center;
+  /* Tiles in a row never run together ("176·9'YR 2°"). */
+  column-gap: var(--gap-inline);
   /* The tiles are the part of a bar that gives way: they shrink (their names
      truncate) instead of running over the zone beside them (calvin-r7lb). */
   min-width: 0;
@@ -145,6 +147,7 @@ onMounted(() => {
 
 .plugin-statusbar-items.orientation-vertical {
   overflow: visible;
+  column-gap: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;

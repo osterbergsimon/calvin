@@ -161,7 +161,7 @@ function readoutClass(item) {
 
 .status__cell-label {
   min-width: 0;
-  flex: 0 8 auto;
+  flex: 0 9999 auto;
   overflow: hidden;
 }
 
