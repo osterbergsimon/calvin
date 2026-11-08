@@ -1243,6 +1243,8 @@ def display_check_job(cfg):
         "seq": _as_int(raw.get("seq")),
         # What the owner typed from the panel's own buttons for a read step.
         "panelLevel": _as_int(raw.get("panelLevel")),
+        # The backend saw a brightness Save during this run (even identical values).
+        "saved": _as_bool(raw.get("saved"), False),
     }
     return job
 
@@ -1397,6 +1399,7 @@ class DisplayCheckRunner:
         # What the config held when the run began: the restore at the end runs
         # only once a poll shows different saved values (this run's Save).
         self._start_saved = _saved_values(brightness_settings(cfg))
+        self._job_saved = bool(job.get("saved"))  # the backend flagged a Save
         self._placeholder = None
         self.limit = None  # kept in the payload (null): v3 finds no limit
         self.last_write = None  # the level this run last wrote (None: none yet)
@@ -1471,6 +1474,7 @@ class DisplayCheckRunner:
             return False
         self.live_settings = brightness_settings(cfg)
         job = display_check_job(cfg)
+        self._note_job(job)
         if job is not None and job["id"] == self.job["id"]:
             if job["action"] == "stop":
                 self._stop_reason = "stopped"
@@ -1847,6 +1851,14 @@ class DisplayCheckRunner:
         start = self._start_level()
         return CHECK_FLOOR if start is None else start
 
+    def _note_job(self, job):
+        """Remember a Save flag the backend put on this run's job."""
+        if job is not None and job.get("id") == self.job["id"] and job.get("saved"):
+            self._job_saved = True
+
+    def _was_saved(self):
+        return self._job_saved or _saved_values(self.live_settings) != self._start_saved
+
     def _saved_by_now(self):
         """True once a config poll shows this calibration's Save landed.
 
@@ -1861,7 +1873,7 @@ class DisplayCheckRunner:
                 self._calibration_fault(self.current_step or "read", None, None, lines)
                 self._stop_reason = None
                 return False
-            if _saved_values(self.live_settings) != self._start_saved:
+            if self._was_saved():
                 return True
             if self.poll is None or self.clock() - begin >= RESTORE_WAIT_SECONDS:
                 break
@@ -1871,7 +1883,8 @@ class DisplayCheckRunner:
                 cfg = None
             if cfg is not None:
                 self.live_settings = brightness_settings(cfg)
-                if _saved_values(self.live_settings) != self._start_saved:
+                self._note_job(display_check_job(cfg))
+                if self._was_saved():
                     return True
             if attempt + 1 < RESTORE_CONFIG_POLLS:
                 self.sleep(DISPLAY_CHECK_POLL_SECONDS)
@@ -2023,6 +2036,7 @@ class DisplayCheckRunner:
                         continue
                     self.live_settings = brightness_settings(cfg)
                     nxt = display_check_job(cfg)
+                    self._note_job(nxt)
                     if nxt is None or nxt["id"] != self.job["id"]:
                         return self._finish("done")
                     if nxt["action"] == "stop":

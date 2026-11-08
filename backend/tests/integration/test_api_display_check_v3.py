@@ -219,3 +219,30 @@ def test_a_late_result_for_an_older_seq_is_not_filed_as_the_current_step(
     # The current seq still files normally.
     _report(test_client, run["id"], "done", level=10, seq=2)
     assert test_client.get(BASE).json()["run"]["steps"]["conversion"]["seq"] == 2
+
+
+@pytest.mark.integration
+def test_a_brightness_save_during_a_run_marks_the_job_saved(test_client: TestClient, kiosk):
+    def job():
+        return test_client.get(f"/api/kiosks/{KIOSK}/config").json()["displayCheck"]
+
+    _start(test_client, "detect")
+    assert job()["saved"] is False
+    # an unrelated write is not the run's Save
+    assert test_client.put(OVERRIDES, json={"overrides": {"theme": "dark"}}).status_code == 200
+    assert job()["saved"] is False
+    # the same values as before still count: the dialog wrote them
+    assert (
+        test_client.put(
+            OVERRIDES, json={"overrides": {"brightness": 18, "brightnessLimit": 21}}
+        ).status_code
+        == 200
+    )
+    assert job()["saved"] is True
+
+
+@pytest.mark.integration
+def test_a_brightness_patch_during_a_run_marks_the_job_saved(test_client: TestClient, kiosk):
+    _start(test_client, "detect")
+    test_client.patch(OVERRIDES, json={"overrides": {"brightnessFloor": 0}})
+    assert test_client.get(f"/api/kiosks/{KIOSK}/config").json()["displayCheck"]["saved"] is True

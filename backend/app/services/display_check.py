@@ -345,6 +345,9 @@ def job_for_config(run: dict | None, settings: dict | None = None) -> dict | Non
         # Bumped by every step request, so a repeated step is a new job.
         "seq": view["seq"],
         "panelLevel": view["panelLevel"],
+        # True once the owner saved brightness values during this run (even the
+        # same ones as before): the agent's end-of-run restore trusts it.
+        "saved": bool(view.get("saved")),
         # What this job's value may reach (calibration never brightens).
         "ceiling": ceiling_for(view, settings),
     }
@@ -522,6 +525,33 @@ async def stop_run(kiosk_id: str) -> dict:
     await _save(row, run)
     logger.info(f"Display check {run['id']} stop requested for {kiosk_id!r}")
     return _view(run)  # type: ignore[return-value]
+
+
+SAVE_KEYS = frozenset(
+    {
+        "brightness",
+        "brightnessLimit",
+        "brightness_limit",
+        "brightnessFloor",
+        "brightness_floor",
+    }
+)
+
+
+@_serialised
+async def note_save(kiosk_id: str, keys: Any) -> None:
+    """An overrides write carrying brightness keys during an active run is its Save."""
+    if not SAVE_KEYS.intersection(keys):
+        return
+    row = await _row(kiosk_id)
+    if row is None:
+        return
+    current = _view(row.display_check)
+    if not current or not current["active"]:
+        return
+    run = dict(row.display_check)
+    run["saved"] = True
+    await _save(row, run)
 
 
 @_serialised

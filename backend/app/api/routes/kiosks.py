@@ -60,6 +60,9 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
     _checked_overrides(body.overrides)
     await set_overrides(kiosk_id, body.overrides)
+    # The dialog's Save writes the whole layer (PUT): brightness keys in it, while
+    # a run is active, are that run's Save, even when the values are unchanged.
+    await display_check.note_save(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": body.overrides}
 
 
@@ -129,6 +132,7 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
     merged = await merge_into_overrides(kiosk_id, body.overrides)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    await display_check.note_save(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": merged}
 
 

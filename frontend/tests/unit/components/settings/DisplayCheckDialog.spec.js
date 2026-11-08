@@ -971,6 +971,35 @@ describe("Back and Remove", () => {
   });
 });
 
+describe("Try again during a live run", () => {
+  it("waits, saying Stopping, until the old run ends, then starts once", async () => {
+    await toStep3();
+    const starts = posts("start").length;
+    backend.stopKeepsActive = true;
+    const pending = wrapper.vm.retry();
+    await flushPromises();
+    expect(posts("stop")).toHaveLength(1);
+    expect(posts("start")).toHaveLength(starts); // not while the agent is still stopping
+    expect(status(wrapper)).toContain("Stopping, bringing brightness down");
+    agent({ status: "stopped" });
+    await settle();
+    await pending;
+    await flushPromises();
+    expect(posts("start")).toHaveLength(starts + 1);
+  });
+
+  it("gives up after a bounded wait and says so when the old run never reports", async () => {
+    await toStep3();
+    const starts = posts("start").length;
+    backend.stopKeepsActive = true;
+    const pending = wrapper.vm.retry();
+    await settle(21000);
+    await pending;
+    expect(posts("start")).toHaveLength(starts);
+    expect(wrapper.text()).toContain("still stopping");
+  });
+});
+
 describe("Stop", () => {
   it("shows the pressed state on pointerdown, before anything comes back", async () => {
     await toStep2();

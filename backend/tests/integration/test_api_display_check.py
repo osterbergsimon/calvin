@@ -75,6 +75,7 @@ def test_start_offers_the_job_on_the_config_poll(test_client: TestClient, kiosk)
         "brightness": 15,
         "ceiling": None,
         "panelLevel": None,
+        "saved": False,
         "seq": 0,
     }
     assert after.json()["display_check"] == job
@@ -194,6 +195,7 @@ def test_step_change_re_offers_the_job_with_the_new_step_and_value(test_client: 
         "brightness": 15,
         "ceiling": None,
         "panelLevel": None,
+        "saved": False,
         "seq": 1,
     }
     # A step with no value drops the old one.

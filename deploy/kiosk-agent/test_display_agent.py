@@ -3083,6 +3083,7 @@ def test_display_check_job_parses_the_proposed_config_shape():
         "ceiling": None,
         "seq": None,
         "panelLevel": None,
+        "saved": False,
     }
     assert agent.display_check_job({"display_check": {"id": "x", "step": "limit"}})[
         "step"
@@ -4822,3 +4823,69 @@ def test_a_fault_during_the_restore_is_recorded_dropped_and_capped(tmp_path):
     assert agent.brightness_target(
         agent.brightness_settings(new_cfg), runner.controller._ceiling()
     ) < 12  # reconcile cannot climb to the same target
+
+
+# -- calvin-rjyn re-review: an identical Save, the guards ----------------------
+def _saved_cfg(saved, **over):
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18, **over)
+    cfg["displayCheck"] = {**_cal_job("read"), "saved": saved}
+    return cfg
+
+
+def test_an_identical_save_still_restores_the_everyday_level(tmp_path):
+    same = {"brightness_ramp_enabled": False, "brightness_limit": 21, "brightness": 18}
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
+        poll=lambda: _saved_cfg(True), cfg_over=same,
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("stopped")
+    assert ddc.writes[-1] == 18  # the values did not change; the backend's flag did
+
+
+def test_the_same_values_without_a_save_flag_do_not_restore(tmp_path):
+    same = {"brightness_ramp_enabled": False, "brightness_limit": 21, "brightness": 18}
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
+        poll=lambda: _saved_cfg(False), cfg_over=same,
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("stopped")
+    assert max(ddc.writes, default=0) <= 5
+
+
+def test_display_check_job_carries_the_saved_flag():
+    assert agent.display_check_job({"displayCheck": {"id": "c1", "step": "read", "saved": True}})["saved"] is True
+    assert agent.display_check_job({"displayCheck": {"id": "c1", "step": "read"}})["saved"] is False
+
+
+def test_a_save_with_no_brightness_chosen_never_ramps_to_the_default(tmp_path):
+    cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness=None)
+    cfg["displayCheck"] = {**_cal_job("read"), "saved": True}
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21), poll=lambda: cfg,
+        cfg_over={"brightness_ramp_enabled": False, "brightness": None},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("stopped")
+    assert agent.DEFAULT_BRIGHTNESS not in ddc.writes
+    assert max(ddc.writes, default=0) <= 5
+
+
+def test_a_waiting_fault_is_recorded_before_the_drop_is_written(tmp_path):
+    seen = []
+    holder = {}
+
+    def on_write(level):
+        seen.append(holder["runner"].fault is not None)
+
+    ddc = ReadingDdc(read=21, on_write=on_write)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ddc, poll=lambda: {},
+    )
+    holder["runner"] = runner
+    runner._execute(_cal_job("read"))
+    seen.clear()
+    fault.faults.append("Under-voltage detected!")
+    runner._finish("stopped")
+    assert seen and seen[0] is True  # the incident existed before the first write

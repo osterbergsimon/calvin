@@ -300,7 +300,7 @@ const troubleText = computed(() => {
   if (!trouble) return "";
   const when = checkedDate(trouble.at);
   let where = trouble.level == null ? "at idle" : `at Calvin ${trouble.level}`;
-  if (trouble.step === "read" && trouble.level == null) {
+  if ((trouble.step === "read" || trouble.step === "detect") && trouble.level == null) {
     // The panel was set with its own buttons; Calvin's level is not where it happened.
     where =
       trouble.panelLevel == null

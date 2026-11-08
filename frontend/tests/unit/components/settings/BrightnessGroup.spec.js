@@ -90,6 +90,27 @@ describe("BrightnessGroup rows", () => {
     );
   });
 
+  it("words a fault with no panel level just as set with the panel's buttons", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: {
+          ...FINDINGS,
+          powerTrouble: {
+            at: "2026-11-06T17:33:00Z",
+            step: "read",
+            level: null,
+            kind: "under-voltage",
+          },
+        },
+      },
+    });
+    const text = find(wrapper, "power-trouble").text();
+    expect(text).toContain("Power trouble while set with the panel's buttons (6 Nov)");
+    expect(text).not.toContain("panel undefined");
+  });
+
   it("shows saved power trouble in amber with a link to the fix", () => {
     const wrapper = mountGroup({
       kiosk: {
