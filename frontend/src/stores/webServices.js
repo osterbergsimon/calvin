@@ -127,7 +127,9 @@ export const useWebServicesStore = defineStore("webServices", () => {
             const instances = (await api.get(`/plugins/${plugin.id}/instances`)).data.instances;
             // Offering a turn-on that would leave nothing to pick helps nobody.
             const runnable = (instances || []).some(instance => instance.enabled !== false);
-            return runnable ? { id: plugin.id, name: plugin.name } : null;
+            return runnable
+              ? { id: plugin.id, name: plugin.name, reason: plugin.error_message || "" }
+              : null;
           } catch (err) {
             logWarn("[WebServicesStore]", `Failed to check instances of ${plugin.id}:`, err);
             return null;
@@ -157,7 +159,12 @@ export const useWebServicesStore = defineStore("webServices", () => {
     } catch (err) {
       outcome = {
         ok: false,
-        message: err?.response?.data?.detail || friendlyError(err, "turn this plugin on"),
+        message:
+          // A plain-text detail (sealed mode, a 403) is the reason; a structured one
+          // (the 401 sign-in object) is not text, so use the standard sentence.
+          typeof err?.response?.data?.detail === "string" && err.response.data.detail
+            ? err.response.data.detail
+            : friendlyError(err, "turn this plugin on"),
       };
     }
     await Promise.allSettled([fetchServices(), loadDisabledPlugins()]);

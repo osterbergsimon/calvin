@@ -32,6 +32,8 @@ export function buildComponentOptions(services = [], disabledPlugins = []) {
       label: plugin.name,
       kind: "disabled-plugin",
       pluginId: plugin.id,
+      // Why it cannot be turned on from here (sealed mode); empty when it can.
+      blockedReason: plugin.reason || "",
       instanceIds: [],
     })),
   ];

@@ -24,6 +24,11 @@ describe("buildComponentOptions", () => {
     });
   });
 
+  it("carries the reason a turned-off plugin cannot be turned on", () => {
+    const options = buildComponentOptions([], [{ id: "cast", name: "Cast", reason: "Sealed." }]);
+    expect(options.at(-1)).toMatchObject({ blockedReason: "Sealed." });
+  });
+
   it("maps service instances to options carrying both instance and plugin names", () => {
     const [yrOption] = buildComponentOptions([yr]).filter(o => o.kind === "service");
     expect(yrOption).toMatchObject({

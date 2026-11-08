@@ -277,9 +277,12 @@ const pickerItems = computed(() => {
   const items = filtered.value.map(opt => ({
     key: opt.value,
     label: opt.label,
+    // A plugin the host will not turn on (sealed mode) shows why instead of a
+    // Turn on that could only answer 403.
+    disabled: opt.kind === "disabled-plugin" && !!opt.blockedReason,
     meta:
       opt.kind === "disabled-plugin"
-        ? "Turned off · Turn on"
+        ? opt.blockedReason || "Turned off · Turn on"
         : opt.pluginName && opt.pluginName !== opt.label
           ? opt.pluginName
           : "",

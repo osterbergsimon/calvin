@@ -308,7 +308,9 @@ const afterInstall = async installedIds => {
       first.type === "theme"
         ? `${names} installed — pick it under Screens › Look.`
         : stillOff
-          ? `${names} installed but still turned off — turn it on from its card.`
+          ? first.error_message
+            ? `${names} installed but not turned on: ${first.error_message}`
+            : `${names} installed but still turned off — turn it on from its card.`
           : hasSetup
             ? `${names} installed and enabled — finish its setup below.`
             : `${names} installed and enabled — add a source from Content when you need it.`,

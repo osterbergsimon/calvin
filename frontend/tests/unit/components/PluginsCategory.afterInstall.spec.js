@@ -153,6 +153,15 @@ describe("PluginsCategory after install (F5)", () => {
     expect(message).toContain("turned off");
   });
 
+  it("gives the recorded reason, not 'turn it on', when sealed mode kept it off", async () => {
+    pluginsRef.value[1].enabled = false;
+    pluginsRef.value[1].error_message = "Sealed mode is on.";
+    await installMealie();
+    const message = useNotificationsStore().items.at(-1).message;
+    expect(message).toContain("Sealed mode is on.");
+    expect(message).not.toContain("turn it on from its card");
+  });
+
   it("jumps to the plugin's kind filter and expands a plugin with setup", async () => {
     const wrapper = await installMealie();
     expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("service");

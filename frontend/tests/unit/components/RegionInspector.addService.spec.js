@@ -133,6 +133,17 @@ describe("RegionInspector 'Shows' picker with a turned-off plugin (calvin-zbcg)"
   });
 });
 
+describe("RegionInspector 'Shows' picker with a plugin that cannot be turned on", () => {
+  it("shows the reason and offers no Turn on", async () => {
+    const w = mountWith([], [{ id: "cast", name: "Cast", reason: "Sealed mode is on." }]);
+    await openPicker(w);
+    const option = w.findAll('[role="menuitem"]').find(item => item.text().includes("Cast"));
+    expect(option.find(".menu__meta").text()).toBe("Sealed mode is on.");
+    await option.trigger("click");
+    expect(w.emitted("enable-plugin")).toBeUndefined();
+  });
+});
+
 describe("RegionInspector 'Shows' picker filter visibility", () => {
   beforeEach(() => {
     localStorage.removeItem("calvin-touch-controls");

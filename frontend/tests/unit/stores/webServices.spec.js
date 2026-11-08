@@ -686,7 +686,41 @@ describe("Web Services Store", () => {
       );
       const store = useWebServicesStore();
       await store.loadDisabledPlugins();
-      expect(store.disabledPlugins).toEqual([{ id: "mealie", name: "Mealie" }]);
+      expect(store.disabledPlugins).toEqual([{ id: "mealie", name: "Mealie", reason: "" }]);
+    });
+
+    it("carries the reason a plugin is blocked (sealed mode) with its turn-on", async () => {
+      api.get.mockImplementation(async url => {
+        if (url === "/plugins") {
+          return {
+            data: {
+              plugins: [
+                { id: "cast", name: "Cast", enabled: false, error_message: "Sealed mode is on." },
+              ],
+            },
+          };
+        }
+        return { data: { instances: [{ id: "c1", enabled: true }] } };
+      });
+      const store = useWebServicesStore();
+      await store.loadDisabledPlugins();
+      expect(store.disabledPlugins).toEqual([
+        { id: "cast", name: "Cast", reason: "Sealed mode is on." },
+      ]);
+    });
+
+    it("turnOnPlugin turns a 401 detail object into the sign-in sentence, not the object", async () => {
+      api.get.mockImplementation(route({}));
+      const store = useWebServicesStore();
+      const toggle = vi.fn().mockRejectedValue({
+        response: { status: 401, data: { detail: { code: "auth_required" } } },
+      });
+
+      const outcome = await store.turnOnPlugin("mealie", toggle);
+
+      expect(outcome.ok).toBe(false);
+      expect(typeof outcome.message).toBe("string");
+      expect(outcome.message).toMatch(/sign in/i);
     });
 
     it("fetchServices on a cold load makes no request for off plugins' instances", async () => {
