@@ -54,6 +54,8 @@ function captured(param, key) {
 export function captureKioskIdentity() {
   const id = captured("kiosk", KIOSK_ID_KEY);
   captured("khost", KIOSK_HOST_KEY);
+  // ?display=kiosk only survives until the first in-app navigation: store it now.
+  captured("display", DISPLAY_KEY);
   try {
     document.documentElement.classList.toggle(KIOSK_ROOT_CLASS, Boolean(id));
   } catch {

@@ -8,7 +8,7 @@
  */
 
 import { expect, test } from "@playwright/test";
-import { KIOSK_SANDBOX } from "../../src/utils/kioskSandbox.js";
+import { KIOSK_SANDBOX, kioskSandboxFor } from "../../src/utils/kioskSandbox.js";
 
 const TOP = "https://probe.test/top";
 
@@ -55,4 +55,55 @@ test("without the sandbox the same links do leave (the probe is meaningful)", as
   await page.goto("https://probe.test/unsandboxed");
   await page.frameLocator("#f").locator("#top").click();
   await expect.poll(() => page.url()).toBe("https://probe.test/stranded");
+});
+
+// A frame from Calvin's own origin is the case allow-same-origin used to break:
+// a same-origin sandboxed frame could call parent.window.open and get a popup.
+test("a Calvin-origin frame cannot reach the parent to open a popup", async ({ page, context }) => {
+  const popups = [];
+  context.on("page", p => popups.push(p));
+  const sandbox = kioskSandboxFor("https://probe.test/frame", "https://probe.test");
+  expect(sandbox).not.toContain("allow-same-origin");
+  await page.route("https://probe.test/own", route =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><body><iframe id="f" src="/ownframe" sandbox="${sandbox}" width="400" height="200"></iframe></body>`,
+    })
+  );
+  await page.route("https://probe.test/ownframe", route =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><body><button id="p" onclick="try{parent.window.open('https://probe.test/popup')}catch(e){}">p</button></body>`,
+    })
+  );
+  await page.goto("https://probe.test/own");
+  await page.frameLocator("#f").locator("#p").click();
+  await page.waitForTimeout(600);
+  expect(popups).toHaveLength(0);
+});
+
+test("the old same-origin sandbox did leak a popup (the probe is meaningful)", async ({
+  page,
+  context,
+}) => {
+  const popups = [];
+  context.on("page", p => popups.push(p));
+  await page.route("https://probe.test/leak", route =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><body><iframe id="f" src="/leakframe" sandbox="${KIOSK_SANDBOX}" width="400" height="200"></iframe></body>`,
+    })
+  );
+  await page.route("https://probe.test/leakframe", route =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><body><button id="p" onclick="try{parent.window.open('https://probe.test/popup')}catch(e){}">p</button></body>`,
+    })
+  );
+  await page.route("https://probe.test/popup", route =>
+    route.fulfill({ contentType: "text/html", body: "<!doctype html><body>popup</body>" })
+  );
+  await page.goto("https://probe.test/leak");
+  await page.frameLocator("#f").locator("#p").click();
+  await expect.poll(() => popups.length).toBeGreaterThan(0);
 });

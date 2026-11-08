@@ -3,7 +3,7 @@
     <iframe
       ref="iframe"
       :src="frameSrc"
-      :sandbox="onKiosk ? KIOSK_SANDBOX : undefined"
+      :sandbox="onKiosk ? kioskSandboxFor(frameSrc) : undefined"
       class="service-iframe"
       :class="{ 'iframe-error': iframeError }"
       frameborder="0"
@@ -49,7 +49,7 @@ import { mdiAlert } from "@mdi/js";
 import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../utils/kioskId";
 import { isHttpUrl } from "../../utils/safeUrl";
-import { KIOSK_SANDBOX } from "../../utils/kioskSandbox";
+import { kioskSandboxFor } from "../../utils/kioskSandbox";
 
 const props = defineProps({
   url: {

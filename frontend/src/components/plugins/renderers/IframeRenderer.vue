@@ -19,6 +19,9 @@
     <Button
       v-if="url && onKiosk"
       class="iframe-renderer__qr"
+      :class="{ 'iframe-renderer__qr--hidden': !qrVisible }"
+      :aria-hidden="qrVisible ? null : 'true'"
+      :tabindex="qrVisible ? null : -1"
       variant="secondary"
       data-test="show-qr-always"
       @click="showQr = true"
@@ -57,7 +60,7 @@
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import Button from "../../ui/Button.vue";
 import Card from "../../ui/Card.vue";
@@ -65,7 +68,7 @@ import InlineNote from "../../ui/InlineNote.vue";
 import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../../utils/kioskId";
 import { isHttpUrl } from "../../../utils/safeUrl";
-import { KIOSK_SANDBOX } from "../../../utils/kioskSandbox";
+import { kioskSandboxFor } from "../../../utils/kioskSandbox";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -76,16 +79,40 @@ const props = defineProps({
 const onKiosk = isKioskDisplay();
 const showQr = ref(false);
 
-// A kiosk has no way back from a popup or a top-level navigation, so its frame
-// gets neither allow-popups nor allow-top-navigation (calvin-eugy review S2).
-const sandbox = onKiosk ? KIOSK_SANDBOX : `${KIOSK_SANDBOX} allow-popups`;
-
 const url = computed(() => {
   if (props.schema.url_path) {
     return safe(resolvePath(props.data, props.schema.url_path));
   }
   return safe(props.schema.url);
 });
+
+// A kiosk has no way back from a popup or a top-level navigation, so its frame
+// gets neither allow-popups nor allow-top-navigation, and a frame from Calvin's
+// own origin loses allow-same-origin too (see utils/kioskSandbox.js).
+const sandbox = computed(() =>
+  onKiosk ? kioskSandboxFor(url.value) : "allow-scripts allow-same-origin allow-forms allow-popups"
+);
+
+// The QR action must not cover a permanent display. On a kiosk it shows for a few
+// seconds after the page loads (a site that refuses framing is only a blank
+// frame, so this is when it is needed) and again when someone taps into the
+// frame: those taps never reach Calvin, but the window loses focus to the iframe.
+const QR_VISIBLE_MS = 8000;
+const qrVisible = ref(false);
+let qrTimer = null;
+function revealQr() {
+  if (!onKiosk || !url.value) return;
+  qrVisible.value = true;
+  if (qrTimer) clearTimeout(qrTimer);
+  qrTimer = setTimeout(() => {
+    qrVisible.value = false;
+    qrTimer = null;
+  }, QR_VISIBLE_MS);
+}
+function onWindowBlur() {
+  if (iframe.value && document.activeElement === iframe.value) revealQr();
+}
+onMounted(() => window.addEventListener("blur", onWindowBlur));
 
 // Only http(s) is ever framed (a plugin or feed may carry javascript: or data:).
 function safe(value) {
@@ -126,6 +153,7 @@ function retry() {
 watch(
   url,
   () => {
+    revealQr();
     error.value = false;
     clearTimer();
     loadTimer = setTimeout(() => {
@@ -143,7 +171,11 @@ watch(
   { immediate: true }
 );
 
-onUnmounted(clearTimer);
+onUnmounted(() => {
+  clearTimer();
+  if (qrTimer) clearTimeout(qrTimer);
+  window.removeEventListener("blur", onWindowBlur);
+});
 </script>
 
 <style scoped>
@@ -166,6 +198,16 @@ onUnmounted(clearTimer);
   bottom: var(--gap-3);
   z-index: var(--z-raised);
   box-shadow: var(--elev-1);
+}
+
+/* Hidden at rest: the frame is a permanent display, so nothing sits over it. */
+.iframe-renderer__qr--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--dur) var(--ease),
+    visibility 0s linear var(--dur);
 }
 
 .iframe-renderer__frame--error {

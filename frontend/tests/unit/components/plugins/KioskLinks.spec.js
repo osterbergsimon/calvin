@@ -332,3 +332,155 @@ describe("ExternalLink: the one way to leave Calvin (S6)", () => {
     expect(found.filter(f => !ALLOWED.includes(f))).toEqual([]);
   });
 });
+
+// ---- re-check of #340 --------------------------------------------------
+
+import { KIOSK_SANDBOX, kioskSandboxFor } from "@/utils/kioskSandbox";
+import { captureKioskIdentity } from "@/utils/kioskId";
+import { KIOSK_ROOT_CLASS } from "@/styles/breakpoints.js";
+
+describe("a Calvin-origin frame loses allow-same-origin (re-check 2)", () => {
+  beforeEach(() => sessionStorage.setItem("calvin_kiosk_id", "calvin-test"));
+  afterEach(() => sessionStorage.removeItem("calvin_kiosk_id"));
+
+  it("kioskSandboxFor drops same-origin only for Calvin's own origin", () => {
+    expect(kioskSandboxFor("https://calvin.local/x", "https://calvin.local")).not.toContain(
+      "allow-same-origin"
+    );
+    expect(kioskSandboxFor("/relative", "https://calvin.local")).not.toContain("allow-same-origin");
+    expect(kioskSandboxFor("https://svc.home/x", "https://calvin.local")).toBe(KIOSK_SANDBOX);
+    for (const u of ["https://calvin.local/x", "https://svc.home/x"]) {
+      const s = kioskSandboxFor(u, "https://calvin.local");
+      expect(s).not.toContain("allow-popups");
+      expect(s).not.toContain("allow-top-navigation");
+    }
+  });
+
+  it("both iframe views apply it", () => {
+    const own = `${window.location.origin}/panel`;
+    const viewer = mount(IframeViewer, { props: { url: own }, global });
+    expect(viewer.find("iframe").attributes("sandbox")).not.toContain("allow-same-origin");
+    const renderer = mount(IframeRenderer, { props: { schema: { url: own } }, global });
+    expect(renderer.find("iframe").attributes("sandbox")).not.toContain("allow-same-origin");
+    const foreign = mount(IframeViewer, { props: { url: URL_ }, global });
+    expect(foreign.find("iframe").attributes("sandbox")).toContain("allow-same-origin");
+  });
+});
+
+describe("the kiosk QR action does not cover the frame at rest (re-check 3)", () => {
+  beforeEach(() => {
+    sessionStorage.setItem("calvin_kiosk_id", "calvin-test");
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    sessionStorage.removeItem("calvin_kiosk_id");
+  });
+  const qr = w => w.find('[data-test="show-qr-always"]');
+
+  it("shows for a few seconds after load, then hides", async () => {
+    const w = mount(IframeRenderer, { props: { schema: { url: URL_ } }, global });
+    expect(qr(w).classes()).not.toContain("iframe-renderer__qr--hidden");
+    vi.advanceTimersByTime(8100);
+    await w.vm.$nextTick();
+    expect(qr(w).classes()).toContain("iframe-renderer__qr--hidden");
+    expect(qr(w).attributes("aria-hidden")).toBe("true");
+    expect(qr(w).attributes("tabindex")).toBe("-1");
+  });
+
+  it("comes back when someone taps into the frame (the window loses focus to the iframe)", async () => {
+    const w = mount(IframeRenderer, {
+      props: { schema: { url: URL_ } },
+      attachTo: document.body,
+      global,
+    });
+    vi.advanceTimersByTime(8100);
+    await w.vm.$nextTick();
+    expect(qr(w).classes()).toContain("iframe-renderer__qr--hidden");
+    w.find("iframe").element.focus();
+    window.dispatchEvent(new Event("blur"));
+    await w.vm.$nextTick();
+    expect(qr(w).classes()).not.toContain("iframe-renderer__qr--hidden");
+    w.unmount();
+  });
+
+  it("a blur that is not into the frame does not reveal it", async () => {
+    const w = mount(IframeRenderer, {
+      props: { schema: { url: URL_ } },
+      attachTo: document.body,
+      global,
+    });
+    vi.advanceTimersByTime(8100);
+    window.dispatchEvent(new Event("blur"));
+    await w.vm.$nextTick();
+    expect(qr(w).classes()).toContain("iframe-renderer__qr--hidden");
+    w.unmount();
+  });
+});
+
+describe("embed cap warns in the last 30 seconds (re-check minor)", () => {
+  beforeEach(() => {
+    sessionStorage.setItem("calvin_kiosk_id", "calvin-test");
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    sessionStorage.removeItem("calvin_kiosk_id");
+  });
+  const mountIt = () =>
+    mount(EmbedOverlay, { props: { url: URL_ }, attachTo: document.body, global });
+
+  it("says Closing soon with a countdown, and Keep open restarts the cap", async () => {
+    const w = mountIt();
+    vi.advanceTimersByTime(4 * 60 * 1000 + 29 * 1000);
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="embed-closing"]').exists()).toBe(false);
+    vi.advanceTimersByTime(2000);
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="embed-closing"]').text()).toContain("Closing in 29 s");
+    vi.advanceTimersByTime(10000);
+    await w.vm.$nextTick();
+    expect(w.find('[data-test="embed-closing"]').text()).toContain("Closing in 19 s");
+
+    await w.find('[data-test="embed-keep"]').trigger("click");
+    expect(w.find('[data-test="embed-closing"]').exists()).toBe(false);
+    vi.advanceTimersByTime(60 * 1000); // past the original cap
+    expect(w.emitted("close")).toBeFalsy();
+    vi.advanceTimersByTime(4 * 60 * 1000 + 1000);
+    expect(w.emitted("close")).toBeTruthy();
+  });
+
+  it("closes at the cap when nobody keeps it open", () => {
+    const w = mountIt();
+    vi.advanceTimersByTime(5 * 60 * 1000 + 100);
+    expect(w.emitted("close")).toBeTruthy();
+  });
+});
+
+describe("?display=kiosk survives the first navigation (re-check 1)", () => {
+  let originalLocation;
+  beforeEach(() => {
+    originalLocation = window.location;
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
+    sessionStorage.clear();
+  });
+
+  it("captureKioskIdentity stores it at boot, without registering a kiosk", () => {
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, hostname: "calvin.local", search: "?display=kiosk" },
+    });
+    captureKioskIdentity();
+    // The router later drops the query string; the stored value still counts.
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, hostname: "calvin.local", search: "" },
+    });
+    expect(isKioskDisplay()).toBe(true);
+    expect(sessionStorage.getItem("calvin_kiosk_id")).toBeNull();
+    expect(document.documentElement.classList.contains(KIOSK_ROOT_CLASS)).toBe(false);
+  });
+});
