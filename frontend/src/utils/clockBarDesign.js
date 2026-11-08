@@ -561,6 +561,21 @@ export function showTileInDesign(design, instanceId) {
   return next;
 }
 
+/** Put one instance on a design's hidden shelf (Content › Clock bar info › Remove). */
+export function hideTileInDesign(design, instanceId) {
+  if (!design || typeof design !== "object") return design;
+  const token = tilePartId(instanceId);
+  const next = JSON.parse(JSON.stringify(design));
+  for (const shape of CLOCK_BAR_SHAPES) {
+    const shapeDesign = next[shape];
+    if (!shapeDesign) continue;
+    const hidden = Array.isArray(shapeDesign.hidden) ? shapeDesign.hidden : [];
+    if (!hidden.includes(token)) hidden.push(token);
+    shapeDesign.hidden = hidden;
+  }
+  return next;
+}
+
 export function partLabel(partId, services = []) {
   if (isTilePart(partId)) {
     const id = tileInstanceId(partId);

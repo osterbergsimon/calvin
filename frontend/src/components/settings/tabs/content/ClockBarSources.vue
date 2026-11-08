@@ -7,7 +7,7 @@
       :highlight-id="savedHighlightId || highlightId"
       :highlight-provider="highlightProvider"
       remove-title="Remove clock bar info"
-      :remove-message="row => `Remove ${row.name}? Its tile leaves the clock bar.`"
+      :remove-message="removeMessage"
       @add="addButton?.open()"
       @toggle="handleToggle"
       @edit="handleEdit"
@@ -48,7 +48,7 @@ import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
 import { buildSourceRow } from "@/utils/instanceSummary";
-import { showTileInDesign } from "@/utils/clockBarDesign";
+import { hideTileInDesign, showTileInDesign } from "@/utils/clockBarDesign";
 import { logError } from "@/utils/logger";
 
 // Clock-bar-only sources (§3.1, §3.6): a service plugin that ships a tile and
@@ -131,9 +131,35 @@ const handleEditSaved = async () => {
   await loadPlugins();
 };
 
+// A source that also has a page is listed here for its tile only: Remove takes
+// the tile off the clock bar and leaves the instance, its page and any screen
+// region using it alone. Deleting stays with clock-bar-only sources.
+const hasPage = row => !!row.plugin?.display_schema;
+
+const removeMessage = row =>
+  hasPage(row)
+    ? `Take ${row.name} off the clock bar? Its page stays under Web pages & apps.`
+    : `Remove ${row.name}? Its tile leaves the clock bar.`;
+
+const hideTile = async row => {
+  await pluginsApi.updatePluginInstance(row.id, {
+    name: row.name,
+    enabled: row.instance?.enabled !== false,
+    plugin_id: row.providerId,
+    config: { ...(row.instance?.config || {}), show_in_statusbar: false },
+  });
+  // The design wins over show_in_statusbar once a tile is listed in it.
+  if (configStore.clockBarDesign) {
+    await configStore.updateConfig({
+      clockBarDesign: hideTileInDesign(configStore.clockBarDesign, row.id),
+    });
+  }
+};
+
 const handleRemove = async row => {
   try {
-    await pluginsApi.deletePluginInstance(row.id);
+    if (hasPage(row)) await hideTile(row);
+    else await pluginsApi.deletePluginInstance(row.id);
     await loadPlugins();
   } catch (error) {
     logError("[ClockBarSources]", "Failed to remove clock bar source:", error);

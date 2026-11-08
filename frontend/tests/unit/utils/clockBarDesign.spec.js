@@ -3,6 +3,7 @@ import {
   buildClockBarDesign,
   defaultClockBarDesign,
   resolveClockBarDesign,
+  hideTileInDesign,
   showTileInDesign,
 } from "@/utils/clockBarDesign";
 
@@ -356,6 +357,27 @@ describe("buildClockBarDesign", () => {
 
     expect(next.horizontal.hidden).not.toContain("tile:weather");
     expect(design.horizontal.hidden).toContain("tile:weather");
+  });
+});
+
+describe("hideTileInDesign (calvin-shsj)", () => {
+  it("puts an instance on the hidden shelf of both shapes without touching the input", () => {
+    const design = defaultClockBarDesign();
+    const next = hideTileInDesign(design, "weather");
+
+    expect(next.horizontal.hidden).toContain("tile:weather");
+    expect(next.vertical.hidden).toContain("tile:weather");
+    expect(design.horizontal.hidden).not.toContain("tile:weather");
+    expect(hideTileInDesign(next, "weather").horizontal.hidden).toEqual(next.horizontal.hidden);
+  });
+
+  it("hides a tile that the design pins in a zone", () => {
+    const resolved = resolveClockBarDesign(config({}), [tile("weather")]);
+    resolved.horizontal.zones.right = ["tile:weather", "status"];
+    const design = hideTileInDesign(buildClockBarDesign(resolved), "weather");
+    const again = resolveClockBarDesign(config({ clockBarDesign: design }), [tile("weather")]);
+
+    expect(again.horizontal.hidden).toContain("tile:weather");
   });
 });
 
