@@ -137,8 +137,13 @@ matches what was typed.
 
 ### 3.2 States, copy and the primary action
 
-**Before step 1: power check (preflight).** Unchanged from v2: it runs when the dialog opens, writes nothing, and
-shows "Checking {screen}'s power before changing anything · 7 s". Trouble at idle shows the v2 "has power trouble
+**Before step 1: waiting for the screen (calvin-elko).** The agent only picks a check up on its next config poll
+(up to about a minute), so the dialog first shows "Waiting for the screen to pick up the check. It checks in about
+once a minute." with no countdown and Stop available. The power check below starts when the agent's first report for
+this run arrives (arrival time in the browser, not the screen's clock).
+
+**Before step 1: power check (preflight).** Unchanged from v2 apart from when it starts: it writes nothing, and
+shows "Checking the power before changing anything · 7 s" (no screen name), counting 10 s from the first report. Trouble at idle shows the v2 "has power trouble
 already" state with **How to fix the power** as the primary and **Check again** / **Close** as secondaries.
 
 **Step 1: Find the display** (detect)
@@ -200,8 +205,8 @@ plus the three converted values.
 
 | Status line | Body | Primary | Secondary |
 |---|---|---|---|
-| "Check finished · not saved yet" | Three rows: **Highest** Panel 60 · Calvin 20; **Everyday** Panel 40 · Calvin 12; **Lowest** Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." The same-scale or approximate note when it applies. | **Save** | **Try again** |
-| "Saved" | "Saved. Brightness can go from Panel 10 to Panel 60." | **Done** | — |
+| "Check finished · not saved yet" | Three rows: **Highest** Panel 60 · Calvin 20; **Everyday** Panel 40 · Calvin 12; **Lowest** Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." "Calvin never goes above 20." The same-scale or approximate note when it applies. A checkbox, ticked by default: "Use these levels when the screen wakes and starts" (Save then also turns the ramp on, in the same save; unticked, the ramp setting is left alone). | **Save** | **Try again** |
+| "Saved" | "Saved. Brightness can go from Panel 10 to Panel 60." "Calvin never goes above 20." "Calvin is bringing the screen back to your everyday level." (the agent does the ramp; the checkbox is gone) | **Done** | — |
 
 - **Not saved yet, until it is.** The summary's lead reads "Not saved yet" until Save succeeds. **Save** waits for the
   write to land: the button shows a spinner, and "Saved" appears only after the server accepted it. On failure the
@@ -212,26 +217,35 @@ plus the three converted values.
   and offers **Read it again** as the primary action instead of **Next**.
 - **One write.** Save sends a single PATCH of overrides:
   `brightnessConversion` = this run's pairs, `brightnessLimit` = the highest Calvin value, `brightness` = the everyday
-  Calvin value, `brightnessFloor` = the lowest Calvin value.
-- **The everyday value is held under the limit.** The brightness is never stored above the limit
-  (§2). When everyday equals highest, the summary says so: "Brightness is kept 4 under the limit."
-- **Done before Save asks nothing.** There is no "Leave without saving?" modal; the stopped view (§3.6) says what was kept.
+  Calvin value, `brightnessFloor` = the lowest Calvin value, and `brightnessRampEnabled: true` when "Use these levels when the screen wakes and starts" is ticked.
+- **The limit is the ceiling itself.** There is no margin under it any more: the highest reading is already one step
+  below where the panel cut out (§3.5), so the summary says "Calvin never goes above {highest Calvin value}." The
+  everyday level is never above the highest (the order check in §3.2 already enforces this).
 
-### 3.5 Power trouble during a level
+### 3.5 Power trouble during a level (calvin-tzzx)
 
-A fault in any of steps 2–4 (or the fallback) shows the red banner from v2 ("Power trouble at Calvin 12 ·
-under-voltage", `role="alert"`, announced once, with later faults joining as "also at … while settling").
+After a power drop in step 2–4 the dialog shows **only** this, in place of the step's normal text, with no red banner
+(the banner used to name Calvin's dim level as the fault level and said the check had ended while the dialog went on):
 
 | State | Status line | Body | Primary | Secondary |
 |---|---|---|---|---|
-| Fault | "Power trouble · the panel's power dropped at that level" | "The power dropped at that level. Calvin dimmed the screen. Set it back to one step below where it was and read it again." The field is kept with what was typed. | **Read it again** | — |
+| After a drop | "Step 2 of 4 · Highest level · type what the panel's menu shows" | "The power dropped. Calvin dimmed the screen to keep it safe." / "Use the panel's buttons to set Brightness one step below where it cut out. Then type the number its menu shows now." and the number field | **Read it** | **Back** |
 
-- **The banner names the panel's level** the person typed ("Power trouble at Panel 60 · under-voltage") when the
-  agent reports no Calvin level, and never prints "Calvin" with no number.
-- **The agent ends the run itself** (touch may be dead). The dialog does not wait for a tap: the next **Read it again**
-  starts a new session if the old one has ended, or reuses it if it hasn't.
-- **Nothing from the faulted level is kept.** Pairs already read in this dialog stay on screen, but only Save writes.
-- **The limit step never raises the brightness**, so there is no "save the fault level as the limit" offer any more.
+- **That reading is the level's reading.** The typed panel number and a real Calvin read at **Read it** are stored as
+  the reading for the step; nothing is computed, estimated or excluded. After a drop on the **highest** step the check
+  goes **straight to the Everyday step** (no reading screen, no re-asking the highest). A drop on step 3 or 4 shows
+  the normal reading screen for that level.
+- **No delay for the dim.** Calvin dims at once; it never waits to read a value during the brownout.
+- **Works whether or not the agent ends the run.** If it ended, **Read it** starts a new session; if it kept it open,
+  the read moves that run on. A read that was waiting when the drop came is dropped (it can't be answered).
+- **Nothing from the faulted level is kept** other than the new reading. Only Save writes.
+- **The limit step never raises the brightness**, so there is no "save the fault level as the limit" offer.
+
+**Back and Remove.** Every step 2–4 has **Back** (text button, last secondary). It leaves the step, drops its reading
+and the previous step's, and returns to the previous step so that one is taken again (from step 2 it returns to
+"Found the display"). The summary lists each reading with **Remove**; Remove takes that one step again, keeps the
+other readings, and returns to the summary after the retake. Remove is gone once the readings are saved; nothing is
+saved until **Save**.
 
 ### 3.6 Stop (calvin-qkm8) and an unfinished run
 
@@ -255,6 +269,9 @@ Nothing is saved from an unfinished run.
 
 ### 3.7 Rules for the whole dialog
 
+- **No fine print about turning the screen off.** The dialog does not say that "Turn off now" or a schedule off waits
+  until the check ends (up to 10 min). If that needs saying, it goes in the Screen now and schedule controls while a
+  check runs, not here.
 - **Watching another device.** When the watched run ends, the read-only view gives way to an ended state
   ("The check on the other device ended"), with **Done** and **Try again**. A reloaded browser recognises its own
   run again (the run ids it started are kept in the tab's session storage).

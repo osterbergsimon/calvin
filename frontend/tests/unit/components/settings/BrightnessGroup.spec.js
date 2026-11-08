@@ -51,7 +51,7 @@ describe("BrightnessGroup rows", () => {
     });
   });
 
-  it("starts the first brightness at the limit when that is lower", async () => {
+  it("starts the first brightness at the limit when that is lower than 20", async () => {
     const wrapper = mountGroup({ overrides: { brightnessLimit: 18 } });
     await find(wrapper, "ramp-toggle")
       .findComponent({ name: "ToggleSwitch" })
@@ -235,7 +235,7 @@ describe("BrightnessGroup slider", () => {
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
-  it("cannot go past the limit", () => {
+  it("cannot go past the limit itself", () => {
     const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
     expect(find(wrapper, "brightness-slider").attributes("max")).toBe("26");
     expect(find(wrapper, "limit-hatch").exists()).toBe(true);

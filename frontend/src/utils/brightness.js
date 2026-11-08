@@ -72,8 +72,13 @@ export function readingsOutlier(readings) {
   return Math.abs(predicted - Number(last.menu)) > OUTLIER_MENU_UNITS;
 }
 
-/** The highest Calvin value the slider can reach: the limit itself (its margin is already in it). */
-export function maxPickable(limit) {
+/**
+ * The highest Calvin value the slider can reach: the limit itself. The limit is
+ * the ceiling (the highest reading is already one step below the cut-out), so
+ * nothing is subtracted. `step` stays in the signature for callers.
+ */
+// eslint-disable-next-line no-unused-vars
+export function maxPickable(limit, step = DEFAULT_STEP) {
   if (limit === null || limit === undefined) return 100;
   return Math.max(0, Number(limit));
 }
@@ -84,8 +89,8 @@ export function firstBrightness(limit) {
 }
 
 /**
- * The overrides with a stored brightness lowered to the limit
- * when it sits above it. Returns the same object when nothing changes, so a
+ * The overrides with a stored brightness lowered to the limit when it sits
+ * above it. Returns the same object when nothing changes, so a
  * caller can tell whether a write is needed.
  */
 export function clampBrightness(overrides) {
@@ -114,8 +119,8 @@ export function calibrationPoints(start) {
   return { first, second, room: first - second >= 2 };
 }
 
-/** The optional third reading, near the top of a known limit. Null without a limit. */
-export function thirdReadingPoint(limit) {
+/** The optional third reading, at the top of a known limit. Null without a limit. */
+export function thirdReadingPoint(limit, step = DEFAULT_STEP) {
   if (limit === null || limit === undefined) return null;
   return maxPickable(limit);
 }

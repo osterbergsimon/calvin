@@ -176,7 +176,7 @@ describe("Screens › {screen} › Power › Brightness", () => {
 });
 
 describe("Screens › Power › Brightness limit safety", () => {
-  it("a calibration saved by the check caps the slider at once and never stores brightness above the limit", async () => {
+  it("a calibration saved by the check caps the slider at once and keeps the everyday level at or under the limit", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { brightnessRampEnabled: true, brightness: 25 },
     });
@@ -215,18 +215,50 @@ describe("Screens › Power › Brightness limit safety", () => {
     expect(await failed).toBe(false);
   });
 
-  it("clamps a stored brightness when a patch changes the step", async () => {
+  it("saves the readings 21/18/0 as they are: the everyday level is not cut below 18", async () => {
+    const { wrapper, store } = mountScreens({ overrides: { brightnessRampEnabled: true } });
+    await flushPromises();
+    await open(wrapper);
+    wrapper.findComponent(DisplayCheckDialog).vm.$emit("patch", {
+      brightnessLimit: 21,
+      brightness: 18,
+      brightnessFloor: 0,
+    });
+    await flush();
+    expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
+      brightnessLimit: 21,
+      brightness: 18,
+      brightnessFloor: 0,
+    });
+  });
+
+  it("clamps a stored brightness to the limit itself when a patch lowers the limit", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { brightnessRampEnabled: true, brightness: 30, brightnessLimit: 26 },
     });
     await flushPromises();
     await open(wrapper);
-    wrapper.findComponent(BrightnessGroup).vm.$emit("patch", { brightnessStep: 3 });
+    wrapper.findComponent(BrightnessGroup).vm.$emit("patch", { brightnessLimit: 20 });
     await flush();
     expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
-      brightnessStep: 3,
-      brightness: 26,
+      brightnessLimit: 20,
+      brightness: 20,
     });
+  });
+
+  it("does not turn the ramp on after a check when the wake option was unticked", async () => {
+    const { wrapper, store } = mountScreens({ displayCheck: null });
+    await flushPromises();
+    await open(wrapper);
+    wrapper.findComponent(BrightnessGroup).vm.$emit("open-check", {
+      step: "detect",
+      enableAfter: true,
+    });
+    await flushPromises();
+    const before = store.saveOverrides.mock.calls.length;
+    wrapper.findComponent(DisplayCheckDialog).vm.$emit("writes-ok", { rampEnabled: false });
+    await flush();
+    expect(store.saveOverrides.mock.calls.length).toBe(before);
   });
 
   it("turns the screen on from the check's asleep state with the normal Turn on now", async () => {

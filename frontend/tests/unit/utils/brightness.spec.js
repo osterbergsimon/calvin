@@ -68,15 +68,15 @@ describe("readingsOutlier", () => {
 });
 
 describe("limits", () => {
-  it("allows the limit minus two steps", () => {
+  it("allows the limit itself, whatever the step", () => {
     expect(maxPickable(26, 2)).toBe(26);
     expect(maxPickable(26, 3)).toBe(26);
     expect(maxPickable(null, 2)).toBe(100);
-    expect(maxPickable(0, 2)).toBe(0);
+    expect(maxPickable(3, 2)).toBe(3);
   });
-  it("starts at the lower of limit minus two steps and 20", () => {
+  it("starts at the lower of the limit and 20", () => {
     expect(firstBrightness(26, 2)).toBe(20);
-    expect(firstBrightness(18, 2)).toBe(18);
+    expect(firstBrightness(14, 2)).toBe(14);
     expect(firstBrightness(null, 2)).toBe(20);
   });
   it("takes the second reading 4 below the start, and has no room at the very bottom", () => {
@@ -85,7 +85,7 @@ describe("limits", () => {
     expect(calibrationPoints(3)).toEqual({ first: 3, second: 0, room: true });
     expect(calibrationPoints(1)).toEqual({ first: 1, second: 0, room: false });
   });
-  it("puts the optional third reading at the limit minus two steps", () => {
+  it("puts the optional third reading at the limit", () => {
     expect(thirdReadingPoint(26, 2)).toBe(26);
     expect(thirdReadingPoint(null, 2)).toBeNull();
   });
@@ -174,13 +174,19 @@ describe("checkSummary", () => {
 });
 
 describe("clampBrightness", () => {
-  it("lowers a stored brightness above the limit, never below it", () => {
-    expect(clampBrightness({ brightness: 30, brightnessLimit: 26 })).toEqual({
-      brightness: 26,
-      brightnessLimit: 26,
+  it("lowers a stored brightness above the limit to the limit itself", () => {
+    expect(clampBrightness({ brightness: 25, brightnessLimit: 20 })).toEqual({
+      brightness: 20,
+      brightnessLimit: 20,
     });
-    const atLimit = { brightness: 26, brightnessLimit: 26, brightnessStep: 3 };
-    expect(clampBrightness(atLimit)).toBe(atLimit);
+    expect(
+      clampBrightness({ brightness: 25, brightnessLimit: 20, brightnessStep: 3 }).brightness
+    ).toBe(20);
+  });
+  it("keeps the everyday level equal to the limit (no margin under it)", () => {
+    const equal = { brightness: 21, brightnessLimit: 21 };
+    expect(clampBrightness(equal)).toBe(equal);
+    expect(clampBrightness({ brightness: 18, brightnessLimit: 21 }).brightness).toBe(18);
   });
   it("leaves a safe value, no limit or no brightness alone and returns the same object", () => {
     const safe = { brightness: 20, brightnessLimit: 26 };
