@@ -45,6 +45,19 @@ describe("AuthLockScreen", () => {
     expect(wrapper.text()).toContain("Repeat password");
   });
 
+  it("says why a kiosk session ended on its own (calvin-q4o8)", () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: true, authenticated: false });
+    auth.signedOutReason = "idle";
+    expect(mountLock().text()).toContain("Signed out after 5 minutes without touch.");
+    auth.signedOutReason = "ended";
+    expect(mountLock().text()).toContain(
+      "A kiosk signs out after 5 minutes without touch or when its screen sleeps."
+    );
+    auth.signedOutReason = null;
+    expect(mountLock().text()).not.toContain("Signed out");
+  });
+
   it("prefills the code when the server allows it (loopback kiosk)", async () => {
     const auth = useAuthStore();
     auth.applyStatus({ configured: false, authenticated: false });

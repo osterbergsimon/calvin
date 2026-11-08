@@ -26,6 +26,12 @@ AGENT_USER="${CALVIN_AGENT_USER:-calvin}"
 AGENT_RUNTIME_DIR="${STATE_DIR}/agent"
 CHOWN="${CALVIN_CHOWN:-chown}"
 SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
+NM_CONF_DIR="${CALVIN_NM_CONF_DIR:-/etc/NetworkManager/conf.d}"
+SYS_NET_DIR="${CALVIN_SYS_NET_DIR:-/sys/class/net}"
+NMCLI="${CALVIN_NMCLI:-nmcli}"
+IW="${CALVIN_IW:-iw}"
+APT_GET="${CALVIN_APT_GET:-apt-get}"
+WIFI_IFACE="${CALVIN_WIFI_IFACE:-wlan0}"
 BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
 LABWC_DIR="${CALVIN_LABWC_DIR:-/home/calvin/.config/labwc}"
 DISPLAY_ENV_FILE="${CALVIN_KIOSK_DISPLAY_ENV_FILE:-/etc/default/calvin-kiosk-display}"
@@ -300,6 +306,79 @@ ensure_agent_runtime_dir() {
   log "could not prepare ${AGENT_RUNTIME_DIR} for user ${AGENT_USER}; agent run state will not persist"
 }
 ensure_agent_runtime_dir
+
+# calvin-grwq: Wi-Fi power saving off, persistently. A power-saving brcmfmac radio
+# (Pi 3B+) drops broadcast ARP: the kiosk still polls out, but nothing on the LAN
+# can reach it. NetworkManager kiosks (Bookworm/Trixie) get wifi.powersave=2 in a
+# conf.d drop-in; others get a oneshot unit running iw. Runs on every update and
+# at bootstrap; unchanged config is left alone, and a failure never blocks the
+# update. Kiosks without a wireless interface are untouched.
+# The 3B+ (and any image without it) has no iw: the agent could not read the radio's
+# state and the oneshot fallback would fail. Install it once, best effort and
+# bounded; offline or locked apt just leaves the status honest ("configured").
+ensure_iw() {
+  command -v "$IW" >/dev/null 2>&1 && return 0
+  command -v "$APT_GET" >/dev/null 2>&1 || return 0
+  log "iw is not installed; trying to install it"
+  DEBIAN_FRONTEND=noninteractive timeout 120 "$APT_GET" install -y -qq iw >/dev/null 2>&1 \
+    || log "could not install iw; the Wi-Fi power-save state will read as configured, not verified"
+}
+wifi_powersave_off_now() {
+  if command -v "$IW" >/dev/null 2>&1; then
+    "$IW" dev "$WIFI_IFACE" set power_save off 2>/dev/null \
+      || log "could not switch ${WIFI_IFACE} power save off right now (the config applies on the next connect)"
+  else
+    log "iw is not installed; ${WIFI_IFACE} power save is switched off on the next connect"
+  fi
+}
+ensure_wifi_powersave_off() {
+  [ -d "${SYS_NET_DIR}/${WIFI_IFACE}/wireless" ] || return 0
+  ensure_iw
+  local want have unit
+  if command -v "$NMCLI" >/dev/null 2>&1 && "$SYSTEMCTL" is-active --quiet NetworkManager.service 2>/dev/null; then
+    want=$'[connection]\nwifi.powersave = 2\n'
+    unit="${NM_CONF_DIR}/calvin-wifi-powersave.conf"
+    have="$(cat "$unit" 2>/dev/null || true)"
+    if [ "$have" != "${want%$'\n'}" ]; then
+      if ! { mkdir -p "$NM_CONF_DIR" && printf '%s' "$want" > "$unit"; }; then
+        log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0
+      fi
+      "$NMCLI" general reload conf >/dev/null 2>&1 || log "NetworkManager did not reload its config"
+      log "Wi-Fi power save disabled for NetworkManager (${unit})"
+    fi
+    wifi_powersave_off_now
+    return 0
+  fi
+  unit="${SYSTEMD_DIR}/calvin-wifi-powersave.service"
+  want="[Unit]
+Description=Calvin: Wi-Fi power saving off
+After=network-pre.target sys-subsystem-net-devices-${WIFI_IFACE}.device
+Wants=sys-subsystem-net-devices-${WIFI_IFACE}.device
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'iw dev ${WIFI_IFACE} set power_save off || iwconfig ${WIFI_IFACE} power off'
+
+[Install]
+WantedBy=multi-user.target"
+  have="$(cat "$unit" 2>/dev/null || true)"
+  if [ "$have" != "$want" ]; then
+    if ! { mkdir -p "$SYSTEMD_DIR" && printf '%s\n' "$want" > "$unit"; }; then
+      log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0
+    fi
+    "$SYSTEMCTL" daemon-reload || true
+    log "Wi-Fi power save disabled by ${unit}"
+  fi
+  # Whether or not the file changed: a oneshot that failed last time (no iw yet)
+  # must be tried again, and an enabled-but-stopped one started.
+  "$SYSTEMCTL" is-enabled --quiet calvin-wifi-powersave.service 2>/dev/null \
+    || "$SYSTEMCTL" enable calvin-wifi-powersave.service || log "enable failed: calvin-wifi-powersave.service"
+  "$SYSTEMCTL" is-active --quiet calvin-wifi-powersave.service 2>/dev/null \
+    || "$SYSTEMCTL" start calvin-wifi-powersave.service \
+    || log "Wi-Fi power save could not be switched off now (no iw?); it will be retried on the next update"
+}
+ensure_wifi_powersave_off || true
 
 write_state() {  # status phase message [version]
   mkdir -p "$STATE_DIR"

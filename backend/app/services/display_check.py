@@ -529,13 +529,26 @@ async def start_run(kiosk_id: str, request: StartRequest) -> dict:
 
 
 @_serialised
-async def stop_run(kiosk_id: str, saved: bool = False) -> dict:
+async def stop_run(kiosk_id: str, saved: bool = False, run_id: str | None = None) -> dict:
+    """Ask the agent to end the active run.
+
+    ``run_id`` (calvin-hn1e) names the run the caller means. A delayed stop from
+    an earlier dialog must not end a run another device started since, so a
+    mismatch changes nothing and the run that is really active is returned.
+    Without ``run_id`` (older callers) the active run is stopped.
+    """
     row = await _row(kiosk_id)
     if row is None:
         raise UnknownKioskError(kiosk_id)
     current = _view(row.display_check)
     if not current or not current["active"]:
         raise NoActiveRunError(kiosk_id)
+    if run_id is not None and run_id != current["id"]:
+        logger.info(
+            f"Display check stop for {run_id} ignored on {kiosk_id!r}: "
+            f"run {current['id']} is the active one"
+        )
+        return current
     run = dict(row.display_check)
     run["action"] = "stop"
     if saved:

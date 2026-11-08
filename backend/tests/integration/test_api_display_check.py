@@ -293,6 +293,33 @@ def test_stop_asks_the_agent_to_finish_and_the_report_ends_it(test_client: TestC
 
 
 @pytest.mark.integration
+def test_stop_for_another_run_id_is_ignored(test_client: TestClient, kiosk):
+    """calvin-hn1e: a delayed stop from an earlier dialog must not hit a later run."""
+    old = _start(test_client, "write", brightness=19).json()
+    _report(test_client, old["id"], "stopped")
+    new = _start(test_client, "detect").json()
+    assert new["id"] != old["id"]
+
+    late = test_client.post(f"{BASE}/stop", json={"runId": old["id"], "saved": True})
+    assert late.status_code == 200
+    assert late.json()["id"] == new["id"]  # the run that is really active
+    assert late.json()["action"] != "stop"
+    assert (
+        "saved" not in _config(test_client)["displayCheck"]
+        or not (_config(test_client)["displayCheck"]["saved"])
+    )
+    assert _config(test_client)["displayCheck"]["action"] != "stop"
+
+
+@pytest.mark.integration
+def test_stop_with_the_matching_run_id_stops_it(test_client: TestClient, kiosk):
+    run = _start(test_client, "write", brightness=19).json()
+    stopped = test_client.post(f"{BASE}/stop", json={"runId": run["id"]})
+    assert stopped.status_code == 200
+    assert stopped.json()["action"] == "stop"
+
+
+@pytest.mark.integration
 def test_asleep_is_surfaced_and_not_retried(test_client: TestClient, kiosk):
     run = _start(test_client, "write").json()
     _report(test_client, run["id"], "asleep", level=0, detail="the panel is asleep")

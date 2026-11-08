@@ -182,10 +182,38 @@ export interface paths {
     /**
      * Auth Status
      * @description Whether an admin password exists and whether this client has a session.
+     *
+     *     A cookie that is no longer valid (idle, signed out by a screen sleep, or from
+     *     before session kinds existed) is cleared here so the browser stops sending it.
+     *     Checking status renews a device session but never a kiosk one: a sleeping
+     *     screen that polls status must still lapse.
      */
     get: operations["auth_status_api_auth_status_get"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/touch": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Auth Touch
+     * @description The page was used: renew this session. A lapsed one stays lapsed.
+     *
+     *     The kiosk page calls this (throttled) while someone is touching the screen, so
+     *     the 5-minute limit counts from the last touch, not from sign-in.
+     */
+    post: operations["auth_touch_api_auth_touch_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1332,6 +1360,30 @@ export interface paths {
     patch: operations["patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch"];
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}/screen-sleep": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Kiosk Screen Sleep
+     * @description The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).
+     *
+     *     Called by the display agent. It carries no credential, but it is only accepted
+     *     from an address that kiosk's own polls came from, so someone else on the network
+     *     cannot sign a kiosk out. It can only sign a kiosk out, never in.
+     */
+    post: operations["kiosk_screen_sleep_api_kiosks__kiosk_id__screen_sleep_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/update": {
     parameters: {
       query?: never;
@@ -2015,6 +2067,30 @@ export interface paths {
      *         Test result with success status and message
      */
     post: operations["test_plugin_api_plugins__plugin_id__test_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/screen-sleep": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Local Screen Sleep
+     * @description The all-in-one kiosk's screen went to sleep: end its admin sessions.
+     *
+     *     The all-in-one display has no kiosk id; its sign-ins are id-less kiosk
+     *     sessions, and its agent runs on this machine, so only a direct loopback caller
+     *     is accepted. It can only sign a screen out.
+     */
+    post: operations["local_screen_sleep_api_screen_sleep_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -3032,6 +3108,10 @@ export interface components {
     };
     /** PasswordBody */
     PasswordBody: {
+      /** Display */
+      display?: "kiosk" | null;
+      /** Kiosk */
+      kiosk?: string | null;
       /** Password */
       password: string;
     };
@@ -3197,6 +3277,10 @@ export interface components {
     SetupBody: {
       /** Code */
       code: string;
+      /** Display */
+      display?: "kiosk" | null;
+      /** Kiosk */
+      kiosk?: string | null;
       /** Password */
       password: string;
     };
@@ -3252,6 +3336,8 @@ export interface components {
     };
     /** StopBody */
     StopBody: {
+      /** Runid */
+      runId?: string | null;
       /**
        * Saved
        * @default false
@@ -3530,6 +3616,26 @@ export interface operations {
     };
   };
   auth_status_api_auth_status_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+    };
+  };
+  auth_touch_api_auth_touch_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -4982,6 +5088,7 @@ export interface operations {
         kstat?: string | null;
         kmsg?: string | null;
         kstack?: string | null;
+        kwifi?: string | null;
         vw?: number | null;
         vh?: number | null;
       };
@@ -5365,6 +5472,37 @@ export interface operations {
         "application/json": components["schemas"]["OverridesBody"];
       };
     };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  kiosk_screen_sleep_api_kiosks__kiosk_id__screen_sleep_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Successful Response */
       200: {
@@ -6393,6 +6531,26 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  local_screen_sleep_api_screen_sleep_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
         };
       };
     };

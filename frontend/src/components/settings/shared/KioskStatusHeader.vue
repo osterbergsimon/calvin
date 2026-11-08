@@ -7,6 +7,9 @@
     <Tag v-if="stackReadout" data-test="kiosk-display-stack">
       {{ stackReadout }}
     </Tag>
+    <Tag v-if="wifi" :tone="wifi.tone" data-test="kiosk-wifi-power-save">
+      {{ wifi.label }}
+    </Tag>
     <Tag :tone="config.tone" :icon="config.icon" data-test="hardware-config-status">
       {{ config.label }}
     </Tag>
@@ -31,6 +34,22 @@ const props = defineProps({
   desiredVersion: { type: String, default: null },
   displayStack: { type: String, default: null },
   agentVersion: { type: String, default: null },
+  // on | off | configured | unknown as the agent reports it; null on a wired screen or an
+  // older agent. A power-saving radio can drop the screen off the LAN (calvin-grwq).
+  wifiPowerSave: { type: String, default: null },
+});
+
+const WIFI_LABELS = {
+  on: "Wi-Fi power saving on",
+  off: "Wi-Fi power saving off",
+  // Calvin set it off, but nothing on the screen can read the radio (no iw).
+  configured: "Wi-Fi power saving set off, not verified",
+  unknown: "Wi-Fi power saving unknown",
+};
+const wifi = computed(() => {
+  const label = WIFI_LABELS[props.wifiPowerSave];
+  if (!label) return null;
+  return { tone: props.wifiPowerSave === "on" ? "warn" : "neutral", label };
 });
 
 const stackReadout = computed(() =>

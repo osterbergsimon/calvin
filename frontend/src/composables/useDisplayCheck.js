@@ -1,6 +1,7 @@
 import { computed, onScopeDispose, ref, unref, watch } from "vue";
 import api from "@/services/api";
 import { logError } from "@/utils/logger";
+import { holdKioskSession } from "@/composables/useKioskSessionGuard";
 
 // Display check client (calvin-29ws, spec §10.2). One run per kiosk is stored
 // by the backend; the agent reports into it and this composable polls it every
@@ -149,8 +150,13 @@ export function useDisplayCheck(kioskId) {
   // restores the everyday level when the run ends. Nothing else sends it.
   async function stop({ saved = false } = {}) {
     try {
-      const response = saved
-        ? await api.post(path(kioskId, "/stop"), { saved: true })
+      // The run id makes a late stop harmless: the backend ignores it when
+      // another run has become the active one (calvin-hn1e).
+      const body = {};
+      if (run.value?.id) body.runId = run.value.id;
+      if (saved) body.saved = true;
+      const response = Object.keys(body).length
+        ? await api.post(path(kioskId, "/stop"), body)
         : await api.post(path(kioskId, "/stop"));
       run.value = response.data ?? run.value;
     } catch (err) {
@@ -236,6 +242,25 @@ export function useDisplayCheck(kioskId) {
 
   watch(isActive, active => (active ? startTimer() : stopTimer()), { immediate: true });
   onScopeDispose(stopTimer);
+
+  // A run this page started needs the admin session until it ends, even though
+  // nobody touches the screen (the owner works the panel's own buttons): without
+  // this the kiosk signs out mid-check, the dialog's Stop gets a 401 and the panel
+  // stays in its test state (calvin-q4o8). Released when the run ends, or with the dialog.
+  let release = null;
+  const releaseHold = () => {
+    release?.();
+    release = null;
+  };
+  watch(
+    () => isActive.value && ownsRun.value,
+    holding => {
+      if (holding && !release) release = holdKioskSession();
+      else if (!holding) releaseHold();
+    },
+    { immediate: true }
+  );
+  onScopeDispose(releaseHold);
 
   return {
     run,

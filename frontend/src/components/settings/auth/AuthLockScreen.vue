@@ -205,7 +205,7 @@
 import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { isPhone as isPhoneViewport } from "@/styles/breakpoints.js";
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { useAuthStore, authErrorCode, retryAfterSeconds } from "@/stores/auth";
+import { useAuthStore, authErrorCode, retryAfterSeconds, idleLabel } from "@/stores/auth";
 import { useRateLimitCountdown } from "@/composables/useRateLimitCountdown";
 import { useTouchCapability } from "@/composables/useTouchCapability";
 import { useOskState } from "@/composables/useOnScreenKeyboard";
@@ -239,7 +239,13 @@ const revealed = ref(false);
 const error1 = ref("");
 const error2 = ref("");
 const error3 = ref("");
-const notice = ref("");
+// A session that ended on its own says why, once (calvin-q4o8).
+const SIGNED_OUT_NOTICES = {
+  idle: `Signed out after ${idleLabel(auth.idleSeconds)} without touch.`,
+  // The server ended it; whether the screen slept or went quiet first, this is true.
+  ended: "Signed out. A kiosk signs out after 5 minutes without touch or when its screen sleeps.",
+};
+const notice = ref(SIGNED_OUT_NOTICES[auth.signedOutReason] ?? "");
 const networkError = ref(false);
 const submitting = ref(false);
 const retrying = ref(false);
