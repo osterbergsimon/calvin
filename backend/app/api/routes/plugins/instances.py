@@ -459,10 +459,12 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     # Update enabled status if provided
     enabled = instance_data.get("enabled")
     if enabled is not None:
+        was_enabled = bool(db_plugin.enabled)
         db_plugin.enabled = enabled
-        # Re-enabling an instance under an off type turns the type on (calvin-zbcg),
-        # unless sealed mode forbids it; the host loads no instances for an off type.
-        if enabled is True:
+        # Only a real off -> on transition of the instance turns its type on
+        # (calvin-zbcg), unless sealed mode forbids it. The edit forms send
+        # `enabled` on every save, and that must not undo a deliberate type off.
+        if enabled is True and not was_enabled:
             await turn_type_on(db_plugin.type_id)
 
     # Update config if provided
