@@ -33,7 +33,7 @@ async def test_creates_new_plugin_type(mock_loader, test_db):
     assert row is not None
     assert row.name == "Acme"
     assert row.version == "1.0.0"
-    assert row.enabled is False  # newly registered types default to disabled
+    assert row.enabled is True  # an install turns the new type on (calvin-zbcg)
 
 
 @pytest.mark.unit
@@ -72,3 +72,26 @@ async def test_not_found_is_noop(mock_loader, test_db):
     await load_plugin_types_for_single("missing")  # must not raise
 
     assert await PluginTypeDB.objects.get_or_none(type_id="missing") is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@patch("app.plugins.registry.loader.plugin_loader")
+async def test_reinstall_keeps_users_off_choice(mock_loader, test_db):
+    """An update of an installed type must not switch it back on (calvin-zbcg)."""
+    await PluginTypeDB.objects.create(
+        type_id="acme",
+        plugin_type="service",
+        name="Acme",
+        description="x",
+        version="1.0.0",
+        common_config_schema={},
+        enabled=False,
+    )
+    mock_loader.get_plugin_types.return_value = [_type_info(version="2.0.0")]
+
+    await load_plugin_types_for_single("acme")
+
+    row = await PluginTypeDB.objects.get(type_id="acme")
+    assert row.version == "2.0.0"
+    assert row.enabled is False

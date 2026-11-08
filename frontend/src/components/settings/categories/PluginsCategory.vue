@@ -270,8 +270,8 @@ const cardHasBody = plugin =>
   (plugin.ui_actions || []).length > 0 ||
   (plugin.ui_sections || []).length > 0;
 
-// After an install (F5): a new plugin type lands disabled and on whatever tab
-// was open, so switch it on, jump to it and say what to do next.
+// After an install (F5): the server turns a new plugin type on (calvin-zbcg), so
+// jump to it and say what to do next. A reinstall keeps the user's off choice.
 const afterInstall = async installedIds => {
   const installed = (installedIds || [])
     .map(id => plugins.value.find(p => p.id === id))
@@ -287,17 +287,6 @@ const afterInstall = async installedIds => {
     return;
   }
 
-  for (const plugin of installed) {
-    // Themes have no on/off switch; everything else becomes usable straight away.
-    if (plugin.type !== "theme" && !plugin.enabled) {
-      try {
-        await togglePlugin(plugin.id, true);
-      } catch (error) {
-        console.error(`Failed to enable plugin ${plugin.id}:`, error);
-      }
-    }
-  }
-
   const first = installed[0];
   const hasSetup = first.type !== "theme" && cardHasBody(first);
   activePluginTab.value = pluginKindKey(first);
@@ -311,15 +300,18 @@ const afterInstall = async installedIds => {
     ?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   const names = installed.map(p => p.name || p.id).join(", ");
+  const stillOff = first.type !== "theme" && !first.enabled;
   notificationsStore.notify({
     severity: "success",
     eyebrow: "Plugin installed",
     message:
       first.type === "theme"
         ? `${names} installed — pick it under Screens › Look.`
-        : hasSetup
-          ? `${names} installed and enabled — finish its setup below.`
-          : `${names} installed and enabled — add a source from Content when you need it.`,
+        : stillOff
+          ? `${names} installed but still turned off — turn it on from its card.`
+          : hasSetup
+            ? `${names} installed and enabled — finish its setup below.`
+            : `${names} installed and enabled — add a source from Content when you need it.`,
   });
 };
 

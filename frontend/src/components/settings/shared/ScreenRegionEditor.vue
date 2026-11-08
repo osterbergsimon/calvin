@@ -343,6 +343,7 @@
               :hide-heading="isPhone"
               @patch-view="patchSelectedView"
               @set-component="setSelectedComponent"
+              @enable-plugin="enableServicePlugin"
               @toggle-source="toggleSelectedSource"
               @clear-sources="clearSelectedSources"
               @toggle-split="toggleSplitSelected"
@@ -498,7 +499,7 @@ const saveConfig = inject("saveConfig", null);
 const webServicesStore = useWebServicesStore();
 const calendarStore = useCalendarStore();
 const kiosksStore = useKiosksStore();
-const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
+const { plugins, pluginInstances, loadingPlugins, loadPlugins, togglePlugin } = usePlugins();
 
 const selectedRegionId = ref(null);
 const previewScreenId = ref(ANY_BROWSER);
@@ -881,7 +882,9 @@ const selectScreen = id => {
 
 /* --- data sources --- */
 const services = computed(() => webServicesStore.services);
-const componentOptions = computed(() => buildComponentOptions(services.value));
+const componentOptions = computed(() =>
+  buildComponentOptions(services.value, webServicesStore.disabledPlugins)
+);
 const calendarSources = computed(() =>
   (calendarStore.sources || [])
     .filter(s => s.enabled !== false)
@@ -1349,6 +1352,12 @@ const addSubToSelected = () => {
   if (!node) return;
   const ownerPath = node.split ? p : p.slice(0, -1);
   updateActiveLayout(addSubRegionAtPath(cloneLayout(), ownerPath));
+};
+// "Turn on" for a plugin the picker listed as turned off: switch it on, then
+// reload services so its instances become pickable.
+const enableServicePlugin = async pluginId => {
+  await togglePlugin(pluginId, true);
+  await webServicesStore.fetchServices();
 };
 const setSelectedComponent = option => {
   const p = selectedPath.value;

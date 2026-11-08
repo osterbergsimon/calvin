@@ -14,6 +14,10 @@ import { friendlyError } from "../utils/friendlyError";
 
 export const useWebServicesStore = defineStore("webServices", () => {
   const services = ref([]);
+  // Service plugins that are turned off yet still own instances. Their tiles
+  // are not loaded, so the screen editor lists them as "turned off" with a
+  // way to switch them on instead of omitting them (calvin-zbcg).
+  const disabledPlugins = ref([]);
   // True once a services list (live or cached) has been applied, so "no tile
   // with that id" can be told apart from "not loaded yet".
   const hasLoaded = ref(false);
@@ -29,6 +33,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
   const applyServices = responseData => {
     const allServices = responseData?.services || [];
     hasLoaded.value = true;
+    disabledPlugins.value = responseData?.disabled_plugins || [];
     services.value = allServices.filter(s => s.enabled);
     // Sort by display_order
     services.value.sort((a, b) => a.display_order - b.display_order);
@@ -55,8 +60,19 @@ export const useWebServicesStore = defineStore("webServices", () => {
 
     // Get instances for each service plugin
     const allInstances = [];
+    const disabled = [];
     let complete = true;
     for (const plugin of plugins) {
+      if (!plugin.enabled) {
+        try {
+          const off = await api.get(`/plugins/${plugin.id}/instances`);
+          if ((off.data.instances || []).length > 0) {
+            disabled.push({ id: plugin.id, name: plugin.name });
+          }
+        } catch (err) {
+          logWarn("[WebServicesStore]", `Failed to check instances of ${plugin.id}:`, err);
+        }
+      }
       if (plugin.enabled) {
         try {
           // Get plugin details to access display_schema
@@ -94,6 +110,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
     // Format as services for compatibility
     // Need to preserve both old format (url) and new format (config.url)
     const responseData = {
+      disabled_plugins: disabled,
       services: allInstances.map(instance => ({
         id: instance.id,
         name: instance.name,
@@ -258,6 +275,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
 
   return {
     services,
+    disabledPlugins,
     loaded,
     currentServiceIndex,
     loading,

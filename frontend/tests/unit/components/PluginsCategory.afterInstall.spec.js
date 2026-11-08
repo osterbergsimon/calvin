@@ -118,7 +118,7 @@ describe("PluginsCategory after install (F5)", () => {
         id: "mealie",
         type: "service",
         name: "Mealie",
-        enabled: false,
+        enabled: true,
         common_config_schema: { server: { type: "string" } },
       },
     ];
@@ -139,9 +139,18 @@ describe("PluginsCategory after install (F5)", () => {
     return wrapper;
   };
 
-  it("enables the freshly installed plugin", async () => {
+  it("leaves enabling to the server (calvin-zbcg): no client-side toggle after install", async () => {
     await installMealie();
-    expect(mockTogglePlugin).toHaveBeenCalledWith("mealie", true);
+    expect(mockTogglePlugin).not.toHaveBeenCalled();
+  });
+
+  it("does not claim 'enabled' for a reinstalled plugin the user left off", async () => {
+    pluginsRef.value[1].enabled = false;
+    await installMealie();
+    const notifications = useNotificationsStore();
+    const message = notifications.items.at(-1).message;
+    expect(message).not.toContain("installed and enabled");
+    expect(message).toContain("turned off");
   });
 
   it("jumps to the plugin's kind filter and expands a plugin with setup", async () => {
@@ -163,7 +172,7 @@ describe("PluginsCategory after install (F5)", () => {
         id: "picsum",
         type: "image",
         name: "Picsum",
-        enabled: false,
+        enabled: true,
         supports_multiple_instances: false,
       },
     ];
@@ -173,7 +182,7 @@ describe("PluginsCategory after install (F5)", () => {
     wrapper.findComponent({ name: "PluginInstaller" }).vm.$emit("install", { path: "picsum" });
     await flushPromises();
 
-    expect(mockTogglePlugin).toHaveBeenCalledWith("picsum", true);
+    expect(mockTogglePlugin).not.toHaveBeenCalled();
     expect(wrapper.findComponent({ name: "PluginManager" }).props("activeTab")).toBe("image");
     expect(activeExpanded.value.picsum).toBeUndefined();
     expect(useNotificationsStore().items.at(-1).message).toContain(

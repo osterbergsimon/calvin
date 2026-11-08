@@ -367,7 +367,9 @@ class TestPluginRegistry:
         db_type = await PluginTypeDB.objects.get_or_none(type_id="new_plugin")
         assert db_type is not None
         assert db_type.name == "New Plugin"
-        assert db_type.enabled is False  # Default to disabled
+        assert (
+            db_type.enabled is True
+        )  # a type first seen on load counts as installed (calvin-zbcg)
 
     @pytest.mark.asyncio
     @patch("app.plugins.registry.loader.plugin_loader")
@@ -614,3 +616,38 @@ class TestLoadPluginInstances:
         stored = await PluginDB.objects.get(id="exiting-instance")
         assert stored.enabled is False
         await db_plugin.delete()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_registering_enabled_instance_turns_its_type_on(test_db):
+    """An enabled instance under an off type is a contradiction: the type goes on (calvin-zbcg)."""
+    from app.models.db_models import PluginDB, PluginTypeDB
+    from app.plugins.registry.manager import register_plugin
+
+    await PluginTypeDB.objects.delete(type_id="zbcg-type")
+    await PluginTypeDB.objects.create(
+        type_id="zbcg-type",
+        plugin_type="service",
+        name="Z",
+        description=None,
+        version="1",
+        common_config_schema={},
+        enabled=False,
+    )
+    plugin = MagicMock()
+    plugin.initialize = AsyncMock()
+    plugin.configure = AsyncMock()
+    plugin.enabled = True
+    with (
+        patch("app.plugins.registry.manager.plugin_loader") as loader,
+        patch("app.plugins.registry.manager.instance_manager") as manager,
+    ):
+        loader.create_plugin_instance.return_value = plugin
+        manager.register = AsyncMock(return_value=None)
+        await register_plugin("zbcg-inst", "zbcg-type", "Z1", {}, enabled=True)
+    try:
+        assert (await PluginTypeDB.objects.get(type_id="zbcg-type")).enabled is True
+    finally:
+        await PluginDB.objects.delete(id="zbcg-inst")
+        await PluginTypeDB.objects.delete(type_id="zbcg-type")

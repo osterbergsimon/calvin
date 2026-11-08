@@ -12,9 +12,11 @@
  * one option per service instance.
  *
  * @param {Array<{id: string, name: string, plugin_name?: string}>} services
+ * @param {Array<{id: string, name: string}>} disabledPlugins service plugins that are
+ *   turned off; listed last, flagged so the picker can offer "Turn on" (calvin-zbcg)
  * @returns {Array<{value: string, label: string, kind: string, instanceIds: string[], pluginName?: string}>}
  */
-export function buildComponentOptions(services = []) {
+export function buildComponentOptions(services = [], disabledPlugins = []) {
   return [
     { value: "calendar", label: "Calendar", kind: "calendar", instanceIds: [] },
     { value: "photos", label: "Photos", kind: "photos", instanceIds: [] },
@@ -24,6 +26,13 @@ export function buildComponentOptions(services = []) {
       pluginName: service.plugin_name || "",
       kind: "service",
       instanceIds: [service.id],
+    })),
+    ...disabledPlugins.map(plugin => ({
+      value: `enable:${plugin.id}`,
+      label: plugin.name,
+      kind: "disabled-plugin",
+      pluginId: plugin.id,
+      instanceIds: [],
     })),
   ];
 }

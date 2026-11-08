@@ -65,6 +65,13 @@ async def register_plugin(
         db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
         plugin_type = db_type.plugin_type if db_type else "unknown"
 
+        # An enabled instance under an off type is a contradiction: the host loads
+        # no instances for an off type. Creating an enabled instance turns its type
+        # on (calvin-zbcg).
+        if enabled and db_type and not db_type.enabled:
+            db_type.enabled = True
+            await db_type.save_with_timestamp()
+
         await PluginDB.objects.create(
             id=plugin_id,
             type_id=type_id,

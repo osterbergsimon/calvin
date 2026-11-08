@@ -96,6 +96,32 @@ describe("Web Services Store", () => {
       expect(store.error).toBe(null);
     });
 
+    it("lists service plugins that are turned off but still have instances (calvin-zbcg)", async () => {
+      api.get.mockImplementation(async url => {
+        if (url === "/plugins") {
+          return {
+            data: {
+              plugins: [
+                { id: "mealie", name: "Mealie", type: "service", enabled: false },
+                { id: "empty", name: "Empty", type: "service", enabled: false },
+              ],
+            },
+          };
+        }
+        if (url === "/plugins/mealie/instances") {
+          return { data: { instances: [{ id: "mealie-1", name: "Mat", enabled: true }] } };
+        }
+        if (url === "/plugins/empty/instances") return { data: { instances: [] } };
+        throw new Error(`unexpected ${url}`);
+      });
+
+      const store = useWebServicesStore();
+      await store.fetchServices();
+
+      expect(store.services).toEqual([]);
+      expect(store.disabledPlugins).toEqual([{ id: "mealie", name: "Mealie" }]);
+    });
+
     it("should filter to enabled services only", async () => {
       const mockPlugins = {
         plugins: [
