@@ -500,6 +500,103 @@ describe("the summary and Save", () => {
     await toSummary();
     await clickPrimary(wrapper);
     expect(wrapper.emitted("writes-ok")).toHaveLength(1);
+    expect(wrapper.emitted("writes-ok")[0][0]).toEqual({ rampEnabled: true });
+  });
+
+  it("passes the unticked wake choice on with writes-ok", async () => {
+    await toSummary();
+    await find(wrapper, "use-on-wake").setValue(false);
+    await clickPrimary(wrapper);
+    expect(wrapper.emitted("writes-ok")[0][0]).toEqual({ rampEnabled: false });
+  });
+});
+
+describe("retaking a reading checks both neighbours", () => {
+  // Readings: highest Panel 60 / Calvin 20, everyday 40 / 12, lowest 10 / 2.
+  async function removeEveryday() {
+    await toSummary();
+    await find(wrapper, "remove-reading-1").trigger("click");
+    await flushPromises();
+  }
+
+  it("refuses a typed level above the highest or below the lowest", async () => {
+    await removeEveryday();
+    await find(wrapper, "reading-input").setValue("70");
+    expect(find(wrapper, "level-too-high").text()).toContain(
+      "can't be higher than the highest, 60"
+    );
+    expect(primary(wrapper).attributes("disabled")).toBeDefined();
+    await find(wrapper, "reading-input").setValue("5");
+    expect(find(wrapper, "level-too-high").text()).toContain("can't be lower than the lowest, 10");
+    expect(primary(wrapper).attributes("disabled")).toBeDefined();
+  });
+
+  it("does not let a read above the highest or below the lowest go on to Save", async () => {
+    await removeEveryday();
+    await readLevel(40, 25); // Calvin 25 is above the highest's 20
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+    expect(primary(wrapper).text()).toBe("Read it again");
+    await clickPrimary(wrapper);
+    await readLevel(40, 1); // Calvin 1 is below the lowest's 2
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+    expect(primary(wrapper).text()).toBe("Read it again");
+    expect(find(wrapper, "check-save").exists()).toBe(false);
+  });
+
+  it("goes back to the summary when the retaken level sits between its neighbours", async () => {
+    await removeEveryday();
+    await readLevel(35, 10);
+    expect(find(wrapper, "level-behind").exists()).toBe(false);
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 35 · Calvin 10");
+  });
+
+  it("checks a retaken highest against the everyday level", async () => {
+    await toSummary();
+    await find(wrapper, "remove-reading-0").trigger("click");
+    await flushPromises();
+    await find(wrapper, "reading-input").setValue("30");
+    expect(find(wrapper, "level-too-high").text()).toContain(
+      "can't be lower than the everyday, 40"
+    );
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 8 }); // below the everyday's 12
+    await settle();
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+  });
+});
+
+describe("Remove and Back leave nothing stale behind", () => {
+  it("a drop reported while the summary shows does not come back on a later step after Remove", async () => {
+    await toSummary();
+    agent({ fault: FAULT });
+    await settle();
+    await find(wrapper, "remove-reading-1").trigger("click");
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("The power dropped");
+    await find(wrapper, "reading-input").setValue("35");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 10 });
+    await settle();
+    expect(wrapper.text()).not.toContain("The power dropped");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain("Panel 35 · Calvin 10");
+  });
+
+  it("Back forgets the 'behind' tries so the own-levels offer starts again", async () => {
+    await toStep3();
+    await readLevel(40, 20); // equal Calvin value, lower typed: behind
+    await clickPrimary(wrapper); // Read it again
+    await readLevel(40, 20);
+    expect(find(wrapper, "use-own-levels").exists()).toBe(true);
+    await find(wrapper, "check-back").trigger("click");
+    await flushPromises();
+    await readLevel(60, 20);
+    await clickPrimary(wrapper);
+    await readLevel(40, 20);
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+    expect(find(wrapper, "use-own-levels").exists()).toBe(false);
   });
 });
 
@@ -631,6 +728,34 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
       [5, 5],
     ]);
     expect(status(wrapper)).toContain("This panel doesn't report its own buttons");
+  });
+
+  it("Remove on a fallback summary resets the whole fallback and never revives the rejected reads", async () => {
+    await toOwnLevels();
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 5, level: 5 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("28");
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain("approximate");
+    await find(wrapper, "remove-reading-1").trigger("click");
+    await flushPromises();
+    // Back to a normal read of the everyday step: no fallback, no old rejected read.
+    expect(status(wrapper)).toContain("Step 3 of 4");
+    expect(wrapper.text()).not.toContain("This panel doesn't report its own buttons");
+    await readLevel(40, 12);
+    await clickPrimary(wrapper);
+    await readLevel(10, 2);
+    await clickPrimary(wrapper);
+    const text = find(wrapper, "check-summary").text();
+    expect(text).not.toContain("approximate");
+    expect(text).toContain("Panel 40 · Calvin 12");
   });
 
   it("writes only low levels, 5 then 1, asking the menu each time", async () => {

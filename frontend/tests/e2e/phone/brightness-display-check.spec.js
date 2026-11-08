@@ -104,7 +104,7 @@ for (const [size, viewport] of SIZES) {
       );
       await expect(group.locator('[data-test="limit-hatch"]')).toBeVisible();
       await expect(group.locator('[data-test="limit-note"]')).toContainText(
-        "You can go up to 68 on the panel's own menu (Calvin 22)"
+        "You can go up to 78 on the panel's own menu (Calvin 26)"
       );
 
       // One save on release, not one per drag step.

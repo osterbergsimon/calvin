@@ -451,29 +451,50 @@ const typedNumber = computed(() => {
   const n = Number(text);
   return n <= 100 ? n : null;
 });
-// A level can't be higher than the one before it.
-const previousTyped = computed(() =>
-  levelIndex.value > 0 ? (levels.value[levelIndex.value - 1]?.typed ?? null) : null
+// A level can't be higher than the one before it, nor lower than the one after
+// it (a retaken level sits between its neighbours).
+const LEVEL_NAMES = ["highest", "everyday", "lowest"];
+const previousLevel = computed(() =>
+  levelIndex.value > 0 ? levels.value[levelIndex.value - 1] : null
 );
+const nextLevelRead = computed(() => levels.value[levelIndex.value + 1] ?? null);
 const tooHigh = computed(() => {
-  if (typedNumber.value === null || previousTyped.value === null) return "";
-  if (typedNumber.value <= previousTyped.value) return "";
-  const before = levelIndex.value === 1 ? "the highest" : "the everyday level";
-  return `The ${LEVELS[levelIndex.value].short} level can't be higher than ${before}, ${previousTyped.value}.`;
+  if (typedNumber.value === null) return "";
+  const before = previousLevel.value;
+  if (before && typedNumber.value > before.typed) {
+    return `The ${LEVELS[levelIndex.value].short} level can't be higher than the ${LEVEL_NAMES[levelIndex.value - 1]}, ${before.typed}.`;
+  }
+  const after = nextLevelRead.value;
+  if (after && typedNumber.value < after.typed) {
+    return `The ${LEVELS[levelIndex.value].short} level can't be lower than the ${LEVEL_NAMES[levelIndex.value + 1]}, ${after.typed}.`;
+  }
+  return "";
 });
-// Reads can lag the panel's menu by a step: a lower level must not read higher.
+// Reads can lag the panel's menu by a step: a lower level must not read higher,
+// nor a higher level lower, than its neighbours.
 const behindNote = computed(() => {
   const now = thisLevel.value;
-  const before = levelIndex.value > 0 ? levels.value[levelIndex.value - 1] : null;
-  if (!now || !before) return "";
-  const name = levelIndex.value === 1 ? "highest" : "everyday";
+  if (!now) return "";
+  const before = previousLevel.value;
+  const after = nextLevelRead.value;
+  if (!before && !after) return "";
   if (!Number.isFinite(now.ddc)) {
     return "That reading doesn't look right: the panel gave no usable number.";
   }
-  // Higher than the level before, or the same while the menu number went down.
-  const behind = now.ddc > before.ddc || (now.ddc === before.ddc && now.typed < before.typed);
-  if (!behind) return "";
-  return `That reading looks behind: the panel reported Calvin ${now.ddc}, not below the ${name} level's ${before.ddc}. It may not have caught up with the menu yet.`;
+  if (before && Number.isFinite(before.ddc)) {
+    // Higher than the level before, or the same while the menu number went down.
+    const behind = now.ddc > before.ddc || (now.ddc === before.ddc && now.typed < before.typed);
+    if (behind) {
+      return `That reading looks behind: the panel reported Calvin ${now.ddc}, not below the ${LEVEL_NAMES[levelIndex.value - 1]} level's ${before.ddc}. It may not have caught up with the menu yet.`;
+    }
+  }
+  if (after && Number.isFinite(after.ddc)) {
+    const ahead = now.ddc < after.ddc || (now.ddc === after.ddc && now.typed > after.typed);
+    if (ahead) {
+      return `That reading looks out of order: the panel reported Calvin ${now.ddc}, not above the ${LEVEL_NAMES[levelIndex.value + 1]} level's ${after.ddc}. It may not have caught up with the menu yet.`;
+    }
+  }
+  return "";
 });
 // Still out of order after one more read: offer Calvin's own low levels instead.
 const offerOwnLevels = computed(
@@ -566,10 +587,15 @@ async function readIt() {
   if (!ok) afterDrop = false;
 }
 // Back leaves this step and retakes the one before it; both readings are dropped.
-function back() {
-  afterDrop = false;
+// A drop the person has moved past must not come back on another step.
+function dismissFault() {
   faulted.value = false;
   if (run.value?.fault) ackedFault.value = faultKey(run.value);
+}
+function back() {
+  afterDrop = false;
+  dismissFault();
+  behindTries.value = [0, 0, 0];
   const index = step.value - 2;
   levels.value[index] = null;
   if (index === 0) {
@@ -583,13 +609,36 @@ function back() {
   readingText.value = previous?.typed == null ? "" : String(previous.typed);
   nextTick(() => readingInput.value?.focus());
 }
+// Leaving a fallback summary starts over: its readings are dropped, and so are
+// the reads that were rejected as out of order and sent the check there.
+function resetFallback() {
+  usedFallback.value = false;
+  fbResult.value = null;
+  fbReadings.value = [];
+  fbTyped.value = [null, null, null];
+  fbWritten.value = [null, null];
+  fbPhase.value = "explain";
+  fbIndex.value = 0;
+  behindTries.value = [0, 0, 0];
+  for (const i of [1, 2]) {
+    const here = levels.value[i];
+    const above = levels.value[i - 1];
+    if (!here) continue;
+    const bad =
+      !Number.isFinite(here.ddc) ||
+      (above && (here.ddc > above.ddc || (here.ddc === above.ddc && here.typed < above.typed)));
+    if (bad) levels.value[i] = null;
+  }
+}
 // Remove on the summary: take that one step again, keep the other readings.
 function removeReading(index) {
   if (saved.value) return;
-  usedFallback.value = false;
-  fbResult.value = null;
+  afterDrop = false;
+  dismissFault();
   levels.value[index] = null;
-  step.value = index + 2;
+  behindTries.value[index] = 0;
+  if (usedFallback.value) resetFallback();
+  step.value = levels.value.findIndex(l => !l) + 2;
   view.value = "step";
   readingText.value = "";
   nextTick(() => readingInput.value?.focus());
@@ -747,7 +796,7 @@ async function saveAll() {
     saveError.value = "Couldn't save to the server. Check the connection and try again.";
     return;
   }
-  emit("writes-ok");
+  emit("writes-ok", { rampEnabled: useOnWake.value });
   saved.value = true;
 }
 
