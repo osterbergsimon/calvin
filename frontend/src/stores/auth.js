@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import api from "@/services/api";
 import { logError } from "@/utils/logger";
+import { getKioskId } from "@/utils/kioskId";
 
 /**
  * Admin session state and the in-place sign-in dialog (CLV-9).
@@ -85,6 +86,14 @@ export function retryAfterSeconds(error) {
   return 60;
 }
 
+// A kiosk page names itself on sign-in so the server gives it the short kiosk
+// session. The server also recognises a kiosk by its address, so this is only
+// one of two signals (see routes/auth.py).
+function withKiosk(body) {
+  const kiosk = getKioskId();
+  return kiosk ? { ...body, kiosk } : body;
+}
+
 const initialDialog = () => ({ open: false, mode: "signin", action: CONTINUE_ACTION });
 
 export const useAuthStore = defineStore("auth", () => {
@@ -93,12 +102,17 @@ export const useAuthStore = defineStore("auth", () => {
   const configured = ref(false);
   const authenticated = ref(false);
   const dialog = ref(initialDialog());
+  // Why the session ended without the person asking (calvin-q4o8): "idle" (no
+  // touch for 5 minutes) or "ended" (the server ended it, e.g. the screen slept).
+  // The lock screen says so; the next sign-in clears it.
+  const signedOutReason = ref(null);
 
   const checking = computed(() => status.value === "checking");
 
   function applyStatus(data) {
     configured.value = Boolean(data?.configured);
     authenticated.value = Boolean(data?.authenticated);
+    if (authenticated.value) signedOutReason.value = null;
     if (authenticated.value) status.value = "authenticated";
     else if (configured.value) status.value = "locked";
     else status.value = "setup";
@@ -118,7 +132,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function setup(password, code) {
     try {
-      await api.post("/auth/setup", { password, code });
+      await api.post("/auth/setup", withKiosk({ password, code }));
     } catch (err) {
       if (authErrorCode(err) === "already_configured") {
         configured.value = true;
@@ -129,6 +143,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
     configured.value = true;
     authenticated.value = true;
+    signedOutReason.value = null;
     status.value = "authenticated";
   }
 
@@ -149,7 +164,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function login(password) {
     try {
-      await api.post("/auth/login", { password });
+      await api.post("/auth/login", withKiosk({ password }));
     } catch (err) {
       if (authErrorCode(err) === "setup_required") {
         configured.value = false;
@@ -160,6 +175,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
     configured.value = true;
     authenticated.value = true;
+    signedOutReason.value = null;
     status.value = "authenticated";
   }
 
@@ -173,6 +189,30 @@ export const useAuthStore = defineStore("auth", () => {
     } finally {
       authenticated.value = false;
       status.value = configured.value ? "locked" : "setup";
+    }
+  }
+
+  /** No touch for the idle limit: sign out and remember why. */
+  async function signOutIdle() {
+    await logout();
+    signedOutReason.value = "idle";
+  }
+
+  /** The server says the session is gone (screen slept, cookie lapsed). */
+  function noteSessionEnded() {
+    authenticated.value = false;
+    status.value = configured.value ? "locked" : "setup";
+    signedOutReason.value = "ended";
+  }
+
+  /** Keep this session alive. Resolves to whether it is still signed in. */
+  async function touch() {
+    try {
+      const { data } = await api.post("/auth/touch");
+      return Boolean(data?.authenticated);
+    } catch (err) {
+      logError("[auth]", "touch failed", err);
+      return true;
     }
   }
 
@@ -223,12 +263,16 @@ export const useAuthStore = defineStore("auth", () => {
     authenticated,
     checking,
     dialog,
+    signedOutReason,
     applyStatus,
     fetchStatus,
     setup,
     fetchSetupCode,
     login,
     logout,
+    signOutIdle,
+    noteSessionEnded,
+    touch,
     changePassword,
     requestSignIn,
     closeSignIn,

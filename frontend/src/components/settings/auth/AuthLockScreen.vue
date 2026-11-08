@@ -239,7 +239,12 @@ const revealed = ref(false);
 const error1 = ref("");
 const error2 = ref("");
 const error3 = ref("");
-const notice = ref("");
+// A session that ended on its own says why, once (calvin-q4o8).
+const SIGNED_OUT_NOTICES = {
+  idle: "Signed out after 5 minutes without touch.",
+  ended: "Signed out while this screen was asleep.",
+};
+const notice = ref(SIGNED_OUT_NOTICES[auth.signedOutReason] ?? "");
 const networkError = ref(false);
 const submitting = ref(false);
 const retrying = ref(false);

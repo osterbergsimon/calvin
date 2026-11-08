@@ -37,6 +37,8 @@ import { useUiScale } from "./composables/useUiScale";
 import { useLayoutOverride } from "./composables/useLayoutOverride";
 // Apply this screen's effects level (full or standard) to <html>
 import { useEffectsLevel } from "./composables/useEffectsLevel";
+// Sign out a kiosk's admin session after 5 minutes without touch (calvin-q4o8)
+import { useKioskSessionGuard } from "./composables/useKioskSessionGuard";
 // Initialize connection store
 import { useConnectionStore } from "./stores/connection";
 
@@ -60,6 +62,7 @@ if (!guest) {
   // Applies data-effects before mount and follows the merged config (calvin-uudb).
   useEffectsLevel().syncWithConfig();
   const connectionStore = useConnectionStore();
+  useKioskSessionGuard();
 
   // Ensure theme is initialized immediately
   onMounted(() => {
