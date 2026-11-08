@@ -750,6 +750,35 @@ def test_findings_power_trouble_from_a_preflight_fault(test_client: TestClient, 
 
 
 @pytest.mark.integration
+def test_a_failed_power_preflight_keeps_an_earlier_successful_findings(
+    test_client: TestClient, kiosk
+):
+    """calvin-v996: a run that ends on power trouble says nothing about DDC or writes."""
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "running", preflight={"status": "clean", "faults": []})
+    _report(test_client, run["id"], "done", info={"model": "X"})
+    _step(test_client, "write")
+    _report(test_client, run["id"], "done", level=19, step="write")
+    test_client.post(f"{BASE}/stop")
+    _report(test_client, run["id"], "stopped")
+    before = _findings(test_client)
+    assert before["ddc"] is True
+
+    run = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        run["id"],
+        "error",
+        reason="power_at_idle",
+        preflight={"status": "fault", "faults": ["usb 1-1.1: reset"]},
+    )
+    after = _findings(test_client)
+    assert after["ddc"] is True
+    assert after["writes"] == before["writes"]
+    assert after["powerTrouble"]["step"] == "preflight"
+
+
+@pytest.mark.integration
 def test_findings_power_trouble_from_a_calibration_fault(test_client: TestClient, kiosk):
     run = _start(test_client, "write").json()
     _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)

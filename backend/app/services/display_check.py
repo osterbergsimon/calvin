@@ -253,6 +253,15 @@ def _apply_findings(
 
 _UNCHANGED: Any = object()
 
+POWER_REASONS = frozenset({"power_at_idle", "power_trouble"})
+
+
+def _ended_on_power(run: dict, report: AgentReport) -> bool:
+    """The report ends the run on a power fault, not on what the panel answered."""
+    if (report.reason or run.get("reason")) in POWER_REASONS:
+        return True
+    return report.preflight is not None and report.preflight.status == "fault"
+
 
 def _power_trouble(run: dict, report: AgentReport, status: str, now: str) -> Any:
     """The new ``findings.powerTrouble`` after a report, or ``_UNCHANGED``."""
@@ -659,13 +668,16 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
             "finishedAt": finished_at,
         }
         run["steps"] = steps
-        findings = _apply_findings(
-            row.display_check_findings,
-            step=step,
-            status=status,
-            info=report.info,
-            finished_at=finished_at,
-        )
+        # A run that ends on power trouble says nothing about DDC or writes: the
+        # panel was never asked, so an earlier successful check stands (calvin-v996).
+        if status != "error" or not _ended_on_power(run, report):
+            findings = _apply_findings(
+                row.display_check_findings,
+                step=step,
+                status=status,
+                info=report.info,
+                finished_at=finished_at,
+            )
     trouble = _power_trouble(run, report, status, now)
     if trouble is not _UNCHANGED:
         findings = findings or findings_view(row.display_check_findings)
