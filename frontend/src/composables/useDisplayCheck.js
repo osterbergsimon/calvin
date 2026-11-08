@@ -1,6 +1,7 @@
 import { computed, onScopeDispose, ref, unref, watch } from "vue";
 import api from "@/services/api";
 import { logError } from "@/utils/logger";
+import { holdKioskSession } from "@/composables/useKioskSessionGuard";
 
 // Display check client (calvin-29ws, spec §10.2). One run per kiosk is stored
 // by the backend; the agent reports into it and this composable polls it every
@@ -241,6 +242,25 @@ export function useDisplayCheck(kioskId) {
 
   watch(isActive, active => (active ? startTimer() : stopTimer()), { immediate: true });
   onScopeDispose(stopTimer);
+
+  // A run this page started needs the admin session until it ends, even though
+  // nobody touches the screen (the owner works the panel's own buttons): without
+  // this the kiosk signs out mid-check, the dialog's Stop gets a 401 and the panel
+  // stays in its test state (calvin-q4o8). Released when the run ends, or with the dialog.
+  let release = null;
+  const releaseHold = () => {
+    release?.();
+    release = null;
+  };
+  watch(
+    () => isActive.value && ownsRun.value,
+    holding => {
+      if (holding && !release) release = holdKioskSession();
+      else if (!holding) releaseHold();
+    },
+    { immediate: true }
+  );
+  onScopeDispose(releaseHold);
 
   return {
     run,

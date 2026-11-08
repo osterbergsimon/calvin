@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { effectScope, ref } from "vue";
+import { effectScope, nextTick, ref } from "vue";
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 vi.mock("@/services/api", () => ({ default: api }));
@@ -316,5 +316,33 @@ describe("useDisplayCheck", () => {
     api.post.mockResolvedValue({ data: run({ step: "limit" }) });
     await check.changeStep("limit");
     expect(check.silence.value).toBe("ok");
+  });
+
+  it("holds the kiosk session while its own run is active, and lets go when it ends", async () => {
+    const guard = await import("@/composables/useKioskSessionGuard");
+    const release = vi.fn();
+    const hold = vi.spyOn(guard, "holdKioskSession").mockReturnValue(release);
+    api.post.mockResolvedValue({ data: run({ id: "mine" }) });
+    const check = make();
+    await check.start("detect");
+    expect(hold).toHaveBeenCalledTimes(1);
+    api.get.mockResolvedValue({
+      data: { run: run({ id: "mine", active: false, status: "stopped" }) },
+    });
+    await check.load();
+    await nextTick();
+    expect(release).toHaveBeenCalledTimes(1);
+    hold.mockRestore();
+  });
+
+  it("does not hold the session for a run another device started", async () => {
+    const guard = await import("@/composables/useKioskSessionGuard");
+    const hold = vi.spyOn(guard, "holdKioskSession").mockReturnValue(() => {});
+    api.get.mockResolvedValue({ data: { run: run({ id: "elsewhere" }) } });
+    const check = make();
+    await check.load();
+    await nextTick();
+    expect(hold).not.toHaveBeenCalled();
+    hold.mockRestore();
   });
 });

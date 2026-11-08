@@ -249,6 +249,27 @@ describe("auth store: API key routes (CLV-32)", () => {
     expect(api.post).toHaveBeenLastCalledWith("/auth/login", { password: "pw-123456" });
   });
 
+  it("an all-in-one kiosk display (no kiosk id) says display: kiosk (calvin-q4o8)", async () => {
+    sessionStorage.setItem("calvin_display_mode", "kiosk");
+    const auth = useAuthStore();
+    api.post.mockResolvedValueOnce({ data: { ok: true } });
+    await auth.login("pw-123456");
+    expect(api.post).toHaveBeenCalledWith("/auth/login", {
+      password: "pw-123456",
+      display: "kiosk",
+    });
+    sessionStorage.clear();
+  });
+
+  it("takes the session kind and idle limit from the status", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: true, authenticated: true, session: "kiosk", idleSeconds: 90 });
+    expect(auth.sessionKind).toBe("kiosk");
+    expect(auth.idleSeconds).toBe(90);
+    auth.applyStatus({ configured: true, authenticated: false });
+    expect(auth.sessionKind).toBeNull();
+  });
+
   it("remembers why the session ended until the next sign-in", async () => {
     const auth = useAuthStore();
     auth.applyStatus({ configured: true, authenticated: true });

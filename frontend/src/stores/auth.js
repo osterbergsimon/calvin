@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import api from "@/services/api";
 import { logError } from "@/utils/logger";
-import { getKioskId } from "@/utils/kioskId";
+import { getKioskId, isKioskDisplay } from "@/utils/kioskId";
 
 /**
  * Admin session state and the in-place sign-in dialog (CLV-9).
@@ -91,7 +91,16 @@ export function retryAfterSeconds(error) {
 // one of two signals (see routes/auth.py).
 function withKiosk(body) {
   const kiosk = getKioskId();
-  return kiosk ? { ...body, kiosk } : body;
+  if (kiosk) return { ...body, kiosk };
+  // The all-in-one kiosk's own display has no kiosk id (?display=kiosk instead).
+  return isKioskDisplay() ? { ...body, display: "kiosk" } : body;
+}
+
+/** "5 minutes" / "90 seconds": the idle limit as a person says it. */
+export function idleLabel(seconds) {
+  const s = Number(seconds) > 0 ? Number(seconds) : 300;
+  if (s >= 120) return `${Math.round(s / 60)} minutes`;
+  return `${s} seconds`;
 }
 
 const initialDialog = () => ({ open: false, mode: "signin", action: CONTINUE_ACTION });
@@ -106,12 +115,22 @@ export const useAuthStore = defineStore("auth", () => {
   // touch for 5 minutes) or "ended" (the server ended it, e.g. the screen slept).
   // The lock screen says so; the next sign-in clears it.
   const signedOutReason = ref(null);
+  // What the server says this session is: "kiosk" (short, idle-limited), "device"
+  // or null. The kiosk guard follows this, not the ?kiosk= id, because an
+  // all-in-one kiosk or one behind a proxy has no id (calvin-q4o8).
+  const sessionKind = ref(null);
+  const idleSeconds = ref(null);
+  // A touch that has been sent and not answered. Signing out waits for it, so its
+  // late Set-Cookie cannot bring a signed-out session back.
+  let touchInFlight = null;
 
   const checking = computed(() => status.value === "checking");
 
   function applyStatus(data) {
     configured.value = Boolean(data?.configured);
     authenticated.value = Boolean(data?.authenticated);
+    sessionKind.value = authenticated.value ? (data?.session ?? null) : null;
+    idleSeconds.value = authenticated.value ? (data?.idleSeconds ?? null) : null;
     if (authenticated.value) signedOutReason.value = null;
     if (authenticated.value) status.value = "authenticated";
     else if (configured.value) status.value = "locked";
@@ -180,6 +199,9 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function logout() {
+    // Let a touch that is on its way finish first: its answer would otherwise set
+    // the cookie again after this sign-out cleared it.
+    if (touchInFlight) await touchInFlight.catch(() => {});
     try {
       await api.post("/auth/logout");
     } catch (err) {
@@ -194,8 +216,9 @@ export const useAuthStore = defineStore("auth", () => {
 
   /** No touch for the idle limit: sign out and remember why. */
   async function signOutIdle() {
-    await logout();
+    // The reason first: the lock screen reads it the moment the session is gone.
     signedOutReason.value = "idle";
+    await logout();
   }
 
   /** The server says the session is gone (screen slept, cookie lapsed). */
@@ -207,12 +230,24 @@ export const useAuthStore = defineStore("auth", () => {
 
   /** Keep this session alive. Resolves to whether it is still signed in. */
   async function touch() {
+    const request = api
+      .post("/auth/touch")
+      .then(({ data }) => {
+        if (data?.session) {
+          sessionKind.value = data.session;
+          idleSeconds.value = data.idleSeconds ?? null;
+        }
+        return Boolean(data?.authenticated);
+      })
+      .catch(err => {
+        logError("[auth]", "touch failed", err);
+        return true;
+      });
+    touchInFlight = request;
     try {
-      const { data } = await api.post("/auth/touch");
-      return Boolean(data?.authenticated);
-    } catch (err) {
-      logError("[auth]", "touch failed", err);
-      return true;
+      return await request;
+    } finally {
+      if (touchInFlight === request) touchInFlight = null;
     }
   }
 
@@ -264,6 +299,8 @@ export const useAuthStore = defineStore("auth", () => {
     checking,
     dialog,
     signedOutReason,
+    sessionKind,
+    idleSeconds,
     applyStatus,
     fetchStatus,
     setup,

@@ -43,6 +43,10 @@ describe("KioskStatusHeader", () => {
     const tag = on.get("[data-test='kiosk-wifi-power-save']");
     expect(tag.text()).toContain("Wi-Fi power saving on");
     expect(tag.classes().join(" ")).toMatch(/warn/);
+    const configured = mountHeader({ wifiPowerSave: "configured" });
+    expect(configured.get("[data-test='kiosk-wifi-power-save']").text()).toBe(
+      "Wi-Fi power saving set off, not verified"
+    );
     const unknown = mountHeader({ wifiPowerSave: "unknown" });
     expect(unknown.get("[data-test='kiosk-wifi-power-save']").text()).toBe(
       "Wi-Fi power saving unknown"

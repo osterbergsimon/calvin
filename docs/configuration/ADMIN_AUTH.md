@@ -86,23 +86,35 @@ enforces it (the page only mirrors it):
 | A kiosk (a wall screen anyone can walk up to) | 5 minutes without touch, or when the screen goes to sleep | touching the screen |
 | A phone or desktop | 30 days without use | using Settings |
 
-A kiosk is recognised by the server, from either signal (one is enough):
+A kiosk is recognised by the server, from any of these signals (one is enough):
 
-- the **network address** the sign-in comes from is one a kiosk's polls came
-  from. A visitor at the screen cannot change it: it is not in the URL, the page,
-  storage or a header;
-- the page says it is a kiosk (`kiosk` in the sign-in body, from `?kiosk=`).
+- the page says it is a kiosk: `kiosk` (its `?kiosk=` id) or `display` (the
+  all-in-one kiosk's own display, which opens `?display=kiosk` and has no kiosk
+  id) in the sign-in body. This is what covers an all-in-one kiosk;
+- the **network address** the sign-in comes from is one a kiosk's polls came from
+  in the last two hours (the newest kiosk wins when a lease was reused). A visitor
+  at the screen cannot change it. It is ignored for any request that carries a
+  proxy header (`Forwarded`, `X-Forwarded-*`, `X-Real-IP`), and such polls never
+  register an address, because behind a reverse proxy or NAT every visitor shares
+  the proxy's address. A page's own kiosk id beats the address.
 
-Both signals can only make a session *shorter*. Lying about them gains nothing,
-and a wrong match (a reused DHCP lease, or a reverse proxy that fronts every
-visitor, which makes every sign-in look like the proxy's address) only means
-more sign-ins. The kind is inside the signed cookie, so it cannot be edited
-into a longer one. The display agent reports when the screen goes to sleep
-(`POST /api/kiosks/{id}/screen-sleep`), which ends that kiosk's sessions at
-once; a restart of Calvin forgets that, and the 5-minute limit still applies.
+All of them can only make a session *shorter*. Lying gains nothing, and a wrong
+match only means more sign-ins. The kind is inside the signed cookie, so it cannot
+be edited into a longer one. `GET /api/auth/status` and `POST /api/auth/touch`
+report the session's kind and idle limit (`session`, `idleSeconds`); the page's
+own timer follows them. The page signs out at the limit and the server allows 30
+seconds more (the page throttles its touches), so the page always acts first.
+
+The screen going to sleep also ends the kiosk's sessions: the display agent
+reports it (`POST /api/kiosks/{id}/screen-sleep`, or `POST /api/screen-sleep` on
+an all-in-one kiosk), retrying a failed report a few times; turning the display
+off from Calvin does the same; and when a display timeout is set the idle limit is
+never longer than it. A restart of Calvin forgets a reported sleep, and the idle
+limit still applies. A display check started on the kiosk holds its session until
+the run ends, so the page does not sign out mid-check.
 
 - Cookie `calvin_admin`: `HttpOnly`, `SameSite=Strict`, `Path=/`, `Max-Age` = the
-  limit above (300 or 2592000 seconds).
+  limit above (330 or 2592000 seconds).
 - Stateless value `v2.<kind>.<kiosk>.<issued>.<last used>.<generation>.<HMAC>`,
   signed with a server secret kept in `admin-auth.json` (mode `0600`, next to the
   kiosk signing key). A cookie from before session kinds existed (400 days, no

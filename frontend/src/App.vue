@@ -14,7 +14,7 @@
 
 <script setup>
 import { onMounted, onUnmounted } from "vue";
-import { RouterView } from "vue-router";
+import { RouterView, useRouter } from "vue-router";
 import { isGuestPath } from "./utils/guestPath";
 import KeyboardHandler from "./components/KeyboardHandler.vue";
 import StatusRail from "./components/StatusRail.vue";
@@ -62,7 +62,7 @@ if (!guest) {
   // Applies data-effects before mount and follows the merged config (calvin-uudb).
   useEffectsLevel().syncWithConfig();
   const connectionStore = useConnectionStore();
-  useKioskSessionGuard();
+  useKioskSessionGuard({ router: useRouter() });
 
   // Ensure theme is initialized immediately
   onMounted(() => {
