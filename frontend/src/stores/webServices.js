@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import api from "../services/api";
 import { fetchWithCache } from "../utils/cache";
 import { useConnectionStore } from "./connection";
@@ -14,6 +14,10 @@ import { friendlyError } from "../utils/friendlyError";
 
 export const useWebServicesStore = defineStore("webServices", () => {
   const services = ref([]);
+  // True once a services list (live or cached) has been applied, so "no tile
+  // with that id" can be told apart from "not loaded yet".
+  const hasLoaded = ref(false);
+  const loaded = computed(() => hasLoaded.value || services.value.length > 0);
   const currentServiceIndex = ref(0);
   const loading = ref(false);
   const error = ref(null);
@@ -24,6 +28,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
 
   const applyServices = responseData => {
     const allServices = responseData?.services || [];
+    hasLoaded.value = true;
     services.value = allServices.filter(s => s.enabled);
     // Sort by display_order
     services.value.sort((a, b) => a.display_order - b.display_order);
@@ -253,6 +258,7 @@ export const useWebServicesStore = defineStore("webServices", () => {
 
   return {
     services,
+    loaded,
     currentServiceIndex,
     loading,
     error,

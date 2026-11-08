@@ -10,6 +10,7 @@ from app.security.admin_auth import get_admin_store
 from app.security.route_policy import (
     ADMIN_READS,
     GUEST_ROUTES,
+    KIOSK_SELF_WRITE_KEYS,
     PUBLIC_WRITES,
     UNSAFE_METHODS,
 )
@@ -92,8 +93,9 @@ def test_unconfigured_says_setup_required(test_client):
     assert _error_code(response) == "setup_required"
 
 
-def test_config_display_key_without_admin(test_client):
-    response = test_client.post("/api/config", json={"themeMode": "dark"})
+@pytest.mark.parametrize("key,value", [("themeMode", "dark"), ("typeTheme", "marquee")])
+def test_config_display_key_without_admin(test_client, key, value):
+    response = test_client.post("/api/config", json={key: value})
     assert response.status_code == 200
 
 
@@ -107,6 +109,18 @@ def test_config_mixed_request_rejected_as_a_whole(test_client):
     response = test_client.post("/api/config", json={"themeMode": "dark", "gitBranch": "main"})
     assert response.status_code == 401
     assert _error_code(response) == "admin_required"
+
+
+def test_kiosk_self_write_is_patch_only_and_keeps_put_admin_only(test_client):
+    """F2: a screen's partial write is open; replacing its layer is not."""
+    assert ("PATCH", "/api/kiosks/{kiosk_id}/overrides") in PUBLIC_WRITES
+    assert ("PUT", "/api/kiosks/{kiosk_id}/overrides") not in PUBLIC_WRITES
+    assert "showUI" in KIOSK_SELF_WRITE_KEYS
+
+    # The whole layer still needs admin on the logged-out client.
+    replaced = test_client.put("/api/kiosks/kitchen/overrides", json={"overrides": {}})
+    assert replaced.status_code == 401
+    assert _error_code(replaced) == "admin_required"
 
 
 def test_policy_tables_reference_real_routes():

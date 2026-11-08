@@ -14,12 +14,27 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from "vue";
+import { computed, defineAsyncComponent, defineComponent, h, onMounted } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { useProgressStore } from "../stores/progress";
-import SchemaStatusbarItem from "./plugins/SchemaStatusbarItem.vue";
 
 defineOptions({ name: "PluginStatusbarItems" });
+
+// The plugin renderer set (SchemaStatusbarItem -> SchemaRenderer ->
+// rendererRegistry) is its own async chunk. It is requested only when a
+// service actually declares a statusbar_schema, so a dashboard with none never
+// downloads it (calvin-0fm6).
+const StatusbarItemPlaceholder = defineComponent({
+  name: "StatusbarItemPlaceholder",
+  setup: () => () =>
+    h("span", { class: "plugin-statusbar-items__placeholder", "aria-hidden": "true" }),
+});
+
+const SchemaStatusbarItem = defineAsyncComponent({
+  loader: () => import("./plugins/SchemaStatusbarItem.vue"),
+  loadingComponent: StatusbarItemPlaceholder,
+  delay: 0,
+});
 
 const props = defineProps({
   ghost: {
@@ -35,6 +50,13 @@ const props = defineProps({
   // so plugin items size independently of the global plugin token. null = inherit.
   size: {
     type: Number,
+    default: null,
+  },
+  // An ordered list of instance ids (docs/design/2026-11-04-clock-bar-editor.md
+  // §7.1). With ids the caller (the clock bar design) decides which tiles show,
+  // so `show_in_statusbar` is not read. Without it, today's behaviour.
+  ids: {
+    type: Array,
     default: null,
   },
 });
@@ -59,9 +81,14 @@ function isStatusbarVisible(service) {
   return true;
 }
 
-const schemaServices = computed(() =>
-  webServicesStore.services.filter(s => s.statusbar_schema?.kind && isStatusbarVisible(s))
-);
+const schemaServices = computed(() => {
+  const barServices = webServicesStore.services.filter(service => service.statusbar_schema?.kind);
+  if (Array.isArray(props.ids)) {
+    const byId = new Map(barServices.map(service => [service.id, service]));
+    return props.ids.map(id => byId.get(id)).filter(Boolean);
+  }
+  return barServices.filter(isStatusbarVisible);
+});
 
 onMounted(() => {
   if (webServicesStore.services.length === 0) {
@@ -86,5 +113,13 @@ onMounted(() => {
   visibility: hidden;
   pointer-events: none;
   user-select: none;
+}
+
+/* While the async plugin chunk loads, hold a slot so the clock bar's layout
+   does not jump when the real item appears. */
+.plugin-statusbar-items__placeholder {
+  display: inline-block;
+  width: 4rem;
+  height: 1.25em;
 }
 </style>

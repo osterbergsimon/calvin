@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+
+const SOURCE = readFileSync(
+  resolve(__dirname, "../../../../src/components/ui/ChipMultiSelect.vue"),
+  "utf-8"
+);
+const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
 
 const DAYS = [
   { value: 1, label: "Mon" },
@@ -39,5 +47,10 @@ describe("ChipMultiSelect", () => {
   it("exposes the group aria-label", () => {
     const w = mount(ChipMultiSelect, { props: { options: DAYS, ariaLabel: "Weekend days" } });
     expect(w.find('[role="group"]').attributes("aria-label")).toBe("Weekend days");
+  });
+
+  it("keeps every chip at least the touch target in both directions", () => {
+    expect(STYLE).toMatch(/\.chip\s*\{[^}]*min-width:\s*var\(--touch-target\)/s);
+    expect(STYLE).toMatch(/\.chip\s*\{[^}]*min-height:\s*var\(--touch-target\)/s);
   });
 });

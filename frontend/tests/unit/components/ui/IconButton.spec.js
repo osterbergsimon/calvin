@@ -1,6 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import IconButton from "@/components/ui/IconButton.vue";
+
+const SOURCE = readFileSync(
+  resolve(__dirname, "../../../../src/components/ui/IconButton.vue"),
+  "utf-8"
+);
+const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
 
 describe("IconButton", () => {
   it("renders a <button type=button> with the label as aria-label", () => {
@@ -77,5 +85,15 @@ describe("IconButton", () => {
     });
     expect(w.attributes("aria-expanded")).toBe("true");
     expect(w.attributes("aria-haspopup")).toBe("menu");
+  });
+
+  it("gives the small box a centred --touch-target hit area", () => {
+    // The visible sm box stays 28px; a transparent ::before brings the
+    // tappable area up to 44x44 (the kiosk browser has no touch adjustment).
+    expect(STYLE).toMatch(/\.icon-btn\s*\{[^}]*position:\s*relative/s);
+    expect(STYLE).toMatch(/\.icon-btn::before\s*\{[^}]*max\(100%,\s*var\(--touch-target\)\)/s);
+    expect(STYLE).toMatch(/\.icon-btn::before\s*\{[^}]*top:\s*50%/s);
+    expect(STYLE).toMatch(/\.icon-btn::before\s*\{[^}]*left:\s*50%/s);
+    expect(STYLE).toMatch(/\.icon-btn::before\s*\{[^}]*translate\(-50%,\s*-50%\)/s);
   });
 });

@@ -54,6 +54,7 @@ function mountWith({ kiosks = [], availableVersion = AVAILABLE, fetchManifest } 
   store.loadKiosks = vi.fn(async () => {
     store.kiosks = kiosks;
   });
+  store.refreshKiosks = vi.fn(async () => {});
   store.fetchOverrides = vi.fn(async () => ({}));
   store.setKioskOverrides = vi.fn();
   store.fetchDeviceConfigVersion = vi.fn(async () => null);

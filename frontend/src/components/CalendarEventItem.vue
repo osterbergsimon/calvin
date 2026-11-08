@@ -107,7 +107,11 @@ const handleFocus = () => {
   overflow: hidden;
   overflow-x: clip; /* Prevent horizontal overflow from long event names */
   cursor: pointer;
-  transition: all var(--dur);
+  /* Only opacity and transform animate: the hover lift is compositor work,
+     while `all` also repainted border, shadow and background on the Pi. */
+  transition:
+    opacity var(--dur),
+    transform var(--dur);
   border: 2px solid transparent;
   outline: none;
   position: relative;
@@ -119,6 +123,12 @@ const handleFocus = () => {
   line-height: 1.3;
   /* Allow event text to wrap and expand vertically when space is available */
   /* The parent container will naturally limit the height */
+}
+
+/* FULL: the original all-property transition (calvin-e70v), so the focus
+   border and shadow fade in again. Standard keeps the compositor-only lift. */
+[data-effects="full"] .event-item {
+  transition: all var(--dur);
 }
 
 /* Multi-day events get special styling via event-start, event-end, event-middle classes */

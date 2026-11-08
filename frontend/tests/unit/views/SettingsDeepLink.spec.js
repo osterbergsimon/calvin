@@ -129,6 +129,35 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
+  it.each([
+    ["dashboard-kiosk", "screen-controls"],
+    ["dashboard-kiosk-focus", "screen-effects"],
+    ["dashboard-ui", "screen-look"],
+  ])("redirects the old %s deep link to its Screens section", async (settingId, sectionId) => {
+    route.query = { setting: settingId };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
+          ScreensSettings: {
+            props: ["initialSection"],
+            template: `<div><span data-test="screens-initial">{{ initialSection }}</span>${section(
+              sectionId,
+              "Moved"
+            )}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("screens");
+    expect(w.find("[data-test='screens-initial']").text()).toBe(sectionId);
+    expect(document.getElementById(`section-${sectionId}`).scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
   it("opens System › Versions & status for device-hardware", async () => {
     route.query = { setting: "device-hardware" };
     const w = mount(Settings, {
@@ -169,14 +198,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
-  it("opens Dashboard for clock-bar-items", async () => {
+  it("opens Dashboard for clock-bar-items and lands on the new section", async () => {
     route.query = { setting: "clock-bar-items" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
           DashboardSettings: {
-            template: `<div>${section("clock-bar-items", "Clock bar items")}</div>`,
+            template: `<div>${section("clock-bar", "Clock bar")}</div>`,
           },
         },
       },
@@ -185,18 +214,18 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     await flushPromises();
 
     expect(activeCategory(w)).toBe("dashboard");
-    expect(document.getElementById("section-clock-bar-items").scrollIntoView).toHaveBeenCalled();
+    expect(document.getElementById("section-clock-bar").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 
-  it("opens Dashboard › Focus & remote for device-notifications", async () => {
+  it("opens Dashboard › Remote buttons for device-notifications", async () => {
     route.query = { setting: "device-notifications" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
           DashboardSettings: {
-            template: `<div>${section("kiosk-touch-focus", "Focus & remote")}</div>`,
+            template: `<div>${section("kiosk-touch-focus", "Remote buttons")}</div>`,
           },
         },
       },
@@ -214,6 +243,7 @@ describe("Settings header after a deep link", () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     signInAsAdmin();
+    route.query = {};
     Element.prototype.scrollIntoView = vi.fn();
   });
 

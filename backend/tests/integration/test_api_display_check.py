@@ -1,0 +1,910 @@
+"""Display check runs: admin start/stop, agent reports, config job (calvin-29ws)."""
+
+from datetime import timedelta
+
+import pytest
+from fastapi.testclient import TestClient
+
+KIOSK = "kitchen-3f9a2c"
+BASE = f"/api/kiosks/{KIOSK}/display-check"
+
+
+@pytest.fixture
+def kiosk(test_client: TestClient) -> str:
+    """Register the kiosk the way the agent does: with a config poll."""
+    assert test_client.get(f"/api/kiosks/{KIOSK}/config?khost=pi").status_code == 200
+    return KIOSK
+
+
+def _start(client: TestClient, step: str = "detect", **extra):
+    return client.post(f"{BASE}/start", json={"step": step, **extra})
+
+
+def _step(client: TestClient, step: str, **extra):
+    return client.post(f"{BASE}/step", json={"step": step, **extra})
+
+
+def _report(client: TestClient, run_id: str, status: str = "running", **extra):
+    payload = {"id": run_id, "step": "detect", "status": status, **extra}
+    return client.post(BASE, json=payload)
+
+
+def _config(client: TestClient) -> dict:
+    return client.get(f"/api/kiosks/{KIOSK}/config").json()
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_start_and_stop_need_admin(test_client: TestClient, kiosk):
+    assert _start(test_client).status_code == 401
+    assert test_client.post(f"{BASE}/stop").status_code == 401
+    assert test_client.post(f"{BASE}/save-limit").status_code == 401
+
+
+@pytest.mark.integration
+def test_start_unknown_kiosk_is_404(test_client: TestClient):
+    resp = test_client.post("/api/kiosks/nobody-here/display-check/start", json={"step": "detect"})
+    assert resp.status_code == 404
+
+
+@pytest.mark.integration
+def test_start_validates_the_request(test_client: TestClient, kiosk):
+    assert _start(test_client, "explode").status_code == 422
+    assert _start(test_client, "conversion", value=101).status_code == 422
+    assert _start(test_client, "detect", surprise=1).status_code == 422
+    assert test_client.get(BASE).json()["run"] is None
+
+
+@pytest.mark.integration
+def test_start_offers_the_job_on_the_config_poll(test_client: TestClient, kiosk):
+    before = test_client.get(f"/api/kiosks/{KIOSK}/config")
+    assert "displayCheck" not in before.json()
+
+    run = _start(test_client, "conversion", value=19, brightness=15).json()
+    assert run["status"] == "requested"
+    assert run["active"] is True
+    assert run["action"] == "start"
+
+    after = test_client.get(f"/api/kiosks/{KIOSK}/config")
+    job = after.json()["displayCheck"]
+    assert job == {
+        "id": run["id"],
+        "step": "conversion",
+        "action": "start",
+        "value": 19,
+        "brightness": 15,
+        "ceiling": None,
+        "panelLevel": None,
+        "saved": False,
+        "seq": 0,
+    }
+    assert after.json()["display_check"] == job
+    # The ETag covers the job (calvin-fufd): the old tag must not give a 304.
+    again = test_client.get(
+        f"/api/kiosks/{KIOSK}/config", headers={"If-None-Match": before.headers["ETag"]}
+    )
+    assert again.status_code == 200
+    assert after.headers["ETag"] != before.headers["ETag"]
+
+
+@pytest.mark.integration
+def test_only_one_active_run_per_kiosk(test_client: TestClient, kiosk):
+    first = _start(test_client).json()
+    second = _start(test_client, "write")
+    assert second.status_code == 409
+    detail = second.json()["detail"]
+    assert detail["code"] == "display_check_active"
+    assert detail["run"]["id"] == first["id"]
+
+
+@pytest.mark.integration
+def test_a_step_done_report_is_a_result_not_the_end_of_the_run(test_client: TestClient, kiosk):
+    run = _start(test_client).json()
+    log = [{"at": "2026-11-05T10:00:00+00:00", "level": 19, "note": "found NOMAD TOUCH"}]
+
+    running = _report(
+        test_client, run["id"], level=19, log=log, startedAt="2026-11-05T10:00:00+00:00"
+    )
+    assert running.status_code == 200
+    assert running.json() == {"accepted": True}
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "running"
+    assert seen["active"] is True
+    assert seen["level"] == 19
+    assert seen["log"] == log
+    assert seen["startedAt"] == "2026-11-05T10:00:00+00:00"
+    assert seen["finishedAt"] is None  # the agent sends finishedAt on every report
+    assert seen["updatedAt"]
+    assert "displayCheck" in _config(test_client)
+
+    done = _report(
+        test_client,
+        run["id"],
+        "done",
+        level=19,
+        info={"bus": 2, "model": "NOMAD TOUCH"},
+        detail="NOMAD TOUCH",
+        finishedAt="2026-11-05T10:00:05+00:00",
+    )
+    assert done.status_code == 200
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "running"  # the session goes on
+    assert seen["active"] is True
+    assert seen["finishedAt"] is None
+    assert seen["steps"]["detect"] == {
+        "status": "done",
+        "value": None,
+        "level": 19,
+        "limit": None,
+        "lastWrite": None,
+        "seq": None,
+        "detail": "NOMAD TOUCH",
+        "info": {"bus": 2, "model": "NOMAD TOUCH"},
+        "finishedAt": "2026-11-05T10:00:05+00:00",
+    }
+    assert _config(test_client)["displayCheck"]["id"] == run["id"]
+    assert _start(test_client, "write").status_code == 409  # still one run per kiosk
+
+
+@pytest.mark.integration
+def test_stop_then_done_ends_the_run_and_clears_the_job(test_client: TestClient, kiosk):
+    run = _start(test_client, "conversion", value=19).json()
+    _report(test_client, run["id"], level=19)
+    _report(test_client, run["id"], "done", level=19)
+    test_client.post(f"{BASE}/stop")
+    assert _config(test_client)["displayCheck"]["action"] == "stop"
+    # The agent's _finish reports done once the job says stop (or is gone).
+    assert _report(test_client, run["id"], "done", level=15).status_code == 200
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "done"
+    assert seen["active"] is False
+    assert seen["finishedAt"]
+    assert "displayCheck" not in _config(test_client)
+    assert _start(test_client, "write").status_code == 200
+
+
+@pytest.mark.integration
+def test_conversion_stays_offered_at_its_value_until_stopped(test_client: TestClient, kiosk):
+    run = _start(test_client, "conversion", value=19).json()
+    for _ in range(3):
+        _report(test_client, run["id"], level=19)
+        _report(test_client, run["id"], "done", level=19, detail="set to 19")
+        job = _config(test_client)["displayCheck"]
+        assert (job["id"], job["step"], job["value"], job["action"]) == (
+            run["id"],
+            "conversion",
+            19,
+            "start",
+        )
+
+
+@pytest.mark.integration
+def test_step_change_re_offers_the_job_with_the_new_step_and_value(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect", brightness=15).json()
+    _report(test_client, run["id"], "done", info={"model": "NOMAD TOUCH"})
+
+    changed = _step(test_client, "conversion", value=9)
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["id"] == run["id"]
+    assert (changed.json()["step"], changed.json()["value"]) == ("conversion", 9)
+    assert _config(test_client)["displayCheck"] == {
+        "id": run["id"],
+        "step": "conversion",
+        "action": "start",
+        "value": 9,
+        "brightness": 15,
+        "ceiling": None,
+        "panelLevel": None,
+        "saved": False,
+        "seq": 1,
+    }
+    # A step with no value drops the old one.
+    assert _step(test_client, "write").json()["value"] is None
+    assert _config(test_client)["displayCheck"]["value"] is None
+    # The results of earlier steps stay in the run.
+    assert test_client.get(BASE).json()["run"]["steps"]["detect"]["status"] == "done"
+
+
+@pytest.mark.integration
+def test_step_results_are_stored_per_step_for_the_step_that_was_offered(
+    test_client: TestClient, kiosk
+):
+    run = _start(test_client, "detect").json()
+    # The agent's reports carry the step of its FIRST job; the backend files each
+    # result under the step it is currently offering.
+    _report(test_client, run["id"], "done", step="detect", info={"model": "M"})
+    _step(test_client, "read")
+    _report(test_client, run["id"], "done", step="detect", level=19)
+    steps = test_client.get(BASE).json()["run"]["steps"]
+    assert steps["detect"]["info"] == {"model": "M"}
+    assert steps["read"]["level"] == 19
+    assert _findings(test_client)["model"] == "M"
+
+
+@pytest.mark.integration
+def test_step_needs_admin_an_active_run_and_a_sane_request(test_client: TestClient, kiosk):
+    assert _step(test_client, "write").status_code == 404  # nothing active
+    run = _start(test_client, "detect").json()
+    assert _step(test_client, "explode").status_code == 422
+    assert _step(test_client, "write", value=101).status_code == 422
+    assert test_client.post(f"{BASE}/step", json={"step": "write", "x": 1}).status_code == 422
+    test_client.post(f"{BASE}/stop")
+    stopping = _step(test_client, "write")
+    assert stopping.status_code == 409  # a stop is already on its way
+    assert stopping.json()["detail"]["code"] == "display_check_stopping"
+    _report(test_client, run["id"], "stopped")
+    assert _step(test_client, "write").status_code == 404  # ended
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_step_change_needs_admin(test_client: TestClient, kiosk):
+    assert _step(test_client, "write").status_code == 401
+
+
+@pytest.mark.integration
+def test_step_change_respects_the_limit_cap(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    _start(test_client, "detect")
+    refused = _step(test_client, "conversion", value=27)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["max"] == 26
+    assert _step(test_client, "conversion", value=27).status_code == 422
+    assert _step(test_client, "conversion", value=26).status_code == 200
+
+
+@pytest.mark.integration
+def test_a_report_for_another_run_is_dropped(test_client: TestClient, kiosk):
+    assert _report(test_client, "never-started").status_code == 409
+    run = _start(test_client).json()
+    assert _report(test_client, "an-old-run", "done").status_code == 409
+    assert test_client.get(BASE).json()["run"]["id"] == run["id"]
+    assert test_client.get(BASE).json()["run"]["status"] == "requested"
+
+
+@pytest.mark.integration
+def test_reports_are_validated(test_client: TestClient, kiosk):
+    run = _start(test_client).json()
+    assert _report(test_client, run["id"], "exploded").status_code == 422
+    assert _report(test_client, run["id"], level=101).status_code == 422
+    assert _report(test_client, run["id"], surprise=1).status_code == 200  # ignored
+    assert test_client.get("/api/kiosks/nobody-here/display-check").status_code == 404
+    assert test_client.post("/api/kiosks/nobody-here/display-check", json={}).status_code == 422
+
+
+@pytest.mark.integration
+def test_stop_asks_the_agent_to_finish_and_the_report_ends_it(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/stop").status_code == 404  # nothing to stop
+
+    run = _start(test_client, "write", brightness=19).json()
+    _report(test_client, run["id"], level=22)
+    stopped = test_client.post(f"{BASE}/stop")
+    assert stopped.status_code == 200
+    assert stopped.json()["action"] == "stop"
+    assert stopped.json()["active"] is True  # still active until the agent reports
+    assert _config(test_client)["displayCheck"]["action"] == "stop"
+    assert _config(test_client)["displayCheck"]["id"] == run["id"]
+
+    assert _report(test_client, run["id"], "stopped", level=19).status_code == 200
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "stopped"
+    assert seen["active"] is False
+    assert "displayCheck" not in _config(test_client)
+
+
+@pytest.mark.integration
+def test_asleep_is_surfaced_and_not_retried(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "asleep", level=0, detail="the panel is asleep")
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "asleep"
+    assert seen["active"] is False
+    assert seen["detail"] == "the panel is asleep"
+    assert "displayCheck" not in _config(test_client)
+
+
+@pytest.mark.integration
+def test_a_run_expires_after_ten_minutes(test_client: TestClient, kiosk, monkeypatch):
+    from app.services import display_check
+
+    run = _start(test_client).json()
+    real_now = display_check.utcnow()
+    monkeypatch.setattr(
+        display_check, "utcnow", lambda: real_now + timedelta(minutes=10, seconds=5)
+    )
+
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "timeout"
+    assert seen["active"] is False
+    assert "displayCheck" not in _config(test_client)
+    # A rebooted agent finishing safely after the expiry is still heard.
+    assert _report(test_client, run["id"], "interrupted", level=0).status_code == 200
+    assert test_client.get(BASE).json()["run"]["status"] == "interrupted"
+    assert _start(test_client).status_code == 200
+
+
+@pytest.mark.integration
+def test_a_new_start_after_expiry_replaces_the_old_run(test_client: TestClient, kiosk, monkeypatch):
+    from app.services import display_check
+
+    old = _start(test_client).json()
+    real_now = display_check.utcnow()
+    monkeypatch.setattr(display_check, "utcnow", lambda: real_now + timedelta(minutes=11))
+    new = _start(test_client, "write")
+    assert new.status_code == 200
+    assert new.json()["id"] != old["id"]
+    assert _report(test_client, old["id"], "done").status_code == 409
+
+
+EMPTY_FINDINGS = {
+    "checkedAt": None,
+    "ddc": None,
+    "writes": None,
+    "model": None,
+    "connector": None,
+    "vcpVersion": None,
+    "limit": None,
+    "powerTrouble": None,
+}
+
+
+def _findings(client: TestClient) -> dict:
+    listed = client.get("/api/kiosks").json()["kiosks"]
+    return next(k for k in listed if k["id"] == KIOSK)["displayCheck"]
+
+
+@pytest.mark.integration
+def test_findings_start_empty(test_client: TestClient, kiosk):
+    assert _findings(test_client) == EMPTY_FINDINGS
+    assert test_client.get(BASE).json()["findings"] == EMPTY_FINDINGS
+
+
+@pytest.mark.integration
+def test_findings_survive_later_steps(test_client: TestClient, kiosk):
+    detect = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        detect["id"],
+        "done",
+        info={
+            "bus": 2,
+            "model": "NOMAD TOUCH",
+            "connector": "card0-HDMI-A-1",
+            "vcp_version": "2.1",
+        },
+    )
+    found = _findings(test_client)
+    assert found["ddc"] is True
+    assert found["model"] == "NOMAD TOUCH"
+    assert found["connector"] == "card0-HDMI-A-1"
+    assert found["vcpVersion"] == "2.1"
+    assert found["writes"] is None
+    assert found["checkedAt"]
+
+    _step(test_client, "write")
+    _report(test_client, detect["id"], "done", level=19)
+    assert _findings(test_client)["writes"] is True
+
+    _step(test_client, "read")
+    _report(test_client, detect["id"], "done", level=19)
+    found = _findings(test_client)
+    # The current step is now the read step, but the earlier verdicts stay.
+    assert (found["ddc"], found["writes"], found["model"]) == (True, True, "NOMAD TOUCH")
+    assert test_client.get(BASE).json()["findings"] == found
+
+
+@pytest.mark.integration
+def test_failed_runs_record_a_negative_verdict(test_client: TestClient, kiosk):
+    detect = _start(test_client, "detect").json()
+    _report(test_client, detect["id"], "error", detail="no display answered DDC/CI")
+    assert _findings(test_client)["ddc"] is False
+
+    write = _start(test_client, "write").json()
+    _report(test_client, write["id"], "error")
+    assert _findings(test_client)["writes"] is False
+
+
+@pytest.mark.integration
+def test_unfinished_runs_do_not_touch_findings(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "running")
+    for status in ("asleep", "stopped", "interrupted", "timeout"):
+        _report(test_client, run["id"], status)
+        run = _start(test_client, "write").json()
+    assert _findings(test_client) == EMPTY_FINDINGS
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_verdict_needs_admin(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/verdict", json={"writes": True}).status_code == 401
+
+
+@pytest.mark.integration
+def test_owner_verdict_sets_writes_and_checked_at(test_client: TestClient, kiosk):
+    write = _start(test_client, "write").json()
+    _report(test_client, write["id"], "done", level=19)
+    assert _findings(test_client)["writes"] is True  # the agent's own verdict
+
+    resp = test_client.post(f"{BASE}/verdict", json={"writes": False})
+    assert resp.status_code == 200, resp.text
+    found = _findings(test_client)
+    assert found["writes"] is False  # the owner has the last word
+    assert found["checkedAt"]
+    assert resp.json() == found
+
+    assert test_client.post(f"{BASE}/verdict", json={"writes": True}).json()["writes"] is True
+    assert _findings(test_client)["writes"] is True
+
+
+@pytest.mark.integration
+def test_verdict_keeps_the_other_findings(test_client: TestClient, kiosk):
+    detect = _start(test_client, "detect").json()
+    _report(test_client, detect["id"], "done", info={"model": "NOMAD TOUCH"})
+    test_client.post(f"{BASE}/verdict", json={"writes": True})
+    found = _findings(test_client)
+    assert (found["ddc"], found["model"], found["writes"]) == (True, "NOMAD TOUCH", True)
+
+
+@pytest.mark.integration
+def test_verdict_is_validated(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/verdict", json={}).status_code == 422
+    assert test_client.post(f"{BASE}/verdict", json={"writes": "maybe"}).status_code == 422
+    assert test_client.post(f"{BASE}/verdict", json={"writes": True, "x": 1}).status_code == 422
+    assert (
+        test_client.post(
+            "/api/kiosks/nobody-here/display-check/verdict", json={"writes": True}
+        ).status_code
+        == 404
+    )
+
+
+@pytest.mark.integration
+def test_a_finished_run_is_never_reactivated_by_a_late_running_report(
+    test_client: TestClient, kiosk
+):
+    """The limit test browns out the Pi; the rebooted agent reports interrupted, then a
+    stale config poll makes it send running again. That must not re-offer the job."""
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], level=24)
+    assert _report(test_client, run["id"], "interrupted", level=0).status_code == 200
+
+    late = _report(test_client, run["id"], "running", level=2)
+    assert late.status_code == 409
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "interrupted"
+    assert seen["active"] is False
+    assert "displayCheck" not in _config(test_client)
+
+
+@pytest.mark.integration
+def test_a_repeated_terminal_report_is_accepted_and_keeps_the_first_status(
+    test_client: TestClient, kiosk
+):
+    run = _start(test_client, "write").json()
+    assert _report(test_client, run["id"], "stopped", level=19).status_code == 200
+    assert _report(test_client, run["id"], "stopped", level=19, detail="again").status_code == 200
+    assert _report(test_client, run["id"], "done").status_code == 200
+    assert _report(test_client, run["id"], "interrupted").status_code == 200
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["status"] == "stopped"
+    assert seen["active"] is False
+    assert _report(test_client, run["id"], "running").status_code == 409
+
+
+@pytest.mark.integration
+def test_an_expired_run_takes_a_terminal_report_but_not_a_running_one(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    from app.services import display_check
+
+    run = _start(test_client, "write").json()
+    now = display_check.utcnow()
+    monkeypatch.setattr(display_check, "utcnow", lambda: now + timedelta(minutes=11))
+    assert _report(test_client, run["id"], "running").status_code == 409
+    assert "displayCheck" not in _config(test_client)
+    assert _report(test_client, run["id"], "interrupted").status_code == 200
+    assert test_client.get(BASE).json()["run"]["status"] == "interrupted"
+
+
+@pytest.mark.integration
+def test_the_agents_final_done_on_an_expired_run_reads_timeout(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    from app.services import display_check
+
+    run = _start(test_client, "conversion", value=10).json()
+    now = display_check.utcnow()
+    monkeypatch.setattr(display_check, "utcnow", lambda: now + timedelta(minutes=11))
+    assert _report(test_client, run["id"], "done").status_code == 200
+    assert test_client.get(BASE).json()["run"]["status"] == "timeout"
+
+
+def _set_overrides(client: TestClient, overrides: dict):
+    resp = client.put(f"/api/kiosks/{KIOSK}/overrides", json={"overrides": overrides})
+    assert resp.status_code == 200, resp.text
+
+
+@pytest.mark.integration
+def test_start_accepts_any_value_without_a_limit(test_client: TestClient, kiosk):
+    assert _start(test_client, "conversion", value=100).status_code == 200
+
+
+@pytest.mark.integration
+def test_start_refuses_a_value_above_the_limit(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26})
+    refused = _start(test_client, "conversion", value=27)  # the limit 26 is the top
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_limit"
+    assert refused.json()["detail"]["max"] == 26
+    assert test_client.get(BASE).json()["run"] is None  # nothing was started
+    assert _start(test_client, "conversion", value=26).status_code == 200
+
+
+@pytest.mark.integration
+def test_value_limit_ignores_the_screens_step(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 26, "brightnessStep": 5})
+    # the step no longer shifts the top: the limit is the ceiling
+    assert _start(test_client, "conversion", value=27).status_code == 422
+    assert _start(test_client, "conversion", value=26).status_code == 200
+
+
+@pytest.mark.integration
+def test_a_report_with_long_notes_and_unknown_fields_is_accepted(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    log = [{"at": "2026-11-05T10:00:00+00:00", "level": 5, "note": "x" * 5000, "extra": 1}]
+    resp = test_client.post(
+        BASE,
+        json={
+            "id": run["id"],
+            "status": "running",
+            "log": log,
+            "detail": "d" * 5000,
+            "somethingNew": True,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    seen = test_client.get(BASE).json()["run"]
+    assert len(seen["log"][0]["note"]) <= 500
+    assert len(seen["detail"]) <= 500
+    assert "extra" not in seen["log"][0]
+
+
+@pytest.mark.integration
+def test_a_huge_log_is_trimmed_to_the_newest_entries(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    log = [{"level": i % 100, "note": f"n{i}"} for i in range(800)]
+    resp = test_client.post(BASE, json={"id": run["id"], "status": "running", "log": log})
+    assert resp.status_code == 200, resp.text
+    seen = test_client.get(BASE).json()["run"]["log"]
+    assert len(seen) == 500
+    assert seen[-1]["note"] == "n799"
+
+
+# -- calibration v2 (calvin-c805) ---------------------------------------------
+START_KNOWN = {"level": 19, "known": True, "source": "last_set"}
+FAULT = {
+    "step": "write",
+    "level": 12,
+    "kind": "under-voltage",
+    "at": "2026-11-06T17:33:39+00:00",
+    "lastGood": 14,
+    "alsoAt": [8],
+}
+
+
+def _run_record(client: TestClient) -> dict:
+    return client.get(BASE).json()["run"]
+
+
+@pytest.mark.integration
+def test_report_stores_preflight_start_fault_and_reason(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        run["id"],
+        "running",
+        preflight={"status": "clean", "faults": []},
+        start=START_KNOWN,
+    )
+    record = _run_record(test_client)
+    assert record["preflight"] == {"status": "clean", "faults": []}
+    assert record["start"] == START_KNOWN
+    assert record["fault"] is None
+    assert record["reason"] is None
+    assert record["menuAtStart"] is None
+
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    record = _run_record(test_client)
+    assert record["status"] == "error"
+    assert record["reason"] == "power_trouble"
+    assert record["fault"] == {**FAULT, "panelLevel": None}
+    assert record["start"] == START_KNOWN  # kept from the earlier report
+
+
+@pytest.mark.integration
+def test_detect_info_passes_placeholder_reads_through(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "done", info={"model": "X", "placeholderReads": True})
+    assert _run_record(test_client)["steps"]["detect"]["info"]["placeholderReads"] is True
+
+
+@pytest.mark.integration
+def test_menu_at_start_is_admin_only_and_needs_an_active_run(test_client: TestClient, kiosk):
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28}).status_code == 404
+    _start(test_client, "detect")
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 101}).status_code == 422
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28, "x": 1}).status_code == 422
+    stored = test_client.post(f"{BASE}/menu-at-start", json={"menu": 28})
+    assert stored.status_code == 200, stored.text
+    assert stored.json()["menuAtStart"] == 28
+    assert _run_record(test_client)["menuAtStart"] == 28
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28}).status_code == 200
+
+
+@pytest.mark.integration
+@pytest.mark.no_admin_login
+def test_menu_at_start_needs_admin(test_client: TestClient):
+    assert test_client.post(f"{BASE}/menu-at-start", json={"menu": 28}).status_code == 401
+
+
+@pytest.mark.integration
+def test_menu_at_start_unknown_kiosk_is_404(test_client: TestClient):
+    assert (
+        test_client.post(
+            "/api/kiosks/nobody/display-check/menu-at-start", json={"menu": 1}
+        ).status_code
+        == 404
+    )
+
+
+def _with_start(client, level=19, known=True, **extra):
+    run = _start(client, "detect").json()
+    start = {"level": level, "known": known, "source": "last_set" if known else None}
+    _report(client, run["id"], "running", start=start, **extra)
+    return run
+
+
+@pytest.mark.integration
+def test_ceiling_is_the_start_level_until_a_fit_exists(test_client: TestClient, kiosk):
+    assert _run_record(test_client) is None
+    run = _with_start(test_client, 19)
+    assert _run_record(test_client)["ceiling"] == 19
+    # menuAtStart alone (no 2-point fit) never changes the base.
+    test_client.post(f"{BASE}/menu-at-start", json={"menu": 40})
+    assert _run_record(test_client)["ceiling"] == 19
+    assert _config(test_client)["displayCheck"]["ceiling"] == 19
+    assert run["id"]
+
+
+@pytest.mark.integration
+def test_unknown_start_ceiling_is_the_floor(test_client: TestClient, kiosk):
+    _with_start(test_client, None, known=False)
+    assert _run_record(test_client)["ceiling"] == 5
+
+
+@pytest.mark.integration
+def test_menu_at_start_raises_the_base_once_the_fit_has_two_points(test_client: TestClient, kiosk):
+    # menu = 16 + 2.4 * ddc  ->  menu 28 is ddc 5, menu 40 is ddc 10
+    _set_overrides(
+        test_client,
+        {"brightnessConversion": [{"ddc": 5, "menu": 28}, {"ddc": 15, "menu": 52}]},
+    )
+    _with_start(test_client, 5, known=False)
+    test_client.post(f"{BASE}/menu-at-start", json={"menu": 40})
+    assert _run_record(test_client)["ceiling"] == 10
+
+
+@pytest.mark.integration
+def test_ceiling_takes_the_lowest_of_base_limit_and_fault_caps(test_client: TestClient, kiosk):
+    _set_overrides(test_client, {"brightnessLimit": 30})  # the limit is the cap
+    _with_start(test_client, 40)
+    assert _run_record(test_client)["ceiling"] == 30
+    run = _run_record(test_client)
+    # fault at 12, lastGood 14: faultLimit = min(14, 12) - 2 = 10, the cap itself
+    _report(test_client, run["id"], "running", fault=FAULT)
+    assert _run_record(test_client)["ceiling"] == 10
+
+
+@pytest.mark.integration
+def test_conversion_value_above_the_ceiling_is_refused(test_client: TestClient, kiosk):
+    _with_start(test_client, 19)
+    refused = _step(test_client, "conversion", value=20)
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["code"] == "value_above_ceiling"
+    assert refused.json()["detail"]["max"] == 19
+    assert _step(test_client, "conversion", value=19).status_code == 200
+    assert _step(test_client, "conversion", value=15).status_code == 200
+    assert _step(test_client, "write").status_code == 200  # no value, no check
+
+
+TWO_READINGS = [{"ddc": 5, "menu": 28}, {"ddc": 1, "menu": 18}]
+
+
+@pytest.mark.integration
+def test_save_limit_from_a_calibration_fault(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    saved = test_client.post(f"{BASE}/save-limit")
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["brightnessLimit"] == 10  # min(14, 12) - 2, never lastGood itself
+    assert _config(test_client)["brightnessLimit"] == 10
+
+
+@pytest.mark.integration
+def test_findings_power_trouble_from_a_preflight_fault(test_client: TestClient, kiosk):
+    assert _findings(test_client)["powerTrouble"] is None
+    run = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        run["id"],
+        "error",
+        reason="power_at_idle",
+        preflight={"status": "fault", "faults": ["Under-voltage detected!"]},
+    )
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble["step"] == "preflight"
+    assert trouble["level"] is None
+    assert trouble["kind"] == "under-voltage"
+    assert trouble["at"]
+
+
+@pytest.mark.integration
+def test_a_failed_power_preflight_keeps_an_earlier_successful_findings(
+    test_client: TestClient, kiosk
+):
+    """calvin-v996: a run that ends on power trouble says nothing about DDC or writes."""
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "running", preflight={"status": "clean", "faults": []})
+    _report(test_client, run["id"], "done", info={"model": "X"})
+    _step(test_client, "write")
+    _report(test_client, run["id"], "done", level=19, step="write")
+    test_client.post(f"{BASE}/stop")
+    _report(test_client, run["id"], "stopped")
+    before = _findings(test_client)
+    assert before["ddc"] is True
+
+    run = _start(test_client, "detect").json()
+    _report(
+        test_client,
+        run["id"],
+        "error",
+        reason="power_at_idle",
+        preflight={"status": "fault", "faults": ["usb 1-1.1: reset"]},
+    )
+    after = _findings(test_client)
+    assert after["ddc"] is True
+    assert after["writes"] == before["writes"]
+    assert after["powerTrouble"]["step"] == "preflight"
+
+
+@pytest.mark.integration
+def test_a_settling_preflight_is_shown_and_is_not_a_power_fault(test_client: TestClient, kiosk):
+    """calvin-v996: the agent waits for the touch controller; the run says so."""
+    run = _start(test_client, "detect").json()
+    resp = _report(
+        test_client,
+        run["id"],
+        "running",
+        preflight={"status": "settling", "faults": [], "settleLeft": 12},
+    )
+    assert resp.status_code == 200, resp.text
+    view = test_client.get(BASE).json()["run"]
+    assert view["preflight"]["status"] == "settling"
+    assert view["preflight"]["settleLeft"] == 12
+    # The wait over, the next report replaces it (an omitted preflight would not).
+    _report(test_client, run["id"], "running", preflight={"status": "watching", "faults": []})
+    assert test_client.get(BASE).json()["run"]["preflight"] == {"status": "watching", "faults": []}
+    assert _findings(test_client)["powerTrouble"] is None
+
+
+@pytest.mark.integration
+def test_findings_power_trouble_from_a_calibration_fault(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble == {
+        "at": FAULT["at"],
+        "step": "write",
+        "level": 12,
+        "panelLevel": None,
+        "kind": "under-voltage",
+    }
+
+
+@pytest.mark.integration
+def test_a_clean_later_run_clears_power_trouble(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    assert _findings(test_client)["powerTrouble"] is not None
+
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "running", preflight={"status": "clean", "faults": []})
+    _report(test_client, run["id"], "done", info={"model": "X"})
+    assert _findings(test_client)["powerTrouble"] is not None  # step 2 not passed yet
+    _step(test_client, "write")
+    _report(test_client, run["id"], "done", level=19)
+    assert _findings(test_client)["powerTrouble"] is None
+
+
+@pytest.mark.integration
+def test_a_run_with_a_dirty_preflight_does_not_clear_power_trouble(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=FAULT)
+    run = _start(test_client, "write").json()
+    _report(
+        test_client,
+        run["id"],
+        "done",
+        preflight={"status": "fault", "faults": ["Under-voltage detected!"]},
+    )
+    assert _findings(test_client)["powerTrouble"] is not None
+
+
+@pytest.mark.integration
+def test_save_limit_refuses_a_limit_at_or_below_the_floor(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    idle = {**FAULT, "step": "detect", "level": None, "lastGood": None}
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=idle)
+    refused = test_client.post(f"{BASE}/save-limit")
+    assert refused.status_code == 409
+    assert refused.json()["detail"]["code"] == "no_limit"
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble["step"] == "detect" and trouble["level"] is None
+    assert (
+        "brightnessLimit"
+        not in test_client.get(f"/api/kiosks/{KIOSK}/overrides").json()["overrides"]
+    )
+
+
+@pytest.mark.integration
+def test_save_limit_refuses_a_fault_limit_of_zero_or_the_floor(test_client: TestClient, kiosk):
+    run = _start(test_client, "write").json()
+    low = {**FAULT, "level": 7, "lastGood": 9}  # 7 - 2 = 5, the floor
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=low)
+    assert test_client.post(f"{BASE}/save-limit").status_code == 409
+
+
+@pytest.mark.integration
+def test_a_finished_read_means_the_display_answers_ddc(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _report(test_client, run["id"], "error", step="detect")  # a stale "no answer"
+    assert _findings(test_client)["ddc"] is False
+    run = _start(test_client, "detect").json()
+    _step(test_client, "read")
+    # Settings used to say "doesn't answer brightness commands" after a clean v3 run.
+    _report(test_client, run["id"], "done", step="read", level=21)
+    assert _findings(test_client)["ddc"] is True
+
+
+@pytest.mark.integration
+def test_a_read_step_carries_the_typed_panel_level_to_the_agent_and_the_view(
+    test_client: TestClient, kiosk
+):
+    _start(test_client, "detect")
+    stepped = test_client.post(f"{BASE}/step", json={"step": "read", "panelLevel": 74})
+    assert stepped.status_code == 200, stepped.text
+    assert stepped.json()["panelLevel"] == 74
+    assert _config(test_client)["displayCheck"]["panelLevel"] == 74
+    assert _step(test_client, "read").json()["panelLevel"] is None  # a new request drops it
+
+
+@pytest.mark.integration
+def test_a_fault_never_shows_the_previous_readings_panel_level(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _step(test_client, "read")
+    test_client.post(f"{BASE}/step", json={"step": "read", "panelLevel": 74})
+    fault = {**FAULT, "step": "read", "level": None, "lastGood": None}  # none typed for this one
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=fault)
+    assert _findings(test_client)["powerTrouble"]["panelLevel"] is None
+
+
+@pytest.mark.integration
+def test_a_read_fault_with_no_level_records_the_panel_level(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    fault = {**FAULT, "step": "read", "level": None, "lastGood": None, "panelLevel": 74}
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=fault)
+    trouble = _findings(test_client)["powerTrouble"]
+    assert trouble["step"] == "read"
+    assert trouble["level"] is None
+    assert trouble["panelLevel"] == 74

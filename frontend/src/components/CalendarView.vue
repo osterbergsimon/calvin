@@ -105,7 +105,7 @@
               </div>
             </div>
             <div class="calendar-weeks">
-              <template v-for="wk in monthWeeks" :key="wk.weekIndex">
+              <template v-for="wk in monthWeeks" :key="wk.key">
                 <!-- Ribbon strip: a compact band in the seam above this week -->
                 <div
                   v-if="wk.laneCount > 0"
@@ -210,7 +210,7 @@
                   <div class="day-events">
                     <CalendarEventItem
                       v-for="(event, eventIndex) in getVisibleEvents(day.events)"
-                      :key="`${event.id}-${day.date.toISOString()}-${eventIndex}`"
+                      :key="eventChipKey(day, event, eventIndex)"
                       :ref="el => setEventRef(el, dayIndex, eventIndex)"
                       :event="event"
                       :day-index="dayIndex"
@@ -549,9 +549,10 @@ const handleVisibilityChange = () => {
 
 // Load calendar sources on mount
 onMounted(async () => {
-  measureHeaderWidth();
   if (typeof ResizeObserver !== "undefined") {
     headerObserver = new ResizeObserver(entries => {
+      // contentRect is the cached measurement: no clientWidth read (which
+      // forces layout) per render or input event.
       const width = entries[0]?.contentRect?.width;
       if (width > 0) headerWidth.value = width;
     });
@@ -610,10 +611,6 @@ const headerEl = ref(null);
 const headerWidth = ref(typeof window !== "undefined" ? window.innerWidth : 0);
 let headerObserver = null;
 const isNarrowHeader = computed(() => isPhoneWidth(headerWidth.value));
-const measureHeaderWidth = () => {
-  const width = headerEl.value?.clientWidth ?? 0;
-  if (width > 0) headerWidth.value = width;
-};
 const focusedDayIndex = ref(null);
 const focusedEventIndex = ref(null);
 const eventRefs = ref({});
@@ -852,6 +849,28 @@ const getOverflowCount = events => {
   return Math.max(0, events.length - maxVisibleEvents.value);
 };
 
+// Local calendar-day identity (YYYY-MM-DD). Dates in the grid are local
+// midnights, so this is stable regardless of the timezone offset that
+// `toISOString()` would apply.
+const localDateKey = date =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+
+// Agenda/day chips key on date + event id, so inserting or reordering one
+// event does not remount every later chip in the day. The occurrence counter
+// only disambiguates duplicate ids on the same day.
+const occurrenceBefore = (items, index, id) => {
+  let occurrence = 0;
+  for (let i = 0; i < index; i++) {
+    if (items[i]?.id === id) occurrence++;
+  }
+  return occurrence;
+};
+
+const eventChipKey = (day, event, eventIndex) =>
+  `e-${localDateKey(day.date)}-${event.id}-${occurrenceBefore(day.events, eventIndex, event.id)}`;
+
 // Event helper functions moved to useEventHelpers composable
 
 // Helper function to get week number for a date (ISO 8601 week numbering)
@@ -960,27 +979,82 @@ const getWeekNumberForDay = dayIndex => {
 // Turn the flat day window into week rows: spanning events become lane-assigned
 // ribbons, timed events stay a per-day list. Decorate each week/segment with the
 // week number, current-week flag, a representative date, and a stable focus key.
-const monthWeeks = computed(() => {
-  const weeks = buildMonthWeeks(calendarDays.value, { maxTimed: maxVisibleEvents.value });
-  return weeks.map((wk, weekIndex) => ({
-    weekIndex,
+//
+// Weeks are identified by their first day, never by position: the same week is
+// the same row in a rolling window, a non-rolling month and its extra weeks.
+// When the window shifts, a shared week keeps its object (and therefore its
+// focus keys) so Vue patches it instead of tearing down every cell and chip.
+
+// Event fields that change what a chip/ribbon renders; the per-week cache uses
+// them to decide whether a week can be reused verbatim across a window shift.
+const monthEventSignature = event =>
+  [
+    event.id,
+    event.start,
+    event.end,
+    event.all_day ? 1 : 0,
+    event.color ?? "",
+    event.source ?? "",
+    event.title ?? "",
+    event._isStart ? 1 : 0,
+    event._isEnd ? 1 : 0,
+    event._isMultiDay ? 1 : 0,
+  ].join("\u0001");
+
+const monthWeekSignature = (days, maxTimed) =>
+  `${maxTimed}\u0002${days
+    .map(day =>
+      [
+        localDateKey(day.date),
+        day.otherMonth ? 1 : 0,
+        day.isToday ? 1 : 0,
+        (day.events || []).map(monthEventSignature).join("\u0003"),
+      ].join("\u0001")
+    )
+    .join("\u0002")}`;
+
+const buildMonthWeek = (wk, days) => {
+  const key = `w-${localDateKey(days[0].date)}`;
+  return {
+    key,
     laneCount: wk.laneCount,
-    weekNumber: getWeekNumber(getWeekStart(wk.days[0].date)),
-    isCurrent: wk.days.some(d => d.isToday),
+    weekNumber: getWeekNumber(getWeekStart(days[0].date)),
+    isCurrent: days.some(d => d.isToday),
     ribbons: wk.ribbons.map(seg => ({
       ...seg,
-      date: wk.days[seg.startCol].date,
-      focusKey: `m-${weekIndex}-r-${seg.event.id}`,
+      date: days[seg.startCol].date,
+      focusKey: `m-r-${key}-${seg.event.id}`,
     })),
     days: wk.days.map((day, col) => ({
       ...day,
       col,
       timed: day.timed.map((ev, ti) => ({
         ev,
-        focusKey: `m-${weekIndex}-t-${col}-${ev.id}-${ti}`,
+        focusKey: `m-t-${localDateKey(day.date)}-${ev.id}-${occurrenceBefore(day.timed, ti, ev.id)}`,
       })),
     })),
-  }));
+  };
+};
+
+let monthWeekCache = new Map();
+
+const monthWeeks = computed(() => {
+  const days = calendarDays.value;
+  const maxTimed = maxVisibleEvents.value;
+  const weeks = buildMonthWeeks(days, { maxTimed });
+  const nextCache = new Map();
+  const result = weeks.map((wk, weekIndex) => {
+    const weekDays = days.slice(weekIndex * 7, weekIndex * 7 + 7);
+    const cacheKey = localDateKey(wk.days[0].date);
+    const signature = monthWeekSignature(weekDays, maxTimed);
+    const cached = monthWeekCache.get(cacheKey);
+    const week =
+      cached && cached.signature === signature ? cached.week : buildMonthWeek(wk, weekDays);
+    nextCache.set(cacheKey, { signature, week });
+    return week;
+  });
+  monthWeekCache = nextCache;
+  return result;
 });
 
 // Watch one rendered day cell for the Auto row fit. The first `.mv-timed` cell
@@ -1140,6 +1214,38 @@ const setFocusedEvent = (dayIndex, eventIndex) => {
   focusedDayIndex.value = dayIndex;
   focusedEventIndex.value = eventIndex;
 };
+
+const agendaEventIdentity = (day, event) => {
+  let occurrence = 0;
+  for (const candidate of day.events) {
+    if (candidate === event) break;
+    if (candidate.id === event.id) occurrence++;
+  }
+  return `${localDateKey(day.date)}\u0000${event.id}\u0000${occurrence}`;
+};
+
+// Agenda/day focus is index-based. When the window shifts (or an event is
+// inserted earlier in a day) those indices point at different chips, so remap
+// them by the event's stable identity to keep keyboard/remote focus on it.
+watch(calendarDays, (days, previousDays) => {
+  if (focusedDayIndex.value === null || focusedEventIndex.value === null) return;
+  const previousDay = previousDays?.[focusedDayIndex.value];
+  const previousEvent = previousDay?.events?.[focusedEventIndex.value];
+  if (!previousDay || !previousEvent) return;
+  const identity = agendaEventIdentity(previousDay, previousEvent);
+  for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
+    const eventIndex = days[dayIndex].events.findIndex(
+      event => agendaEventIdentity(days[dayIndex], event) === identity
+    );
+    if (eventIndex !== -1) {
+      focusedDayIndex.value = dayIndex;
+      focusedEventIndex.value = eventIndex;
+      return;
+    }
+  }
+  focusedDayIndex.value = null;
+  focusedEventIndex.value = null;
+});
 
 const focusEvent = (dayIndex, eventIndex) => {
   const key = `${dayIndex}-${eventIndex}`;
@@ -1316,8 +1422,11 @@ const navigateNext = () => {
 const previousMonth = navigatePrevious;
 const nextMonth = navigateNext;
 
-const loadEvents = async (background = false) => {
-  lastLoadedAt = Date.now();
+// The one fetched window: `viewMode`, `rolling`, the week/day counts, the
+// current date and the selected sources all feed it. Watching its key (instead
+// of each input separately) means a screen switch that changes several props
+// still makes a single fetch.
+const eventsWindow = computed(() => {
   let startDate, endDate;
 
   if (viewMode.value === "day") {
@@ -1346,10 +1455,21 @@ const loadEvents = async (background = false) => {
     endDate.setHours(23, 59, 59, 999);
   }
 
+  return {
+    key: `${startDate.toISOString()}|${endDate.toISOString()}|${sourceKey.value}`,
+    startDate,
+    endDate,
+  };
+});
+
+const loadEvents = async (background = false, window = eventsWindow.value) => {
+  lastLoadedAt = Date.now();
+  const { startDate, endDate } = window;
+
   try {
-    // Don't force refresh on navigation - let the cache handle it
-    // Only refresh when explicitly requested (e.g., manual refresh button)
-    // The cache TTL (5 minutes) and periodic refresh (15 minutes) will keep data fresh
+    // Don't force refresh on navigation - the store serves a fresh cache hit
+    // and revalidates older ones in the background. The periodic refresh (15
+    // minutes) and explicit user refreshes are real network fetches.
     const refresh = false;
 
     await trackLoad("events", () =>
@@ -1363,42 +1483,19 @@ const loadEvents = async (background = false) => {
   }
 };
 
-watch(currentDate, () => {
-  loadEvents();
-});
+// One watcher for the fetched window.
+watch(
+  () => eventsWindow.value.key,
+  () => loadEvents()
+);
 
-watch(sourceKey, () => {
-  loadEvents();
-});
-
-// The visible date range differs per view mode (a month spans wider than the
-// ±7-day week/day window), so refetch when the mode changes and drop any stale
-// event focus.
+// Dropping event focus is view-only: the window watcher above decides whether
+// a fetch is needed.
 watch(viewMode, () => {
   focusedDayIndex.value = null;
   focusedEventIndex.value = null;
   focusedMonthKey.value = null;
-  loadEvents();
 });
-
-// A larger window needs a wider fetch range than what's already loaded. Weeks
-// drive month view; days drive the week agenda strip.
-watch(rollingWeeks, () => {
-  if (viewMode.value === "month") loadEvents();
-});
-
-watch(rollingDays, () => {
-  if (viewMode.value === "week") loadEvents();
-});
-
-// Appending look-ahead weeks widens a non-rolling month's fetch range.
-watch(extraWeeks, () => {
-  if (viewMode.value === "month" && !rolling.value) loadEvents();
-});
-
-// Rolling on/off (and base mode) can flip the effective window; reload so the
-// fetched range matches what's rendered.
-watch(rolling, () => loadEvents());
 
 // Watch for route changes to reload events when navigating back to dashboard
 watch(

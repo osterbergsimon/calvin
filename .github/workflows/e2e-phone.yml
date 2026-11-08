@@ -36,8 +36,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        working-directory: ./frontend
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
 
       # The suite mocks the backend with route interception; no backend is
       # started. Host-acting routes (restart, update, display) are always

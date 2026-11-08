@@ -3,18 +3,17 @@ import { useConfigStore } from "../stores/config";
 
 /**
  * Shared clock-bar logic used by both ClockBarHorizontal and ClockBarVertical.
+ * The resolved clock bar design (utils/clockBarDesign) is the only source of
+ * the bar's shape and sizes; the household's time zone and time format are the
+ * only config values read here.
  *
  * @param {Object} opts
  * @param {() => boolean} opts.enabled         Whether the bar is enabled (reactive getter).
  * @param {() => boolean} opts.showInKiosk     Show when UI is hidden.
  * @param {() => boolean} opts.showInNonKiosk  Show when UI is visible.
- * @param {() => boolean} [opts.previewMode]   When true, always show and use preview overrides.
- * @param {() => number|null} [opts.previewTimeSize]
- * @param {() => number|null} [opts.previewDateSize]
- * @param {() => string|null} [opts.previewLayout]
- * @param {() => number|null} [opts.previewPadding]
- * @param {() => number|null} [opts.previewPluginItemSize]
+ * @param {() => boolean} [opts.alwaysShow]    Show even when the dashboard would hide it.
  * @param {() => 'horizontal'|'vertical'} [opts.orientation]
+ * @param {() => Object} opts.design           The resolved clock bar design of this shape.
  */
 // Fixed edge gutter (px) along the bar's inline axis, so the leading logo is never
 // flush against the screen edge regardless of the thickness slider.
@@ -25,23 +24,19 @@ export function useClockBar(opts) {
 
   const get = (fn, fallback = null) => (typeof fn === "function" ? fn() : fallback);
 
-  const isPreview = computed(() => !!get(opts.previewMode, false));
   const orientation = computed(() => get(opts.orientation, "horizontal"));
+  const design = computed(() => get(opts.design, null) || {});
 
   const shouldShow = computed(() => {
-    if (isPreview.value) return true;
+    if (get(opts.alwaysShow, false)) return true;
     if (!get(opts.enabled, true)) return false;
     if (get(opts.showInNonKiosk, false) && configStore.shouldShowUI) return true;
     if (get(opts.showInKiosk, false) && !configStore.shouldShowUI) return true;
     return false;
   });
 
-  const showDate = computed(() => !!configStore.clockShowDate);
-  // Plugin tiles are rendered unconditionally: each one is gated by its own
-  // toggle in Dashboard › Clock bar items. Decision C removed the global "Show
-  // plugin info" switch, so a stale master flag can no longer hide every tile
-  // with no control to bring it back.
-  const showSeconds = computed(() => !!configStore.clockShowSeconds);
+  const showDate = computed(() => !!design.value.parts?.date?.visible);
+  const showSeconds = computed(() => !!design.value.parts?.time?.seconds);
   // Reject anything Intl can't accept as a time zone. The backend persists an
   // unset timezone as the literal string "None" (str(None)), which would make
   // every Intl formatter below throw "invalid time zone: None" and crash the
@@ -61,47 +56,7 @@ export function useClockBar(opts) {
   );
   const timeFormat = computed(() => configStore.timeFormat || "24h");
 
-  const fontSize = computed(() => {
-    const preview = get(opts.previewTimeSize, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalFontSize || 18;
-    return configStore.clockBarFontSize || 16;
-  });
-
-  const dateFontSize = computed(() => {
-    const preview = get(opts.previewDateSize, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalDateFontSize || 11;
-    return configStore.clockBarDateFontSize || 14;
-  });
-
-  // Size of plugin statusbar item readouts (the value/number). Drives an override
-  // of --plugin-value-size-sm scoped to the bar's PluginStatusbarItems wrapper.
-  const pluginItemSize = computed(() => {
-    const preview = get(opts.previewPluginItemSize, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") return configStore.clockBarVerticalPluginItemSize ?? 16;
-    return configStore.clockBarPluginItemSize ?? 16;
-  });
-
-  const layout = computed(() => {
-    const preview = get(opts.previewLayout, null);
-    if (isPreview.value && preview !== null) return preview;
-    if (orientation.value === "vertical") {
-      if (configStore.clockBarVerticalLayout) return configStore.clockBarVerticalLayout;
-      return configStore.clockBarLayout === "vertical-compact" ? "compact-time" : "upright";
-    }
-    return configStore.clockBarLayout || "single-line";
-  });
-
-  const barPadding = computed(() => {
-    const preview = get(opts.previewPadding, null);
-    if (isPreview.value && preview !== null) return preview;
-    // Nullish coalescing, not ||: padding 0 is valid ("all the way down") and
-    // must not fall back to the 8px default.
-    if (orientation.value === "vertical") return configStore.clockBarVerticalPadding ?? 8;
-    return configStore.clockBarPadding ?? 8;
-  });
+  const barPadding = computed(() => design.value.paddingPx ?? 8);
 
   // The slider controls the bar's *thickness* (cross-axis) only. Padding along the
   // bar's inline axis just squeezes the fixed-size logo toward the screen edge, so
@@ -274,14 +229,11 @@ export function useClockBar(opts) {
   return {
     shouldShow,
     showDate,
+    showSeconds,
     formattedTime,
     compactTimeParts,
     formattedDate,
     compactDateParts,
-    fontSize,
-    dateFontSize,
-    pluginItemSize,
-    layout,
     barPadding,
     barPaddingStyle,
   };

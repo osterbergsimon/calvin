@@ -22,6 +22,7 @@ export const roleLint = {
   ],
   baseline: [
     "components/ui/ChipMultiSelect.vue",
+    "components/ui/ConfirmModal.vue",
     "components/ui/EmptyState.vue",
     "components/ui/FocusPanel.vue",
     "components/ui/IconButton.vue",
@@ -40,7 +41,7 @@ export const roleLint = {
 
 export const controlLint = {
   allowlist: [],
-  baseline: [],
+  baseline: ["components/ui/ConfirmModal.vue"],
 };
 
 export const settingsNoStyle = {

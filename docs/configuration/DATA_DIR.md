@@ -41,6 +41,12 @@ An empty value (`CALVIN_DATA_DIR=`, `BACKUP_DIR=`, ...) counts as unset.
 evicted, and a single remote image larger than `IMAGE_CACHE_MAX_ITEM_MB`
 (default 25) is refused instead of being read into memory.
 
+`image_cache/variants/` holds the width-bucketed copies the slideshow asks for
+(`?w=640|960|1280|1920|2560`), so a kiosk never downloads a full original.
+Its own cap is `IMAGE_VARIANT_CACHE_MAX_MB` (default 512), with the same
+least-recently-used eviction. Deleting the directory is always safe; variants
+are generated again on demand.
+
 ## Upgrading when the data dir moves
 
 Before `CALVIN_DATA_DIR` was read, everything without its own variable was

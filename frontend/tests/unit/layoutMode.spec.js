@@ -1,10 +1,11 @@
 /**
  * calvin-tnkg — forcing the desktop or phone layout.
  *
- * A kiosk's choice is stored in its screen overrides; any other browser keeps
- * its own choice in localStorage. Both are expressed as one class on <html>,
- * so the JS breakpoints and the CSS custom media agree on the effective layout.
- * Auto means "decide from the viewport", i.e. today's behaviour.
+ * A kiosk's choice is stored in its screen overrides; a plain browser follows
+ * the household config (neither has a browser localStorage layer now). Both are
+ * expressed as one class on <html>, so the JS breakpoints and the CSS custom
+ * media agree on the effective layout. Auto means "decide from the viewport",
+ * i.e. today's behaviour.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import {

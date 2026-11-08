@@ -930,7 +930,12 @@ export function useOnScreenKeyboard() {
     viewportHeight.value = window.innerHeight;
     height.value = 0;
     hardwareSeen.value = readHardwareSeen();
-    focusedTarget.value = isTargetElement(document.activeElement) ? document.activeElement : null;
+    const active = isTargetElement(document.activeElement) ? document.activeElement : null;
+    focusedTarget.value = active;
+    // The keyboard is mounted lazily on focus, so this start() often runs when
+    // the field is already focused: there will be no second focusin to react
+    // to. Open for it here (calvin-0fm6).
+    if (active && canShowFor(active)) showFor(active);
     publishHeight();
     document.addEventListener("focusin", onFocusIn);
     document.addEventListener("focusout", onFocusOut);

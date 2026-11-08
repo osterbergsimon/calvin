@@ -22,7 +22,7 @@ export const settingsCategories = [
     id: "dashboard",
     label: "Dashboard",
     icon: mdiViewDashboardOutline,
-    subtitle: "Pages · clock bar · theme",
+    subtitle: "Pages · clock bar",
   },
   {
     id: "screens",
@@ -67,11 +67,23 @@ export const settingsDestinations = [
   },
   {
     id: "dashboard-layout",
-    label: "Screen orientation",
+    label: "Display: orientation and sizes",
     path: "Screens / Default · Display",
     category: "screens",
     section: "layout",
-    keywords: ["display", "orientation", "flip", "rotation", "landscape", "portrait"],
+    keywords: [
+      "display",
+      "orientation",
+      "flip",
+      "rotation",
+      "landscape",
+      "portrait",
+      "dashboard size",
+      "settings text size",
+      "text size",
+      "ui size",
+      "size",
+    ],
   },
   {
     id: "dashboard-regions",
@@ -93,22 +105,41 @@ export const settingsDestinations = [
     ],
   },
   {
+    // Look moved from Dashboard › Appearance (settings-scope §7 item 6). The
+    // old id and words stay, so a search from habit and an old deep link still
+    // land; Themes themselves are still installed in Plugins.
     id: "dashboard-ui",
-    label: "Appearance",
-    path: "Dashboard / Appearance",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "appearance",
-    keywords: ["ui", "display", "theme", "appearance", "typeface", "font", "dark mode"],
+    label: "Look: theme, light or dark and font",
+    path: "Screens / Default · Look",
+    category: "screens",
+    section: "screen-look",
+    keywords: [
+      "ui",
+      "display",
+      "look",
+      "theme",
+      "appearance",
+      "typeface",
+      "font",
+      "dark mode",
+      "light or dark",
+      "dark hours",
+      "selected theme",
+      "theme picker",
+      "dashboard",
+    ],
   },
   {
+    // Moved from Dashboard › Controls (settings-scope §7 item 4). The old id
+    // and words stay so a search from habit, and an old deep link, still land.
     id: "dashboard-kiosk",
     label: "Controls",
-    path: "Dashboard / Controls",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "kiosk-touch",
+    path: "Screens / Default · Controls",
+    category: "screens",
+    section: "screen-controls",
     keywords: [
+      "dashboard",
+      "dashboard controls",
       "kiosk",
       "wall",
       "controls",
@@ -116,6 +147,7 @@ export const settingsDestinations = [
       "keep clock bar",
       "tap anywhere",
       "show-controls corner",
+      "hot corner",
       "reveal corner",
       "corner visibility",
       "corner size",
@@ -123,23 +155,29 @@ export const settingsDestinations = [
     ],
   },
   {
+    // The per-screen half of the old Dashboard › Focus & remote. Remote
+    // buttons and Hide label after stay in Dashboard.
     id: "dashboard-kiosk-focus",
-    label: "Focus and remote",
-    path: "Dashboard / Focus & remote",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "kiosk-touch-focus",
+    label: "Effects, focus light and button labels",
+    path: "Screens / Default · Effects & focus",
+    category: "screens",
+    section: "screen-effects",
     keywords: [
-      "touch",
+      "dashboard",
+      "dashboard focus",
+      "focus",
       "focus light",
       "spotlight",
       "dim",
-      "focus",
-      "dashboard size",
-      "touch size",
+      "dim other regions",
+      "controls",
+      "hot corner",
+      "effects",
+      "show button presses",
+      "button presses",
+      "label size",
       "remote",
       "buttons",
-      "button bindings",
       "key-press",
       "key press",
       "keyboard feedback",
@@ -174,9 +212,12 @@ export const settingsDestinations = [
     ],
   },
   {
-    id: "clock-bar-appearance",
-    label: "Clock",
-    path: "Dashboard / Clock",
+    // One destination for the one clock bar section. The old ids
+    // (clock-bar-appearance / -layout / -items) stay as aliases so an old
+    // search word or deep link still lands here (§5).
+    id: "clock-bar",
+    label: "Clock bar",
+    path: "Dashboard / Clock bar",
     category: "dashboard",
     tabKey: "settings_tab_dashboard",
     tab: "clock",
@@ -190,23 +231,17 @@ export const settingsDestinations = [
       "font",
       "logo",
       "position",
-    ],
-  },
-  {
-    id: "clock-bar-items",
-    label: "Clock bar items",
-    path: "Dashboard / Clock bar items",
-    category: "dashboard",
-    tabKey: "settings_tab_dashboard",
-    tab: "bar-items",
-    keywords: [
-      "clock bar",
-      "status bar",
+      "appearance",
+      "layout",
+      "two lines",
+      "clock bar items",
       "tiles",
       "items",
       "components",
       "plugins",
+      "plugin tiles",
       "weather tile",
+      "size",
     ],
   },
   {
@@ -340,11 +375,27 @@ export const settingsDestinations = [
   },
   {
     id: "device-power",
-    label: "Screen on/off schedule and idle",
+    label: "Screen on/off schedule, idle and brightness",
     path: "Screens / Default · Power",
     category: "screens",
     section: "device-power",
-    keywords: ["power", "display", "schedule", "daily schedule", "timeout", "screen"],
+    keywords: [
+      "power",
+      "display",
+      "schedule",
+      "daily schedule",
+      "timeout",
+      "screen",
+      "brightness",
+      "dim",
+      "ramp",
+      "ddc",
+      "display check",
+      "under-voltage",
+      "brown out",
+      "power supply",
+      "wake",
+    ],
   },
   {
     id: "device-keyboard",
@@ -377,15 +428,15 @@ export const settingsDestinations = [
   },
   {
     id: "device-notifications",
-    label: "Remote and buttons",
-    path: "Dashboard / Focus & remote",
+    label: "Remote buttons and key-press labels",
+    path: "Dashboard / Remote buttons",
     category: "dashboard",
     section: "kiosk-touch-focus",
     keywords: [
       "notifications",
       "key-press",
       "key press",
-      "keyboard feedback",
+      "hide label after",
       "mode indicator",
       "auto-hide",
       "remote",
@@ -483,6 +534,14 @@ export const settingsDestinations = [
   },
 ];
 
+// Old destination ids keep working: a saved link or a search habit lands on the
+// section that replaced them.
+const SETTINGS_DESTINATION_ALIASES = {
+  "clock-bar-appearance": "clock-bar",
+  "clock-bar-layout": "clock-bar",
+  "clock-bar-items": "clock-bar",
+};
+
 export const normalizeSettingsCategoryId = categoryId => {
   if (typeof categoryId !== "string") return null;
   const resolved = settingsCategoryAliases[categoryId] ?? categoryId;
@@ -492,8 +551,10 @@ export const normalizeSettingsCategoryId = categoryId => {
 export const isKnownSettingsCategory = categoryId =>
   normalizeSettingsCategoryId(categoryId) !== null;
 
-export const getSettingDestinationById = destinationId =>
-  settingsDestinations.find(destination => destination.id === destinationId);
+export const getSettingDestinationById = destinationId => {
+  const resolved = SETTINGS_DESTINATION_ALIASES[destinationId] ?? destinationId;
+  return settingsDestinations.find(destination => destination.id === resolved);
+};
 
 export const getSettingsDestinationSearchText = destination =>
   [destination.label, destination.path, ...(destination.keywords || [])].join(" ").toLowerCase();

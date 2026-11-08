@@ -74,6 +74,7 @@ const onKey = e => {
   border: 0;
   border-radius: var(--seg-btn-radius, var(--radius-sm));
   padding: var(--seg-btn-padding, 0.625rem 1.125rem);
+  min-width: var(--touch-target);
   min-height: var(--seg-btn-min-height, var(--touch-target));
   cursor: pointer;
   display: flex;

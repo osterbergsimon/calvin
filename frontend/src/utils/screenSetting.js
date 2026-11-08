@@ -7,10 +7,49 @@
 // made from the dashboard ⋯ menu shows up in Settings.
 
 import { ref } from "vue";
+import { LAYOUT_STORAGE_KEY } from "./layoutMode";
 
 const localRefs = new Map();
 
 export const screenStorageKey = key => `calvin-screen-${key}`;
+
+/**
+ * Values the old Default Behaviour rows wrote into this browser before F1 was
+ * fixed (settings-scope §7 item 3). These settings have no browser layer now:
+ * a plain browser follows the household config, so a leftover value must not
+ * silently win. Removed once at app start.
+ */
+export const RETIRED_BROWSER_SETTING_KEYS = Object.freeze([
+  LAYOUT_STORAGE_KEY,
+  screenStorageKey("loadingLight"),
+  screenStorageKey("photoFrameEnabled"),
+  screenStorageKey("photoFrameTimeout"),
+  screenStorageKey("photoFrameSourceIds"),
+]);
+
+/** Drop the stale browser copies; returns the keys actually removed. */
+export function removeRetiredBrowserSettings(storage) {
+  if (storage === undefined) {
+    try {
+      storage = typeof window === "undefined" ? null : window.localStorage;
+    } catch {
+      return [];
+    }
+  }
+  if (!storage) return [];
+  const removed = [];
+  for (const key of RETIRED_BROWSER_SETTING_KEYS) {
+    try {
+      if (storage.getItem(key) !== null) {
+        storage.removeItem(key);
+        removed.push(key);
+      }
+    } catch {
+      // Storage blocked: there is nothing to clean and nothing to break.
+    }
+  }
+  return removed;
+}
 
 export function readScreenStorage(storageKey) {
   try {
@@ -55,8 +94,10 @@ export async function writeScreenSetting({
   applyServerValue,
 }) {
   if (kioskId) {
-    const overrides = (await kiosksStore.fetchOverrides(kioskId)) || {};
-    await kiosksStore.saveOverrides(kioskId, { ...overrides, [key]: next });
+    // Merge just this key: a kiosk without admin may only write the allowlisted
+    // per-screen keys (showUI first), and the server keeps every other key
+    // (F2, settings-scope §7.9).
+    await kiosksStore.mergeOverrides(kioskId, { [key]: next });
     applyServerValue?.(next);
     return;
   }

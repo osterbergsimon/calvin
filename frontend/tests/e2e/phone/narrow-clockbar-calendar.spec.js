@@ -29,6 +29,11 @@ test.describe("CLV-110 narrow clock bar and calendar header", () => {
 
     const time = page.locator(".clock-bar-horizontal .clock-time");
     await expect(time).toBeVisible();
+    // The live bar keeps the time's own face (calvin-d7cl review 1).
+    expect(await time.evaluate(el => getComputedStyle(el).fontVariantNumeric)).toContain(
+      "tabular-nums"
+    );
+    expect(await time.evaluate(el => getComputedStyle(el).whiteSpace)).toBe("nowrap");
     const timeBox = await visibleBox(time);
     expect(timeBox).not.toBeNull();
 

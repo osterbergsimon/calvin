@@ -25,7 +25,7 @@ vi.mock("@/composables", () => ({
 import MaintenanceSettings from "@/components/settings/categories/MaintenanceSettings.vue";
 import { collapseSettingsSection, expandSettingsSection } from "@/utils/settingsSectionExpansion";
 import { filterSettingsDestinations } from "@/components/settings/settingsRegistry";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import KioskSoftwarePointer from "@/components/settings/shared/KioskSoftwarePointer.vue";
 import { RELOAD_SOURCE_ID, useProgressStore } from "@/stores/progress";
 

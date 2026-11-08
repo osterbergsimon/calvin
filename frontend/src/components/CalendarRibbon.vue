@@ -116,6 +116,12 @@ const handleFocus = () => emit("focus", props.ribbon);
   border: 1px solid color-mix(in srgb, var(--ribbon-hue) 55%, transparent);
   border-left: 2px solid var(--ribbon-hue);
   border-radius: var(--radius-xs);
+  transition: background var(--dur-fast);
+}
+
+/* FULL: restore the focus-shadow fade from before the audit (calvin-e70v).
+   Standard keeps the cheaper background-only transition. */
+[data-effects="full"] .ribbon {
   transition:
     background var(--dur-fast),
     box-shadow var(--dur-fast);

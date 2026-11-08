@@ -38,8 +38,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        working-directory: ./frontend
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: chromium
 
       # Serious and critical axe violations fail the build. Moderate findings
       # are attached to the Playwright report instead of failing; record them

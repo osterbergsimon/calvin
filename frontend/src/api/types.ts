@@ -869,6 +869,10 @@ export interface paths {
      * Get Image File
      * @description Get image file by ID from plugin service.
      *
+     *     With ``?w=``, serve a width-bucketed, disk-cached display variant (never
+     *     upscaled) so kiosks don't download full originals. Without it, the original
+     *     file is returned unchanged for downloads and the Local photos browser.
+     *
      *     For remote images, downloads and serves via the local cache (avoids rate limits,
      *     enables stale-on-error). For local images, serves the file directly.
      *
@@ -1093,6 +1097,34 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Kiosk
+     * @description Remove a screen and everything stored for it (admin).
+     *
+     *     Deletes the registry row with its overrides, calibration, pending update
+     *     request and display-check state. 404 for an unknown kiosk; 409 while a
+     *     display check is active on it.
+     *
+     *     Removal does not block the device: a kiosk that is still running registers
+     *     again on its next real poll (one that sends its hostname or agent version),
+     *     so remove only screens that have been decommissioned.
+     */
+    delete: operations["delete_kiosk_api_kiosks__kiosk_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/config": {
     parameters: {
       query?: never;
@@ -1107,10 +1139,160 @@ export interface paths {
      *     ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
      *     reported at load and on resize) so the layout editor can preview a screen at
      *     its real aspect ratio (CLV-36).
+     *
+     *     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
+     *     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
+     *     A bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the
+     *     config but changes nothing, so it can neither create a ghost nor make a dead
+     *     screen look online (calvin-7aqu).
      */
     get: operations["get_kiosk_config_api_kiosks__kiosk_id__config_get"];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Display Check
+     * @description The latest display-check run for a kiosk (expiry applied), or ``null``.
+     */
+    get: operations["get_display_check_api_kiosks__kiosk_id__display_check_get"];
+    put?: never;
+    /**
+     * Post Display Check Report
+     * @description The display agent's report on a run. Dropped unless it names the stored run.
+     */
+    post: operations["post_display_check_report_api_kiosks__kiosk_id__display_check_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/menu-at-start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Display Check Menu At Start
+     * @description The Brightness the screen's own menu showed before the check began (admin).
+     */
+    post: operations["post_display_check_menu_at_start_api_kiosks__kiosk_id__display_check_menu_at_start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/save-limit": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Save Display Check Limit
+     * @description Save the limit the latest calibration fault implies as ``brightnessLimit`` (admin).
+     */
+    post: operations["save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Start Display Check
+     * @description Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk.
+     */
+    post: operations["start_display_check_api_kiosks__kiosk_id__display_check_start_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/step": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Change Display Check Step
+     * @description Move the active run to another step/value (admin); the job is re-offered.
+     */
+    post: operations["change_display_check_step_api_kiosks__kiosk_id__display_check_step_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/stop": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Stop Display Check
+     * @description Ask the agent to end the active run safely (admin).
+     */
+    post: operations["stop_display_check_api_kiosks__kiosk_id__display_check_stop_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/kiosks/{kiosk_id}/display-check/verdict": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Post Display Check Verdict
+     * @description The owner's answer to "did the screen change?" (admin). Returns the findings.
+     */
+    post: operations["post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -1138,7 +1320,16 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    patch?: never;
+    /**
+     * Patch Kiosk Overrides
+     * @description Merge keys into a kiosk's override layer (a screen's own write, F2).
+     *
+     *     Additive and partial: keys already in the layer stay, nothing is removed.
+     *     Without an admin session only :data:`KIOSK_SELF_WRITE_KEYS` may be written,
+     *     so the dashboard's ⋯ Hide controls toggle works on a kiosk that was never
+     *     signed in. Any other key is a 403 for that caller.
+     */
+    patch: operations["patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch"];
     trace?: never;
   };
   "/api/kiosks/{kiosk_id}/update": {
@@ -2220,6 +2411,49 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    /**
+     * AgentReport
+     * @description The agent's POST body (deploy/kiosk-agent, ``post_display_check``).
+     *
+     *     Tolerant on purpose: unknown fields are ignored and long text is clipped,
+     *     because a rejected report leaves the run stuck ``running`` until it expires.
+     */
+    AgentReport: {
+      /** Detail */
+      detail?: string | null;
+      fault?: components["schemas"]["FaultIncident"] | null;
+      /** Finishedat */
+      finishedAt?: string | null;
+      /** Id */
+      id: string;
+      /** Info */
+      info?: {
+        [key: string]: unknown;
+      } | null;
+      /** Lastwrite */
+      lastWrite?: number | null;
+      /** Level */
+      level?: number | null;
+      /** Limit */
+      limit?: number | null;
+      /** Log */
+      log?: components["schemas"]["LogEntry"][] | null;
+      preflight?: components["schemas"]["Preflight"] | null;
+      /** Reason */
+      reason?: string | null;
+      /** Seq */
+      seq?: number | null;
+      start?: components["schemas"]["StartLevel"] | null;
+      /** Startedat */
+      startedAt?: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "running" | "done" | "stopped" | "timeout" | "error" | "interrupted" | "asleep";
+      /** Step */
+      step?: string | null;
+    };
     /** AllowedOriginsBody */
     AllowedOriginsBody: {
       /** Origins */
@@ -2320,6 +2554,16 @@ export interface components {
        * Format: binary
        */
       file: string;
+    };
+    /**
+     * BrightnessPoint
+     * @description One owner reading for the DDC to panel-menu conversion (calvin-29ws).
+     */
+    BrightnessPoint: {
+      /** Ddc */
+      ddc: number;
+      /** Menu */
+      menu: number;
     };
     /**
      * CalendarEvent
@@ -2440,6 +2684,95 @@ export interface components {
       claim: string;
     };
     /**
+     * ClockBarDesign
+     * @description The household clock bar design (docs/design/2026-11-04-clock-bar-editor.md §4).
+     */
+    ClockBarDesign: {
+      horizontal?: components["schemas"]["ClockBarHorizontalDesign"] | null;
+      /**
+       * Version
+       * @default 1
+       * @constant
+       */
+      version: 1;
+      vertical?: components["schemas"]["ClockBarVerticalDesign"] | null;
+    };
+    /** ClockBarHorizontalDesign */
+    ClockBarHorizontalDesign: {
+      /**
+       * Barheight
+       * @default normal
+       */
+      barHeight: number | ("slim" | "normal" | "roomy");
+      /** Hidden */
+      hidden?: string[];
+      /** Parts */
+      parts?: {
+        [key: string]: components["schemas"]["ClockBarPart"];
+      };
+      /**
+       * Tilesize
+       * @default m
+       */
+      tileSize: number | ("s" | "m" | "l");
+      zones: components["schemas"]["ClockBarHorizontalZones"];
+    };
+    /** ClockBarHorizontalZones */
+    ClockBarHorizontalZones: {
+      /** Center */
+      center?: string[];
+      /** Left */
+      left?: string[];
+      /** Right */
+      right?: string[];
+    };
+    /**
+     * ClockBarPart
+     * @description One part's options inside a clock bar design.
+     *
+     *     A size is a step name or a px value (Custom). Part ids are dynamic for
+     *     plugin tiles, so they are not validated here.
+     */
+    ClockBarPart: {
+      /** Seconds */
+      seconds?: boolean | null;
+      /** Size */
+      size?: number | ("s" | "m" | "l" | "xl") | null;
+      /** Style */
+      style?: ("upright" | "stacked" | "line") | null;
+      /** Undertime */
+      underTime?: boolean | null;
+    };
+    /** ClockBarVerticalDesign */
+    ClockBarVerticalDesign: {
+      /**
+       * Barheight
+       * @default normal
+       */
+      barHeight: number | ("slim" | "normal" | "roomy");
+      /** Hidden */
+      hidden?: string[];
+      /** Parts */
+      parts?: {
+        [key: string]: components["schemas"]["ClockBarPart"];
+      };
+      /**
+       * Tilesize
+       * @default m
+       */
+      tileSize: number | ("s" | "m" | "l");
+      zones: components["schemas"]["ClockBarVerticalZones"];
+    };
+    /** ClockBarVerticalZones */
+    ClockBarVerticalZones: {
+      /** Bottom */
+      bottom?: string[];
+      /** Middle */
+      middle?: string[];
+      /** Top */
+      top?: string[];
+    };
+    /**
      * ConfigUpdate
      * @description Configuration update model.
      */
@@ -2448,12 +2781,29 @@ export interface components {
       applyDisplayRotation?: boolean | null;
       /** Availablescreens */
       availableScreens?: string[] | null;
+      /** Brightness */
+      brightness?: number | null;
+      /** Brightnessconversion */
+      brightnessConversion?: components["schemas"]["BrightnessPoint"][] | null;
+      /** Brightnessfloor */
+      brightnessFloor?: number | null;
+      /** Brightnesslimit */
+      brightnessLimit?: number | null;
+      /** Brightnessrampenabled */
+      brightnessRampEnabled?: boolean | null;
+      /** Brightnessstep */
+      brightnessStep?: number | null;
+      /** Brightnessstepseconds */
+      brightnessStepSeconds?: number | null;
       /** Calendarrefreshinterval */
       calendarRefreshInterval?: number | null;
       /** Calendarsplit */
       calendarSplit?: number | null;
+      clockBarDesign?: components["schemas"]["ClockBarDesign"] | null;
       /** Clockbarpluginitemsize */
       clockBarPluginItemSize?: number | null;
+      /** Clockbarshowinkiosk */
+      clockBarShowInKiosk?: boolean | null;
       /** Clockbarverticaldatefontsize */
       clockBarVerticalDateFontSize?: number | null;
       /** Clockbarverticalfontsize */
@@ -2493,28 +2843,50 @@ export interface components {
       displayTimeout?: number | null;
       /** Displaytimeoutenabled */
       displayTimeoutEnabled?: boolean | null;
+      /** Effectslevel */
+      effectsLevel?: ("auto" | "full" | "standard") | null;
+      /** Focuslightdimothers */
+      focusLightDimOthers?: boolean | null;
+      /** Focuslightmode */
+      focusLightMode?: ("always" | "interaction" | "off") | null;
       /** Gitbranch */
       gitBranch?: string | null;
       /** Gitrepourl */
       gitRepoUrl?: string | null;
+      /** Hotcornerlongpressms */
+      hotCornerLongPressMs?: number | null;
+      /** Hotcorneropacity */
+      hotCornerOpacity?: number | null;
+      /** Hotcornerposition */
+      hotCornerPosition?: ("bottom-left" | "bottom-right" | "top-left" | "top-right") | null;
+      /** Hotcornersize */
+      hotCornerSize?: number | null;
       /** Imagedisplaymode */
       imageDisplayMode?: string | null;
       /** Keyboardfeedbackenabled */
       keyboardFeedbackEnabled?: boolean | null;
       /** Keyboardfeedbackmode */
-      keyboardFeedbackMode?: string | null;
+      keyboardFeedbackMode?: ("normal" | "small") | null;
       /** Lastsideviewmode */
       lastSideViewMode?: string | null;
+      /** Layoutmode */
+      layoutMode?: ("auto" | "desktop" | "phone") | null;
+      /** Loadinglight */
+      loadingLight?: ("comet" | "pulse" | "off") | null;
       /** Maxvisibleevents */
       maxVisibleEvents?: number | null;
       /** Modeindicatortimeout */
       modeIndicatorTimeout?: number | null;
+      /** Onscreenkeyboard */
+      onScreenKeyboard?: ("auto" | "on" | "off") | null;
       /** Orientation */
-      orientation?: string | null;
+      orientation?: ("landscape" | "portrait") | null;
       /** Orientationflipped */
       orientationFlipped?: boolean | null;
       /** Photoframeenabled */
       photoFrameEnabled?: boolean | null;
+      /** Photoframesourceids */
+      photoFrameSourceIds?: string[] | null;
       /** Photoframetimeout */
       photoFrameTimeout?: number | null;
       /** Photorotationinterval */
@@ -2537,14 +2909,24 @@ export interface components {
       showUI?: boolean | null;
       /** Showweeknumbers */
       showWeekNumbers?: boolean | null;
+      /** Sleepmode */
+      sleepMode?: ("standby" | "dim") | null;
+      /** Tapanywherereveal */
+      tapAnywhereReveal?: boolean | null;
       /** Thememode */
-      themeMode?: string | null;
+      themeMode?: ("light" | "dark" | "auto" | "time") | null;
       /** Timeformat */
       timeFormat?: string | null;
       /** Timezone */
       timezone?: string | null;
+      /** Touchcontrolsize */
+      touchControlSize?: ("xsmall" | "small" | "medium" | "large" | "xlarge") | null;
+      /** Touchcontrols */
+      touchControls?: ("auto" | "on" | "off") | null;
+      /** Typetheme */
+      typeTheme?: string | null;
       /** Uisize */
-      uiSize?: string | null;
+      uiSize?: ("extra-compact" | "compact" | "default" | "large" | "extra-large") | null;
       /** Weekstartday */
       weekStartDay?: number | null;
       /** Weekenddays */
@@ -2586,6 +2968,26 @@ export interface components {
       /** Name */
       name: string;
     };
+    /**
+     * FaultIncident
+     * @description One power-trouble incident; faults seen while settling join ``alsoAt``.
+     */
+    FaultIncident: {
+      /** Alsoat */
+      alsoAt?: number[];
+      /** At */
+      at?: string | null;
+      /** Kind */
+      kind?: string | null;
+      /** Lastgood */
+      lastGood?: number | null;
+      /** Level */
+      level?: number | null;
+      /** Panellevel */
+      panelLevel?: number | null;
+      /** Step */
+      step?: string | null;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -2600,6 +3002,26 @@ export interface components {
       mappings: {
         [key: string]: string;
       };
+    };
+    /** LogEntry */
+    LogEntry: {
+      /** At */
+      at?: string | null;
+      /** Level */
+      level?: number | null;
+      /**
+       * Note
+       * @default
+       */
+      note: string;
+    };
+    /**
+     * MenuAtStartRequest
+     * @description The Brightness the screen's own menu showed before the check changed anything.
+     */
+    MenuAtStartRequest: {
+      /** Menu */
+      menu: number;
     };
     /** OverridesBody */
     OverridesBody: {
@@ -2751,6 +3173,21 @@ export interface components {
       /** Success */
       success: boolean;
     };
+    /**
+     * Preflight
+     * @description The 10 s power watch before the first write (calibration v2).
+     */
+    Preflight: {
+      /** Faults */
+      faults?: string[];
+      /** Settleleft */
+      settleLeft?: number | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "clean" | "fault" | "settling" | "watching";
+    };
     /** SealedModeBody */
     SealedModeBody: {
       /** Sealed Mode */
@@ -2771,6 +3208,56 @@ export interface components {
       /** Action */
       action: string;
     };
+    /**
+     * StartLevel
+     * @description The brightness the screen was at when the run started.
+     */
+    StartLevel: {
+      /**
+       * Known
+       * @default false
+       */
+      known: boolean;
+      /** Level */
+      level?: number | null;
+      /** Source */
+      source?: ("read" | "last_set") | null;
+    };
+    /** StartRequest */
+    StartRequest: {
+      /** Brightness */
+      brightness?: number | null;
+      /**
+       * Step
+       * @enum {string}
+       */
+      step: "detect" | "write" | "conversion" | "read";
+      /** Value */
+      value?: number | null;
+    };
+    /**
+     * StepRequest
+     * @description Move the active run to another step (and target value).
+     */
+    StepRequest: {
+      /** Panellevel */
+      panelLevel?: number | null;
+      /**
+       * Step
+       * @enum {string}
+       */
+      step: "detect" | "write" | "conversion" | "read";
+      /** Value */
+      value?: number | null;
+    };
+    /** StopBody */
+    StopBody: {
+      /**
+       * Saved
+       * @default false
+       */
+      saved: boolean;
+    };
     /** UpdateLinkBody */
     UpdateLinkBody: {
       /** Guests See All */
@@ -2786,6 +3273,11 @@ export interface components {
       msg: string;
       /** Error Type */
       type: string;
+    };
+    /** VerdictRequest */
+    VerdictRequest: {
+      /** Writes */
+      writes: boolean;
     };
   };
   responses: never;
@@ -4096,7 +4588,10 @@ export interface operations {
   };
   get_image_file_api_images__image_id__get: {
     parameters: {
-      query?: never;
+      query?: {
+        /** @description Optional display width; rounded up to 640/960/1280/1920/2560. */
+        w?: number | null;
+      };
       header?: never;
       path: {
         image_id: string;
@@ -4448,6 +4943,37 @@ export interface operations {
       };
     };
   };
+  delete_kiosk_api_kiosks__kiosk_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   get_kiosk_config_api_kiosks__kiosk_id__config_get: {
     parameters: {
       query?: {
@@ -4466,6 +4992,278 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_display_check_api_kiosks__kiosk_id__display_check_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_display_check_report_api_kiosks__kiosk_id__display_check_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AgentReport"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_display_check_menu_at_start_api_kiosks__kiosk_id__display_check_menu_at_start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MenuAtStartRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  start_display_check_api_kiosks__kiosk_id__display_check_start_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StartRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  change_display_check_step_api_kiosks__kiosk_id__display_check_step_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["StepRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  stop_display_check_api_kiosks__kiosk_id__display_check_stop_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["StopBody"] | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["VerdictRequest"];
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {
@@ -4519,6 +5317,41 @@ export interface operations {
     };
   };
   put_kiosk_overrides_api_kiosks__kiosk_id__overrides_put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["OverridesBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch: {
     parameters: {
       query?: never;
       header?: never;

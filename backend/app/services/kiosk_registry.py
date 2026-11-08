@@ -11,6 +11,8 @@ from loguru import logger
 from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
 from app.models.db_models import KioskDB
+from app.schemas.config_update import sanitize_overrides
+from app.services import display_check
 from app.utils.db_retry import retry_on_db_locked
 from app.utils.utc import as_utc, utcnow
 
@@ -62,11 +64,13 @@ def public_overrides(overrides: dict | None) -> dict:
     """Return an override layer safe to hand to the UI.
 
     Host-internal agent keys never belong in a device setting, so they are
-    stripped before the layer leaves the server (CLV-36). Returns a new dict.
+    stripped before the layer leaves the server (CLV-36). Values that no longer
+    validate are dropped too, so a stale layer cannot break a screen's config
+    load (settings-scope §7 item 8). Returns a new dict.
     """
     ov = dict(overrides or {})
     ov.pop(_UPDATE_FLAG_KEY, None)
-    return ov
+    return sanitize_overrides(ov)
 
 
 # The display stacks the kiosk agent can run (deploy/kiosk-agent/calvin_display_agent.py).
@@ -93,6 +97,18 @@ def _normalized_viewport(viewport: dict | None) -> dict | None:
     if w <= 0 or h <= 0 or w > 20000 or h > 20000:
         return None
     return {"w": w, "h": h}
+
+
+_HEARTBEAT_COLUMNS = [
+    "hostname",
+    "last_seen",
+    "agent_version",
+    "agent_update_status",
+    "agent_update_message",
+    "viewport",
+    "display_stack",
+    "overrides",
+]
 
 
 @retry_on_db_locked()
@@ -187,7 +203,9 @@ async def record_kiosk(
     ):
         return
     existing.last_seen = now
-    await existing.update()
+    # Never the display-check columns: the kiosk's own poll rewrites its row about
+    # every 1.5 s during a check and must not put back a stale copy of the run.
+    await existing.update(_columns=_HEARTBEAT_COLUMNS)
 
 
 def _to_utc_iso(dt: datetime | None) -> str | None:
@@ -223,9 +241,38 @@ async def list_kiosks() -> list[dict]:
             "overrides": public_overrides(row.overrides),
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
+            "displayCheck": display_check.findings_view(row.display_check_findings),
+            "displayCheckActive": bool(
+                (display_check.view_of(row.display_check) or {}).get("active")
+            ),
         }
         for row in rows
     ]
+
+
+@retry_on_db_locked()
+async def remove_kiosk(kiosk_id: str) -> bool:
+    """Delete a kiosk's row and with it everything keyed by it.
+
+    The overrides (calibration, the pending update request) and the display-check
+    run and findings are columns of the same row, so one delete clears them all.
+    Returns False for an unknown kiosk; raises ``display_check.RunActiveError``
+    while a display check is active on it.
+    """
+    if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
+        return False
+    # The display-check start path holds this lock, so a run cannot begin between
+    # the active check and the delete: the 409 guarantee holds.
+    async with display_check._kiosk_lock(kiosk_id):
+        row = await KioskDB.objects.get_or_none(id=kiosk_id)
+        if row is None:
+            return False
+        current = display_check.view_of(row.display_check)
+        if current and current["active"]:
+            raise display_check.RunActiveError(current)
+        await row.delete()
+    logger.info(f"Removed kiosk {kiosk_id!r}")
+    return True
 
 
 @retry_on_db_locked()
@@ -305,11 +352,15 @@ def device_config_version(merged: dict) -> str:
 
 
 async def get_overrides(kiosk_id: str) -> dict | None:
-    """Return a kiosk's raw override layer, or None if the kiosk is unknown."""
+    """Return a kiosk's raw override layer, or None if the kiosk is unknown.
+
+    Invalid values left in storage are dropped with a warning, so an old or
+    hand-edited layer cannot break a config load (settings-scope §7 item 8).
+    """
     row = await KioskDB.objects.get_or_none(id=kiosk_id)
     if row is None:
         return None
-    return row.overrides or {}
+    return sanitize_overrides(row.overrides, kiosk_id=kiosk_id)
 
 
 _GLOBAL_NAME_KEYS = ("displayName", "display_name")
@@ -566,4 +617,29 @@ async def set_overrides(kiosk_id: str, overrides: dict) -> None:
                 # Extremely unlikely (row vanished again); nothing safe to do.
                 return
     existing.overrides = overrides
-    await existing.update()
+    # Only this column: a stale whole-row write would put back an old display-check run.
+    await existing.update(_columns=["overrides"])
+
+
+@retry_on_db_locked()
+async def merge_into_overrides(kiosk_id: str, partial: dict) -> dict | None:
+    """Merge ``partial`` into a known kiosk's override layer and return it.
+
+    Additive only: keys already in the layer survive and nothing is removed, so
+    a partial write can never wipe a screen's settings. ``None`` means the
+    kiosk is unknown (or its id is malformed); callers answer 404 rather than
+    creating a row from a partial write.
+    """
+    if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
+        return None
+    existing = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if existing is None:
+        return None
+    merged = dict(existing.overrides or {})
+    merged.update(partial)
+    if merged != (existing.overrides or {}):
+        existing.overrides = merged
+        # Only this column: a concurrent heartbeat (last_seen, agent_*) must not
+        # be overwritten by this snapshot.
+        await existing.update(_columns=["overrides"])
+    return merged

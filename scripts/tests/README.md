@@ -21,6 +21,7 @@ This directory contains tests for the Calvin setup scripts.
 - `test_cog_panel.sh` - Verifies the cog panel helper's screen-off/on order (stop, MainPID wait, tty1 clear, blank 0/4), DPMS verification with one retry, and rotation persistence
 - `test_update_kiosk_cog.sh` - Verifies the updater installs the cog unit but never switches stacks or starts Chromium on cog
 - `test_setup_kiosk_fallback_branch.sh` - Standalone `setup-kiosk.sh` falls back to `develop` (never `main`) for `setup-common.sh`
+- `test_check_commit_attribution.sh` - Verifies `scripts/check-commit-attribution.sh` rejects AI attribution trailers/emails and leaves ordinary Claude mentions alone
 - `helpers/` - Test helper functions and mocks
 
 The `test_*.sh` files are plain bash (no bats needed) and run in CI via the

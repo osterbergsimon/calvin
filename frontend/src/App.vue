@@ -7,7 +7,7 @@
     <ConnectionStatus v-if="!clockBarVisible" floating />
     <StatusRail />
     <ReloadLight />
-    <OnScreenKeyboard />
+    <OnScreenKeyboardLoader />
     <AdminSignInDialog />
   </div>
 </template>
@@ -19,18 +19,24 @@ import { isGuestPath } from "./utils/guestPath";
 import KeyboardHandler from "./components/KeyboardHandler.vue";
 import StatusRail from "./components/StatusRail.vue";
 import ReloadLight from "./components/ReloadLight.vue";
-import OnScreenKeyboard from "./components/ui/OnScreenKeyboard.vue";
+import OnScreenKeyboardLoader from "./components/ui/OnScreenKeyboardLoader.vue";
 import AdminSignInDialog from "./components/auth/AdminSignInDialog.vue";
 import ConnectionStatus from "./components/ConnectionStatus.vue";
 import { useClockBarVisible } from "./composables/useClockBarVisible";
+// Drop retired per-browser values once, before anything reads the screen config
+import { removeRetiredBrowserSettings } from "./utils/screenSetting";
 // Initialize photo frame mode globally
 import { usePhotoFrameMode } from "./composables/usePhotoFrameMode";
 // Initialize theme globally
 import { useTheme } from "./composables/useTheme";
+// Keep the household font in sync with config (H4)
+import { useTypeTheme } from "./composables/useTypeTheme";
 // Keep the global UI scale in sync with config
 import { useUiScale } from "./composables/useUiScale";
 // Force this screen's desktop/phone layout, if it has one
 import { useLayoutOverride } from "./composables/useLayoutOverride";
+// Apply this screen's effects level (full or standard) to <html>
+import { useEffectsLevel } from "./composables/useEffectsLevel";
 // Initialize connection store
 import { useConnectionStore } from "./stores/connection";
 
@@ -38,13 +44,21 @@ import { useConnectionStore } from "./stores/connection";
 // page load of its own, never reached by in-app navigation.
 const guest = isGuestPath(window.location.pathname);
 
+// One-time migration, before any composable reads a screen setting: the old
+// browser values for Behaviour must never beat the household value.
+removeRetiredBrowserSettings();
+
 const clockBarVisible = guest ? null : useClockBarVisible();
 if (!guest) {
   usePhotoFrameMode();
   const theme = useTheme();
+  // Applies the boot cache now, then the household font once config arrives.
+  useTypeTheme().syncWithConfig();
   const uiScale = useUiScale();
   // Applies the layout class before mount; keeps it in step with Settings.
   useLayoutOverride().syncWithConfig();
+  // Applies data-effects before mount and follows the merged config (calvin-uudb).
+  useEffectsLevel().syncWithConfig();
   const connectionStore = useConnectionStore();
 
   // Ensure theme is initialized immediately

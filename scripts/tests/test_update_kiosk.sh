@@ -342,6 +342,42 @@ grep -q 'start calvin-kiosk-remote.service'  "$tmp/systemctl.log" || { echo "FAI
 grep -q "\[Unit\]" "$NEWUNIT" || { echo "FAIL ixk: new unit file not installed"; exit 1; }
 echo "PASS ixk-enable-new-unit"
 
+# --- r3wt: the agent's runtime state dir is created and handed to the agent user ---
+# Existing kiosks have a root-owned state dir; each update must (re)create the
+# "agent" subdir and chown it to the agent user, idempotently, without touching
+# the root-owned updater files.
+cat > "$tmp/bin/chown" <<EOF
+#!/usr/bin/env bash
+echo "\$*" >> "$tmp/chown.log"
+EOF
+chmod +x "$tmp/bin/chown"
+mkdir -p "$tmp/state_r3wt"; rm -f "$tmp/chown.log"
+echo 'print("OLD")' > "$tmp/local/calvin_display_agent.py"
+for pass in 1 2; do
+  CALVIN_CHOWN="$tmp/bin/chown" CALVIN_AGENT_STATE_DIR="$tmp/state_r3wt" bash "$SCRIPT" || { echo "FAIL r3wt: pass $pass exited non-zero"; exit 1; }
+  [ -d "$tmp/state_r3wt/agent" ] || { echo "FAIL r3wt: agent runtime dir not created"; exit 1; }
+  [ "$(stat -c %a "$tmp/state_r3wt/agent")" = "755" ] || { echo "FAIL r3wt: agent dir mode"; exit 1; }
+  grep -qx -e "-h calvin:calvin $tmp/state_r3wt/agent" "$tmp/chown.log" || { echo "FAIL r3wt: agent dir not chowned to calvin"; cat "$tmp/chown.log" 2>&1; exit 1; }
+done
+[ -f "$tmp/state_r3wt/agent-version.json" ] || { echo "FAIL r3wt: updater files missing from the state dir"; exit 1; }
+# --self-check stays read-only: no runtime dir created
+mkdir -p "$tmp/state_r3wt_sc"
+CALVIN_CHOWN="$tmp/bin/chown" CALVIN_AGENT_STATE_DIR="$tmp/state_r3wt_sc" bash "$SCRIPT" --self-check || { echo "FAIL r3wt: self-check"; exit 1; }
+[ ! -e "$tmp/state_r3wt_sc/agent" ] || { echo "FAIL r3wt: self-check created the runtime dir"; exit 1; }
+echo "PASS r3wt-agent-runtime-dir"
+
+# --- r3wt: a symlinked (or non-directory) agent path is refused, never chowned ---
+mkdir -p "$tmp/state_r3wt_ln"; : > "$tmp/rootfile"; rm -f "$tmp/chown.log"
+ln -s "$tmp/rootfile" "$tmp/state_r3wt_ln/agent"
+CALVIN_CHOWN="$tmp/bin/chown" CALVIN_AGENT_STATE_DIR="$tmp/state_r3wt_ln" bash "$SCRIPT" > "$tmp/ln.out" 2>&1 || { echo "FAIL r3wt-symlink: update must not fail"; exit 1; }
+[ -L "$tmp/state_r3wt_ln/agent" ] || { echo "FAIL r3wt-symlink: link was replaced"; exit 1; }
+! grep -q "state_r3wt_ln/agent" "$tmp/chown.log" 2>/dev/null || { echo "FAIL r3wt-symlink: chowned through the link"; exit 1; }
+grep -q "refusing to prepare" "$tmp/ln.out" || { echo "FAIL r3wt-symlink: no refusal logged"; exit 1; }
+rm -f "$tmp/state_r3wt_ln/agent"; : > "$tmp/state_r3wt_ln/agent"
+CALVIN_CHOWN="$tmp/bin/chown" CALVIN_AGENT_STATE_DIR="$tmp/state_r3wt_ln" bash "$SCRIPT" > "$tmp/ln.out" 2>&1 || { echo "FAIL r3wt-file: update must not fail"; exit 1; }
+grep -q "refusing to prepare" "$tmp/ln.out" || { echo "FAIL r3wt-file: no refusal logged"; exit 1; }
+echo "PASS r3wt-refuse-symlink"
+
 # --- 0ug: a unit dropped from the manifest is decommissioned post-health ---
 mkdir -p "$tmp/state_0ug"
 DROP_UNIT="$tmp/systemd/calvin-old.service"

@@ -48,6 +48,7 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "selectedTheme",
         "darkModeStart",
         "darkModeEnd",
+        "typeTheme",
         "displayScheduleEnabled",
         "displaySchedule",
         "displayTimeoutEnabled",
@@ -72,6 +73,7 @@ def test_get_config_returns_all_frontend_tracked_fields(test_client: TestClient)
         "clockBarVerticalPluginItemSize",
         "clockBarShowPluginItems",
         "clockBarShowLogo",
+        "clockBarDesign",
         "uiSize",
         "consoleLogEnabled",
         "consoleLogLevel",
@@ -144,6 +146,23 @@ def test_ui_size_defaults_and_round_trips(test_client: TestClient):
     persisted = test_client.get("/api/config")
     assert persisted.status_code == 200
     assert persisted.json().get("uiSize") == "large"
+
+
+@pytest.mark.integration
+def test_type_theme_defaults_to_none_and_round_trips(test_client: TestClient):
+    """The font is a household key (H4). None means "the household has no choice",
+    which lets a browser migrate its old localStorage value exactly once."""
+    default = test_client.get("/api/config")
+    assert default.status_code == 200
+    assert default.json().get("typeTheme") is None
+
+    update = test_client.post("/api/config", json={"typeTheme": "marquee"})
+    assert update.status_code == 200
+    assert update.json().get("typeTheme") == "marquee"
+
+    persisted = test_client.get("/api/config")
+    assert persisted.status_code == 200
+    assert persisted.json().get("typeTheme") == "marquee"
 
 
 @pytest.mark.integration

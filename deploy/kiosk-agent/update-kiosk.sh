@@ -20,6 +20,11 @@ CURL="${CALVIN_CURL:-curl}"
 SYSTEMCTL="${CALVIN_SYSTEMCTL:-systemctl}"
 PYTHON="${CALVIN_PYTHON:-python3}"
 STATE_DIR="${CALVIN_AGENT_STATE_DIR:-/var/lib/calvin}"
+# The agent runs as this user and keeps its run state (display-check, DDC bus) in
+# ${STATE_DIR}/agent. STATE_DIR itself and the updater files in it stay root-owned.
+AGENT_USER="${CALVIN_AGENT_USER:-calvin}"
+AGENT_RUNTIME_DIR="${STATE_DIR}/agent"
+CHOWN="${CALVIN_CHOWN:-chown}"
 SYSTEMD_DIR="${CALVIN_SYSTEMD_DIR:-/etc/systemd/system}"
 BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
 LABWC_DIR="${CALVIN_LABWC_DIR:-/home/calvin/.config/labwc}"
@@ -277,6 +282,24 @@ BOOTSTRAP=0
 if [ "${1:-}" = "--bootstrap" ]; then BOOTSTRAP=1; fi
 
 mkdir -p "$STATE_DIR"
+
+# calvin-r3wt: create/repair the agent's runtime dir. Runs on every update, so
+# kiosks installed with a root-owned state dir are fixed by their next self-update.
+# Idempotent; a failure must not block the update (the agent warns at startup).
+ensure_agent_runtime_dir() {
+  # Never chown through a symlink: where the state dir is user-writable the agent
+  # user could point "agent" at a root file. Refuse anything that is not a plain dir.
+  if [ -L "$AGENT_RUNTIME_DIR" ] || { [ -e "$AGENT_RUNTIME_DIR" ] && [ ! -d "$AGENT_RUNTIME_DIR" ]; }; then
+    log "refusing to prepare ${AGENT_RUNTIME_DIR}: it is a symlink or not a directory; agent run state will not persist"
+    return 0
+  fi
+  if mkdir -p "$AGENT_RUNTIME_DIR" && chmod 0755 "$AGENT_RUNTIME_DIR" \
+    && "$CHOWN" -h "${AGENT_USER}:${AGENT_USER}" "$AGENT_RUNTIME_DIR"; then
+    return 0
+  fi
+  log "could not prepare ${AGENT_RUNTIME_DIR} for user ${AGENT_USER}; agent run state will not persist"
+}
+ensure_agent_runtime_dir
 
 write_state() {  # status phase message [version]
   mkdir -p "$STATE_DIR"

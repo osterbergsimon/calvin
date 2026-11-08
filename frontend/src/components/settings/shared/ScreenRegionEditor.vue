@@ -369,6 +369,7 @@
               @toggle-direction="toggleLayoutDir"
               @clock-enabled="setClockEnabled"
               @clock-position="setClockPosition"
+              @clock-design="clockDesignOpen = true"
               @clock-inherit="clearClock"
               @duplicate="duplicateScreen"
               @delete="requestDeleteActiveScreen"
@@ -399,17 +400,27 @@
         @alternative="hideActivePage"
         @cancel="deleteConfirm = null"
       />
+
+      <!-- The clock bar design editor opens on top of this one (§5). -->
+      <ClockBarEditor
+        :config="config"
+        :open="clockDesignOpen"
+        :initial-shape="clock.mode"
+        :initial-preview-kiosk="previewScreenId === ANY_BROWSER ? null : previewScreenId"
+        @update:config="patch => emit('update:config', patch)"
+        @close="clockDesignOpen = false"
+      />
     </div>
   </Dialog>
 </template>
 
 <script setup>
-import { WIDE_MIN_WIDTH, isPhoneWidth } from "@/styles/breakpoints.js";
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useConfigStore } from "@/stores/config";
+import { useEditorLayout } from "@/composables/useEditorLayout";
 import { usePlugins } from "@/composables";
 import { buildComponentOptions } from "@/utils/componentPicker";
 import Button from "@/components/ui/Button.vue";
@@ -423,11 +434,12 @@ import Tag from "@/components/ui/Tag.vue";
 import { mdiPlus } from "@mdi/js";
 import { getKioskId } from "@/utils/kioskId";
 import { screenLabel } from "@/utils/screenLabel";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import { findPlaceableRegion, placeKindInRegion, placeServiceInRegion } from "@/utils/placement";
 import ScreenInspector from "./regions/ScreenInspector.vue";
 import RegionInspector from "./regions/RegionInspector.vue";
 import RegionNode from "./regions/RegionNode.vue";
+import ClockBarEditor from "./ClockBarEditor.vue";
 import { logError } from "@/utils/logger";
 import {
   MAX_TOP_REGIONS,
@@ -498,104 +510,19 @@ const regionsEl = ref(null);
 const dragState = ref(null);
 
 /* --- size class + touch capability --------------------------------------- */
-// The editor's layout follows the SPACE IT IS GIVEN, not its own box. The two
-// layouts are different sizes (Wide keeps a gutter and a header, Compact/Phone
-// bleed to the edges), so a class decided from the modal's own measurements
-// resized the box that decided it and flipped forever: at a 1280x720 fullscreen
-// window the Wide content measures ~627px tall and Compact ~663px, either side
-// of the 640px threshold. The dialog's fixed overlay is the available space —
-// inset 0 with its bottom above the on-screen keyboard (--osk-height) — so the
-// OSK shrinking the space still re-evaluates the class, while none of the
-// editor's own layout can change the measurement.
-const modalEl = ref(null);
-const stageEl = ref(null);
-const stageSize = ref({ width: 0, height: 0 });
-const WIDE_MIN_HEIGHT = 640;
-// A deadband around each Wide threshold: device-pixel rounding (a 1.25/1.5 dpr
-// screen) or a scrollbar appearing must not flip the layout twice at a boundary.
-const WIDE_HYSTERESIS = 24;
-
-const resolveSizeClass = ({ width, height }, current) => {
-  // Unmeasured (first paint, or a test host without ResizeObserver): keep
-  // today's layout until the observer reports.
-  if (!width || !height) return "wide";
-  const wide =
-    current === "wide"
-      ? width >= WIDE_MIN_WIDTH - WIDE_HYSTERESIS && height >= WIDE_MIN_HEIGHT - WIDE_HYSTERESIS
-      : width >= WIDE_MIN_WIDTH + WIDE_HYSTERESIS && height >= WIDE_MIN_HEIGHT + WIDE_HYSTERESIS;
-  if (wide) return "wide";
-  return isPhoneWidth(width) ? "phone" : "compact";
-};
-
-const sizeClass = ref("wide");
-const setAvailableSize = size => {
-  sizeClass.value = resolveSizeClass(size, sizeClass.value);
-};
-const isPhone = computed(() => sizeClass.value === "phone");
-
-const coarsePointer = ref(false);
-const reduceMotion = ref(false);
-const mediaCleanups = [];
-const watchMedia = (query, target) => {
-  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-  const mql = window.matchMedia(query);
-  target.value = Boolean(mql.matches);
-  const handler = event => {
-    target.value = Boolean(event.matches);
-  };
-  if (typeof mql.addEventListener === "function") {
-    mql.addEventListener("change", handler);
-    mediaCleanups.push(() => mql.removeEventListener("change", handler));
-  } else if (typeof mql.addListener === "function") {
-    mql.addListener(handler);
-    mediaCleanups.push(() => mql.removeListener(handler));
-  }
-};
-watchMedia("(any-pointer: coarse)", coarsePointer);
-watchMedia("(prefers-reduced-motion: reduce)", reduceMotion);
-
-// The overlay is the editor's available space; <html> is the fallback for a
-// host that renders the editor without the Dialog shell.
-const spaceElement = () =>
-  modalEl.value?.closest?.(".dialog-overlay") ||
-  (typeof document !== "undefined" ? document.documentElement : null);
-// Read the border box: contentRect would subtract the overlay's gutter, which
-// the bleed layout removes, so it would depend on the class again.
-const borderBoxOf = entry => {
-  const border = entry?.borderBoxSize;
-  const size = Array.isArray(border) ? border[0] : border;
-  if (size && (size.inlineSize || size.blockSize)) {
-    return { width: size.inlineSize, height: size.blockSize };
-  }
-  const rect = entry?.target?.getBoundingClientRect?.();
-  if (rect) return { width: rect.width, height: rect.height };
-  const content = entry?.contentRect;
-  return { width: content?.width ?? 0, height: content?.height ?? 0 };
-};
-
-let spaceObserver = null;
-let stageObserver = null;
-const stopObserving = () => {
-  spaceObserver?.disconnect();
-  stageObserver?.disconnect();
-  spaceObserver = null;
-  stageObserver = null;
-};
-const startObserving = () => {
-  if (typeof ResizeObserver === "undefined") return;
-  stopObserving();
-  spaceObserver = new ResizeObserver(entries => {
-    const entry = entries[0];
-    if (entry) setAvailableSize(borderBoxOf(entry));
-  });
-  stageObserver = new ResizeObserver(entries => {
-    const box = entries[0]?.contentRect;
-    if (box) stageSize.value = { width: box.width, height: box.height };
-  });
-  const space = spaceElement();
-  if (space) spaceObserver.observe(space);
-  if (stageEl.value) stageObserver.observe(stageEl.value);
-};
+// Shared with the clock bar editor so both full-size editors use one layout.
+const {
+  modalEl,
+  stageEl,
+  stageSize,
+  sizeClass,
+  isPhone,
+  coarsePointer,
+  reduceMotion,
+  startObserving,
+  stopObserving,
+  resetLayout,
+} = useEditorLayout();
 
 /* --- model --- */
 const configValue = computed(() => props.config || {});
@@ -807,6 +734,7 @@ const STAGE_CHROME_HEIGHT = 72; // the stage tag above + the caption/note below
 
 const sheetOpen = ref(false);
 const clockSelected = ref(false);
+const clockDesignOpen = ref(false);
 
 const deviceBox = computed(() => {
   const vp = previewViewport.value;
@@ -1596,9 +1524,9 @@ watch(
       startObserving();
     } else {
       stopObserving();
-      sizeClass.value = "wide";
-      stageSize.value = { width: 0, height: 0 };
+      resetLayout();
       sheetOpen.value = false;
+      clockDesignOpen.value = false;
     }
   }
 );
@@ -1652,7 +1580,6 @@ onUnmounted(() => {
   window.removeEventListener("pointermove", onResizeMove);
   window.removeEventListener("pointermove", onSheetDragMove);
   stopObserving();
-  mediaCleanups.forEach(cleanup => cleanup());
   clearInterval(clockTimer);
 });
 </script>

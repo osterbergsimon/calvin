@@ -9,6 +9,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export const useKiosksStore = defineStore("kiosks", () => {
   const kiosks = ref([]);
+  let refreshSequence = 0;
 
   async function loadKiosks() {
     try {
@@ -19,6 +20,25 @@ export const useKiosksStore = defineStore("kiosks", () => {
       logError("[kiosks]", "Failed to load kiosks, using cache:", err);
       const cached = getCachedData(CACHE_KEY, CACHE_TTL, { allowStale: true });
       if (cached) kiosks.value = cached;
+    }
+  }
+
+  // Background presence refreshes must not replace configuration currently
+  // being edited. Merge each kiosk's live fields but retain its list overrides.
+  async function refreshKiosks() {
+    const sequence = ++refreshSequence;
+    try {
+      const response = await api.get("/kiosks");
+      if (sequence !== refreshSequence) return;
+      const currentById = new Map(kiosks.value.map(k => [k.id, k]));
+      const fresh = response.data?.kiosks ?? [];
+      kiosks.value = fresh.map(k => {
+        const current = currentById.get(k.id);
+        return current ? { ...k, overrides: current.overrides ?? k.overrides } : k;
+      });
+      setCachedData(CACHE_KEY, kiosks.value);
+    } catch {
+      // Quietly keep the last good data; the next visible interval can retry.
     }
   }
 
@@ -34,6 +54,17 @@ export const useKiosksStore = defineStore("kiosks", () => {
 
   async function saveOverrides(id, overrides) {
     await api.put(`/kiosks/${encodeURIComponent(id)}/overrides`, { overrides });
+  }
+
+  // A screen without an admin session may only merge the keys it is changing
+  // into its own layer (F2, settings-scope §7.9). Nothing else in the layer is
+  // touched, and the server answers with the merged layer. Returns null when
+  // the response carries no layer, so callers keep their last known copy.
+  async function mergeOverrides(id, partial) {
+    const response = await api.patch(`/kiosks/${encodeURIComponent(id)}/overrides`, {
+      overrides: partial,
+    });
+    return response.data?.overrides ?? null;
   }
 
   // Keep the list's copy in step after a write (the list carries overrides so
@@ -54,6 +85,21 @@ export const useKiosksStore = defineStore("kiosks", () => {
     }
   }
 
+  // Removes the screen's row and everything stored for it. A screen that is
+  // still running shows up again on its next check-in.
+  async function removeKiosk(id) {
+    try {
+      await api.delete(`/kiosks/${encodeURIComponent(id)}`);
+    } catch (err) {
+      // Already gone (removed on another device): the goal is met.
+      if (err?.response?.status !== 404) throw err;
+    }
+    // Drop any in-flight refresh so it can't put the row back.
+    refreshSequence++;
+    kiosks.value = kiosks.value.filter(k => k.id !== id);
+    setCachedData(CACHE_KEY, kiosks.value);
+  }
+
   async function triggerUpdate(id) {
     await api.post(`/kiosks/${encodeURIComponent(id)}/update`);
     await loadKiosks();
@@ -71,10 +117,13 @@ export const useKiosksStore = defineStore("kiosks", () => {
   return {
     kiosks,
     loadKiosks,
+    refreshKiosks,
     fetchOverrides,
     saveOverrides,
+    mergeOverrides,
     setKioskOverrides,
     fetchDeviceConfigVersion,
+    removeKiosk,
     triggerUpdate,
     fetchAvailableAgentVersion,
   };

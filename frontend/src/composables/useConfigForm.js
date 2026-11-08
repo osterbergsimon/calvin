@@ -2,22 +2,59 @@
  * Composable for managing configuration form state and updates.
  */
 
-import { computed, ref } from "vue";
+import { computed, getCurrentInstance, onUnmounted, ref } from "vue";
 import { useConfigStore } from "../stores/config";
 import * as configApi from "../services/configApi";
 import { logError } from "../utils/logger";
 import { friendlyError } from "../utils/friendlyError";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
+import { createOptimisticQueue } from "../utils/optimisticQueue";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
-  const localConfig = ref({ ...initialConfig });
-  const saving = ref(false);
   const error = ref("");
   const saveSuccess = ref(false);
   const lastSavedKeys = ref([]);
   let saveSuccessTimer = null;
+
+  // The form is one target: confirmed is the last config the server accepted,
+  // and pending holds the keys the user has changed since. The displayed form
+  // is pending over confirmed, so a tap shows at once and a failure only
+  // reverts the values that actually failed.
+  const queue = createOptimisticQueue({
+    initial: initialConfig,
+    save: async ({ changes }) => {
+      error.value = "";
+      saveSuccess.value = false;
+      // The store POSTs to the backend and applies the result; one request per save.
+      await configStore.updateConfig(changes);
+      lastSavedKeys.value = Object.keys(changes);
+      saveSuccess.value = true;
+      if (saveSuccessTimer) {
+        clearTimeout(saveSuccessTimer);
+      }
+      saveSuccessTimer = setTimeout(() => {
+        saveSuccess.value = false;
+        saveSuccessTimer = null;
+      }, 2500);
+    },
+    onError: err => {
+      logError("[useConfigForm]", "Failed to save config:", err);
+      error.value = friendlyError(err, "save your settings");
+    },
+  });
+
+  const saving = queue.saving;
+  // A test or a reset may replace the whole form; that also drops anything
+  // still queued so it cannot be written after the replacement.
+  const localConfig = computed({
+    get: () => queue.display.value,
+    set: next => {
+      queue.discardPending();
+      queue.confirm(next);
+    },
+  });
 
   const saveStatus = computed(() => {
     if (saving.value) {
@@ -91,6 +128,9 @@ export function useConfigForm(initialConfig = {}) {
         )
           ? (response.photoFrameSourceIds ?? response.photo_frame_source_ids)
           : [],
+        // Per-screen layout (calvin-tnkg): the household default lives here now
+        // that Screens › Default writes it; a screen's own value is an override.
+        layoutMode: response.layoutMode ?? response.layout_mode ?? "auto",
         photoRotationInterval:
           response.photoRotationInterval ?? response.photo_rotation_interval ?? 30,
         imageDisplayMode: response.imageDisplayMode ?? response.image_display_mode ?? "smart",
@@ -101,6 +141,7 @@ export function useConfigForm(initialConfig = {}) {
         focusLightMode: response.focusLightMode ?? response.focus_light_mode ?? "interaction",
         focusLightDimOthers:
           response.focusLightDimOthers ?? response.focus_light_dim_others ?? true,
+        effectsLevel: response.effectsLevel ?? response.effects_level ?? "auto",
         loadingLight: response.loadingLight ?? response.loading_light ?? "comet",
         touchControls: response.touchControls ?? response.touch_controls ?? "auto",
         touchControlSize: response.touchControlSize ?? response.touch_control_size ?? "medium",
@@ -193,6 +234,7 @@ export function useConfigForm(initialConfig = {}) {
         clockBarShowPluginItems:
           response.clockBarShowPluginItems ?? response.clock_bar_show_plugin_items ?? true,
         clockBarShowLogo: response.clockBarShowLogo ?? response.clock_bar_show_logo ?? true,
+        clockBarDesign: response.clockBarDesign ?? response.clock_bar_design ?? null,
         // Other
         uiSize: response.uiSize ?? response.ui_size ?? "default",
         consoleLogEnabled: response.consoleLogEnabled ?? response.console_log_enabled ?? true,
@@ -212,50 +254,37 @@ export function useConfigForm(initialConfig = {}) {
     }
   };
 
-  // Update a single config value
-  const updateConfigValue = async (key, value) => {
-    localConfig.value[key] = value;
-    await saveConfig({ [key]: value });
-  };
+  // Update a single config value. The form value changes first; the save is
+  // coalesced with any other quick edits and rolls the value back if it fails.
+  const updateConfigValue = (key, value) => queue.setPartial({ [key]: value });
 
   // Update multiple config values
-  const updateConfig = async updates => {
-    Object.assign(localConfig.value, updates);
-    await saveConfig(updates);
-  };
+  const updateConfig = updates => queue.setPartial(updates);
 
-  // Save config to backend
+  // Save config to backend. This is the shared write path: a control has
+  // already applied its value locally by the time it gets here.
   const saveConfig = async (updates = null) => {
-    saving.value = true;
-    error.value = "";
-    saveSuccess.value = false;
-
-    try {
-      const configToSave = updates || localConfig.value;
-      // The store POSTs to the backend and applies the result; one request per save.
-      await configStore.updateConfig(configToSave);
-      lastSavedKeys.value = updates ? Object.keys(updates) : [];
-      saveSuccess.value = true;
-      if (saveSuccessTimer) {
-        clearTimeout(saveSuccessTimer);
-      }
-      saveSuccessTimer = setTimeout(() => {
-        saveSuccess.value = false;
-        saveSuccessTimer = null;
-      }, 2500);
-    } catch (err) {
-      logError("[useConfigForm]", "Failed to save config:", err);
-      error.value = friendlyError(err, "save your settings");
-      throw err;
-    } finally {
-      saving.value = false;
-    }
+    return queue.setPartial(updates || queue.display.value);
   };
 
   // Reset to store values
   const resetConfig = async () => {
     await loadConfig();
   };
+
+  // Never lose a queued value on navigation or a page close.
+  const flush = () => {
+    void queue.flush();
+  };
+  if (typeof window !== "undefined" && getCurrentInstance()) {
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("pagehide", flush);
+    onUnmounted(() => {
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("pagehide", flush);
+      flush();
+    });
+  }
 
   return {
     localConfig,

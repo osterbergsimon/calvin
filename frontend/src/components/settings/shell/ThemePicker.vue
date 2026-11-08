@@ -1,5 +1,5 @@
 <template>
-  <Popover v-model="open" class="theme-picker" label="Choose theme" role="dialog" @open="loadDark">
+  <Popover v-model="open" label="Choose theme" role="dialog" @open="loadDark">
     <template #trigger="{ attrs }">
       <Button
         v-bind="attrs"
@@ -21,6 +21,7 @@
         :selected-theme-id="selectedThemeId || CALVIN_ID"
         :loading="loading"
         :dark="dark"
+        :show-both-modes="true"
         :show-help="false"
         @select="onSelect"
       />

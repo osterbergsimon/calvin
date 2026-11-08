@@ -1,6 +1,198 @@
 {
   "components": {
     "schemas": {
+      "AgentReport": {
+        "description": "The agent's POST body (deploy/kiosk-agent, ``post_display_check``).\n\nTolerant on purpose: unknown fields are ignored and long text is clipped,\nbecause a rejected report leaves the run stuck ``running`` until it expires.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "fault": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FaultIncident"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id",
+            "type": "string"
+          },
+          "info": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Info"
+          },
+          "lastWrite": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastwrite"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit"
+          },
+          "log": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LogEntry"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log"
+          },
+          "preflight": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Preflight"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "seq": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seq"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StartLevel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "done",
+              "stopped",
+              "timeout",
+              "error",
+              "interrupted",
+              "asleep"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "title": "AgentReport",
+        "type": "object"
+      },
       "AllowedOriginsBody": {
         "properties": {
           "origins": {
@@ -163,6 +355,30 @@
           "file"
         ],
         "title": "Body_upload_image_api_images_upload_post",
+        "type": "object"
+      },
+      "BrightnessPoint": {
+        "additionalProperties": false,
+        "description": "One owner reading for the DDC to panel-menu conversion (calvin-29ws).",
+        "properties": {
+          "ddc": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Ddc",
+            "type": "integer"
+          },
+          "menu": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Menu",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ddc",
+          "menu"
+        ],
+        "title": "BrightnessPoint",
         "type": "object"
       },
       "CalendarEvent": {
@@ -401,6 +617,318 @@
         "title": "ClaimBody",
         "type": "object"
       },
+      "ClockBarDesign": {
+        "additionalProperties": false,
+        "description": "The household clock bar design (docs/design/2026-11-04-clock-bar-editor.md \u00a74).",
+        "properties": {
+          "horizontal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarHorizontalDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "version": {
+            "const": 1,
+            "default": 1,
+            "title": "Version",
+            "type": "integer"
+          },
+          "vertical": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarVerticalDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ClockBarDesign",
+        "type": "object"
+      },
+      "ClockBarHorizontalDesign": {
+        "additionalProperties": false,
+        "properties": {
+          "barHeight": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "slim",
+                  "normal",
+                  "roomy"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "normal",
+            "title": "Barheight"
+          },
+          "hidden": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Hidden",
+            "type": "array"
+          },
+          "parts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ClockBarPart"
+            },
+            "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 64
+            },
+            "title": "Parts",
+            "type": "object"
+          },
+          "tileSize": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "s",
+                  "m",
+                  "l"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "m",
+            "title": "Tilesize"
+          },
+          "zones": {
+            "$ref": "#/components/schemas/ClockBarHorizontalZones"
+          }
+        },
+        "required": [
+          "zones"
+        ],
+        "title": "ClockBarHorizontalDesign",
+        "type": "object"
+      },
+      "ClockBarHorizontalZones": {
+        "additionalProperties": false,
+        "properties": {
+          "center": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Center",
+            "type": "array"
+          },
+          "left": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Left",
+            "type": "array"
+          },
+          "right": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Right",
+            "type": "array"
+          }
+        },
+        "title": "ClockBarHorizontalZones",
+        "type": "object"
+      },
+      "ClockBarPart": {
+        "additionalProperties": false,
+        "description": "One part's options inside a clock bar design.\n\nA size is a step name or a px value (Custom). Part ids are dynamic for\nplugin tiles, so they are not validated here.",
+        "properties": {
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "s",
+                  "m",
+                  "l",
+                  "xl"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "enum": [
+                  "upright",
+                  "stacked",
+                  "line"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Style"
+          },
+          "underTime": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undertime"
+          }
+        },
+        "title": "ClockBarPart",
+        "type": "object"
+      },
+      "ClockBarVerticalDesign": {
+        "additionalProperties": false,
+        "properties": {
+          "barHeight": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "slim",
+                  "normal",
+                  "roomy"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "normal",
+            "title": "Barheight"
+          },
+          "hidden": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Hidden",
+            "type": "array"
+          },
+          "parts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ClockBarPart"
+            },
+            "maxProperties": 50,
+            "propertyNames": {
+              "maxLength": 64
+            },
+            "title": "Parts",
+            "type": "object"
+          },
+          "tileSize": {
+            "anyOf": [
+              {
+                "maximum": 200.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "enum": [
+                  "s",
+                  "m",
+                  "l"
+                ],
+                "type": "string"
+              }
+            ],
+            "default": "m",
+            "title": "Tilesize"
+          },
+          "zones": {
+            "$ref": "#/components/schemas/ClockBarVerticalZones"
+          }
+        },
+        "required": [
+          "zones"
+        ],
+        "title": "ClockBarVerticalDesign",
+        "type": "object"
+      },
+      "ClockBarVerticalZones": {
+        "additionalProperties": false,
+        "properties": {
+          "bottom": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Bottom",
+            "type": "array"
+          },
+          "middle": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Middle",
+            "type": "array"
+          },
+          "top": {
+            "items": {
+              "maxLength": 120,
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Top",
+            "type": "array"
+          }
+        },
+        "title": "ClockBarVerticalZones",
+        "type": "object"
+      },
       "ConfigUpdate": {
         "additionalProperties": true,
         "description": "Configuration update model.",
@@ -430,6 +958,97 @@
             ],
             "title": "Availablescreens"
           },
+          "brightness": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightness"
+          },
+          "brightnessConversion": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BrightnessPoint"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessconversion"
+          },
+          "brightnessFloor": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessfloor"
+          },
+          "brightnessLimit": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnesslimit"
+          },
+          "brightnessRampEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessrampenabled"
+          },
+          "brightnessStep": {
+            "anyOf": [
+              {
+                "maximum": 5.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessstep"
+          },
+          "brightnessStepSeconds": {
+            "anyOf": [
+              {
+                "maximum": 10.0,
+                "minimum": 0.5,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightnessstepseconds"
+          },
           "calendarRefreshInterval": {
             "anyOf": [
               {
@@ -453,6 +1072,16 @@
             ],
             "title": "Calendarsplit"
           },
+          "clockBarDesign": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ClockBarDesign"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "clockBarPluginItemSize": {
             "anyOf": [
               {
@@ -463,6 +1092,17 @@
               }
             ],
             "title": "Clockbarpluginitemsize"
+          },
+          "clockBarShowInKiosk": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clockbarshowinkiosk"
           },
           "clockBarVerticalDateFontSize": {
             "anyOf": [
@@ -533,6 +1173,8 @@
           "darkModeEnd": {
             "anyOf": [
               {
+                "maximum": 23.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -544,6 +1186,8 @@
           "darkModeStart": {
             "anyOf": [
               {
+                "maximum": 23.0,
+                "minimum": 0.0,
                 "type": "integer"
               },
               {
@@ -638,6 +1282,49 @@
             ],
             "title": "Displaytimeoutenabled"
           },
+          "effectsLevel": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "full",
+                  "standard"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effectslevel"
+          },
+          "focusLightDimOthers": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focuslightdimothers"
+          },
+          "focusLightMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "always",
+                  "interaction",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Focuslightmode"
+          },
           "gitBranch": {
             "anyOf": [
               {
@@ -659,6 +1346,60 @@
               }
             ],
             "title": "Gitrepourl"
+          },
+          "hotCornerLongPressMs": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcornerlongpressms"
+          },
+          "hotCornerOpacity": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcorneropacity"
+          },
+          "hotCornerPosition": {
+            "anyOf": [
+              {
+                "enum": [
+                  "bottom-left",
+                  "bottom-right",
+                  "top-left",
+                  "top-right"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcornerposition"
+          },
+          "hotCornerSize": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotcornersize"
           },
           "imageDisplayMode": {
             "anyOf": [
@@ -685,6 +1426,10 @@
           "keyboardFeedbackMode": {
             "anyOf": [
               {
+                "enum": [
+                  "normal",
+                  "small"
+                ],
                 "type": "string"
               },
               {
@@ -703,6 +1448,38 @@
               }
             ],
             "title": "Lastsideviewmode"
+          },
+          "layoutMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "desktop",
+                  "phone"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layoutmode"
+          },
+          "loadingLight": {
+            "anyOf": [
+              {
+                "enum": [
+                  "comet",
+                  "pulse",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loadinglight"
           },
           "maxVisibleEvents": {
             "anyOf": [
@@ -726,9 +1503,29 @@
             ],
             "title": "Modeindicatortimeout"
           },
+          "onScreenKeyboard": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "on",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Onscreenkeyboard"
+          },
           "orientation": {
             "anyOf": [
               {
+                "enum": [
+                  "landscape",
+                  "portrait"
+                ],
                 "type": "string"
               },
               {
@@ -758,6 +1555,20 @@
               }
             ],
             "title": "Photoframeenabled"
+          },
+          "photoFrameSourceIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photoframesourceids"
           },
           "photoFrameTimeout": {
             "anyOf": [
@@ -880,9 +1691,41 @@
             ],
             "title": "Showweeknumbers"
           },
+          "sleepMode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "standby",
+                  "dim"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sleepmode"
+          },
+          "tapAnywhereReveal": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tapanywherereveal"
+          },
           "themeMode": {
             "anyOf": [
               {
+                "enum": [
+                  "light",
+                  "dark",
+                  "auto",
+                  "time"
+                ],
                 "type": "string"
               },
               {
@@ -913,9 +1756,62 @@
             ],
             "title": "Timezone"
           },
+          "touchControlSize": {
+            "anyOf": [
+              {
+                "enum": [
+                  "xsmall",
+                  "small",
+                  "medium",
+                  "large",
+                  "xlarge"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Touchcontrolsize"
+          },
+          "touchControls": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "on",
+                  "off"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Touchcontrols"
+          },
+          "typeTheme": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Typetheme"
+          },
           "uiSize": {
             "anyOf": [
               {
+                "enum": [
+                  "extra-compact",
+                  "compact",
+                  "default",
+                  "large",
+                  "extra-large"
+                ],
                 "type": "string"
               },
               {
@@ -1029,6 +1925,92 @@
         "title": "CreateLinkBody",
         "type": "object"
       },
+      "FaultIncident": {
+        "description": "One power-trouble incident; faults seen while settling join ``alsoAt``.",
+        "properties": {
+          "alsoAt": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Alsoat",
+            "type": "array"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "lastGood": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lastgood"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "panelLevel": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panellevel"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          }
+        },
+        "title": "FaultIncident",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1057,6 +2039,58 @@
           "mappings"
         ],
         "title": "KeyboardMappings",
+        "type": "object"
+      },
+      "LogEntry": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "title": "LogEntry",
+        "type": "object"
+      },
+      "MenuAtStartRequest": {
+        "additionalProperties": false,
+        "description": "The Brightness the screen's own menu showed before the check changed anything.",
+        "properties": {
+          "menu": {
+            "maximum": 100.0,
+            "minimum": 0.0,
+            "title": "Menu",
+            "type": "number"
+          }
+        },
+        "required": [
+          "menu"
+        ],
+        "title": "MenuAtStartRequest",
         "type": "object"
       },
       "OverridesBody": {
@@ -1393,6 +2427,46 @@
         "title": "PluginTypeConfigUpdateResponse",
         "type": "object"
       },
+      "Preflight": {
+        "description": "The 10 s power watch before the first write (calibration v2).",
+        "properties": {
+          "faults": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Faults",
+            "type": "array"
+          },
+          "settleLeft": {
+            "anyOf": [
+              {
+                "maximum": 3600.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settleleft"
+          },
+          "status": {
+            "enum": [
+              "clean",
+              "fault",
+              "settling",
+              "watching"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Preflight",
+        "type": "object"
+      },
       "SealedModeBody": {
         "properties": {
           "sealed_mode": {
@@ -1436,6 +2510,150 @@
           "action"
         ],
         "title": "SingleMapping",
+        "type": "object"
+      },
+      "StartLevel": {
+        "description": "The brightness the screen was at when the run started.",
+        "properties": {
+          "known": {
+            "default": false,
+            "title": "Known",
+            "type": "boolean"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "read",
+                  "last_set"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "title": "StartLevel",
+        "type": "object"
+      },
+      "StartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "brightness": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brightness"
+          },
+          "step": {
+            "enum": [
+              "detect",
+              "write",
+              "conversion",
+              "read"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StartRequest",
+        "type": "object"
+      },
+      "StepRequest": {
+        "additionalProperties": false,
+        "description": "Move the active run to another step (and target value).",
+        "properties": {
+          "panelLevel": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Panellevel"
+          },
+          "step": {
+            "enum": [
+              "detect",
+              "write",
+              "conversion",
+              "read"
+            ],
+            "title": "Step",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "step"
+        ],
+        "title": "StepRequest",
+        "type": "object"
+      },
+      "StopBody": {
+        "properties": {
+          "saved": {
+            "default": false,
+            "title": "Saved",
+            "type": "boolean"
+          }
+        },
+        "title": "StopBody",
         "type": "object"
       },
       "UpdateLinkBody": {
@@ -1499,6 +2717,20 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VerdictRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "writes": {
+            "title": "Writes",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "writes"
+        ],
+        "title": "VerdictRequest",
         "type": "object"
       }
     }
@@ -3280,7 +4512,7 @@
         ]
       },
       "get": {
-        "description": "Get image file by ID from plugin service.\n\nFor remote images, downloads and serves via the local cache (avoids rate limits,\nenables stale-on-error). For local images, serves the file directly.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Image file response",
+        "description": "Get image file by ID from plugin service.\n\nWith ``?w=``, serve a width-bucketed, disk-cached display variant (never\nupscaled) so kiosks don't download full originals. Without it, the original\nfile is returned unchanged for downloads and the Local photos browser.\n\nFor remote images, downloads and serves via the local cache (avoids rate limits,\nenables stale-on-error). For local images, serves the file directly.\n\nArgs:\n    image_id: Image ID\n\nReturns:\n    Image file response",
         "operationId": "get_image_file_api_images__image_id__get",
         "parameters": [
           {
@@ -3290,6 +4522,24 @@
             "schema": {
               "title": "Image Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "Optional display width; rounded up to 640/960/1280/1920/2560.",
+            "in": "query",
+            "name": "w",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional display width; rounded up to 640/960/1280/1920/2560.",
+              "title": "W"
             }
           }
         ],
@@ -3670,9 +4920,50 @@
         ]
       }
     },
+    "/api/kiosks/{kiosk_id}": {
+      "delete": {
+        "description": "Remove a screen and everything stored for it (admin).\n\nDeletes the registry row with its overrides, calibration, pending update\nrequest and display-check state. 404 for an unknown kiosk; 409 while a\ndisplay check is active on it.\n\nRemoval does not block the device: a kiosk that is still running registers\nagain on its next real poll (one that sends its hostname or agent version),\nso remove only screens that have been decommissioned.",
+        "operationId": "delete_kiosk_api_kiosks__kiosk_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Kiosk",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
     "/api/kiosks/{kiosk_id}/config": {
       "get": {
-        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36).",
+        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36).\n\nOnly a real poll is recorded (registers a new kiosk and bumps last-seen): one\nthat carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).\nA bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the\nconfig but changes nothing, so it can neither create a ghost nor make a dead\nscreen look online (calvin-7aqu).",
         "operationId": "get_kiosk_config_api_kiosks__kiosk_id__config_get",
         "parameters": [
           {
@@ -3823,6 +5114,399 @@
         ]
       }
     },
+    "/api/kiosks/{kiosk_id}/display-check": {
+      "get": {
+        "description": "The latest display-check run for a kiosk (expiry applied), or ``null``.",
+        "operationId": "get_display_check_api_kiosks__kiosk_id__display_check_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      },
+      "post": {
+        "description": "The display agent's report on a run. Dropped unless it names the stored run.",
+        "operationId": "post_display_check_report_api_kiosks__kiosk_id__display_check_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Report",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/menu-at-start": {
+      "post": {
+        "description": "The Brightness the screen's own menu showed before the check began (admin).",
+        "operationId": "post_display_check_menu_at_start_api_kiosks__kiosk_id__display_check_menu_at_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MenuAtStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Menu At Start",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/save-limit": {
+      "post": {
+        "description": "Save the limit the latest calibration fault implies as ``brightnessLimit`` (admin).",
+        "operationId": "save_display_check_limit_api_kiosks__kiosk_id__display_check_save_limit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Display Check Limit",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/start": {
+      "post": {
+        "description": "Ask a kiosk's agent to run a display-check step (admin). One active run per kiosk.",
+        "operationId": "start_display_check_api_kiosks__kiosk_id__display_check_start_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/step": {
+      "post": {
+        "description": "Move the active run to another step/value (admin); the job is re-offered.",
+        "operationId": "change_display_check_step_api_kiosks__kiosk_id__display_check_step_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Display Check Step",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/stop": {
+      "post": {
+        "description": "Ask the agent to end the active run safely (admin).",
+        "operationId": "stop_display_check_api_kiosks__kiosk_id__display_check_stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/StopBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Display Check",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/display-check/verdict": {
+      "post": {
+        "description": "The owner's answer to \"did the screen change?\" (admin). Returns the findings.",
+        "operationId": "post_display_check_verdict_api_kiosks__kiosk_id__display_check_verdict_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerdictRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Display Check Verdict",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
     "/api/kiosks/{kiosk_id}/overrides": {
       "get": {
         "description": "Return a kiosk's raw override layer (not merged). 404 if kiosk unknown.",
@@ -3859,6 +5543,55 @@
           }
         },
         "summary": "Get Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      },
+      "patch": {
+        "description": "Merge keys into a kiosk's override layer (a screen's own write, F2).\n\nAdditive and partial: keys already in the layer stay, nothing is removed.\nWithout an admin session only :data:`KIOSK_SELF_WRITE_KEYS` may be written,\nso the dashboard's \u22ef Hide controls toggle works on a kiosk that was never\nsigned in. Any other key is a 403 for that caller.",
+        "operationId": "patch_kiosk_overrides_api_kiosks__kiosk_id__overrides_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OverridesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Kiosk Overrides",
         "tags": [
           "kiosks"
         ]

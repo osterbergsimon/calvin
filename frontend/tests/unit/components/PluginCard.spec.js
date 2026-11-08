@@ -59,9 +59,9 @@ describe("PluginCard source count", () => {
     expect(w.emitted("add-source")?.[0]).toEqual(["svc"]);
   });
 
-  it("says a theme is chosen in Appearance", async () => {
+  it("says a theme is chosen in Screens › Look", async () => {
     const w = mountCard({ id: "ocean", name: "Ocean", type: "theme", enabled: true });
-    expect(normalized(w.find(".pc-summary").text())).toBe("Choose it in Dashboard › Appearance");
+    expect(normalized(w.find(".pc-summary").text())).toBe("Choose it in Screens › Look");
     await w.find(".pc-summary .pc-link").trigger("click");
     expect(w.emitted("open-appearance")?.length).toBe(1);
   });

@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { mount } from "@vue/test-utils";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
+
+const SOURCE = readFileSync(
+  resolve(__dirname, "../../../../src/components/ui/SegmentedControl.vue"),
+  "utf-8"
+);
+const STYLE = SOURCE.slice(SOURCE.indexOf("<style"), SOURCE.indexOf("</style>"));
 
 const OPTS = [
   { value: "landscape", label: "Landscape" },
@@ -45,5 +53,12 @@ describe("SegmentedControl", () => {
     const w = mount(SegmentedControl, { props: { modelValue: "landscape", options: OPTS } });
     await w.find('[role="radiogroup"]').trigger("keydown", { key: "ArrowLeft" });
     expect(w.emitted("update:modelValue")[0]).toEqual(["portrait"]);
+  });
+
+  it("keeps every segment at least the touch target in both directions", () => {
+    expect(STYLE).toMatch(/\.seg__btn\s*\{[^}]*min-width:\s*var\(--touch-target\)/s);
+    expect(STYLE).toMatch(
+      /\.seg__btn\s*\{[^}]*min-height:\s*var\(--seg-btn-min-height,\s*var\(--touch-target\)\)/s
+    );
   });
 });

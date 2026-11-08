@@ -86,8 +86,9 @@ COPY --from=backend-builder /usr/local/bin/uv /usr/local/bin/uv
 COPY backend/data/themes/builtin.json /app/data/themes/builtin.json
 
 # Frontend dist — FastAPI serves /assets/* and falls back to index.html
-# for SPA routing. Backend's main.py probes ../frontend/dist relative
-# to /app/, so put the dist there.
+# for SPA routing. The whole directory is copied, so the build's .br/.gz
+# siblings (frontend/scripts/compress-dist.mjs) travel with it. Backend's
+# main.py probes ../frontend/dist relative to /app/, so put the dist there.
 COPY --from=frontend-builder /build/dist /frontend/dist
 
 # Kiosk bundle + one-command installer, served to Raspberry Pi kiosks at

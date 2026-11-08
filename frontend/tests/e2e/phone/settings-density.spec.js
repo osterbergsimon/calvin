@@ -68,12 +68,22 @@ test.describe("settings density at 1280", () => {
 
     await selectCategory(page, "Dashboard");
     await expect(page.locator(".setting-row").first()).toBeVisible();
-    const dashboardRows = await compactRows(page);
-    expect(dashboardRows.length).toBeGreaterThan(0);
-    for (const row of dashboardRows) {
-      expect(row.height, `Dashboard: ${row.label} is too tall`).toBeLessThanOrEqual(120);
-      expect(row.sideBySide, `Dashboard: ${row.label} stacked its control`).toBe(true);
-    }
+    // The old Clock toggles moved into the clock bar editor; the section's one
+    // SettingRow (preview + Edit clock bar) still stays compact.
+    const clockRow = page.locator("#section-clock-bar .setting-row").first();
+    await expect(clockRow).toBeVisible();
+    const clockMetrics = await clockRow.evaluate(row => {
+      const label = row.querySelector(".setting-row__label").getBoundingClientRect();
+      const control = row.querySelector(".setting-row__control").getBoundingClientRect();
+      return {
+        height: Math.round(row.getBoundingClientRect().height),
+        sideBySide: control.top < label.bottom && control.bottom > label.top,
+      };
+    });
+    expect(clockMetrics.height, "Dashboard: the clock bar row is too tall").toBeLessThanOrEqual(
+      120
+    );
+    expect(clockMetrics.sideBySide, "Dashboard: the clock bar row stacked its control").toBe(true);
 
     await selectCategory(page, "Screens");
     await page.locator("[data-test='screen-default-card']").click();

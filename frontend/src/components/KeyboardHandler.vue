@@ -28,42 +28,41 @@ const { handleAction } = useKeyboardActions();
 const { resetInactivityTimer } = usePhotoFrameMode();
 const notificationRef = ref(null);
 
-// Reboot combo tracking
+// Reboot combo tracking. This is a host action, so be strict: only a fresh,
+// non-repeat transition arms it, and once fired it stays latched until every
+// combo key has been released.
 const pressedKeys = new Set();
-let rebootComboStartTime = null;
 let rebootComboKeys = ["KEY_1", "KEY_7"]; // Will be loaded from config
 let rebootComboDuration = 10000; // Will be loaded from config (10 seconds default)
-let rebootComboCheckInterval = null;
+let rebootComboTimer = null;
+let rebootComboFired = false;
 
-const checkRebootCombo = () => {
-  // Check if both reboot combo keys are pressed
-  const comboKeysPressed = rebootComboKeys.every(key => pressedKeys.has(key));
+const comboKeysAllDown = () => rebootComboKeys.every(key => pressedKeys.has(key));
+const anyComboKeyPressed = () => rebootComboKeys.some(key => pressedKeys.has(key));
 
-  if (comboKeysPressed) {
-    // Start tracking combo duration
-    if (!rebootComboStartTime) {
-      rebootComboStartTime = Date.now();
-      console.log(`Reboot combo started (${rebootComboKeys.join(" + ")})...`);
-    } else {
-      // Check if combo has been held for required duration
-      const elapsed = Date.now() - rebootComboStartTime;
-      if (elapsed >= rebootComboDuration) {
-        // Trigger reboot
-        console.log(
-          `Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`
-        );
-        triggerReboot();
-        // Reset combo tracking
-        rebootComboStartTime = null;
-        pressedKeys.clear();
-      }
-    }
-  } else {
-    // Combo not complete, reset tracking
-    if (rebootComboStartTime) {
-      rebootComboStartTime = null;
-    }
+const cancelArmedRebootCombo = () => {
+  if (rebootComboTimer) {
+    clearTimeout(rebootComboTimer);
+    rebootComboTimer = null;
   }
+};
+
+const resetRebootCombo = () => {
+  cancelArmedRebootCombo();
+  pressedKeys.clear();
+  rebootComboFired = false;
+};
+
+// Arm on the transition to "all combo keys down" only; repeats never call this.
+const armRebootCombo = () => {
+  if (rebootComboFired || rebootComboTimer || !comboKeysAllDown()) return;
+  console.log(`Reboot combo started (${rebootComboKeys.join(" + ")})...`);
+  rebootComboTimer = setTimeout(() => {
+    rebootComboTimer = null;
+    rebootComboFired = true;
+    console.log(`Reboot combo held for ${rebootComboDuration / 1000} seconds - rebooting system`);
+    triggerReboot();
+  }, rebootComboDuration);
 };
 
 const triggerReboot = async () => {
@@ -103,9 +102,13 @@ const onKeyDown = async event => {
     return;
   }
 
-  // Track pressed keys for reboot combo
-  pressedKeys.add(keyCode);
-  checkRebootCombo();
+  // Track pressed keys for the reboot combo. Repeated keydowns are ignored:
+  // they must not re-add keys cleared by a reset or re-arm a fired combo.
+  if (!event.repeat) {
+    const wasAllDown = comboKeysAllDown();
+    pressedKeys.add(keyCode);
+    if (!wasAllDown && comboKeysAllDown()) armRebootCombo();
+  }
 
   // Find action for this key (single unified map)
   const mappings = keyboardStore.mappings || {};
@@ -132,11 +135,13 @@ const onKeyUp = event => {
   // Remove from pressed keys
   pressedKeys.delete(keyCode);
 
-  // Reset reboot combo if any combo key is released
-  if (rebootComboKeys.includes(keyCode)) {
-    rebootComboStartTime = null;
-  }
+  // Any release breaks "all combo keys down"; clear the armed timer.
+  if (!comboKeysAllDown()) cancelArmedRebootCombo();
+  // The fired latch clears only after every combo key has been released.
+  if (!anyComboKeyPressed()) rebootComboFired = false;
 };
+
+let lastKeyboardConfigSignature = null;
 
 const loadKeyboardConfig = async () => {
   try {
@@ -145,14 +150,29 @@ const loadKeyboardConfig = async () => {
     const response = await fetch(configUrl());
     if (response.ok) {
       const config = await response.json();
-      // Load reboot combo settings
+      const signature = JSON.stringify(config ?? null);
+      if (signature === lastKeyboardConfigSignature) return;
+      lastKeyboardConfigSignature = signature;
+      // Load reboot combo settings. A change while a combo is armed cancels
+      // the pending reboot; a fresh hold is required under the new settings.
+      let nextKeys = rebootComboKeys;
       if (config.rebootComboKey1 || config.reboot_combo_key1) {
         const key1 = config.rebootComboKey1 || config.reboot_combo_key1;
         const key2 = config.rebootComboKey2 || config.reboot_combo_key2 || "KEY_7";
-        rebootComboKeys = [key1, key2];
+        nextKeys = [key1, key2];
       }
+      let nextDuration = rebootComboDuration;
       if (config.rebootComboDuration !== undefined || config.reboot_combo_duration !== undefined) {
-        rebootComboDuration = config.rebootComboDuration || config.reboot_combo_duration || 10000;
+        nextDuration = config.rebootComboDuration || config.reboot_combo_duration || 10000;
+      }
+      if (
+        nextKeys[0] !== rebootComboKeys[0] ||
+        nextKeys[1] !== rebootComboKeys[1] ||
+        nextDuration !== rebootComboDuration
+      ) {
+        cancelArmedRebootCombo();
+        rebootComboKeys = nextKeys;
+        rebootComboDuration = nextDuration;
       }
     }
   } catch (error) {
@@ -201,6 +221,14 @@ watch(updateMessage, msg => {
   notificationsStore.notify({ severity, eyebrow: "System", message: msg });
 });
 
+// A lost keyup (focus change, tab hidden, page teardown) must never leave a
+// host reboot armed.
+const onWindowBlur = () => resetRebootCombo();
+const onVisibilityChange = () => {
+  if (document.visibilityState === "hidden") resetRebootCombo();
+};
+const onPageHide = () => resetRebootCombo();
+
 onMounted(async () => {
   // Load keyboard mappings and config
   await loadKeyboardConfig();
@@ -211,24 +239,24 @@ onMounted(async () => {
   // Add global keyboard listeners
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
-
-  // Start checking reboot combo periodically
-  rebootComboCheckInterval = setInterval(checkRebootCombo, 100); // Check every 100ms
+  window.addEventListener("blur", onWindowBlur);
+  window.addEventListener("pagehide", onPageHide);
+  document.addEventListener("visibilitychange", onVisibilityChange);
 });
 
 onUnmounted(() => {
   // Remove keyboard listeners
   window.removeEventListener("keydown", onKeyDown);
   window.removeEventListener("keyup", onKeyUp);
+  window.removeEventListener("blur", onWindowBlur);
+  window.removeEventListener("pagehide", onPageHide);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
 
   // Clean up intervals
   if (keyboardConfigInterval) {
     clearInterval(keyboardConfigInterval);
     keyboardConfigInterval = null;
   }
-  if (rebootComboCheckInterval) {
-    clearInterval(rebootComboCheckInterval);
-    rebootComboCheckInterval = null;
-  }
+  resetRebootCombo();
 });
 </script>

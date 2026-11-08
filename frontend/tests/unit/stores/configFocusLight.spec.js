@@ -9,6 +9,7 @@ describe("config store — Cycle B focus-light keys", () => {
     const store = useConfigStore();
     expect(store.focusLightMode).toBe("interaction");
     expect(store.focusLightDimOthers).toBe(true);
+    expect(store.effectsLevel).toBe("auto");
   });
 
   it("setters update state", () => {
@@ -24,9 +25,17 @@ describe("config store — Cycle B focus-light keys", () => {
     await store.updateConfig({
       focusLightMode: "off",
       focusLightDimOthers: false,
+      effectsLevel: "full",
     });
+    expect(store.effectsLevel).toBe("full");
     expect(store.focusLightMode).toBe("off");
     expect(store.focusLightDimOthers).toBe(false);
+  });
+
+  it("reads a stray stored 'performance' value as Standard (calvin-uudb)", async () => {
+    const store = useConfigStore();
+    await store.updateConfig({ effectsLevel: "performance" });
+    expect(store.effectsLevel).toBe("standard");
   });
 
   it("has no global room name: a screen's Name is its own override (CLV-111)", async () => {

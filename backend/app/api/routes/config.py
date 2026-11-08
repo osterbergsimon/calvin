@@ -4,19 +4,18 @@ import asyncio
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.config import settings
+from app.schemas.config_update import BRIGHTNESS_KEYS, ConfigUpdate
 from app.security.admin_auth import get_admin_store
 from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
 from app.services.config_service import config_service
 from app.services.display_orientation_service import display_orientation_service
 from app.utils.errors import internal_error
-from app.utils.git_refs import validate_git_branch, validate_git_repo_url
+from app.utils.git_refs import validate_git_repo_url
 from app.utils.host_control import host_control_enabled
 from app.version import get_revision, get_version
 
@@ -93,109 +92,6 @@ def _write_update_setting(key: str, value: str | None) -> None:
     except Exception as e:
         # Log error but don't fail the config update
         logger.warning(f"Failed to update {CALVIN_UPDATE_FILE}: {e}")
-
-
-class ConfigUpdate(BaseModel):
-    """Configuration update model."""
-
-    orientation: str | None = None
-    orientationFlipped: bool | None = None  # Whether orientation is flipped (180° rotation)
-    applyDisplayRotation: bool | None = (
-        None  # Whether to physically rotate display on RPi (default: True)
-    )
-    calendarSplit: float | None = None
-    dashboardLayout: dict[str, Any] | None = None
-    dashboardScreens: dict[str, Any] | None = None
-    lastSideViewMode: str | None = None  # Last side view mode ('photos' | 'web_services')
-    photoFrameEnabled: bool | None = None
-    photoFrameTimeout: int | None = None
-    showUI: bool | None = None
-    photoRotationInterval: int | None = None  # Photo rotation interval in seconds
-    timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
-    modeIndicatorTimeout: int | None = (
-        None  # Mode indicator auto-hide timeout in seconds (0 = never hide)
-    )
-    weekStartDay: int | None = None  # Week starting day (0=Sunday, 1=Monday, ..., 6=Saturday)
-    showWeekNumbers: bool | None = None  # Show week numbers in calendar
-    weekendDays: list[int] | None = None  # Weekend days (e.g. [0, 6] for Sun+Sat)
-    maxVisibleEvents: int | None = None  # Max events visible per day cell
-    showRedDays: bool | None = None  # Highlight holidays/red days
-    uiSize: str | None = (
-        None  # Global UI size: 'extra-compact' | 'compact' | 'default' | 'large' | 'extra-large'
-    )
-    themeMode: str | None = None  # Theme mode: 'light' | 'dark' | 'auto' | 'time'
-    selectedTheme: str | None = None  # Selected custom theme ID (null = use themeMode)
-    darkModeStart: int | None = None  # Dark mode start hour (0-23)
-    darkModeEnd: int | None = None  # Dark mode end hour (0-23)
-    displayScheduleEnabled: bool | None = None  # Enable display power schedule
-    # Display schedule as JSON string or array:
-    # [{"day": 0-6, "enabled": bool, "onTime": "HH:MM", "offTime": "HH:MM"}, ...]
-    displaySchedule: str | list[dict[str, Any]] | None = None
-    displayTimeoutEnabled: bool | None = None  # Enable display timeout (screensaver)
-    displayTimeout: int | None = None  # Display timeout in seconds (0 = never, default: 0)
-    rebootComboKey1: str | None = None  # First key for reboot combo (e.g., "KEY_1")
-    rebootComboKey2: str | None = None  # Second key for reboot combo (e.g., "KEY_7")
-    rebootComboDuration: int | None = None  # Reboot combo duration in milliseconds (default: 10000)
-    keyboardFeedbackEnabled: bool | None = None  # Enable visual keyboard feedback (default: True)
-    keyboardFeedbackMode: str | None = (
-        None  # Keyboard feedback mode: 'normal' | 'small' (default: 'normal')
-    )
-    # Image display mode: 'fit', 'fill', 'crop', 'center', 'smart' (default: 'smart')
-    imageDisplayMode: str | None = None
-    randomizeImages: bool | None = None  # Randomize image order (default: False)
-    # Timezone (e.g., "America/New_York", "Europe/London", "UTC") - null = system timezone
-    timezone: str | None = None
-    gitRepoUrl: str | None = (
-        None  # Git repository URL for updates (default: 'https://github.com/osterbergsimon/calvin.git')
-    )
-    gitBranch: str | None = None  # Git branch to use for updates (default: 'main')
-    # The add-on catalog the provider picker may install from (§3.7).
-    pluginCatalogRepo: str | None = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def _check_snake_case_git_keys(cls, data: Any) -> Any:
-        # extra="allow" would otherwise let git_branch/git_repo_url (the stored
-        # names, read by the update route) through unvalidated.
-        if isinstance(data, dict):
-            if data.get("git_branch") is not None:
-                validate_git_branch(data["git_branch"])
-            if data.get("git_repo_url") is not None:
-                validate_git_repo_url(data["git_repo_url"])
-        return data
-
-    @field_validator("gitRepoUrl")
-    @classmethod
-    def _check_git_repo_url(cls, value: str | None) -> str | None:
-        return None if value is None else validate_git_repo_url(value)
-
-    @field_validator("gitBranch")
-    @classmethod
-    def _check_git_branch(cls, value: str | None) -> str | None:
-        return None if value is None else validate_git_branch(value)
-
-    @field_validator("pluginCatalogRepo")
-    @classmethod
-    def _check_plugin_catalog_repo(cls, value: str | None) -> str | None:
-        return None if value is None else validate_git_repo_url(value)
-
-    configPollInterval: int | None = None  # Config polling interval in seconds (default: 30)
-    # Calendar cache refresh interval in minutes (default: 15). Must never be
-    # 0 or negative: that used to schedule one refresh per second (audit R4).
-    calendarRefreshInterval: int | None = Field(None, ge=1)
-    clockBarVerticalLayout: str | None = None  # Vertical bar layout
-    clockBarVerticalFontSize: int | None = None
-    clockBarVerticalDateFontSize: int | None = None
-    clockBarVerticalPadding: int | None = None
-    clockBarPluginItemSize: int | None = None
-    clockBarVerticalPluginItemSize: int | None = None
-
-    # Per-kiosk content assignment (calvin-dd9.4). Override keys; null/absent on global config.
-    availableScreens: list[str] | None = None  # allowlist of screen ids a kiosk may show
-    defaultScreenId: str | None = None  # screen id a kiosk boots into
-
-    # Allow arbitrary fields for extensibility
-    model_config = ConfigDict(extra="allow")
 
 
 async def build_global_config() -> dict:
@@ -352,6 +248,15 @@ async def build_global_config() -> dict:
         pass
     else:
         config["darkModeEnd"] = 6  # 6 AM default
+    # Household font (H4). None, not a default id: the frontend must be able to
+    # tell "no household choice" from "chose Instrument" to migrate once.
+    if "type_theme" in config:
+        config["typeTheme"] = config["type_theme"]
+    elif "typeTheme" in config:
+        # Already in camelCase, keep it
+        pass
+    else:
+        config["typeTheme"] = None
     if "displayScheduleEnabled" not in config and "display_schedule_enabled" not in config:
         config["displayScheduleEnabled"] = False  # Disabled by default
     elif "display_schedule_enabled" in config and "displayScheduleEnabled" not in config:
@@ -534,6 +439,10 @@ async def build_global_config() -> dict:
         config["clockBarShowLogo"] = True
     elif "clock_bar_show_logo" in config and "clockBarShowLogo" not in config:
         config["clockBarShowLogo"] = config["clock_bar_show_logo"]
+    # The clock bar design is optional: absent means the frontend derives one
+    # from the old keys, so a null is the honest value here.
+    if "clockBarDesign" not in config:
+        config["clockBarDesign"] = None
     if "uiSize" not in config and "ui_size" not in config:
         config["uiSize"] = "default"  # Global UI size preset
     elif "ui_size" in config and "uiSize" not in config:
@@ -600,6 +509,14 @@ async def update_config(config_update: ConfigUpdate, request: Request):
     if not is_admin(request) and not update_dict.keys() <= CONFIG_DISPLAY_KEYS:
         raise admin_error(get_admin_store().is_configured())
 
+    # Brightness belongs to one panel: a household value would reach every screen.
+    household_refused = sorted(BRIGHTNESS_KEYS & update_dict.keys())
+    if household_refused:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{', '.join(household_refused)}: set per screen (Screens), not household-wide",
+        )
+
     # Convert camelCase to snake_case for storage
     if "orientationFlipped" in update_dict:
         update_dict["orientation_flipped"] = update_dict.pop("orientationFlipped")
@@ -649,6 +566,8 @@ async def update_config(config_update: ConfigUpdate, request: Request):
         update_dict["dark_mode_start"] = update_dict.pop("darkModeStart")
     if "darkModeEnd" in update_dict:
         update_dict["dark_mode_end"] = update_dict.pop("darkModeEnd")
+    if "typeTheme" in update_dict:
+        update_dict["type_theme"] = update_dict.pop("typeTheme")
     if "displayScheduleEnabled" in update_dict:
         update_dict["display_schedule_enabled"] = update_dict.pop("displayScheduleEnabled")
     if "displaySchedule" in update_dict:

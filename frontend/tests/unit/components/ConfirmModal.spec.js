@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { mount, enableAutoUnmount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import DialogScrim from "@/components/ui/DialogScrim.vue";
 
@@ -33,6 +33,21 @@ describe("ConfirmModal", () => {
       expect(wrapper.findComponent(Dialog).exists()).toBe(true);
       expect(wrapper.find("[role='dialog']").exists()).toBe(true);
       expect(wrapper.findComponent(DialogScrim).exists()).toBe(true);
+    });
+  });
+
+  describe("Size", () => {
+    it("uses the larger sheet when an alternative action is offered", () => {
+      const wrapper = mountConfirm({
+        show: true,
+        alternativeText: "Hide on Kitchen",
+      });
+      expect(wrapper.findComponent(Dialog).props("size")).toBe("md");
+    });
+
+    it("keeps the small sheet for a two-button confirm", () => {
+      const wrapper = mountConfirm({ show: true });
+      expect(wrapper.findComponent(Dialog).props("size")).toBe("sm");
     });
   });
 

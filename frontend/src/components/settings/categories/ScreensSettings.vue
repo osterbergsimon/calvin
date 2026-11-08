@@ -119,6 +119,9 @@
               <template #meta>
                 <InlineNote data-test="screen-id">{{ k.id }}</InlineNote>
                 <InlineNote data-test="screen-summary">{{ summaryFor(k) }}</InlineNote>
+                <InlineNote data-test="screen-last-seen">
+                  {{ k.lastSeen ? `Last seen ${relativeTime(k.lastSeen)}` : "Never seen" }}
+                </InlineNote>
                 <InlineNote
                   v-if="changedSettingCount(k.overrides) > 0"
                   data-test="screen-changed-count"
@@ -180,6 +183,7 @@
       v-if="defaultOpen"
       :config="config"
       @update:config="patch => emit('update:config', patch)"
+      @open-screen="select"
     />
     <ThisBrowserSettings v-else-if="browserOpen" :config="config" @changed="refreshBrowserCount" />
 
@@ -193,6 +197,9 @@
         :display-stack="selectedKiosk.displayStack ?? null"
         :agent-version="selectedKiosk.agentVersion ?? null"
       />
+
+      <ChangedHereLine :items="changedHereItems" />
+      <ScreenSectionIndex :sections="sectionIndex" />
 
       <SettingsSection id="screen-name" title="Name">
         <SettingRow label="Name" description="Shown in this screen's clock bar.">
@@ -218,7 +225,7 @@
       </SettingsSection>
 
       <SettingsSection id="screen-pages" title="Pages">
-        <SettingRow label="Pages shown">
+        <SettingRow label="Pages shown" :id="rowAnchorId('availableScreens')">
           <template #description>
             <span>Pages are shared by all screens. Choose which ones this screen shows.</span>
             <InlineNote v-if="pages.length === 1" data-test="only-one-page">
@@ -271,7 +278,7 @@
             </Button>
           </template>
         </ListRow>
-        <SettingRow label="Start page">
+        <SettingRow label="Start page" :id="rowAnchorId('defaultScreenId')">
           <template #description>
             <ScopeLine
               :overridden="defaultOverridden"
@@ -291,8 +298,31 @@
         </InlineNote>
       </SettingsSection>
 
+      <SettingsSection id="screen-look" title="Look">
+        <template v-for="descriptor in visibleLookDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
+            :value="look[descriptor.key]"
+            :overridden="Boolean(lookOverridden[descriptor.key])"
+            :note="lookNote.key === descriptor.key ? lookNote.text : ''"
+            @set="value => setLook(descriptor.key, value)"
+            @reset="() => resetLook(descriptor.key)"
+          />
+        </template>
+        <InlineNote
+          v-if="lookMsg"
+          class="screens-saved"
+          :tone="toneFor(lookMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ lookMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-display" title="Display">
-        <SettingRow label="Orientation">
+        <SettingRow label="Orientation" :id="rowAnchorId('orientation')">
           <template #description>
             <ScopeLine
               :overridden="orientationOverridden"
@@ -310,7 +340,7 @@
             @update:model-value="setOrientation"
           />
         </SettingRow>
-        <SettingRow label="Upside down">
+        <SettingRow label="Upside down" :id="rowAnchorId('orientationFlipped')">
           <template #description>
             <ScopeLine :overridden="flipOverridden" reset-test="reset-flip" @reset="resetFlip" />
           </template>
@@ -320,7 +350,7 @@
             @update:model-value="setFlipped"
           />
         </SettingRow>
-        <SettingRow label="Rotate the screen output">
+        <SettingRow label="Rotate the screen output" :id="rowAnchorId('applyDisplayRotation')">
           <template #description>
             <ScopeLine
               :overridden="applyOverridden"
@@ -334,6 +364,16 @@
             @update:model-value="setApply"
           />
         </SettingRow>
+        <template v-for="descriptor in displaySizeDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
+            :value="displaySizes[descriptor.key]"
+            :overridden="Boolean(displaySizesOverridden[descriptor.key])"
+            @set="value => setDisplaySize(descriptor.key, value)"
+            @reset="() => resetDisplaySize(descriptor.key)"
+          />
+        </template>
         <Card data-test="screen-live-preview">
           <PageThumbnail
             :page="selectedStartPage"
@@ -354,8 +394,53 @@
         </InlineNote>
       </SettingsSection>
 
+      <SettingsSection id="screen-effects" title="Effects & focus">
+        <template v-for="descriptor in visibleEffectsDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
+            :value="effects[descriptor.key]"
+            :overridden="Boolean(effectsOverridden[descriptor.key])"
+            :auto-note="descriptor.key === 'effectsLevel' ? effectsAutoCopy : ''"
+            @set="value => setEffects(descriptor.key, value)"
+            @reset="() => resetEffects(descriptor.key)"
+          />
+        </template>
+        <InlineNote
+          v-if="effectsMsg"
+          class="screens-saved"
+          :tone="toneFor(effectsMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ effectsMsg }}
+        </InlineNote>
+      </SettingsSection>
+
+      <SettingsSection id="screen-controls" title="Controls">
+        <template v-for="descriptor in visibleControlDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :descriptor="descriptor"
+            :id="rowAnchorId(descriptor.key)"
+            :value="controls[descriptor.key]"
+            :overridden="Boolean(controlsOverridden[descriptor.key])"
+            @set="value => setControl(descriptor.key, value)"
+            @reset="() => resetControl(descriptor.key)"
+          />
+        </template>
+        <InlineNote
+          v-if="controlsMsg"
+          class="screens-saved"
+          :tone="toneFor(controlsMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ controlsMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-power" title="Power">
-        <SettingRow label="Screen on/off schedule">
+        <SettingRow label="Screen on/off schedule" :id="rowAnchorId('displayScheduleEnabled')">
           <template #description>
             <ScopeLine
               :overridden="scheduleEnabledOverridden"
@@ -371,6 +456,7 @@
         </SettingRow>
         <DisplayScheduleGrid
           v-if="effScheduleEnabled"
+          :id="rowAnchorId('displaySchedule')"
           :model-value="effSchedule || []"
           :week-start="config.weekStartDay ?? 1"
           :time-format="config.timeFormat || '24h'"
@@ -380,7 +466,7 @@
           @update:model-value="setSchedule"
           @reset="resetDailySchedule"
         />
-        <SettingRow label="Turn off when idle">
+        <SettingRow label="Turn off when idle" :id="rowAnchorId('displayTimeout')">
           <template #description>
             <ScopeLine
               :overridden="idleOverridden"
@@ -403,6 +489,9 @@
             <InlineNote v-if="activeOverride" data-test="screen-now-until">
               {{ untilCopy }}
             </InlineNote>
+            <InlineNote v-if="dimmingSeconds !== null" data-test="screen-now-dimming">
+              Dimming… then off · about {{ dimmingSeconds }} s
+            </InlineNote>
           </template>
           <Button data-test="screen-now-on" :disabled="desiredOnNow" @click="setScreenNow('on')">
             Turn on now
@@ -419,6 +508,26 @@
             Follow schedule
           </Button>
         </SettingRow>
+        <BrightnessGroup
+          :kiosk="selectedKiosk"
+          :overrides="overrides"
+          :screen-name="selectedName"
+          :asleep="!desiredOnNow"
+          :online="selectedKiosk ? isOnline(selectedKiosk) : true"
+          @patch="patchBrightness"
+          @open-check="openCheck"
+        />
+        <DisplayCheckDialog
+          v-model="checkOpen"
+          :kiosk-id="selectedId || ''"
+          :screen-name="selectedName"
+          :asleep="!desiredOnNow"
+          :on-panel="Boolean(kioskId) && kioskId === selectedId"
+          :overrides="overrides"
+          :save-patch="patchBrightness"
+          @patch="patchBrightness"
+          @turn-on="setScreenNow('on')"
+        />
         <InlineNote
           v-if="powerMsg"
           class="screens-saved"
@@ -431,7 +540,7 @@
       </SettingsSection>
 
       <SettingsSection id="screen-touch" title="Touch & keyboard">
-        <SettingRow label="Touchscreen">
+        <SettingRow label="Touchscreen" :id="rowAnchorId('touchControls')">
           <template #description>
             <ScopeLine
               :overridden="touchOverridden"
@@ -450,7 +559,7 @@
             @update:model-value="setTouch"
           />
         </SettingRow>
-        <SettingRow label="On-screen keyboard">
+        <SettingRow label="On-screen keyboard" :id="rowAnchorId('onScreenKeyboard')">
           <template #description>
             <ScopeLine :overridden="oskOverridden" reset-test="osk-use-shared" @reset="resetOsk" />
           </template>
@@ -477,15 +586,15 @@
       </SettingsSection>
 
       <SettingsSection id="screen-behaviour" title="Behaviour">
-        <ScreenBehaviourRows
-          :photo-frame-enabled="behaviour.photoFrameEnabled"
-          :photo-frame-timeout="behaviour.photoFrameTimeout"
-          :photo-frame-source-ids="behaviour.photoFrameSourceIds"
-          :loading-light="behaviour.loadingLight"
-          :layout-mode="behaviour.layoutMode"
-          :overridden="behaviourOverridden"
-          @set="setBehaviour"
-          @reset="resetBehaviour"
+        <ScreenSettingRow
+          v-for="descriptor in visibleBehaviourDescriptors"
+          :key="descriptor.key"
+          :descriptor="descriptor"
+          :id="rowAnchorId(descriptor.key)"
+          :value="behaviour[descriptor.key]"
+          :overridden="Boolean(behaviourOverridden[descriptor.key])"
+          @set="value => setBehaviour(descriptor.key, value)"
+          @reset="() => resetBehaviour(descriptor.key)"
         />
         <InlineNote
           v-if="behaviourMsg"
@@ -533,6 +642,36 @@
         </SettingRow>
       </SettingsSection>
 
+      <SettingsSection id="screen-remove" title="Remove screen">
+        <SettingRow label="Remove this screen">
+          <template #description>
+            <InlineNote>
+              For a screen that has been taken away. Its own settings and calibration are deleted.
+            </InlineNote>
+            <InlineNote v-if="removeBlockedReason" data-test="remove-screen-reason">
+              {{ removeBlockedReason }}
+            </InlineNote>
+          </template>
+          <Button
+            variant="danger"
+            data-test="remove-screen-btn"
+            :disabled="Boolean(removeBlockedReason)"
+            @click="askRemove"
+          >
+            Remove screen
+          </Button>
+        </SettingRow>
+        <InlineNote
+          v-if="removeMsg"
+          class="screens-saved"
+          :tone="toneFor(removeMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ removeMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <!-- Page footer: only when this screen differs from Default (§4). -->
       <Card v-if="selectedChangedCount > 0" data-test="screen-override-footer">
         <InlineNote>
@@ -575,6 +714,7 @@ import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
+import { useIntervalWhenVisible } from "@/composables/useIntervalWhenVisible";
 import {
   hasUpdateError,
   isUpdateBlocked,
@@ -598,9 +738,13 @@ import {
 } from "@/utils/screenPower";
 import {
   changedSettingCount,
+  changedSettingRows,
+  descriptorsForSection,
   formatSettingList,
   hasOwnSettings,
+  rowAnchorId,
   useAsDefaultPatch,
+  visibleDescriptors,
   withoutAllOverrides,
   withoutPromotedSettings,
 } from "@/utils/screenOverrides";
@@ -611,6 +755,9 @@ import EmptyState from "@/components/ui/EmptyState.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScopeLine from "@/components/ui/ScopeLine.vue";
+import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
+import DisplayCheckDialog from "@/components/settings/shared/DisplayCheckDialog.vue";
+import { clampBrightness, dimSeconds, firstBrightness } from "@/utils/brightness";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
@@ -623,11 +770,15 @@ import AddKioskPanel from "@/components/settings/shared/AddKioskPanel.vue";
 import KioskStatusHeader from "@/components/settings/shared/KioskStatusHeader.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
+import ScreenSectionIndex from "@/components/settings/shared/ScreenSectionIndex.vue";
 import ScreensLayout from "@/components/settings/shared/ScreensLayout.vue";
-import ConfirmModal from "@/components/settings/shared/ConfirmModal.vue";
+import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import DefaultScreenSettings from "@/components/settings/categories/DefaultScreenSettings.vue";
 import ThisBrowserSettings from "@/components/settings/categories/ThisBrowserSettings.vue";
-import ScreenBehaviourRows from "@/components/settings/shared/ScreenBehaviourRows.vue";
+import ScreenSettingRow from "@/components/settings/shared/ScreenSettingRow.vue";
+import ChangedHereLine from "@/components/settings/shared/ChangedHereLine.vue";
+import { effectsLevelLabel, resolveEffectsLevel } from "@/utils/effectsLevel";
+import { flushKioskOverridesQueues, kioskOverridesQueue } from "@/utils/kioskOverridesQueue";
 
 const props = defineProps({
   config: { type: Object, required: true },
@@ -651,14 +802,44 @@ const editorOpen = ref(false);
 
 // --- which page is open ----------------------------------------------------
 // null (the list) · "default" · "browser" · a screen id on a kiosk selection.
+// These sections exist on both the Default page and a screen's own page, so a
+// deep link can open the right one for the device: a kiosk opens its own page,
+// any other browser opens Default.
+const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-look", "screen-effects", "screen-controls"]);
 const DEFAULT_SECTION_IDS = new Set([
   "layout",
   "device-power",
   "device-keyboard",
   "device-behaviour",
+  "screen-look",
+  "screen-effects",
+  "screen-controls",
 ]);
+
+// The section index under a screen's header uses the same `section-<id>`
+// anchors the deep links scroll to (settings-scope §5).
+const sectionIndex = [
+  { id: "screen-name", label: "Name" },
+  { id: "screen-pages", label: "Pages" },
+  { id: "screen-look", label: "Look" },
+  { id: "screen-display", label: "Display" },
+  { id: "screen-effects", label: "Effects & focus" },
+  { id: "screen-controls", label: "Controls" },
+  { id: "screen-power", label: "Power" },
+  { id: "screen-touch", label: "Touch & keyboard" },
+  { id: "screen-behaviour", label: "Behaviour" },
+  { id: "screen-software", label: "Software" },
+];
+const initialOwnScreenId =
+  props.initialSection && INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) && kioskId
+    ? kioskId
+    : null;
 const selection = ref(
-  props.initialSection && DEFAULT_SECTION_IDS.has(props.initialSection) ? { kind: "default" } : null
+  initialOwnScreenId
+    ? { kind: "screen", id: initialOwnScreenId }
+    : props.initialSection && DEFAULT_SECTION_IDS.has(props.initialSection)
+      ? { kind: "default" }
+      : null
 );
 const defaultOpen = computed(() => selection.value?.kind === "default");
 const browserOpen = computed(() => selection.value?.kind === "browser");
@@ -686,12 +867,20 @@ if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
 
 const nameMsg = ref("");
 const pagesMsg = ref("");
+const lookMsg = ref("");
+const lookNote = ref({ key: "", text: "" });
 const displayMsg = ref("");
+const effectsMsg = ref("");
+const controlsMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
 const behaviourMsg = ref("");
 const footerMsg = ref("");
-const overrides = ref({});
+const overridesQueue = computed(() =>
+  selectedId.value ? kioskOverridesQueue(selectedId.value) : null
+);
+// Confirmed overrides with this screen's still-pending taps on top.
+const overrides = computed(() => overridesQueue.value?.display.value ?? {});
 
 // Browser-only choices that make up "{n} settings just for this browser".
 const BROWSER_STORAGE_KEYS = ["calvin-touch-controls", "calvin-osk-mode", "calvin-ui-size"];
@@ -809,6 +998,7 @@ const defaultSummary = computed(() => {
 // --- list / detail -------------------------------------------------------
 const selectedKiosk = computed(() => kiosks.value.find(k => k.id === selectedId.value) || null);
 const selectedChangedCount = computed(() => changedSettingCount(overrides.value));
+const changedHereItems = computed(() => changedSettingRows(overrides.value));
 const selectedName = computed(() => (selectedKiosk.value ? screenLabel(selectedKiosk.value) : ""));
 const footerCopy = computed(() => {
   const count = selectedChangedCount.value;
@@ -818,23 +1008,26 @@ const footerCopy = computed(() => {
 function clearMessages() {
   nameMsg.value = "";
   pagesMsg.value = "";
+  lookMsg.value = "";
+  clearLookNote();
   displayMsg.value = "";
+  effectsMsg.value = "";
+  controlsMsg.value = "";
   powerMsg.value = "";
   touchMsg.value = "";
   behaviourMsg.value = "";
   footerMsg.value = "";
+  removeMsg.value = "";
 }
 
 function openDefault() {
   selection.value = { kind: "default" };
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
 }
 
 function openBrowser() {
   selection.value = { kind: "browser" };
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
@@ -847,13 +1040,20 @@ async function select(id) {
   // Guard the stale-selection race: clicking screen A then B before A's fetch
   // resolves must not land A's overrides under B's selection (calvin-vk3).
   if (selectedId.value !== id) return;
-  overrides.value = fetched;
+  kioskOverridesQueue(id).confirm(fetched);
   await refreshDesiredVersion(id);
 }
 
+// The open screen vanished from the list (removed on another device): leave its
+// page for the list and drop any confirm that was about it.
+watch(selectedKiosk, kiosk => {
+  if (kiosk || !selectedId.value) return;
+  confirm.show = false;
+  closeDetail();
+});
+
 function closeDetail() {
   selection.value = null;
-  overrides.value = {};
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
@@ -946,7 +1146,9 @@ const effSchedule = computed(() =>
 const powerTimeZone = computed(() => effectiveTimeZone(props.config));
 const nowTick = ref(Date.now());
 const now = () => new Date(nowTick.value);
-let nowTimer = null;
+useIntervalWhenVisible(() => {
+  nowTick.value = Date.now();
+}, 15000);
 const activeOverride = computed(() =>
   activePowerOverride(overrides.value.screenNow, {
     enabled: effScheduleEnabled.value,
@@ -982,6 +1184,42 @@ function setScreenNow(power) {
   persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 
+// "Dimming… then off" (calvin-29ws): with the ramp on, "Turn off now" first steps
+// the brightness down. The agent picks the change up within its 60 s poll.
+const AGENT_POLL_S = 60;
+const dimmingSeconds = computed(() => {
+  const own = activeOverride.value;
+  const values = overrides.value;
+  if (!own || own.power !== "off") return null;
+  if (values.brightnessRampEnabled !== true && values.sleepMode !== "dim") return null;
+  const level = values.brightness ?? firstBrightness(values.brightnessLimit ?? null);
+  const seconds = dimSeconds(
+    level,
+    values.brightnessStep ?? 2,
+    values.brightnessStepSeconds ?? 1.5
+  );
+  const elapsed = (nowTick.value - Date.parse(own.setAt)) / 1000;
+  return elapsed < seconds + AGENT_POLL_S ? seconds : null;
+});
+
+// The Brightness group and the display check write typed per-screen overrides.
+// A key set to null is cleared.
+function patchBrightness(change) {
+  const next = { ...overrides.value };
+  for (const [key, value] of Object.entries(change)) {
+    if (value === null || value === undefined) delete next[key];
+    else next[key] = value;
+  }
+  // A brightness above the limit is never stored.
+  return persistPower(clampBrightness(next));
+}
+
+const checkOpen = ref(false);
+// The first check turns the ramp on with Save itself: Save writes the levels and the
+// ramp in one patch (the dialog's wake option), so the page makes no second write.
+function openCheck() {
+  checkOpen.value = true;
+}
 function followSchedule() {
   const next = { ...overrides.value };
   delete next.screenNow;
@@ -1030,22 +1268,24 @@ const effOsk = computed(() =>
 );
 
 // --- writes --------------------------------------------------------------
+// Every control on a screen writes the same overrides target. The shared queue
+// shows the change at once, coalesces quick taps, and on failure reverts only
+// the keys whose value has not been tapped again since.
 async function persist(next, messageRef, onlineCopy, offlineCopy) {
-  // Optimistic set with snapshot revert so a failed save doesn't leave the UI
-  // showing apparently-applied values under the error banner (calvin-dd9.13).
-  const kioskIdToSave = selectedId.value;
-  const prior = overrides.value;
-  overrides.value = next;
-  messageRef.value = "";
+  const kioskId = selectedId.value;
+  if (!kioskId) return false;
+  if (messageRef) messageRef.value = "";
   try {
-    await store.saveOverrides(kioskIdToSave, next);
-    store.setKioskOverrides(kioskIdToSave, next);
+    await kioskOverridesQueue(kioskId).replaceAll(next);
     const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
-    messageRef.value = online ? onlineCopy : offlineCopy;
-    await refreshDesiredVersion(kioskIdToSave);
+    if (messageRef) messageRef.value = online ? onlineCopy : offlineCopy;
+    await refreshDesiredVersion(kioskId);
+    return true;
   } catch {
-    if (selectedId.value === kioskIdToSave) overrides.value = prior;
-    messageRef.value = "Couldn't save to the server. Check the connection and try again.";
+    if (messageRef) {
+      messageRef.value = "Couldn't save to the server. Check the connection and try again.";
+    }
+    return false;
   }
 }
 
@@ -1112,6 +1352,92 @@ function resetDefaultScreen() {
   persistPages(next);
 }
 
+// --- Look: theme, light or dark and font (§7 item 6) ----------------------
+// These rows write this screen's overrides from any browser, so editing the
+// kitchen's theme from a desktop never changes the desktop's own look. The
+// kiosk applies the merged config on its next poll (~30 s).
+const lookDescriptors = descriptorsForSection("look");
+const lookOverridden = computed(() =>
+  Object.fromEntries(
+    lookDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const look = computed(() =>
+  Object.fromEntries(
+    lookDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleLookDescriptors = computed(() => visibleDescriptors(lookDescriptors, look.value));
+
+const LOOK_NOTE_MS = 10000;
+let lookNoteTimer = null;
+function clearLookNote() {
+  if (lookNoteTimer !== null) {
+    clearTimeout(lookNoteTimer);
+    lookNoteTimer = null;
+  }
+  lookNote.value = { key: "", text: "" };
+}
+function showLookNote(key) {
+  clearLookNote();
+  lookNote.value = {
+    key,
+    text: `${selectedName.value} will switch on its next check (about 30 s)`,
+  };
+  lookNoteTimer = setTimeout(clearLookNote, LOOK_NOTE_MS);
+}
+function persistLook(next, key) {
+  return persist(next, lookMsg, APPLIED_BY_AGENT, OFFLINE_COPY).then(ok => {
+    if (ok) showLookNote(key);
+    return ok;
+  });
+}
+function setLook(key, value) {
+  persistLook({ ...overrides.value, [key]: value }, key);
+}
+function resetLook(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistLook(next, key);
+}
+
+// --- Display sizes moved in from Dashboard (§7 item 6) --------------------
+const DISPLAY_SIZE_KEYS = ["touchControlSize", "uiSize"];
+const displaySizeDescriptors = descriptorsForSection("display").filter(descriptor =>
+  DISPLAY_SIZE_KEYS.includes(descriptor.key)
+);
+const displaySizesOverridden = computed(() =>
+  Object.fromEntries(
+    displaySizeDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const displaySizes = computed(() =>
+  Object.fromEntries(
+    displaySizeDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+function persistDisplaySize(next) {
+  persist(next, displayMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+}
+function setDisplaySize(key, value) {
+  persistDisplaySize({ ...overrides.value, [key]: value });
+}
+function resetDisplaySize(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistDisplaySize(next);
+}
+
 function persistDisplay(next) {
   persist(next, displayMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
@@ -1141,7 +1467,7 @@ function resetApply() {
 }
 
 function persistPower(next) {
-  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+  return persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
 function setScheduleEnabled(value) {
   persistPower({ ...overrides.value, displayScheduleEnabled: value });
@@ -1197,36 +1523,112 @@ function resetOsk() {
   persistTouch(next);
 }
 
+// --- Effects & focus: the whole group moved here (§7 item 4) ----------------
+// Effects decides how expensive the look is; Focus light and Dim other regions
+// decide whether it shows at all (calvin-uudb). The rows read this screen's
+// overrides over the household values, like Behaviour.
+const effectsDescriptors = descriptorsForSection("effects");
+const effectsOverridden = computed(() =>
+  Object.fromEntries(
+    effectsDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const effects = computed(() =>
+  Object.fromEntries(
+    effectsDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleEffectsDescriptors = computed(() =>
+  visibleDescriptors(effectsDescriptors, effects.value)
+);
+const effectsAutoCopy = `Auto (${effectsLevelLabel(
+  resolveEffectsLevel({ level: "auto", kiosk: true })
+)} on this screen)`;
+
+function persistEffects(next) {
+  persist(next, effectsMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
+}
+function setEffects(key, value) {
+  persistEffects({ ...overrides.value, [key]: value });
+}
+function resetEffects(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistEffects(next);
+}
+
+// --- Controls: the whole group moved here (§7 item 4) ----------------------
+// On a kiosk these used to edit only the device you were on (the bug behind
+// H1/G1); a screen page now writes that screen's overrides from any browser.
+const controlDescriptors = descriptorsForSection("controls");
+const controlsOverridden = computed(() =>
+  Object.fromEntries(
+    controlDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const controls = computed(() =>
+  Object.fromEntries(
+    controlDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleControlDescriptors = computed(() =>
+  visibleDescriptors(controlDescriptors, controls.value)
+);
+
+function persistControls(next) {
+  persist(next, controlsMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
+}
+function setControl(key, value) {
+  persistControls({ ...overrides.value, [key]: value });
+}
+function resetControl(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistControls(next);
+}
+
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------
 // These rows moved here from Dashboard › Focus & remote; the keys stay the
 // same, so a screen's existing override (or this browser's stored choice) is
-// untouched.
-const behaviourOverridden = computed(() => ({
-  photoFrameEnabled: "photoFrameEnabled" in overrides.value,
-  photoFrameTimeout: "photoFrameTimeout" in overrides.value,
-  photoFrameSourceIds: "photoFrameSourceIds" in overrides.value,
-  loadingLight: "loadingLight" in overrides.value,
-  layoutMode: "layoutMode" in overrides.value,
-}));
+// untouched. The row itself is descriptor-driven; this page hands it the
+// screen's overrides and the household value underneath.
+const behaviourDescriptors = descriptorsForSection("behaviour");
 
-const behaviour = computed(() => ({
-  photoFrameEnabled:
-    "photoFrameEnabled" in overrides.value
-      ? overrides.value.photoFrameEnabled
-      : props.config.photoFrameEnabled,
-  photoFrameTimeout:
-    "photoFrameTimeout" in overrides.value
-      ? overrides.value.photoFrameTimeout
-      : props.config.photoFrameTimeout,
-  photoFrameSourceIds:
-    "photoFrameSourceIds" in overrides.value
-      ? overrides.value.photoFrameSourceIds
-      : props.config.photoFrameSourceIds,
-  loadingLight:
-    "loadingLight" in overrides.value ? overrides.value.loadingLight : props.config.loadingLight,
-  // The global config has no layout mode: Auto is the default.
-  layoutMode: "layoutMode" in overrides.value ? overrides.value.layoutMode : "auto",
-}));
+const behaviourOverridden = computed(() =>
+  Object.fromEntries(
+    behaviourDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+
+const defaultBehaviourValue = key => {
+  if (key === "layoutMode") return props.config.layoutMode ?? "auto";
+  return props.config[key];
+};
+
+const behaviour = computed(() =>
+  Object.fromEntries(
+    behaviourDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : defaultBehaviourValue(descriptor.key),
+    ])
+  )
+);
+
+const visibleBehaviourDescriptors = computed(() =>
+  visibleDescriptors(behaviourDescriptors, behaviour.value)
+);
 
 function persistBehaviour(next) {
   persist(
@@ -1268,9 +1670,44 @@ function askUseAsDefault() {
   confirm.show = true;
 }
 
+const removeMsg = ref("");
+const removeBlockedReason = computed(() =>
+  selectedKiosk.value?.displayCheckActive
+    ? "A display check is running on this screen. Stop it first."
+    : ""
+);
+
+function askRemove() {
+  confirm.mode = "remove";
+  confirm.title = `Remove ${selectedName.value}?`;
+  confirm.message =
+    "Its own settings and calibration are deleted. If this screen is still running, it will show up again the next time it checks in.";
+  confirm.confirmText = "Remove";
+  confirm.show = true;
+}
+
+async function removeSelected() {
+  const id = selectedId.value;
+  if (!id) return;
+  const name = selectedName.value;
+  try {
+    await store.removeKiosk(id);
+  } catch (err) {
+    removeMsg.value =
+      err?.response?.status === 409
+        ? "Couldn't remove it: a display check is running on this screen."
+        : `Couldn't remove ${name}. Try again.`;
+    return;
+  }
+  // Land on the list, which has the next screen to pick.
+  closeDetail();
+  notifications.notify({ severity: "success", eyebrow: "Screens", message: `Removed ${name}.` });
+}
+
 async function onConfirm() {
   const mode = confirm.mode;
   confirm.show = false;
+  if (mode === "remove") return removeSelected();
   if (mode === "reset") {
     await persist(
       withoutAllOverrides(overrides.value),
@@ -1351,17 +1788,21 @@ async function updateAll() {
 // --- presence + versions ------------------------------------------------
 const ONLINE_WINDOW_MS = 120000; // 2 minutes
 
+useIntervalWhenVisible(() => {
+  store.refreshKiosks();
+}, 30000);
+
 function isPending(k) {
   const desired = desiredVersions.value[k.id];
   return !isOnline(k) && !!desired && k.lastAppliedVersion !== desired;
 }
 function isOnline(k) {
   if (!k.lastSeen) return false;
-  return Date.now() - Date.parse(k.lastSeen) < ONLINE_WINDOW_MS;
+  return nowTick.value - Date.parse(k.lastSeen) < ONLINE_WINDOW_MS;
 }
 function relativeTime(iso) {
   if (!iso) return "never";
-  const secs = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  const secs = Math.max(0, Math.round((nowTick.value - Date.parse(iso)) / 1000));
   if (secs < 60) return `${secs}s ago`;
   if (secs < 3600) return `${Math.round(secs / 60)}m ago`;
   if (secs < 86400) return `${Math.round(secs / 3600)}h ago`;
@@ -1372,12 +1813,19 @@ async function refreshDesiredVersion(id) {
   if (v) desiredVersions.value = { ...desiredVersions.value, [id]: v };
 }
 
+// Never lose a queued override save on navigation or a page close.
+const flushQueuedOverrides = () => {
+  void flushKioskOverridesQueues();
+};
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", flushQueuedOverrides);
+  window.addEventListener("pagehide", flushQueuedOverrides);
+}
+
 onMounted(async () => {
-  nowTimer = window.setInterval(() => {
-    nowTick.value = Date.now();
-  }, 30000);
   refreshBrowserCount();
   await store.loadKiosks();
+  if (initialOwnScreenId) await select(initialOwnScreenId);
   if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,
@@ -1392,7 +1840,10 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (nowTimer !== null) window.clearInterval(nowTimer);
+  clearLookNote();
+  window.removeEventListener("beforeunload", flushQueuedOverrides);
+  window.removeEventListener("pagehide", flushQueuedOverrides);
+  flushQueuedOverrides();
   if (!narrowMql) return;
   if (typeof narrowMql.removeEventListener === "function") {
     narrowMql.removeEventListener("change", onNarrowChange);

@@ -39,8 +39,10 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browsers
-        working-directory: ./frontend
-        run: npx playwright install --with-deps webkit chromium
+        timeout-minutes: 8
+        uses: ./.github/actions/install-playwright
+        with:
+          browsers: webkit chromium
 
       # The default project runs without a backend: tests that need data answer
       # every /api request with page.route, and the rest tolerate an absent
