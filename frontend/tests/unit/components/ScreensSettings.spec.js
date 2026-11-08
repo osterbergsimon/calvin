@@ -2541,6 +2541,23 @@ describe("ScreensSettings — remove a screen", () => {
     expect(wrapper.find("[data-test='remove-screen-btn']").exists()).toBe(false);
   });
 
+  it("goes back to the list and closes an open confirm when the screen is removed elsewhere", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk(), kiosk({ id: "hall", hostname: "hall-pi" })],
+    });
+    await flushPromises();
+    await selectFirst(wrapper);
+    await wrapper.find("[data-test='remove-screen-btn']").trigger("click");
+    await flushPromises();
+    expect(wrapper.findComponent(ConfirmModal).props("show")).toBe(true);
+    store.kiosks = store.kiosks.filter(k => k.id !== "kitchen");
+    await flushPromises();
+    const modal = wrapper.findComponent(ConfirmModal);
+    expect(modal.exists() ? modal.props("show") : false).toBe(false);
+    expect(wrapper.find("[data-test='remove-screen-btn']").exists()).toBe(false);
+    expect(wrapper.findAll("[data-test='screen-card']")).toHaveLength(1);
+  });
+
   it("is disabled, with the reason, while a display check runs", async () => {
     const { wrapper } = mountScreens({ kiosks: [kiosk({ displayCheckActive: true })] });
     await flushPromises();

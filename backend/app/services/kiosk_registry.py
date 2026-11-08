@@ -261,13 +261,16 @@ async def remove_kiosk(kiosk_id: str) -> bool:
     """
     if not kiosk_id or not _KIOSK_ID_RE.fullmatch(kiosk_id):
         return False
-    row = await KioskDB.objects.get_or_none(id=kiosk_id)
-    if row is None:
-        return False
-    current = display_check.view_of(row.display_check)
-    if current and current["active"]:
-        raise display_check.RunActiveError(current)
-    await row.delete()
+    # The display-check start path holds this lock, so a run cannot begin between
+    # the active check and the delete: the 409 guarantee holds.
+    async with display_check._kiosk_lock(kiosk_id):
+        row = await KioskDB.objects.get_or_none(id=kiosk_id)
+        if row is None:
+            return False
+        current = display_check.view_of(row.display_check)
+        if current and current["active"]:
+            raise display_check.RunActiveError(current)
+        await row.delete()
     logger.info(f"Removed kiosk {kiosk_id!r}")
     return True
 

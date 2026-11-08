@@ -1045,6 +1045,14 @@ async function select(id) {
   await refreshDesiredVersion(id);
 }
 
+// The open screen vanished from the list (removed on another device): leave its
+// page for the list and drop any confirm that was about it.
+watch(selectedKiosk, kiosk => {
+  if (kiosk || !selectedId.value) return;
+  confirm.show = false;
+  closeDetail();
+});
+
 function closeDetail() {
   selection.value = null;
   editorOpen.value = false;

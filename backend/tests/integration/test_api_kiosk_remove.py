@@ -71,13 +71,6 @@ def test_agent_poll_registers_and_known_kiosk_keeps_updating(test_client: TestCl
     assert kiosk["agentVersion"] == "1.2.4"
 
 
-@pytest.mark.integration
-def test_bare_fetch_of_known_kiosk_still_touches_last_seen(test_client: TestClient):
-    test_client.put("/api/kiosks/known-1/overrides", json={"overrides": {}})
-    assert test_client.get("/api/kiosks/known-1/config").status_code == 200
-    assert "known-1" in _ids(test_client)
-
-
 def _last_seen(client: TestClient, kiosk_id: str) -> str:
     rows = client.get("/api/kiosks").json()["kiosks"]
     return next(k["lastSeen"] for k in rows if k["id"] == kiosk_id)
@@ -112,3 +105,26 @@ def test_settings_reads_never_change_last_seen(test_client: TestClient, monkeypa
     # A real poll does bump it.
     test_client.get("/api/kiosks/dead-1/config?khost=pi-dead")
     assert _last_seen(test_client, "dead-1") != before
+
+
+@pytest.mark.integration
+def test_bare_fetch_does_not_change_last_seen(test_client: TestClient):
+    test_client.put("/api/kiosks/known-1/overrides", json={"overrides": {}})
+    before = _last_seen(test_client, "known-1")
+    assert test_client.get("/api/kiosks/known-1/config").status_code == 200
+    assert _last_seen(test_client, "known-1") == before
+
+
+@pytest.mark.asyncio
+async def test_remove_kiosk_waits_for_the_kiosk_lock(test_db):
+    """remove_kiosk takes the display-check lock, so it cannot race a run start."""
+    import asyncio
+
+    from app.services import display_check, kiosk_registry
+
+    await kiosk_registry.record_kiosk("lock-1", hostname="pi")
+    async with display_check._kiosk_lock("lock-1"):
+        task = asyncio.create_task(kiosk_registry.remove_kiosk("lock-1"))
+        await asyncio.sleep(0.05)
+        assert not task.done()
+    assert await task is True
