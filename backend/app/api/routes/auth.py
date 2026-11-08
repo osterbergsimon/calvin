@@ -12,14 +12,20 @@ from loguru import logger
 from pydantic import BaseModel, field_validator
 
 from app.security.admin_auth import (
-    COOKIE_MAX_AGE,
     COOKIE_NAME,
     PasswordTooShort,
+    SessionKind,
     get_admin_store,
     login_limiter,
 )
 from app.security.api_keys import MAX_NAME_LEN, DuplicateKeyName, get_api_key_store
-from app.security.route_policy import admin_error, is_admin_session, request_api_key
+from app.security.route_policy import (
+    admin_error,
+    is_admin_session,
+    renew_admin_cookie,
+    request_api_key,
+    set_session_cookie,
+)
 from app.security.setup_code import (
     current_setup_code,
     ensure_setup_code,
@@ -27,6 +33,7 @@ from app.security.setup_code import (
     invalidate_setup_code,
     verify_setup_code,
 )
+from app.services import kiosk_registry
 from app.utils.host_control import host_control_enabled
 
 router = APIRouter()
@@ -34,12 +41,16 @@ router = APIRouter()
 
 class PasswordBody(BaseModel):
     password: str
+    # The kiosk id when the page runs on a kiosk (?kiosk=). A claim can only make
+    # the session shorter; see ``_session_for_login``.
+    kiosk: str | None = None
 
 
 class SetupBody(BaseModel):
     password: str
     # Required: a body without a code is a 422, before anything can be claimed.
     code: str
+    kiosk: str | None = None
 
 
 class ChangePasswordBody(BaseModel):
@@ -64,16 +75,38 @@ def _rate_limited(wait: int) -> HTTPException:
     )
 
 
-def _set_admin_cookie(response: Response, value: str) -> None:
-    response.set_cookie(
-        COOKIE_NAME,
-        value,
-        max_age=COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="strict",
-        path="/",
-        secure=False,
-    )
+def _set_admin_cookie(response: Response, value: str, kind: SessionKind) -> None:
+    set_session_cookie(response, value, kind)
+
+
+async def _session_for_login(
+    request: Request, claimed: str | None
+) -> tuple[SessionKind, str | None]:
+    """Which kind of session a sign-in gets (calvin-q4o8).
+
+    A kiosk is a wall screen anyone can walk up to, so its session is minutes. The
+    server decides, from two signals, and either one is enough:
+
+    * the TCP peer address is one a kiosk's polls came from. A visitor at the
+      kiosk cannot change it from the touchscreen: it is not in the URL, the page,
+      storage or a header.
+    * the page says it is a kiosk (``kiosk`` = the ``?kiosk=`` id). A visitor could
+      lose that (a link that opens a fresh tab), which is why it is not the only signal.
+
+    Both signals can only shorten a session. Nobody gains a longer session by lying,
+    and a wrong address match (a reused DHCP lease, a proxy in front of everything)
+    just means more sign-ins. The kind is then inside the signed cookie, so it
+    cannot be edited into a longer one either.
+    """
+    peer = request.client.host if request.client else None
+    from_address = await kiosk_registry.kiosk_for_peer(peer)
+    claim = claimed.strip() if claimed and claimed.strip() else None
+    if claim is not None and not kiosk_registry.valid_kiosk_id(claim):
+        claim = "?"  # junk still means "I am a kiosk": shorter, with no id to lock
+    if from_address is not None or claim is not None:
+        kiosk_id = from_address or (None if claim == "?" else claim)
+        return SessionKind.KIOSK, kiosk_id
+    return SessionKind.DEVICE, None
 
 
 # A local reverse proxy makes every visitor's peer loopback. If the request
@@ -107,10 +140,43 @@ def _is_loopback(request: Request) -> bool:
 
 
 @router.get("/auth/status")
-async def auth_status(request: Request):
-    """Whether an admin password exists and whether this client has a session."""
+async def auth_status(request: Request, response: Response):
+    """Whether an admin password exists and whether this client has a session.
+
+    A cookie that is no longer valid (idle, signed out by a screen sleep, or from
+    before session kinds existed) is cleared here so the browser stops sending it.
+    Checking status renews a device session but never a kiosk one: a sleeping
+    screen that polls status must still lapse.
+    """
     store = get_admin_store()
-    return {"configured": store.is_configured(), "authenticated": is_admin_session(request)}
+    authenticated = is_admin_session(request)
+    if authenticated:
+        session = store.read_session(request.cookies.get(COOKIE_NAME))
+        if session is not None and session.kind is SessionKind.DEVICE:
+            renew_admin_cookie(request, response)
+    elif request.cookies.get(COOKIE_NAME) and request_api_key(request) is None:
+        response.delete_cookie(COOKIE_NAME, path="/")
+    return {"configured": store.is_configured(), "authenticated": authenticated}
+
+
+@router.post("/auth/touch")
+async def auth_touch(request: Request, response: Response):
+    """The page was used: renew this session. A lapsed one stays lapsed.
+
+    The kiosk page calls this (throttled) while someone is touching the screen, so
+    the 5-minute limit counts from the last touch, not from sign-in.
+    """
+    store = get_admin_store()
+    value = request.cookies.get(COOKIE_NAME)
+    session = store.read_session(value)
+    if session is None:
+        if value:
+            response.delete_cookie(COOKIE_NAME, path="/")
+        return {"authenticated": False}
+    renewed = store.renew_cookie(value, force=True)
+    if renewed is not None:
+        _set_admin_cookie(response, renewed, session.kind)
+    return {"authenticated": True}
 
 
 @router.get("/auth/setup-code")
@@ -192,7 +258,8 @@ async def auth_setup(body: SetupBody, request: Request, response: Response):
     invalidate_setup_code()
     login_limiter.record_success(ip)
     logger.info("Admin password configured (first run); setup code invalidated")
-    _set_admin_cookie(response, store.issue_cookie())
+    kind, kiosk_id = await _session_for_login(request, body.kiosk)
+    _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
     return {"ok": True}
 
 
@@ -214,7 +281,8 @@ async def auth_login(body: PasswordBody, request: Request, response: Response):
             detail={"code": "bad_password", "message": "Wrong admin password."},
         )
     login_limiter.record_success(ip)
-    _set_admin_cookie(response, store.issue_cookie())
+    kind, kiosk_id = await _session_for_login(request, body.kiosk)
+    _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
     return {"ok": True}
 
 
@@ -244,6 +312,8 @@ async def auth_change_password(body: ChangePasswordBody, request: Request, respo
             status_code=401,
             detail={"code": "bad_password", "message": "Wrong admin password."},
         )
+    # Read before the change: bumping the generation invalidates the cookie.
+    current = store.read_session(request.cookies.get(COOKIE_NAME))
     try:
         store.set_password(body.new)
     except PasswordTooShort:
@@ -256,7 +326,11 @@ async def auth_change_password(body: ChangePasswordBody, request: Request, respo
         ) from None
     login_limiter.record_success(ip)
     logger.info("Admin password changed; other sessions signed out")
-    _set_admin_cookie(response, store.issue_cookie())
+    # Keep the caller's kind: changing the password must not turn a kiosk session
+    # into a month-long one.
+    kind = current.kind if current else SessionKind.DEVICE
+    kiosk_id = current.kiosk_id if current else None
+    _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
     return {"ok": True}
 
 

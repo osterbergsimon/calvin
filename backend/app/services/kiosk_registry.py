@@ -100,6 +100,34 @@ def _normalized_wifi_power_save(value: str | None) -> str | None:
     return state if state in WIFI_POWER_SAVE_STATES else None
 
 
+# How many addresses are remembered per kiosk. A few cover a DHCP change or a
+# Wi-Fi/Ethernet switch; the cap stops one caller filling the column.
+_MAX_PEER_IPS = 4
+
+
+async def kiosk_for_peer(peer_ip: str | None) -> str | None:
+    """The kiosk whose polls came from this address, if any (calvin-q4o8).
+
+    Used to decide that a sign-in happens AT a kiosk. The address is the TCP
+    peer, never ``X-Forwarded-*``. A wrong match (a reused DHCP lease, a reverse
+    proxy that fronts everything) only makes a session shorter, never longer.
+    """
+    if not peer_ip:
+        return None
+    for row in await KioskDB.objects.order_by("-last_seen").all():
+        if peer_ip in (row.peer_ips or []):
+            return row.id
+    return None
+
+
+async def kiosk_exists(kiosk_id: str) -> bool:
+    return await KioskDB.objects.get_or_none(id=kiosk_id) is not None
+
+
+def valid_kiosk_id(kiosk_id: str | None) -> bool:
+    return bool(kiosk_id) and _KIOSK_ID_RE.fullmatch(kiosk_id) is not None
+
+
 def _normalized_viewport(viewport: dict | None) -> dict | None:
     """Accept only a sane ``{w, h}`` pair of positive ints. Anything else is None."""
     if not isinstance(viewport, dict):
@@ -121,6 +149,7 @@ _HEARTBEAT_COLUMNS = [
     "viewport",
     "display_stack",
     "wifi_power_save",
+    "peer_ips",
     "overrides",
 ]
 
@@ -136,6 +165,7 @@ async def record_kiosk(
     viewport: dict | None = None,
     display_stack: str | None = None,
     wifi_power_save: str | None = None,
+    peer_ip: str | None = None,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
     if not kiosk_id:
@@ -166,6 +196,7 @@ async def record_kiosk(
                 viewport=viewport,
                 display_stack=display_stack,
                 wifi_power_save=wifi_power_save,
+                peer_ips=[peer_ip] if peer_ip else None,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             await _adopt_global_settings()
@@ -199,6 +230,9 @@ async def record_kiosk(
         changed = True
     if display_stack is not None and existing.display_stack != display_stack:
         existing.display_stack = display_stack
+        changed = True
+    if peer_ip and peer_ip not in (existing.peer_ips or []):
+        existing.peer_ips = [*(existing.peer_ips or [])[-(_MAX_PEER_IPS - 1) :], peer_ip]
         changed = True
     if wifi_power_save is not None and existing.wifi_power_save != wifi_power_save:
         existing.wifi_power_save = wifi_power_save

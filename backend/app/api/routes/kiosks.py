@@ -8,6 +8,7 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
+from app.security.admin_auth import lock_kiosk_sessions
 from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, is_admin
 from app.services import display_check, kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
@@ -441,6 +442,21 @@ async def get_installer_file(name: str):
     return Response(content=data, media_type="text/x-shellscript")
 
 
+@router.post("/kiosks/{kiosk_id}/screen-sleep")
+async def kiosk_screen_sleep(kiosk_id: str):
+    """The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).
+
+    Called by the display agent. It carries no credential, like the agent's other
+    reports, and can only sign a kiosk out, never in.
+    """
+    _valid_id_or_400(kiosk_id)
+    if not await kiosk_registry.kiosk_exists(kiosk_id):
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    lock_kiosk_sessions(kiosk_id)
+    logger.info(f"Kiosk {kiosk_id!r} screen asleep: its admin sessions ended")
+    return {"ok": True}
+
+
 @router.get("/kiosks/{kiosk_id}/config")
 async def get_kiosk_config(
     kiosk_id: str,
@@ -487,6 +503,7 @@ async def get_kiosk_config(
                 viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
                 display_stack=kstack,
                 wifi_power_save=kwifi,
+                peer_ip=request.client.host if request.client else None,
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")

@@ -5,10 +5,16 @@ admin session unless its ``(method, path_format)`` is in :data:`PUBLIC_WRITES`,
 so a newly added write route is protected without anyone remembering to.
 """
 
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Response
 from loguru import logger
 
-from app.security.admin_auth import COOKIE_NAME, api_key_limiter, get_admin_store
+from app.security.admin_auth import (
+    COOKIE_NAME,
+    SessionKind,
+    api_key_limiter,
+    cookie_max_age,
+    get_admin_store,
+)
 from app.security.api_keys import SCOPE_RANK, get_api_key_store
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -35,6 +41,10 @@ PUBLIC_WRITES = frozenset(
         ("POST", "/api/auth/setup"),
         ("POST", "/api/auth/login"),
         ("POST", "/api/auth/logout"),
+        # Keeps the caller's own session alive; answers authenticated: false otherwise.
+        ("POST", "/api/auth/touch"),
+        # The display agent: the screen went to sleep, so end that kiosk's sessions.
+        ("POST", "/api/kiosks/{kiosk_id}/screen-sleep"),
     }
 )
 
@@ -231,7 +241,29 @@ def _authenticate_guest(request: Request, route_id: tuple[str, str]) -> None:
         ) from None
 
 
-async def enforce_route_policy(request: Request) -> None:
+def set_session_cookie(response: Response, value: str, kind: SessionKind) -> None:
+    response.set_cookie(
+        COOKIE_NAME,
+        value,
+        max_age=cookie_max_age(kind),
+        httponly=True,
+        samesite="strict",
+        path="/",
+        secure=False,
+    )
+
+
+def renew_admin_cookie(request: Request, response: Response) -> None:
+    """Re-sign the caller's session cookie when it is due (using Calvin renews it)."""
+    store = get_admin_store()
+    value = request.cookies.get(COOKIE_NAME)
+    session = store.read_session(value)
+    renewed = store.renew_cookie(value)
+    if session is not None and renewed is not None:
+        set_session_cookie(response, renewed, session.kind)
+
+
+async def enforce_route_policy(request: Request, response: Response) -> None:
     """FastAPI app-level dependency implementing the three route tiers.
 
     A bearer key replaces the cookie entirely: when the header is present the
@@ -268,9 +300,11 @@ async def enforce_route_policy(request: Request) -> None:
         if (method, path) in PUBLIC_WRITES:
             return
         if is_admin(request):
+            renew_admin_cookie(request, response)
             return
         raise admin_error(get_admin_store().is_configured())
     if method in ("GET", "HEAD") and path in ADMIN_READS:
         if is_admin(request):
+            renew_admin_cookie(request, response)
             return
         raise admin_error(get_admin_store().is_configured())

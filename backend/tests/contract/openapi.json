@@ -2109,6 +2109,17 @@
       },
       "PasswordBody": {
         "properties": {
+          "kiosk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kiosk"
+          },
           "password": {
             "title": "Password",
             "type": "string"
@@ -2485,6 +2496,17 @@
           "code": {
             "title": "Code",
             "type": "string"
+          },
+          "kiosk": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kiosk"
           },
           "password": {
             "title": "Password",
@@ -3026,7 +3048,7 @@
     },
     "/api/auth/status": {
       "get": {
-        "description": "Whether an admin password exists and whether this client has a session.",
+        "description": "Whether an admin password exists and whether this client has a session.\n\nA cookie that is no longer valid (idle, signed out by a screen sleep, or from\nbefore session kinds existed) is cleared here so the browser stops sending it.\nChecking status renews a device session but never a kiosk one: a sleeping\nscreen that polls status must still lapse.",
         "operationId": "auth_status_api_auth_status_get",
         "responses": {
           "200": {
@@ -3039,6 +3061,26 @@
           }
         },
         "summary": "Auth Status",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/touch": {
+      "post": {
+        "description": "The page was used: renew this session. A lapsed one stays lapsed.\n\nThe kiosk page calls this (throttled) while someone is touching the screen, so\nthe 5-minute limit counts from the last touch, not from sign-in.",
+        "operationId": "auth_touch_api_auth_touch_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Touch",
         "tags": [
           "auth"
         ]
@@ -5668,6 +5710,47 @@
           }
         },
         "summary": "Put Kiosk Overrides",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
+    "/api/kiosks/{kiosk_id}/screen-sleep": {
+      "post": {
+        "description": "The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).\n\nCalled by the display agent. It carries no credential, like the agent's other\nreports, and can only sign a kiosk out, never in.",
+        "operationId": "kiosk_screen_sleep_api_kiosks__kiosk_id__screen_sleep_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Kiosk Screen Sleep",
         "tags": [
           "kiosks"
         ]
