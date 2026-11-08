@@ -424,3 +424,9 @@ buttons) is carried in the job and the run view; a fault during a read step reco
 `panelLevel`. A successful `read` sets `findings.ddc` to true. After a run that took readings ends without power
 trouble, the agent ramps once from 0 to the saved everyday brightness (capped by the new ceiling, even with the ramp
 off), after waiting a bounded few config polls for the one that carries the saved values.
+
+The restore runs only when the config poll shows this calibration's values were saved (brightness, limit or floor
+differ from what the run started with); otherwise a run's end after readings only drops (one write, no default and no
+old saved level). The drop is written first, the wait for the saved config is short (at most 6 s), and a power fault
+anywhere in that window, or during the restore ramp, is recorded, the screen dropped and the ceiling held below it. A
+fault while waiting for the owner's next panel step (`read`, `detect`) records no level and no `panelLevel`.

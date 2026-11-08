@@ -4679,7 +4679,8 @@ def test_a_run_that_took_readings_restores_the_saved_everyday_level(tmp_path):
     runner, reports, ddc, polls = _restore_runner(tmp_path, level=None, new_cfg=new_cfg)
     runner._execute(_cal_job("read"))
     runner._finish("done")
-    assert ddc.writes[0] == 0  # the level is unknown: from 0
+    assert ddc.writes[0] == 5  # dropped at once, before waiting for the config
+    assert ddc.writes[1] == 0  # then the restore starts from 0
     assert ddc.writes[-1] == 18  # the NEW saved level, not the stale 17
     assert max(ddc.writes) <= 21
     assert len(polls) >= 2  # waited for the poll that carries the new config
@@ -4717,3 +4718,107 @@ def test_no_restore_after_power_trouble(tmp_path):
     ddc.writes.clear()
     runner._finish("error")
     assert 18 not in ddc.writes and max(ddc.writes, default=0) <= 5
+
+
+# -- calvin-rjyn review: restore only after a Save, waits record no level ------
+@pytest.mark.parametrize("status", ["stopped", "error", "timeout", "done"])
+def test_no_restore_without_a_save_never_uses_the_default_or_an_old_value(tmp_path, status):
+    unchanged = _ramp_cfg(brightness_ramp_enabled=False, brightness=60)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
+        poll=lambda: unchanged, cfg_over={"brightness_ramp_enabled": False, "brightness": 60},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish(status)
+    assert max(ddc.writes, default=0) <= 5  # no 20, no old 60
+    assert reports[-1]["status"] == status
+
+
+def test_no_restore_when_nothing_was_ever_saved_and_no_brightness_exists(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
+        poll=lambda: _ramp_cfg(brightness=None), cfg_over={"brightness": None},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("stopped")
+    assert agent.DEFAULT_BRIGHTNESS not in ddc.writes
+
+
+def test_stop_after_a_read_drops_before_waiting_for_the_config(tmp_path):
+    seen = []
+    holder = {}
+
+    def poll():
+        seen.append(list(holder["ddc"].writes))
+        return _ramp_cfg(brightness_ramp_enabled=False, brightness=60)
+
+    ddc = ReadingDdc(read=21)
+    holder["ddc"] = ddc
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ddc, poll=poll,
+        cfg_over={"brightness_ramp_enabled": False, "brightness": 60},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("stopped")
+    assert seen and seen[0] == [5]  # the drop was written before the first poll
+
+
+def test_a_fault_waiting_when_the_run_ends_is_recorded_before_any_write(tmp_path):
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ReadingDdc(read=21), poll=lambda: {},
+    )
+    runner._execute(_cal_job("read"))
+    fault.faults.append("Under-voltage detected!")
+    n = len(ddc.writes)
+    runner._finish("stopped")
+    assert runner.fault is not None and runner.fault["level"] is None
+    assert reports[-1]["status"] == "error"
+    assert 21 not in ddc.writes[n:]
+
+
+@pytest.mark.parametrize("step", ["read", "detect"])
+def test_a_fault_in_the_wait_between_panel_steps_records_no_level(tmp_path, step):
+    fault = ConsumingFault()
+    holder = {}
+
+    def poll():
+        # Once the step has reported, the owner is moving the panel by hand.
+        if any(r["status"] == "done" for r in holder["reports"]) and not holder.get("sent"):
+            holder["sent"] = True
+            fault.faults.append("Under-voltage detected!")
+        return {"displayCheck": dict(_cal_job(step), panelLevel=74)}
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        step, tmp_path, level=19, ddc=ReadingDdc(read=19), fault=fault, poll=poll
+    )
+    holder["reports"] = reports
+    runner.run()
+    incident = runner.fault
+    assert incident["step"] == step
+    assert incident["level"] is None and incident["lastGood"] is None
+    assert "panelLevel" not in incident  # the typed level belongs to the earlier read
+    assert reports[-1]["status"] == "error"
+
+
+def test_a_fault_during_the_restore_is_recorded_dropped_and_capped(tmp_path):
+    fault = ConsumingFault()
+
+    def on_write(level):
+        if level == 12:
+            fault.faults.append("Under-voltage detected!")
+
+    new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21, on_write=on_write), fault=fault,
+        poll=lambda: new_cfg, cfg_over={"brightness_ramp_enabled": False},
+    )
+    runner._execute(_cal_job("read"))
+    runner._finish("done")
+    assert runner.fault is not None and runner.fault["level"] == 12
+    assert reports[-1]["status"] == "error"
+    assert max(ddc.writes) == 12  # never went on climbing
+    assert ddc.writes[-1] <= 5  # dropped
+    assert runner.controller.fault_ceiling is not None and runner.controller.fault_ceiling < 12
+    assert agent.brightness_target(
+        agent.brightness_settings(new_cfg), runner.controller._ceiling()
+    ) < 12  # reconcile cannot climb to the same target

@@ -270,9 +270,8 @@ def _power_trouble(run: dict, report: AgentReport, status: str, now: str) -> Any
             "at": fault.at or report.finishedAt or now,
             "step": fault.step,
             "level": fault.level,
-            "panelLevel": fault.panelLevel
-            if fault.panelLevel is not None
-            else run.get("panelLevel"),
+            # Only the level typed for THIS fault, never the previous reading's.
+            "panelLevel": fault.panelLevel,
             "kind": fault.kind or "under-voltage",
         }
     clean = (run.get("preflight") or {}).get("status") == "clean"

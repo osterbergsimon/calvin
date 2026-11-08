@@ -839,6 +839,16 @@ def test_a_read_step_carries_the_typed_panel_level_to_the_agent_and_the_view(
 
 
 @pytest.mark.integration
+def test_a_fault_never_shows_the_previous_readings_panel_level(test_client: TestClient, kiosk):
+    run = _start(test_client, "detect").json()
+    _step(test_client, "read")
+    test_client.post(f"{BASE}/step", json={"step": "read", "panelLevel": 74})
+    fault = {**FAULT, "step": "read", "level": None, "lastGood": None}  # none typed for this one
+    _report(test_client, run["id"], "error", reason="power_trouble", fault=fault)
+    assert _findings(test_client)["powerTrouble"]["panelLevel"] is None
+
+
+@pytest.mark.integration
 def test_a_read_fault_with_no_level_records_the_panel_level(test_client: TestClient, kiosk):
     run = _start(test_client, "detect").json()
     fault = {**FAULT, "step": "read", "level": None, "lastGood": None, "panelLevel": 74}
