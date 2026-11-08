@@ -60,9 +60,6 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     _check_floor_under_limit(merge_overrides(await build_global_config(), body.overrides))
     _checked_overrides(body.overrides)
     await set_overrides(kiosk_id, body.overrides)
-    # The dialog's Save writes the whole layer (PUT): brightness keys in it, while
-    # a run is active, are that run's Save, even when the values are unchanged.
-    await display_check.note_save(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": body.overrides}
 
 
@@ -160,7 +157,6 @@ async def patch_kiosk_overrides(kiosk_id: str, body: OverridesBody, request: Req
     merged = await merge_into_overrides(kiosk_id, body.overrides)
     if merged is None:
         raise HTTPException(status_code=404, detail="Unknown kiosk")
-    await display_check.note_save(kiosk_id, body.overrides)
     return {"id": kiosk_id, "overrides": merged}
 
 
@@ -302,12 +298,18 @@ async def change_display_check_step(kiosk_id: str, body: display_check.StepReque
         )
 
 
+class StopBody(BaseModel):
+    # True when this calibration's Save landed before the stop (Done, or close).
+    saved: bool = False
+
+
 @router.post("/kiosks/{kiosk_id}/display-check/stop")
-async def stop_display_check(kiosk_id: str):
+async def stop_display_check(kiosk_id: str, body: StopBody | None = None):
     """Ask the agent to end the active run safely (admin)."""
     _valid_id_or_400(kiosk_id)
     try:
-        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id))
+        saved = bool(body and body.saved)
+        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id, saved))
     except (display_check.UnknownKioskError, display_check.NoActiveRunError):
         raise HTTPException(status_code=404, detail="No display check is running")
 

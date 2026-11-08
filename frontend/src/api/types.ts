@@ -3248,6 +3248,14 @@ export interface components {
       /** Value */
       value?: number | null;
     };
+    /** StopBody */
+    StopBody: {
+      /**
+       * Saved
+       * @default false
+       */
+      saved: boolean;
+    };
     /** UpdateLinkBody */
     UpdateLinkBody: {
       /** Guests See All */
@@ -5214,7 +5222,11 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["StopBody"] | null;
+      };
+    };
     responses: {
       /** @description Successful Response */
       200: {

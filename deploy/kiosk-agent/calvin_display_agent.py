@@ -277,8 +277,6 @@ DISPLAY_CHECK_STATE = "display-check.json"
 DISPLAY_CHECK_STEPS = ("detect", "write", "conversion", "read")
 DISPLAY_CHECK_POLL_SECONDS = 1.5
 # After readings: config polls to wait for the one carrying the saved values.
-RESTORE_CONFIG_POLLS = 4
-RESTORE_WAIT_SECONDS = 6.0  # the longest the end of a run waits for the saved config
 # Calibration v2 (calvin-c805): steps 1-3 never brighten the screen.
 CHECK_FLOOR = 5  # where an unknown start is dimmed to
 PREFLIGHT_SECONDS = 10.0  # the power watch before the first write
@@ -1396,10 +1394,10 @@ class DisplayCheckRunner:
         self.current_step = job.get("step")
         self.current_seq = job.get("seq")
         self.live_settings = self.settings  # refreshed from every config poll
-        # What the config held when the run began: the restore at the end runs
-        # only once a poll shows different saved values (this run's Save).
-        self._start_saved = _saved_values(brightness_settings(cfg))
-        self._job_saved = bool(job.get("saved"))  # the backend flagged a Save
+        # The restore at the end runs only on the backend's explicit flag: the
+        # dialog's Stop said this calibration's Save landed. Config values that
+        # changed (another device, a schedule toggle) prove nothing.
+        self._job_saved = bool(job.get("saved"))
         self._placeholder = None
         self.limit = None  # kept in the payload (null): v3 finds no limit
         self.last_write = None  # the level this run last wrote (None: none yet)
@@ -1856,39 +1854,19 @@ class DisplayCheckRunner:
         if job is not None and job.get("id") == self.job["id"] and job.get("saved"):
             self._job_saved = True
 
-    def _was_saved(self):
-        return self._job_saved or _saved_values(self.live_settings) != self._start_saved
-
     def _saved_by_now(self):
-        """True once a config poll shows this calibration's Save landed.
+        """True when the backend flagged this run's job as saved.
 
-        Save runs just before Done: wait (bounded, short) for a poll whose
-        brightness/limit/floor differ from what the run started with. A fault
-        in the wait is recorded (and the screen dropped) and stops the restore.
+        The flag arrives with the Stop (or close) that follows Save, so no wait
+        is needed. A power fault seen here is recorded (screen dropped) and
+        stops the restore.
         """
-        begin = self.clock()
-        for attempt in range(RESTORE_CONFIG_POLLS):
-            lines = self._polled_faults()
-            if lines:
-                self._calibration_fault(self.current_step or "read", None, None, lines)
-                self._stop_reason = None
-                return False
-            if self._was_saved():
-                return True
-            if self.poll is None or self.clock() - begin >= RESTORE_WAIT_SECONDS:
-                break
-            try:
-                cfg = self.poll()
-            except Exception:
-                cfg = None
-            if cfg is not None:
-                self.live_settings = brightness_settings(cfg)
-                self._note_job(display_check_job(cfg))
-                if self._was_saved():
-                    return True
-            if attempt + 1 < RESTORE_CONFIG_POLLS:
-                self.sleep(DISPLAY_CHECK_POLL_SECONDS)
-        return False
+        lines = self._polled_faults()
+        if lines:
+            self._calibration_fault(self.current_step or "read", None, None, lines)
+            self._stop_reason = None
+            return False
+        return self._job_saved
 
     def _restore_everyday(self):
         """Ramp once, from 0, to the saved everyday level (capped by the new ceiling).
@@ -2048,11 +2026,6 @@ class DisplayCheckRunner:
         finally:
             if controller is not None:
                 controller.check_running = False
-
-
-def _saved_values(settings):
-    """The three values a calibration Save writes: brightness, limit, floor."""
-    return (settings.get("brightness"), settings.get("limit"), settings.get("floor"))
 
 
 def _interrupted_limit(state, settings):

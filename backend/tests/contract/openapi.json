@@ -2630,6 +2630,17 @@
         "title": "StepRequest",
         "type": "object"
       },
+      "StopBody": {
+        "properties": {
+          "saved": {
+            "default": false,
+            "title": "Saved",
+            "type": "boolean"
+          }
+        },
+        "title": "StopBody",
+        "type": "object"
+      },
       "UpdateLinkBody": {
         "properties": {
           "guests_see_all": {
@@ -5387,6 +5398,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/StopBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {

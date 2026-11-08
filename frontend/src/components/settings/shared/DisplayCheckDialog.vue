@@ -807,7 +807,7 @@ async function saveAll() {
 // agent reports the run finished. Taps repeat safely.
 function requestStop() {
   stopRequested.value = true;
-  return check.stop();
+  return check.stop({ saved: saved.value });
 }
 function onStopClick(event) {
   // A pointer press already asked; a keyboard click (detail 0) asks here.
@@ -1313,7 +1313,9 @@ async function onClosed() {
   clearInterval(clock);
   clock = null;
   // Closing ends our own run; a run another device started is left alone.
-  if (check.isActive.value && check.ownsRun.value) await check.stop();
+  if (check.isActive.value && check.ownsRun.value) {
+    await check.stop({ saved: saved.value });
+  }
   check.dispose();
 }
 
@@ -1340,7 +1342,7 @@ function onDialogModel(value) {
 
 // Done ends the session itself; closing the dialog any other way does too.
 async function close() {
-  if (check.isActive.value && check.ownsRun.value) await check.stop();
+  if (check.isActive.value && check.ownsRun.value) await check.stop({ saved: saved.value });
   emit("update:modelValue", false);
 }
 </script>

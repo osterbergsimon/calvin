@@ -221,28 +221,29 @@ def test_a_late_result_for_an_older_seq_is_not_filed_as_the_current_step(
     assert test_client.get(BASE).json()["run"]["steps"]["conversion"]["seq"] == 2
 
 
-@pytest.mark.integration
-def test_a_brightness_save_during_a_run_marks_the_job_saved(test_client: TestClient, kiosk):
-    def job():
-        return test_client.get(f"/api/kiosks/{KIOSK}/config").json()["displayCheck"]
-
-    _start(test_client, "detect")
-    assert job()["saved"] is False
-    # an unrelated write is not the run's Save
-    assert test_client.put(OVERRIDES, json={"overrides": {"theme": "dark"}}).status_code == 200
-    assert job()["saved"] is False
-    # the same values as before still count: the dialog wrote them
-    assert (
-        test_client.put(
-            OVERRIDES, json={"overrides": {"brightness": 18, "brightnessLimit": 21}}
-        ).status_code
-        == 200
-    )
-    assert job()["saved"] is True
+def _job(test_client):
+    return test_client.get(f"/api/kiosks/{KIOSK}/config").json()["displayCheck"]
 
 
 @pytest.mark.integration
-def test_a_brightness_patch_during_a_run_marks_the_job_saved(test_client: TestClient, kiosk):
+def test_overrides_writes_during_a_run_never_mark_it_saved(test_client: TestClient, kiosk):
     _start(test_client, "detect")
+    test_client.put(OVERRIDES, json={"overrides": {"brightness": 60, "theme": "dark"}})
     test_client.patch(OVERRIDES, json={"overrides": {"brightnessFloor": 0}})
-    assert test_client.get(f"/api/kiosks/{KIOSK}/config").json()["displayCheck"]["saved"] is True
+    assert _job(test_client)["saved"] is False
+
+
+@pytest.mark.integration
+def test_only_a_stop_that_says_saved_marks_the_job_saved(test_client: TestClient, kiosk):
+    _start(test_client, "detect")
+    assert test_client.post(f"{BASE}/stop").status_code == 200
+    job = _job(test_client)
+    assert job["action"] == "stop" and job["saved"] is False
+
+
+@pytest.mark.integration
+def test_a_stop_with_saved_true_marks_the_job_saved(test_client: TestClient, kiosk):
+    _start(test_client, "detect")
+    assert test_client.post(f"{BASE}/stop", json={"saved": True}).status_code == 200
+    job = _job(test_client)
+    assert job["action"] == "stop" and job["saved"] is True

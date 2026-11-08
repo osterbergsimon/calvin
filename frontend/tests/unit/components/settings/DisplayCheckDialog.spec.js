@@ -971,6 +971,35 @@ describe("Back and Remove", () => {
   });
 });
 
+describe("telling the agent the Save landed", () => {
+  const stopBody = () => posts("stop").at(-1)?.[1];
+
+  it("Done after a successful Save stops with saved: true", async () => {
+    await toSummary({ savePatch: vi.fn().mockResolvedValue(true) });
+    await clickPrimary(wrapper); // Save
+    await clickPrimary(wrapper); // Done
+    expect(posts("stop")).toHaveLength(1);
+    expect(stopBody()).toEqual({ saved: true });
+  });
+
+  it("closing (X) after a successful Save stops with saved: true", async () => {
+    await toSummary({ savePatch: vi.fn().mockResolvedValue(true) });
+    await clickPrimary(wrapper);
+    await wrapper.setProps({ modelValue: false });
+    await flushPromises();
+    expect(stopBody()).toEqual({ saved: true });
+  });
+
+  it("Done or close without a Save, or after a failed one, never says saved", async () => {
+    await toSummary({ savePatch: vi.fn().mockResolvedValue(false) });
+    await clickPrimary(wrapper); // Save fails
+    await wrapper.setProps({ modelValue: false });
+    await flushPromises();
+    expect(posts("stop")).toHaveLength(1);
+    expect(stopBody()).toBeUndefined();
+  });
+});
+
 describe("Try again during a live run", () => {
   it("waits, saying Stopping, until the old run ends, then starts once", async () => {
     await toStep3();

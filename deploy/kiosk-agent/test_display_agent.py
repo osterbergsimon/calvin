@@ -4675,22 +4675,29 @@ def _restore_runner(tmp_path, *, level, new_cfg, ramp=False):
     return runner, reports, ddc, polls
 
 
+def _the_stop_says_saved(runner, new_cfg):
+    """What the poll that carries Stop-after-Save gives the runner."""
+    runner.live_settings = agent.brightness_settings(new_cfg)
+    runner._note_job({**_cal_job("read", action="stop"), "saved": True})
+
+
 def test_a_run_that_took_readings_restores_the_saved_everyday_level(tmp_path):
     new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18)
     runner, reports, ddc, polls = _restore_runner(tmp_path, level=None, new_cfg=new_cfg)
     runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, new_cfg)
     runner._finish("done")
-    assert ddc.writes[0] == 5  # dropped at once, before waiting for the config
+    assert ddc.writes[0] == 5  # dropped at once
     assert ddc.writes[1] == 0  # then the restore starts from 0
     assert ddc.writes[-1] == 18  # the NEW saved level, not the stale 17
     assert max(ddc.writes) <= 21
-    assert len(polls) >= 2  # waited for the poll that carries the new config
 
 
 def test_the_restore_is_capped_by_the_new_ceiling(tmp_path):
     new_cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=50)
     runner, reports, ddc, polls = _restore_runner(tmp_path, level=5, new_cfg=new_cfg)
     runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, new_cfg)
     runner._finish("stopped")
     assert ddc.writes[-1] == 21
 
@@ -4745,25 +4752,6 @@ def test_no_restore_when_nothing_was_ever_saved_and_no_brightness_exists(tmp_pat
     assert agent.DEFAULT_BRIGHTNESS not in ddc.writes
 
 
-def test_stop_after_a_read_drops_before_waiting_for_the_config(tmp_path):
-    seen = []
-    holder = {}
-
-    def poll():
-        seen.append(list(holder["ddc"].writes))
-        return _ramp_cfg(brightness_ramp_enabled=False, brightness=60)
-
-    ddc = ReadingDdc(read=21)
-    holder["ddc"] = ddc
-    runner, reports, clock, ddc, fault = _cal_runner(
-        "read", tmp_path, level=19, ddc=ddc, poll=poll,
-        cfg_over={"brightness_ramp_enabled": False, "brightness": 60},
-    )
-    runner._execute(_cal_job("read"))
-    runner._finish("stopped")
-    assert seen and seen[0] == [5]  # the drop was written before the first poll
-
-
 def test_a_fault_waiting_when_the_run_ends_is_recorded_before_any_write(tmp_path):
     runner, reports, clock, ddc, fault = _cal_runner(
         "read", tmp_path, level=19, ddc=ReadingDdc(read=21), poll=lambda: {},
@@ -4814,6 +4802,7 @@ def test_a_fault_during_the_restore_is_recorded_dropped_and_capped(tmp_path):
         poll=lambda: new_cfg, cfg_over={"brightness_ramp_enabled": False},
     )
     runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, new_cfg)
     runner._finish("done")
     assert runner.fault is not None and runner.fault["level"] == 12
     assert reports[-1]["status"] == "error"
@@ -4826,32 +4815,46 @@ def test_a_fault_during_the_restore_is_recorded_dropped_and_capped(tmp_path):
 
 
 # -- calvin-rjyn re-review: an identical Save, the guards ----------------------
-def _saved_cfg(saved, **over):
-    cfg = _ramp_cfg(brightness_ramp_enabled=False, brightness_limit=21, brightness=18, **over)
-    cfg["displayCheck"] = {**_cal_job("read"), "saved": saved}
-    return cfg
+def _run_ending(tmp_path, *, saved, cfg_over, ended_cfg=None):
+    """A whole run: one read, then the dialog ends it (Stop/Done/close) with `saved`."""
+    holder = {}
+    base = _ramp_cfg(**cfg_over)
 
+    def poll():
+        done = any(r["status"] == "done" for r in holder["reports"])
+        job = {**_cal_job("read", action="stop" if done else "start"), "saved": saved and done}
+        return {**(ended_cfg if done and ended_cfg else base), "displayCheck": job}
 
-def test_an_identical_save_still_restores_the_everyday_level(tmp_path):
-    same = {"brightness_ramp_enabled": False, "brightness_limit": 21, "brightness": 18}
     runner, reports, clock, ddc, fault = _cal_runner(
-        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
-        poll=lambda: _saved_cfg(True), cfg_over=same,
+        "read", tmp_path, level=5, ddc=ReadingDdc(read=21), poll=poll, cfg_over=cfg_over
     )
-    runner._execute(_cal_job("read"))
-    runner._finish("stopped")
-    assert ddc.writes[-1] == 18  # the values did not change; the backend's flag did
+    holder["reports"] = reports
+    runner.run()
+    return ddc
 
 
-def test_the_same_values_without_a_save_flag_do_not_restore(tmp_path):
-    same = {"brightness_ramp_enabled": False, "brightness_limit": 21, "brightness": 18}
-    runner, reports, clock, ddc, fault = _cal_runner(
-        "read", tmp_path, level=5, ddc=ReadingDdc(read=21),
-        poll=lambda: _saved_cfg(False), cfg_over=same,
+SAME = {"brightness_ramp_enabled": False, "brightness_limit": 21, "brightness": 18}
+
+
+def test_done_after_a_save_restores_even_with_identical_values(tmp_path):
+    ddc = _run_ending(tmp_path, saved=True, cfg_over=SAME)
+    assert ddc.writes[-1] == 18
+
+
+def test_close_after_a_save_restores_too(tmp_path):
+    # X sends the same Stop-with-saved as Done: the agent cannot tell them apart.
+    ddc = _run_ending(tmp_path, saved=True, cfg_over={**SAME, "brightness": 17},
+                      ended_cfg=_ramp_cfg(**SAME))
+    assert ddc.writes[-1] == 18
+
+
+def test_a_whole_layer_write_or_changed_brightness_without_a_save_does_not_restore(tmp_path):
+    changed = _ramp_cfg(brightness_ramp_enabled=False, brightness=60, brightness_limit=None)
+    ddc = _run_ending(
+        tmp_path, saved=False, cfg_over={"brightness_ramp_enabled": False, "brightness": 40},
+        ended_cfg=changed,
     )
-    runner._execute(_cal_job("read"))
-    runner._finish("stopped")
-    assert max(ddc.writes, default=0) <= 5
+    assert max(ddc.writes, default=0) <= 5  # no 60, no 40, no default 20
 
 
 def test_display_check_job_carries_the_saved_flag():
@@ -4867,6 +4870,7 @@ def test_a_save_with_no_brightness_chosen_never_ramps_to_the_default(tmp_path):
         cfg_over={"brightness_ramp_enabled": False, "brightness": None},
     )
     runner._execute(_cal_job("read"))
+    _the_stop_says_saved(runner, cfg)
     runner._finish("stopped")
     assert agent.DEFAULT_BRIGHTNESS not in ddc.writes
     assert max(ddc.writes, default=0) <= 5
