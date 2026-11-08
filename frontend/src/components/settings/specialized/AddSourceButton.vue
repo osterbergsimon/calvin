@@ -27,6 +27,17 @@
     @confirm="confirmInstall"
     @cancel="cancelInstall"
   />
+
+  <ConfirmModal
+    :show="!!hiddenPrompt"
+    title="Already added"
+    :message="hiddenPromptMessage"
+    confirm-text="Show it"
+    alternative-text="Add another"
+    @confirm="confirmShowHidden"
+    @alternative="addAnother"
+    @cancel="hiddenPrompt = null"
+  />
 </template>
 
 <script setup>
@@ -62,9 +73,15 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // Clock bar info: instances of a plugin whose tile is hidden. When there are
+  // some, adding offers to show them again instead of creating a duplicate.
+  hiddenInstancesFor: {
+    type: Function,
+    default: null,
+  },
 });
 
-const emit = defineEmits(["saved", "upload"]);
+const emit = defineEmits(["saved", "upload", "show-hidden"]);
 
 const router = useRouter();
 const configStore = useConfigStore();
@@ -97,8 +114,8 @@ const matchesKind = plugin => {
   if (props.kind === "calendar") return plugin.type === "calendar";
   if (props.kind === "photos") return plugin.type === "image";
   if (props.kind === "services") return plugin.type === "service" && !!plugin.display_schema;
-  // Clock-bar-only services have a tile and no page of their own (§3.1).
-  return plugin.type === "service" && !!plugin.statusbar_schema && !plugin.display_schema;
+  // Any service with a clock-bar tile, with or without a page (§3.1, calvin-shsj).
+  return plugin.type === "service" && !!plugin.statusbar_schema;
 };
 
 const pluginProviders = computed(() =>
@@ -309,8 +326,36 @@ const choose = async provider => {
   openProvider(provider);
 };
 
+const hiddenPrompt = ref(null);
+const hiddenPromptMessage = computed(() => {
+  const prompt = hiddenPrompt.value;
+  if (!prompt) return "";
+  const names = prompt.instances.map(instance => instance.name).join(", ");
+  return `${prompt.provider.label} already has a tile that is hidden from the clock bar: ${names}. Show it again instead of adding another?`;
+});
+
 const openProvider = provider => {
+  const hidden =
+    props.kind === "clock" && props.hiddenInstancesFor ? props.hiddenInstancesFor(provider.id) : [];
+  if (hidden.length > 0) {
+    hiddenPrompt.value = { provider, instances: hidden };
+    return;
+  }
   selectedPlugin.value = provider.plugin;
+  showModal.value = true;
+};
+
+const confirmShowHidden = () => {
+  const prompt = hiddenPrompt.value;
+  hiddenPrompt.value = null;
+  if (prompt) emit("show-hidden", prompt.instances);
+};
+
+const addAnother = () => {
+  const prompt = hiddenPrompt.value;
+  hiddenPrompt.value = null;
+  if (!prompt) return;
+  selectedPlugin.value = prompt.provider.plugin;
   showModal.value = true;
 };
 

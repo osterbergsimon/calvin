@@ -765,4 +765,43 @@ describe("config store — per-screen control visibility", () => {
     expect(store.shouldShowUI).toBe(false);
     expect(localStorage.getItem("calvin-screen-showUI")).toBe("false");
   });
+
+  describe("fetchConfig in-flight sharing (calvin-hwjz)", () => {
+    it("makes one request when several callers fetch at the same time", async () => {
+      let resolve;
+      api.get.mockReturnValue(new Promise(r => (resolve = r)));
+      const store = useConfigStore();
+
+      const calls = [store.fetchConfig(), store.fetchConfig(), store.fetchConfig()];
+      resolve({ data: { weekStartDay: 0 } });
+      const results = await Promise.all(calls);
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(results.every(r => r === results[0])).toBe(true);
+    });
+
+    it("fetches again once the first request has settled", async () => {
+      api.get.mockResolvedValue({ data: {} });
+      const store = useConfigStore();
+      await store.fetchConfig();
+      await store.fetchConfig();
+      expect(api.get).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not hand a fetch started before a save to a caller after it", async () => {
+      let resolveFirst;
+      api.get
+        .mockReturnValueOnce(new Promise(r => (resolveFirst = r)))
+        .mockResolvedValueOnce({ data: { weekStartDay: 3 } });
+      const store = useConfigStore();
+
+      const before = store.fetchConfig();
+      await store.updateConfig({ weekStartDay: 3 });
+      const after = store.fetchConfig();
+      resolveFirst({ data: { weekStartDay: 1 } });
+      await Promise.all([before, after]);
+
+      expect(api.get).toHaveBeenCalledTimes(2);
+    });
+  });
 });

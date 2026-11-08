@@ -18,6 +18,7 @@ from app.plugins.base import PluginType
 from app.plugins.isolated_check import run_isolated_plugin_check
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.registry.enable_policy import SEALED_REASON
 from app.plugins.registry.loader import load_plugin_types_for_single
 from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.plugins.utils.secrets import (
@@ -887,6 +888,9 @@ async def _update_plugin_type(
         # Update existing plugin type
         if enabled is not None:
             db_type.enabled = enabled
+            if enabled is True and db_type.error_message == SEALED_REASON:
+                # Turned on after unsealing: the recorded reason is stale.
+                db_type.error_message = None
         if config:
             current_schema = db_type.common_config_schema or {}
             # Only universal schema-backed values are stored here. Regular

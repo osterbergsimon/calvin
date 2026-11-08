@@ -65,4 +65,38 @@ describe("Themes Store", () => {
       expect(store.selectedTheme).toBe("theme1");
     });
   });
+
+  describe("getTheme in-flight sharing (calvin-hwjz)", () => {
+    it("makes one request per theme id while one is in flight", async () => {
+      let resolve;
+      api.get.mockReturnValue(new Promise(r => (resolve = r)));
+      const store = useThemesStore();
+
+      const calls = [store.getTheme("ocean"), store.getTheme("ocean"), store.getTheme("ocean")];
+      resolve({ data: { id: "ocean" } });
+      const results = await Promise.all(calls);
+
+      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(api.get).toHaveBeenCalledWith("/plugins/ocean");
+      expect(results).toEqual([{ id: "ocean" }, { id: "ocean" }, { id: "ocean" }]);
+    });
+
+    it("keeps different themes apart and refetches after settling", async () => {
+      api.get.mockImplementation(async url => ({ data: { id: url } }));
+      const store = useThemesStore();
+
+      await Promise.all([store.getTheme("ocean"), store.getTheme("forest")]);
+      await store.getTheme("ocean");
+
+      expect(api.get).toHaveBeenCalledTimes(3);
+    });
+
+    it("lets a failed request be retried", async () => {
+      api.get.mockRejectedValueOnce(new Error("boom")).mockResolvedValueOnce({ data: { id: "x" } });
+      const store = useThemesStore();
+
+      await expect(store.getTheme("x")).rejects.toThrow("boom");
+      await expect(store.getTheme("x")).resolves.toEqual({ id: "x" });
+    });
+  });
 });
