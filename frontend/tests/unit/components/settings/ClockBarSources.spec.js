@@ -28,6 +28,8 @@ vi.mock("@/services/pluginsApi", () => ({
 }));
 
 import * as pluginsApi from "@/services/pluginsApi";
+import { useConfigStore } from "@/stores/config";
+import { defaultClockBarDesign, hideTileInDesign } from "@/utils/clockBarDesign";
 import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 
 const weather = {
@@ -41,7 +43,8 @@ const weather = {
 
 const addStub = {
   name: "AddSourceButton",
-  emits: ["saved"],
+  emits: ["saved", "show-hidden"],
+  props: ["kind", "hiddenInstancesFor"],
   template: "<div />",
   methods: { open: openAddButton },
 };
@@ -128,6 +131,66 @@ describe("Clock bar info section", () => {
         plugin_id: "sl_departures",
         config: { stop: "A", show_in_statusbar: false },
       });
+    });
+
+    it("gives a hidden row a Show action that restores the tile and the design entry", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const config = useConfigStore();
+      config.clockBarDesign = hideTileInDesign(defaultClockBarDesign(), "sl1");
+      const update = vi.spyOn(config, "updateConfig").mockResolvedValue({});
+      const w = await mountSection();
+
+      expect(firstRow(w).inClockBar).toBe(false);
+      await w.get("[data-test='clock-show']").trigger("click");
+      await flushPromises();
+
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("sl1", {
+        name: "Home stop",
+        enabled: true,
+        plugin_id: "sl_departures",
+        config: { show_in_statusbar: true },
+      });
+      expect(update.mock.calls[0][0].clockBarDesign.horizontal.hidden).not.toContain("tile:sl1");
+    });
+
+    it("says In the clock bar for a tile the editor restored, whatever its own flag says", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const config = useConfigStore();
+      const design = defaultClockBarDesign();
+      design.horizontal.zones.right = ["tile:sl1", ...design.horizontal.zones.right];
+      config.clockBarDesign = design;
+      const w = await mountSection();
+
+      expect(firstRow(w).inClockBar).toBe(true);
+      expect(w.find("[data-test='clock-show']").exists()).toBe(false);
+    });
+
+    it("shows a hidden tile when the add prompt asks for it", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const w = await mountSection();
+      const add = w.findComponent({ name: "AddSourceButton" });
+      expect(
+        add
+          .props("hiddenInstancesFor")("sl_departures")
+          .map(i => i.id)
+      ).toEqual(["sl1"]);
+      expect(add.props("hiddenInstancesFor")("weather")).toEqual([]);
+
+      add.vm.$emit("show-hidden", [{ id: "sl1", name: "Home stop" }]);
+      await flushPromises();
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalled();
     });
 
     it("still deletes a clock-bar-only source", async () => {

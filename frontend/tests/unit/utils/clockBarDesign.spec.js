@@ -5,6 +5,7 @@ import {
   resolveClockBarDesign,
   hideTileInDesign,
   showTileInDesign,
+  tileShownInDesign,
 } from "@/utils/clockBarDesign";
 
 const tile = (id, config = {}) => ({
@@ -371,13 +372,36 @@ describe("hideTileInDesign (calvin-shsj)", () => {
     expect(hideTileInDesign(next, "weather").horizontal.hidden).toEqual(next.horizontal.hidden);
   });
 
-  it("hides a tile that the design pins in a zone", () => {
-    const resolved = resolveClockBarDesign(config({}), [tile("weather")]);
-    resolved.horizontal.zones.right = ["tile:weather", "status"];
-    const design = hideTileInDesign(buildClockBarDesign(resolved), "weather");
-    const again = resolveClockBarDesign(config({ clockBarDesign: design }), [tile("weather")]);
+  // A real pin: the stored design lists the tile in a zone (build would collapse
+  // a default-position tile back into the `tiles` placeholder).
+  const pinned = () => ({
+    version: 1,
+    horizontal: {
+      zones: { left: ["tile:weather"], center: ["time"], right: ["tiles", "status"] },
+      hidden: [],
+      parts: {},
+      barHeight: "normal",
+      tileSize: "m",
+    },
+  });
 
-    expect(again.horizontal.hidden).toContain("tile:weather");
+  it("takes a tile pinned in a zone out of the zones as well as hiding it", () => {
+    const before = resolveClockBarDesign(config({ clockBarDesign: pinned() }), [tile("weather")]);
+    expect(before.horizontal.zones.left).toContain("tile:weather");
+
+    const design = hideTileInDesign(pinned(), "weather");
+    const after = resolveClockBarDesign(config({ clockBarDesign: design }), [tile("weather")]);
+
+    expect(JSON.stringify(after.horizontal.zones)).not.toContain("tile:weather");
+    expect(after.horizontal.hidden).toContain("tile:weather");
+  });
+
+  it("reads a tile's state from the design first, then from its own flag", () => {
+    const design = pinned();
+    expect(tileShownInDesign(design, "weather", false)).toBe(true);
+    expect(tileShownInDesign(hideTileInDesign(design, "weather"), "weather", true)).toBe(false);
+    expect(tileShownInDesign(design, "other", false)).toBe(false);
+    expect(tileShownInDesign(null, "other", true)).toBe(true);
   });
 });
 

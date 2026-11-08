@@ -169,6 +169,50 @@ describe("AddSourceButton provider picker", () => {
     expect(providers.map(p => p.id).sort()).toEqual(["sl_departures", "weather"]);
   });
 
+  it("offers Show instead of a duplicate when the plugin already has a hidden tile (calvin-shsj)", async () => {
+    pluginsRef.value = [
+      service({
+        id: "sl_departures",
+        name: "SL departures",
+        statusbar_schema: { kind: "status" },
+      }),
+    ];
+    const hidden = [{ id: "sl1", name: "Home stop" }];
+    const w = await mountButton({
+      kind: "clock",
+      hiddenInstancesFor: id => (id === "sl_departures" ? hidden : []),
+    });
+    w.vm.open();
+    await flushPromises();
+    // A single provider opens straight away: it must stop at the prompt.
+    expect(w.findComponent({ name: "InstanceModal" }).props("show")).toBe(false);
+    const prompt = w.findAllComponents({ name: "ConfirmModal" })[1];
+    expect(prompt.props("show")).toBe(true);
+    expect(prompt.props("message")).toContain("Home stop");
+
+    prompt.vm.$emit("confirm");
+    await flushPromises();
+    expect(w.emitted("show-hidden")[0][0]).toEqual(hidden);
+    expect(w.findComponent({ name: "InstanceModal" }).props("show")).toBe(false);
+  });
+
+  it("still lets the user add another instance after the Show prompt", async () => {
+    pluginsRef.value = [
+      service({ id: "sl_departures", name: "SL departures", statusbar_schema: { kind: "status" } }),
+    ];
+    const w = await mountButton({
+      kind: "clock",
+      hiddenInstancesFor: () => [{ id: "sl1", name: "Home stop" }],
+    });
+    w.vm.open();
+    await flushPromises();
+
+    w.findAllComponents({ name: "ConfirmModal" })[1].vm.$emit("alternative");
+    await flushPromises();
+
+    expect(w.findComponent({ name: "InstanceModal" }).props("show")).toBe(true);
+  });
+
   it("deep-links to Plugins › Install with the kind filter", async () => {
     pluginsRef.value = [iframe];
     const w = await mountButton();

@@ -16,7 +16,12 @@
       <template #meta="{ row }">
         <span class="cbs-place">
           <template v-if="row.inClockBar">In the clock bar</template>
-          <template v-else>Hidden from the clock bar</template>
+          <template v-else>
+            Hidden from the clock bar ·
+            <Button variant="link" class="cbs-link" data-test="clock-show" @click="showRow(row)">
+              Show
+            </Button>
+          </template>
           ·
           <Button variant="link" class="cbs-link" @click="openClockBarEditor">
             Edit clock bar look…
@@ -25,7 +30,13 @@
       </template>
     </SourceList>
 
-    <AddSourceButton ref="addButton" kind="clock" @saved="handleSaved" />
+    <AddSourceButton
+      ref="addButton"
+      kind="clock"
+      :hidden-instances-for="hiddenInstancesFor"
+      @saved="handleSaved"
+      @show-hidden="instances => instances.forEach(showInstance)"
+    />
 
     <InstanceModal
       :show="showModal"
@@ -48,7 +59,7 @@ import SourceList from "@/components/settings/specialized/SourceList.vue";
 import AddSourceButton from "@/components/settings/specialized/AddSourceButton.vue";
 import InstanceModal from "@/components/settings/specialized/InstanceModal.vue";
 import { buildSourceRow } from "@/utils/instanceSummary";
-import { hideTileInDesign, showTileInDesign } from "@/utils/clockBarDesign";
+import { hideTileInDesign, showTileInDesign, tileShownInDesign } from "@/utils/clockBarDesign";
 import { logError } from "@/utils/logger";
 
 // Clock-bar-only sources (§3.1, §3.6): a service plugin that ships a tile and
@@ -95,7 +106,13 @@ const rows = computed(() =>
   clockPlugins.value.flatMap(plugin =>
     (pluginInstances.value[plugin.id] || []).map(instance => ({
       ...buildSourceRow(plugin, instance),
-      inClockBar: isClockBarShown(instance),
+      // The saved design decides when it mentions the tile (the clock bar editor
+      // pins and hides there); only an unmentioned tile follows its own flag.
+      inClockBar: tileShownInDesign(
+        configStore.clockBarDesign,
+        instance.id,
+        isClockBarShown(instance)
+      ),
     }))
   )
 );
@@ -166,34 +183,55 @@ const handleRemove = async row => {
   }
 };
 
+// Show one instance's tile: its own flag on, and off the design's hidden shelf
+// (the design wins over the flag once a tile is listed in it, §7.2).
+const showInstance = async instance => {
+  try {
+    await pluginsApi.updatePluginInstance(instance.id, {
+      name: instance.name,
+      enabled: instance.enabled !== false,
+      plugin_id: instance.plugin_id || providerOf(instance.id),
+      config: { ...(instance.config || {}), show_in_statusbar: true },
+    });
+    if (configStore.clockBarDesign) {
+      await configStore.updateConfig({
+        clockBarDesign: showTileInDesign(configStore.clockBarDesign, instance.id),
+      });
+    }
+  } catch (error) {
+    logError("[ClockBarSources]", "Failed to show the tile:", error);
+  }
+  await loadPlugins();
+};
+
+const providerOf = instanceId =>
+  Object.keys(pluginInstances.value).find(pluginId =>
+    (pluginInstances.value[pluginId] || []).some(item => item.id === instanceId)
+  );
+
+const showRow = row => showInstance({ ...row.instance, plugin_id: row.providerId });
+
+// Instances of a plugin whose tile is hidden: Add offers to show these instead of
+// creating a second instance.
+const hiddenInstancesFor = pluginId =>
+  (pluginInstances.value[pluginId] || []).filter(
+    instance =>
+      !tileShownInDesign(configStore.clockBarDesign, instance.id, isClockBarShown(instance))
+  );
+
 const handleSaved = async payload => {
   const instance = (pluginInstances.value[payload?.pluginId] || []).find(
     item => item.name === payload?.instanceName
   );
   if (instance) {
-    try {
-      // Adding clock bar info means showing it: a tile that stays hidden would
-      // make the add look like it did nothing.
-      await pluginsApi.updatePluginInstance(instance.id, {
-        name: instance.name,
-        enabled: instance.enabled !== false,
-        plugin_id: payload.pluginId,
-        config: { ...(instance.config || {}), show_in_statusbar: true },
-      });
-      // The design wins over show_in_statusbar once a tile is listed in it, so
-      // remove it from the Not shown shelf too (§7.2).
-      if (configStore.clockBarDesign) {
-        await configStore.updateConfig({
-          clockBarDesign: showTileInDesign(configStore.clockBarDesign, instance.id),
-        });
-      }
-    } catch (error) {
-      logError("[ClockBarSources]", "Failed to switch the new tile on:", error);
-    }
+    // Adding clock bar info means showing it: a tile that stays hidden would
+    // make the add look like it did nothing.
+    await showInstance({ ...instance, plugin_id: payload.pluginId });
     savedHighlightId.value = instance.id;
     setTimeout(() => {
       savedHighlightId.value = "";
     }, 1500);
+    return;
   }
   await loadPlugins();
 };
