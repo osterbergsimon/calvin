@@ -7,7 +7,7 @@
 
 import { watch } from "vue";
 import { useKiosksStore } from "../stores/kiosks";
-import { KEEPALIVE_REQUEST } from "../services/api";
+import { keepaliveOptionsFor } from "../services/api";
 import { createOptimisticQueue } from "./optimisticQueue";
 
 const registries = new WeakMap();
@@ -35,7 +35,8 @@ export function kioskOverridesQueue(kioskId) {
     load: async () => (await store.fetchOverrides(kioskId)) || {},
     save: async ({ changes, merge, snapshot }, { keepalive } = {}) => {
       // Only a page-close flush adds the request option; an ordinary save is unchanged.
-      const extra = keepalive ? [KEEPALIVE_REQUEST] : [];
+      const options = keepalive ? keepaliveOptionsFor(merge ? changes : snapshot) : undefined;
+      const extra = options ? [options] : [];
       if (merge) {
         // A per-screen row changed one key: merge it, so a screen without an
         // admin session can save the keys it is allowed to change (F2). The

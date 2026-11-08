@@ -92,4 +92,17 @@ describe.each(["pagehide", "beforeunload"])("saves queued at %s (calvin-msa8)", 
     expect(api.post.mock.calls[0][2]).toBeUndefined();
     wrapper.unmount();
   });
+
+  it("sends a body over the keepalive limit as a normal request instead of failing", async () => {
+    api.post.mockResolvedValue({ data: {} });
+    const { wrapper, result } = mountWith(() => useConfigForm({}));
+
+    void result.updateConfigValue("notes", "x".repeat(70 * 1024));
+    window.dispatchEvent(new Event(eventName));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(api.post).toHaveBeenCalledTimes(1);
+    expect(api.post.mock.calls[0][2]).toBeUndefined();
+    wrapper.unmount();
+  });
 });

@@ -10,7 +10,7 @@ import { friendlyError } from "../utils/friendlyError";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 import { createOptimisticQueue } from "../utils/optimisticQueue";
-import { KEEPALIVE_REQUEST } from "../services/api";
+import { keepaliveOptionsFor } from "../services/api";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
@@ -29,8 +29,9 @@ export function useConfigForm(initialConfig = {}) {
       error.value = "";
       saveSuccess.value = false;
       // The store POSTs to the backend and applies the result; one request per save.
-      await (keepalive
-        ? configStore.updateConfig(changes, KEEPALIVE_REQUEST)
+      const options = keepalive ? keepaliveOptionsFor(changes) : undefined;
+      await (options
+        ? configStore.updateConfig(changes, options)
         : configStore.updateConfig(changes));
       lastSavedKeys.value = Object.keys(changes);
       saveSuccess.value = true;
