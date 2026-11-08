@@ -128,11 +128,24 @@ onMounted(() => {
 
 <style scoped>
 .plugin-statusbar-items {
-  display: flex;
+  /* A grid of minmax(0, max-content) columns: as wide as its tiles when there
+     is room, but a floor of zero, so the zone holding it can shrink to its
+     fixed parts and the tiles truncate. (A flex row would report its full
+     width as the floor.) */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, max-content);
   align-items: center;
+  /* The tiles are the part of a bar that gives way: they shrink (their names
+     truncate) instead of running over the zone beside them (calvin-r7lb). */
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
 }
 
 .plugin-statusbar-items.orientation-vertical {
+  overflow: visible;
+  display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }

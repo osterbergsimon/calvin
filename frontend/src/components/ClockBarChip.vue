@@ -56,6 +56,17 @@ defineEmits(["select", "move"]);
   touch-action: none;
 }
 
+/* A tile chip may be narrower than its content so the tile inside truncates
+   (its name first); every other chip (logo, time, dots, menu) keeps its full
+   width and the tiles give way (calvin-r7lb). */
+.clock-bar-chip[data-part-id="room"],
+.clock-bar-chip[data-part-id="tiles"],
+.clock-bar-chip[data-part-id^="tile:"] {
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+
 .clock-bar-chip.is-selected {
   border-color: var(--focus);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 35%, transparent);

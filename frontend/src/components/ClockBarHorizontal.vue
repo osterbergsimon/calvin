@@ -359,8 +359,12 @@ onMounted(() => {
   min-width: 0;
 }
 
+/* A side zone never shrinks below its fixed parts (logo, room, page dots, the
+   menu). The tiles add nothing to that floor (see PluginStatusbarItems), so
+   they are what gives way and a zone's box never slides under its neighbour. */
 .clock-bar-side {
   gap: var(--gap-inline);
+  min-width: min-content;
 }
 
 .clock-bar-left {
@@ -372,6 +376,12 @@ onMounted(() => {
   flex: 1;
   justify-content: flex-end;
 }
+
+/* What gives way when a bar is crowded, in one rule (calvin-r7lb): the plugin
+   tiles truncate their names first, then their values (StatusRenderer); the room
+   name ends in an ellipsis; the logo, page dots, time, date and the menu never
+   shrink. The side zones may be narrower than their content (min-width: 0) only
+   because everything in them that can be wide can also truncate. */
 
 /* The centred clock keeps its full width: the side groups yield instead of
    the time being squeezed under the screen dots (CLV-91). */

@@ -173,6 +173,11 @@ const dotsActiveId = computed(() => (props.sample ? SAMPLE_SCREENS[0].id : props
 }
 
 .clock-bar-room {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-ui);
   color: var(--ink-3);
   font-size: var(--text-body);

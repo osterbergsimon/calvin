@@ -25,7 +25,7 @@
       <span v-if="isAlert(item)" class="calvin-plugin-lamp" />
       <span v-if="iconFor(item)" class="status__icon">{{ iconFor(item) }}</span>
       <span v-if="labelFor(item)" class="status__cell-label calvin-plugin-readout__label">
-        {{ labelFor(item) }}
+        <span class="status__cell-text">{{ labelFor(item) }}</span>
       </span>
       <span v-if="hasValue(item)" class="status__cell-value calvin-plugin-readout__value">
         {{ valueFor(item)
@@ -143,14 +143,39 @@ function readoutClass(item) {
   display: inline-flex;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
 }
 
+/* A row in a bar gives way before it overlaps its neighbour: every cell can
+   shrink, the name (label) truncates with an ellipsis first and the value only
+   after that (calvin-r7lb). */
 .status__cell {
   display: inline-flex;
   align-items: baseline;
   gap: 0.35rem;
   padding: 0 0.65rem;
   white-space: nowrap;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
+.status__cell-label {
+  min-width: 0;
+  flex: 0 8 auto;
+  overflow: hidden;
+}
+
+.status__cell-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status__cell-value {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status__cell:first-child {
