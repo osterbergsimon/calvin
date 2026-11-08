@@ -231,6 +231,11 @@ for (const scenario of SCENARIOS) {
           test(`editor preview: ${label} bar, ${orientation}`, async ({ page }) => {
             const api = await installApiMock(page, { overrides: tileOverrides(scenario.tiles) });
             const editor = await openEditor(page, { shape, orientation });
+            await page
+              .locator(`.cbe-root ${bar}`)
+              .screenshot({
+                path: shot(`editor-${scenario.name}-${shape}-${orientation}-${size.name}`),
+              });
             const measured = await measure(page, `.cbe-root ${bar}`);
             expect(collisions(measured)).toEqual([]);
             expect(await timeIsWhole(page)).toBe(true);
@@ -252,6 +257,10 @@ for (const scenario of SCENARIOS) {
           await expect(page.locator(bar).first()).toBeVisible();
           await expect(page.locator(".plugin-statusbar-items .status--row").first()).toBeAttached();
           await page.waitForTimeout(400);
+          await page
+            .locator(bar)
+            .first()
+            .screenshot({ path: shot(`live-${scenario.name}-${shape}-${size.name}`) });
           const measured = await measure(page, bar);
           expect(collisions(measured)).toEqual([]);
           expect(await timeIsWhole(page)).toBe(true);
