@@ -125,7 +125,7 @@ async def kiosk_exists(kiosk_id: str) -> bool:
 
 
 def valid_kiosk_id(kiosk_id: str | None) -> bool:
-    return bool(kiosk_id) and _KIOSK_ID_RE.fullmatch(kiosk_id) is not None
+    return kiosk_id is not None and _KIOSK_ID_RE.fullmatch(kiosk_id) is not None
 
 
 def _normalized_viewport(viewport: dict | None) -> dict | None:
