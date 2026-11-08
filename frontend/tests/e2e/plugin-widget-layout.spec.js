@@ -14,13 +14,13 @@ import { test } from "./phone/fixtures/phone-audit.js";
 import { installApiMock } from "./phone/fixtures/api-mock.js";
 import { WIDGETS, SIZES, widgetOverrides } from "./fixtures/plugin-widgets.js";
 
-async function openWidget(page, key, size, { view } = {}) {
+async function openWidget(page, key, size, { view, kiosk = null } = {}) {
   const hits = { data: 0 };
   const widget = widgetOverrides(key, hits);
   if (view) widget.config.dashboardScreens.screens[0].layout.regions[0].view = view;
   await page.setViewportSize(SIZES[size]);
   const api = await installApiMock(page, { config: widget.config, overrides: widget.overrides });
-  await page.goto("/");
+  await page.goto(kiosk ? `/?kiosk=${encodeURIComponent(kiosk)}` : "/");
   await page.waitForLoadState("networkidle");
   const region = page.locator(".dashboard-region--leaf").first();
   await expect(region.locator(WIDGETS[key].unit).first()).toBeVisible();
@@ -266,5 +266,57 @@ test.describe("item lists take Link behavior too", () => {
     await page.locator(".region-view-options__trigger").click();
     await page.getByRole("dialog").getByText("Off", { exact: true }).click();
     await expect(page.locator(".item-list__row--clickable")).toHaveCount(0);
+  });
+});
+
+test.describe("link behavior on a kiosk (links never leave Calvin)", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  const tapItem = async page => page.locator(".card-grid__item").first().click();
+  const choose = async (page, label) => {
+    await page.locator(".region-view-options__trigger").click();
+    await page.getByRole("dialog").getByText(label, { exact: true }).click();
+    await page.keyboard.press("Escape");
+  };
+  const qr = page => page.getByText("Scan to open on your phone");
+  const embed = page => page.getByRole("dialog", { name: "Embedded page" });
+
+  test("Default and QR show the QR code with an Open here button", async ({ page }) => {
+    await openWidget(page, "mealie", "medium", { kiosk: "pi-panel", view: { linkAction: "off" } });
+    for (const label of ["QR", "Default"]) {
+      await choose(page, label);
+      await tapItem(page);
+      await expect(qr(page), label).toBeVisible();
+      await expect(page.getByRole("button", { name: "Open here" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(qr(page)).toHaveCount(0);
+    }
+  });
+
+  test("In-app opens the page inside Calvin", async ({ page }) => {
+    await openWidget(page, "mealie", "medium", { kiosk: "pi-panel" });
+    await choose(page, "In-app");
+    await tapItem(page);
+    await expect(embed(page)).toBeVisible();
+    await expect(qr(page)).toHaveCount(0);
+  });
+
+  test("In-app on a site that refuses framing falls back to the QR code", async ({ page }) => {
+    await openWidget(page, "mealie", "medium", { kiosk: "pi-panel" });
+    await choose(page, "In-app");
+    await tapItem(page);
+    await embed(page).getByRole("button", { name: "Show QR code" }).click();
+    await expect(qr(page)).toBeVisible();
+    // The site already refused: nowhere left to open it on a kiosk.
+    await expect(page.getByRole("button", { name: "Open here" })).toHaveCount(0);
+  });
+
+  test("Off makes items inert", async ({ page }) => {
+    await openWidget(page, "mealie", "medium", { kiosk: "pi-panel" });
+    await choose(page, "Off");
+    await expect(page.locator(".card-grid__item--clickable")).toHaveCount(0);
+    await tapItem(page);
+    await expect(qr(page)).toHaveCount(0);
+    await expect(embed(page)).toHaveCount(0);
   });
 });
