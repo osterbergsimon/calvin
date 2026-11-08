@@ -36,11 +36,20 @@ export function useLinkOpen(getRegionAction) {
     overlay.value = null;
   };
 
+  // The site refused embedding: back to the QR handoff, flagged so a kiosk does
+  // not offer Open again (it would only loop back into the refused embed).
   const fallbackToHandoff = () => {
     if (overlay.value?.kind === "embed") {
-      overlay.value = { kind: "handoff", url: overlay.value.url };
+      overlay.value = { kind: "handoff", url: overlay.value.url, embedRefused: true };
     }
   };
 
-  return { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff };
+  // Kiosk Open: show the page inside Calvin instead of leaving it.
+  const openEmbedded = () => {
+    if (overlay.value?.kind === "handoff") {
+      overlay.value = { kind: "embed", url: overlay.value.url };
+    }
+  };
+
+  return { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff, openEmbedded };
 }

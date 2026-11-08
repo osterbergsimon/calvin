@@ -19,8 +19,16 @@
         <InlineNote>It blocks being shown inside another page (X-Frame-Options/CSP).</InlineNote>
         <p v-if="url" class="iframe-renderer__url">{{ url }}</p>
         <div class="iframe-renderer__actions">
+          <Button
+            v-if="url && onKiosk"
+            variant="secondary"
+            data-test="show-qr"
+            @click="showQr = true"
+          >
+            Show QR code
+          </Button>
           <a
-            v-if="url"
+            v-else-if="url"
             :href="url"
             target="_blank"
             rel="noopener noreferrer"
@@ -32,6 +40,7 @@
         </div>
       </Card>
     </div>
+    <HandoffOverlay v-if="showQr" :url="url" embed-refused @close="showQr = false" />
   </div>
 </template>
 
@@ -41,6 +50,8 @@ import { resolvePath } from "../../../utils/jsonPath";
 import Button from "../../ui/Button.vue";
 import Card from "../../ui/Card.vue";
 import InlineNote from "../../ui/InlineNote.vue";
+import HandoffOverlay from "../overlays/HandoffOverlay.vue";
+import { getKioskId } from "../../../utils/kioskId";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -54,6 +65,9 @@ const url = computed(() => {
   return props.schema.url || "";
 });
 
+// A kiosk has no way back from an opened tab: offer the QR handoff instead.
+const onKiosk = Boolean(getKioskId());
+const showQr = ref(false);
 const iframe = ref(null);
 const error = ref(false);
 let loadTimer = null;

@@ -5,7 +5,9 @@
         <p class="handoff__host">{{ host }}</p>
         <img v-if="qr" class="handoff__qr" data-test="qr" :src="qr" alt="QR code for this link" />
         <InlineNote>Scan to open on your phone</InlineNote>
-        <Button variant="primary" data-test="open" @click="openNow">Open ↗</Button>
+        <Button v-if="showOpen" variant="primary" data-test="open" @click="openNow">
+          {{ onKiosk ? "Open here" : "Open ↗" }}
+        </Button>
       </div>
     </Dialog>
   </teleport>
@@ -17,11 +19,20 @@ import QRCode from "qrcode";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
+import { getKioskId } from "@/utils/kioskId";
 
 const props = defineProps({
   url: { type: String, required: true },
+  // The site already refused to be embedded: a kiosk has nowhere left to open it.
+  embedRefused: { type: Boolean, default: false },
 });
-const emit = defineEmits(["close"]);
+const emit = defineEmits(["close", "embed"]);
+
+// A kiosk browser has no tabs or back button, so a tapped link must never leave
+// Calvin: Open shows the page in the embed overlay instead, and disappears once
+// the site refuses embedding (the QR code is then the only way out).
+const onKiosk = Boolean(getKioskId());
+const showOpen = computed(() => !(onKiosk && props.embedRefused));
 
 const qr = ref("");
 const host = computed(() => {
@@ -43,6 +54,10 @@ watch(() => props.url, renderQr, { immediate: true });
 
 const emitClose = () => emit("close");
 const openNow = () => {
+  if (onKiosk) {
+    emit("embed");
+    return;
+  }
   window.open(props.url, "_blank", "noopener");
   emitClose();
 };

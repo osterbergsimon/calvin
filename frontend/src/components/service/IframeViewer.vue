@@ -28,19 +28,25 @@
           {{ url }}
         </p>
         <div class="error-actions">
-          <a :href="url" target="_blank" rel="noopener noreferrer" class="btn-open-new">
+          <button v-if="onKiosk" class="btn-open-new" data-test="show-qr" @click="showQr = true">
+            Show QR Code
+          </button>
+          <a v-else :href="url" target="_blank" rel="noopener noreferrer" class="btn-open-new">
             Open in New Window
           </a>
           <button class="btn-retry" @click="retryLoad">Retry</button>
         </div>
       </div>
     </div>
+    <HandoffOverlay v-if="showQr" :url="url" embed-refused @close="showQr = false" />
   </div>
 </template>
 
 <script setup>
 import { ref, watch, onUnmounted } from "vue";
 import { mdiAlert } from "@mdi/js";
+import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
+import { getKioskId } from "../../utils/kioskId";
 
 const props = defineProps({
   url: {
@@ -51,6 +57,9 @@ const props = defineProps({
 
 const emit = defineEmits(["error"]);
 
+// A kiosk has no way back from an opened tab: offer the QR handoff instead.
+const onKiosk = Boolean(getKioskId());
+const showQr = ref(false);
 const iframe = ref(null);
 const iframeError = ref(false);
 const iframeLoadTimeout = ref(null);
