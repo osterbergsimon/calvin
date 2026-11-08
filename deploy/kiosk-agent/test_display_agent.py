@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import os
+import subprocess
 import threading
 import time as time_module
 from datetime import datetime, time, timedelta, timezone
@@ -979,6 +980,73 @@ def test_fetch_config_reports_the_display_stack(monkeypatch, tmp_path):
     agent.fetch_config("http://s:8000")
 
     assert "kstack=cog" in seen["url"]
+
+
+def test_config_url_appends_wifi_power_save():
+    assert "kwifi=off" in agent._config_url("http://s:8000", "k1", "pi", kwifi="off")
+    assert "kwifi" not in agent._config_url("http://s:8000", "k1", "pi")
+
+
+def _net(tmp_path, wireless=True):
+    (tmp_path / "wlan0").mkdir()
+    if wireless:
+        (tmp_path / "wlan0" / "wireless").mkdir()
+    return str(tmp_path)
+
+
+def _iw_says(text, rc=0):
+    def run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, rc, stdout=text, stderr="")
+
+    return run
+
+
+def test_wifi_power_save_none_without_a_wireless_interface(tmp_path):
+    assert agent.wifi_power_save_state(sys_net=_net(tmp_path, wireless=False)) is None
+
+
+def test_wifi_power_save_reads_the_live_state_from_iw(tmp_path):
+    net = _net(tmp_path)
+    off = agent.wifi_power_save_state(sys_net=net, run=_iw_says("Power save: off\n"))
+    on = agent.wifi_power_save_state(sys_net=net, run=_iw_says("Power save: on\n"))
+    assert (off, on) == ("off", "on")
+
+
+def test_wifi_power_save_unknown_when_iw_cannot_say(tmp_path):
+    net = _net(tmp_path)
+
+    def missing(cmd, **kwargs):
+        raise FileNotFoundError("iw")
+
+    assert agent.wifi_power_save_state(sys_net=net, run=missing) == "unknown"
+    assert agent.wifi_power_save_state(sys_net=net, run=_iw_says("", rc=1)) == "unknown"
+
+
+def test_fetch_config_reports_the_wifi_power_save(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "k1")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v9")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: "off")
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(url, timeout=None):
+        seen["url"] = url
+        return FakeResponse()
+
+    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
+    agent.fetch_config("http://s:8000")
+    assert "kwifi=off" in seen["url"]
 
 
 def test_update_report_reads_updater_state(tmp_path):

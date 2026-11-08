@@ -87,6 +87,19 @@ def _normalized_display_stack(stack: str | None) -> str | None:
     return value if value in DISPLAY_STACKS else None
 
 
+# What the agent can report about Wi-Fi power saving (calvin-grwq). "on" is the
+# unwanted state; "unknown" means a radio whose state the agent could not read.
+WIFI_POWER_SAVE_STATES: tuple[str, ...] = ("on", "off", "unknown")
+
+
+def _normalized_wifi_power_save(value: str | None) -> str | None:
+    """Only a known state from the agent is stored; anything else is ignored."""
+    if not isinstance(value, str):
+        return None
+    state = value.strip().lower()
+    return state if state in WIFI_POWER_SAVE_STATES else None
+
+
 def _normalized_viewport(viewport: dict | None) -> dict | None:
     """Accept only a sane ``{w, h}`` pair of positive ints. Anything else is None."""
     if not isinstance(viewport, dict):
@@ -107,6 +120,7 @@ _HEARTBEAT_COLUMNS = [
     "agent_update_message",
     "viewport",
     "display_stack",
+    "wifi_power_save",
     "overrides",
 ]
 
@@ -121,6 +135,7 @@ async def record_kiosk(
     available_version: str | None = None,
     viewport: dict | None = None,
     display_stack: str | None = None,
+    wifi_power_save: str | None = None,
 ) -> None:
     """Upsert a kiosk's registry row. No-op when kiosk_id is empty/None."""
     if not kiosk_id:
@@ -135,6 +150,7 @@ async def record_kiosk(
         agent_message = agent_message[:255]
     viewport = _normalized_viewport(viewport)
     display_stack = _normalized_display_stack(display_stack)
+    wifi_power_save = _normalized_wifi_power_save(wifi_power_save)
 
     now = utcnow()
     existing = await KioskDB.objects.get_or_none(id=kiosk_id)
@@ -149,6 +165,7 @@ async def record_kiosk(
                 agent_update_message=agent_message,
                 viewport=viewport,
                 display_stack=display_stack,
+                wifi_power_save=wifi_power_save,
             )
             logger.info(f"Registered new kiosk: {kiosk_id!r} (hostname={hostname!r})")
             await _adopt_global_settings()
@@ -182,6 +199,9 @@ async def record_kiosk(
         changed = True
     if display_stack is not None and existing.display_stack != display_stack:
         existing.display_stack = display_stack
+        changed = True
+    if wifi_power_save is not None and existing.wifi_power_save != wifi_power_save:
+        existing.wifi_power_save = wifi_power_save
         changed = True
     # Auto-clear the update flag only once the agent confirms it runs the AVAILABLE
     # (target) version — clearing on any reported version would cancel a just-issued
@@ -241,6 +261,7 @@ async def list_kiosks() -> list[dict]:
             "overrides": public_overrides(row.overrides),
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
+            "wifiPowerSave": row.wifi_power_save,
             "displayCheck": display_check.findings_view(row.display_check_findings),
             "displayCheckActive": bool(
                 (display_check.view_of(row.display_check) or {}).get("active")

@@ -92,6 +92,34 @@ def test_config_fetch_ignores_an_unknown_display_stack(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_config_fetch_records_wifi_power_save(test_client: TestClient):
+    """The agent reports the Wi-Fi power-save state; GET /kiosks returns it (calvin-grwq)."""
+    resp = test_client.get("/api/kiosks/hall-wifi/config?khost=pi&kwifi=off")
+    assert resp.status_code == 200
+    kiosk = next(
+        k for k in test_client.get("/api/kiosks").json()["kiosks"] if k["id"] == "hall-wifi"
+    )
+    assert kiosk["wifiPowerSave"] == "off"
+    # A later poll that reports "on" replaces it; one that reports nothing keeps it.
+    test_client.get("/api/kiosks/hall-wifi/config?khost=pi&kwifi=on")
+    test_client.get("/api/kiosks/hall-wifi/config?khost=pi")
+    kiosk = next(
+        k for k in test_client.get("/api/kiosks").json()["kiosks"] if k["id"] == "hall-wifi"
+    )
+    assert kiosk["wifiPowerSave"] == "on"
+
+
+@pytest.mark.integration
+def test_config_fetch_ignores_an_unknown_wifi_power_save(test_client: TestClient):
+    resp = test_client.get("/api/kiosks/hall-wifi-bad/config?khost=pi&kwifi=banana")
+    assert resp.status_code == 200
+    kiosk = next(
+        k for k in test_client.get("/api/kiosks").json()["kiosks"] if k["id"] == "hall-wifi-bad"
+    )
+    assert kiosk["wifiPowerSave"] is None
+
+
+@pytest.mark.integration
 def test_list_kiosks_includes_overrides_without_agent_keys(test_client: TestClient):
     """GET /kiosks carries each kiosk's overrides, with host-internal keys stripped."""
     test_client.put(

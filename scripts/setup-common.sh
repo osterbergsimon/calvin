@@ -156,6 +156,7 @@ CALVIN_KIOSK_PACKAGES=(
     unclutter
     xdotool
     x11-xserver-utils
+    iw
 )
 
 # Extra packages for the opt-in Wayland stack (phase 1, SPLIT kiosks). Chromium

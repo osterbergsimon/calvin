@@ -5068,6 +5068,22 @@
           },
           {
             "in": "query",
+            "name": "kwifi",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kwifi"
+            }
+          },
+          {
+            "in": "query",
             "name": "vw",
             "required": false,
             "schema": {

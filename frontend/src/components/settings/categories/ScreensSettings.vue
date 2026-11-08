@@ -196,6 +196,7 @@
         :desired-version="desiredVersions[selectedId] ?? null"
         :display-stack="selectedKiosk.displayStack ?? null"
         :agent-version="selectedKiosk.agentVersion ?? null"
+        :wifi-power-save="selectedKiosk.wifiPowerSave ?? null"
       />
 
       <ChangedHereLine :items="changedHereItems" />

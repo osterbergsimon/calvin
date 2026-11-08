@@ -4984,6 +4984,7 @@ export interface operations {
         kstat?: string | null;
         kmsg?: string | null;
         kstack?: string | null;
+        kwifi?: string | null;
         vw?: number | null;
         vh?: number | null;
       };

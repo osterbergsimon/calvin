@@ -2400,7 +2400,34 @@ def update_report(state_dir=STATE_DIR):
     return status, (str(message)[:255] if message else None)
 
 
-def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None, kstack=None):
+def wifi_power_save_state(sys_net="/sys/class/net", iface="wlan0", run=subprocess.run):
+    """Wi-Fi power saving on `iface` as the kiosk status reports it (calvin-grwq).
+
+    None: no wireless interface (wired kiosk), nothing to report.
+    "off" / "on": what the radio says right now (`iw dev <iface> get power_save`).
+    "unknown": there is a radio but its state cannot be read (iw missing).
+    A power-saving radio can drop broadcast ARP, so "on" is worth a warning.
+    """
+    if not os.path.isdir(os.path.join(sys_net, iface, "wireless")):
+        return None
+    try:
+        out = run(
+            ["iw", "dev", iface, "get", "power_save"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    if out.returncode != 0:
+        return "unknown"
+    match = re.search(r"power save:\s*(on|off)", out.stdout or "", re.IGNORECASE)
+    return match.group(1).lower() if match else "unknown"
+
+
+def _config_url(
+    backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None, kstack=None, kwifi=None
+):
     """Effective-config URL: per-kiosk endpoint when a kiosk id is set, else global."""
     base = backend_url.rstrip("/")
     if kiosk_id:
@@ -2415,6 +2442,8 @@ def _config_url(backend_url, kiosk_id, host, kagent=None, kstat=None, kmsg=None,
             params["kmsg"] = kmsg
         if kstack:
             params["kstack"] = kstack
+        if kwifi:
+            params["kwifi"] = kwifi
         q = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
         return f"{base}/api/kiosks/{kiosk_id}/config" + (f"?{q}" if q else "")
     return base + "/api/config"
@@ -2433,6 +2462,7 @@ def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT):
         kstat=kstat,
         kmsg=kmsg,
         kstack=display_stack(),
+        kwifi=wifi_power_save_state(),
     )
     with urllib.request.urlopen(url, timeout=timeout) as r:
         cfg = json.load(r)

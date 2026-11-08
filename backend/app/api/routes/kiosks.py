@@ -450,6 +450,7 @@ async def get_kiosk_config(
     kstat: str | None = None,
     kmsg: str | None = None,
     kstack: str | None = None,
+    kwifi: str | None = None,
     vw: int | None = None,
     vh: int | None = None,
 ):
@@ -485,6 +486,7 @@ async def get_kiosk_config(
                 available_version=available,
                 viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
                 display_stack=kstack,
+                wifi_power_save=kwifi,
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
