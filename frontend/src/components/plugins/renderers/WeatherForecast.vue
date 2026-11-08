@@ -110,10 +110,10 @@ const { clampStyle, shadeClass } = useFitScroll(itemsEl, {
   itemSelector: ".weather-forecast-renderer__item",
   data: () => props.data,
 });
-// Natural column widths so the strip OVERFLOWS horizontally instead of shrinking
-// columns to fit — that overflow is what useFitScroll clamps/scrolls (X-axis
-// analogue of the card-grid grid-auto-rows:max-content fix).
-const stripStyle = { gridAutoColumns: "minmax(90px, max-content)" };
+// Columns never shrink below their natural width, so a strip wider than the
+// region OVERFLOWS (what useFitScroll clamps/scrolls); a strip narrower than the
+// region shares the spare width so the days span it.
+const stripStyle = { gridAutoColumns: "minmax(max-content, 1fr)" };
 
 const temperatureUnit = computed(() => units.value.temperature || "°C");
 const windUnit = computed(() => units.value.wind || "m/s");
@@ -187,7 +187,10 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   gap: var(--gap-5);
-  overflow: hidden;
+  /* A region shorter than the whole readout scrolls it instead of cutting the
+     forecast off. */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
@@ -198,9 +201,13 @@ function capitalize(value) {
   text-align: center;
 }
 
+/* The current conditions take the spare height and centre in it, so the
+   forecast strip sits at the foot of the region instead of mid-way down it. */
 .weather-forecast-renderer__current {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--gap-5);
 }
 
@@ -265,8 +272,7 @@ function capitalize(value) {
 }
 
 .weather-forecast-renderer__forecast {
-  flex: 1;
-  min-height: 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -284,8 +290,6 @@ function capitalize(value) {
   display: grid;
   grid-auto-flow: column;
   overflow-y: hidden;
-  flex: 1;
-  min-height: 0;
 }
 
 .weather-forecast-renderer__item {
@@ -294,6 +298,7 @@ function capitalize(value) {
   align-items: center;
   gap: var(--gap-2);
   text-align: center;
+  min-width: 90px;
   padding: var(--gap-1) var(--gap-2);
   scroll-snap-align: start;
 }

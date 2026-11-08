@@ -1,0 +1,159 @@
+/**
+ * calvin-xxe3: schema-driven plugin widgets (CardGrid, StatusRenderer,
+ * WeatherForecast, ItemList, MetricDashboard, ImageWithCaption) must
+ *  1. keep the region header clear of their content,
+ *  2. fill their region at any size without silently cutting content off,
+ *  3. apply the region's view options (card size, link behaviour, refresh).
+ *
+ * Real renderers, realistic payloads served through the API mock. Host actions
+ * stay intercepted by the mock; nothing reaches a real server.
+ */
+
+import { expect } from "@playwright/test";
+import { test } from "./phone/fixtures/phone-audit.js";
+import { installApiMock } from "./phone/fixtures/api-mock.js";
+import { WIDGETS, SIZES, widgetOverrides } from "./fixtures/plugin-widgets.js";
+
+async function openWidget(page, key, size, { view } = {}) {
+  const hits = { data: 0 };
+  const widget = widgetOverrides(key, hits);
+  if (view) widget.config.dashboardScreens.screens[0].layout.regions[0].view = view;
+  await page.setViewportSize(SIZES[size]);
+  const api = await installApiMock(page, { config: widget.config, overrides: widget.overrides });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  const region = page.locator(".dashboard-region--leaf").first();
+  await expect(region.locator(WIDGETS[key].unit).first()).toBeVisible();
+  // Focus the region so its header (title and controls) is revealed.
+  const box = await region.boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.locator(".dashboard-panel__header")).toBeVisible();
+  // Let the fit-clamp and fonts settle.
+  await page.waitForTimeout(400);
+  return { api, hits, region };
+}
+
+/** Geometry of the header, the panel body and every content unit. */
+function measure(page, unitSelector) {
+  return page.evaluate(unit => {
+    const rect = el => {
+      const b = el.getBoundingClientRect();
+      return { top: b.top, bottom: b.bottom, left: b.left, right: b.right };
+    };
+    const header = document.querySelector(".dashboard-panel__header");
+    const body = document.querySelector(".dashboard-panel__body");
+    const bodyRect = rect(body);
+    const scrollable = el => {
+      for (let node = el.parentElement; node && node !== body; node = node.parentElement) {
+        const overflow = getComputedStyle(node).overflowY;
+        if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight)
+          return true;
+      }
+      return false;
+    };
+    const units = [...document.querySelectorAll(unit)].map(el => ({
+      ...rect(el),
+      scrollable: scrollable(el),
+    }));
+    return { header: rect(header), body: bodyRect, units };
+  }, unitSelector);
+}
+
+const overlapArea = (a, b) =>
+  Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+  Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+
+test.describe("plugin widgets in a region", () => {
+  for (const key of Object.keys(WIDGETS)) {
+    for (const size of Object.keys(SIZES)) {
+      test(`${WIDGETS[key].label} at ${size}: header clears content, content fills, nothing is cut`, async ({
+        page,
+        consoleErrors,
+      }) => {
+        const { api } = await openWidget(page, key, size);
+        const m = await measure(page, WIDGETS[key].unit);
+        expect(m.units.length, "content rendered").toBeGreaterThan(0);
+
+        // 1. The header box never touches a content unit that is on screen.
+        for (const [i, unit] of m.units.entries()) {
+          expect(
+            overlapArea(m.header, unit),
+            `header overlaps content unit ${i} (header ${m.header.top}-${m.header.bottom}, unit ${unit.top}-${unit.bottom})`
+          ).toBe(0);
+        }
+
+        // 2. Content fills the region: its visible extent reaches the body's
+        //    far edges (one gutter of slack), or the content scrolls.
+        const slack = 40;
+        const reachesBottom = m.units.some(
+          unit => Math.min(unit.bottom, m.body.bottom) >= m.body.bottom - slack
+        );
+        const reachesRight = m.units.some(unit => unit.right >= m.body.right - slack);
+        expect(reachesBottom, "content reaches the bottom of the region").toBe(true);
+        expect(reachesRight, "content reaches the right edge of the region").toBe(true);
+
+        // 3. Nothing is cut off silently: a unit that leaves the body is
+        //    reachable by scrolling.
+        for (const [i, unit] of m.units.entries()) {
+          const inside = unit.top >= m.body.top - 1 && unit.bottom <= m.body.bottom + 1;
+          expect(inside || unit.scrollable, `content unit ${i} is cut off without scroll`).toBe(
+            true
+          );
+        }
+
+        expect(api.hostActions).toEqual([]);
+        expect(consoleErrors).toEqual([]);
+      });
+    }
+  }
+});
+
+test.describe("region view options reach the widget", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  const cardWidth = page =>
+    page.locator(".card-grid__card").first().evaluate(el => el.getBoundingClientRect().width);
+
+  test("Card size changes the card footprint and is saved", async ({ page }) => {
+    const { api } = await openWidget(page, "mealie", "medium");
+    const before = await cardWidth(page);
+
+    await page.locator(".region-view-options__trigger").click();
+    await page.getByRole("dialog").locator("button.pill").click();
+    await page.getByRole("option", { name: "X-Large" }).click();
+
+    await expect.poll(() => cardWidth(page)).toBeGreaterThan(before + 40);
+    const saved = api.configPosts.at(-1)?.dashboardScreens?.screens?.[0]?.layout?.regions?.[0];
+    expect(saved?.view?.cardSize).toBe("xlarge");
+  });
+
+  test("Link behavior Off makes the items inert", async ({ page }) => {
+    const { api } = await openWidget(page, "mealie", "medium");
+    await expect(page.locator(".card-grid__item--clickable").first()).toBeVisible();
+
+    await page.locator(".region-view-options__trigger").click();
+    await page.getByRole("dialog").getByText("Off", { exact: true }).click();
+
+    await expect(page.locator(".card-grid__item--clickable")).toHaveCount(0);
+    const saved = api.configPosts.at(-1)?.dashboardScreens?.screens?.[0]?.layout?.regions?.[0];
+    expect(saved?.view?.linkAction).toBe("off");
+  });
+
+  test("Refresh now fetches the widget's data again", async ({ page }) => {
+    const { hits } = await openWidget(page, "mealie", "medium");
+    const before = hits.data;
+
+    await page.locator(".region-view-options__trigger").click();
+    await page.locator("[data-action=refresh-now]").click();
+
+    await expect.poll(() => hits.data).toBeGreaterThan(before);
+  });
+
+  test("Item lists offer no Card size they would ignore", async ({ page }) => {
+    await openWidget(page, "list", "medium");
+    await page.locator(".region-view-options__trigger").click();
+    const panel = page.getByRole("dialog");
+    await expect(panel.getByText("Link behavior")).toBeVisible();
+    await expect(panel.getByText("Card size")).toHaveCount(0);
+  });
+});

@@ -108,10 +108,10 @@ const gridStyle = computed(() => {
     // unchanged.
     gridTemplateColumns = `repeat(auto-fit, minmax(var(--card-min, ${min}px), 1fr))`;
   }
-  // max-content keeps each row at its natural (card) height so the grid OVERFLOWS
-  // its region instead of squishing rows to title height — that overflow is what
-  // the fit-clamp measures and clamps/scrolls.
-  return { gridTemplateColumns, gridAutoRows: "max-content" };
+  // Rows never shrink below the card's natural height, so a grid taller than its
+  // region OVERFLOWS (what the fit-clamp measures and clamps/scrolls); when the
+  // region is taller than the cards, the 1fr share stretches the rows to fill it.
+  return { gridTemplateColumns, gridAutoRows: "minmax(max-content, 1fr)" };
 });
 
 function cardTitle(card) {

@@ -1,6 +1,12 @@
 <template>
   <!-- list: the quiet table — label left, value right, hairline rows -->
-  <ul v-if="layout === 'list'" class="status status--list calvin-plugin-list">
+  <ul
+    v-if="layout === 'list'"
+    ref="listEl"
+    class="status status--list calvin-plugin-list"
+    :class="shadeClass"
+    :style="clampStyle"
+  >
     <li
       v-for="(item, i) in items"
       :key="i"
@@ -66,9 +72,10 @@
 //   item: { icon, label, value, unit, status } — each key also accepts a
 //         `<key>_path` variant resolved against the item, plus `value_format`.
 //         status values: "ok" (renders monochrome) | "warn" | "error"
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import { applyFormat } from "../../../utils/formatters";
+import { useFitScroll } from "../../../composables/useFitScroll.js";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -88,6 +95,16 @@ const items = computed(() => {
     : props.data;
   if (Array.isArray(scoped)) return scoped;
   return scoped === null || scoped === undefined ? [] : [scoped];
+});
+
+// Only the list layout is taller than its region; the shared fit-scroll gives it
+// the same scroll (pointer) or whole-row clamp (keyboard-only) the other list
+// renderers have, instead of cutting a row in half.
+const listEl = ref(null);
+const { clampStyle, shadeClass } = useFitScroll(listEl, {
+  axis: "block",
+  itemSelector: ".status__line",
+  data: () => props.data,
 });
 
 const itemSpec = computed(() => props.schema.item || {});
@@ -189,11 +206,15 @@ function readoutClass(item) {
 /* list rows */
 .status--list {
   width: 100%;
+  height: 100%;
 }
 
+/* Rows keep their natural height and share any spare region height, so a short
+   list in a tall region fills it; the readout sits centred in its row. */
 .status__line {
+  flex: 1 0 auto;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--gap-4);
   min-width: 0;
