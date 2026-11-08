@@ -411,7 +411,7 @@ test.describe("owner tiles keep their values whole", () => {
 
   test("editor preview, top/bottom bar, landscape", async ({ page }) => {
     await installApiMock(page, { overrides: tileOverrides(ALL_TILES.slice(0, 2)) });
-    const editor = await openEditor(page, { shape: "horizontal", orientation: "landscape" });
+    await openEditor(page, { shape: "horizontal", orientation: "landscape" });
     const flags = await cutFlags(page);
     expect(flags.nameCut).toBeGreaterThan(0);
     expect(flags.valueCut).toEqual([]);
