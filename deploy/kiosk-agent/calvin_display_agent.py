@@ -1437,6 +1437,8 @@ class DisplayCheckRunner:
         self.current_step = job.get("step")
         self.current_seq = job.get("seq")
         self.live_settings = self.settings  # refreshed from every config poll
+        # The newest ceiling the backend sent with this run's job (None: not yet).
+        self.live_ceiling = job.get("ceiling")
         # The restore at the end runs only on the backend's explicit flag: the
         # dialog's Stop said this calibration's Save landed. Config values that
         # changed (another device, a schedule toggle) prove nothing.
@@ -1700,6 +1702,35 @@ class DisplayCheckRunner:
             cap = min(cap, ceiling)
         return cap
 
+    def _recap(self, job):
+        """A limit lowered while a step is offered: bring a level above it back down.
+
+        The ceiling arrives with every poll. The check never brightens, but a level it
+        already set can sit above a limit the owner has since lowered (calvin-8ck0).
+        Returns True when the run must end (a fault or a write that did not take).
+        """
+        ceiling = self._live_cap(job.get("ceiling"))
+        if (
+            self.current_step not in ("write", "conversion")
+            or not self._level_known
+            or self.level <= ceiling
+        ):
+            return False
+        self._entry(f"limit lowered to {ceiling}: bringing the level down from {self.level}")
+        outcome = self._calibration_ramp(ceiling, cancel_missing=False)
+        if outcome.get("fault"):
+            self._calibration_fault(
+                self.current_step, outcome["fault_level"], outcome["last_good"], [outcome["fault"]]
+            )
+            self._stop_reason = None
+            return True
+        if outcome.get("write_failed"):
+            self._entry("brightness writes did not take effect")
+            self._stop_reason = "error"
+            return True
+        self.report(self._payload("running", level=self.level))
+        return False
+
     def _calibration_ramp(self, target, *, cancel_missing=True):
         """A calibration ramp: any fault stops it where it is."""
         return self._ramp(target, cancel_missing=cancel_missing, stop_on_fault=True)
@@ -1951,12 +1982,27 @@ class DisplayCheckRunner:
         if self.reason in ("power_at_idle", "power_trouble"):
             return None
         start = self._start_level()
-        return CHECK_FLOOR if start is None else start
+        target = CHECK_FLOOR if start is None else start
+        # A limit lowered during the run applies to the finish too: it must not climb
+        # back past it (calvin-8ck0).
+        return min(target, self._live_cap())
+
+    def _live_cap(self, job_ceiling=None):
+        """The highest level allowed right now: the saved limit and the latest ceiling."""
+        caps = [brightness_ceiling(self.live_settings)]
+        for ceiling in (job_ceiling, self.live_ceiling):
+            if ceiling is not None:
+                caps.append(max(0, int(ceiling)))
+        return min(caps)
 
     def _note_job(self, job):
-        """Remember a Save flag the backend put on this run's job."""
-        if job is not None and job.get("id") == self.job["id"] and job.get("saved"):
+        """Remember a Save flag, and the newest ceiling, the backend put on this run's job."""
+        if job is None or job.get("id") != self.job["id"]:
+            return
+        if job.get("saved"):
             self._job_saved = True
+        if job.get("ceiling") is not None:
+            self.live_ceiling = job["ceiling"]
 
     def _saved_by_now(self):
         """True when the backend flagged this run's job as saved.
@@ -2143,6 +2189,10 @@ class DisplayCheckRunner:
                     if _job_signature(nxt) != signature:
                         current = nxt
                         break
+                    if self._recap(nxt):
+                        status = self._stop_reason or "error"
+                        self._stop_reason = None
+                        return self._finish(status)
                     self._pending_fault = self._sleep_watching(
                         DISPLAY_CHECK_POLL_SECONDS, current["step"] in CALIBRATION_STEPS
                     )

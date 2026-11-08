@@ -193,6 +193,40 @@ describe("Clock bar info section", () => {
       expect(pluginsApi.updatePluginInstance).toHaveBeenCalled();
     });
 
+    it("shows every hidden instance the add prompt offers, none re-hiding another (calvin-7xxf)", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+          { id: "sl2", name: "Work stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const config = useConfigStore();
+      config.clockBarDesign = hideTileInDesign(
+        hideTileInDesign(defaultClockBarDesign(), "sl1"),
+        "sl2"
+      );
+      // Like the real store: the design is replaced once the save has landed, and
+      // that takes a moment, which is when two overlapping writes lose one.
+      vi.spyOn(config, "updateConfig").mockImplementation(async ({ clockBarDesign }) => {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        config.clockBarDesign = clockBarDesign;
+        return {};
+      });
+      const w = await mountSection();
+      const add = w.findComponent({ name: "AddSourceButton" });
+
+      add.vm.$emit("show-hidden", [
+        { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        { id: "sl2", name: "Work stop", enabled: true, config: { show_in_statusbar: false } },
+      ]);
+      await new Promise(resolve => setTimeout(resolve, 60));
+      await flushPromises();
+
+      const hidden = config.clockBarDesign.horizontal.hidden;
+      expect(hidden).not.toContain("tile:sl1");
+      expect(hidden).not.toContain("tile:sl2");
+    });
+
     it("still deletes a clock-bar-only source", async () => {
       instancesRef.value = { weather: [{ id: "w1", name: "Outside", config: {} }] };
       const w = await mountSection();

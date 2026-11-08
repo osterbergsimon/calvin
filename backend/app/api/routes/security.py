@@ -56,4 +56,9 @@ async def get_sealed_mode_setting():
 async def put_sealed_mode_setting(body: SealedModeBody):
     """Enable or disable sealed mode."""
     await config_service.set_value(_SEALED_KEY, body.sealed_mode, value_type="bool")
+    if not body.sealed_mode:
+        # A plugin left off because of sealed mode is no longer blocked by it.
+        from app.plugins.registry.enable_policy import clear_sealed_reasons
+
+        await clear_sealed_reasons()
     return {"sealed_mode": body.sealed_mode}

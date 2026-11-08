@@ -57,6 +57,26 @@ async def turn_type_on(type_id: str) -> bool:
     return True
 
 
-def keeps_reason(db_type) -> bool:
-    """A refresh of a type's row must not erase the sealed-mode reason while it is off."""
-    return not db_type.enabled and db_type.error_message == SEALED_REASON
+async def keeps_reason(db_type) -> bool:
+    """A refresh of a type's row must not erase the sealed-mode reason while it still applies.
+
+    That is: the type is off with the recorded reason AND sealed mode is still on.
+    Once sealed mode is off the reason is stale (the picker would keep showing the
+    plugin blocked), so a refresh drops it.
+    """
+    if db_type.enabled or db_type.error_message != SEALED_REASON:
+        return False
+    return bool(await get_sealed_mode())
+
+
+async def clear_sealed_reasons() -> int:
+    """Sealed mode went off: drop the recorded reason from every type that carries it.
+
+    The types stay off, as the owner left them; only the stale "turn sealed mode off"
+    block goes. Other error messages are left alone. Returns how many rows changed.
+    """
+    rows = await PluginTypeDB.objects.filter(error_message=SEALED_REASON).all()
+    for row in rows:
+        row.error_message = None
+        await row.save_with_timestamp()
+    return len(rows)

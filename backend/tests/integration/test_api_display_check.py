@@ -331,6 +331,43 @@ def test_asleep_is_surfaced_and_not_retried(test_client: TestClient, kiosk):
 
 
 @pytest.mark.integration
+def test_the_ten_minutes_count_from_pickup_so_a_late_pickup_keeps_its_result(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    """calvin-8ck0: the agent's own deadline starts when it picks the run up."""
+    from app.services import display_check
+
+    run = _start(test_client).json()
+    real_now = display_check.utcnow()
+    clock = {"now": real_now + timedelta(minutes=9)}  # the agent finds it a minute late
+    monkeypatch.setattr(display_check, "utcnow", lambda: clock["now"])
+    assert _report(test_client, run["id"]).status_code == 200  # picked up
+
+    clock["now"] = real_now + timedelta(minutes=14)  # 14 min after the request, 5 after pickup
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["active"] is True
+    assert _report(test_client, run["id"], "done", level=19).status_code == 200
+    assert test_client.get(BASE).json()["run"]["steps"]["detect"]["status"] == "done"
+
+    clock["now"] = real_now + timedelta(minutes=9, seconds=601)  # ten minutes after pickup
+    assert test_client.get(BASE).json()["run"]["status"] == "timeout"
+
+
+@pytest.mark.integration
+def test_a_run_nobody_picks_up_still_expires_ten_minutes_after_the_request(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    from app.services import display_check
+
+    _start(test_client)
+    real_now = display_check.utcnow()
+    monkeypatch.setattr(
+        display_check, "utcnow", lambda: real_now + timedelta(minutes=10, seconds=5)
+    )
+    assert test_client.get(BASE).json()["run"]["status"] == "timeout"
+
+
+@pytest.mark.integration
 def test_a_run_expires_after_ten_minutes(test_client: TestClient, kiosk, monkeypatch):
     from app.services import display_check
 
