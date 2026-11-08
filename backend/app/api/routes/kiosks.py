@@ -66,6 +66,34 @@ async def put_kiosk_overrides(kiosk_id: str, body: OverridesBody):
     return {"id": kiosk_id, "overrides": body.overrides}
 
 
+@router.delete("/kiosks/{kiosk_id}")
+async def delete_kiosk(kiosk_id: str):
+    """Remove a screen and everything stored for it (admin).
+
+    Deletes the registry row with its overrides, calibration, pending update
+    request and display-check state. 404 for an unknown kiosk; 409 while a
+    display check is active on it.
+
+    Removal does not block the device: a kiosk that is still running registers
+    again on its next real poll (one that sends its hostname or agent version),
+    so remove only screens that have been decommissioned.
+    """
+    _valid_id_or_400(kiosk_id)
+    try:
+        removed = await kiosk_registry.remove_kiosk(kiosk_id)
+    except display_check.RunActiveError:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "display_check_active",
+                "message": "A display check is running on this screen. Stop it first.",
+            },
+        )
+    if not removed:
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    return {"id": kiosk_id, "removed": True}
+
+
 def _check_floor_under_limit(layer: dict) -> None:
     """422 when the EFFECTIVE (household + override) floor is above the limit."""
 
@@ -422,6 +450,12 @@ async def get_kiosk_config(
     ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
     reported at load and on resize) so the layout editor can preview a screen at
     its real aspect ratio (CLV-36).
+
+    Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
+    that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
+    A bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the
+    config but changes nothing, so it can neither create a ghost nor make a dead
+    screen look online (calvin-7aqu).
     """
     _valid_id_or_400(kiosk_id)
     # Compute available version BEFORE record_kiosk so we can pass it in,
@@ -433,16 +467,17 @@ async def get_kiosk_config(
     except Exception:
         available = None
     try:
-        await kiosk_registry.record_kiosk(
-            kiosk_id,
-            hostname=khost,
-            agent_version=kagent,
-            agent_status=kstat,
-            agent_message=kmsg,
-            available_version=available,
-            viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
-            display_stack=kstack,
-        )
+        if khost or kagent:
+            await kiosk_registry.record_kiosk(
+                kiosk_id,
+                hostname=khost,
+                agent_version=kagent,
+                agent_status=kstat,
+                agent_message=kmsg,
+                available_version=available,
+                viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
+                display_stack=kstack,
+            )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")
 

@@ -1097,6 +1097,34 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/kiosks/{kiosk_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete Kiosk
+     * @description Remove a screen and everything stored for it (admin).
+     *
+     *     Deletes the registry row with its overrides, calibration, pending update
+     *     request and display-check state. 404 for an unknown kiosk; 409 while a
+     *     display check is active on it.
+     *
+     *     Removal does not block the device: a kiosk that is still running registers
+     *     again on its next real poll (one that sends its hostname or agent version),
+     *     so remove only screens that have been decommissioned.
+     */
+    delete: operations["delete_kiosk_api_kiosks__kiosk_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/kiosks/{kiosk_id}/config": {
     parameters: {
       query?: never;
@@ -1111,6 +1139,12 @@ export interface paths {
      *     ``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,
      *     reported at load and on resize) so the layout editor can preview a screen at
      *     its real aspect ratio (CLV-36).
+     *
+     *     Only a real poll is recorded (registers a new kiosk and bumps last-seen): one
+     *     that carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).
+     *     A bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the
+     *     config but changes nothing, so it can neither create a ghost nor make a dead
+     *     screen look online (calvin-7aqu).
      */
     get: operations["get_kiosk_config_api_kiosks__kiosk_id__config_get"];
     put?: never;
@@ -4874,6 +4908,37 @@ export interface operations {
       header?: never;
       path: {
         name: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_kiosk_api_kiosks__kiosk_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        kiosk_id: string;
       };
       cookie?: never;
     };

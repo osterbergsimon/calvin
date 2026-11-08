@@ -4894,9 +4894,50 @@
         ]
       }
     },
+    "/api/kiosks/{kiosk_id}": {
+      "delete": {
+        "description": "Remove a screen and everything stored for it (admin).\n\nDeletes the registry row with its overrides, calibration, pending update\nrequest and display-check state. 404 for an unknown kiosk; 409 while a\ndisplay check is active on it.\n\nRemoval does not block the device: a kiosk that is still running registers\nagain on its next real poll (one that sends its hostname or agent version),\nso remove only screens that have been decommissioned.",
+        "operationId": "delete_kiosk_api_kiosks__kiosk_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kiosk_id",
+            "required": true,
+            "schema": {
+              "title": "Kiosk Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Kiosk",
+        "tags": [
+          "kiosks"
+        ]
+      }
+    },
     "/api/kiosks/{kiosk_id}/config": {
       "get": {
-        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36).",
+        "description": "Return a kiosk's effective (merged) config; records the kiosk + its agent report.\n\n``vw``/``vh`` are the kiosk's CSS viewport (``window.innerWidth/innerHeight``,\nreported at load and on resize) so the layout editor can preview a screen at\nits real aspect ratio (CLV-36).\n\nOnly a real poll is recorded (registers a new kiosk and bumps last-seen): one\nthat carries ``khost`` (the kiosk browser) or ``kagent`` (the display agent).\nA bare fetch (curl, a typo'd id, the Settings UI reading a screen) gets the\nconfig but changes nothing, so it can neither create a ghost nor make a dead\nscreen look online (calvin-7aqu).",
         "operationId": "get_kiosk_config_api_kiosks__kiosk_id__config_get",
         "parameters": [
           {

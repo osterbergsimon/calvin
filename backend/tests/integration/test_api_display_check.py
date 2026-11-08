@@ -12,7 +12,7 @@ BASE = f"/api/kiosks/{KIOSK}/display-check"
 @pytest.fixture
 def kiosk(test_client: TestClient) -> str:
     """Register the kiosk the way the agent does: with a config poll."""
-    assert test_client.get(f"/api/kiosks/{KIOSK}/config").status_code == 200
+    assert test_client.get(f"/api/kiosks/{KIOSK}/config?khost=pi").status_code == 200
     return KIOSK
 
 

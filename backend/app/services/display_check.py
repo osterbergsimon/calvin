@@ -331,6 +331,9 @@ def _view(run: dict | None) -> dict | None:
     return view
 
 
+view_of = _view  # the run as the UI sees it, for callers outside this module
+
+
 def job_for_config(run: dict | None, settings: dict | None = None) -> dict | None:
     """The job as the agent reads it from the config poll, only while active."""
     view = _view(run)
