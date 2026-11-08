@@ -56,6 +56,8 @@
               <ServiceRegionViewOptions
                 v-if="showControls && hasPointer && isLinkCapable"
                 :region-id="regionId"
+                :service-id="currentService.id"
+                :kind="currentService.display_schema?.kind"
                 :view="view"
               />
               <IconButton

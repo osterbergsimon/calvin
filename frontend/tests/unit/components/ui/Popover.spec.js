@@ -135,6 +135,22 @@ describe("Popover", () => {
     expect(document.activeElement).toBe(outside);
   });
 
+  it("stays open when a floating layer opened from its panel is poked", async () => {
+    // A select inside the panel teleports its menu to <body>, so the menu is
+    // outside the panel in the DOM but still part of the same interaction.
+    const w = mountPopover({ modelValue: true }, document.body);
+    await nextTick();
+    const layer = document.createElement("div");
+    layer.setAttribute("data-floating-layer", "");
+    const option = document.createElement("li");
+    layer.appendChild(option);
+    document.body.appendChild(layer);
+    option.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toBeUndefined();
+    expect(w.emitted("close")).toBeUndefined();
+  });
+
   it("does not close when the panel itself is poked", async () => {
     const w = mountPopover({ modelValue: true }, document.body);
     await nextTick();

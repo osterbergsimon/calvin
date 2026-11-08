@@ -22,7 +22,13 @@
       <span class="pill__cv" aria-hidden="true">▾</span>
     </button>
     <Teleport to="body">
-      <div v-if="open" ref="menuEl" class="pill__panel" :style="popoverStyle">
+      <div
+        v-if="open"
+        ref="menuEl"
+        class="pill__panel"
+        data-floating-layer
+        :style="popoverStyle"
+      >
         <div v-if="searchable" class="pill__search">
           <input
             ref="searchEl"

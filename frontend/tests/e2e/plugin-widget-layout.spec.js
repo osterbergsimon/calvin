@@ -24,9 +24,10 @@ async function openWidget(page, key, size, { view } = {}) {
   await page.waitForLoadState("networkidle");
   const region = page.locator(".dashboard-region--leaf").first();
   await expect(region.locator(WIDGETS[key].unit).first()).toBeVisible();
-  // Focus the region so its header (title and controls) is revealed.
+  // Focus the region so its header (title and controls) is revealed. Click its
+  // bottom edge: the middle may be a link that opens an overlay.
   const box = await region.boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height - 3);
   await expect(page.locator(".dashboard-panel__header")).toBeVisible();
   // Let the fit-clamp and fonts settle.
   await page.waitForTimeout(400);

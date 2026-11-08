@@ -10,7 +10,7 @@
         @update:model-value="setLink"
       />
     </div>
-    <div class="svo-row">
+    <div v-if="hasCardSize" class="svo-row">
       <span class="svo-label">Card size</span>
       <SelectPill
         class="svo-size"
@@ -38,6 +38,7 @@
 
 <script setup>
 import { computed } from "vue";
+import { useQueryClient } from "@tanstack/vue-query";
 import { useConfigStore } from "@/stores/config";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useProgressStore } from "@/stores/progress";
@@ -49,8 +50,15 @@ import { DEFAULT_CARD_SIZE } from "@/styles/cardSizeScale.js";
 
 const props = defineProps({
   regionId: { type: String, default: null },
+  // The service this region shows: Refresh now refetches its data.
+  serviceId: { type: String, default: null },
+  // The widget's display kind. Card size sizes cards, so only card grids offer it.
+  kind: { type: String, default: null },
   view: { type: Object, default: () => ({}) },
 });
+
+const queryClient = useQueryClient();
+const hasCardSize = computed(() => props.kind === "card-grid");
 
 const configStore = useConfigStore();
 const webServicesStore = useWebServicesStore();
@@ -59,7 +67,13 @@ const refreshNow = () => {
   progressStore
     .track(
       `plugin:refresh:${props.regionId || "fullscreen"}`,
-      () => webServicesStore.refreshCurrentService(),
+      async () => {
+        await webServicesStore.refreshCurrentService();
+        // The widget's payload lives in its own query (useSchemaData), which the
+        // service list refresh does not touch.
+        const key = props.serviceId ? ["plugin-data", props.serviceId] : ["plugin-data"];
+        await queryClient.refetchQueries({ queryKey: key });
+      },
       { regionId: props.regionId || null }
     )
     .catch(err => {
