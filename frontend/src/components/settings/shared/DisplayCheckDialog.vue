@@ -635,9 +635,11 @@ function removeReading(index) {
   if (saved.value) return;
   afterDrop = false;
   dismissFault();
+  // Reset first: it drops rejected reads by comparing neighbours, which the
+  // removed level must still be part of.
+  if (usedFallback.value) resetFallback();
   levels.value[index] = null;
   behindTries.value[index] = 0;
-  if (usedFallback.value) resetFallback();
   step.value = levels.value.findIndex(l => !l) + 2;
   view.value = "step";
   readingText.value = "";
@@ -915,7 +917,8 @@ function onStepResult(name, result, asked) {
       };
       if (afterDrop) {
         afterDrop = false;
-        nextLevel();
+        // A stale read must go through the same out-of-order check as any other.
+        if (!behindNote.value) nextLevel();
       }
       return;
     case "conversion":

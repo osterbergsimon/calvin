@@ -758,6 +758,29 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
     expect(text).toContain("Panel 40 · Calvin 12");
   });
 
+  it("Remove Highest on a fallback summary drops the rejected Everyday read too", async () => {
+    await toOwnLevels();
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 5, level: 5 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("28");
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").text()).toContain("approximate");
+    await find(wrapper, "remove-reading-0").trigger("click");
+    await flushPromises();
+    expect(status(wrapper)).toContain("Step 2 of 4");
+    await readLevel(70, 35);
+    await clickPrimary(wrapper);
+    // The rejected Everyday 30 is gone: Everyday is asked again.
+    expect(status(wrapper)).toContain("Step 3 of 4");
+  });
+
   it("writes only low levels, 5 then 1, asking the menu each time", async () => {
     await toOwnLevels();
     await clickPrimary(wrapper);
@@ -832,6 +855,22 @@ describe("power trouble in a step", () => {
       expect(patches()).toHaveLength(0);
     });
   }
+
+  it("after Remove Highest, a drop then a stale read below Everyday does not advance to the summary", async () => {
+    await toSummary();
+    await find(wrapper, "remove-reading-0").trigger("click");
+    await flushPromises();
+    await find(wrapper, "reading-input").setValue("74");
+    await clickPrimary(wrapper);
+    agent({ fault: FAULT });
+    await settle();
+    await find(wrapper, "reading-input").setValue("70");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 5, lastWrite: null });
+    await settle();
+    expect(find(wrapper, "check-summary").exists()).toBe(false);
+    expect(find(wrapper, "level-behind").exists()).toBe(true);
+  });
 
   it("takes the next reading as the highest, with the typed panel number, and goes to Everyday", async () => {
     await dropAtHighest({ typed: 74 });
