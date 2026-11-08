@@ -61,6 +61,7 @@ async def test_list_kiosks_shape(test_db):
         "viewport",
         "displayStack",
         "displayCheck",
+        "displayCheckActive",
     }
     assert isinstance(kiosks[0]["lastSeen"], str)  # ISO-8601
 
