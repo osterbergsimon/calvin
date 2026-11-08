@@ -5,6 +5,8 @@ admin session unless its ``(method, path_format)`` is in :data:`PUBLIC_WRITES`,
 so a newly added write route is protected without anyone remembering to.
 """
 
+import ipaddress
+
 from fastapi import HTTPException, Request, Response
 from loguru import logger
 
@@ -151,6 +153,17 @@ def direct_peer_ip(request: Request) -> str | None:
     if any(header in request.headers for header in PROXY_HEADERS):
         return None
     return request.client.host if request.client else None
+
+
+def is_loopback_peer(request: Request) -> bool:
+    """True only for a direct loopback peer with no proxy header at all."""
+    host = direct_peer_ip(request)
+    if not host:
+        return False
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
 
 
 def bearer_secret(request: Request) -> str | None:

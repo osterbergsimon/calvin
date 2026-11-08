@@ -4,7 +4,6 @@ All endpoints here are same-origin-checked by the Host/Origin middleware and are
 registered by :func:`app.security.install.install_security` at prefix ``/api``.
 """
 
-import ipaddress
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -21,10 +20,10 @@ from app.security.admin_auth import (
 )
 from app.security.api_keys import MAX_NAME_LEN, DuplicateKeyName, get_api_key_store
 from app.security.route_policy import (
-    PROXY_HEADERS,
     admin_error,
     direct_peer_ip,
     is_admin_session,
+    is_loopback_peer,
     renew_admin_cookie,
     request_api_key,
     set_session_cookie,
@@ -137,15 +136,7 @@ def _is_loopback(request: Request) -> bool:
     rewrite ``request.client`` from ``X-Forwarded-For`` when a local proxy is
     trusted, so the header check comes first and does not depend on that.
     """
-    if any(header in request.headers for header in PROXY_HEADERS):
-        return False
-    host = request.client.host if request.client else ""
-    if not host:
-        return False
-    try:
-        return ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        return host == "localhost"
+    return is_loopback_peer(request)
 
 
 @router.get("/auth/status")
@@ -170,6 +161,13 @@ async def auth_status(request: Request, response: Response):
         "authenticated": authenticated,
         **_session_info(request),
     }
+
+
+def _kind_info(kind: SessionKind) -> dict:
+    """The session kind and idle limit, for a response that just created the session."""
+    if kind is SessionKind.KIOSK:
+        return {"session": "kiosk", "idleSeconds": kiosk_idle_seconds()}
+    return {"session": "device", "idleSeconds": None}
 
 
 def _session_info(request: Request) -> dict:
@@ -283,7 +281,7 @@ async def auth_setup(body: SetupBody, request: Request, response: Response):
     logger.info("Admin password configured (first run); setup code invalidated")
     kind, kiosk_id = await _session_for_login(request, body.kiosk, body.display)
     _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
-    return {"ok": True}
+    return {"ok": True, **_kind_info(kind)}
 
 
 @router.post("/auth/login")
@@ -306,7 +304,7 @@ async def auth_login(body: PasswordBody, request: Request, response: Response):
     login_limiter.record_success(ip)
     kind, kiosk_id = await _session_for_login(request, body.kiosk, body.display)
     _set_admin_cookie(response, store.issue_cookie(kind, kiosk_id), kind)
-    return {"ok": True}
+    return {"ok": True, **_kind_info(kind)}
 
 
 @router.post("/auth/logout")

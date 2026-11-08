@@ -149,9 +149,39 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  /**
+   * A sign-in succeeded. The answer says what kind of session it created (a kiosk
+   * session is idle-limited), which the kiosk guard needs right now: Settings only
+   * asks the server at mount, before the password was typed. An answer without it
+   * (an older server) is followed by a status check.
+   */
+  async function adoptSignIn(data) {
+    configured.value = true;
+    authenticated.value = true;
+    signedOutReason.value = null;
+    status.value = "authenticated";
+    if (data?.session) {
+      sessionKind.value = data.session;
+      idleSeconds.value = data.idleSeconds ?? null;
+    } else {
+      // Only the kind is taken from the status; a sign-in that just worked is
+      // never undone by what a status check says.
+      try {
+        const { data: status2 } = await api.get("/auth/status");
+        if (status2?.authenticated && status2.session) {
+          sessionKind.value = status2.session;
+          idleSeconds.value = status2.idleSeconds ?? null;
+        }
+      } catch (err) {
+        logError("[auth]", "could not read the session kind", err);
+      }
+    }
+  }
+
   async function setup(password, code) {
+    let data;
     try {
-      await api.post("/auth/setup", withKiosk({ password, code }));
+      data = (await api.post("/auth/setup", withKiosk({ password, code })))?.data;
     } catch (err) {
       if (authErrorCode(err) === "already_configured") {
         configured.value = true;
@@ -160,10 +190,7 @@ export const useAuthStore = defineStore("auth", () => {
       }
       throw err;
     }
-    configured.value = true;
-    authenticated.value = true;
-    signedOutReason.value = null;
-    status.value = "authenticated";
+    await adoptSignIn(data);
   }
 
   /**
@@ -182,8 +209,9 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function login(password) {
+    let data;
     try {
-      await api.post("/auth/login", withKiosk({ password }));
+      data = (await api.post("/auth/login", withKiosk({ password })))?.data;
     } catch (err) {
       if (authErrorCode(err) === "setup_required") {
         configured.value = false;
@@ -192,10 +220,7 @@ export const useAuthStore = defineStore("auth", () => {
       }
       throw err;
     }
-    configured.value = true;
-    authenticated.value = true;
-    signedOutReason.value = null;
-    status.value = "authenticated";
+    await adoptSignIn(data);
   }
 
   async function logout() {

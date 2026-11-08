@@ -195,4 +195,53 @@ describe("useKioskSessionGuard", () => {
     await out;
     expect(order).toEqual(["touch answered", "/auth/logout"]);
   });
+
+  // The page signs in AFTER the guard exists (Settings mounts, then the password is
+  // typed), so the guard must pick the kind up from the sign-in itself.
+  it("starts for a fresh sign-in through the real login(), with no status check in between", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: true, authenticated: false });
+    scope = effectScope();
+    scope.run(() => useKioskSessionGuard({ router }));
+    api.post.mockResolvedValue({ data: { ok: true, session: "kiosk", idleSeconds: 300 } });
+    api.get.mockResolvedValue({
+      data: { configured: true, authenticated: true, session: "kiosk", idleSeconds: 300 },
+    });
+    await auth.login("pw-123456");
+    expect(auth.sessionKind).toBe("kiosk");
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(KIOSK_IDLE_MS + 1);
+    expect(api.post).toHaveBeenCalledWith("/auth/logout");
+    expect(auth.signedOutReason).toBe("idle");
+    expect(router.push).toHaveBeenCalledWith("/");
+  });
+
+  it("starts after the real setup() too", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: false, authenticated: false });
+    scope = effectScope();
+    scope.run(() => useKioskSessionGuard({ router }));
+    api.post.mockResolvedValue({ data: { ok: true, session: "kiosk", idleSeconds: 300 } });
+    api.get.mockResolvedValue({
+      data: { configured: true, authenticated: true, session: "kiosk", idleSeconds: 300 },
+    });
+    await auth.setup("pw-123456", "ABCD-EFGH");
+    await nextTick();
+    await vi.advanceTimersByTimeAsync(KIOSK_IDLE_MS + 1);
+    expect(auth.signedOutReason).toBe("idle");
+  });
+
+  it("asks the server for the kind when the sign-in answer does not carry it (older server)", async () => {
+    const auth = useAuthStore();
+    auth.applyStatus({ configured: true, authenticated: false });
+    scope = effectScope();
+    scope.run(() => useKioskSessionGuard({ router }));
+    api.post.mockResolvedValue({ data: { ok: true } });
+    api.get.mockResolvedValue({
+      data: { configured: true, authenticated: true, session: "kiosk", idleSeconds: 300 },
+    });
+    await auth.login("pw-123456");
+    expect(api.get).toHaveBeenCalledWith("/auth/status");
+    expect(auth.sessionKind).toBe("kiosk");
+  });
 });

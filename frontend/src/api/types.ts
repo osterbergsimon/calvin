@@ -1373,8 +1373,9 @@ export interface paths {
      * Kiosk Screen Sleep
      * @description The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).
      *
-     *     Called by the display agent. It carries no credential, like the agent's other
-     *     reports, and can only sign a kiosk out, never in.
+     *     Called by the display agent. It carries no credential, but it is only accepted
+     *     from an address that kiosk's own polls came from, so someone else on the network
+     *     cannot sign a kiosk out. It can only sign a kiosk out, never in.
      */
     post: operations["kiosk_screen_sleep_api_kiosks__kiosk_id__screen_sleep_post"];
     delete?: never;
@@ -2086,7 +2087,8 @@ export interface paths {
      * @description The all-in-one kiosk's screen went to sleep: end its admin sessions.
      *
      *     The all-in-one display has no kiosk id; its sign-ins are id-less kiosk
-     *     sessions. Same trust as the per-kiosk route: it can only sign a screen out.
+     *     sessions, and its agent runs on this machine, so only a direct loopback caller
+     *     is accepted. It can only sign a screen out.
      */
     post: operations["local_screen_sleep_api_screen_sleep_post"];
     delete?: never;

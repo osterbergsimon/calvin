@@ -253,11 +253,40 @@ def test_status_says_what_kind_of_session_this_is(test_client: TestClient):
     assert test_client.get("/api/auth/status").json()["session"] is None
 
 
+def _from(test_client: TestClient, host: str) -> TestClient:
+    return TestClient(test_client.app, client=(host, 50000))
+
+
+def test_sign_in_answers_with_the_session_kind(test_client: TestClient):
+    """The page needs the kind right after signing in, not only at the next status check."""
+    body = _login(test_client, display="kiosk").json()
+    assert (body["session"], body["idleSeconds"]) == ("kiosk", 300)
+    body = _login(test_client).json()
+    assert (body["session"], body["idleSeconds"]) == ("device", None)
+
+
+def test_only_the_kiosk_itself_can_say_its_screen_slept(test_client: TestClient):
+    """A random LAN caller must not be able to sign a kiosk out."""
+    assert test_client.get("/api/kiosks/hall-1/config?khost=pi").status_code == 200
+    stranger = _from(test_client, "203.0.113.9")
+    assert stranger.post("/api/kiosks/hall-1/screen-sleep").status_code == 403
+    proxied = test_client.post(
+        "/api/kiosks/hall-1/screen-sleep", headers={"X-Forwarded-For": "203.0.113.9"}
+    )
+    assert proxied.status_code == 403
+    assert test_client.post("/api/kiosks/hall-1/screen-sleep").status_code == 200
+
+
+def test_only_this_machine_can_say_the_local_screen_slept(test_client: TestClient):
+    assert _from(test_client, "203.0.113.9").post("/api/screen-sleep").status_code == 403
+    assert _from(test_client, "127.0.0.1").post("/api/screen-sleep").status_code == 200
+
+
 def test_the_local_screen_going_to_sleep_ends_the_id_less_sessions(test_client: TestClient):
     local = _login(test_client, display="kiosk")
     named = get_admin_store().issue_cookie(SessionKind.KIOSK, "hall-1", now=int(time.time()) - 5)
     time.sleep(1.1)
-    assert test_client.post("/api/screen-sleep").status_code == 200
+    assert _from(test_client, "127.0.0.1").post("/api/screen-sleep").status_code == 200
     test_client.cookies.set(COOKIE, _cookie_value(local))
     assert _authenticated(test_client) is False
     test_client.cookies.set(COOKIE, named)

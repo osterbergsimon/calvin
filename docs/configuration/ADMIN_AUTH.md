@@ -107,7 +107,9 @@ seconds more (the page throttles its touches), so the page always acts first.
 
 The screen going to sleep also ends the kiosk's sessions: the display agent
 reports it (`POST /api/kiosks/{id}/screen-sleep`, or `POST /api/screen-sleep` on
-an all-in-one kiosk), retrying a failed report a few times; turning the display
+an all-in-one kiosk), retrying a failed report a few times. The per-kiosk route
+accepts it only from an address that kiosk's own polls came from, and the local
+one only from loopback, so someone else on the network cannot sign a kiosk out; turning the display
 off from Calvin does the same; and when a display timeout is set the idle limit is
 never longer than it. A restart of Calvin forgets a reported sleep, and the idle
 limit still applies. A display check started on the kiosk holds its session until

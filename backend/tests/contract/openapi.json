@@ -5741,7 +5741,7 @@
     },
     "/api/kiosks/{kiosk_id}/screen-sleep": {
       "post": {
-        "description": "The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).\n\nCalled by the display agent. It carries no credential, like the agent's other\nreports, and can only sign a kiosk out, never in.",
+        "description": "The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).\n\nCalled by the display agent. It carries no credential, but it is only accepted\nfrom an address that kiosk's own polls came from, so someone else on the network\ncannot sign a kiosk out. It can only sign a kiosk out, never in.",
         "operationId": "kiosk_screen_sleep_api_kiosks__kiosk_id__screen_sleep_post",
         "parameters": [
           {
@@ -7214,7 +7214,7 @@
     },
     "/api/screen-sleep": {
       "post": {
-        "description": "The all-in-one kiosk's screen went to sleep: end its admin sessions.\n\nThe all-in-one display has no kiosk id; its sign-ins are id-less kiosk\nsessions. Same trust as the per-kiosk route: it can only sign a screen out.",
+        "description": "The all-in-one kiosk's screen went to sleep: end its admin sessions.\n\nThe all-in-one display has no kiosk id; its sign-ins are id-less kiosk\nsessions, and its agent runs on this machine, so only a direct loopback caller\nis accepted. It can only sign a screen out.",
         "operationId": "local_screen_sleep_api_screen_sleep_post",
         "responses": {
           "200": {

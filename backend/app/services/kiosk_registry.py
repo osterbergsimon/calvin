@@ -156,6 +156,16 @@ async def kiosk_for_peer(peer_ip: str | None, now: float | None = None) -> str |
     return best[1] if best else None
 
 
+async def kiosk_has_peer(kiosk_id: str, peer_ip: str | None, now: float | None = None) -> bool:
+    """True when this kiosk's polls recently came from ``peer_ip``."""
+    if not peer_ip:
+        return False
+    row = await KioskDB.objects.get_or_none(id=kiosk_id)
+    if row is None:
+        return False
+    return peer_ip in _live_peers(row.peer_ips, _now() if now is None else now)
+
+
 async def kiosk_exists(kiosk_id: str) -> bool:
     return await KioskDB.objects.get_or_none(id=kiosk_id) is not None
 

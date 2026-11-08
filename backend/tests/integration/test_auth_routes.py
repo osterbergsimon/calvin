@@ -48,7 +48,7 @@ def test_setup_logs_in(test_client):
     get_admin_store().reset()
     response = _setup(test_client)
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.json()["ok"] is True
     assert "calvin_admin" in response.headers["set-cookie"]
 
     status = test_client.get("/api/auth/status").json()

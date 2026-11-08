@@ -9,7 +9,12 @@ from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
 from app.security.admin_auth import lock_kiosk_sessions
-from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, direct_peer_ip, is_admin
+from app.security.route_policy import (
+    KIOSK_SELF_WRITE_KEYS,
+    direct_peer_ip,
+    is_admin,
+    is_loopback_peer,
+)
 from app.services import display_check, kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
@@ -443,27 +448,33 @@ async def get_installer_file(name: str):
 
 
 @router.post("/kiosks/{kiosk_id}/screen-sleep")
-async def kiosk_screen_sleep(kiosk_id: str):
+async def kiosk_screen_sleep(kiosk_id: str, request: Request):
     """The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).
 
-    Called by the display agent. It carries no credential, like the agent's other
-    reports, and can only sign a kiosk out, never in.
+    Called by the display agent. It carries no credential, but it is only accepted
+    from an address that kiosk's own polls came from, so someone else on the network
+    cannot sign a kiosk out. It can only sign a kiosk out, never in.
     """
     _valid_id_or_400(kiosk_id)
     if not await kiosk_registry.kiosk_exists(kiosk_id):
         raise HTTPException(status_code=404, detail="Unknown kiosk")
+    if not await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+        raise HTTPException(status_code=403, detail="Only the kiosk itself can report this")
     lock_kiosk_sessions(kiosk_id)
     logger.info(f"Kiosk {kiosk_id!r} screen asleep: its admin sessions ended")
     return {"ok": True}
 
 
 @router.post("/screen-sleep")
-async def local_screen_sleep():
+async def local_screen_sleep(request: Request):
     """The all-in-one kiosk's screen went to sleep: end its admin sessions.
 
     The all-in-one display has no kiosk id; its sign-ins are id-less kiosk
-    sessions. Same trust as the per-kiosk route: it can only sign a screen out.
+    sessions, and its agent runs on this machine, so only a direct loopback caller
+    is accepted. It can only sign a screen out.
     """
+    if not is_loopback_peer(request):
+        raise HTTPException(status_code=403, detail="Only this machine can report this")
     lock_kiosk_sessions(None)
     logger.info("Local screen asleep: its admin sessions ended")
     return {"ok": True}
