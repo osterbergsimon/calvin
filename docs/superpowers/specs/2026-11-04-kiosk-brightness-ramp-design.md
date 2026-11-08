@@ -303,8 +303,7 @@ a start level):
 base       = convert(menuAtStart)   when menuAtStart is set and brightnessConversion has >= 2 points,
              else start.level (the floor 5 when the start is unknown)
 faultLimit = min(fault.lastGood, fault.level) - step          (calibration faults only; none otherwise)
-faultCap   = faultLimit - 2 * step
-ceiling    = min(base, limit - 2 * step, faultCap)             (terms that do not exist are left out)
+ceiling    = min(base, limit, faultLimit)                      (terms that do not exist are left out)
 ```
 
 `limit` is the lower of the saved `brightnessLimit` and the limit this run's `limit` step found. A `fault` from the
@@ -316,8 +315,8 @@ can only raise the base. Values are clamped to >= 0.
 - `POST /kiosks/{id}/display-check/menu-at-start` (admin), body `{"menu": 0-100}` (a number; extra fields 422). Stores
   `menuAtStart` on the active run and returns the run record. 404 when there is no active run (or an unknown kiosk).
 - `step` with a `conversion` `value` above the active run's ceiling is refused with **422 `value_above_ceiling`** and
-  `max`. Everything is capped at the `ceiling`. The only value allowed above it is the third reading: `value == limit - 2 * step`
-  with a limit known and at least two saved readings (then the maximum is `min(limit - 2 * step, faultCap)`). `value_above_limit` is unchanged. `start` begins a new run, which has no ceiling yet, so it is not checked; other
+  `max`. Everything is capped at the `ceiling`. The only value allowed above it is the third reading: `value == limit`
+  with a limit known and at least two saved readings (then the maximum is `min(limit, faultLimit)`). `value_above_limit` is unchanged. `start` begins a new run, which has no ceiling yet, so it is not checked; other
   steps carry no ceiling check. The ceiling is also in the run record's `ceiling` on every read.
 - `save-limit` with no `limit`-step result saves `faultLimit` from the latest run's calibration `fault` (never
   `lastGood` itself) and returns the same body as before. A limit at or below the floor (5), or from a fault with no level (an idle fault with an unknown start), is never saved: 409 `no_limit`. A `limit`-step result still wins; with neither, 409
@@ -414,3 +413,14 @@ on `GET /kiosks/{id}/display-check`. Every field is always present; `null` = not
   overrides.
 - **Stopping the run of an offline kiosk**: `stop` only marks the run `action: "stop"`. The run stays active until the
   agent reports or the run expires (at most 10 minutes); the UI should say so.
+
+
+**Calvin never goes above the limit (calvin-rjyn).** The limit already carries its own margin: a limit found from
+readings is the highest level read, one step under the cut-out, and a limit derived from a fault (`faultLimit`, and the
+agent's own ramp fault limit) has the margin applied once, when it is stored. So the ceiling is the limit as it
+stands; nothing more is subtracted anywhere (agent `brightness_ceiling`, the backend ceiling, `value_above_limit`, and
+the frontend slider/clamp). A `read` step's `panelLevel` (optional, 0-100: the level the owner typed from the panel's
+buttons) is carried in the job and the run view; a fault during a read step records `level: null` and that
+`panelLevel`. A successful `read` sets `findings.ddc` to true. After a run that took readings ends without power
+trouble, the agent ramps once from 0 to the saved everyday brightness (capped by the new ceiling, even with the ramp
+off), after waiting a bounded few config polls for the one that carries the saved values.

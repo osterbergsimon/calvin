@@ -2949,6 +2949,8 @@ export interface components {
       lastGood?: number | null;
       /** Level */
       level?: number | null;
+      /** Panellevel */
+      panelLevel?: number | null;
       /** Step */
       step?: string | null;
     };
@@ -3202,6 +3204,8 @@ export interface components {
      * @description Move the active run to another step (and target value).
      */
     StepRequest: {
+      /** Panellevel */
+      panelLevel?: number | null;
       /**
        * Step
        * @enum {string}

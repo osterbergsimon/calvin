@@ -176,7 +176,7 @@ describe("Screens › {screen} › Power › Brightness", () => {
 });
 
 describe("Screens › Power › Brightness limit safety", () => {
-  it("a calibration saved by the check caps the slider at once and keeps brightness under the limit", async () => {
+  it("a calibration saved by the check caps the slider at once and never stores brightness above the limit", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { brightnessRampEnabled: true, brightness: 25 },
     });
@@ -194,11 +194,11 @@ describe("Screens › Power › Brightness limit safety", () => {
     await flush();
     expect(wrapper.findComponent(BrightnessGroup).props("overrides").brightnessLimit).toBe(26);
     expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
-      brightness: 22,
+      brightness: 26,
       brightnessLimit: 26,
       brightnessFloor: 2,
     });
-    expect(wrapper.find("[data-test='brightness-slider']").attributes("max")).toBe("52"); // 22 on Calvin's scale is 52 on the panel's menu
+    expect(wrapper.find("[data-test='brightness-slider']").attributes("max")).toBe("60"); // 26 on Calvin's scale is 60 on the panel's menu
   });
 
   it("tells the dialog whether the calibration save landed", async () => {
@@ -217,7 +217,7 @@ describe("Screens › Power › Brightness limit safety", () => {
 
   it("clamps a stored brightness when a patch changes the step", async () => {
     const { wrapper, store } = mountScreens({
-      overrides: { brightnessRampEnabled: true, brightness: 22, brightnessLimit: 26 },
+      overrides: { brightnessRampEnabled: true, brightness: 30, brightnessLimit: 26 },
     });
     await flushPromises();
     await open(wrapper);
@@ -225,7 +225,7 @@ describe("Screens › Power › Brightness limit safety", () => {
     await flush();
     expect(store.saveOverrides.mock.calls.at(-1)[1]).toMatchObject({
       brightnessStep: 3,
-      brightness: 20,
+      brightness: 26,
     });
   });
 

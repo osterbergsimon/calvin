@@ -69,14 +69,14 @@ describe("readingsOutlier", () => {
 
 describe("limits", () => {
   it("allows the limit minus two steps", () => {
-    expect(maxPickable(26, 2)).toBe(22);
-    expect(maxPickable(26, 3)).toBe(20);
+    expect(maxPickable(26, 2)).toBe(26);
+    expect(maxPickable(26, 3)).toBe(26);
     expect(maxPickable(null, 2)).toBe(100);
-    expect(maxPickable(3, 2)).toBe(0);
+    expect(maxPickable(0, 2)).toBe(0);
   });
   it("starts at the lower of limit minus two steps and 20", () => {
     expect(firstBrightness(26, 2)).toBe(20);
-    expect(firstBrightness(22, 2)).toBe(18);
+    expect(firstBrightness(18, 2)).toBe(18);
     expect(firstBrightness(null, 2)).toBe(20);
   });
   it("takes the second reading 4 below the start, and has no room at the very bottom", () => {
@@ -86,7 +86,7 @@ describe("limits", () => {
     expect(calibrationPoints(1)).toEqual({ first: 1, second: 0, room: false });
   });
   it("puts the optional third reading at the limit minus two steps", () => {
-    expect(thirdReadingPoint(26, 2)).toBe(22);
+    expect(thirdReadingPoint(26, 2)).toBe(26);
     expect(thirdReadingPoint(null, 2)).toBeNull();
   });
   it("offers the fault limit one step under the lower of the last good level and the fault", () => {
@@ -109,6 +109,12 @@ describe("dimSeconds", () => {
 });
 
 describe("availability", () => {
+  it("a v3 run with successful reads (ddc true, no write step) makes the ramp available", () => {
+    const v3 = { checkedAt: "2026-11-07T10:00:00Z", ddc: true, writes: null, powerTrouble: null };
+    const a = availability({ displayStack: "cog" }, v3);
+    expect(a.state).toBe("ok");
+    expect(a.disabled).toBe(false);
+  });
   const found = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
   it("is available after a good check", () => {
     expect(availability({ displayStack: "cog" }, found).state).toBe("ok");
@@ -168,14 +174,13 @@ describe("checkSummary", () => {
 });
 
 describe("clampBrightness", () => {
-  it("lowers a stored brightness above the limit minus two steps", () => {
-    expect(clampBrightness({ brightness: 25, brightnessLimit: 26 })).toEqual({
-      brightness: 22,
+  it("lowers a stored brightness above the limit, never below it", () => {
+    expect(clampBrightness({ brightness: 30, brightnessLimit: 26 })).toEqual({
+      brightness: 26,
       brightnessLimit: 26,
     });
-    expect(
-      clampBrightness({ brightness: 25, brightnessLimit: 26, brightnessStep: 3 }).brightness
-    ).toBe(20);
+    const atLimit = { brightness: 26, brightnessLimit: 26, brightnessStep: 3 };
+    expect(clampBrightness(atLimit)).toBe(atLimit);
   });
   it("leaves a safe value, no limit or no brightness alone and returns the same object", () => {
     const safe = { brightness: 20, brightnessLimit: 26 };

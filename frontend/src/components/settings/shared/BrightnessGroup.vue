@@ -299,7 +299,14 @@ const troubleText = computed(() => {
   const trouble = findings.value?.powerTrouble;
   if (!trouble) return "";
   const when = checkedDate(trouble.at);
-  const where = trouble.level == null ? "at idle" : `at Calvin ${trouble.level}`;
+  let where = trouble.level == null ? "at idle" : `at Calvin ${trouble.level}`;
+  if (trouble.step === "read" && trouble.level == null) {
+    // The panel was set with its own buttons; Calvin's level is not where it happened.
+    where =
+      trouble.panelLevel == null
+        ? "while set with the panel's buttons"
+        : `while set with the panel's buttons (panel ${trouble.panelLevel})`;
+  }
   return `Power trouble ${where}${when ? ` (${when})` : ""}`;
 });
 const summary = computed(() => checkSummary(findings.value, readings.value, limit.value));

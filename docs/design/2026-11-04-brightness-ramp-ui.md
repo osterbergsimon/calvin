@@ -38,7 +38,7 @@ Rows, in order:
      menu value of the limit.
    - **Without a menu match**, the slider is on Calvin's scale (DDC 0–100): "19 (Calvin's scale)", with a link,
      "Match it to the panel's own menu", that opens the display check.
-   - **The highest value you can pick** is the limit minus two steps. The range between that and the limit is drawn
+   - **The highest value you can pick** is the limit. The range between that and the limit is drawn
      hatched and can't be reached, with the limit marked and labelled. The note under the slider says "You can go up
      to 67 on the screen's menu (Calvin 22). Above that is too close to the limit the display check found on 4 Nov."
      When no limit has been found, there is no hatch, and the note says "No limit found yet. Run the display check to
@@ -46,7 +46,7 @@ Rows, in order:
    - **Moving the slider applies now** (owner answer 1). The note changes to "Changing… 61 → 67 on the screen's menu,
      2 at a time" until the agent reports it is done. While the screen is asleep, it says "Applies when Kitchen wakes".
      Save the value when the knob is released, not while it is dragged, so a drag never queues a series of ramps.
-   - **The first time the ramp is turned on**, the brightness starts at the lower of "limit minus two steps" and DDC 20.
+   - **The first time the ramp is turned on**, the brightness starts at the lower of "the limit" and DDC 20.
      It never starts above the limit.
 3. **Last wake.** The result of the latest ramp, from the agent's report:
    - "Today 06:30 · brightened to 19 in 22 s · no power trouble" (normal text);
@@ -213,7 +213,7 @@ plus the three converted values.
 - **One write.** Save sends a single PATCH of overrides:
   `brightnessConversion` = this run's pairs, `brightnessLimit` = the highest Calvin value, `brightness` = the everyday
   Calvin value, `brightnessFloor` = the lowest Calvin value.
-- **The everyday value is held under the limit.** The brightness is never stored above the limit minus two steps
+- **The everyday value is held under the limit.** The brightness is never stored above the limit
   (§2). When everyday equals highest, the summary says so: "Brightness is kept 4 under the limit."
 - **Done before Save asks nothing.** There is no "Leave without saving?" modal; the stopped view (§3.6) says what was kept.
 
@@ -305,7 +305,7 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
 
 - The Brightness group sits in Power, not in Display.
 - There are no Brightness rows on Default; one line explains why.
-- The first-time brightness is the lower of "limit minus two steps" and DDC 20.
+- The first-time brightness is the lower of "the limit" and DDC 20.
 - Calibration (steps 1–3) never brightens above the start level (owner, v2). Step 2 dims from the start and back.
   Step 3 reads at the start and start − 4; a third point near limit − 2 × step only once a limit is known.
 - v2: the unknown-start menu question is asked in step 1, before the dim (§3.2).
@@ -321,7 +321,7 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
 - **Every unavailable state** shows its text and action, and its toggle is disabled (Never checked opens the check).
 - **The slider:**
   - menu scale with a menu match, Calvin scale without one;
-  - it can't go past the limit minus two steps;
+  - it can't go past the limit;
   - it saves once on release, not during the drag;
   - it shows "Changing…" until the agent reports, and "Applies when Kitchen wakes" while the screen is asleep.
 - **Screen now** shows "Dimming… then off" while the ramp is on.

@@ -72,19 +72,19 @@ export function readingsOutlier(readings) {
   return Math.abs(predicted - Number(last.menu)) > OUTLIER_MENU_UNITS;
 }
 
-/** The highest Calvin value the slider can reach: the limit minus two steps. */
-export function maxPickable(limit, step = DEFAULT_STEP) {
+/** The highest Calvin value the slider can reach: the limit itself (its margin is already in it). */
+export function maxPickable(limit) {
   if (limit === null || limit === undefined) return 100;
-  return Math.max(0, Number(limit) - 2 * (Number(step) || DEFAULT_STEP));
+  return Math.max(0, Number(limit));
 }
 
 /** Where the brightness starts the first time the ramp is turned on. */
-export function firstBrightness(limit, step = DEFAULT_STEP) {
-  return Math.min(DEFAULT_START, maxPickable(limit, step));
+export function firstBrightness(limit) {
+  return Math.min(DEFAULT_START, maxPickable(limit));
 }
 
 /**
- * The overrides with a stored brightness lowered to the limit minus two steps
+ * The overrides with a stored brightness lowered to the limit
  * when it sits above it. Returns the same object when nothing changes, so a
  * caller can tell whether a write is needed.
  */
@@ -94,7 +94,7 @@ export function clampBrightness(overrides) {
   if (limit === null || limit === undefined || level === null || level === undefined) {
     return overrides;
   }
-  const cap = maxPickable(limit, overrides.brightnessStep ?? DEFAULT_STEP);
+  const cap = maxPickable(limit);
   return Number(level) > cap ? { ...overrides, brightness: cap } : overrides;
 }
 
@@ -115,9 +115,9 @@ export function calibrationPoints(start) {
 }
 
 /** The optional third reading, near the top of a known limit. Null without a limit. */
-export function thirdReadingPoint(limit, step = DEFAULT_STEP) {
+export function thirdReadingPoint(limit) {
   if (limit === null || limit === undefined) return null;
-  return maxPickable(limit, step);
+  return maxPickable(limit);
 }
 
 /**
