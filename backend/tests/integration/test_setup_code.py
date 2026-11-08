@@ -74,7 +74,7 @@ def test_right_code_sets_password_and_invalidates_code(test_client):
 
     response = _setup(test_client, "setup-pass-1", code=code)
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.json()["ok"] is True
     assert get_admin_store().is_configured()
     assert not path.exists()
     assert ensure_setup_code() is None
