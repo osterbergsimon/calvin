@@ -24,11 +24,11 @@ def _clean_locks():
 @pytest.mark.unit
 async def test_an_address_nobody_used_for_two_hours_is_forgotten(test_db, monkeypatch):
     monkeypatch.setattr(kiosk_registry, "_now", lambda: 1_000_000.0)
-    await kiosk_registry.record_kiosk("hall-1", hostname="pi", peer_ip="192.168.1.43")
-    assert await kiosk_registry.kiosk_for_peer("192.168.1.43", now=1_000_000.0) == "hall-1"
+    await kiosk_registry.record_kiosk("hall-1", hostname="pi", peer_ip="192.0.2.43")
+    assert await kiosk_registry.kiosk_for_peer("192.0.2.43", now=1_000_000.0) == "hall-1"
     just_in = 1_000_000.0 + kiosk_registry.PEER_IP_TTL_S
-    assert await kiosk_registry.kiosk_for_peer("192.168.1.43", now=just_in) == "hall-1"
-    assert await kiosk_registry.kiosk_for_peer("192.168.1.43", now=just_in + 1) is None
+    assert await kiosk_registry.kiosk_for_peer("192.0.2.43", now=just_in) == "hall-1"
+    assert await kiosk_registry.kiosk_for_peer("192.0.2.43", now=just_in + 1) is None
 
 
 @pytest.mark.asyncio
@@ -36,10 +36,10 @@ async def test_an_address_nobody_used_for_two_hours_is_forgotten(test_db, monkey
 async def test_a_reused_address_names_the_kiosk_that_used_it_last(test_db, monkeypatch):
     clock = {"now": 1_000_000.0}
     monkeypatch.setattr(kiosk_registry, "_now", lambda: clock["now"])
-    await kiosk_registry.record_kiosk("old-kiosk", hostname="a", peer_ip="192.168.1.50")
+    await kiosk_registry.record_kiosk("old-kiosk", hostname="a", peer_ip="192.0.2.50")
     clock["now"] += 3600  # the lease moved to another Pi an hour later
-    await kiosk_registry.record_kiosk("new-kiosk", hostname="b", peer_ip="192.168.1.50")
-    assert await kiosk_registry.kiosk_for_peer("192.168.1.50", now=clock["now"]) == "new-kiosk"
+    await kiosk_registry.record_kiosk("new-kiosk", hostname="b", peer_ip="192.0.2.50")
+    assert await kiosk_registry.kiosk_for_peer("192.0.2.50", now=clock["now"]) == "new-kiosk"
 
 
 @pytest.mark.asyncio
@@ -47,11 +47,11 @@ async def test_a_reused_address_names_the_kiosk_that_used_it_last(test_db, monke
 async def test_a_live_kiosk_keeps_its_address_fresh(test_db, monkeypatch):
     clock = {"now": 1_000_000.0}
     monkeypatch.setattr(kiosk_registry, "_now", lambda: clock["now"])
-    await kiosk_registry.record_kiosk("hall-1", hostname="pi", peer_ip="192.168.1.43")
+    await kiosk_registry.record_kiosk("hall-1", hostname="pi", peer_ip="192.0.2.43")
     for _ in range(12):  # polls over 3 hours
         clock["now"] += 900
-        await kiosk_registry.record_kiosk("hall-1", hostname="pi", peer_ip="192.168.1.43")
-    assert await kiosk_registry.kiosk_for_peer("192.168.1.43", now=clock["now"]) == "hall-1"
+        await kiosk_registry.record_kiosk("hall-1", hostname="pi", peer_ip="192.0.2.43")
+    assert await kiosk_registry.kiosk_for_peer("192.0.2.43", now=clock["now"]) == "hall-1"
 
 
 @pytest.mark.asyncio
