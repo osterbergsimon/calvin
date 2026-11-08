@@ -367,7 +367,24 @@ export const useConfigStore = defineStore("config", () => {
     logError("[ConfigStore]", message, err);
   };
 
-  const fetchConfig = async () => {
+  // Several components ask for the config on a cold load (App, theme, Dashboard,
+  // photo frame). While one request is in flight the others share it instead of
+  // each hitting the server (calvin-hwjz). A save drops the shared request, so a
+  // fetch made after it is never answered by one that began before.
+  let inflightFetch = null;
+  let inflightPath = null;
+  const fetchConfig = () => {
+    const path = withViewport(configPath());
+    if (inflightFetch && inflightPath === path) return inflightFetch;
+    const request = loadConfigFromServer().finally(() => {
+      if (inflightFetch === request) inflightFetch = null;
+    });
+    inflightFetch = request;
+    inflightPath = path;
+    return request;
+  };
+
+  const loadConfigFromServer = async () => {
     loading.value = true;
     clearError();
     bindViewportReporting();
@@ -425,6 +442,7 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const updateConfig = async config => {
+    inflightFetch = null;
     loading.value = true;
     clearError();
     try {
