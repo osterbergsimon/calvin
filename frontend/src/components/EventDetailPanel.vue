@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import IconButton from "@/components/ui/IconButton.vue";
 import Tag from "@/components/ui/Tag.vue";
 import { useConfigStore } from "../stores/config";
@@ -230,11 +230,25 @@ const formatRangeDay = dateString =>
     month: "short",
   });
 
+// A raw id ("google-5bf8afe7") is never shown. A source the store does not know
+// (a stale cached list, a failed fetch) reads "Calendar" until one refresh,
+// asked once per id, brings the real name.
 const getSourceName = sourceId => {
-  if (!sourceId) return "Calendar";
-  const source = calendarStore.sources.find(s => s.id === sourceId);
-  return source?.name || sourceId;
+  const source = sourceId && calendarStore.sources.find(s => s.id === sourceId);
+  return source?.name || "Calendar";
 };
+
+const refreshedFor = new Set();
+watch(
+  () => props.event?.source,
+  sourceId => {
+    if (!sourceId || refreshedFor.has(sourceId)) return;
+    if (calendarStore.sources.some(s => s.id === sourceId)) return;
+    refreshedFor.add(sourceId);
+    Promise.resolve(calendarStore.fetchSources({ refresh: true })).catch(() => {});
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

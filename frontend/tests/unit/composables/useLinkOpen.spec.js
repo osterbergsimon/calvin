@@ -41,7 +41,7 @@ describe("useLinkOpen", () => {
     const { overlay, openLink, fallbackToHandoff } = useLinkOpen(() => "embed");
     openLink("https://x", undefined);
     fallbackToHandoff();
-    expect(overlay.value).toEqual({ kind: "handoff", url: "https://x" });
+    expect(overlay.value).toEqual({ kind: "handoff", url: "https://x", embedRefused: true });
   });
   it("closeOverlay clears state", () => {
     const { overlay, openLink, closeOverlay } = useLinkOpen(() => null);

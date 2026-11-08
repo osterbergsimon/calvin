@@ -146,15 +146,13 @@
         <InlineNote data-test="check-summary">{{ summary }}</InlineNote>
         <InlineNote v-if="troubleText" tone="warn" data-test="power-trouble">
           {{ troubleText }} ·
-          <a
+          <ExternalLink
             class="brightness-group__fix"
             data-test="power-fix-link"
             :href="POWER_HELP_URL"
-            target="_blank"
-            rel="noopener"
           >
             How to fix the power
-          </a>
+          </ExternalLink>
         </InlineNote>
       </template>
       <Button data-test="check-open" @click="emit('open-check', { step: 'detect' })">
@@ -210,6 +208,7 @@
 </template>
 
 <script setup>
+import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";

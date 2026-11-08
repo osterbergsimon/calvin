@@ -60,13 +60,6 @@
           @update:model-value="v => emit('update:config', { timeFormat: v })"
         />
       </SettingRow>
-      <SettingRow label="Highlight holidays" description="Marks public holidays on the calendar.">
-        <ToggleSwitch
-          :model-value="config.showRedDays"
-          aria-label="Highlight holidays"
-          @update:model-value="v => emit('update:config', { showRedDays: v })"
-        />
-      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="content-photos" title="Photos">

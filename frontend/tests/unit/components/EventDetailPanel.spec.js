@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import EventDetailPanel from "@/components/EventDetailPanel.vue";
 import { useConfigStore } from "@/stores/config";
@@ -175,10 +175,44 @@ describe("EventDetailPanel", () => {
       expect(wrapper.find(".event-detail__calendar").text()).toContain("Test Calendar");
     });
 
-    it("falls back to the source id when the calendar is unknown", () => {
+    it("falls back to a neutral name, not the id, when the calendar is unknown", () => {
       calendarStore.sources = [];
+      vi.spyOn(calendarStore, "fetchSources").mockResolvedValue({});
       const wrapper = createWrapper({ event: createEvent({ source: "unknown-source" }) });
-      expect(wrapper.find(".event-detail__calendar").text()).toContain("unknown-source");
+      expect(wrapper.find(".event-detail__calendar").text()).toBe("Calendar");
+    });
+  });
+
+  describe("Calendar name (calvin-v04i)", () => {
+    it("never shows a raw calendar id: neutral name, one refresh, then the real name", async () => {
+      const event = createEvent({ source: "google-5bf8afe7" });
+      const fetchSources = vi.spyOn(calendarStore, "fetchSources").mockImplementation(async () => {
+        await Promise.resolve();
+        calendarStore.sources = [{ id: "google-5bf8afe7", name: "Almon" }];
+      });
+      const w = createWrapper({ event });
+      expect(w.find(".event-detail__calendar").text()).toBe("Calendar");
+      expect(w.text()).not.toContain("google-5bf8afe7");
+      await flushPromises();
+      expect(fetchSources).toHaveBeenCalledTimes(1);
+      expect(fetchSources).toHaveBeenCalledWith({ refresh: true });
+      expect(w.find(".event-detail__calendar").text()).toBe("Almon");
+    });
+
+    it("stays neutral and does not loop when the refresh still has no such source", async () => {
+      const fetchSources = vi.spyOn(calendarStore, "fetchSources").mockResolvedValue({});
+      const w = createWrapper({ event: createEvent({ source: "gone-1" }) });
+      await flushPromises();
+      expect(w.find(".event-detail__calendar").text()).toBe("Calendar");
+      expect(fetchSources).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not refresh when the source is already known", async () => {
+      calendarStore.sources = [{ id: "test-source", name: "Home" }];
+      const fetchSources = vi.spyOn(calendarStore, "fetchSources").mockResolvedValue({});
+      createWrapper();
+      await flushPromises();
+      expect(fetchSources).not.toHaveBeenCalled();
     });
   });
 });

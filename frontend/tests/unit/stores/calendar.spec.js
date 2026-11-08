@@ -38,6 +38,23 @@ describe("Calendar Store", () => {
     useConnectionStore.mockReturnValue(mockConnectionStore);
   });
 
+  describe("fetchSources refresh (calvin-v04i)", () => {
+    it("a refresh bypasses a cached list that predates a source, even when not fully online", async () => {
+      setCachedData("calendar_sources", { sources: [{ id: "old", name: "Old" }] });
+      mockConnectionStore.isFullyOnline.mockReturnValue(false);
+      api.get.mockResolvedValue({
+        data: { sources: [{ id: "google-5bf8afe7", name: "Almon" }] },
+      });
+      const store = useCalendarStore();
+
+      await store.fetchSources();
+      expect(store.sources.map(s => s.id)).toEqual(["old"]); // the stale-cache path
+
+      await store.fetchSources({ refresh: true });
+      expect(store.sources.map(s => s.id)).toEqual(["google-5bf8afe7"]);
+    });
+  });
+
   describe("Initialization", () => {
     it("should initialize with default values", () => {
       const store = useCalendarStore();
