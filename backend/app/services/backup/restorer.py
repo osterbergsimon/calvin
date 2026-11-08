@@ -334,6 +334,7 @@ async def _restore_keyboard(doc: BackupDocument, mode: str) -> None:
 
 @retry_on_db_locked(max_retries=5)
 async def _restore_plugin_types(doc: BackupDocument, out: _Outcome) -> None:
+    from app.plugins.registry.enable_policy import turn_type_on
     from app.plugins.registry.loader import load_plugin_types_for_single
 
     for row in doc.data.plugin_types:
@@ -346,12 +347,20 @@ async def _restore_plugin_types(doc: BackupDocument, out: _Outcome) -> None:
                 f"Plugin type {row.type_id} is not available; its settings were skipped."
             )
             continue
-        db_type.enabled = row.enabled
         db_type.common_config_schema = {
             **(db_type.common_config_schema or {}),
             **(row.common_config_schema or {}),
         }
-        await db_type.save_with_timestamp()
+        if row.enabled:
+            # Turning on follows the same sealed-mode rule as every other enable path.
+            await db_type.save_with_timestamp()
+            if not await turn_type_on(row.type_id):
+                out.warnings.append(
+                    f"Plugin {row.type_id} stays off: it needs sealed mode to be turned off first."
+                )
+        else:
+            db_type.enabled = False
+            await db_type.save_with_timestamp()
 
 
 @retry_on_db_locked(max_retries=5)

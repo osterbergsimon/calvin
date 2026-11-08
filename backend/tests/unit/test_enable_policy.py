@@ -216,3 +216,111 @@ async def test_manager_update_disabling_an_instance_still_turns_the_type_off():
     await _instance(enabled=True)
     await _generic_update(False)
     assert (await _row()).enabled is False
+
+
+# --- restore, stale reason ----------------------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_restore_keeps_a_sealed_blocked_type_off():
+    from types import SimpleNamespace
+
+    from app.services.backup.restorer import _Outcome, _restore_plugin_types
+
+    await _off_type()
+    doc = SimpleNamespace(
+        data=SimpleNamespace(
+            plugin_types=[SimpleNamespace(type_id="castish", enabled=True, common_config_schema={})]
+        )
+    )
+    out = _Outcome()
+    with (
+        patch("app.plugins.registry.enable_policy.plugin_loader") as policy_loader,
+        patch(SEALED, new=AsyncMock(return_value=True)),
+    ):
+        policy_loader.get_plugin_types.return_value = [_meta(["cast.example.com"])]
+        await _restore_plugin_types(doc, out)
+    assert (await _row()).enabled is False
+    assert any("sealed mode" in w.lower() for w in out.warnings)
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_turning_a_blocked_type_on_after_unsealing_clears_the_reason():
+    from app.plugins.registry.enable_policy import SEALED_REASON, turn_type_on
+
+    await _off_type()
+    row = await _row()
+    row.error_message = SEALED_REASON
+    await row.save_with_timestamp()
+    with (
+        patch("app.plugins.registry.enable_policy.plugin_loader") as policy_loader,
+        patch(SEALED, new=AsyncMock(return_value=False)),
+    ):
+        policy_loader.get_plugin_types.return_value = [_meta(["cast.example.com"])]
+        assert await turn_type_on("castish") is True
+    row = await _row()
+    assert row.enabled is True
+    assert row.error_message is None
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_startup_refresh_keeps_the_reason_while_the_type_is_off():
+    from app.plugins.registry.enable_policy import SEALED_REASON
+
+    await _off_type()
+    row = await _row()
+    row.error_message = SEALED_REASON
+    await row.save_with_timestamp()
+    with (
+        patch("app.plugins.registry.loader.plugin_loader") as loader,
+        patch(SEALED, new=AsyncMock(return_value=True)),
+    ):
+        loader.get_plugin_types.return_value = [_meta(["cast.example.com"])]
+        await load_plugin_types()
+        await load_plugin_types_for_single("castish")
+    assert (await _row()).error_message == SEALED_REASON
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_the_toggle_clears_the_reason_when_it_turns_the_type_on(test_client):
+    from types import SimpleNamespace
+
+    from app.plugins.registry.enable_policy import SEALED_REASON
+
+    await _off_type()
+    row = await _row()
+    row.error_message = SEALED_REASON
+    await row.save_with_timestamp()
+    fake = SimpleNamespace(
+        type_id="castish",
+        browser_origins=["cast.example.com"],
+        plugin_type="service",
+        common_config_schema={},
+        instance_config_schema={},
+        name="Castish",
+        description="",
+        version="1",
+        ui_actions=[],
+        ui_sections=[],
+        supports_multiple_instances=False,
+        instance_label=None,
+        display_schema=None,
+        statusbar_schema=None,
+    )
+    with (
+        patch(
+            "app.api.routes.plugins.management.plugin_loader.get_plugin_types",
+            return_value=[fake],
+        ),
+        patch(
+            "app.api.routes.plugins.management.get_sealed_mode", new=AsyncMock(return_value=False)
+        ),
+    ):
+        test_client.put("/api/plugins/castish", json={"enabled": True})
+    row = await _row()
+    assert row.enabled is True
+    assert row.error_message is None

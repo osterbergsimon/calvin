@@ -50,5 +50,13 @@ async def turn_type_on(type_id: str) -> bool:
         await db_type.save_with_timestamp()
         return False
     db_type.enabled = True
+    # The reason recorded while it was blocked is stale once it is on.
+    if db_type.error_message == SEALED_REASON:
+        db_type.error_message = None
     await db_type.save_with_timestamp()
     return True
+
+
+def keeps_reason(db_type) -> bool:
+    """A refresh of a type's row must not erase the sealed-mode reason while it is off."""
+    return not db_type.enabled and db_type.error_message == SEALED_REASON

@@ -5,7 +5,7 @@ from loguru import logger
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
-from app.plugins.registry.enable_policy import initial_enabled
+from app.plugins.registry.enable_policy import initial_enabled, keeps_reason
 
 
 async def load_plugin_types() -> None:
@@ -79,8 +79,10 @@ async def load_plugin_types() -> None:
                     db_type.common_config_schema = merged_schema
 
                     db_type.plugin_type = plugin_type_value
-                    # Clear error message on successful load
-                    db_type.error_message = None
+                    # Clear error message on successful load, except the recorded
+                    # reason a type was left off (sealed mode)
+                    if not keeps_reason(db_type):
+                        db_type.error_message = None
                     await db_type.save_with_timestamp()
 
             await _save_plugin_type()
@@ -177,7 +179,8 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
             existing_schema = db_type.common_config_schema or {}
             db_type.common_config_schema = {**metadata_schema, **existing_schema}
             db_type.plugin_type = plugin_type_value
-            db_type.error_message = None
+            if not keeps_reason(db_type):
+                db_type.error_message = None
             await db_type.save_with_timestamp()
 
     await _save_plugin_type()
