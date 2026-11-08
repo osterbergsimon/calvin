@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 import { ref } from "vue";
+import { readFileSync } from "node:fs";
 
 vi.mock("vue-router", () => ({
   useRoute: () => ({ path: "/" }),
@@ -56,14 +57,25 @@ describe("CalendarView touch controls", () => {
     expect(w.find(".calendar-header__label").exists()).toBe(true);
   });
 
-  it("hides the control row when not focused", () => {
+  it("keeps the control row in the layout but hidden when not focused (calvin-mbze)", () => {
     const w = mountCal({ focused: false });
-    expect(w.find(".calendar-header__controls").exists()).toBe(false);
+    const controls = w.find(".calendar-header__controls");
+    expect(controls.exists()).toBe(true);
+    expect(controls.classes()).toContain("calendar-header__controls--hidden");
+    expect(controls.attributes("aria-hidden")).toBe("true");
   });
 
   it("shows the control row when focused and a pointer is present", () => {
     const w = mountCal({ focused: true });
-    expect(w.find(".calendar-header__controls").exists()).toBe(true);
+    const controls = w.find(".calendar-header__controls");
+    expect(controls.exists()).toBe(true);
+    expect(controls.classes()).not.toContain("calendar-header__controls--hidden");
+    expect(controls.attributes("aria-hidden")).toBeUndefined();
+  });
+
+  it("gives the hidden row visibility:hidden so it leaves the tab order", () => {
+    const css = readFileSync("src/components/CalendarView.vue", "utf8");
+    expect(css).toMatch(/\.calendar-header__controls--hidden\s*\{[^}]*visibility:\s*hidden/);
   });
 
   it("keeps the month title and controls as separate header groups so the header can wrap", () => {
