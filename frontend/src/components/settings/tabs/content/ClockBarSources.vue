@@ -35,7 +35,7 @@
       kind="clock"
       :hidden-instances-for="hiddenInstancesFor"
       @saved="handleSaved"
-      @show-hidden="instances => instances.forEach(showInstance)"
+      @show-hidden="showInstances"
     />
 
     <InstanceModal
@@ -202,6 +202,13 @@ const showInstance = async instance => {
     logError("[ClockBarSources]", "Failed to show the tile:", error);
   }
   await loadPlugins();
+};
+
+// Several hidden instances at once (the add prompt's "show these"): one after the
+// other. Each write rebuilds the design from the current one, so overlapping writes
+// would let the last one put an earlier tile back on the hidden shelf (calvin-7xxf).
+const showInstances = async instances => {
+  for (const instance of instances) await showInstance(instance);
 };
 
 const providerOf = instanceId =>
