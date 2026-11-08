@@ -161,3 +161,44 @@ test.describe("region view options reach the widget", () => {
     await expect(panel.getByText("Card size")).toHaveCount(0);
   });
 });
+
+test.describe("link behavior reaches a tapped Mealie item", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  // [option shown in the menu, view.linkAction it saves, overlay a tap opens]
+  const CHOICES = [
+    ["Default", undefined, "handoff"],
+    ["QR", "handoff", "handoff"],
+    ["In-app", "embed", "embed"],
+    ["Off", "off", "none"],
+  ];
+
+  for (const [label, saved, overlay] of CHOICES) {
+    test(`${label} -> ${overlay}`, async ({ page }) => {
+      // Start from the opposite of the choice so selecting it is a real change.
+      const start = label === "Off" ? "embed" : "off";
+      const { api } = await openWidget(page, "mealie", "medium", {
+        view: { linkAction: start },
+      });
+      await page.locator(".region-view-options__trigger").click();
+      await page.getByRole("dialog").getByText(label, { exact: true }).click();
+      await expect
+        .poll(
+          () =>
+            api.configPosts.at(-1)?.dashboardScreens?.screens?.[0]?.layout?.regions?.[0]?.view
+              ?.linkAction
+        )
+        .toBe(saved);
+
+      await page.keyboard.press("Escape");
+      const item = page.locator(".card-grid__item").first();
+      await item.click();
+      const qr = page.getByText("Scan to open on your phone");
+      const embed = page.getByRole("dialog", { name: "Embedded page" });
+      if (overlay === "handoff") await expect(qr).toBeVisible();
+      else await expect(qr).toHaveCount(0);
+      if (overlay === "embed") await expect(embed).toBeVisible();
+      else await expect(embed).toHaveCount(0);
+    });
+  }
+});
