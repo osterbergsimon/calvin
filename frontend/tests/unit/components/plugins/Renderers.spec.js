@@ -486,7 +486,7 @@ describe("WeatherForecast", () => {
     const strip = wrapper.find(".weather-forecast-renderer__items");
     expect(strip.classes()).toContain("calvin-plugin-scroll-shade");
     expect(strip.attributes("style")).toContain("grid-auto-columns");
-    expect(strip.attributes("style")).toContain("max-content");
+    expect(strip.attributes("style")).toContain("minmax(max-content, 1fr)");
   });
 });
 
@@ -506,11 +506,14 @@ describe("CardGrid — footprint vars (calvin-fub)", () => {
     expect(grid.attributes("style")).toContain("220px"); // schema fallback preserved
   });
 
-  it("uses max-content rows so cards keep natural height (guards row-collapse)", () => {
+  it("rows never shrink below the card's height and share spare space (guards row-collapse and short content)", () => {
     const wrapper = mount(CardGrid, { props: { schema, data } });
-    // grid-auto-rows:max-content stops the grid from squishing rows to title
-    // height under space pressure — without it the fit-clamp never sees overflow.
-    expect(wrapper.find(".card-grid").attributes("style")).toContain("grid-auto-rows: max-content");
+    // The max-content floor stops the grid from squishing rows to title height
+    // under space pressure (the fit-clamp then sees overflow); the 1fr ceiling
+    // stretches the rows to fill a region taller than its cards.
+    expect(wrapper.find(".card-grid").attributes("style")).toContain(
+      "grid-auto-rows: minmax(max-content, 1fr)"
+    );
   });
 });
 

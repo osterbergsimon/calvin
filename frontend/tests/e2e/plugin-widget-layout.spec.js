@@ -113,7 +113,10 @@ test.describe("region view options reach the widget", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
   const cardWidth = page =>
-    page.locator(".card-grid__card").first().evaluate(el => el.getBoundingClientRect().width);
+    page
+      .locator(".card-grid__card")
+      .first()
+      .evaluate(el => el.getBoundingClientRect().width);
 
   test("Card size changes the card footprint and is saved", async ({ page }) => {
     const { api } = await openWidget(page, "mealie", "medium");

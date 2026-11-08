@@ -63,4 +63,41 @@ describe("ServiceRegionViewOptions", () => {
     expect(store.refreshCurrentService).toHaveBeenCalled();
     w.unmount();
   });
+
+  it("Refresh now refetches the service's widget data", async () => {
+    const { useWebServicesStore } = await import("@/stores/webServices");
+    const { QueryClient } = await import("@tanstack/vue-query");
+    useWebServicesStore().refreshCurrentService = vi.fn().mockResolvedValue();
+    const refetch = vi.spyOn(QueryClient.prototype, "refetchQueries").mockResolvedValue();
+    const w = mount(ServiceRegionViewOptions, {
+      attachTo: document.body,
+      props: { regionId: "r1", serviceId: "svc-9", view: {} },
+      global: { stubs: { teleport: true } },
+    });
+    await w.find(".region-view-options__trigger").trigger("click");
+    await w.find('[data-action="refresh-now"]').trigger("click");
+    await vi.waitFor(() =>
+      expect(refetch).toHaveBeenCalledWith({ queryKey: ["plugin-data", "svc-9"] })
+    );
+    refetch.mockRestore();
+    w.unmount();
+  });
+
+  it("offers Card size only for card grids", async () => {
+    const mountKind = async kind => {
+      const w = mount(ServiceRegionViewOptions, {
+        attachTo: document.body,
+        props: { regionId: "r1", kind, view: {} },
+        global: { stubs: { teleport: true } },
+      });
+      await w.find(".region-view-options__trigger").trigger("click");
+      return w;
+    };
+    const grid = await mountKind("card-grid");
+    expect(grid.text()).toContain("Card size");
+    grid.unmount();
+    const list = await mountKind("item-list");
+    expect(list.text()).not.toContain("Card size");
+    list.unmount();
+  });
 });

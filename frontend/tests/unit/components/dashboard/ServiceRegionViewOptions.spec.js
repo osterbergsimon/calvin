@@ -14,7 +14,7 @@ describe("ServiceRegionViewOptions — card size", () => {
   function openPopover(view = {}) {
     const wrapper = mount(ServiceRegionViewOptions, {
       attachTo: document.body,
-      props: { regionId: "region-1", view },
+      props: { regionId: "region-1", kind: "card-grid", view },
     });
     // RegionViewOptions renders the popover slot only when open; click the trigger.
     wrapper.find(".region-view-options__trigger").trigger("click");

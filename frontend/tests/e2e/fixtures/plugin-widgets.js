@@ -212,9 +212,7 @@ function screensFor(instanceId) {
           layout: {
             version: 1,
             preset: "single",
-            regions: [
-              { id: "region-1", kind: "service", instanceIds: [instanceId], size: 100 },
-            ],
+            regions: [{ id: "region-1", kind: "service", instanceIds: [instanceId], size: 100 }],
           },
           activeRegionId: "region-1",
         },
@@ -266,10 +264,7 @@ export function widgetOverrides(key, hits) {
           return reply(route, { plugins: !type || type === "service" ? [plugin] : [] });
         },
       ],
-      [
-        new RegExp(`^/api/plugins/${widget.pluginId}$`),
-        route => reply(route, plugin),
-      ],
+      [new RegExp(`^/api/plugins/${widget.pluginId}$`), route => reply(route, plugin)],
       [
         new RegExp(`^/api/plugins/${widget.pluginId}/instances$`),
         route => reply(route, { instances: [instance] }),
