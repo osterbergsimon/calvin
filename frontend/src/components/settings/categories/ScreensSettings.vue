@@ -1169,7 +1169,7 @@ function patchBrightness(change) {
     if (value === null || value === undefined) delete next[key];
     else next[key] = value;
   }
-  // A brightness above the limit minus two steps is never stored.
+  // A brightness above the limit is never stored.
   return persistPower(clampBrightness(next));
 }
 
@@ -1180,9 +1180,12 @@ function openCheck({ enableAfter = false } = {}) {
   checkOpen.value = true;
 }
 // The first check passing the writes step is what turns the ramp on.
-function onWritesOk() {
+// The dialog passes the person's choice: unticking "Use these levels when the
+// screen wakes and starts" must not turn the ramp on behind their back.
+function onWritesOk(choice) {
   if (!enableAfterCheck.value) return;
   enableAfterCheck.value = false;
+  if (choice?.rampEnabled === false) return;
   const change = { brightnessRampEnabled: true };
   if (overrides.value.brightness == null) {
     change.brightness = firstBrightness(overrides.value.brightnessLimit ?? null);

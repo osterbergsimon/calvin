@@ -51,8 +51,8 @@ describe("BrightnessGroup rows", () => {
     });
   });
 
-  it("starts the first brightness at the limit minus two steps when that is lower", async () => {
-    const wrapper = mountGroup({ overrides: { brightnessLimit: 22 } });
+  it("starts the first brightness at the limit when that is lower than 20", async () => {
+    const wrapper = mountGroup({ overrides: { brightnessLimit: 18 } });
     await find(wrapper, "ramp-toggle")
       .findComponent({ name: "ToggleSwitch" })
       .vm.$emit("update:modelValue", true);
@@ -213,16 +213,16 @@ describe("BrightnessGroup slider", () => {
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
-  it("cannot go past the limit minus two steps", () => {
+  it("cannot go past the limit itself", () => {
     const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
-    expect(find(wrapper, "brightness-slider").attributes("max")).toBe("22");
+    expect(find(wrapper, "brightness-slider").attributes("max")).toBe("26");
     expect(find(wrapper, "limit-hatch").exists()).toBe(true);
   });
 
   it("explains the limit on the menu scale", () => {
     const wrapper = mountGroup({ overrides: withMenu });
     expect(find(wrapper, "limit-note").text()).toContain(
-      "You can go up to 68 on the panel's own menu (Calvin 22)."
+      "You can go up to 78 on the panel's own menu (Calvin 26)."
     );
     expect(find(wrapper, "limit-note").text()).toContain("limit the display check found on 4 Nov");
   });
