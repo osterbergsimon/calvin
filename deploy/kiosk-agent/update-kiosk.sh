@@ -340,8 +340,9 @@ ensure_wifi_powersave_off() {
     unit="${NM_CONF_DIR}/calvin-wifi-powersave.conf"
     have="$(cat "$unit" 2>/dev/null || true)"
     if [ "$have" != "${want%$'\n'}" ]; then
-      mkdir -p "$NM_CONF_DIR" && printf '%s' "$want" > "$unit" \
-        || { log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0; }
+      if ! { mkdir -p "$NM_CONF_DIR" && printf '%s' "$want" > "$unit"; }; then
+        log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0
+      fi
       "$NMCLI" general reload conf >/dev/null 2>&1 || log "NetworkManager did not reload its config"
       log "Wi-Fi power save disabled for NetworkManager (${unit})"
     fi
@@ -363,8 +364,9 @@ ExecStart=/bin/sh -c 'iw dev ${WIFI_IFACE} set power_save off || iwconfig ${WIFI
 WantedBy=multi-user.target"
   have="$(cat "$unit" 2>/dev/null || true)"
   if [ "$have" != "$want" ]; then
-    mkdir -p "$SYSTEMD_DIR" && printf '%s\n' "$want" > "$unit" \
-      || { log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0; }
+    if ! { mkdir -p "$SYSTEMD_DIR" && printf '%s\n' "$want" > "$unit"; }; then
+      log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0
+    fi
     "$SYSTEMCTL" daemon-reload || true
     log "Wi-Fi power save disabled by ${unit}"
   fi
