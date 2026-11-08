@@ -135,6 +135,48 @@ describe("Popover", () => {
     expect(document.activeElement).toBe(outside);
   });
 
+  it("stays open when a floating layer opened from its panel is poked", async () => {
+    // A select inside the panel teleports its menu to <body>, so the menu is
+    // outside the panel in the DOM but still part of the same interaction.
+    const w = mountPopover({ modelValue: true }, document.body);
+    await nextTick();
+    const layer = document.createElement("div");
+    layer.setAttribute("data-floating-layer", "");
+    const option = document.createElement("li");
+    layer.appendChild(option);
+    document.body.appendChild(layer);
+    option.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    await nextTick();
+    expect(w.emitted("update:modelValue")).toBeUndefined();
+    expect(w.emitted("close")).toBeUndefined();
+  });
+
+  it("Escape inside a nested select does not also close the popover", async () => {
+    // The select closes its own menu on Escape and stops the key there.
+    const { default: SelectPill } = await import("@/components/ui/SelectPill.vue");
+    const w = mount(
+      {
+        components: { Popover, SelectPill },
+        data: () => ({ open: true, size: "medium" }),
+        template:
+          "<Popover v-model=\"open\"><SelectPill v-model=\"size\" :options=\"[{value:'small',label:'Small'},{value:'medium',label:'Medium'}]\" aria-label=\"Size\" /></Popover>",
+      },
+      { attachTo: document.body }
+    );
+    wrappers.push(w);
+    await nextTick();
+    document.querySelector("button.pill").click();
+    await nextTick();
+    const list = document.querySelector('[role="listbox"]');
+    expect(list).not.toBeNull();
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    );
+    await nextTick();
+    expect(w.vm.open).toBe(true);
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+  });
+
   it("does not close when the panel itself is poked", async () => {
     const w = mountPopover({ modelValue: true }, document.body);
     await nextTick();

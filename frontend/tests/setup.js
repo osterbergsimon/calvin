@@ -5,6 +5,12 @@ import { cleanup } from "@testing-library/vue";
 import * as matchers from "@testing-library/jest-dom/matchers";
 import axios from "axios";
 import { setActivePinia, createPinia } from "pinia";
+import { config } from "@vue/test-utils";
+import { VueQueryPlugin } from "@tanstack/vue-query";
+
+// The app installs vue-query in main.js; mounted components that call
+// useQueryClient() (Refresh now) need the same in a test.
+config.global.plugins = [...(config.global.plugins || []), [VueQueryPlugin]];
 
 // Mock axios globally to prevent network errors in tests
 // Store created instances so we can apply default mocks to them

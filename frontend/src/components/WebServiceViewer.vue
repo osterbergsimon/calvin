@@ -56,6 +56,8 @@
               <ServiceRegionViewOptions
                 v-if="showControls && hasPointer && isLinkCapable"
                 :region-id="regionId"
+                :service-id="currentService.id"
+                :kind="currentService.display_schema?.kind"
                 :view="view"
               />
               <IconButton
@@ -258,9 +260,11 @@ const toggleFullscreen = () => {
     // "current" service (which may belong to another region/screen). When this
     // viewer has no pinned service (the WEB_SERVICES carousel), pass null so
     // fullscreen cycles from the current index.
+    // The region's own view (card size, link behavior) goes along, so its
+    // options still apply in the maximized view.
     modeStore.enterFullscreen(
       modeStore.MODES.WEB_SERVICES,
-      props.serviceId ? { serviceId: props.serviceId } : null
+      props.serviceId ? { serviceId: props.serviceId, view: props.view || null } : null
     );
   }
 

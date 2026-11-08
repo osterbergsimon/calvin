@@ -1,5 +1,13 @@
 <template>
-  <section v-if="data && !data.error" class="weather-forecast-renderer">
+  <section
+    v-if="data && !data.error"
+    ref="rootEl"
+    class="weather-forecast-renderer"
+    :class="{
+      'weather-forecast-renderer--compact': compact,
+      'weather-forecast-renderer--forecast-only': !current,
+    }"
+  >
     <div v-if="current" class="weather-forecast-renderer__current">
       <div class="weather-forecast-renderer__main">
         <svg class="weather-forecast-renderer__icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -14,7 +22,7 @@
         </div>
       </div>
 
-      <div class="weather-forecast-renderer__details">
+      <div v-if="!hideDetails" class="weather-forecast-renderer__details">
         <div v-if="hasValue(feelsLike)" class="calvin-plugin-readout">
           <span class="calvin-plugin-readout__label">Feels like</span>
           <span class="weather-forecast-renderer__detail-value">
@@ -78,6 +86,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import { useResizeObserver } from "@vueuse/core";
 import { resolvePath } from "../../../utils/jsonPath";
 import { weatherIconPath } from "../../../utils/weatherIcons";
 import { useFitScroll } from "../../../composables/useFitScroll.js";
@@ -104,16 +113,29 @@ const forecast = computed(() => {
   return Array.isArray(items) ? items : [];
 });
 
+// A short region (an 800x480 kiosk) keeps the forecast on screen: the hero goes
+// on one row first, then the facts give way, since the forecast matters more.
+// Heights are the region's own, so this follows the region, not the viewport.
+const COMPACT_BELOW = 520;
+const HIDE_DETAILS_BELOW = 420;
+const rootEl = ref(null);
+const regionHeight = ref(Infinity);
+useResizeObserver(rootEl, ([entry]) => {
+  regionHeight.value = entry.contentRect.height;
+});
+const compact = computed(() => regionHeight.value < COMPACT_BELOW);
+const hideDetails = computed(() => regionHeight.value < HIDE_DETAILS_BELOW);
+
 const itemsEl = ref(null);
 const { clampStyle, shadeClass } = useFitScroll(itemsEl, {
   axis: "inline",
   itemSelector: ".weather-forecast-renderer__item",
   data: () => props.data,
 });
-// Natural column widths so the strip OVERFLOWS horizontally instead of shrinking
-// columns to fit — that overflow is what useFitScroll clamps/scrolls (X-axis
-// analogue of the card-grid grid-auto-rows:max-content fix).
-const stripStyle = { gridAutoColumns: "minmax(90px, max-content)" };
+// Columns never shrink below their natural width, so a strip wider than the
+// region OVERFLOWS (what useFitScroll clamps/scrolls); a strip narrower than the
+// region shares the spare width so the days span it.
+const stripStyle = { gridAutoColumns: "minmax(max-content, 1fr)" };
 
 const temperatureUnit = computed(() => units.value.temperature || "°C");
 const windUnit = computed(() => units.value.wind || "m/s");
@@ -187,7 +209,10 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   gap: var(--gap-5);
-  overflow: hidden;
+  /* A region shorter than the whole readout scrolls it instead of cutting the
+     forecast off. */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
 }
 
@@ -198,7 +223,10 @@ function capitalize(value) {
   text-align: center;
 }
 
+/* The hero (icon, temperature) takes the spare height and centres in it; the
+   facts and the forecast stay together at the foot of the region. */
 .weather-forecast-renderer__current {
+  flex: 1 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--gap-5);
@@ -210,9 +238,24 @@ function capitalize(value) {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--gap-2);
   padding: var(--gap-3) 0 var(--gap-1);
-  flex-shrink: 0;
+  flex: 1 0 auto;
+}
+
+/* Short region: icon, temperature and description side by side. */
+.weather-forecast-renderer--compact .weather-forecast-renderer__main {
+  flex-direction: row;
+  justify-content: center;
+  gap: var(--gap-4);
+}
+.weather-forecast-renderer--compact .weather-forecast-renderer__icon {
+  width: 48px;
+  height: 48px;
+}
+.weather-forecast-renderer--compact .weather-forecast-renderer__current {
+  gap: var(--gap-3);
 }
 
 .weather-forecast-renderer__icon {
@@ -265,13 +308,23 @@ function capitalize(value) {
 }
 
 .weather-forecast-renderer__forecast {
-  flex: 1;
-  min-height: 0;
+  flex: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   border-top: 1px solid var(--line-soft);
   padding-top: var(--gap-4);
+}
+
+/* No current conditions: the forecast is all there is, so it takes the region and
+   centres its strip instead of sitting at the top of it. */
+.weather-forecast-renderer--forecast-only .weather-forecast-renderer__forecast {
+  flex: 1 0 auto;
+  border-top: 0;
+}
+.weather-forecast-renderer--forecast-only .weather-forecast-renderer__items {
+  flex: 1;
+  align-content: center;
 }
 
 .weather-forecast-renderer__forecast h4 {
@@ -284,8 +337,6 @@ function capitalize(value) {
   display: grid;
   grid-auto-flow: column;
   overflow-y: hidden;
-  flex: 1;
-  min-height: 0;
 }
 
 .weather-forecast-renderer__item {
@@ -294,6 +345,7 @@ function capitalize(value) {
   align-items: center;
   gap: var(--gap-2);
   text-align: center;
+  min-width: 90px;
   padding: var(--gap-1) var(--gap-2);
   scroll-snap-align: start;
 }

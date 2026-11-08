@@ -54,6 +54,7 @@
               v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
               :is-fullscreen="true"
               :service-id="modeStore.fullscreenContext?.serviceId || null"
+              :view="modeStore.fullscreenContext?.view || null"
             />
           </div>
 
