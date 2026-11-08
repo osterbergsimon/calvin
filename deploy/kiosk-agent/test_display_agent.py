@@ -4263,7 +4263,7 @@ def test_a_value_above_the_start_is_refused_even_if_the_ceiling_allows_it(tmp_pa
     assert max(ddc.writes, default=0) <= 5
 
 
-def _polls_after_the_offer(first, ddc_holder, *, lowered_to=None, stop_after=6):
+def _polls_after_the_offer(first, ddc_holder, *, lowered_to=None, stop_after=6, vanish=False, **cfg):
     """A poll() that only starts counting once the offered value has been written."""
     state = {"n": 0}
 
@@ -4275,8 +4275,10 @@ def _polls_after_the_offer(first, ddc_holder, *, lowered_to=None, stop_after=6):
         if lowered_to is not None and state["n"] >= 1:
             job["ceiling"] = lowered_to  # same request (id and seq), limit lowered since
         if state["n"] >= stop_after:
+            if vanish:
+                return _ramp_cfg(**cfg)  # the dialog closed: no job any more
             job["action"] = "stop"
-        return _job_cfg(job)
+        return _job_cfg(job, **cfg)
 
     return poll
 
@@ -4297,6 +4299,60 @@ def test_a_limit_lowered_mid_run_brings_an_already_set_level_down_to_it(tmp_path
     assert 6 in after_offer[:-1], ddc.writes
     assert max(after_offer) <= 12
     assert any(r["status"] == "running" and r.get("level") == 6 for r in reports), reports
+
+
+def _after_the_recap(ddc):
+    return ddc.writes[ddc.writes.index(6) :]
+
+
+def test_a_stop_after_the_recap_does_not_climb_back_past_the_new_limit(tmp_path):
+    """calvin-8ck0 review: with the ramp off the finish used to return to the start level."""
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    cfg = {"brightness_ramp_enabled": False}
+    poll = _polls_after_the_offer(first, holder, lowered_to=6, **cfg)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll, cfg_over=cfg
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 in ddc.writes, ddc.writes
+    assert max(_after_the_recap(ddc)) <= 6, ddc.writes
+
+
+def test_the_dialog_closing_after_the_recap_does_not_climb_back_either(tmp_path):
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    poll = _polls_after_the_offer(first, holder, lowered_to=6, vanish=True)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 in ddc.writes, ddc.writes
+    assert max(_after_the_recap(ddc)) <= 6, ddc.writes
+
+
+def test_a_saved_limit_lowered_mid_run_also_caps_the_finish(tmp_path):
+    """The limit setting itself (live settings), not only the job's ceiling."""
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    cfg = {"brightness_ramp_enabled": False}
+    state = {"n": 0}
+
+    def poll():
+        if 12 in holder[0].writes:
+            state["n"] += 1
+        job = dict(first, action="stop" if state["n"] >= 4 else "start")
+        return _job_cfg(job, **cfg, brightness_limit=6 if state["n"] >= 1 else None)
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll, cfg_over=cfg
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 in ddc.writes, ddc.writes
+    assert max(_after_the_recap(ddc)) <= 6, ddc.writes
 
 
 def test_a_ceiling_that_stays_put_writes_nothing_extra(tmp_path):

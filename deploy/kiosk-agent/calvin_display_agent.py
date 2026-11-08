@@ -1437,6 +1437,8 @@ class DisplayCheckRunner:
         self.current_step = job.get("step")
         self.current_seq = job.get("seq")
         self.live_settings = self.settings  # refreshed from every config poll
+        # The newest ceiling the backend sent with this run's job (None: not yet).
+        self.live_ceiling = job.get("ceiling")
         # The restore at the end runs only on the backend's explicit flag: the
         # dialog's Stop said this calibration's Save landed. Config values that
         # changed (another device, a schedule toggle) prove nothing.
@@ -1707,10 +1709,9 @@ class DisplayCheckRunner:
         already set can sit above a limit the owner has since lowered (calvin-8ck0).
         Returns True when the run must end (a fault or a write that did not take).
         """
-        ceiling = job.get("ceiling")
+        ceiling = self._live_cap(job.get("ceiling"))
         if (
-            ceiling is None
-            or self.current_step not in ("write", "conversion")
+            self.current_step not in ("write", "conversion")
             or not self._level_known
             or self.level <= ceiling
         ):
@@ -1981,12 +1982,27 @@ class DisplayCheckRunner:
         if self.reason in ("power_at_idle", "power_trouble"):
             return None
         start = self._start_level()
-        return CHECK_FLOOR if start is None else start
+        target = CHECK_FLOOR if start is None else start
+        # A limit lowered during the run applies to the finish too: it must not climb
+        # back past it (calvin-8ck0).
+        return min(target, self._live_cap())
+
+    def _live_cap(self, job_ceiling=None):
+        """The highest level allowed right now: the saved limit and the latest ceiling."""
+        caps = [brightness_ceiling(self.live_settings)]
+        for ceiling in (job_ceiling, self.live_ceiling):
+            if ceiling is not None:
+                caps.append(max(0, int(ceiling)))
+        return min(caps)
 
     def _note_job(self, job):
-        """Remember a Save flag the backend put on this run's job."""
-        if job is not None and job.get("id") == self.job["id"] and job.get("saved"):
+        """Remember a Save flag, and the newest ceiling, the backend put on this run's job."""
+        if job is None or job.get("id") != self.job["id"]:
+            return
+        if job.get("saved"):
             self._job_saved = True
+        if job.get("ceiling") is not None:
+            self.live_ceiling = job["ceiling"]
 
     def _saved_by_now(self):
         """True when the backend flagged this run's job as saved.

@@ -1089,6 +1089,7 @@ function onRun(current) {
     }
   }
   if (!current.active) return onRunEnded(current);
+  followRecap(current);
   if (!awaiting) return;
   const result = current.steps?.[awaiting.step];
   if (!result) return;
@@ -1108,6 +1109,21 @@ function onRun(current) {
   const done = awaiting;
   clearAwaiting();
   onStepResult(done.step, result, done.value);
+}
+
+// The agent re-caps the panel when the limit is lowered while a low level stands
+// (calvin-8ck0) and says so with a running update, not a new result. The menu number
+// the person types is read at that new level, so the pair must use it: follow the
+// run's level while the fallback waits for the number, and drop a number typed
+// before the move.
+function followRecap(current) {
+  if (fbPhase.value !== "ask") return;
+  const level = Number(current.level);
+  const written = fbWritten.value[fbIndex.value];
+  if (!Number.isFinite(level) || written === null || level === written) return;
+  if (level > written) return; // only ever lower: the check never brightens
+  fbWritten.value = fbWritten.value.map((n, i) => (i === fbIndex.value ? level : n));
+  readingText.value = "";
 }
 
 watch(() => check.run.value, onRun);
