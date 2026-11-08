@@ -439,8 +439,14 @@ async def handle_plugin_config_update_generic(
             if db_type and hasattr(db_type, "save_with_timestamp"):
                 # Only update if it's a real Ormar model (not a mock in tests)
                 try:
-                    db_type.enabled = final_enabled
-                    await db_type.save_with_timestamp()
+                    if final_enabled and not db_type.enabled:
+                        # Same sealed-mode rule as every other enable path.
+                        from app.plugins.registry.enable_policy import turn_type_on
+
+                        await turn_type_on(db_type.type_id)
+                    else:
+                        db_type.enabled = final_enabled
+                        await db_type.save_with_timestamp()
                 except (AttributeError, TypeError):
                     # Fallback for mocks or if save_with_timestamp doesn't exist
                     if hasattr(db_type, "update"):

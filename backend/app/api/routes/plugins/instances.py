@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.registry.enable_policy import turn_type_on
 from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.plugins.utils.secrets import (
     SecretEndpointChangedError,
@@ -459,6 +460,10 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     enabled = instance_data.get("enabled")
     if enabled is not None:
         db_plugin.enabled = enabled
+        # Re-enabling an instance under an off type turns the type on (calvin-zbcg),
+        # unless sealed mode forbids it; the host loads no instances for an off type.
+        if enabled is True:
+            await turn_type_on(db_plugin.type_id)
 
     # Update config if provided
     updated_config = None
