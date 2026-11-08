@@ -6,7 +6,7 @@
   >
     <SchemaStatusbarItem
       v-for="service in schemaServices"
-      :key="service.id"
+      :key="`${service.id}:${retryKey}`"
       :service-id="service.id"
       :schema="service.statusbar_schema"
     />
@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, defineComponent, h, onMounted } from "vue";
+import { computed, defineAsyncComponent, defineComponent, h, onMounted, ref } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { useProgressStore } from "../stores/progress";
 
@@ -30,10 +30,38 @@ const StatusbarItemPlaceholder = defineComponent({
     h("span", { class: "plugin-statusbar-items__placeholder", "aria-hidden": "true" }),
 });
 
+// A failed chunk load (flaky Wi-Fi) is retried twice on its own, then replaced
+// by a tap-to-retry control rather than a blank gap in the clock bar
+// (calvin-o8c1). Bumping retryKey remounts the async wrapper, which loads again.
+const retryKey = ref(0);
+const StatusbarItemError = defineComponent({
+  name: "StatusbarItemError",
+  setup: () => () =>
+    h(
+      "button",
+      {
+        type: "button",
+        class: "plugin-statusbar-items__retry",
+        "data-test": "statusbar-retry",
+        title: "Clock bar info did not load. Tap to retry.",
+        "aria-label": "Clock bar info did not load. Retry",
+        onClick: () => {
+          retryKey.value += 1;
+        },
+      },
+      "↻"
+    ),
+});
+
 const SchemaStatusbarItem = defineAsyncComponent({
   loader: () => import("./plugins/SchemaStatusbarItem.vue"),
   loadingComponent: StatusbarItemPlaceholder,
+  errorComponent: StatusbarItemError,
   delay: 0,
+  onError(error, retry, fail, attempts) {
+    if (attempts <= 2) setTimeout(retry, 1500 * attempts);
+    else fail();
+  },
 });
 
 const props = defineProps({
@@ -113,6 +141,16 @@ onMounted(() => {
   visibility: hidden;
   pointer-events: none;
   user-select: none;
+}
+
+.plugin-statusbar-items__retry {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 /* While the async plugin chunk loads, hold a slot so the clock bar's layout
