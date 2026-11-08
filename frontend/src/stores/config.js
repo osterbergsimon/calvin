@@ -441,12 +441,16 @@ export const useConfigStore = defineStore("config", () => {
     }
   };
 
-  const updateConfig = async config => {
+  const updateConfig = async (config, requestOptions) => {
     inflightFetch = null;
     loading.value = true;
     clearError();
     try {
-      const response = await api.post("/config", config);
+      const response = await api.post(
+        "/config",
+        config,
+        ...(requestOptions ? [requestOptions] : [])
+      );
       applyConfigPayload(config, configRefs);
       const responseData = response.data || {};
       applyConfigPayload(responseData, configRefs);

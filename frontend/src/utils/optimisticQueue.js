@@ -28,7 +28,7 @@ const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
  *     deleted: string[],
  *     snapshot: object,
  *     merge: boolean,
- *   }) => Promise<any>,
+ *   }, options: { keepalive: boolean }) => Promise<any>,
  *   onError?: (err: any, batch: object) => void,
  *   delay?: number,
  * }} options
@@ -56,6 +56,9 @@ export function createOptimisticQueue({
   let running = false;
   let currentRun = null;
   let flushRequested = false;
+  // True while a flush made on page close runs: the save then asks the browser
+  // to finish the request even if the page is gone (fetch keepalive).
+  let keepaliveFlush = false;
   let waiters = [];
 
   const display = computed(() => {
@@ -83,6 +86,21 @@ export function createOptimisticQueue({
       if (ok) waiter.resolve(outcome);
       else waiter.reject(outcome);
     }
+  };
+
+  // After a successful save, a caller whose key was tapped again while it was in
+  // flight has not had its latest value saved: it keeps waiting for the save that
+  // carries it instead of resolving with the earlier one (calvin-msa8).
+  const settleSent = (batchWaiters, outcome, sentVersions) => {
+    const superseded = batchWaiters.filter(waiter =>
+      [...waiter.keys].some(key => versionOf(key) !== sentVersions.get(key))
+    );
+    if (superseded.length > 0) waiters = [...superseded, ...waiters];
+    settle(
+      batchWaiters.filter(waiter => !superseded.includes(waiter)),
+      true,
+      outcome
+    );
   };
 
   const performSave = async () => {
@@ -134,7 +152,7 @@ export function createOptimisticQueue({
           sentKeys.every(key => mergeable.has(key)) &&
           Object.keys(sentDeleted).length === 0,
       };
-      await save(batch);
+      await save(batch, { keepalive: keepaliveFlush });
 
       // Only the sent keys become confirmed; a server change that arrived
       // while this save was in flight is kept for every other key.
@@ -156,7 +174,7 @@ export function createOptimisticQueue({
       }
       pending.value = nextPending;
       deleted.value = nextDeleted;
-      settle(batchWaiters, true, batch);
+      settleSent(batchWaiters, batch, sentVersions);
     } catch (err) {
       // Roll back to confirmed only where the user has not tapped again.
       const nextPending = clone(pending.value);
@@ -171,6 +189,8 @@ export function createOptimisticQueue({
       pending.value = nextPending;
       deleted.value = nextDeleted;
       onError?.(err, { changes: sentPending, deleted: Object.keys(sentDeleted) });
+      // A failure is reported to its caller at once, re-tapped or not: that
+      // caller's value was rolled back and its UI needs the error now.
       settle(batchWaiters, false, err);
     } finally {
       running = false;
@@ -297,12 +317,13 @@ export function createOptimisticQueue({
     isLoaded = true;
   };
 
-  const flush = async () => {
+  const flush = async ({ keepalive = false } = {}) => {
     if (timer !== null) {
       clearTimeout(timer);
       timer = null;
     }
     flushRequested = true;
+    if (keepalive) keepaliveFlush = true;
     try {
       while (running || hasPending()) {
         if (running) await currentRun;
@@ -310,6 +331,7 @@ export function createOptimisticQueue({
       }
     } finally {
       flushRequested = false;
+      keepaliveFlush = false;
     }
   };
 

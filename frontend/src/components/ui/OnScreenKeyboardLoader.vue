@@ -91,7 +91,7 @@ onUnmounted(stopListening);
   min-height: 44px;
   padding: 0 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--bg-1, var(--bg-0));
   color: inherit;
   font: inherit;

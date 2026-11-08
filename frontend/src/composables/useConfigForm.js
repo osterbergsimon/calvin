@@ -10,6 +10,7 @@ import { friendlyError } from "../utils/friendlyError";
 import { normalizeDashboardLayout, normalizeDashboardScreens } from "../utils/layout";
 import { normalizeOskExtraLayouts, normalizeOskLayout } from "../utils/oskLayouts";
 import { createOptimisticQueue } from "../utils/optimisticQueue";
+import { KEEPALIVE_REQUEST } from "../services/api";
 
 export function useConfigForm(initialConfig = {}) {
   const configStore = useConfigStore();
@@ -24,11 +25,13 @@ export function useConfigForm(initialConfig = {}) {
   // reverts the values that actually failed.
   const queue = createOptimisticQueue({
     initial: initialConfig,
-    save: async ({ changes }) => {
+    save: async ({ changes }, { keepalive } = {}) => {
       error.value = "";
       saveSuccess.value = false;
       // The store POSTs to the backend and applies the result; one request per save.
-      await configStore.updateConfig(changes);
+      await (keepalive
+        ? configStore.updateConfig(changes, KEEPALIVE_REQUEST)
+        : configStore.updateConfig(changes));
       lastSavedKeys.value = Object.keys(changes);
       saveSuccess.value = true;
       if (saveSuccessTimer) {
@@ -276,12 +279,16 @@ export function useConfigForm(initialConfig = {}) {
   const flush = () => {
     void queue.flush();
   };
+  // On a page close the request must outlive the page (fetch keepalive).
+  const flushOnPageClose = () => {
+    void queue.flush({ keepalive: true });
+  };
   if (typeof window !== "undefined" && getCurrentInstance()) {
-    window.addEventListener("beforeunload", flush);
-    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flushOnPageClose);
+    window.addEventListener("pagehide", flushOnPageClose);
     onUnmounted(() => {
-      window.removeEventListener("beforeunload", flush);
-      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flushOnPageClose);
+      window.removeEventListener("pagehide", flushOnPageClose);
       flush();
     });
   }
