@@ -135,7 +135,8 @@ class Preflight(BaseModel):
 
     # ``settling``: after a power drop the agent waits for the touch controller to
     # go quiet before the watch (calvin-v996); ``settleLeft`` is the seconds to go.
-    status: Literal["clean", "fault", "settling"]
+    # ``watching``: the wait is over and the 10 s power watch has begun.
+    status: Literal["clean", "fault", "settling", "watching"]
     faults: Annotated[list[str], BeforeValidator(_newest(20))] = Field(default_factory=list)
     settleLeft: int | None = Field(None, ge=0, le=3600)
 

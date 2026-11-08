@@ -792,6 +792,9 @@ def test_a_settling_preflight_is_shown_and_is_not_a_power_fault(test_client: Tes
     view = test_client.get(BASE).json()["run"]
     assert view["preflight"]["status"] == "settling"
     assert view["preflight"]["settleLeft"] == 12
+    # The wait over, the next report replaces it (an omitted preflight would not).
+    _report(test_client, run["id"], "running", preflight={"status": "watching", "faults": []})
+    assert test_client.get(BASE).json()["run"]["preflight"] == {"status": "watching", "faults": []}
     assert _findings(test_client)["powerTrouble"] is None
 
 

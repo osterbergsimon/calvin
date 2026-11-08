@@ -364,7 +364,7 @@ const STARTUP_LINE =
   "Calvin starts the screen at the lowest level and brings it up to your everyday level after it turns on.";
 // After Read it on the highest step the power is watched this long (calvin-puiw).
 const HOLD_S = 10;
-const SETTLE_QUIET_S = 20;
+const SETTLE_QUIET_S = 35;
 // The fallback only writes low levels: 5, then 1, held under the run's ceiling
 // and start level so it can never be refused as "above the ceiling".
 const FALLBACK_BASE = [5, 1];
@@ -995,6 +995,18 @@ function onStepResult(name, result, asked) {
 // the previous one and returns to it. A read still in flight is the level that
 // dropped, so that step simply asks again.
 function discardForDrop(wasReading) {
+  if (view.value === "summary" && !saved.value && !usedFallback.value) {
+    // The last reading is the one just taken: it is not kept, and its step asks again.
+    const last = levelIndex.value;
+    if (!levels.value[last]) return;
+    levels.value[last] = null;
+    view.value = "step";
+    droppedAfterRead.value = true;
+    readingText.value = "";
+    afterDrop = last === 0;
+    nextTick(() => readingInput.value?.focus());
+    return;
+  }
   if (view.value !== "step" || step.value < 2) return;
   const index = levelIndex.value;
   afterDrop = false;
@@ -1107,7 +1119,9 @@ watch(() => check.run.value, onRun);
 // once its power check has passed. A stale read goes through the same out-of-order
 // check as any other.
 watch(holding, (now, before) => {
-  if (!before || now || !afterDrop) return;
+  // Only while the person is still on this step: a Stop, an end state or the
+  // summary has taken over, and the reading is unproven.
+  if (!before || now || !afterDrop || view.value !== "step" || stopRequested.value) return;
   afterDrop = false;
   if (thisLevel.value && !behindNote.value) nextLevel();
 });
@@ -1200,6 +1214,13 @@ function noteReport() {
   firstReportMs.value = Date.now();
 }
 watch(() => [run.value?.id, run.value?.updatedAt], noteReport);
+// After waiting out a drop the agent starts its 10 s power watch: count it from here.
+watch(
+  () => run.value?.preflight?.status,
+  statusNow => {
+    if (statusNow === "watching") firstReportMs.value = Date.now();
+  }
+);
 
 const preflightLeft = computed(() =>
   Math.max(0, PREFLIGHT_S - Math.floor((nowMs.value - (firstReportMs.value ?? nowMs.value)) / 1000))

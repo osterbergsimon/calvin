@@ -2454,7 +2454,8 @@
             "enum": [
               "clean",
               "fault",
-              "settling"
+              "settling",
+              "watching"
             ],
             "title": "Status",
             "type": "string"

@@ -587,22 +587,6 @@ describe("retaking a reading checks both neighbours", () => {
 });
 
 describe("Remove and Back leave nothing stale behind", () => {
-  it("a drop reported while the summary shows does not come back on a later step after Remove", async () => {
-    await toSummary();
-    agent({ fault: FAULT });
-    await settle();
-    await find(wrapper, "remove-reading-1").trigger("click");
-    await flushPromises();
-    expect(wrapper.text()).not.toContain("The power dropped");
-    await find(wrapper, "reading-input").setValue("35");
-    await clickPrimary(wrapper);
-    agentStep("read", { level: 10 });
-    await settle();
-    expect(wrapper.text()).not.toContain("The power dropped");
-    await clickPrimary(wrapper);
-    expect(find(wrapper, "check-summary").text()).toContain("Panel 35 · Calvin 10");
-  });
-
   it("Back forgets the 'behind' tries so the own-levels offer starts again", async () => {
     await toStep3();
     await readLevel(40, 20); // equal Calvin value, lower typed: behind
@@ -1027,6 +1011,70 @@ describe("a power drop just after Read it (calvin-puiw)", () => {
     expect(status(wrapper)).toContain("Step 3 of 4");
     expect(find(wrapper, "check-step-body").text()).toContain("The power dropped.");
     expect(find(wrapper, "check-step-body").text()).not.toContain(KEPT_LEAD);
+  });
+});
+
+describe("coordinator review fixes on #337", () => {
+  const KEPT_LEAD = "The power dropped after that reading, so Calvin didn't keep it.";
+
+  async function afterDropHold() {
+    // The other two readings stand; the highest is retaken, drops, is retaken again
+    // and is being power-watched.
+    await toSummary();
+    await find(wrapper, "remove-reading-0").trigger("click");
+    await flushPromises();
+    await find(wrapper, "reading-input").setValue("74");
+    await clickPrimary(wrapper);
+    agent({ status: "error", reason: "power_trouble", fault: FAULT });
+    await settle();
+    await find(wrapper, "reading-input").setValue("60");
+    await clickPrimary(wrapper);
+    agentStep("read", { level: 18, lastWrite: null });
+    await settle();
+    expect(status(wrapper)).toContain("Checking the power at this level");
+  }
+
+  it("Stop during the hold after a drop does not slip on to the next level or a Save-able summary", async () => {
+    await afterDropHold();
+    await find(wrapper, "check-stop").trigger("pointerdown");
+    agent({ status: "stopped", fault: undefined });
+    await settle(HOLD_MS + 2100);
+    expect(find(wrapper, "check-summary").exists()).toBe(false);
+    expect(find(wrapper, "check-save").exists()).toBe(false);
+    expect(find(wrapper, "check-end").exists()).toBe(true);
+  });
+
+  it("a fault just after See the summary discards that reading and returns to it", async () => {
+    await toStep4();
+    await readLevel(10, 2);
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "check-summary").exists()).toBe(true);
+    agent({ fault: { ...FAULT, level: 2 } });
+    await settle();
+    expect(find(wrapper, "check-summary").exists()).toBe(false);
+    expect(status(wrapper)).toContain("Step 4 of 4");
+    expect(find(wrapper, "check-step-body").text()).toContain(KEPT_LEAD);
+    expect(find(wrapper, "level-pair").exists()).toBe(false);
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("a fault on a saved summary changes nothing", async () => {
+    await toSummary();
+    await clickPrimary(wrapper);
+    expect(find(wrapper, "bringing-back").exists()).toBe(true);
+    agent({ fault: { ...FAULT, level: 2 } });
+    await settle();
+    expect(find(wrapper, "check-summary").exists()).toBe(true);
+  });
+
+  it("counts the 10 s power watch from when the agent stops waiting, not from the first report", async () => {
+    wrapper = mountDialog();
+    await flushPromises();
+    agent({ preflight: { status: "settling", faults: [], settleLeft: 20 } });
+    await settle(30000);
+    agent({ preflight: { status: "watching", faults: [] } });
+    await settle();
+    expect(status(wrapper)).toMatch(/Checking the power before changing anything · (10|9|8) s/);
   });
 });
 

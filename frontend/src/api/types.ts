@@ -3186,7 +3186,7 @@ export interface components {
        * Status
        * @enum {string}
        */
-      status: "clean" | "fault" | "settling";
+      status: "clean" | "fault" | "settling" | "watching";
     };
     /** SealedModeBody */
     SealedModeBody: {

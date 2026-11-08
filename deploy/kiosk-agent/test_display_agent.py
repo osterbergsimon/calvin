@@ -5014,3 +5014,76 @@ def test_a_fault_between_steps_is_noticed_within_a_second(tmp_path):
     runner.run()
     assert reports[-1]["reason"] == "power_trouble"
     assert first_report["t"] - fault_at["t"] <= 1.0
+
+
+# -- coordinator review of #337 -------------------------------------------------
+def _after_a_drop(tmp_path):
+    fault = ConsumingFault()
+    ddc = FakeDdc(on_write=_fault_on_write(fault, None, [13]))
+    first, _, clock, ddc, fault = _cal_runner("write", tmp_path, ddc=ddc, fault=fault)
+    first.run()
+    second, reports = _second_run("write", tmp_path, first, fault)
+    return first, second, reports, clock, fault, ddc
+
+
+def test_real_under_voltage_while_waiting_ends_the_run_and_drops_at_once(tmp_path):
+    first, second, reports, clock, fault, ddc = _after_a_drop(tmp_path)
+    began = clock.t
+    original = clock.sleep
+    fired = {}
+
+    def sleep(seconds):
+        original(seconds)
+        if "t" not in fired and clock.t >= began + 3:
+            fired["t"] = clock.t
+            fault.faults.append("Under-voltage detected!")
+
+    second.sleep = sleep
+    writes_before = len(ddc.writes)
+    second.run()
+    assert second.reason == "power_at_idle"
+    assert reports[-1]["status"] == "error"
+    assert reports[-1]["preflight"]["status"] == "fault"
+    assert len(ddc.writes) > writes_before, "the screen was dimmed"
+    assert clock.t - fired["t"] < 10, "did not sit out the whole wait"
+
+
+def test_touch_only_resets_21_and_19_seconds_apart_do_not_fail_the_next_power_check(tmp_path):
+    first, second, reports, clock, fault, ddc = _after_a_drop(tmp_path)
+    began = clock.t
+    resets = [began + 5, began + 26, began + 45]  # gaps of 21 s and 19 s, as on the 3B+
+    original = clock.sleep
+
+    def sleep(seconds):
+        original(seconds)
+        if resets and clock.t >= resets[0]:
+            resets.pop(0)
+            fault.faults.append("usb 1-1.1: reset full-speed USB device")
+
+    second.sleep = sleep
+    second.run()
+    assert second.reason != "power_at_idle"
+    assert agent.AFTER_DROP_QUIET_SECONDS >= 30
+
+
+def test_after_waiting_the_report_says_watching_so_the_dialog_stops_showing_settling(tmp_path):
+    first, second, reports, clock, fault, ddc = _after_a_drop(tmp_path)
+    second.run()
+    kinds = [(r.get("preflight") or {}).get("status") for r in reports]
+    assert "settling" in kinds
+    last_settling = max(i for i, k in enumerate(kinds) if k == "settling")
+    assert kinds[last_settling + 1] == "watching"
+
+
+def test_the_drop_is_written_before_the_blocking_report(tmp_path):
+    order = []
+    fault = ConsumingFault()
+    ddc = ReadingDdc(read=40, on_write=lambda level: order.append(("write", level)))
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "read", tmp_path, level=19, ddc=ddc, fault=fault
+    )
+    runner.report = lambda payload: order.append(("report", bool(payload.get("fault"))))
+    fault.faults.append("Under-voltage detected!")
+    runner._calibration_fault("read", 19, 19, ["Under-voltage detected!"])
+    kinds = [k for k, _ in order]
+    assert kinds.index("write") < kinds.index("report")

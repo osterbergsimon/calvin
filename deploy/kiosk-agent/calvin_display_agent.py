@@ -284,13 +284,16 @@ PREFLIGHT_POLL_SECONDS = 1.0
 # After a power drop the touch controller can keep resetting for a minute or so
 # (calvin-v996). A run that starts inside AFTER_DROP_WINDOW waits until it has
 # been quiet for AFTER_DROP_QUIET, giving up after AFTER_DROP_TIMEOUT so a screen
-# that never settles still gets its honest power check.
+# that never settles still gets its honest power check. The quiet period is clearly
+# longer than the 19-21 s gaps between resets seen on a 3B+ (2026-11-08 14:11-14:12).
 AFTER_DROP_WINDOW_SECONDS = 300.0
-AFTER_DROP_QUIET_SECONDS = 20.0
+AFTER_DROP_QUIET_SECONDS = 35.0
 AFTER_DROP_TIMEOUT_SECONDS = 90.0
 # Between steps the power is checked this often (the config poll stays at 1.5 s),
-# so a drop is noticed in about a second rather than after a whole poll (calvin-puiw).
-FAULT_WATCH_SECONDS = 0.5
+# instead of once per config poll (calvin-puiw). Each check runs journalctl and
+# vcgencmd, so it is kept at about a second to avoid adding load to a supply that
+# is already marginal.
+FAULT_WATCH_SECONDS = 1.0
 CALIBRATION_STEPS = ("detect", "write", "conversion", "read")
 DISPLAY_CHECK_TIMEOUT_SECONDS = 600
 DISPLAY_CHECK_REPORT_PATH = "/api/kiosks/{kiosk_id}/display-check"
@@ -1557,7 +1560,18 @@ class DisplayCheckRunner:
         self._entry("waiting for the touch controller to settle after the power drop")
         while True:
             now = self.clock()
-            if self._polled_faults():
+            lines = self._polled_faults()
+            if lines and _fault_kind(lines) != "touch controller reset":
+                # Real under-voltage (or over-current): the level just set is not
+                # safe. Only a touch-only reset may extend the wait.
+                self.preflight = {"status": "fault", "faults": lines}
+                self.reason = "power_at_idle"
+                self._note_drop()
+                self._entry(f"power trouble while waiting: {'; '.join(lines)}")
+                self._drop_to_floor()
+                self._stop_reason = "error"
+                return False
+            if lines:
                 quiet_since = now
             if now - quiet_since >= AFTER_DROP_QUIET_SECONDS:
                 self._entry(f"quiet for {int(AFTER_DROP_QUIET_SECONDS)} s; checking the power")
@@ -1571,7 +1585,10 @@ class DisplayCheckRunner:
             if self._cancel():
                 return False
             self.sleep(PREFLIGHT_POLL_SECONDS)
-        self.preflight = None
+        # Say so: an omitted preflight would leave the backend showing "settling"
+        # through the whole 10 s watch.
+        self.preflight = {"status": "watching", "faults": []}
+        self.report(self._payload("running"))
         return True
 
     def _watch_power(self):
@@ -1736,8 +1753,10 @@ class DisplayCheckRunner:
     def _calibration_fault(self, step, level, last_good, lines, panel_level=None):
         """A fault in any check step ends the run: one write to the floor, settle, no retry."""
         self._fault_incident(step, level, last_good, lines, panel_level)
-        self.report(self._payload("running"))
+        # Dim first: the report below is a network call (up to HTTP_TIMEOUT), and
+        # on a 3B+ the Ethernet port shares the USB bus that is resetting.
         self._drop_to_floor()
+        self.report(self._payload("running"))
         self._entry("waiting for the power to settle")
         self._settle()
         self._stop_reason = "error"

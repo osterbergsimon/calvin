@@ -21,7 +21,9 @@ The two signs mean different things, and Calvin reports them separately.
 - **Under-voltage** (`Under-voltage detected!`, or bit `0x1` in `vcgencmd get_throttled`): the Pi's own 5 V rail sagged. The Pi's supply or cable, or the panel drawing from the Pi, is the cause.
 - **Touch-only reset** (`usb 1-1.1: reset full-speed USB device` with no under-voltage line): only the panel's USB link dropped. It can happen when the panel's own supply sags at a high backlight level, even though the Pi stayed healthy. The touch stops for a moment, then comes back, and it can repeat for a minute or so.
 
-A touch-only reset still counts as power trouble, because the cure is the same. Calvin waits for it to stop before it starts another check. After a drop, the next check shows "Waiting for the touch controller to settle", and starts once the touch controller has been quiet for 20 s (it gives up waiting after 90 s and checks the power as usual).
+Real under-voltage is different: if the level you just set still browns out the Pi, Calvin dims the screen and ends the check at once instead of waiting.
+
+A touch-only reset still counts as power trouble, because the cure is the same. Calvin waits for it to stop before it starts another check. After a drop, the next check shows "Waiting for the touch controller to settle", and starts once the touch controller has been quiet for 35 s (it gives up waiting after 90 s and checks the power as usual).
 
 ## How to tell it happened
 
