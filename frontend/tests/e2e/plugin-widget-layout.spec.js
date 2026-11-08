@@ -421,7 +421,7 @@ test("Yr with no current conditions still fills its region", async ({ page }) =>
   const widget = widgetOverrides("yr", hits);
   const base = WIDGETS.yr.data;
   const original = widget.overrides.find(([re]) => re.test("/api/plugins/inst-yr/data"));
-  original[1] = (route, ctx) => {
+  original[1] = route => {
     hits.data += 1;
     const body = base();
     delete body.current;
