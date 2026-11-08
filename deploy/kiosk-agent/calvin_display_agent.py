@@ -1303,6 +1303,26 @@ def post_display_check(backend_url, payload, *, kiosk_id=None, opener=None):
         return False
 
 
+def post_screen_sleep(backend_url, *, opener=None):
+    """Tell the server this kiosk's screen went to sleep (calvin-q4o8).
+
+    The server then ends the kiosk's admin sessions, so a signed-in Settings page
+    does not wait on the screen for the next visitor. Never raises.
+    """
+    kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
+    if not kiosk_id:
+        return False
+    opener = opener or urllib.request
+    url = backend_url.rstrip("/") + f"/api/kiosks/{urllib.parse.quote(kiosk_id)}/screen-sleep"
+    request = urllib.request.Request(url, data=b"", method="POST")
+    try:
+        with opener.urlopen(request, timeout=HTTP_TIMEOUT) as response:
+            return 200 <= getattr(response, "status", 200) < 300
+    except (OSError, ValueError) as e:
+        log(f"screen sleep: report failed ({e})")
+        return False
+
+
 def _json_state_path(state_dir, name):
     return os.path.join(state_dir, name)
 
@@ -2594,6 +2614,8 @@ def run(
                 )
             if prev != last:
                 log(f"display -> {'ON' if last else 'OFF'}")
+                if last is False:
+                    post_screen_sleep(backend_url)
             secs = seconds_to_next_boundary(cfg, now)
             delay = (
                 refresh_seconds if secs is None else max(1, min(secs, refresh_seconds))

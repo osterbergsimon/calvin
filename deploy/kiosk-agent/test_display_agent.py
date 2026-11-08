@@ -387,6 +387,48 @@ def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):
     assert slept == [900]  # capped by refresh, not 7h
 
 
+def test_run_tells_the_server_when_the_screen_goes_to_sleep(monkeypatch):
+    """calvin-q4o8: a sleeping screen ends its kiosk's admin sessions."""
+    cfg = _cfg()
+    times = iter(
+        [
+            datetime(2026, 7, 11, 12, 0),  # on
+            datetime(2026, 7, 11, 23, 0),  # off: the transition
+            datetime(2026, 7, 11, 23, 5),  # still off: no second report
+            datetime(2026, 7, 12, 7, 0),  # on again: nothing to report
+        ]
+    )
+    monkeypatch.setattr(agent, "now_in", lambda c: next(times))
+    monkeypatch.setattr(agent, "apply_on", lambda on: "test")
+    reported = []
+    monkeypatch.setattr(agent, "post_screen_sleep", lambda url: reported.append(url))
+    agent.run(
+        "http://x",
+        900,
+        fetch=lambda url: cfg,
+        sleep=lambda s: None,
+        iterations=4,
+    )
+    assert reported == ["http://x"]
+
+
+def test_post_screen_sleep_posts_to_the_kiosk_and_never_raises(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "hall-1")
+    seen = {}
+
+    class Opener:
+        @staticmethod
+        def urlopen(request, timeout=None):
+            seen["url"] = request.full_url
+            seen["method"] = request.get_method()
+            raise OSError("server down")
+
+    assert agent.post_screen_sleep("http://s:8000/", opener=Opener) is False
+    assert seen == {"url": "http://s:8000/api/kiosks/hall-1/screen-sleep", "method": "POST"}
+    monkeypatch.delenv("CALVIN_KIOSK_ID")
+    assert agent.post_screen_sleep("http://s:8000", opener=Opener) is False
+
+
 def test_main_uses_default_refresh_unless_overridden(monkeypatch):
     seen = []
     monkeypatch.setenv("CALVIN_BACKEND_URL", "http://x")
