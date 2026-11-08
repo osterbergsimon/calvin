@@ -37,7 +37,7 @@ ExecStartPre=/bin/bash -c 'rm -rf /home/calvin/.config/calvin-kiosk-chromium/Def
 # (Trixie ships 156) ignores the debugging port on the default profile, so the
 # kiosk runs a dedicated one - never the user's browser profile.
 ExecStart=/bin/bash -c 'q=""; \
-    [ -n "${CALVIN_KIOSK_ID:-}" ] && q="kiosk=${CALVIN_KIOSK_ID}"; \
+    if [ -n "${CALVIN_KIOSK_ID:-}" ]; then q="kiosk=${CALVIN_KIOSK_ID}"; else q="display=kiosk"; fi; \
     [ -n "${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=${CALVIN_KIOSK_HOSTNAME}"; \
     url="$${CALVIN_BACKEND_URL%%/}/$${q:+?$${q}}"; \
     /usr/bin/chromium \

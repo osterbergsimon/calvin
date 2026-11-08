@@ -35,7 +35,13 @@
         :message="schema.empty_text || 'Nothing planned.'"
       />
     </Card>
-    <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
+    <HandoffOverlay
+      v-if="overlay?.kind === 'handoff'"
+      :url="overlay.url"
+      :embed-refused="Boolean(overlay.embedRefused)"
+      @close="closeOverlay"
+      @embed="openEmbedded"
+    />
     <EmbedOverlay
       v-else-if="overlay?.kind === 'embed'"
       :url="overlay.url"
@@ -62,9 +68,8 @@ const props = defineProps({
   linkAction: { type: String, default: null },
 });
 
-const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useLinkOpen(
-  () => props.linkAction
-);
+const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff, openEmbedded } =
+  useLinkOpen(() => props.linkAction);
 
 const gridEl = ref(null);
 const { clampStyle, shadeClass } = useFitScroll(gridEl, {

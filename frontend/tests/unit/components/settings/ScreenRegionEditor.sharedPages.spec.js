@@ -441,7 +441,7 @@ describe("Pages & regions shared-pages copy", () => {
     const { w } = await mountEditor();
     expect(w.text()).toContain("Pages are shared by your screens");
     expect(w.find('[data-test="stage-caption"]').text()).toBe(
-      "Drag regions to swap them, dividers to resize, the clock bar to reposition"
+      "Drag dividers to resize, the clock bar to reposition"
     );
     expect(w.find(".pill__label").text()).toBe("Browsers & new screens");
   });
