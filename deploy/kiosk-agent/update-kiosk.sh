@@ -30,6 +30,7 @@ NM_CONF_DIR="${CALVIN_NM_CONF_DIR:-/etc/NetworkManager/conf.d}"
 SYS_NET_DIR="${CALVIN_SYS_NET_DIR:-/sys/class/net}"
 NMCLI="${CALVIN_NMCLI:-nmcli}"
 IW="${CALVIN_IW:-iw}"
+APT_GET="${CALVIN_APT_GET:-apt-get}"
 WIFI_IFACE="${CALVIN_WIFI_IFACE:-wlan0}"
 BIN_DIR="${CALVIN_BIN_DIR:-/usr/local/bin}"
 LABWC_DIR="${CALVIN_LABWC_DIR:-/home/calvin/.config/labwc}"
@@ -312,6 +313,16 @@ ensure_agent_runtime_dir
 # conf.d drop-in; others get a oneshot unit running iw. Runs on every update and
 # at bootstrap; unchanged config is left alone, and a failure never blocks the
 # update. Kiosks without a wireless interface are untouched.
+# The 3B+ (and any image without it) has no iw: the agent could not read the radio's
+# state and the oneshot fallback would fail. Install it once, best effort and
+# bounded; offline or locked apt just leaves the status honest ("configured").
+ensure_iw() {
+  command -v "$IW" >/dev/null 2>&1 && return 0
+  command -v "$APT_GET" >/dev/null 2>&1 || return 0
+  log "iw is not installed; trying to install it"
+  DEBIAN_FRONTEND=noninteractive timeout 120 "$APT_GET" install -y -qq iw >/dev/null 2>&1 \
+    || log "could not install iw; the Wi-Fi power-save state will read as configured, not verified"
+}
 wifi_powersave_off_now() {
   if command -v "$IW" >/dev/null 2>&1; then
     "$IW" dev "$WIFI_IFACE" set power_save off 2>/dev/null \
@@ -322,6 +333,7 @@ wifi_powersave_off_now() {
 }
 ensure_wifi_powersave_off() {
   [ -d "${SYS_NET_DIR}/${WIFI_IFACE}/wireless" ] || return 0
+  ensure_iw
   local want have unit
   if command -v "$NMCLI" >/dev/null 2>&1 && "$SYSTEMCTL" is-active --quiet NetworkManager.service 2>/dev/null; then
     want=$'[connection]\nwifi.powersave = 2\n'
@@ -354,10 +366,15 @@ WantedBy=multi-user.target"
     mkdir -p "$SYSTEMD_DIR" && printf '%s\n' "$want" > "$unit" \
       || { log "could not write ${unit}; Wi-Fi power save stays as it is"; return 0; }
     "$SYSTEMCTL" daemon-reload || true
-    "$SYSTEMCTL" enable calvin-wifi-powersave.service || log "enable failed: calvin-wifi-powersave.service"
-    "$SYSTEMCTL" start calvin-wifi-powersave.service || log "Wi-Fi power save could not be switched off now (iw missing?)"
     log "Wi-Fi power save disabled by ${unit}"
   fi
+  # Whether or not the file changed: a oneshot that failed last time (no iw yet)
+  # must be tried again, and an enabled-but-stopped one started.
+  "$SYSTEMCTL" is-enabled --quiet calvin-wifi-powersave.service 2>/dev/null \
+    || "$SYSTEMCTL" enable calvin-wifi-powersave.service || log "enable failed: calvin-wifi-powersave.service"
+  "$SYSTEMCTL" is-active --quiet calvin-wifi-powersave.service 2>/dev/null \
+    || "$SYSTEMCTL" start calvin-wifi-powersave.service \
+    || log "Wi-Fi power save could not be switched off now (no iw?); it will be retried on the next update"
 }
 ensure_wifi_powersave_off || true
 

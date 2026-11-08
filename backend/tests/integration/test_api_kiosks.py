@@ -444,3 +444,16 @@ def test_install_script_503_on_broken_checkout(test_client: TestClient):
     with patch.object(kiosk_bundle.settings, "repo_dir", Path("/nonexistent-checkout")):
         r = test_client.get("/api/kiosks/install.sh")
     assert r.status_code == 503
+
+
+@pytest.mark.integration
+def test_wifi_power_save_configured_and_cleared_when_the_kiosk_goes_wired(test_client: TestClient):
+    def state():
+        listed = test_client.get("/api/kiosks").json()["kiosks"]
+        return next(k for k in listed if k["id"] == "hall-wired")["wifiPowerSave"]
+
+    test_client.get("/api/kiosks/hall-wired/config?khost=pi&kwifi=configured")
+    assert state() == "configured"
+    # Moved to Ethernet: the agent says "none", and the stale state goes.
+    test_client.get("/api/kiosks/hall-wired/config?khost=pi&kwifi=none")
+    assert state() is None

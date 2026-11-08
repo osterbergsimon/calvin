@@ -1303,17 +1303,25 @@ def post_display_check(backend_url, payload, *, kiosk_id=None, opener=None):
         return False
 
 
+# A failed sleep report is retried on the next polls, a few times: the server is
+# often briefly unreachable exactly when a screen goes to sleep.
+SCREEN_SLEEP_ATTEMPTS = 5
+
+
 def post_screen_sleep(backend_url, *, opener=None):
     """Tell the server this kiosk's screen went to sleep (calvin-q4o8).
 
     The server then ends the kiosk's admin sessions, so a signed-in Settings page
-    does not wait on the screen for the next visitor. Never raises.
+    does not wait on the screen for the next visitor. A kiosk with an id reports
+    to its own route; the all-in-one display (no id) to the local one. Never raises.
     """
     kiosk_id = os.environ.get("CALVIN_KIOSK_ID", "").strip()
-    if not kiosk_id:
-        return False
+    base = backend_url.rstrip("/")
+    if kiosk_id:
+        url = f"{base}/api/kiosks/{urllib.parse.quote(kiosk_id)}/screen-sleep"
+    else:
+        url = f"{base}/api/screen-sleep"
     opener = opener or urllib.request
-    url = backend_url.rstrip("/") + f"/api/kiosks/{urllib.parse.quote(kiosk_id)}/screen-sleep"
     request = urllib.request.Request(url, data=b"", method="POST")
     try:
         with opener.urlopen(request, timeout=HTTP_TIMEOUT) as response:
@@ -2420,16 +2428,27 @@ def update_report(state_dir=STATE_DIR):
     return status, (str(message)[:255] if message else None)
 
 
-def wifi_power_save_state(sys_net="/sys/class/net", iface="wlan0", run=subprocess.run):
+WIFI_POWERSAVE_MARKERS = (
+    "/etc/NetworkManager/conf.d/calvin-wifi-powersave.conf",
+    "/etc/systemd/system/calvin-wifi-powersave.service",
+)
+
+
+def wifi_power_save_state(
+    sys_net="/sys/class/net", iface="wlan0", run=subprocess.run, markers=WIFI_POWERSAVE_MARKERS
+):
     """Wi-Fi power saving on `iface` as the kiosk status reports it (calvin-grwq).
 
     None: no wireless interface (wired kiosk), nothing to report.
     "off" / "on": what the radio says right now (`iw dev <iface> get power_save`).
-    "unknown": there is a radio but its state cannot be read (iw missing).
+    "configured": the radio's state cannot be read (no iw) but the updater has set
+    power save off for it (NetworkManager drop-in or the iw oneshot): set, not verified.
+    "unknown": there is a radio, nothing reads its state and nothing was set.
     A power-saving radio can drop broadcast ARP, so "on" is worth a warning.
     """
     if not os.path.isdir(os.path.join(sys_net, iface, "wireless")):
         return None
+    unreadable = "configured" if any(os.path.exists(m) for m in markers) else "unknown"
     try:
         out = run(
             ["iw", "dev", iface, "get", "power_save"],
@@ -2438,11 +2457,11 @@ def wifi_power_save_state(sys_net="/sys/class/net", iface="wlan0", run=subproces
             timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
-        return "unknown"
+        return unreadable
     if out.returncode != 0:
-        return "unknown"
+        return unreadable
     match = re.search(r"power save:\s*(on|off)", out.stdout or "", re.IGNORECASE)
-    return match.group(1).lower() if match else "unknown"
+    return match.group(1).lower() if match else unreadable
 
 
 def _config_url(
@@ -2482,7 +2501,9 @@ def fetch_config(backend_url, kstat=None, kmsg=None, timeout=HTTP_TIMEOUT):
         kstat=kstat,
         kmsg=kmsg,
         kstack=display_stack(),
-        kwifi=wifi_power_save_state(),
+        # "none" tells the server there is no Wi-Fi (any more): a kiosk moved to
+        # Ethernet must not keep showing a stale Wi-Fi state.
+        kwifi=wifi_power_save_state() or "none",
     )
     with urllib.request.urlopen(url, timeout=timeout) as r:
         cfg = json.load(r)
@@ -2516,6 +2537,7 @@ def run(
         apply_device = apply_device_physical
     controller = brightness
     last = None
+    sleep_attempts = 0  # screen-sleep reports still to try (calvin-q4o8)
     last_version = _UNSET
     update_state = {"attempted": set()}
     check_thread = None
@@ -2614,8 +2636,9 @@ def run(
                 )
             if prev != last:
                 log(f"display -> {'ON' if last else 'OFF'}")
-                if last is False:
-                    post_screen_sleep(backend_url)
+                sleep_attempts = SCREEN_SLEEP_ATTEMPTS if last is False else 0
+            if sleep_attempts > 0 and last is False:
+                sleep_attempts = 0 if post_screen_sleep(backend_url) else sleep_attempts - 1
             secs = seconds_to_next_boundary(cfg, now)
             delay = (
                 refresh_seconds if secs is None else max(1, min(secs, refresh_seconds))

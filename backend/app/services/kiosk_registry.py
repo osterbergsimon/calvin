@@ -89,8 +89,9 @@ def _normalized_display_stack(stack: str | None) -> str | None:
 
 
 # What the agent can report about Wi-Fi power saving (calvin-grwq). "on" is the
-# unwanted state; "unknown" means a radio whose state the agent could not read.
-WIFI_POWER_SAVE_STATES: tuple[str, ...] = ("on", "off", "unknown")
+# unwanted state; "configured" means set off but not verifiable (no iw); "unknown"
+# a radio nothing could read; "none" no Wi-Fi (any more), which clears an old state.
+WIFI_POWER_SAVE_STATES: tuple[str, ...] = ("on", "off", "configured", "unknown", "none")
 
 
 def _normalized_wifi_power_save(value: str | None) -> str | None:
@@ -332,7 +333,7 @@ async def list_kiosks() -> list[dict]:
             "overrides": public_overrides(row.overrides),
             "viewport": _normalized_viewport(row.viewport),
             "displayStack": row.display_stack,
-            "wifiPowerSave": row.wifi_power_save,
+            "wifiPowerSave": None if row.wifi_power_save == "none" else row.wifi_power_save,
             "displayCheck": display_check.findings_view(row.display_check_findings),
             "displayCheckActive": bool(
                 (display_check.view_of(row.display_check) or {}).get("active")
