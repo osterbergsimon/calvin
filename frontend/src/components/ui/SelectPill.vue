@@ -223,6 +223,8 @@ const onListKey = e => {
     if (option) choose(option.value);
   } else if (e.key === "Escape") {
     e.preventDefault();
+    // Closes the menu only: an enclosing popover or dialog stays open.
+    e.stopPropagation();
     close();
   }
 };
@@ -255,6 +257,8 @@ const onSearchKey = e => {
     if (option) choose(option.value);
   } else if (e.key === "Escape") {
     e.preventDefault();
+    // Closes the menu only: an enclosing popover or dialog stays open.
+    e.stopPropagation();
     close();
   }
 };

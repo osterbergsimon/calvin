@@ -3,6 +3,7 @@ import { useModeStore } from "../stores/mode";
 import { useCalendarStore } from "../stores/calendar";
 import { useImagesStore } from "../stores/images";
 import { useWebServicesStore } from "../stores/webServices";
+import { useServiceDataRefresh } from "./useServiceDataRefresh";
 import { useConfigStore } from "../stores/config";
 import { useActiveRegionStore } from "../stores/activeRegion";
 import { useProgressStore } from "../stores/progress";
@@ -38,6 +39,7 @@ export function useKeyboardActions() {
   const calendarStore = useCalendarStore();
   const imagesStore = useImagesStore();
   const webServicesStore = useWebServicesStore();
+  const refreshServiceData = useServiceDataRefresh();
   const progressStore = useProgressStore();
   const configStore = useConfigStore();
   const activeRegionStore = useActiveRegionStore();
@@ -839,7 +841,12 @@ export function useKeyboardActions() {
           const region = getActiveRegion();
           const serviceId =
             region?.kind === "service" ? region.instanceIds?.[0] || region.serviceId || null : null;
-          modeStore.enterFullscreen(modeStore.MODES.WEB_SERVICES, serviceId ? { serviceId } : null);
+          // The region's view (Card size, Link behavior) goes along, as for a calendar.
+          const view = region?.kind === "service" ? (region.view ?? null) : null;
+          modeStore.enterFullscreen(
+            modeStore.MODES.WEB_SERVICES,
+            serviceId ? { serviceId, view } : null
+          );
           router.push("/");
         }
         break;
@@ -869,7 +876,12 @@ export function useKeyboardActions() {
           activeRegionKindIs("service")
         ) {
           progressStore
-            .track("plugin:refresh:keyboard", () => webServicesStore.refreshCurrentService())
+            .track("plugin:refresh:keyboard", () => {
+              const region = getActiveRegion();
+              const serviceId =
+                region?.kind === "service" ? region.instanceIds?.[0] || region.serviceId : null;
+              return refreshServiceData(serviceId || null);
+            })
             .catch(err => {
               logError("[Keyboard]", "Failed to refresh service:", err);
             });

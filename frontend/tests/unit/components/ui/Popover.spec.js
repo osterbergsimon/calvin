@@ -151,6 +151,32 @@ describe("Popover", () => {
     expect(w.emitted("close")).toBeUndefined();
   });
 
+  it("Escape inside a nested select does not also close the popover", async () => {
+    // The select closes its own menu on Escape and stops the key there.
+    const { default: SelectPill } = await import("@/components/ui/SelectPill.vue");
+    const w = mount(
+      {
+        components: { Popover, SelectPill },
+        data: () => ({ open: true, size: "medium" }),
+        template:
+          "<Popover v-model=\"open\"><SelectPill v-model=\"size\" :options=\"[{value:'small',label:'Small'},{value:'medium',label:'Medium'}]\" aria-label=\"Size\" /></Popover>",
+      },
+      { attachTo: document.body }
+    );
+    wrappers.push(w);
+    await nextTick();
+    document.querySelector("button.pill").click();
+    await nextTick();
+    const list = document.querySelector('[role="listbox"]');
+    expect(list).not.toBeNull();
+    list.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+    );
+    await nextTick();
+    expect(w.vm.open).toBe(true);
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+  });
+
   it("does not close when the panel itself is poked", async () => {
     const w = mountPopover({ modelValue: true }, document.body);
     await nextTick();

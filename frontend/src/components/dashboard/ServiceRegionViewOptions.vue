@@ -38,9 +38,8 @@
 
 <script setup>
 import { computed } from "vue";
-import { useQueryClient } from "@tanstack/vue-query";
 import { useConfigStore } from "@/stores/config";
-import { useWebServicesStore } from "@/stores/webServices";
+import { useServiceDataRefresh } from "@/composables/useServiceDataRefresh";
 import { useProgressStore } from "@/stores/progress";
 import RegionViewOptions from "./RegionViewOptions.vue";
 import Button from "@/components/ui/Button.vue";
@@ -57,23 +56,16 @@ const props = defineProps({
   view: { type: Object, default: () => ({}) },
 });
 
-const queryClient = useQueryClient();
 const hasCardSize = computed(() => props.kind === "card-grid");
 
 const configStore = useConfigStore();
-const webServicesStore = useWebServicesStore();
+const refreshServiceData = useServiceDataRefresh();
 const progressStore = useProgressStore();
 const refreshNow = () => {
   progressStore
     .track(
       `plugin:refresh:${props.regionId || "fullscreen"}`,
-      async () => {
-        await webServicesStore.refreshCurrentService();
-        // The widget's payload lives in its own query (useSchemaData), which the
-        // service list refresh does not touch.
-        const key = props.serviceId ? ["plugin-data", props.serviceId] : ["plugin-data"];
-        await queryClient.refetchQueries({ queryKey: key });
-      },
+      () => refreshServiceData(props.serviceId),
       { regionId: props.regionId || null }
     )
     .catch(err => {

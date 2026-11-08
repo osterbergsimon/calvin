@@ -387,3 +387,63 @@ test.describe("design review: nothing hugs the top of a tall surface", () => {
     for (const px of sizes) expect(px).toBeGreaterThanOrEqual(9.9);
   });
 });
+
+test.describe("keyboard-only devices: the fit clamp releases when the region grows", () => {
+  for (const key of ["mealie", "sl", "yr"]) {
+    test(`${WIDGETS[key].label} refills a region that grows`, async ({ page }) => {
+      const hits = { data: 0 };
+      const widget = widgetOverrides(key, hits);
+      widget.config.touchControls = "off";
+      await page.setViewportSize({ width: 1000, height: 800 });
+      await installApiMock(page, { config: widget.config, overrides: widget.overrides });
+      await page.goto("/");
+      await page.waitForLoadState("networkidle");
+      await expect(page.locator(WIDGETS[key].unit).first()).toBeVisible();
+      await page.waitForTimeout(300);
+      // The region grows (a flow header hiding, a rotated screen, a bigger window).
+      await page.setViewportSize({ width: 1600, height: 1300 });
+      await page.waitForTimeout(700);
+      const m = await measure(page, WIDGETS[key].unit);
+      const bottom = Math.max(...m.units.map(u => Math.min(u.bottom, m.body.bottom)));
+      expect(bottom, "content reaches the grown region's bottom").toBeGreaterThanOrEqual(
+        m.body.bottom - 40
+      );
+      const right = Math.max(...m.units.map(u => Math.min(u.right, m.body.right)));
+      expect(right, "content reaches the grown region's right edge").toBeGreaterThanOrEqual(
+        m.body.right - 40
+      );
+    });
+  }
+});
+
+test("Yr with no current conditions still fills its region", async ({ page }) => {
+  const hits = { data: 0 };
+  const widget = widgetOverrides("yr", hits);
+  const base = WIDGETS.yr.data;
+  const original = widget.overrides.find(([re]) => re.test("/api/plugins/inst-yr/data"));
+  original[1] = (route, ctx) => {
+    hits.data += 1;
+    const body = base();
+    delete body.current;
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+  };
+  await page.setViewportSize(SIZES.large);
+  await installApiMock(page, { config: widget.config, overrides: widget.overrides });
+  await page.goto("/");
+  await page.waitForLoadState("networkidle");
+  await expect(page.locator(".weather-forecast-renderer__item").first()).toBeVisible();
+  await page.waitForTimeout(300);
+  const g = await page.evaluate(() => {
+    const r = sel => document.querySelector(sel).getBoundingClientRect();
+    return { body: r(".dashboard-panel__body"), item: r(".weather-forecast-renderer__item") };
+  });
+  const centre = (g.item.top + g.item.bottom) / 2;
+  const bodyCentre = (g.body.top + g.body.bottom) / 2;
+  expect(Math.abs(centre - bodyCentre), "forecast sits mid-region, not at the top").toBeLessThan(
+    g.body.height * 0.2
+  );
+});

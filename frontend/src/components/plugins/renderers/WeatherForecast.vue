@@ -3,7 +3,10 @@
     v-if="data && !data.error"
     ref="rootEl"
     class="weather-forecast-renderer"
-    :class="{ 'weather-forecast-renderer--compact': compact }"
+    :class="{
+      'weather-forecast-renderer--compact': compact,
+      'weather-forecast-renderer--forecast-only': !current,
+    }"
   >
     <div v-if="current" class="weather-forecast-renderer__current">
       <div class="weather-forecast-renderer__main">
@@ -311,6 +314,17 @@ function capitalize(value) {
   overflow: hidden;
   border-top: 1px solid var(--line-soft);
   padding-top: var(--gap-4);
+}
+
+/* No current conditions: the forecast is all there is, so it takes the region and
+   centres its strip instead of sitting at the top of it. */
+.weather-forecast-renderer--forecast-only .weather-forecast-renderer__forecast {
+  flex: 1 0 auto;
+  border-top: 0;
+}
+.weather-forecast-renderer--forecast-only .weather-forecast-renderer__items {
+  flex: 1;
+  align-content: center;
 }
 
 .weather-forecast-renderer__forecast h4 {
