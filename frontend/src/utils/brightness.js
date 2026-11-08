@@ -75,10 +75,9 @@ export function readingsOutlier(readings) {
 /**
  * The highest Calvin value the slider can reach: the limit itself. The limit is
  * the ceiling (the highest reading is already one step below the cut-out), so
- * nothing is subtracted. `step` stays in the signature for callers.
+ * nothing is subtracted.
  */
-// eslint-disable-next-line no-unused-vars
-export function maxPickable(limit, step = DEFAULT_STEP) {
+export function maxPickable(limit) {
   if (limit === null || limit === undefined) return 100;
   return Math.max(0, Number(limit));
 }
@@ -120,7 +119,7 @@ export function calibrationPoints(start) {
 }
 
 /** The optional third reading, at the top of a known limit. Null without a limit. */
-export function thirdReadingPoint(limit, step = DEFAULT_STEP) {
+export function thirdReadingPoint(limit) {
   if (limit === null || limit === undefined) return null;
   return maxPickable(limit);
 }

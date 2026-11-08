@@ -69,10 +69,10 @@ describe("readingsOutlier", () => {
 
 describe("limits", () => {
   it("allows the limit itself, whatever the step", () => {
-    expect(maxPickable(26, 2)).toBe(26);
-    expect(maxPickable(26, 3)).toBe(26);
-    expect(maxPickable(null, 2)).toBe(100);
-    expect(maxPickable(3, 2)).toBe(3);
+    expect(maxPickable(26)).toBe(26);
+    expect(maxPickable(26)).toBe(26);
+    expect(maxPickable(null)).toBe(100);
+    expect(maxPickable(3)).toBe(3);
   });
   it("starts at the lower of the limit and 20", () => {
     expect(firstBrightness(26, 2)).toBe(20);
@@ -86,8 +86,8 @@ describe("limits", () => {
     expect(calibrationPoints(1)).toEqual({ first: 1, second: 0, room: false });
   });
   it("puts the optional third reading at the limit", () => {
-    expect(thirdReadingPoint(26, 2)).toBe(26);
-    expect(thirdReadingPoint(null, 2)).toBeNull();
+    expect(thirdReadingPoint(26)).toBe(26);
+    expect(thirdReadingPoint(null)).toBeNull();
   });
   it("offers the fault limit one step under the lower of the last good level and the fault", () => {
     expect(faultLimit({ level: 12, lastGood: 14 }, 2)).toBe(10);

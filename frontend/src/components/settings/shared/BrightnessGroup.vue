@@ -256,7 +256,7 @@ const readings = computed(() => props.overrides.brightnessConversion ?? []);
 const fit = computed(() => fitConversion(readings.value));
 const sleepMode = computed(() => props.overrides.sleepMode ?? "standby");
 
-const maxDdc = computed(() => maxPickable(limit.value, step.value));
+const maxDdc = computed(() => maxPickable(limit.value));
 const brightness = computed(() =>
   Math.min(maxDdc.value, props.overrides.brightness ?? firstBrightness(limit.value, step.value))
 );
