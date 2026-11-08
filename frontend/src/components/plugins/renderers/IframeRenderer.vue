@@ -198,16 +198,13 @@ onUnmounted(() => {
   bottom: var(--gap-3);
   z-index: var(--z-raised);
   box-shadow: var(--elev-1);
+  transition: opacity var(--dur) var(--ease);
 }
 
 /* Hidden at rest: the frame is a permanent display, so nothing sits over it. */
 .iframe-renderer__qr--hidden {
   opacity: 0;
-  visibility: hidden;
   pointer-events: none;
-  transition:
-    opacity var(--dur) var(--ease),
-    visibility 0s linear var(--dur);
 }
 
 .iframe-renderer__frame--error {
