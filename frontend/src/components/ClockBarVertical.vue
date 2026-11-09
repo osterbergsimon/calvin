@@ -188,7 +188,10 @@ const screens = computed(() =>
       ]
     : screensConfig.value.screens
 );
-const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
+// The dot follows the tap at once (pending target), not the finished patch.
+const activeScreenId = computed(
+  () => configStore.displayedScreenId ?? getActiveDashboardScreen(screensConfig.value)?.id ?? null
+);
 const roomLabel = computed(() => (props.sample ? "Kitchen" : ""));
 // The side bar draws a non-stacked date vertically when the time is stacked.
 const compactDate = computed(() => bar.value.parts?.time?.style === "stacked");

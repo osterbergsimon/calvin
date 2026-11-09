@@ -36,9 +36,6 @@ export const SCREEN_SWITCH_TIMING = Object.freeze({
   // A switch is a held interaction: show long enough to read, but not the full
   // 800 ms a background fetch earns.
   minVisibleMs: 300,
-  // A device whose last switch settled faster than this does not need a light
-  // for the next one.
-  fastSettleMs: 150,
 });
 
 /** Frame id of the whole-dashboard light. Region frames use the region id. */
