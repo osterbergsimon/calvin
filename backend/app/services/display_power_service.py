@@ -12,6 +12,7 @@ except ImportError:
 
 from loguru import logger
 
+from app.security.admin_auth import lock_kiosk_sessions, set_kiosk_idle_seconds
 from app.services.config_service import config_service
 from app.utils.host_control import host_control_enabled
 from app.utils.platform import has_x11, is_raspberry_pi, run_command
@@ -274,6 +275,8 @@ class DisplayPowerService:
         if not host_control_enabled():
             logger.debug("CALVIN_HOST_CONTROL is off - not turning the display off")
             return
+        # A sleeping screen ends the all-in-one kiosk's admin sessions (calvin-q4o8).
+        lock_kiosk_sessions(None)
         # Set up X11 environment
         x11_env = {
             "DISPLAY": ":0",
@@ -361,6 +364,10 @@ class DisplayPowerService:
             timeout_enabled: Whether timeout is enabled
             timeout_seconds: Timeout in seconds (0 = never)
         """
+        # The screen sleeps after this long without input, so a kiosk admin session
+        # must not outlive it (calvin-q4o8). Set whatever the display stack.
+        enabled = timeout_enabled is True and timeout_seconds is not None and timeout_seconds > 0
+        set_kiosk_idle_seconds(timeout_seconds if enabled else None)
         # Set up X11 environment
         x11_env = {
             "DISPLAY": ":0",

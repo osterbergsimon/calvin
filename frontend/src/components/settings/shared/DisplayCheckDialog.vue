@@ -257,17 +257,15 @@
             aria-label="Brightness shown in the panel's own menu"
             @keyup.enter="ui.primary?.run()"
           />
-          <a
+          <ExternalLink
             v-if="ui.primary?.href"
             class="dcheck__fix dcheck__fix--primary"
             data-primary="true"
             :data-test="ui.primary.test || 'check-primary'"
             :href="ui.primary.href"
-            target="_blank"
-            rel="noopener"
           >
             {{ ui.primary.label }}
-          </a>
+          </ExternalLink>
           <Button
             v-else-if="ui.primary"
             variant="primary"
@@ -282,16 +280,14 @@
         </div>
         <div v-if="ui.secondary?.length" class="dcheck__secondary">
           <template v-for="item in ui.secondary" :key="item.test">
-            <a
+            <ExternalLink
               v-if="item.href"
               class="dcheck__fix"
               :data-test="item.test"
               :href="item.href"
-              target="_blank"
-              rel="noopener"
             >
               {{ item.label }}
-            </a>
+            </ExternalLink>
             <Button
               v-else
               :variant="item.plain ? 'secondary' : 'link'"
@@ -327,6 +323,7 @@
 </template>
 
 <script setup>
+import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { computed, nextTick, onBeforeUnmount, ref, toRef, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
 import Dialog from "@/components/ui/Dialog.vue";
@@ -1092,6 +1089,7 @@ function onRun(current) {
     }
   }
   if (!current.active) return onRunEnded(current);
+  followRecap(current);
   if (!awaiting) return;
   const result = current.steps?.[awaiting.step];
   if (!result) return;
@@ -1111,6 +1109,21 @@ function onRun(current) {
   const done = awaiting;
   clearAwaiting();
   onStepResult(done.step, result, done.value);
+}
+
+// The agent re-caps the panel when the limit is lowered while a low level stands
+// (calvin-8ck0) and says so with a running update, not a new result. The menu number
+// the person types is read at that new level, so the pair must use it: follow the
+// run's level while the fallback waits for the number, and drop a number typed
+// before the move.
+function followRecap(current) {
+  if (fbPhase.value !== "ask") return;
+  const level = Number(current.level);
+  const written = fbWritten.value[fbIndex.value];
+  if (!Number.isFinite(level) || written === null || level === written) return;
+  if (level > written) return; // only ever lower: the check never brightens
+  fbWritten.value = fbWritten.value.map((n, i) => (i === fbIndex.value ? level : n));
+  readingText.value = "";
 }
 
 watch(() => check.run.value, onRun);

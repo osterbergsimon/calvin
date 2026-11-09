@@ -8,7 +8,13 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from app.api.routes.config import ConfigUpdate, build_global_config
-from app.security.route_policy import KIOSK_SELF_WRITE_KEYS, is_admin
+from app.security.admin_auth import lock_kiosk_sessions
+from app.security.route_policy import (
+    KIOSK_SELF_WRITE_KEYS,
+    direct_peer_ip,
+    is_admin,
+    is_loopback_peer,
+)
 from app.services import display_check, kiosk_bundle, kiosk_registry
 from app.services.kiosk_registry import (
     _KIOSK_ID_RE,
@@ -301,6 +307,9 @@ async def change_display_check_step(kiosk_id: str, body: display_check.StepReque
 class StopBody(BaseModel):
     # True when this calibration's Save landed before the stop (Done, or close).
     saved: bool = False
+    # The run this stop is for (calvin-hn1e). Omitted by older callers: then the
+    # active run is stopped. A different id is ignored.
+    runId: str | None = None  # noqa: N815 - wire name, like the other display-check bodies
 
 
 @router.post("/kiosks/{kiosk_id}/display-check/stop")
@@ -309,7 +318,10 @@ async def stop_display_check(kiosk_id: str, body: StopBody | None = None):
     _valid_id_or_400(kiosk_id)
     try:
         saved = bool(body and body.saved)
-        return await _ceilinged(kiosk_id, await display_check.stop_run(kiosk_id, saved))
+        return await _ceilinged(
+            kiosk_id,
+            await display_check.stop_run(kiosk_id, saved, body.runId if body else None),
+        )
     except (display_check.UnknownKioskError, display_check.NoActiveRunError):
         raise HTTPException(status_code=404, detail="No display check is running")
 
@@ -435,6 +447,39 @@ async def get_installer_file(name: str):
     return Response(content=data, media_type="text/x-shellscript")
 
 
+@router.post("/kiosks/{kiosk_id}/screen-sleep")
+async def kiosk_screen_sleep(kiosk_id: str, request: Request):
+    """The screen went to sleep: end this kiosk's admin sessions (calvin-q4o8).
+
+    Called by the display agent. It carries no credential, but it is only accepted
+    from an address that kiosk's own polls came from, so someone else on the network
+    cannot sign a kiosk out. It can only sign a kiosk out, never in.
+    """
+    _valid_id_or_400(kiosk_id)
+    if not await kiosk_registry.kiosk_exists(kiosk_id):
+        raise HTTPException(status_code=404, detail="Unknown kiosk")
+    if not await kiosk_registry.kiosk_has_peer(kiosk_id, direct_peer_ip(request)):
+        raise HTTPException(status_code=403, detail="Only the kiosk itself can report this")
+    lock_kiosk_sessions(kiosk_id)
+    logger.info(f"Kiosk {kiosk_id!r} screen asleep: its admin sessions ended")
+    return {"ok": True}
+
+
+@router.post("/screen-sleep")
+async def local_screen_sleep(request: Request):
+    """The all-in-one kiosk's screen went to sleep: end its admin sessions.
+
+    The all-in-one display has no kiosk id; its sign-ins are id-less kiosk
+    sessions, and its agent runs on this machine, so only a direct loopback caller
+    is accepted. It can only sign a screen out.
+    """
+    if not is_loopback_peer(request):
+        raise HTTPException(status_code=403, detail="Only this machine can report this")
+    lock_kiosk_sessions(None)
+    logger.info("Local screen asleep: its admin sessions ended")
+    return {"ok": True}
+
+
 @router.get("/kiosks/{kiosk_id}/config")
 async def get_kiosk_config(
     kiosk_id: str,
@@ -444,6 +489,7 @@ async def get_kiosk_config(
     kstat: str | None = None,
     kmsg: str | None = None,
     kstack: str | None = None,
+    kwifi: str | None = None,
     vw: int | None = None,
     vh: int | None = None,
 ):
@@ -479,6 +525,8 @@ async def get_kiosk_config(
                 available_version=available,
                 viewport={"w": vw, "h": vh} if vw is not None and vh is not None else None,
                 display_stack=kstack,
+                wifi_power_save=kwifi,
+                peer_ip=direct_peer_ip(request),
             )
     except Exception as exc:
         logger.warning(f"Failed to record kiosk {kiosk_id!r}: {exc}")

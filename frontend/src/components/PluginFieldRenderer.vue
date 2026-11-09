@@ -124,20 +124,19 @@
     <!-- Extra author help text and links -->
     <span v-if="ui && (ui.help_text || ui.help_link)" class="help-text">
       <span v-if="ui.help_text">{{ ui.help_text }}</span>
-      <a
+      <ExternalLink
         v-if="ui.help_link"
         :href="ui.help_link"
-        target="_blank"
-        rel="noopener noreferrer"
         style="color: var(--focus-text); text-decoration: underline"
       >
         {{ ui.help_link }}
-      </a>
+      </ExternalLink>
     </span>
   </div>
 </template>
 
 <script setup>
+import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { computed, ref } from "vue";
 import axios from "axios";
 import SelectPill from "@/components/ui/SelectPill.vue";

@@ -260,15 +260,7 @@ export const settingsDestinations = [
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "calendar-display",
-    keywords: [
-      "calendar",
-      "week start",
-      "weekend",
-      "time format",
-      "red days",
-      "holidays",
-      "content sources",
-    ],
+    keywords: ["calendar", "week start", "weekend", "time format", "content sources"],
   },
   {
     id: "content-photos",

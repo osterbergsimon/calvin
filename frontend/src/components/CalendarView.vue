@@ -17,7 +17,16 @@
         <!-- Always-visible header: month/year label, navigation + view switch -->
         <div ref="headerEl" class="calendar-header">
           <div class="calendar-header__label">{{ currentMonthYear }}</div>
-          <RegionHeaderControls v-if="showControls && hasPointer" class="calendar-header__controls">
+          <!-- Always in the layout while a pointer exists, hidden until the region is
+               focused: showing them on focus used to add a wrapped row and relayout
+               the whole calendar (calvin-mbze). visibility:hidden also drops them
+               from the tab order and the accessibility tree. -->
+          <RegionHeaderControls
+            v-if="controlsReserved"
+            class="calendar-header__controls"
+            :class="{ 'calendar-header__controls--hidden': !showControls }"
+            :aria-hidden="showControls ? null : 'true'"
+          >
             <Button
               v-if="!isCurrentPeriod"
               class="calendar-header__today"
@@ -329,6 +338,17 @@ const props = defineProps({
 const configStore = useConfigStore();
 const { hasPointer } = useTouchCapability();
 const showControls = computed(() => props.controlsVisible ?? props.focused);
+// The controls' row is reserved only while they can actually appear: a pointer
+// exists and the UI is shown, or a tap anywhere will reveal it. With the UI
+// hidden and only the hot corner to reveal it, an empty row would just waste
+// space (calvin-mbze review S5). Standalone use (no controlsVisible) always can.
+const controlsReserved = computed(
+  () =>
+    hasPointer.value &&
+    (props.controlsVisible === null ||
+      configStore.shouldShowUI ||
+      configStore.effectiveTapAnywhereReveal)
+);
 const sourceKey = computed(() =>
   [
     ...new Set(
@@ -1630,6 +1650,11 @@ onActivated(() => {
   /* Wrap under the label as a whole, then let the view selector shrink (and
      ellipsize) if a row is still narrower than the controls themselves. */
   flex: 0 1 auto;
+}
+
+/* Reserved, not removed: the row keeps its size so focus changes no layout. */
+.calendar-header__controls--hidden {
+  visibility: hidden;
 }
 
 .calendar-header__view-switch {

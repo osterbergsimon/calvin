@@ -39,7 +39,7 @@ EnvironmentFile=-/etc/default/calvin-kiosk-cog
 # a crashed WPE web process is restarted in place (no Chromium DevTools port).
 ExecStart=/bin/bash -c 'url="$${CALVIN_BACKEND_URL%/}"; \
     q=""; \
-    [ -n "$${CALVIN_KIOSK_ID:-}" ] && q="kiosk=$${CALVIN_KIOSK_ID}"; \
+    if [ -n "$${CALVIN_KIOSK_ID:-}" ]; then q="kiosk=$${CALVIN_KIOSK_ID}"; else q="display=kiosk"; fi; \
     [ -n "$${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=$${CALVIN_KIOSK_HOSTNAME}"; \
     [ -n "$${q}" ] && url="$${url}?$${q}"; \
     exec /usr/bin/cog \

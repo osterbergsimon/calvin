@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { isHttpUrl } from "../utils/safeUrl";
 
 // Region overrides may disable a link; a plugin hint never does.
 const REGION_ACTIONS = ["handoff", "embed", "off"];
@@ -23,10 +24,10 @@ export function useLinkOpen(getRegionAction) {
   const overlay = ref(null);
 
   const isClickable = (url, itemAction) =>
-    Boolean(url) && resolveLinkAction(getRegionAction(), itemAction) !== "off";
+    isHttpUrl(url) && resolveLinkAction(getRegionAction(), itemAction) !== "off";
 
   const openLink = (url, itemAction) => {
-    if (!url) return;
+    if (!isHttpUrl(url)) return;
     const action = resolveLinkAction(getRegionAction(), itemAction);
     if (action === "off") return;
     overlay.value = { kind: action, url };
@@ -36,11 +37,22 @@ export function useLinkOpen(getRegionAction) {
     overlay.value = null;
   };
 
-  const fallbackToHandoff = () => {
+  // The site refused embedding: back to the QR handoff, flagged so a kiosk does
+  // not offer Open again (it would only loop back into the refused embed).
+  // `info.blocked` marks a frame Calvin's own policy blocked (shows a note).
+  const fallbackToHandoff = info => {
     if (overlay.value?.kind === "embed") {
-      overlay.value = { kind: "handoff", url: overlay.value.url };
+      overlay.value = { kind: "handoff", url: overlay.value.url, embedRefused: true };
+      if (info?.blocked === true) overlay.value.blocked = true;
     }
   };
 
-  return { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff };
+  // Kiosk Open: show the page inside Calvin instead of leaving it.
+  const openEmbedded = () => {
+    if (overlay.value?.kind === "handoff") {
+      overlay.value = { kind: "embed", url: overlay.value.url };
+    }
+  };
+
+  return { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff, openEmbedded };
 }

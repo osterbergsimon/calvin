@@ -10,7 +10,7 @@
         @update:model-value="setLink"
       />
     </div>
-    <div class="svo-row">
+    <div v-if="hasCardSize" class="svo-row">
       <span class="svo-label">Card size</span>
       <SelectPill
         class="svo-size"
@@ -39,7 +39,7 @@
 <script setup>
 import { computed } from "vue";
 import { useConfigStore } from "@/stores/config";
-import { useWebServicesStore } from "@/stores/webServices";
+import { useServiceDataRefresh } from "@/composables/useServiceDataRefresh";
 import { useProgressStore } from "@/stores/progress";
 import RegionViewOptions from "./RegionViewOptions.vue";
 import Button from "@/components/ui/Button.vue";
@@ -49,17 +49,23 @@ import { DEFAULT_CARD_SIZE } from "@/styles/cardSizeScale.js";
 
 const props = defineProps({
   regionId: { type: String, default: null },
+  // The service this region shows: Refresh now refetches its data.
+  serviceId: { type: String, default: null },
+  // The widget's display kind. Card size sizes cards, so only card grids offer it.
+  kind: { type: String, default: null },
   view: { type: Object, default: () => ({}) },
 });
 
+const hasCardSize = computed(() => props.kind === "card-grid");
+
 const configStore = useConfigStore();
-const webServicesStore = useWebServicesStore();
+const refreshServiceData = useServiceDataRefresh();
 const progressStore = useProgressStore();
 const refreshNow = () => {
   progressStore
     .track(
       `plugin:refresh:${props.regionId || "fullscreen"}`,
-      () => webServicesStore.refreshCurrentService(),
+      () => refreshServiceData(props.serviceId),
       { regionId: props.regionId || null }
     )
     .catch(err => {

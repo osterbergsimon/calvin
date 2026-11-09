@@ -28,6 +28,8 @@ vi.mock("@/services/pluginsApi", () => ({
 }));
 
 import * as pluginsApi from "@/services/pluginsApi";
+import { useConfigStore } from "@/stores/config";
+import { defaultClockBarDesign, hideTileInDesign } from "@/utils/clockBarDesign";
 import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 
 const weather = {
@@ -41,7 +43,8 @@ const weather = {
 
 const addStub = {
   name: "AddSourceButton",
-  emits: ["saved"],
+  emits: ["saved", "show-hidden"],
+  props: ["kind", "hiddenInstancesFor"],
   template: "<div />",
   methods: { open: openAddButton },
 };
@@ -68,6 +71,173 @@ describe("Clock bar info section", () => {
 
     expect(w.find(".sl-row").text()).toContain("Outside");
     expect(w.find(".sl-row").text()).toContain("In the clock bar");
+  });
+
+  it("also lists sources of a plugin that has both a page and a clock-bar tile (calvin-shsj)", async () => {
+    pluginsRef.value = [
+      weather,
+      {
+        id: "sl_departures",
+        name: "SL departures",
+        type: "service",
+        enabled: true,
+        display_schema: { kind: "item-list" },
+        statusbar_schema: { kind: "status" },
+      },
+      { id: "mealie", name: "Mealie", type: "service", enabled: true, display_schema: {} },
+    ];
+    instancesRef.value = {
+      sl_departures: [{ id: "sl1", name: "Home stop", config: {} }],
+      mealie: [{ id: "m1", name: "Menu", config: {} }],
+    };
+    const w = await mountSection();
+
+    const text = w.findAll(".sl-row").map(r => r.text());
+    expect(text).toHaveLength(1);
+    expect(text[0]).toContain("Home stop");
+  });
+
+  describe("Remove on a source that also has a page (calvin-shsj)", () => {
+    const departures = {
+      id: "sl_departures",
+      name: "SL departures",
+      type: "service",
+      enabled: true,
+      display_schema: { kind: "item-list" },
+      statusbar_schema: { kind: "status" },
+    };
+    const firstRow = w => w.findComponent({ name: "SourceList" }).props("rows")[0];
+
+    beforeEach(() => {
+      pluginsRef.value = [weather, departures];
+      pluginsApi.updatePluginInstance.mockResolvedValue({});
+    });
+
+    it("only takes the tile off the clock bar; the instance and its page stay", async () => {
+      instancesRef.value = {
+        sl_departures: [{ id: "sl1", name: "Home stop", enabled: true, config: { stop: "A" } }],
+      };
+      const w = await mountSection();
+      const list = w.findComponent({ name: "SourceList" });
+
+      expect(list.props("removeMessage")(firstRow(w))).toContain("page stays");
+      list.vm.$emit("remove", firstRow(w));
+      await flushPromises();
+
+      expect(pluginsApi.deletePluginInstance).not.toHaveBeenCalled();
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("sl1", {
+        name: "Home stop",
+        enabled: true,
+        plugin_id: "sl_departures",
+        config: { stop: "A", show_in_statusbar: false },
+      });
+    });
+
+    it("gives a hidden row a Show action that restores the tile and the design entry", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const config = useConfigStore();
+      config.clockBarDesign = hideTileInDesign(defaultClockBarDesign(), "sl1");
+      const update = vi.spyOn(config, "updateConfig").mockResolvedValue({});
+      const w = await mountSection();
+
+      expect(firstRow(w).inClockBar).toBe(false);
+      await w.get("[data-test='clock-show']").trigger("click");
+      await flushPromises();
+
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalledWith("sl1", {
+        name: "Home stop",
+        enabled: true,
+        plugin_id: "sl_departures",
+        config: { show_in_statusbar: true },
+      });
+      expect(update.mock.calls[0][0].clockBarDesign.horizontal.hidden).not.toContain("tile:sl1");
+    });
+
+    it("says In the clock bar for a tile the editor restored, whatever its own flag says", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const config = useConfigStore();
+      const design = defaultClockBarDesign();
+      design.horizontal.zones.right = ["tile:sl1", ...design.horizontal.zones.right];
+      config.clockBarDesign = design;
+      const w = await mountSection();
+
+      expect(firstRow(w).inClockBar).toBe(true);
+      expect(w.find("[data-test='clock-show']").exists()).toBe(false);
+    });
+
+    it("shows a hidden tile when the add prompt asks for it", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const w = await mountSection();
+      const add = w.findComponent({ name: "AddSourceButton" });
+      expect(
+        add
+          .props("hiddenInstancesFor")("sl_departures")
+          .map(i => i.id)
+      ).toEqual(["sl1"]);
+      expect(add.props("hiddenInstancesFor")("weather")).toEqual([]);
+
+      add.vm.$emit("show-hidden", [{ id: "sl1", name: "Home stop" }]);
+      await flushPromises();
+      expect(pluginsApi.updatePluginInstance).toHaveBeenCalled();
+    });
+
+    it("shows every hidden instance the add prompt offers, none re-hiding another (calvin-7xxf)", async () => {
+      instancesRef.value = {
+        sl_departures: [
+          { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+          { id: "sl2", name: "Work stop", enabled: true, config: { show_in_statusbar: false } },
+        ],
+      };
+      const config = useConfigStore();
+      config.clockBarDesign = hideTileInDesign(
+        hideTileInDesign(defaultClockBarDesign(), "sl1"),
+        "sl2"
+      );
+      // Like the real store: the design is replaced once the save has landed, and
+      // that takes a moment, which is when two overlapping writes lose one.
+      vi.spyOn(config, "updateConfig").mockImplementation(async ({ clockBarDesign }) => {
+        await new Promise(resolve => setTimeout(resolve, 5));
+        config.clockBarDesign = clockBarDesign;
+        return {};
+      });
+      const w = await mountSection();
+      const add = w.findComponent({ name: "AddSourceButton" });
+
+      add.vm.$emit("show-hidden", [
+        { id: "sl1", name: "Home stop", enabled: true, config: { show_in_statusbar: false } },
+        { id: "sl2", name: "Work stop", enabled: true, config: { show_in_statusbar: false } },
+      ]);
+      await new Promise(resolve => setTimeout(resolve, 60));
+      await flushPromises();
+
+      const hidden = config.clockBarDesign.horizontal.hidden;
+      expect(hidden).not.toContain("tile:sl1");
+      expect(hidden).not.toContain("tile:sl2");
+    });
+
+    it("still deletes a clock-bar-only source", async () => {
+      instancesRef.value = { weather: [{ id: "w1", name: "Outside", config: {} }] };
+      const w = await mountSection();
+      const list = w.findComponent({ name: "SourceList" });
+
+      expect(list.props("removeMessage")(firstRow(w))).toContain("Its tile leaves");
+      list.vm.$emit("remove", firstRow(w));
+      await flushPromises();
+
+      expect(pluginsApi.deletePluginInstance).toHaveBeenCalledWith("w1");
+    });
   });
 
   it("opens the add flow when Clock bar items links here to add the first tile", async () => {

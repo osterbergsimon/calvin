@@ -4,6 +4,7 @@
       :title="panelTitle"
       :subtitle="subtitle"
       :variant="panelVariant"
+      :header-mode="panelVariant === 'default' || panelVariant === 'dense' ? 'flow' : 'overlay'"
       :header-visible="headerVisible"
       :focused="focused"
     >

@@ -46,6 +46,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  // "overlay" floats the header over the body (full-bleed media, web pages);
+  // "flow" gives it its own band above the body so nothing sits under it.
+  headerMode: {
+    type: String,
+    default: "overlay",
+    validator: value => ["overlay", "flow"].includes(value),
+  },
   dim: {
     type: Boolean,
     default: false,
@@ -60,6 +67,7 @@ const panelClasses = computed(() => [
   "dashboard-panel",
   `dashboard-panel--${props.variant}`,
   { "dashboard-panel--header-hidden": !showPanelHeader.value },
+  { "dashboard-panel--header-flow": props.headerMode === "flow" },
 ]);
 </script>
 
@@ -109,6 +117,18 @@ const panelClasses = computed(() => [
 /* When a title IS shown, space it opposite the controls. */
 .dashboard-panel__header:has(.dashboard-panel__title-group) {
   justify-content: space-between;
+}
+
+/* Flow: the header is a band of its own and the body takes what is left, so a
+   widget never draws under the title or controls however tall they wrap. */
+.dashboard-panel--header-flow .dashboard-panel__header {
+  position: relative;
+  flex: none;
+  background: none;
+  pointer-events: auto;
+}
+.dashboard-panel--header-flow:not(.dashboard-panel--header-hidden) .dashboard-panel__body {
+  padding-top: 0;
 }
 
 .dashboard-panel__title-group {

@@ -41,17 +41,21 @@ const metrics = computed(() => {
 
 const tileSpec = computed(() => props.schema.tile || {});
 
+// Rows keep each tile's natural height and share any spare region height, so a
+// dashboard in a large region fills it instead of hugging the top.
+const ROWS = "minmax(max-content, 1fr)";
+
 const gridStyle = computed(() => {
   const cols = props.schema.layout?.columns;
   if (typeof cols === "number") {
-    return { gridTemplateColumns: `repeat(${cols}, 1fr)` };
+    return { gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: ROWS };
   }
   if (cols === "auto-square") {
     const n = Math.max(metrics.value.length, 1);
     const c = Math.max(Math.ceil(Math.sqrt(n)), 1);
-    return { gridTemplateColumns: `repeat(${c}, 1fr)` };
+    return { gridTemplateColumns: `repeat(${c}, 1fr)`, gridAutoRows: ROWS };
   }
-  return { gridTemplateColumns: "repeat(2, 1fr)" };
+  return { gridTemplateColumns: "repeat(2, 1fr)", gridAutoRows: ROWS };
 });
 
 function pick(metric, pathKey, literalKey, formatKey) {

@@ -13,12 +13,31 @@ import os
 import secrets
 import time
 from collections import deque
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 
 from loguru import logger
 
 COOKIE_NAME = "calvin_admin"
-COOKIE_MAX_AGE = 34560000  # 400 days, the browser cap
+
+# Session lifetimes (calvin-q4o8). Both are measured from the last use, not from
+# sign-in: using Calvin renews the session, leaving it alone lets it lapse.
+# A kiosk is a wall screen anyone can walk up to, so its session is minutes;
+# a phone or desktop is the owner's own, so it lasts about a month.
+KIOSK_IDLE_SECONDS = 300
+# The page throttles its touches, so the server's last-use time can trail the
+# screen's by a little. The server waits this much longer than the page does,
+# so the page always signs out first and what it says is true.
+KIOSK_TOUCH_GRACE = 30
+_MIN_KIOSK_IDLE = 30
+DEVICE_SESSION_SECONDS = 30 * 24 * 3600
+# A session is only re-signed when its last use is at least this old, so an
+# ordinary burst of requests does not rewrite the cookie every time.
+_KIOSK_RENEW_AFTER = 10
+_DEVICE_RENEW_AFTER = 24 * 3600
+_COOKIE_VERSION = "v2"
+_CLOCK_SKEW = 60
 MIN_PASSWORD_LEN = 8
 
 _SCRYPT_N = 16384
@@ -28,6 +47,68 @@ _SCRYPT_DKLEN = 32
 _SCRYPT_SALT_BYTES = 16
 _SERVER_SECRET_BYTES = 32
 _FILE_VERSION = 1
+
+
+class SessionKind(StrEnum):
+    """Which lifetime a signed session gets. Part of the signed cookie."""
+
+    DEVICE = "d"
+    KIOSK = "k"
+
+
+@dataclass(frozen=True)
+class Session:
+    kind: SessionKind
+    kiosk_id: str | None
+    issued_at: int
+    last_active: int
+
+    @property
+    def idle_limit(self) -> int:
+        if self.kind is SessionKind.KIOSK:
+            return kiosk_idle_seconds() + KIOSK_TOUCH_GRACE
+        return DEVICE_SESSION_SECONDS
+
+
+_kiosk_idle_override: int | None = None
+
+
+def set_kiosk_idle_seconds(display_timeout: int | None) -> None:
+    """Follow the display timeout: a kiosk session never outlives the screen's sleep.
+
+    ``None`` (timeout off) restores the default. Never longer than 5 minutes, never
+    shorter than 30 seconds.
+    """
+    global _kiosk_idle_override
+    if display_timeout is None or display_timeout <= 0:
+        _kiosk_idle_override = None
+    else:
+        _kiosk_idle_override = max(_MIN_KIOSK_IDLE, min(KIOSK_IDLE_SECONDS, int(display_timeout)))
+
+
+def kiosk_idle_seconds() -> int:
+    """How long a kiosk may go without a touch before it is signed out."""
+    return _kiosk_idle_override or KIOSK_IDLE_SECONDS
+
+
+def cookie_max_age(kind: SessionKind) -> int:
+    """The browser-side lifetime that matches a session kind's idle limit."""
+    if kind is SessionKind.KIOSK:
+        return kiosk_idle_seconds() + KIOSK_TOUCH_GRACE
+    return DEVICE_SESSION_SECONDS
+
+
+# kiosk id -> when its screen last went to sleep. In memory on purpose: a restart
+# loses it, but a kiosk session still lapses on its own 5-minute idle limit.
+_kiosk_locks: dict[str | None, int] = {}
+
+
+def lock_kiosk_sessions(kiosk_id: str | None, now: int | None = None) -> None:
+    """End every session of this kiosk used up to now (its screen went to sleep).
+
+    ``None`` is the all-in-one kiosk, whose page has no kiosk id.
+    """
+    _kiosk_locks[kiosk_id] = int(time.time() if now is None else now)
 
 
 class PasswordTooShort(ValueError):  # noqa: N818 - name is part of the CLV-9 plan contract
@@ -163,44 +244,93 @@ class AdminAuthStore:
 
     # -- cookies ---------------------------------------------------------
 
-    def _cookie_mac(self, issued_at: int, generation: int, server_secret: bytes) -> str:
-        message = f"{issued_at}.{generation}".encode()
-        return hmac.new(server_secret, message, hashlib.sha256).hexdigest()
+    def _cookie_mac(self, body: str, server_secret: bytes) -> str:
+        return hmac.new(server_secret, body.encode(), hashlib.sha256).hexdigest()
 
-    def issue_cookie(self, now: int | None = None) -> str:
-        """Return ``"{issued_at}.{generation}.{hex_hmac}"`` for this store."""
+    def issue_cookie(
+        self,
+        kind: SessionKind = SessionKind.DEVICE,
+        kiosk_id: str | None = None,
+        now: int | None = None,
+    ) -> str:
+        """Return a signed session cookie for ``kind`` (the kind is inside the signature)."""
         data = self._load()
         if data is None:
             raise RuntimeError("Admin auth is not configured")
-        issued_at = int(time.time() if now is None else now)
-        generation = int(data["generation"])
-        mac = self._cookie_mac(issued_at, generation, bytes.fromhex(data["server_secret"]))
-        return f"{issued_at}.{generation}.{mac}"
+        stamp = int(time.time() if now is None else now)
+        return self._sign(data, kind, kiosk_id, stamp, stamp)
 
-    def verify_cookie(self, value: str | None, now: int | None = None) -> bool:
-        """Verify signature, generation and 400-day age. False on anything doubtful."""
+    def _sign(
+        self, data: dict, kind: SessionKind, kiosk_id: str | None, issued_at: int, last_active: int
+    ) -> str:
+        # Hex keeps the id free of the "." separator (kiosk ids may contain dots).
+        kid = kiosk_id.encode().hex() if kiosk_id else "-"
+        body = f"{_COOKIE_VERSION}.{kind.value}.{kid}.{issued_at}.{last_active}.{int(data['generation'])}"
+        return f"{body}.{self._cookie_mac(body, bytes.fromhex(data['server_secret']))}"
+
+    def read_session(self, value: str | None, now: int | None = None) -> Session | None:
+        """The live session behind a cookie, or ``None`` on anything doubtful.
+
+        Doubtful covers a bad signature, an old generation, a cookie in the
+        retired 400-day format, an idle session past its limit, and a kiosk
+        session ended by that screen going to sleep.
+        """
         if not value:
-            return False
+            return None
         data = self._load()
         if data is None:
-            return False
+            return None
         parts = value.split(".")
-        if len(parts) != 3:
-            return False
+        if len(parts) != 7 or parts[0] != _COOKIE_VERSION:
+            return None
         try:
-            issued_at = int(parts[0])
-            generation = int(parts[1])
+            kind = SessionKind(parts[1])
+            kiosk_id = None if parts[2] == "-" else bytes.fromhex(parts[2]).decode()
+            issued_at = int(parts[3])
+            last_active = int(parts[4])
+            generation = int(parts[5])
             server_secret = bytes.fromhex(data["server_secret"])
             current_generation = int(data["generation"])
         except (ValueError, KeyError, TypeError):
-            return False
+            return None
         if generation != current_generation:
-            return False
+            return None
+        body = ".".join(parts[:6])
+        if not hmac.compare_digest(self._cookie_mac(body, server_secret), parts[6]):
+            return None
+        session = Session(kind, kiosk_id, issued_at, last_active)
         current_time = int(time.time() if now is None else now)
-        if current_time - issued_at > COOKIE_MAX_AGE:
-            return False
-        expected = self._cookie_mac(issued_at, generation, server_secret)
-        return hmac.compare_digest(expected, parts[2])
+        if last_active > current_time + _CLOCK_SKEW:
+            return None
+        if current_time - last_active > session.idle_limit:
+            return None
+        if kind is SessionKind.KIOSK:
+            locked_at = _kiosk_locks.get(kiosk_id)
+            if locked_at is not None and last_active <= locked_at:
+                return None
+        return session
+
+    def verify_cookie(self, value: str | None, now: int | None = None) -> bool:
+        """True for a live session. False on anything doubtful."""
+        return self.read_session(value, now) is not None
+
+    def renew_cookie(
+        self, value: str | None, now: int | None = None, *, force: bool = False
+    ) -> str | None:
+        """A fresh cookie with last use = now, or ``None`` when no renewal is due.
+
+        Only a live session renews; a lapsed one stays lapsed. ``force`` renews
+        regardless of age (an explicit touch from a kiosk page).
+        """
+        session = self.read_session(value, now)
+        data = self._load()
+        if session is None or data is None:
+            return None
+        current_time = int(time.time() if now is None else now)
+        due = _KIOSK_RENEW_AFTER if session.kind is SessionKind.KIOSK else _DEVICE_RENEW_AFTER
+        if not force and current_time - session.last_active < due:
+            return None
+        return self._sign(data, session.kind, session.kiosk_id, session.issued_at, current_time)
 
 
 class LoginRateLimiter:

@@ -22,7 +22,7 @@
       <span class="pill__cv" aria-hidden="true">▾</span>
     </button>
     <Teleport to="body">
-      <div v-if="open" ref="menuEl" class="pill__panel" :style="popoverStyle">
+      <div v-if="open" ref="menuEl" class="pill__panel" data-floating-layer :style="popoverStyle">
         <div v-if="searchable" class="pill__search">
           <input
             ref="searchEl"
@@ -223,6 +223,8 @@ const onListKey = e => {
     if (option) choose(option.value);
   } else if (e.key === "Escape") {
     e.preventDefault();
+    // Closes the menu only: an enclosing popover or dialog stays open.
+    e.stopPropagation();
     close();
   }
 };
@@ -255,6 +257,8 @@ const onSearchKey = e => {
     if (option) choose(option.value);
   } else if (e.key === "Escape") {
     e.preventDefault();
+    // Closes the menu only: an enclosing popover or dialog stays open.
+    e.stopPropagation();
     close();
   }
 };

@@ -116,7 +116,6 @@ describe("ContentSettings copy (§3.1)", () => {
     w.findAllComponents({ name: "SettingRow" }).find(r => r.props("label") === label);
 
   const COPY = [
-    ["Highlight holidays", "Marks public holidays on the calendar."],
     [
       "Photo frame when idle",
       "Per screen now: choose Off/On, the idle wait and the photo sources in Screens › Behaviour.",
@@ -129,6 +128,12 @@ describe("ContentSettings copy (§3.1)", () => {
       global: { stubs },
     });
     expect(row(w, label).props("description")).toBe(description);
+  });
+
+  it("does not offer Highlight holidays while holiday detection does not exist (calvin-awvd)", () => {
+    const w = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
+    expect(row(w, "Highlight holidays")).toBeUndefined();
+    expect(w.text()).not.toContain("Highlight holidays");
   });
 
   it("puts the photo seconds on the control, not in a label", () => {

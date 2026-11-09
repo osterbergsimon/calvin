@@ -288,7 +288,7 @@
               {{ orientationBadge }}
             </Tag>
             <p v-if="sizeClass === 'wide'" class="sre-stage-caption" data-test="stage-caption">
-              Drag regions to swap them, dividers to resize, the clock bar to reposition
+              Drag dividers to resize, the clock bar to reposition
             </p>
           </div>
 
@@ -343,6 +343,7 @@
               :hide-heading="isPhone"
               @patch-view="patchSelectedView"
               @set-component="setSelectedComponent"
+              @enable-plugin="enableServicePlugin"
               @toggle-source="toggleSelectedSource"
               @clear-sources="clearSelectedSources"
               @toggle-split="toggleSplitSelected"
@@ -416,6 +417,7 @@
 
 <script setup>
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useNotificationsStore } from "@/stores/notifications";
 import { useWebServicesStore } from "@/stores/webServices";
 import { useCalendarStore } from "@/stores/calendar";
 import { useKiosksStore } from "@/stores/kiosks";
@@ -498,7 +500,7 @@ const saveConfig = inject("saveConfig", null);
 const webServicesStore = useWebServicesStore();
 const calendarStore = useCalendarStore();
 const kiosksStore = useKiosksStore();
-const { plugins, pluginInstances, loadingPlugins, loadPlugins } = usePlugins();
+const { plugins, pluginInstances, loadingPlugins, loadPlugins, togglePlugin } = usePlugins();
 
 const selectedRegionId = ref(null);
 const previewScreenId = ref(ANY_BROWSER);
@@ -881,7 +883,9 @@ const selectScreen = id => {
 
 /* --- data sources --- */
 const services = computed(() => webServicesStore.services);
-const componentOptions = computed(() => buildComponentOptions(services.value));
+const componentOptions = computed(() =>
+  buildComponentOptions(services.value, webServicesStore.disabledPlugins)
+);
 const calendarSources = computed(() =>
   (calendarStore.sources || [])
     .filter(s => s.enabled !== false)
@@ -1350,6 +1354,18 @@ const addSubToSelected = () => {
   const ownerPath = node.split ? p : p.slice(0, -1);
   updateActiveLayout(addSubRegionAtPath(cloneLayout(), ownerPath));
 };
+// "Turn on" for a plugin the picker listed as turned off: switch it on, then
+// reload services so its instances become pickable.
+const enableServicePlugin = async pluginId => {
+  const outcome = await webServicesStore.turnOnPlugin(pluginId, togglePlugin);
+  if (!outcome.ok) {
+    useNotificationsStore().notify({
+      severity: "error",
+      eyebrow: "Turn on",
+      message: outcome.message,
+    });
+  }
+};
 const setSelectedComponent = option => {
   const p = selectedPath.value;
   if (!p) return;
@@ -1572,6 +1588,7 @@ onMounted(async () => {
   clockTimer = setInterval(() => (now.value = new Date()), 30000);
   if (webServicesStore.services.length === 0 && !webServicesStore.loading)
     webServicesStore.fetchServices();
+  void webServicesStore.loadDisabledPlugins();
   if (calendarStore.sources.length === 0 && !calendarStore.loading) calendarStore.fetchSources();
   if (plugins.value.length === 0 && !loadingPlugins.value) loadPlugins();
   if (kiosksStore.kiosks.length === 0) kiosksStore.loadKiosks();

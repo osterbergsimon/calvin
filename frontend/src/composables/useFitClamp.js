@@ -68,6 +68,14 @@ export function useFitClamp(containerRef, { axis = "block", itemSelector, viewpo
     // container sits flush at the viewport's content-top (true for the card-grid
     // in the panel body). If a wrapper is ever inserted between them, offset the
     // bounds by (container top - viewport content top).
+    // Measure UNCLAMPED. The clamp is written back as a max-size on `el`, and
+    // stretching tracks (1fr rows/columns) grow to whatever the container
+    // allows, so a measurement taken under last time's cap just returns that cap
+    // and the region can never grow back. Lift the cap for the read (no paint in
+    // between) and restore it.
+    const capProp = axis === "inline" ? "maxInlineSize" : "maxBlockSize";
+    const cap = el.style[capProp];
+    el.style[capProp] = "none";
     const orect = el.getBoundingClientRect();
     const originStart = axis === "inline" ? orect.left : orect.top;
     const items = Array.from(el.querySelectorAll(itemSelector));
@@ -78,6 +86,7 @@ export function useFitClamp(containerRef, { axis = "block", itemSelector, viewpo
       }
       return { start: r.top - originStart, end: r.bottom - originStart };
     });
+    el.style[capProp] = cap;
     const res = computeFitBoundary(bounds, containerSize);
     if (res.fits !== fits.value) fits.value = res.fits;
     if (res.fitCount !== fitCount.value) fitCount.value = res.fitCount;

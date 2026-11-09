@@ -696,6 +696,30 @@ describe("the fallback: the panel doesn't report its own buttons", () => {
     ]);
   });
 
+  it("pairs the menu number with the level the panel is at after a re-cap (calvin-8ck0)", async () => {
+    await toOwnLevels();
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 5, level: 5 });
+    await settle();
+    // The limit was lowered while the person read the menu: the agent re-capped the
+    // panel to 3 and reported it as a running update, not as a new result.
+    backend.run = { ...backend.run, level: 3, updatedAt: new Date().toISOString() };
+    await settle();
+    await find(wrapper, "reading-input").setValue("20");
+    await clickPrimary(wrapper);
+    agentStep("conversion", { value: 1, level: 1 });
+    await settle();
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await find(wrapper, "reading-input").setValue("10");
+    await clickPrimary(wrapper);
+    await clickPrimary(wrapper);
+    expect(patches()[0][0].brightnessConversion).toEqual([
+      { ddc: 1, menu: 10 },
+      { ddc: 3, menu: 20 },
+    ]);
+  });
+
   it("skips the two-level fallback with a plain message when the cap is 1 or less", async () => {
     await toStep2();
     backend.run = { ...backend.run, ceiling: 1 };
@@ -1158,7 +1182,7 @@ describe("telling the agent the Save landed", () => {
     await clickPrimary(wrapper); // Save
     await clickPrimary(wrapper); // Done
     expect(posts("stop")).toHaveLength(1);
-    expect(stopBody()).toEqual({ saved: true });
+    expect(stopBody()).toEqual({ runId: expect.any(String), saved: true });
   });
 
   it("closing (X) after a successful Save stops with saved: true", async () => {
@@ -1166,7 +1190,7 @@ describe("telling the agent the Save landed", () => {
     await clickPrimary(wrapper);
     await wrapper.setProps({ modelValue: false });
     await flushPromises();
-    expect(stopBody()).toEqual({ saved: true });
+    expect(stopBody()).toEqual({ runId: expect.any(String), saved: true });
   });
 
   it("Done or close without a Save, or after a failed one, never says saved", async () => {
@@ -1175,7 +1199,7 @@ describe("telling the agent the Save landed", () => {
     await wrapper.setProps({ modelValue: false });
     await flushPromises();
     expect(posts("stop")).toHaveLength(1);
-    expect(stopBody()).toBeUndefined();
+    expect(stopBody()).toEqual({ runId: expect.any(String) });
   });
 });
 

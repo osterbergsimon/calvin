@@ -13,6 +13,22 @@ describe("buildComponentOptions", () => {
     expect(options.map(o => o.value)).toEqual(["calendar", "photos"]);
   });
 
+  it("adds a flagged option for each service plugin that is turned off (calvin-zbcg)", () => {
+    const options = buildComponentOptions([], [{ id: "mealie", name: "Mealie" }]);
+    expect(options.at(-1)).toMatchObject({
+      value: "enable:mealie",
+      label: "Mealie",
+      kind: "disabled-plugin",
+      pluginId: "mealie",
+      instanceIds: [],
+    });
+  });
+
+  it("carries the reason a turned-off plugin cannot be turned on", () => {
+    const options = buildComponentOptions([], [{ id: "cast", name: "Cast", reason: "Sealed." }]);
+    expect(options.at(-1)).toMatchObject({ blockedReason: "Sealed." });
+  });
+
   it("maps service instances to options carrying both instance and plugin names", () => {
     const [yrOption] = buildComponentOptions([yr]).filter(o => o.kind === "service");
     expect(yrOption).toMatchObject({

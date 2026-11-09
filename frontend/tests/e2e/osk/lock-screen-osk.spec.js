@@ -103,7 +103,10 @@ for (const c of CASES) {
       // Enter submits: the password Vue holds (v-model), not only the DOM
       // value, reaches the server.
       await osk.locator('.hg-button[data-skbtn="{enter}"]').tap();
-      await expect.poll(() => loginBody).toEqual({ password: PASSWORD });
+      // A registered kiosk names itself so the server gives it a kiosk session (calvin-q4o8).
+      await expect
+        .poll(() => loginBody)
+        .toEqual(c.kiosk ? { password: PASSWORD, kiosk: "pi-panel" } : { password: PASSWORD });
       await expect(page.getByText("That's not the admin password.")).toBeVisible();
 
       expect(state.hostActions).toEqual([]);

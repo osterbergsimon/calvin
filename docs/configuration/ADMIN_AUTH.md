@@ -9,8 +9,8 @@ on a kiosk (next photo, switch screen, calendar view, theme), stay open.
 On a fresh install — or after upgrading from a version without admin auth — open
 **Settings**. Calvin shows one card: a **setup code** and an admin password to
 choose. The password can be any characters, at least 8. Whoever does this first
-claims the install, and is signed in immediately; the browser keeps that session
-for up to 400 days.
+claims the install, and is signed in immediately. How long that session lasts
+depends on the device; see [Sessions](#sessions).
 
 The setup code is what stops someone else on the network from claiming the
 install before you do. Calvin generates an 8-character code (shown as
@@ -78,10 +78,49 @@ becomes invalid. The file is never in the database, a backup, or
 
 ## Sessions
 
-- Cookie `calvin_admin`: `HttpOnly`, `SameSite=Strict`, `Path=/`,
-  `Max-Age=34560000` (400 days, the browser cap).
-- Stateless value `issued_at.generation.HMAC`, signed with a server secret kept
-  in `admin-auth.json` (mode `0600`, next to the kiosk signing key).
+How long you stay signed in depends on where you signed in, and the server
+enforces it (the page only mirrors it):
+
+| Where | Signed out after | Renewed by |
+| --- | --- | --- |
+| A kiosk (a wall screen anyone can walk up to) | 5 minutes without touch, or when the screen goes to sleep | touching the screen |
+| A phone or desktop | 30 days without use | using Settings |
+
+A kiosk is recognised by the server, from any of these signals (one is enough):
+
+- the page says it is a kiosk: `kiosk` (its `?kiosk=` id) or `display` (the
+  all-in-one kiosk's own display, which opens `?display=kiosk` and has no kiosk
+  id) in the sign-in body. This is what covers an all-in-one kiosk;
+- the **network address** the sign-in comes from is one a kiosk's polls came from
+  in the last two hours (the newest kiosk wins when a lease was reused). A visitor
+  at the screen cannot change it. It is ignored for any request that carries a
+  proxy header (`Forwarded`, `X-Forwarded-*`, `X-Real-IP`), and such polls never
+  register an address, because behind a reverse proxy or NAT every visitor shares
+  the proxy's address. A page's own kiosk id beats the address.
+
+All of them can only make a session *shorter*. Lying gains nothing, and a wrong
+match only means more sign-ins. The kind is inside the signed cookie, so it cannot
+be edited into a longer one. `GET /api/auth/status` and `POST /api/auth/touch`
+report the session's kind and idle limit (`session`, `idleSeconds`); the page's
+own timer follows them. The page signs out at the limit and the server allows 30
+seconds more (the page throttles its touches), so the page always acts first.
+
+The screen going to sleep also ends the kiosk's sessions: the display agent
+reports it (`POST /api/kiosks/{id}/screen-sleep`, or `POST /api/screen-sleep` on
+an all-in-one kiosk), retrying a failed report a few times. The per-kiosk route
+accepts it only from an address that kiosk's own polls came from, and the local
+one only from loopback, so someone else on the network cannot sign a kiosk out; turning the display
+off from Calvin does the same; and when a display timeout is set the idle limit is
+never longer than it. A restart of Calvin forgets a reported sleep, and the idle
+limit still applies. A display check started on the kiosk holds its session until
+the run ends, so the page does not sign out mid-check.
+
+- Cookie `calvin_admin`: `HttpOnly`, `SameSite=Strict`, `Path=/`, `Max-Age` = the
+  limit above (330 or 2592000 seconds).
+- Stateless value `v2.<kind>.<kiosk>.<issued>.<last used>.<generation>.<HMAC>`,
+  signed with a server secret kept in `admin-auth.json` (mode `0600`, next to the
+  kiosk signing key). A cookie from before session kinds existed (400 days, no
+  kind) is refused and cleared once, so every browser signs in again one time.
 - Changing the password bumps the generation, so every other browser is signed
   out. Sign out just clears the cookie.
 - Login failures are limited per peer IP: 5 within 60 seconds → `429`, then a

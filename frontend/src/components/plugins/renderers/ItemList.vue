@@ -26,7 +26,14 @@
       <EmptyState compact :inset="false" :message="schema.empty_text || 'Nothing to show yet.'" />
     </li>
   </ul>
-  <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
+  <HandoffOverlay
+    v-if="overlay?.kind === 'handoff'"
+    :url="overlay.url"
+    :embed-refused="Boolean(overlay.embedRefused)"
+    :blocked="Boolean(overlay.blocked)"
+    @close="closeOverlay"
+    @embed="openEmbedded"
+  />
   <EmbedOverlay
     v-else-if="overlay?.kind === 'embed'"
     :url="overlay.url"
@@ -53,9 +60,8 @@ const props = defineProps({
   linkAction: { type: String, default: null },
 });
 
-const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useLinkOpen(
-  () => props.linkAction
-);
+const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff, openEmbedded } =
+  useLinkOpen(() => props.linkAction);
 
 const items = computed(() => {
   const slice = props.schema.data_path

@@ -561,6 +561,45 @@ export function showTileInDesign(design, instanceId) {
   return next;
 }
 
+/** Put one instance on a design's hidden shelf (Content › Clock bar info › Remove). */
+export function hideTileInDesign(design, instanceId) {
+  if (!design || typeof design !== "object") return design;
+  const token = tilePartId(instanceId);
+  const next = JSON.parse(JSON.stringify(design));
+  for (const shape of CLOCK_BAR_SHAPES) {
+    const shapeDesign = next[shape];
+    if (!shapeDesign) continue;
+    const hidden = Array.isArray(shapeDesign.hidden) ? shapeDesign.hidden : [];
+    if (!hidden.includes(token)) hidden.push(token);
+    shapeDesign.hidden = hidden;
+    // A zone beats the hidden shelf, so a pinned tile has to leave its zone too.
+    for (const key of Object.keys(shapeDesign.zones || {})) {
+      if (Array.isArray(shapeDesign.zones[key])) {
+        shapeDesign.zones[key] = shapeDesign.zones[key].filter(entry => entry !== token);
+      }
+    }
+  }
+  return next;
+}
+
+/**
+ * Whether a tile is in the clock bar. A saved design decides (a zone pins it, the
+ * hidden shelf hides it), whichever of Content or the clock bar editor changed it;
+ * only a tile the design does not mention follows its own `show_in_statusbar`.
+ */
+export function tileShownInDesign(design, instanceId, flagShown) {
+  if (!design || typeof design !== "object") return flagShown;
+  const token = tilePartId(instanceId);
+  const shapes = CLOCK_BAR_SHAPES.map(shape => design[shape]).filter(Boolean);
+  const inZone = shapeDesign =>
+    Object.values(shapeDesign.zones || {}).some(
+      list => Array.isArray(list) && list.includes(token)
+    );
+  if (shapes.some(inZone)) return true;
+  if (shapes.some(shapeDesign => (shapeDesign.hidden || []).includes(token))) return false;
+  return flagShown;
+}
+
 export function partLabel(partId, services = []) {
   if (isTilePart(partId)) {
     const id = tileInstanceId(partId);

@@ -8,19 +8,50 @@
       :class="{ 'iframe-renderer__frame--error': error }"
       frameborder="0"
       referrerpolicy="no-referrer"
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      :sandbox="sandbox"
       allowfullscreen
       @load="handleLoad"
       @error="handleError"
     />
 
+    <!-- A refusing site fires load, not error, so a failure cannot be detected
+         reliably: on a kiosk the QR handoff is always one tap away. -->
+    <Button
+      v-if="url && onKiosk"
+      class="iframe-renderer__qr"
+      :class="{ 'iframe-renderer__qr--hidden': !qrVisible }"
+      :aria-hidden="qrVisible ? null : 'true'"
+      :tabindex="qrVisible ? null : -1"
+      variant="secondary"
+      data-test="show-qr-always"
+      @click="showQr = true"
+    >
+      Show QR code
+    </Button>
+
     <div v-if="error" class="iframe-renderer__fallback">
-      <Card class="iframe-renderer__fallback-card" title="This site won't embed">
-        <InlineNote>It blocks being shown inside another page (X-Frame-Options/CSP).</InlineNote>
+      <Card
+        class="iframe-renderer__fallback-card"
+        :title="frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : `This site won't embed`"
+      >
+        <InlineNote v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
+          {{ frameBlockedBody(frameBlock.sealed.value) }}
+        </InlineNote>
+        <InlineNote v-else>
+          It blocks being shown inside another page (X-Frame-Options/CSP).
+        </InlineNote>
         <p v-if="url" class="iframe-renderer__url">{{ url }}</p>
         <div class="iframe-renderer__actions">
+          <Button
+            v-if="url && onKiosk"
+            variant="secondary"
+            data-test="show-qr"
+            @click="showQr = true"
+          >
+            Show QR code
+          </Button>
           <a
-            v-if="url"
+            v-else-if="url"
             :href="url"
             target="_blank"
             rel="noopener noreferrer"
@@ -28,31 +59,77 @@
           >
             Open in new window
           </a>
-          <Button variant="secondary" @click="retry">Retry</Button>
+          <Button v-if="!frameBlock.blocked.value" variant="secondary" @click="retry">
+            Retry
+          </Button>
         </div>
       </Card>
     </div>
+    <HandoffOverlay v-if="showQr" :url="url" embed-refused @close="showQr = false" />
   </div>
 </template>
 
 <script setup>
-import { computed, onUnmounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { resolvePath } from "../../../utils/jsonPath";
 import Button from "../../ui/Button.vue";
 import Card from "../../ui/Card.vue";
 import InlineNote from "../../ui/InlineNote.vue";
+import HandoffOverlay from "../overlays/HandoffOverlay.vue";
+import { isKioskDisplay } from "../../../utils/kioskId";
+import { isHttpUrl } from "../../../utils/safeUrl";
+import { kioskSandboxFor } from "../../../utils/kioskSandbox";
+import { FRAME_BLOCKED_TITLE, frameBlockedBody } from "../../../utils/frameBlockedCopy";
+import { useFrameBlockDetection } from "../../../composables/useFrameBlockDetection";
 
 const props = defineProps({
   schema: { type: Object, required: true },
   data: { type: [Object, Array, null], default: null },
 });
 
+// A kiosk has no way back from an opened tab: offer the QR handoff instead.
+const onKiosk = isKioskDisplay();
+const showQr = ref(false);
+
 const url = computed(() => {
   if (props.schema.url_path) {
-    return resolvePath(props.data, props.schema.url_path) || "";
+    return safe(resolvePath(props.data, props.schema.url_path));
   }
-  return props.schema.url || "";
+  return safe(props.schema.url);
 });
+
+// A kiosk has no way back from a popup or a top-level navigation, so its frame
+// gets neither allow-popups nor allow-top-navigation, and a frame from Calvin's
+// own origin loses allow-same-origin too (see utils/kioskSandbox.js).
+const sandbox = computed(() =>
+  onKiosk ? kioskSandboxFor(url.value) : "allow-scripts allow-same-origin allow-forms allow-popups"
+);
+
+// The QR action must not cover a permanent display. On a kiosk it shows for a few
+// seconds after the page loads (a site that refuses framing is only a blank
+// frame, so this is when it is needed) and again when someone taps into the
+// frame: those taps never reach Calvin, but the window loses focus to the iframe.
+const QR_VISIBLE_MS = 8000;
+const qrVisible = ref(false);
+let qrTimer = null;
+function revealQr() {
+  if (!onKiosk || !url.value) return;
+  qrVisible.value = true;
+  if (qrTimer) clearTimeout(qrTimer);
+  qrTimer = setTimeout(() => {
+    qrVisible.value = false;
+    qrTimer = null;
+  }, QR_VISIBLE_MS);
+}
+function onWindowBlur() {
+  if (iframe.value && document.activeElement === iframe.value) revealQr();
+}
+onMounted(() => window.addEventListener("blur", onWindowBlur));
+
+// Only http(s) is ever framed (a plugin or feed may carry javascript: or data:).
+function safe(value) {
+  return isHttpUrl(value) ? value : "";
+}
 
 const iframe = ref(null);
 const error = ref(false);
@@ -65,7 +142,11 @@ function clearTimer() {
   }
 }
 
+// A CSP-blocked frame still fires load afterwards: that must not clear the error.
+const frameBlock = useFrameBlockDetection(url, () => handleError());
+
 function handleLoad() {
+  if (frameBlock.blocked.value) return;
   error.value = false;
   clearTimer();
 }
@@ -77,6 +158,7 @@ function handleError() {
 
 function retry() {
   error.value = false;
+  frameBlock.reset();
   if (!iframe.value) return;
   const current = url.value;
   iframe.value.src = "";
@@ -88,7 +170,9 @@ function retry() {
 watch(
   url,
   () => {
+    revealQr();
     error.value = false;
+    frameBlock.reset();
     clearTimer();
     loadTimer = setTimeout(() => {
       const el = iframe.value;
@@ -105,7 +189,11 @@ watch(
   { immediate: true }
 );
 
-onUnmounted(clearTimer);
+onUnmounted(() => {
+  clearTimer();
+  if (qrTimer) clearTimeout(qrTimer);
+  window.removeEventListener("blur", onWindowBlur);
+});
 </script>
 
 <style scoped>
@@ -120,6 +208,21 @@ onUnmounted(clearTimer);
   height: 100%;
   border: none;
   background: var(--bg-1);
+}
+
+.iframe-renderer__qr {
+  position: absolute;
+  right: var(--gap-3);
+  bottom: var(--gap-3);
+  z-index: var(--z-raised);
+  box-shadow: var(--elev-1);
+  transition: opacity var(--dur) var(--ease);
+}
+
+/* Hidden at rest: the frame is a permanent display, so nothing sits over it. */
+.iframe-renderer__qr--hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .iframe-renderer__frame--error {

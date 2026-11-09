@@ -341,7 +341,7 @@ describe("progress store: loading-light engine (CLV-115)", () => {
 
   describe("screen-switch sources (immediate, shorter minimum)", () => {
     it("names the switch timing next to the engine timing", () => {
-      expect(SCREEN_SWITCH_TIMING).toEqual({ minVisibleMs: 300, fastSettleMs: 150 });
+      expect(SCREEN_SWITCH_TIMING).toEqual({ minVisibleMs: 300 });
     });
 
     it("shows the light synchronously for an immediate source", () => {

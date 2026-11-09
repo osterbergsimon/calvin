@@ -35,7 +35,14 @@
         :message="schema.empty_text || 'Nothing planned.'"
       />
     </Card>
-    <HandoffOverlay v-if="overlay?.kind === 'handoff'" :url="overlay.url" @close="closeOverlay" />
+    <HandoffOverlay
+      v-if="overlay?.kind === 'handoff'"
+      :url="overlay.url"
+      :embed-refused="Boolean(overlay.embedRefused)"
+      :blocked="Boolean(overlay.blocked)"
+      @close="closeOverlay"
+      @embed="openEmbedded"
+    />
     <EmbedOverlay
       v-else-if="overlay?.kind === 'embed'"
       :url="overlay.url"
@@ -62,9 +69,8 @@ const props = defineProps({
   linkAction: { type: String, default: null },
 });
 
-const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff } = useLinkOpen(
-  () => props.linkAction
-);
+const { overlay, isClickable, openLink, closeOverlay, fallbackToHandoff, openEmbedded } =
+  useLinkOpen(() => props.linkAction);
 
 const gridEl = ref(null);
 const { clampStyle, shadeClass } = useFitScroll(gridEl, {
@@ -73,10 +79,10 @@ const { clampStyle, shadeClass } = useFitScroll(gridEl, {
   data: () => props.data,
 });
 
-// A region's card-size control sets --card-pad (styles/cardSizeScale.js); the
-// card block owns its inset otherwise. This is the one geometry a plugin panel
-// may override, so it stays an inline var rather than a local card style.
-const cardPadStyle = { padding: "var(--card-pad, var(--gap-4))" };
+// A region's card-size control sets --card-pad and --card-fs (styles/cardSizeScale.js);
+// the card block owns its inset and text size otherwise. This is the one geometry a
+// plugin panel may override, so it stays an inline var rather than a local card style.
+const cardPadStyle = { padding: "var(--card-pad, var(--gap-4))", fontSize: "var(--card-fs, 1em)" };
 
 const itemLinkAction = computed(() => itemSpec().link_action);
 
@@ -103,10 +109,10 @@ const gridStyle = computed(() => {
     // unchanged.
     gridTemplateColumns = `repeat(auto-fit, minmax(var(--card-min, ${min}px), 1fr))`;
   }
-  // max-content keeps each row at its natural (card) height so the grid OVERFLOWS
-  // its region instead of squishing rows to title height — that overflow is what
-  // the fit-clamp measures and clamps/scrolls.
-  return { gridTemplateColumns, gridAutoRows: "max-content" };
+  // Rows never shrink below the card's natural height, so a grid taller than its
+  // region OVERFLOWS (what the fit-clamp measures and clamps/scrolls); when the
+  // region is taller than the cards, the 1fr share stretches the rows to fill it.
+  return { gridTemplateColumns, gridAutoRows: "minmax(max-content, 1fr)" };
 });
 
 function cardTitle(card) {
@@ -172,7 +178,8 @@ function itemKey(item, idx) {
 /* card title = the readout microlabel: one label voice everywhere */
 .card-grid__title {
   font-family: var(--font-ui);
-  font-size: 0.7em;
+  /* The floor keeps the smallest Card size legible on a wall display. */
+  font-size: max(0.7em, var(--text-caption));
   font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -181,9 +188,16 @@ function itemKey(item, idx) {
   border-bottom: 1px solid var(--line-soft);
 }
 
+/* Meal rows share the card's spare height equally (never below their own
+   height), so a tall card reads as a planner and the rows line up across days. */
+.card-grid__items {
+  flex: 1 1 auto;
+}
+
 .card-grid__item {
+  flex: 1 1 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--gap-3);
   border-radius: 2px;
 }
@@ -194,7 +208,7 @@ function itemKey(item, idx) {
 
 .card-grid__item-label {
   font-family: var(--font-ui);
-  font-size: 0.7em;
+  font-size: max(0.7em, var(--text-caption));
   font-weight: var(--weight-title);
   letter-spacing: 0.09em;
   text-transform: uppercase;

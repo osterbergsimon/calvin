@@ -293,6 +293,33 @@ def test_stop_asks_the_agent_to_finish_and_the_report_ends_it(test_client: TestC
 
 
 @pytest.mark.integration
+def test_stop_for_another_run_id_is_ignored(test_client: TestClient, kiosk):
+    """calvin-hn1e: a delayed stop from an earlier dialog must not hit a later run."""
+    old = _start(test_client, "write", brightness=19).json()
+    _report(test_client, old["id"], "stopped")
+    new = _start(test_client, "detect").json()
+    assert new["id"] != old["id"]
+
+    late = test_client.post(f"{BASE}/stop", json={"runId": old["id"], "saved": True})
+    assert late.status_code == 200
+    assert late.json()["id"] == new["id"]  # the run that is really active
+    assert late.json()["action"] != "stop"
+    assert (
+        "saved" not in _config(test_client)["displayCheck"]
+        or not (_config(test_client)["displayCheck"]["saved"])
+    )
+    assert _config(test_client)["displayCheck"]["action"] != "stop"
+
+
+@pytest.mark.integration
+def test_stop_with_the_matching_run_id_stops_it(test_client: TestClient, kiosk):
+    run = _start(test_client, "write", brightness=19).json()
+    stopped = test_client.post(f"{BASE}/stop", json={"runId": run["id"]})
+    assert stopped.status_code == 200
+    assert stopped.json()["action"] == "stop"
+
+
+@pytest.mark.integration
 def test_asleep_is_surfaced_and_not_retried(test_client: TestClient, kiosk):
     run = _start(test_client, "write").json()
     _report(test_client, run["id"], "asleep", level=0, detail="the panel is asleep")
@@ -301,6 +328,43 @@ def test_asleep_is_surfaced_and_not_retried(test_client: TestClient, kiosk):
     assert seen["active"] is False
     assert seen["detail"] == "the panel is asleep"
     assert "displayCheck" not in _config(test_client)
+
+
+@pytest.mark.integration
+def test_the_ten_minutes_count_from_pickup_so_a_late_pickup_keeps_its_result(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    """calvin-8ck0: the agent's own deadline starts when it picks the run up."""
+    from app.services import display_check
+
+    run = _start(test_client).json()
+    real_now = display_check.utcnow()
+    clock = {"now": real_now + timedelta(minutes=9)}  # the agent finds it a minute late
+    monkeypatch.setattr(display_check, "utcnow", lambda: clock["now"])
+    assert _report(test_client, run["id"]).status_code == 200  # picked up
+
+    clock["now"] = real_now + timedelta(minutes=14)  # 14 min after the request, 5 after pickup
+    seen = test_client.get(BASE).json()["run"]
+    assert seen["active"] is True
+    assert _report(test_client, run["id"], "done", level=19).status_code == 200
+    assert test_client.get(BASE).json()["run"]["steps"]["detect"]["status"] == "done"
+
+    clock["now"] = real_now + timedelta(minutes=9, seconds=601)  # ten minutes after pickup
+    assert test_client.get(BASE).json()["run"]["status"] == "timeout"
+
+
+@pytest.mark.integration
+def test_a_run_nobody_picks_up_still_expires_ten_minutes_after_the_request(
+    test_client: TestClient, kiosk, monkeypatch
+):
+    from app.services import display_check
+
+    _start(test_client)
+    real_now = display_check.utcnow()
+    monkeypatch.setattr(
+        display_check, "utcnow", lambda: real_now + timedelta(minutes=10, seconds=5)
+    )
+    assert test_client.get(BASE).json()["run"]["status"] == "timeout"
 
 
 @pytest.mark.integration

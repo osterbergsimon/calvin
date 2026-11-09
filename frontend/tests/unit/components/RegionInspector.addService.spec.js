@@ -11,13 +11,13 @@ enableAutoUnmount(afterEach);
 
 const defaultMatchMedia = window.matchMedia;
 
-const mountWith = services =>
+const mountWith = (services, disabledPlugins = []) =>
   mount(RegionInspector, {
     props: {
       region: { id: "r1", kind: "calendar", instanceIds: [] },
       screen: { name: "Home", layout: { regions: [{ id: "r1" }] } },
       layoutDir: "row",
-      componentOptions: buildComponentOptions(services),
+      componentOptions: buildComponentOptions(services, disabledPlugins),
       sourceOptions: [],
       context: null,
     },
@@ -118,6 +118,29 @@ describe("RegionInspector 'Shows' picker without services (F4)", () => {
       "Kitchen",
     ]);
     expect(w.text()).not.toContain("No matches");
+  });
+});
+
+describe("RegionInspector 'Shows' picker with a turned-off plugin (calvin-zbcg)", () => {
+  it("lists it as turned off and asks to enable it instead of picking it", async () => {
+    const w = mountWith([], [{ id: "mealie", name: "Mealie" }]);
+    await openPicker(w);
+    const option = w.findAll('[role="menuitem"]').find(item => item.text().includes("Mealie"));
+    expect(option.find(".menu__meta").text()).toBe("Turned off · Turn on");
+    await option.trigger("click");
+    expect(w.emitted("enable-plugin")[0]).toEqual(["mealie"]);
+    expect(w.emitted("set-component")).toBeUndefined();
+  });
+});
+
+describe("RegionInspector 'Shows' picker with a plugin that cannot be turned on", () => {
+  it("shows the reason and offers no Turn on", async () => {
+    const w = mountWith([], [{ id: "cast", name: "Cast", reason: "Sealed mode is on." }]);
+    await openPicker(w);
+    const option = w.findAll('[role="menuitem"]').find(item => item.text().includes("Cast"));
+    expect(option.find(".menu__meta").text()).toBe("Sealed mode is on.");
+    await option.trigger("click");
+    expect(w.emitted("enable-plugin")).toBeUndefined();
   });
 });
 

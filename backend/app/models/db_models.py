@@ -180,6 +180,12 @@ class KioskDB(ormar.Model):
     display_stack: str | None = ormar.String(
         max_length=16, nullable=True
     )  # x11 | wayland | cog, reported by the display agent (calvin-2ibz)
+    peer_ips: dict | None = ormar.JSON(
+        nullable=True
+    )  # {address: when last seen} for this kiosk's polls: a login from one is a kiosk session (calvin-q4o8)
+    wifi_power_save: str | None = ormar.String(
+        max_length=16, nullable=True
+    )  # on | off | unknown, reported by the display agent (calvin-grwq)
     display_check: dict | None = ormar.JSON(
         nullable=True
     )  # latest display-check run record, see app/services/display_check.py (calvin-29ws)

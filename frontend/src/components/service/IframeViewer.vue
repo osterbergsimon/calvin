@@ -2,7 +2,8 @@
   <div class="iframe-viewer">
     <iframe
       ref="iframe"
-      :src="url"
+      :src="frameSrc"
+      :sandbox="onKiosk ? kioskSandboxFor(frameSrc) : undefined"
       class="service-iframe"
       :class="{ 'iframe-error': iframeError }"
       frameborder="0"
@@ -18,9 +19,12 @@
           <svg class="error-content__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path :d="mdiAlert" />
           </svg>
-          Cannot Display Service
+          {{ frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : "Cannot Display Service" }}
         </h3>
-        <p>
+        <p v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
+          {{ frameBlockedBody(frameBlock.sealed.value) }}
+        </p>
+        <p v-else>
           This service cannot be embedded in an iframe due to security restrictions
           (CORS/X-Frame-Options).
         </p>
@@ -28,19 +32,31 @@
           {{ url }}
         </p>
         <div class="error-actions">
-          <a :href="url" target="_blank" rel="noopener noreferrer" class="btn-open-new">
+          <button v-if="onKiosk" class="btn-open-new" data-test="show-qr" @click="showQr = true">
+            Show QR Code
+          </button>
+          <a v-else :href="url" target="_blank" rel="noopener noreferrer" class="btn-open-new">
             Open in New Window
           </a>
-          <button class="btn-retry" @click="retryLoad">Retry</button>
+          <button v-if="!frameBlock.blocked.value" class="btn-retry" @click="retryLoad">
+            Retry
+          </button>
         </div>
       </div>
     </div>
+    <HandoffOverlay v-if="showQr" :url="url" embed-refused @close="showQr = false" />
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from "vue";
+import { computed, ref, watch, onUnmounted } from "vue";
 import { mdiAlert } from "@mdi/js";
+import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
+import { isKioskDisplay } from "../../utils/kioskId";
+import { isHttpUrl } from "../../utils/safeUrl";
+import { kioskSandboxFor } from "../../utils/kioskSandbox";
+import { FRAME_BLOCKED_TITLE, frameBlockedBody } from "../../utils/frameBlockedCopy";
+import { useFrameBlockDetection } from "../../composables/useFrameBlockDetection";
 
 const props = defineProps({
   url: {
@@ -51,11 +67,20 @@ const props = defineProps({
 
 const emit = defineEmits(["error"]);
 
+// A kiosk has no way back from an opened tab: offer the QR handoff instead.
+const onKiosk = isKioskDisplay();
+// Only http(s) is ever framed (a plugin or feed may carry javascript: or data:).
+const frameSrc = computed(() => (isHttpUrl(props.url) ? props.url : "about:blank"));
+const showQr = ref(false);
 const iframe = ref(null);
 const iframeError = ref(false);
 const iframeLoadTimeout = ref(null);
 
+// A CSP-blocked frame still fires load afterwards: that must not clear the error.
+const frameBlock = useFrameBlockDetection(frameSrc, () => handleIframeError());
+
 const handleIframeLoad = () => {
+  if (frameBlock.blocked.value) return;
   iframeError.value = false;
   if (iframeLoadTimeout.value) {
     clearTimeout(iframeLoadTimeout.value);
@@ -65,7 +90,7 @@ const handleIframeLoad = () => {
 
 const handleIframeError = () => {
   iframeError.value = true;
-  emit("error");
+  emit("error", frameBlock.blocked.value ? { reason: "blocked" } : undefined);
   if (iframeLoadTimeout.value) {
     clearTimeout(iframeLoadTimeout.value);
     iframeLoadTimeout.value = null;
@@ -74,9 +99,10 @@ const handleIframeError = () => {
 
 const retryLoad = () => {
   iframeError.value = false;
+  frameBlock.reset();
   if (iframe.value) {
     // Force reload by setting src again
-    const url = props.url;
+    const url = frameSrc.value;
     iframe.value.src = "";
     setTimeout(() => {
       if (iframe.value) {
@@ -91,6 +117,7 @@ watch(
   () => props.url,
   () => {
     iframeError.value = false;
+    frameBlock.reset();
     if (iframeLoadTimeout.value) {
       clearTimeout(iframeLoadTimeout.value);
     }

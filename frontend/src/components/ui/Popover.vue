@@ -124,6 +124,9 @@ function restoreFocus() {
 
 function onDocumentPointerDown(event) {
   if (panelEl.value?.contains(event.target) || triggerEl.value?.contains(event.target)) return;
+  // A control inside the panel (a select) teleports its own menu to <body>; a
+  // poke on that menu belongs to this interaction, not to "outside".
+  if (event.target?.closest?.("[data-floating-layer]")) return;
   close("outside");
 }
 

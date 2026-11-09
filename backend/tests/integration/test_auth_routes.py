@@ -40,18 +40,19 @@ def test_status_unconfigured(test_client):
     get_admin_store().reset()
     response = test_client.get("/api/auth/status")
     assert response.status_code == 200
-    assert response.json() == {"configured": False, "authenticated": False}
+    assert response.json()["configured"] is False
+    assert response.json()["authenticated"] is False
 
 
 def test_setup_logs_in(test_client):
     get_admin_store().reset()
     response = _setup(test_client)
     assert response.status_code == 200
-    assert response.json() == {"ok": True}
+    assert response.json()["ok"] is True
     assert "calvin_admin" in response.headers["set-cookie"]
 
     status = test_client.get("/api/auth/status").json()
-    assert status == {"configured": True, "authenticated": True}
+    assert (status["configured"], status["authenticated"]) == (True, True)
     assert test_client.post("/api/calendar/sources", json={}).status_code != 401
 
 
@@ -165,4 +166,4 @@ def test_cookie_attributes(test_client):
     assert "httponly" in header
     assert "samesite=strict" in header
     assert "path=/" in header
-    assert "max-age=34560000" in header
+    assert "max-age=2592000" in header  # a device session: 30 days (calvin-q4o8)

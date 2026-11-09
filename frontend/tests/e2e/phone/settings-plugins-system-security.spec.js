@@ -160,7 +160,6 @@ test.describe("phone: Security", () => {
     // Allowed sites keeps the add row usable on a phone.
     await page.locator("#origin-input").fill("https://photos.local");
     await page.locator('[data-test="origin-add"]').click();
-    await page.locator('[data-test="origins-save"]').click();
     await expect.poll(() => api.requests).toContain("PUT /api/security/allowed-origins");
 
     await expectPhoneLayout(page, "Security after changes");

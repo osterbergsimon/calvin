@@ -323,7 +323,14 @@ def _iso(dt: datetime) -> str:
 
 
 def _expires_at(run: dict) -> datetime:
-    return as_utc(datetime.fromisoformat(run["requestedAt"])) + RUN_TTL
+    """Ten minutes from pickup, or from the request while nobody has picked it up.
+
+    The agent's own deadline starts when it picks the run up, so counting from the
+    request would time a late pickup out while the agent still works (calvin-8ck0).
+    A request no agent ever takes still lapses ten minutes after it was made.
+    """
+    started = run.get("pickedUpAt") or run["requestedAt"]
+    return as_utc(datetime.fromisoformat(started)) + RUN_TTL
 
 
 def _view(run: dict | None) -> dict | None:
@@ -529,13 +536,26 @@ async def start_run(kiosk_id: str, request: StartRequest) -> dict:
 
 
 @_serialised
-async def stop_run(kiosk_id: str, saved: bool = False) -> dict:
+async def stop_run(kiosk_id: str, saved: bool = False, run_id: str | None = None) -> dict:
+    """Ask the agent to end the active run.
+
+    ``run_id`` (calvin-hn1e) names the run the caller means. A delayed stop from
+    an earlier dialog must not end a run another device started since, so a
+    mismatch changes nothing and the run that is really active is returned.
+    Without ``run_id`` (older callers) the active run is stopped.
+    """
     row = await _row(kiosk_id)
     if row is None:
         raise UnknownKioskError(kiosk_id)
     current = _view(row.display_check)
     if not current or not current["active"]:
         raise NoActiveRunError(kiosk_id)
+    if run_id is not None and run_id != current["id"]:
+        logger.info(
+            f"Display check stop for {run_id} ignored on {kiosk_id!r}: "
+            f"run {current['id']} is the active one"
+        )
+        return current
     run = dict(row.display_check)
     run["action"] = "stop"
     if saved:
@@ -637,6 +657,8 @@ async def record_report(kiosk_id: str, report: AgentReport) -> None:
         logger.info(f"Display check {report.id} for {kiosk_id!r} ended: {run['status']}")
         return
 
+    if not run.get("pickedUpAt"):
+        run["pickedUpAt"] = now  # the agent has the run: its ten minutes start here
     current_seq = run.get("seq")
     if (
         status in ("running", "done", "error")

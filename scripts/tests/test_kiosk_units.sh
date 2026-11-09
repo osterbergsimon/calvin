@@ -22,6 +22,21 @@ assert_not_contains "$f" 'localhost:8000' "calvin-kiosk.service still hard-codes
 assert_contains "$f" 'localhost:\$\{CALVIN_PORT:-8000\}' "calvin-kiosk.service does not use CALVIN_PORT"
 pass "calvin-kiosk.service uses CALVIN_PORT"
 
+# The all-in-one display has no ?kiosk= id, so the page is told it is a kiosk
+# for link handling (calvin-eugy): links there must never navigate the wall.
+assert_contains "$f" '/\?display=kiosk"' "calvin-kiosk.service does not mark the display as a kiosk for links"
+pass "calvin-kiosk.service marks its display for kiosk link handling"
+
 # The generated openbox autostart (Chromium-launching variant) too.
 assert_not_contains "$REPO/scripts/setup-common.sh" 'localhost:8000/api/health' "openbox autostart hard-codes port 8000"
 pass "openbox autostart has no hard-coded port"
+
+# Every launcher tells the page its display has no tabs or back button. A registered
+# kiosk carries ?kiosk=<id>; one without an id falls back to ?display=kiosk, so a
+# link can never strand the wall (calvin-eugy). The URL applies on the next kiosk
+# restart.
+for unit in calvin-cog.service calvin-kiosk-remote.service; do
+    assert_contains "$REPO/deploy/systemd/$unit" 'else q="display=kiosk"' "$unit has no display=kiosk fallback when CALVIN_KIOSK_ID is unset"
+done
+assert_contains "$REPO/scripts/setup-common.sh" '/\?display=kiosk &' "openbox autostart does not mark the display as a kiosk"
+pass "every kiosk launcher marks its display for kiosk link handling"

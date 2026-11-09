@@ -4,17 +4,19 @@
     :class="[`orientation-${orientation}`, { ghost }]"
     :style="sizeStyle"
   >
-    <SchemaStatusbarItem
-      v-for="service in schemaServices"
-      :key="service.id"
-      :service-id="service.id"
-      :schema="service.statusbar_schema"
-    />
+    <div class="plugin-statusbar-items__row">
+      <SchemaStatusbarItem
+        v-for="service in schemaServices"
+        :key="`${service.id}:${retryKey}`"
+        :service-id="service.id"
+        :schema="service.statusbar_schema"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, defineComponent, h, onMounted } from "vue";
+import { computed, defineAsyncComponent, defineComponent, h, onMounted, ref } from "vue";
 import { useWebServicesStore } from "../stores/webServices";
 import { useProgressStore } from "../stores/progress";
 
@@ -30,10 +32,38 @@ const StatusbarItemPlaceholder = defineComponent({
     h("span", { class: "plugin-statusbar-items__placeholder", "aria-hidden": "true" }),
 });
 
+// A failed chunk load (flaky Wi-Fi) is retried twice on its own, then replaced
+// by a tap-to-retry control rather than a blank gap in the clock bar
+// (calvin-o8c1). Bumping retryKey remounts the async wrapper, which loads again.
+const retryKey = ref(0);
+const StatusbarItemError = defineComponent({
+  name: "StatusbarItemError",
+  setup: () => () =>
+    h(
+      "button",
+      {
+        type: "button",
+        class: "plugin-statusbar-items__retry",
+        "data-test": "statusbar-retry",
+        title: "Clock bar info did not load. Tap to retry.",
+        "aria-label": "Clock bar info did not load. Retry",
+        onClick: () => {
+          retryKey.value += 1;
+        },
+      },
+      "↻"
+    ),
+});
+
 const SchemaStatusbarItem = defineAsyncComponent({
   loader: () => import("./plugins/SchemaStatusbarItem.vue"),
   loadingComponent: StatusbarItemPlaceholder,
+  errorComponent: StatusbarItemError,
   delay: 0,
+  onError(error, retry, fail, attempts) {
+    if (attempts <= 2) setTimeout(retry, 1500 * attempts);
+    else fail();
+  },
 });
 
 const props = defineProps({
@@ -100,11 +130,41 @@ onMounted(() => {
 
 <style scoped>
 .plugin-statusbar-items {
+  /* A grid of minmax(0, max-content) columns: as wide as its tiles when there
+     is room, but a floor of zero, so the zone holding it can shrink to its
+     fixed parts and the tiles truncate. (A flex row would report its full
+     width as the floor.) */
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, max-content);
+  align-items: center;
+  /* The tiles are the part of a bar that gives way: they shrink (their names
+     truncate) instead of running over the zone beside them (calvin-r7lb). */
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+}
+
+/* The tiles share one flex row, so every tile's shrink is weighted by the width
+   of its names (StatusRenderer): names go before any value, across tiles. */
+.plugin-statusbar-items__row {
   display: flex;
   align-items: center;
+  /* Tiles in a row never run together ("176·9'YR 2°"). */
+  column-gap: var(--gap-inline);
+  min-width: 0;
+}
+
+.plugin-statusbar-items.orientation-vertical .plugin-statusbar-items__row {
+  flex-direction: column;
+  gap: 0.5rem;
+  column-gap: 0.5rem;
 }
 
 .plugin-statusbar-items.orientation-vertical {
+  overflow: visible;
+  column-gap: 0;
+  display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
@@ -113,6 +173,16 @@ onMounted(() => {
   visibility: hidden;
   pointer-events: none;
   user-select: none;
+}
+
+.plugin-statusbar-items__retry {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
 }
 
 /* While the async plugin chunk loads, hold a slot so the clock bar's layout

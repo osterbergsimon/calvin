@@ -48,7 +48,9 @@ export const useCalendarStore = defineStore("calendar", () => {
     logError("[Calendar]", message, err);
   };
 
-  const fetchSources = async () => {
+  // `refresh` skips the offline-cache shortcut, for a caller that knows the cached
+  // list is missing a source.
+  const fetchSources = async ({ refresh = false } = {}) => {
     loading.value = true;
     clearError();
 
@@ -65,7 +67,7 @@ export const useCalendarStore = defineStore("calendar", () => {
           /** @type {CalendarSourcesResponse} */
           return response.data;
         },
-        { preferCache: !connectionStore.isFullyOnline() }
+        { preferCache: !refresh && !connectionStore.isFullyOnline() }
       );
       if (result.fromCache) {
         logInfo(

@@ -5,16 +5,7 @@ from loguru import logger
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager as instance_manager
-
-# Built-in plugin classes live under this package; installed plugins load as
-# ``installed_plugin_<id>`` modules instead.
-_BUILTIN_MODULE_PREFIX = "app.plugins."
-
-
-def _is_builtin(type_info) -> bool:
-    """True when the type ships with Calvin itself (not installed from a repo)."""
-    module = getattr(type_info.plugin_class, "__module__", "") or ""
-    return module.startswith(_BUILTIN_MODULE_PREFIX)
+from app.plugins.registry.enable_policy import initial_enabled, keeps_reason
 
 
 async def load_plugin_types() -> None:
@@ -37,6 +28,9 @@ async def load_plugin_types() -> None:
 
             # Check if plugin type exists in database
             db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
+            seed_enabled, seed_reason = (
+                await initial_enabled(type_info) if not db_type else (True, None)
+            )
 
             # Use retry logic for database operations to handle SQLite concurrency
             from app.utils.db_retry import retry_on_db_locked
@@ -57,12 +51,11 @@ async def load_plugin_types() -> None:
                         description=type_info.description,
                         version=type_info.version,
                         common_config_schema=type_info.common_config_schema,
-                        # First boot (calvin-0y6): built-in types start enabled so the
-                        # default Local Images source and Iframe services work out of
-                        # the box; installed plugins stay off until the user opts in.
-                        # Only the initial row is seeded — a later user toggle sticks.
-                        enabled=_is_builtin(type_info),
-                        error_message=None,  # Clear any previous errors
+                        # A type with no row yet is newly installed (calvin-zbcg), so it
+                        # starts on, built-in or not. Only the initial row is seeded: a
+                        # later user toggle sticks across restarts and updates.
+                        enabled=seed_enabled,
+                        error_message=seed_reason,
                     )
                 else:
                     # Update existing plugin type if needed
@@ -86,8 +79,10 @@ async def load_plugin_types() -> None:
                     db_type.common_config_schema = merged_schema
 
                     db_type.plugin_type = plugin_type_value
-                    # Clear error message on successful load
-                    db_type.error_message = None
+                    # Clear error message on successful load, except the recorded
+                    # reason a type was left off (sealed mode)
+                    if not await keeps_reason(db_type):
+                        db_type.error_message = None
                     await db_type.save_with_timestamp()
 
             await _save_plugin_type()
@@ -152,6 +147,7 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
     type_id: str = type_info.type_id
 
     db_type = await PluginTypeDB.objects.get_or_none(type_id=type_id)
+    seed_enabled, seed_reason = await initial_enabled(type_info) if not db_type else (True, None)
 
     from app.utils.db_retry import retry_on_db_locked
 
@@ -170,8 +166,10 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
                 description=type_info.description,
                 version=type_info.version,
                 common_config_schema=type_info.common_config_schema,
-                enabled=False,
-                error_message=None,
+                # An install turns the type on (calvin-zbcg); the update branch below
+                # leaves a user's later off choice alone.
+                enabled=seed_enabled,
+                error_message=seed_reason,
             )
         else:
             db_type.name = type_info.name or type_id or "Unknown Plugin"
@@ -181,7 +179,8 @@ async def load_plugin_types_for_single(plugin_id: str) -> None:
             existing_schema = db_type.common_config_schema or {}
             db_type.common_config_schema = {**metadata_schema, **existing_schema}
             db_type.plugin_type = plugin_type_value
-            db_type.error_message = None
+            if not await keeps_reason(db_type):
+                db_type.error_message = None
             await db_type.save_with_timestamp()
 
     await _save_plugin_type()

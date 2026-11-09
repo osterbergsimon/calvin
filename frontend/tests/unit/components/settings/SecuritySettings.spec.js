@@ -33,14 +33,70 @@ describe("SecuritySettings", () => {
     expect(wrapper.text()).not.toContain("10.0.0.0/24");
   });
 
-  it("adds a valid origin and saves the full list", async () => {
+  it("adds a valid origin and persists the full list immediately", async () => {
     const { wrapper, store } = mountWith(["grafana.lab"]);
     await flushPromises();
     await wrapper.find("#origin-input").setValue("*.lab.example.com");
     await wrapper.find("[data-test='origin-add']").trigger("click");
-    await wrapper.find("[data-test='origins-save']").trigger("click");
     await flushPromises();
     expect(store.saveAllowedOrigins).toHaveBeenCalledWith(["grafana.lab", "*.lab.example.com"]);
+    expect(wrapper.find("[data-test='origins-save']").exists()).toBe(false);
+  });
+
+  it("says it saved and that open screens need a reload", async () => {
+    const { wrapper } = mountWith([]);
+    await flushPromises();
+    await wrapper.find("#origin-input").setValue("grafana.lab");
+    await wrapper.find("[data-test='origin-add']").trigger("click");
+    await flushPromises();
+    const note = wrapper.find("[data-test='origins-saved']");
+    expect(note.text()).toBe("Saved. Screens already open need a reload to apply this.");
+    expect(note.attributes("role")).toBe("status");
+  });
+
+  it("only says Saved while sealed mode is on", async () => {
+    const { wrapper } = mountWith([], true);
+    await flushPromises();
+    await wrapper.find("#origin-input").setValue("grafana.lab");
+    await wrapper.find("[data-test='origin-add']").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test='origins-saved']").text()).toBe("Saved.");
+  });
+
+  it("persists a removal immediately", async () => {
+    const { wrapper, store } = mountWith(["a.lab", "b.lab"]);
+    await flushPromises();
+    await wrapper.find("[data-test='origin-remove']").trigger("click");
+    await flushPromises();
+    expect(store.saveAllowedOrigins).toHaveBeenCalledWith(["b.lab"]);
+  });
+
+  it("rolls back the list and restores the typed text when a save fails", async () => {
+    const { wrapper, store } = mountWith(["a.lab"]);
+    await flushPromises();
+    store.saveAllowedOrigins.mockRejectedValueOnce(new Error("nope"));
+    await wrapper.find("#origin-input").setValue("b.lab");
+    await wrapper.find("[data-test='origin-add']").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test='origin-error']").exists()).toBe(true);
+    expect(wrapper.find("[data-test='origins-saved']").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("b.lab\nRemove");
+    expect(wrapper.findAll("[data-test='origin-remove']")).toHaveLength(1);
+    expect(wrapper.find("#origin-input").element.value).toBe("b.lab");
+  });
+
+  it("disables Add and Remove while a save is running", async () => {
+    const { wrapper, store } = mountWith(["a.lab"]);
+    await flushPromises();
+    let release;
+    store.saveAllowedOrigins.mockImplementationOnce(() => new Promise(r => (release = r)));
+    await wrapper.find("#origin-input").setValue("b.lab");
+    await wrapper.find("[data-test='origin-add']").trigger("click");
+    expect(wrapper.find("[data-test='origin-add']").attributes("disabled")).toBeDefined();
+    expect(wrapper.find("[data-test='origin-remove']").attributes("disabled")).toBeDefined();
+    release();
+    await flushPromises();
+    expect(wrapper.find("[data-test='origin-add']").attributes("disabled")).toBeUndefined();
   });
 
   it("renders the sealed-mode toggle reflecting current state", async () => {

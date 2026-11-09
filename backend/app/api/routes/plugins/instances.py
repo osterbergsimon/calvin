@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from app.models.db_models import PluginDB, PluginTypeDB
 from app.plugins.loader import plugin_loader
 from app.plugins.manager import plugin_manager
+from app.plugins.registry.enable_policy import turn_type_on
 from app.plugins.utils.instance_manager import apply_plugin_config_update
 from app.plugins.utils.secrets import (
     SecretEndpointChangedError,
@@ -458,7 +459,13 @@ async def update_plugin_instance(instance_id: str, instance_data: dict[str, Any]
     # Update enabled status if provided
     enabled = instance_data.get("enabled")
     if enabled is not None:
+        was_enabled = bool(db_plugin.enabled)
         db_plugin.enabled = enabled
+        # Only a real off -> on transition of the instance turns its type on
+        # (calvin-zbcg), unless sealed mode forbids it. The edit forms send
+        # `enabled` on every save, and that must not undo a deliberate type off.
+        if enabled is True and not was_enabled:
+            await turn_type_on(db_plugin.type_id)
 
     # Update config if provided
     updated_config = None

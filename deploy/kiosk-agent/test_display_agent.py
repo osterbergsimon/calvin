@@ -1,6 +1,7 @@
 import importlib.util
 import io
 import os
+import subprocess
 import threading
 import time as time_module
 from datetime import datetime, time, timedelta, timezone
@@ -384,6 +385,92 @@ def test_run_sleeps_min_of_boundary_and_refresh(monkeypatch):
     agent.run("http://x", 900, fetch=lambda url: cfg, sleep=fake_sleep, iterations=1)
     assert applied == [False]  # applied OFF once
     assert slept == [900]  # capped by refresh, not 7h
+
+
+def test_run_tells_the_server_when_the_screen_goes_to_sleep(monkeypatch):
+    """calvin-q4o8: a sleeping screen ends its kiosk's admin sessions."""
+    cfg = _cfg()
+    times = iter(
+        [
+            datetime(2026, 7, 11, 12, 0),  # on
+            datetime(2026, 7, 11, 23, 0),  # off: the transition
+            datetime(2026, 7, 11, 23, 5),  # still off: no second report
+            datetime(2026, 7, 12, 7, 0),  # on again: nothing to report
+        ]
+    )
+    monkeypatch.setattr(agent, "now_in", lambda c: next(times))
+    monkeypatch.setattr(agent, "apply_on", lambda on: "test")
+    reported = []
+    monkeypatch.setattr(
+        agent, "post_screen_sleep", lambda url: reported.append(url) or True
+    )
+    agent.run(
+        "http://x",
+        900,
+        fetch=lambda url: cfg,
+        sleep=lambda s: None,
+        iterations=4,
+    )
+    assert reported == ["http://x"]
+
+
+def test_post_screen_sleep_posts_to_the_kiosk_and_never_raises(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "hall-1")
+    seen = {}
+
+    class Opener:
+        @staticmethod
+        def urlopen(request, timeout=None):
+            seen["url"] = request.full_url
+            seen["method"] = request.get_method()
+            raise OSError("server down")
+
+    assert agent.post_screen_sleep("http://s:8000/", opener=Opener) is False
+    assert seen == {"url": "http://s:8000/api/kiosks/hall-1/screen-sleep", "method": "POST"}
+
+def test_post_screen_sleep_without_a_kiosk_id_uses_the_local_endpoint(monkeypatch):
+    """The all-in-one kiosk has no CALVIN_KIOSK_ID: its sessions have no kiosk id either."""
+    monkeypatch.delenv("CALVIN_KIOSK_ID", raising=False)
+    seen = {}
+
+    class Opener:
+        @staticmethod
+        def urlopen(request, timeout=None):
+            seen["url"] = request.full_url
+
+            class Ok:
+                status = 200
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *exc):
+                    return False
+
+            return Ok()
+
+    assert agent.post_screen_sleep("http://s:8000", opener=Opener) is True
+    assert seen["url"] == "http://s:8000/api/screen-sleep"
+
+
+def test_a_failed_screen_sleep_report_is_retried_a_few_times_then_dropped(monkeypatch):
+    cfg = _cfg()
+    monkeypatch.setattr(agent, "now_in", lambda c: datetime(2026, 7, 11, 23, 0))  # always off
+    monkeypatch.setattr(agent, "apply_on", lambda on: "test")
+    calls = []
+
+    def flaky(url):
+        calls.append(url)
+        return len(calls) >= 3  # fails twice, then lands
+
+    monkeypatch.setattr(agent, "post_screen_sleep", flaky)
+    agent.run("http://x", 900, fetch=lambda url: cfg, sleep=lambda s: None, iterations=8)
+    assert len(calls) == 3  # retried until it landed, then stopped
+
+    calls.clear()
+    monkeypatch.setattr(agent, "post_screen_sleep", lambda url: calls.append(url) and False)
+    agent.run("http://x", 900, fetch=lambda url: cfg, sleep=lambda s: None, iterations=20)
+    assert len(calls) == agent.SCREEN_SLEEP_ATTEMPTS  # bounded
 
 
 def test_main_uses_default_refresh_unless_overridden(monkeypatch):
@@ -979,6 +1066,119 @@ def test_fetch_config_reports_the_display_stack(monkeypatch, tmp_path):
     agent.fetch_config("http://s:8000")
 
     assert "kstack=cog" in seen["url"]
+
+
+def test_config_url_appends_wifi_power_save():
+    assert "kwifi=off" in agent._config_url("http://s:8000", "k1", "pi", kwifi="off")
+    assert "kwifi" not in agent._config_url("http://s:8000", "k1", "pi")
+
+
+def _net(tmp_path, wireless=True):
+    (tmp_path / "wlan0").mkdir()
+    if wireless:
+        (tmp_path / "wlan0" / "wireless").mkdir()
+    return str(tmp_path)
+
+
+def _iw_says(text, rc=0):
+    def run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, rc, stdout=text, stderr="")
+
+    return run
+
+
+def test_wifi_power_save_none_without_a_wireless_interface(tmp_path):
+    assert agent.wifi_power_save_state(sys_net=_net(tmp_path, wireless=False)) is None
+
+
+def test_wifi_power_save_reads_the_live_state_from_iw(tmp_path):
+    net = _net(tmp_path)
+    off = agent.wifi_power_save_state(sys_net=net, run=_iw_says("Power save: off\n"))
+    on = agent.wifi_power_save_state(sys_net=net, run=_iw_says("Power save: on\n"))
+    assert (off, on) == ("off", "on")
+
+
+def test_wifi_power_save_is_configured_not_verified_when_iw_cannot_say_but_calvin_set_it(
+    tmp_path,
+):
+    net = _net(tmp_path)
+    marker = tmp_path / "calvin-wifi-powersave.conf"
+    marker.write_text("[connection]\nwifi.powersave = 2\n")
+
+    def missing(cmd, **kwargs):
+        raise FileNotFoundError("iw")
+
+    assert (
+        agent.wifi_power_save_state(sys_net=net, run=missing, markers=[str(marker)])
+        == "configured"
+    )
+    assert agent.wifi_power_save_state(sys_net=net, run=missing, markers=[]) == "unknown"
+
+
+def test_a_wired_kiosk_reports_none_so_a_stale_wifi_state_is_cleared(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "k1")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v9")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: None)
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    monkeypatch.setattr(
+        agent.urllib.request,
+        "urlopen",
+        lambda url, timeout=None: seen.update(url=url) or FakeResponse(),
+    )
+    agent.fetch_config("http://s:8000")
+    assert "kwifi=none" in seen["url"]
+
+
+def test_wifi_power_save_unknown_when_iw_cannot_say(tmp_path):
+    net = _net(tmp_path)
+
+    def missing(cmd, **kwargs):
+        raise FileNotFoundError("iw")
+
+    assert agent.wifi_power_save_state(sys_net=net, run=missing, markers=[]) == "unknown"
+    assert (
+        agent.wifi_power_save_state(sys_net=net, run=_iw_says("", rc=1), markers=[]) == "unknown"
+    )
+
+
+def test_fetch_config_reports_the_wifi_power_save(monkeypatch):
+    monkeypatch.setenv("CALVIN_KIOSK_ID", "k1")
+    monkeypatch.setenv("CALVIN_KIOSK_HOSTNAME", "pi")
+    monkeypatch.setattr(agent, "running_version", lambda: "v9")
+    monkeypatch.setattr(agent, "touch_ready", lambda: None)
+    monkeypatch.setattr(agent, "wifi_power_save_state", lambda: "off")
+    seen = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"{}"
+
+    def fake_urlopen(url, timeout=None):
+        seen["url"] = url
+        return FakeResponse()
+
+    monkeypatch.setattr(agent.urllib.request, "urlopen", fake_urlopen)
+    agent.fetch_config("http://s:8000")
+    assert "kwifi=off" in seen["url"]
 
 
 def test_update_report_reads_updater_state(tmp_path):
@@ -4061,6 +4261,110 @@ def test_a_value_above_the_start_is_refused_even_if_the_ceiling_allows_it(tmp_pa
     runner.run()
     assert reports[-1]["reason"] == "above_ceiling"
     assert max(ddc.writes, default=0) <= 5
+
+
+def _polls_after_the_offer(first, ddc_holder, *, lowered_to=None, stop_after=6, vanish=False, **cfg):
+    """A poll() that only starts counting once the offered value has been written."""
+    state = {"n": 0}
+
+    def poll():
+        offered = 12 in ddc_holder[0].writes
+        if offered:
+            state["n"] += 1
+        job = dict(first)
+        if lowered_to is not None and state["n"] >= 1:
+            job["ceiling"] = lowered_to  # same request (id and seq), limit lowered since
+        if state["n"] >= stop_after:
+            if vanish:
+                return _ramp_cfg(**cfg)  # the dialog closed: no job any more
+            job["action"] = "stop"
+        return _job_cfg(job, **cfg)
+
+    return poll
+
+
+def test_a_limit_lowered_mid_run_brings_an_already_set_level_down_to_it(tmp_path):
+    """calvin-8ck0: the live ceiling arrives with every poll; a level above it is re-capped."""
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    poll = _polls_after_the_offer(first, holder, lowered_to=6)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll
+    )
+    holder[0] = ddc
+    runner.run()
+    after_offer = ddc.writes[ddc.writes.index(12) :]
+    # Re-capped to the new limit while the run was still going (not only by the
+    # end-of-run drop), in small steps, never above the offered value.
+    assert 6 in after_offer[:-1], ddc.writes
+    assert max(after_offer) <= 12
+    assert any(r["status"] == "running" and r.get("level") == 6 for r in reports), reports
+
+
+def _after_the_recap(ddc):
+    return ddc.writes[ddc.writes.index(6) :]
+
+
+def test_a_stop_after_the_recap_does_not_climb_back_past_the_new_limit(tmp_path):
+    """calvin-8ck0 review: with the ramp off the finish used to return to the start level."""
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    cfg = {"brightness_ramp_enabled": False}
+    poll = _polls_after_the_offer(first, holder, lowered_to=6, **cfg)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll, cfg_over=cfg
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 in ddc.writes, ddc.writes
+    assert max(_after_the_recap(ddc)) <= 6, ddc.writes
+
+
+def test_the_dialog_closing_after_the_recap_does_not_climb_back_either(tmp_path):
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    poll = _polls_after_the_offer(first, holder, lowered_to=6, vanish=True)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 in ddc.writes, ddc.writes
+    assert max(_after_the_recap(ddc)) <= 6, ddc.writes
+
+
+def test_a_saved_limit_lowered_mid_run_also_caps_the_finish(tmp_path):
+    """The limit setting itself (live settings), not only the job's ceiling."""
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    cfg = {"brightness_ramp_enabled": False}
+    state = {"n": 0}
+
+    def poll():
+        if 12 in holder[0].writes:
+            state["n"] += 1
+        job = dict(first, action="stop" if state["n"] >= 4 else "start")
+        return _job_cfg(job, **cfg, brightness_limit=6 if state["n"] >= 1 else None)
+
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll, cfg_over=cfg
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 in ddc.writes, ddc.writes
+    assert max(_after_the_recap(ddc)) <= 6, ddc.writes
+
+
+def test_a_ceiling_that_stays_put_writes_nothing_extra(tmp_path):
+    first = _cal_job("conversion", 12, ceiling=12)
+    holder = [None]
+    poll = _polls_after_the_offer(first, holder)
+    runner, reports, clock, ddc, fault = _cal_runner(
+        "conversion", tmp_path, level=19, value=12, ceiling=12, poll=poll
+    )
+    holder[0] = ddc
+    runner.run()
+    assert 6 not in ddc.writes and 8 not in ddc.writes, ddc.writes
 
 
 # 5: the start is read once per run
