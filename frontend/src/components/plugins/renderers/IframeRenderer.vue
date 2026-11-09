@@ -30,8 +30,16 @@
     </Button>
 
     <div v-if="error" class="iframe-renderer__fallback">
-      <Card class="iframe-renderer__fallback-card" title="This site won't embed">
-        <InlineNote>It blocks being shown inside another page (X-Frame-Options/CSP).</InlineNote>
+      <Card
+        class="iframe-renderer__fallback-card"
+        :title="frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : `This site won't embed`"
+      >
+        <InlineNote v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
+          {{ frameBlockedBody(frameBlock.sealed.value) }}
+        </InlineNote>
+        <InlineNote v-else>
+          It blocks being shown inside another page (X-Frame-Options/CSP).
+        </InlineNote>
         <p v-if="url" class="iframe-renderer__url">{{ url }}</p>
         <div class="iframe-renderer__actions">
           <Button
@@ -51,7 +59,9 @@
           >
             Open in new window
           </a>
-          <Button variant="secondary" @click="retry">Retry</Button>
+          <Button v-if="!frameBlock.blocked.value" variant="secondary" @click="retry">
+            Retry
+          </Button>
         </div>
       </Card>
     </div>
@@ -69,6 +79,8 @@ import HandoffOverlay from "../overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../../utils/kioskId";
 import { isHttpUrl } from "../../../utils/safeUrl";
 import { kioskSandboxFor } from "../../../utils/kioskSandbox";
+import { FRAME_BLOCKED_TITLE, frameBlockedBody } from "../../../utils/frameBlockedCopy";
+import { useFrameBlockDetection } from "../../../composables/useFrameBlockDetection";
 
 const props = defineProps({
   schema: { type: Object, required: true },
@@ -130,7 +142,11 @@ function clearTimer() {
   }
 }
 
+// A CSP-blocked frame still fires load afterwards: that must not clear the error.
+const frameBlock = useFrameBlockDetection(url, () => handleError());
+
 function handleLoad() {
+  if (frameBlock.blocked.value) return;
   error.value = false;
   clearTimer();
 }
@@ -142,6 +158,7 @@ function handleError() {
 
 function retry() {
   error.value = false;
+  frameBlock.reset();
   if (!iframe.value) return;
   const current = url.value;
   iframe.value.src = "";
@@ -155,6 +172,7 @@ watch(
   () => {
     revealQr();
     error.value = false;
+    frameBlock.reset();
     clearTimer();
     loadTimer = setTimeout(() => {
       const el = iframe.value;

@@ -30,6 +30,7 @@
     v-if="overlay?.kind === 'handoff'"
     :url="overlay.url"
     :embed-refused="Boolean(overlay.embedRefused)"
+    :blocked="Boolean(overlay.blocked)"
     @close="closeOverlay"
     @embed="openEmbedded"
   />

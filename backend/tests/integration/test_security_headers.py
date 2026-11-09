@@ -326,3 +326,126 @@ class TestSecurityHeaders:
         csp = response.headers.get("content-security-policy", "")
         assert "default-src 'self'" in csp
         assert "frame-src 'self'" in csp
+
+
+def _run(coro):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+def _directive(csp: str, name: str) -> str:
+    return next((d for d in csp.split("; ") if d.startswith(name)), "")
+
+
+@pytest.fixture
+def plugin_site_schema(monkeypatch):
+    """Register a fake plugin type 'sitey' whose schema marks `url` and `home`
+    as URL fields (both marker styles), plus a name-looks-like-URL decoy and a secret."""
+    from types import SimpleNamespace
+
+    from app.plugins.loader import plugin_loader
+
+    schema = {
+        "url": {"type": "string", "ui": {"component": "input", "validation": {"type": "url"}}},
+        "home": {"type": "url"},
+        "base_url_note": {"type": "string", "ui": {"component": "input"}},
+        "api_token": {"type": "password"},
+    }
+    cls = SimpleNamespace(metadata=SimpleNamespace(instance_config_schema=schema))
+    real = plugin_loader.get_plugin_class
+    monkeypatch.setattr(
+        plugin_loader,
+        "get_plugin_class",
+        lambda type_id: cls if type_id == "sitey" else real(type_id),
+    )
+
+
+async def _seed_site(
+    *, instance_id="sitey-1", enabled=True, type_enabled=True, config=None, type_id="sitey"
+):
+    from app.models.db_models import PluginTypeDB
+
+    try:
+        await PluginTypeDB.objects.get(type_id=type_id)
+    except Exception:
+        await PluginTypeDB.objects.create(
+            type_id=type_id, plugin_type="service", name=type_id, enabled=type_enabled
+        )
+    await PluginDB.objects.create(
+        id=instance_id,
+        type_id=type_id,
+        plugin_type="service",
+        name=instance_id,
+        enabled=enabled,
+        config=config,
+        display_order=0,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+
+@pytest.mark.integration
+class TestPluginSiteFrameOrigins:
+    def test_enabled_instance_url_fields_reach_frame_src_only(
+        self, security_test_client, plugin_site_schema
+    ):
+        _run(
+            _seed_site(
+                config={
+                    "url": "https://recipes.example.com/dish/42?x=1",
+                    "home": "http://home.lab:8080/path",
+                    "base_url_note": "https://decoy.example.com",
+                    "api_token": "https://secret.example.com",
+                }
+            )
+        )
+        csp = security_test_client.get("/api/health").headers["content-security-policy"]
+        frame = _directive(csp, "frame-src")
+        assert "https://recipes.example.com" in frame
+        assert "http://home.lab:8080" in frame
+        assert "/dish" not in csp and "x=1" not in csp
+        assert "decoy.example.com" not in csp
+        assert "secret.example.com" not in csp
+        assert "recipes.example.com" not in _directive(csp, "img-src")
+        assert "recipes.example.com" not in _directive(csp, "connect-src")
+        assert "home.lab" not in _directive(csp, "img-src")
+        assert "home.lab" not in _directive(csp, "connect-src")
+
+    def test_disabled_instance_excluded(self, security_test_client, plugin_site_schema):
+        _run(_seed_site(enabled=False, config={"url": "https://off.example.com"}))
+        csp = security_test_client.get("/api/health").headers["content-security-policy"]
+        assert "off.example.com" not in csp
+
+    def test_disabled_type_excluded(self, security_test_client, plugin_site_schema):
+        _run(_seed_site(type_enabled=False, config={"url": "https://typeoff.example.com"}))
+        csp = security_test_client.get("/api/health").headers["content-security-policy"]
+        assert "typeoff.example.com" not in csp
+
+    def test_non_http_values_ignored(self, security_test_client, plugin_site_schema):
+        _run(_seed_site(config={"url": "ftp://files.example.com", "home": "javascript:alert(1)"}))
+        csp = security_test_client.get("/api/health").headers["content-security-policy"]
+        assert "files.example.com" not in csp
+        assert "javascript" not in csp
+
+    def test_sealed_mode_collapses_plugin_sites(self, security_test_client, plugin_site_schema):
+        from app.models.db_models import ConfigDB
+
+        _run(_seed_site(config={"url": "https://recipes.example.com"}))
+        _run(ConfigDB.objects.create(key="sealed_mode", value="true", value_type="bool"))
+        csp = security_test_client.get("/api/health").headers["content-security-policy"]
+        assert _directive(csp, "frame-src") == "frame-src 'self'"
+        assert "recipes.example.com" not in csp
+
+    def test_lookup_failure_falls_back_to_self_only(self, security_test_client):
+        with patch(
+            "app.middleware.security_headers.get_plugin_site_origins",
+            new=AsyncMock(side_effect=Exception("boom")),
+        ):
+            response = security_test_client.get("/api/health")
+        assert response.status_code == 200
+        csp = response.headers["content-security-policy"]
+        assert _directive(csp, "frame-src") == "frame-src 'self'"

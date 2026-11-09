@@ -8,7 +8,7 @@ docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
 import re
 from urllib.parse import urlsplit
 
-from app.models.db_models import PluginDB
+from app.models.db_models import PluginDB, PluginTypeDB
 from app.services.config_service import config_service
 
 # Baseline directives. frame-src is appended per-request with configured origins.
@@ -135,6 +135,53 @@ async def get_web_service_origins() -> list[str]:
         origin = origin_from_url(url)
         if origin:
             origins.add(origin)
+    return sorted(origins)
+
+
+def _url_field_keys(schema: dict | None) -> list[str]:
+    """Keys of schema fields declared as URLs (top-level or ui.validation type "url").
+
+    Identified from the declared schema, never by field name, so a secret or a
+    free-text field that merely looks like a URL is never read.
+    """
+    keys: list[str] = []
+    for key, entry in (schema or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        ui = entry.get("ui")
+        validation = ui.get("validation") if isinstance(ui, dict) else None
+        validation_type = validation.get("type") if isinstance(validation, dict) else None
+        if "url" in (entry.get("type"), validation_type):
+            keys.append(key)
+    return keys
+
+
+async def get_plugin_site_origins() -> list[str]:
+    """Origins of URL-typed config fields of enabled plugin instances (frame-src only).
+
+    A plugin's site (e.g. a recipe manager) is a per-instance config URL, so it is
+    in no static list; without it every In-app link to that site is blocked.
+    Only the origin is ever taken, only from fields the plugin's schema declares
+    as URLs, only for enabled instances of enabled plugin types.
+    """
+    from app.plugins.loader import plugin_loader
+
+    instances = await PluginDB.objects.filter(enabled=True).all()
+    if not instances:
+        return []
+    enabled_types = {t.type_id for t in await PluginTypeDB.objects.filter(enabled=True).all()}
+    origins: set[str] = set()
+    for instance in instances:
+        if instance.type_id not in enabled_types or not instance.config:
+            continue
+        cls = plugin_loader.get_plugin_class(instance.type_id)
+        metadata = getattr(cls, "metadata", None)
+        schema = getattr(metadata, "instance_config_schema", None)
+        for key in _url_field_keys(schema):
+            value = instance.config.get(key)
+            origin = origin_from_url(value) if isinstance(value, str) else None
+            if origin:
+                origins.add(origin)
     return sorted(origins)
 
 

@@ -3,6 +3,9 @@
     <Dialog :model-value="true" label="Open this link on your phone" @close="emitClose">
       <div class="handoff">
         <p class="handoff__host">{{ host }}</p>
+        <InlineNote v-if="blocked" data-test="handoff-blocked">
+          {{ FRAME_BLOCKED_HANDOFF_NOTE }}
+        </InlineNote>
         <img v-if="qr" class="handoff__qr" data-test="qr" :src="qr" alt="QR code for this link" />
         <InlineNote>Scan to open on your phone</InlineNote>
         <Button v-if="showOpen" variant="primary" data-test="open" @click="openNow">
@@ -21,11 +24,14 @@ import Dialog from "@/components/ui/Dialog.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import { isKioskDisplay } from "@/utils/kioskId";
 import { isHttpUrl } from "@/utils/safeUrl";
+import { FRAME_BLOCKED_HANDOFF_NOTE } from "@/utils/frameBlockedCopy";
 
 const props = defineProps({
   url: { type: String, required: true },
   // The site already refused to be embedded: a kiosk has nowhere left to open it.
   embedRefused: { type: Boolean, default: false },
+  // Calvin's own policy blocked the embed (not the site refusing): say so.
+  blocked: { type: Boolean, default: false },
 });
 const emit = defineEmits(["close", "embed"]);
 

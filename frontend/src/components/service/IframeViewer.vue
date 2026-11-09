@@ -19,9 +19,12 @@
           <svg class="error-content__icon" viewBox="0 0 24 24" aria-hidden="true">
             <path :d="mdiAlert" />
           </svg>
-          Cannot Display Service
+          {{ frameBlock.blocked.value ? FRAME_BLOCKED_TITLE : "Cannot Display Service" }}
         </h3>
-        <p>
+        <p v-if="frameBlock.blocked.value" data-test="frame-blocked-body">
+          {{ frameBlockedBody(frameBlock.sealed.value) }}
+        </p>
+        <p v-else>
           This service cannot be embedded in an iframe due to security restrictions
           (CORS/X-Frame-Options).
         </p>
@@ -35,7 +38,9 @@
           <a v-else :href="url" target="_blank" rel="noopener noreferrer" class="btn-open-new">
             Open in New Window
           </a>
-          <button class="btn-retry" @click="retryLoad">Retry</button>
+          <button v-if="!frameBlock.blocked.value" class="btn-retry" @click="retryLoad">
+            Retry
+          </button>
         </div>
       </div>
     </div>
@@ -50,6 +55,8 @@ import HandoffOverlay from "../plugins/overlays/HandoffOverlay.vue";
 import { isKioskDisplay } from "../../utils/kioskId";
 import { isHttpUrl } from "../../utils/safeUrl";
 import { kioskSandboxFor } from "../../utils/kioskSandbox";
+import { FRAME_BLOCKED_TITLE, frameBlockedBody } from "../../utils/frameBlockedCopy";
+import { useFrameBlockDetection } from "../../composables/useFrameBlockDetection";
 
 const props = defineProps({
   url: {
@@ -69,7 +76,11 @@ const iframe = ref(null);
 const iframeError = ref(false);
 const iframeLoadTimeout = ref(null);
 
+// A CSP-blocked frame still fires load afterwards: that must not clear the error.
+const frameBlock = useFrameBlockDetection(frameSrc, () => handleIframeError());
+
 const handleIframeLoad = () => {
+  if (frameBlock.blocked.value) return;
   iframeError.value = false;
   if (iframeLoadTimeout.value) {
     clearTimeout(iframeLoadTimeout.value);
@@ -79,7 +90,7 @@ const handleIframeLoad = () => {
 
 const handleIframeError = () => {
   iframeError.value = true;
-  emit("error");
+  emit("error", frameBlock.blocked.value ? { reason: "blocked" } : undefined);
   if (iframeLoadTimeout.value) {
     clearTimeout(iframeLoadTimeout.value);
     iframeLoadTimeout.value = null;
@@ -88,6 +99,7 @@ const handleIframeError = () => {
 
 const retryLoad = () => {
   iframeError.value = false;
+  frameBlock.reset();
   if (iframe.value) {
     // Force reload by setting src again
     const url = frameSrc.value;
@@ -105,6 +117,7 @@ watch(
   () => props.url,
   () => {
     iframeError.value = false;
+    frameBlock.reset();
     if (iframeLoadTimeout.value) {
       clearTimeout(iframeLoadTimeout.value);
     }
