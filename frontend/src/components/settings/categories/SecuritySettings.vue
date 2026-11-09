@@ -30,6 +30,9 @@
           </InlineNote>
           <InlineNote v-if="!origins.length">No sites allowed.</InlineNote>
           <InlineNote v-if="error" tone="err" data-test="origin-error">{{ error }}</InlineNote>
+          <InlineNote v-if="savedNote" role="status" data-test="origins-saved">
+            {{ savedNote }}
+          </InlineNote>
         </template>
         <TextField
           v-model="draft"
@@ -38,23 +41,12 @@
           placeholder="grafana.lab or *.lab.example.com"
           @keyup.enter="add"
         />
-        <Button data-test="origin-add" @click="add">Add</Button>
+        <Button data-test="origin-add" :disabled="saving" @click="add">Add</Button>
       </SettingRow>
 
       <SettingRow v-for="origin in origins" :key="origin" :label="origin">
-        <Button size="sm" data-test="origin-remove" @click="remove(origin)">Remove</Button>
-      </SettingRow>
-
-      <SettingRow label="Save allowed sites" description="Applies the list above to this Calvin.">
-        <Button
-          variant="primary"
-          data-test="origins-save"
-          :disabled="saving"
-          :loading="saving"
-          loading-label="Saving…"
-          @click="save"
-        >
-          Save
+        <Button size="sm" data-test="origin-remove" :disabled="saving" @click="remove(origin)">
+          Remove
         </Button>
       </SettingRow>
     </SettingsSection>
@@ -110,36 +102,56 @@ function inputError(value) {
   if (hostPart.includes("/")) {
     return "IP ranges (CIDR) and paths aren't supported — use a wildcard domain like *.lab.example.com.";
   }
-  if (/[\s?#]/.test(hostPart)) return "Origins can't contain spaces, query, or fragment.";
+  if (/[\s?#]/.test(hostPart)) return "Sites can't contain spaces, query, or fragment.";
   return "";
 }
 
-function add() {
+// Add and Remove persist at once (like the rest of Settings), so a listed site
+// is always an applied one. A failed save rolls the list back.
+const savedNote = ref("");
+
+async function persist(next) {
+  const previous = origins.value;
+  origins.value = next;
+  saving.value = true;
+  error.value = "";
+  savedNote.value = "";
+  try {
+    await store.saveAllowedOrigins(next);
+    savedNote.value = sealed.value
+      ? "Saved."
+      : "Saved. Screens already open need a reload to apply this.";
+    return true;
+  } catch (err) {
+    origins.value = previous;
+    error.value = friendlyError(err, "save the allowed sites");
+    logError("[SecuritySettings]", "save failed", err);
+    return false;
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function add() {
+  if (saving.value) return;
   const v = draft.value.trim();
   const err = inputError(v);
   if (err) {
     error.value = err;
     return;
   }
-  if (!origins.value.includes(v)) origins.value = [...origins.value, v];
+  if (origins.value.includes(v)) {
+    draft.value = "";
+    error.value = "";
+    return;
+  }
   draft.value = "";
-  error.value = "";
+  const ok = await persist([...origins.value, v]);
+  if (!ok) draft.value = v; // keep what was typed
 }
 
 function remove(origin) {
-  origins.value = origins.value.filter(o => o !== origin);
-}
-
-async function save() {
-  saving.value = true;
-  error.value = "";
-  try {
-    await store.saveAllowedOrigins(origins.value);
-  } catch (err) {
-    error.value = friendlyError(err, "save the allowed sites");
-    logError("[SecuritySettings]", "save failed", err);
-  } finally {
-    saving.value = false;
-  }
+  if (saving.value) return;
+  return persist(origins.value.filter(o => o !== origin));
 }
 </script>

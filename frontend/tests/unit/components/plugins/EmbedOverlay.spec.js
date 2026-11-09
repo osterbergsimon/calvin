@@ -34,4 +34,12 @@ describe("EmbedOverlay", () => {
     w.findComponent(IframeViewer).vm.$emit("error");
     expect(w.emitted("fallback")).toBeTruthy();
   });
+
+  it("passes a CSP block through to the fallback, plain errors carry no flag", () => {
+    const w = mountIt();
+    w.findComponent(IframeViewer).vm.$emit("error", { reason: "blocked" });
+    w.findComponent(IframeViewer).vm.$emit("error");
+    expect(w.emitted("fallback")[0]).toEqual([{ blocked: true }]);
+    expect(w.emitted("fallback")[1]).toEqual([]);
+  });
 });

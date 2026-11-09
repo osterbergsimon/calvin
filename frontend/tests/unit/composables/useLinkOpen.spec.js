@@ -49,4 +49,16 @@ describe("useLinkOpen", () => {
     closeOverlay();
     expect(overlay.value).toBe(null);
   });
+
+  it("fallbackToHandoff records a real block only when told", () => {
+    const { overlay, openLink, fallbackToHandoff } = useLinkOpen(() => "embed");
+    openLink("https://x");
+    fallbackToHandoff({ blocked: true });
+    expect(overlay.value).toEqual({
+      kind: "handoff",
+      url: "https://x",
+      embedRefused: true,
+      blocked: true,
+    });
+  });
 });

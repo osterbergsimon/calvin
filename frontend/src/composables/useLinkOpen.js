@@ -39,9 +39,11 @@ export function useLinkOpen(getRegionAction) {
 
   // The site refused embedding: back to the QR handoff, flagged so a kiosk does
   // not offer Open again (it would only loop back into the refused embed).
-  const fallbackToHandoff = () => {
+  // `info.blocked` marks a frame Calvin's own policy blocked (shows a note).
+  const fallbackToHandoff = info => {
     if (overlay.value?.kind === "embed") {
       overlay.value = { kind: "handoff", url: overlay.value.url, embedRefused: true };
+      if (info?.blocked === true) overlay.value.blocked = true;
     }
   };
 

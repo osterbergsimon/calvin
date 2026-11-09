@@ -8,10 +8,12 @@
       @close="$emit('close')"
     >
       <div class="embed-overlay__frame">
-        <IframeViewer :url="url" @error="$emit('fallback')" />
+        <IframeViewer :url="url" @error="onFrameError" />
       </div>
-      <!-- A site that refuses framing fires load, not error, so a refusal cannot
-           be detected: on a kiosk the QR handoff is always one tap away. -->
+      <!-- A frame blocked by Calvin's CSP is detected (securitypolicyviolation) and
+           falls back via IframeViewer's error. A site that refuses framing with
+           X-Frame-Options fires load, not error, and cannot be detected: on a
+           kiosk the QR handoff is always one tap away. -->
       <template v-if="onKiosk" #actions>
         <InlineNote v-if="secondsLeft !== null" role="status" data-test="embed-closing">
           Closing in {{ secondsLeft }} s
@@ -47,6 +49,13 @@ defineProps({ url: { type: String, required: true } });
 const emit = defineEmits(["close", "fallback"]);
 
 const onKiosk = isKioskDisplay();
+
+// Only a real CSP block carries a flag: the Show QR button emits a plain
+// fallback, so the handoff's "can't be shown" note never follows a working page.
+const onFrameError = info => {
+  if (info?.reason === "blocked") emit("fallback", { blocked: true });
+  else emit("fallback");
+};
 
 // Taps inside the frame never reach this page, so an idle timer cannot be reset
 // by them: on a kiosk the embed gets a hard cap, then closes, so a wall never
