@@ -1,0 +1,2615 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/superpowers/specs/2026-11-04-kiosk-brightness-ramp-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Kiosk brightness ramp at sleep/wake, and a display diagnostics helper - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kiosk-brightness-ramp-at-sleepwake-and-a-display-diagnostics-helper" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Kiosk brightness ramp at sleep/wake, and a display diagnostics helper
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-anti-goals-would-be-a-failure-even-if-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Anti-goals (would be a failure even if it "works")
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-constraints-and-facts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Constraints and facts
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-decided-by-the-owner" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Decided (by the owner)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-my-calls-marked-the-owner-can-overturn-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. My calls (marked; the owner can overturn them)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-left-to-the-builder" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Left to the builder
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-verification-the-coordinator-on-the-real-kiosks-outside-the-sleep-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Verification (the coordinator, on the real kiosks, outside the sleep window)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-backend-api-lane-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Backend API (lane 2)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Backend API (lane 2)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-per-screen-settings-override-layer-screens-screen-power" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Per-screen settings (override layer, Screens › {screen} › Power)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-display-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Display check
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10.2 Display check">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1021-calibration-v2-calvin-c805-calvin-u8yn" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2.1 Calibration v2 (calvin-c805, calvin-u8yn)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#1022-calibration-v3-calvin-idts-calvin-qkm8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2.2 Calibration v3 (calvin-idts, calvin-qkm8)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-findings-kept-across-runs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Findings (kept across runs)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#104-rules-added-in-review" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.4 Rules added in review
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="kiosk-brightness-ramp-at-sleepwake-and-a-display-diagnostics-helper">Kiosk brightness ramp at sleep/wake, and a display diagnostics helper<a class="headerlink" href="#kiosk-brightness-ramp-at-sleepwake-and-a-display-diagnostics-helper" title="Permanent link">&para;</a></h1>
+<p>Status: design, owner-approved functionality (2026-11-04). UI/UX goes through the design lead. Bead: calvin-29ws.
+Motivation and evidence: calvin-ppiu.</p>
+<h2 id="1-why">1. Why<a class="headerlink" href="#1-why" title="Permanent link">&para;</a></h2>
+<p>On the Pi 3B+ kiosk the touch panel (Logicom NOMAD TOUCH) is fed by a Y-cable: USB-C into the panel, the data
+leg into the Pi, the power leg into a PSU. With no power blocker on the data leg, the panel also draws 5 V through
+the Pi. When the panel <strong>wakes from standby at normal brightness</strong> (schedule off, then on; or a manual turn off,
+then on), the surge browns out the Pi. The persistent journal shows <code>Undervoltage detected!</code>, then the panel's touch
+controller (<code>27c0:0859</code>) resetting every ~2 s, then the Pi resetting, in a loop. The Pi's USB hub also logged
+<code>over-current change</code> on its ports. Measured on 2026-11-04:</p>
+<ul>
+<li>At panel-menu brightness 0–1, off → on works (one wake still dipped under-voltage for ~20 s, then recovered).</li>
+<li>Raising brightness in one DDC step (0 → 50) reset the touch controller. Raising it in steps of 2 every 1.5 s was
+  fine up to DDC 26; at DDC 28 the touch controller reset; the Pi stayed up.</li>
+<li>DDC and the panel's own menu use different scales: DDC 5 → menu 28, DDC 19 → menu 61, DDC 22 → menu 67
+  (≈ menu 16 + 2.3 × DDC). The panel's DDC read-back is a placeholder: brightness and contrast always read 0.</li>
+</ul>
+<p>The hardware fix (a USB power blocker on the data leg) is coming. But other people's kiosks will have the same
+class of problem: a USB-powered panel, a weak supply, a panel whose wake surge is too much. A per-screen ramp makes
+the wake gentle, and a helper lets someone find out what their panel supports and where its limit is.</p>
+<h2 id="2-goals">2. Goals<a class="headerlink" href="#2-goals" title="Permanent link">&para;</a></h2>
+<ol>
+<li>A per-screen setting, <strong>Ramp brightness at sleep and wake</strong> (on/off; default off), and a <strong>Brightness</strong> value
+   (DDC 0–100) that Calvin applies after boot and after every wake.</li>
+<li>When the ramp is on, the display agent:</li>
+<li>before the panel sleeps (schedule boundary, "Turn off now", any off), steps the brightness <strong>down</strong> to 0,
+     then runs the normal off;</li>
+<li>after the panel wakes, and after boot, waits until the panel and its USB devices have settled, then steps
+     the brightness <strong>up</strong> to the chosen value.</li>
+<li>A <strong>display diagnostics helper</strong>, run from Calvin settings on any device (phone, desktop browser, or the kiosk
+   panel itself once it's onboarded), that:</li>
+<li>checks whether the screen answers over DDC/CI at all (detect, model, VCP version);</li>
+<li>checks whether brightness <strong>writes take effect</strong>, even when reads lie (the owner confirms what they see);</li>
+<li>builds a <strong>DDC → panel-menu conversion</strong> from the owner's readings (set a DDC value, the owner types in the
+      menu value; at least two points), so the UI can show "≈ menu 61" next to the DDC value;</li>
+<li>optionally runs a <strong>careful ramp test</strong> that finds the level where the hardware faults (under-voltage,
+      over-current, a USB device reset) and stores it as this screen's <strong>brightness limit</strong>. Calvin then never
+      steps above it, even if the slider asks for more.</li>
+<li>The agent records what it did, so it can be read back. Diagnostics results and each ramp's outcome are visible
+   to the owner in settings, and in the kiosk's journal.</li>
+</ol>
+<h2 id="3-non-goals">3. Non-goals<a class="headerlink" href="#3-non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Fixing power hardware. The ramp is mitigation; the setup docs should say that a USB-powered touch panel needs a
+  data-only (power-blocked) link to a Pi.</li>
+<li>Automatic brightness (ambient light, time-of-day curves).</li>
+<li>DDC power control. Some monitors can't be woken over DDC; the MSI G241 on the Pi 400 is one (see memory
+  <code>pi400-monitor-freesync</code>). Power stays with the existing DPMS/fb path.</li>
+<li>Non-cog display stacks in this round. X11/Wayland kiosks keep today's behaviour; the setting is hidden or
+  disabled there, saying why.</li>
+<li>Plain browsers (no kiosk agent): the setting and the helper are unavailable there.</li>
+</ul>
+<h2 id="4-anti-goals-would-be-a-failure-even-if-it-works">4. Anti-goals (would be a failure even if it "works")<a class="headerlink" href="#4-anti-goals-would-be-a-failure-even-if-it-works" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>A big brightness step.</strong> Any single write larger than the configured step (default 2 DDC units) is a bug.
+  That's exactly what reset the touch controller on 2026-11-04.
+  Owner exception (2026-11-05): when the agent does not know the panel's level (after an agent start or boot, or
+  after a mid-check reboot) it writes 0 once before off/dim/ramp. A single downward write to 0 is allowed; no upward
+  write may exceed the step.</li>
+<li>Brightness changes while the panel is asleep or waking, before it has settled.</li>
+<li>A diagnostics run that can leave the screen dark, or at a level above the limit, if the page or the network
+  goes away mid-run. The agent owns the run and always finishes it in a safe state.</li>
+<li>Any change in behaviour for screens with the setting off. The agent never touches brightness unless the
+  setting is on, or a diagnostics run is active.</li>
+<li>Flapping: a ramp must not race another on/off. A new on/off cancels the running ramp cleanly.</li>
+</ul>
+<h2 id="5-constraints-and-facts">5. Constraints and facts<a class="headerlink" href="#5-constraints-and-facts" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The DDC work runs in the <strong>display agent on the Pi</strong> (<code>deploy/kiosk-agent/calvin_display_agent.py</code>): only it can
+  reach the panel. It calls <code>ddcutil</code> (already used on the Pi 400; it needs the <code>ddcutil</code> package and the <code>i2c-dev</code>
+  module, so <code>install-kiosk.sh</code> and the updater must provide both). On the 3B+ the bus was <code>/dev/i2c-2</code>, connector
+  <code>card0-HDMI-A-1</code>. Use <code>--bus</code> (or the connector) to stay fast; <code>ddcutil detect</code> is slow.</li>
+<li>Power on/off on cog goes through <code>calvin-cog-panel.sh on|off</code> (<code>apply_on_cog</code>). The ramp wraps it: down, then
+  <code>off</code>; <code>on</code>, then settle, then up.</li>
+<li>Settle signal after wake (my call; the builder may refine it): DRM connector <code>connected</code>, plus no new
+  <code>usb … reset</code> / <code>Undervoltage</code> kernel lines for ~5 s, plus <code>calvin-cog</code> active. Cap the wait at ~30 s, then ramp
+  anyway, still with fault checks.</li>
+<li>Fault detection during any ramp: <code>vcgencmd get_throttled</code> bit 0 (under-voltage now), and new kernel lines
+  matching <code>Undervoltage detected</code>, <code>over-current</code>, <code>usb .*: reset</code>. On a fault: stop, step back down by two steps,
+  record the level, and don't retry above it until the next wake.</li>
+<li>The agent's normal poll is 60 s (<code>DEFAULT_REFRESH_SECONDS</code>). Diagnostics need a back-and-forth with the owner,
+  so while a diagnostics run is requested the agent polls every 1–2 s (my call), and falls back afterwards and
+  after a timeout (~10 min).</li>
+<li>Settings follow the settings-scope spec (<code>docs/design/2026-11-03-settings-scope.md</code>). The ramp, the brightness,
+  the conversion and the limit are <strong>per-screen</strong> (device-physical) values with no household default except
+  "ramp off". They're added as per-screen descriptors next to <code>displayScheduleEnabled</code> in
+  <code>frontend/src/utils/screenOverrides.js</code>, typed on the backend's per-screen write paths.</li>
+<li>The kiosk config the agent polls is <code>/api/kiosks/{id}/config</code> (<code>backend/app/api/routes/kiosks.py</code>). The agent
+  already reports <code>kagent</code>/<code>kstat</code>/<code>kmsg</code> on that poll; diagnostics results need a small structured report
+  channel (a POST from the agent, or richer poll params; the builder chooses), stored per kiosk and shown in
+  settings.</li>
+<li>Kiosk agent self-update ships through the bundle; a backend that offers the setting to an agent too old to
+  honour it must say so ("update the kiosk agent") rather than silently doing nothing.</li>
+<li>Never run kiosk tests during a sleep window (see memory <code>pi-kiosk-webdriver-testing</code>).</li>
+</ul>
+<h2 id="6-decided-by-the-owner">6. Decided (by the owner)<a class="headerlink" href="#6-decided-by-the-owner" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Setting shape: <strong>ramp at sleep/wake y/n</strong>; if yes, <strong>which brightness to set once up</strong> (after boot and wake).</li>
+<li>Brightness is the value set in <strong>Calvin's screen settings</strong>, applied over DDC.</li>
+<li>A helper to diagnose when DDC and the screen don't match, run from <strong>Calvin settings on a phone, a browser, or
+  the panel itself</strong> if it's onboarded.</li>
+<li>UI/UX by the design lead; functionality as above.</li>
+</ul>
+<p>Answers to the design lead's review (owner, 2026-11-04, all as recommended):</p>
+<ol>
+<li><strong>The Brightness slider applies now</strong> while the screen is awake: ramped at the same step to the new value, never
+   above the limit, with "Changing…" feedback. It's also re-applied after boot and every wake.</li>
+<li><strong>The limit-finding ramp test may crash or reboot the kiosk</strong>, so it's offered <strong>only from another device</strong>
+   (phone or desktop), never from the kiosk panel itself. The panel offers the safe steps only (detect, writes,
+   conversion). Warn before starting that the screen may restart; the agent finishes a run safely on its own after
+   a reboot.</li>
+<li><strong>"Turn off now" dims first, then turns off</strong> ("Dimming… then off" in the UI). At a schedule boundary the dim
+   <strong>starts at the boundary</strong>, not early.</li>
+<li><strong>Turning the ramp off while the screen sleeps</strong> (at DDC 0): at the next wake the agent does one last careful
+   step-up to the chosen brightness, then stops touching brightness. This is the only exception to "never touch
+   brightness when the ramp is off".</li>
+<li>
+<p><strong>With a conversion, the slider reads in the panel's own menu numbers</strong> ("≈ 61 on the screen's menu", with the
+   DDC value in small text); storage stays DDC. Without a conversion it uses DDC units, with a pointer to the helper.
+   This replaces the first item in section 7.</p>
+</li>
+<li>
+<p><strong>"Dim only" sleep mode</strong> (owner, 2026-11-04 late). Per screen: <strong>At sleep: Standby</strong> (default, today's
+   behaviour) <strong>or Dim only</strong>. With Dim only, a sleep (schedule boundary or "Turn off now") ramps the brightness down
+   to 0 and leaves the panel and the page running: no DPMS power-down, cog keeps running. A wake ramps back up to the
+   chosen brightness. It needs DDC (it's unavailable where DDC isn't). Trade-off shown in the UI: the backlight never
+   fully turns off and the page keeps running. Coordinator calls: dim to DDC 0; the setting lives in the same
+   Brightness group; it doesn't require "Ramp brightness" to be on (Dim only always ramps). Config key: sleepMode =
+   "standby" | "dim".</p>
+</li>
+</ol>
+<h2 id="7-my-calls-marked-the-owner-can-overturn-them">7. My calls (marked; the owner can overturn them)<a class="headerlink" href="#7-my-calls-marked-the-owner-can-overturn-them" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The slider is on the <strong>DDC scale (0–100)</strong>, because that's what Calvin controls. With a conversion, the UI also
+  shows the estimated panel-menu value. Without one, it shows the DDC value only and says why.</li>
+<li>Default step: 2 DDC units every 1.5 s (tonight's proven-safe pace), configurable per screen in advanced settings.</li>
+<li>Ramp down before sleep goes to DDC 0.</li>
+<li>The conversion is linear from ≥2 points (the owner can add more); show "estimated".</li>
+<li>If the helper's ramp test found a limit, the brightness slider's max is the limit minus two steps.</li>
+<li>With the ramp off, the agent never touches brightness. With it on but DDC unsupported, the setting shows as
+  unavailable for that screen, with the helper's finding.</li>
+</ul>
+<h2 id="8-left-to-the-builder">8. Left to the builder<a class="headerlink" href="#8-left-to-the-builder" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The diagnostics protocol between backend and agent (job request in the config poll, report endpoint, storage).</li>
+<li>How the helper's steps look and read (the design lead's mock), within section 2.3.</li>
+<li>Where the ramp state machine lives in the agent, and its tests (the agent already has <code>test_display_agent.py</code>).</li>
+<li>Packaging <code>ddcutil</code> + <code>i2c-dev</code> for new installs and existing kiosks through the updater.</li>
+<li>Docs: a short page on USB-powered touch panels (data-only link), the setting, and the helper.</li>
+</ul>
+<h2 id="9-verification-the-coordinator-on-the-real-kiosks-outside-the-sleep-window">9. Verification (the coordinator, on the real kiosks, outside the sleep window)<a class="headerlink" href="#9-verification-the-coordinator-on-the-real-kiosks-outside-the-sleep-window" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Pi 3B+ without the blocker, ramp on, brightness at the owner's level: turn off, wait more than 1 min, turn on.
+  There are no resets and no <code>usb … reset</code> lines; brightness steps up after settle.</li>
+<li>The same with the schedule boundary as the trigger.</li>
+<li>The helper on the 3B+ reproduces tonight's findings: writes take effect, reads are placeholders, a conversion of
+  ≈ 16 + 2.3 × DDC, a limit near DDC 26–28.</li>
+<li>Pi 400 (MSI G241): DDC brightness only, never DDC power; the ramp off leaves it untouched.</li>
+</ul>
+<h2 id="10-backend-api-lane-2">10. Backend API (lane 2)<a class="headerlink" href="#10-backend-api-lane-2" title="Permanent link">&para;</a></h2>
+<p>Status: contract for the frontend lane, written before the code (2026-11-05). The agent
+(<code>deploy/kiosk-agent/calvin_display_agent.py</code>, PR #320) is the source of truth for key names, types and payloads.
+All paths are under <code>/api</code>. <code>{id}</code> is the kiosk id (<code>[A-Za-z0-9._-]{1,64}</code>, else 400).</p>
+<h3 id="101-per-screen-settings-override-layer-screens-screen-power">10.1 Per-screen settings (override layer, Screens › {screen} › Power)<a class="headerlink" href="#101-per-screen-settings-override-layer-screens-screen-power" title="Permanent link">&para;</a></h3>
+<p>The eight keys live in the kiosk's existing override layer and are written with the existing endpoints
+(<code>PATCH /kiosks/{id}/overrides</code> for single keys, <code>PUT</code> to replace the layer; both admin, and <code>PATCH</code> returns 403
+<code>override_needs_admin</code> without a session because none of these keys is in <code>KIOSK_SELF_WRITE_KEYS</code>). <strong>Write camelCase
+only</strong>; the snake_case spellings (<code>brightness_ramp_enabled</code>, <code>brightness_limit</code>, <code>brightness_step</code>,
+<code>brightness_step_seconds</code>, <code>brightness_conversion</code>, <code>brightness_floor</code>, <code>sleep_mode</code>) are rejected with 400 <code>Invalid overrides</code>.
+<code>null</code> clears a key (back to the agent's default). Out-of-range or wrongly typed values are 400.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Range / values</th>
+<th>Agent default when null/absent</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>brightnessRampEnabled</code></td>
+<td>bool</td>
+<td></td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>brightness</code></td>
+<td>int</td>
+<td>0–100 (Calvin/DDC scale)</td>
+<td>DDC 20 (or <code>limit − 2 × step</code>)</td>
+</tr>
+<tr>
+<td><code>brightnessLimit</code></td>
+<td>int</td>
+<td>0–100</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>brightnessFloor</code></td>
+<td>int</td>
+<td>0–100, must be <code>&lt;= brightnessLimit</code> when both are set (422 <code>floor_above_limit</code>)</td>
+<td>none (dims to 0)</td>
+</tr>
+<tr>
+<td><code>brightnessStep</code></td>
+<td>int</td>
+<td>1–5</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>brightnessStepSeconds</code></td>
+<td>number</td>
+<td>0.5–10</td>
+<td>1.5</td>
+</tr>
+<tr>
+<td><code>brightnessConversion</code></td>
+<td>list of <code>{ddc: int 0–100, menu: number 0–100}</code></td>
+<td>at most 20 points, no unknown fields</td>
+<td><code>[]</code></td>
+</tr>
+<tr>
+<td><code>sleepMode</code></td>
+<td><code>"standby"</code> | <code>"dim"</code></td>
+<td></td>
+<td><code>"standby"</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>GET /kiosks/{id}/config</code> delivers them merged with the household layer; as for every override, both spellings are
+present in the body (the agent reads snake_case first). <code>GET /kiosks</code> already returns each kiosk's <code>overrides</code>, so the
+UI reads the saved values from there. The config <code>ETag</code> is a hash of the whole body, so it changes when any of these
+keys or the display-check job changes.</p>
+<h3 id="102-display-check">10.2 Display check<a class="headerlink" href="#102-display-check" title="Permanent link">&para;</a></h3>
+<p><strong>One run is one session</strong>, like the agent's: a run (one id) stays active across steps. The dialog starts it once,
+moves it from step to step with <code>step</code>, and ends it with <code>stop</code> (or closing the dialog). A step's <code>done</code> report is a
+<strong>result</strong>, not the end of the run, and the job stays on the config poll until the run ends. One run per kiosk is
+stored (the latest; a new start replaces an ended one). <strong>Run record</strong> (what the UI reads):</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;run-id&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;detect|write|conversion|read&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;brightness&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nt">&quot;action&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;start|stop&quot;</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;requested|running|done|stopped|timeout|error|interrupted|asleep&quot;</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span><span class="nt">&quot;active&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">26</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;log&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;note&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text&quot;</span><span class="p">}],</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;info&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;bus&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;placeholderReads&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">},</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">  </span><span class="nt">&quot;reason&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;power_at_idle|power_trouble|above_ceiling|null&quot;</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="nt">&quot;preflight&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;clean|fault&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;faults&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">]},</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">  </span><span class="nt">&quot;start&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;known&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;source&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;read|last_set|null&quot;</span><span class="p">},</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">  </span><span class="nt">&quot;ceiling&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;menuAtStart&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">28</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span><span class="nt">&quot;fault&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;write&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;under-voltage&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">            </span><span class="nt">&quot;lastGood&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">14</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;alsoAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">8</span><span class="p">]},</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">  </span><span class="nt">&quot;steps&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nt">&quot;detect&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;done|error&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">19</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;lastWrite&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">               </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;text&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;info&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">},</span><span class="w"> </span><span class="nt">&quot;finishedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span><span class="p">}</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="nt">&quot;requestedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;startedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601|null&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;finishedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601|null&quot;</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">  </span><span class="nt">&quot;updatedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601|null&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;expiresAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>requested</code> = asked for, the agent has not reported yet; <code>running</code> = the agent is on it (between steps too).
+<code>active</code> is true while the status is <code>requested</code> or <code>running</code> and the run has not expired. <strong>The run ends</strong> (and the
+job leaves the config poll) on <code>stopped</code>, <code>timeout</code>, <code>error</code>, <code>interrupted</code>, <code>asleep</code>, or on a <code>done</code> report that
+arrives after an admin stop (the agent's final report); <code>finishedAt</code> is set then. Before that, a <code>done</code> report only
+fills <code>steps[step]</code> (<code>step</code> is the one the backend is offering at that moment, because the agent files every report
+under its first job's step) and updates the findings. A run expires 10 minutes after <code>requestedAt</code>, as the agent's
+own timeout does (it is <strong>not</strong> extended by steps or reports): it then reads <code>timeout</code> (<code>active</code> false) and is no
+longer offered. <strong><code>asleep</code> is surfaced and never retried</strong>: the panel is asleep, nothing was written; the UI shows
+"Turn it on now to check it" and the admin starts a new run when ready. <code>updatedAt</code> is the time of the last agent
+report, so the UI can show "Waiting for {screen}…" (no report for 10 s) and "isn't answering" (60 s). While the run
+is <code>active</code>, the UI polls the status endpoint every 1–2 s. A <strong>conversion</strong> step stays at its <code>value</code> (the job keeps
+being offered unchanged) until the admin changes the step or stops the run.</p>
+<p>Admin endpoints (admin session or admin-scope API key, like every per-screen write; 401 otherwise):</p>
+<ul>
+<li><code>POST /kiosks/{id}/display-check/start</code>, body <code>{"step": "detect|write|conversion|read", "value"?: 0–100, "brightness"?: 0–100}</code>
+  (extra fields are 422). Returns the run record. 404 unknown kiosk; <strong>409 <code>display_check_active</code></strong> (body carries the
+  active run) when a run is already active, which is how a second device sees the "running from another device" state.</li>
+<li><code>POST /kiosks/{id}/display-check/step</code>, body <code>{"step": ..., "value"?: 0–100}</code> (extra fields are 422). Moves the
+  active run to another step and target (a step without <code>value</code> drops the old one) and returns the record; the agent
+  re-runs on the new <code>(id, step, value)</code>. Same value cap as <code>start</code>. 404 when no run is active; <strong>409
+  <code>display_check_stopping</code></strong> when a stop is already on its way. The agent ignores an unchanged <code>(step, value)</code>, so
+  "Show me again" needs a different value or an intermediate step.</li>
+<li><code>POST /kiosks/{id}/display-check/stop</code>, no body. Marks the active run <code>action: "stop"</code>; the agent drops the screen
+  to the floor in one write (v3, §10.2.2) and reports <code>stopped</code> (or a final <code>done</code>). Returns the run record. 404
+  when there is no active run. Stop stays available to any admin, whichever device started the run.</li>
+<li><code>POST /kiosks/{id}/display-check/save-limit</code>, no body. Saves the limit a calibration <strong>fault</strong> implies
+  (<code>faultLimit</code>, §10.2.1) as the override <code>brightnessLimit</code> and returns <code>{"id", "brightnessLimit", "overrides"}</code>.
+  Without a usable fault, <strong>409 <code>no_limit</code></strong>. Never automatic. (The v2 <code>limit</code>-step source is gone: §10.2.2.)</li>
+</ul>
+<p>Public (no session; the kiosk's own traffic, like the config poll):</p>
+<ul>
+<li><code>GET /kiosks/{id}/display-check</code> returns <code>{"run": &lt;record&gt;|null, "findings": {...}}</code>. A run that has expired is
+  returned as <code>timeout</code>. 404 for an unknown kiosk.</li>
+<li><code>POST /kiosks/{id}/display-check</code> is the <strong>agent's report</strong> (payload as in PR #320). It is accepted only when <code>id</code>
+  matches the stored run (otherwise 409 and the report is dropped; a late report for a replaced run cannot overwrite
+  the new one). Returns <code>{"accepted": true}</code>.</li>
+</ul>
+<p>The job reaches the agent as <code>displayCheck</code> (and <code>display_check</code>) on <code>GET /kiosks/{id}/config</code>, exactly the shape in
+PR #320 (<code>id</code>, <code>step</code>, <code>action</code>, <code>value</code>, <code>brightness</code>), present only while the run is <code>active</code>. The panel itself can
+call the public endpoints but not the admin ones without signing in.</p>
+<h4 id="1021-calibration-v2-calvin-c805-calvin-u8yn">10.2.1 Calibration v2 (calvin-c805, calvin-u8yn)<a class="headerlink" href="#1021-calibration-v2-calvin-c805-calvin-u8yn" title="Permanent link">&para;</a></h4>
+<p>Design: <a href="../../../design/2026-11-04-brightness-ramp-ui/">brightness-ramp-ui.md §3</a>. Steps 1-3 (<code>detect</code>, <code>write</code>,
+<code>conversion</code>) are <strong>calibration</strong> and never raise the brightness above the run's start level; <code>limit</code> (step 4) is the
+only step that raises.</p>
+<p><strong>Agent report, new optional fields</strong> (all ignored when absent; sent again on every later report of the run):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Shape</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reason</code></td>
+<td>string</td>
+<td>Why a run ended with <code>status: "error"</code>: <code>power_at_idle</code> (preflight found trouble, nothing was written), <code>power_trouble</code> (a fault in steps 1-3), <code>above_ceiling</code> (the agent refused a <code>conversion</code> value above the ceiling).</td>
+</tr>
+<tr>
+<td><code>preflight</code></td>
+<td><code>{status: "clean"\|"fault", faults: [text]}</code></td>
+<td>The 10 s power watch before the first write. <code>fault</code> ends the run (<code>error</code>, <code>power_at_idle</code>) with no write made.</td>
+</tr>
+<tr>
+<td><code>start</code></td>
+<td><code>{level: int\|null, known: bool, source: "read"\|"last_set"\|null}</code></td>
+<td>The brightness the screen was at when the run started. <code>read</code> = the DDC read-back is real; <code>last_set</code> = the last level the agent itself set; <code>known: false</code> = neither (a read-back counts only when it equals the last level the agent set, so a constant non-zero read is a placeholder too; the start is read once per run), and <code>level</code> stays <code>null</code> until the agent has dimmed the screen to the floor (<code>5</code>) at the start of step 2, then <code>level</code> is <code>5</code>.</td>
+</tr>
+<tr>
+<td><code>fault</code></td>
+<td><code>{step, level, kind, at, lastGood, alsoAt: [int]}</code></td>
+<td>One incident. <code>level</code> = where the fault showed; <code>lastGood</code> = the last level written before it with no fault (above <code>level</code> while dimming); <code>kind</code> = <code>under-voltage</code>|<code>over-current</code>|<code>touch controller reset</code>; <code>alsoAt</code> = levels of further faults seen while settling (they never start a new step-down). Sent for a fault in any step.</td>
+</tr>
+<tr>
+<td><code>info.placeholderReads</code></td>
+<td>bool</td>
+<td>On the <code>detect</code> report: the DDC read-back is a placeholder (always 0 or <code>null</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Agent behaviour</strong> (each rule has a test in <code>deploy/kiosk-agent/test_display_agent.py</code>):</p>
+<ul>
+<li>Preflight: before the first write the agent watches its fault monitor for 10 s without writing. Trouble ends the run
+  before any write.</li>
+<li>Steps 1-3 never write above <code>start.level</code> (unknown start: one downward write to the floor <code>5</code> first).
+  <code>write</code> dims <code>S -&gt; max(0, S-10) -&gt; S</code>. <code>conversion</code> refuses (does not clamp) a value above the job's <code>ceiling</code>.</li>
+<li>A fault in steps 1-3 ends the run: ramp to the floor at the normal pace, settle (5 s of clean power, capped at 30 s),
+  report <code>error</code> / <code>power_trouble</code> with <code>fault</code>. No retry. Faults seen while settling join <code>fault.alsoAt</code>.</li>
+<li>Every ramp step is at most the configured step. The single downward write to <code>0</code> (and to the floor from an unknown
+  start) is the only larger write.</li>
+<li>Ending a run returns to <code>start.level</code> when it is known, never above the start on the way out of steps 1-3; with an
+  unknown start the screen stays at the floor.</li>
+</ul>
+<p><strong>Job</strong> (<code>displayCheck</code> on the config poll) gains <code>ceiling</code>: for a <code>conversion</code> job, the most that job's <code>value</code> may
+reach (the ceiling below, or the third reading's value when it qualifies); otherwise the ceiling or <code>null</code>. It is read
+from every job, not only the first. The agent applies the lower of it and its own start level, and accepts a value above
+the start only for the third reading, which it checks itself against the limit and the saved readings.</p>
+<p><strong>The ceiling.</strong> The backend computes it on every read and puts it in the run record (<code>null</code> until the run has
+a start level):</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>base       = convert(menuAtStart)   when menuAtStart is set and brightnessConversion has &gt;= 2 points,
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>             else start.level (the floor 5 when the start is unknown)
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>faultLimit = min(fault.lastGood, fault.level) - step          (calibration faults only; none otherwise)
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>ceiling    = min(base, limit, faultLimit)                      (terms that do not exist are left out)
+</span></code></pre></div>
+<p><code>limit</code> is the lower of the saved <code>brightnessLimit</code> and the limit this run's <code>limit</code> step found. A <code>fault</code> from the
+<code>limit</code> step is not a calibration fault and adds no term. A known fault or limit always wins over <code>menuAtStart</code>, which
+can only raise the base. Values are clamped to &gt;= 0.</p>
+<p><strong>New and changed endpoints</strong></p>
+<ul>
+<li><code>POST /kiosks/{id}/display-check/menu-at-start</code> (admin), body <code>{"menu": 0-100}</code> (a number; extra fields 422). Stores
+  <code>menuAtStart</code> on the active run and returns the run record. 404 when there is no active run (or an unknown kiosk).</li>
+<li><code>step</code> with a <code>conversion</code> <code>value</code> above the active run's ceiling is refused with <strong>422 <code>value_above_ceiling</code></strong> and
+  <code>max</code>. Everything is capped at the <code>ceiling</code>. The only value allowed above it is the third reading: <code>value == limit</code>
+  with a limit known and at least two saved readings (then the maximum is <code>min(limit, faultLimit)</code>). <code>value_above_limit</code> is unchanged. <code>start</code> begins a new run, which has no ceiling yet, so it is not checked; other
+  steps carry no ceiling check. The ceiling is also in the run record's <code>ceiling</code> on every read.</li>
+<li><code>save-limit</code> with no <code>limit</code>-step result saves <code>faultLimit</code> from the latest run's calibration <code>fault</code> (never
+  <code>lastGood</code> itself) and returns the same body as before. A limit at or below the floor (5), or from a fault with no level (an idle fault with an unknown start), is never saved: 409 <code>no_limit</code>. A <code>limit</code>-step result still wins; with neither, 409
+  <code>no_limit</code>.</li>
+</ul>
+<h4 id="1022-calibration-v3-calvin-idts-calvin-qkm8">10.2.2 Calibration v3 (calvin-idts, calvin-qkm8)<a class="headerlink" href="#1022-calibration-v3-calvin-idts-calvin-qkm8" title="Permanent link">&para;</a></h4>
+<p>Replaces the v2 steps 2-4 flow and <strong>removes the limit climb</strong>. The owner sets the panel (with its own buttons) to
+its max, a comfortable level and its min and types the menu number each time; Calvin only <strong>reads</strong> DDC back.
+Design (UI): <a href="../../../design/2026-11-04-brightness-ramp-ui/">brightness-ramp-ui.md</a>.</p>
+<ul>
+<li><strong>Steps:</strong> <code>detect</code>, <code>read</code>, <code>write</code>, <code>conversion</code>. <code>limit</code> is gone (422 from <code>start</code>/<code>step</code>; the agent has no code
+  path for it, so nothing ever ramps up to 100). <code>findings.limit</code> stays in the payload and is never set again.</li>
+<li><strong><code>read</code></strong> (any number of times after <code>detect</code>): one DDC <code>getvcp 0x10</code>, <strong>no write</strong>. Report
+  <code>{step: "read", status: "done", level: &lt;ddc read&gt;, lastWrite: &lt;level the agent last wrote this run, or null&gt;}</code>;
+  stored in <code>steps.read</code> (<code>level</code>, <code>lastWrite</code>). <code>status: "error"</code> + <code>detail</code> when the read fails (that ends the run).
+  A read never changes the run's level, the controller level or <code>last_set</code> (many panels answer with a constant, often
+  100). <code>ddc == lastWrite</code> (or an unchanged value across reads) tells the UI the read-back does not follow the buttons.</li>
+<li><strong>Fallback</strong> for a read-back that does not follow: the existing <code>write</code>/<code>conversion</code> steps, floor <code>5</code> then <code>1</code>,
+  never above the run's start (the §10.2.1 rules, unchanged; the third-reading exception is removed).</li>
+<li><strong><code>brightnessFloor</code></strong> (§10.1): the lowest level Calvin dims to. The agent uses it as the dim-only sleep level, as
+  the lower bound of the ramp target (<code>brightness</code> never goes under it). Dim sleep and the shutdown write go to
+  <code>min(floor, ceiling, current level)</code>, never upward, and the level actually written is remembered. Unset means the
+  old behaviour (0). <code>floor &lt;= limit</code> is enforced on the effective (household + override) config (422
+  <code>floor_above_limit</code>); <code>save-limit</code> clamps a floor above the new limit down to it.</li>
+<li><strong>Faults:</strong> a fault at any point of a check (preflight, <code>read</code>, <code>write</code>, <code>conversion</code>) ends the run <code>error</code> /
+  <code>power_trouble</code> with <code>fault</code> recorded (<code>fault.step</code> may be <code>read</code>; its level and <code>lastGood</code> are the last level Calvin
+  wrote). The agent drops the screen in <strong>one write</strong> to <code>min(5, brightnessFloor, ceiling, run start, level it knows)</code>,
+  at least 1 while it is lit (a floor of 0 does not black the dialog), then settles as in v2. No slow ramp. With the
+  ramp on, a <strong>Stop</strong> at any time drops the same way, immediately, and does not climb back; with the ramp off it
+  returns to the start level as in v2.</li>
+<li><strong>Fault before Stop</strong> (calvin-qkm8): <code>ramp_brightness</code> polls faults <strong>before</strong> it checks the Stop, and re-polls once
+  after a Stop, so a fault that arrives in the same poll is recorded (the 2026-11-07 01:21 sequence: the touchscreen
+  USB device reset as Stop was pressed, the fault was dropped and the run ended with <code>limit</code> and <code>powerTrouble</code> null).
+  Regression test: <code>test_ramp_records_a_fault_that_arrives_in_the_same_poll_as_a_cancel</code>.</li>
+<li><strong>Ceiling:</strong> unchanged (§10.2.1) minus the found-limit term and the third-reading exception: <code>limit</code> is the saved
+  <code>brightnessLimit</code> only. <code>value_above_limit</code> and <code>value_above_ceiling</code> stay.</li>
+<li><strong>Shutdown (boot side).</strong> The max can be 100 while the panel is on, but powering the panel on at a high level
+  surges and browns out the Pi. Sleep/wake already covers it (dim before sleep, ramp up after wake). On the boot side
+  the agent handles SIGTERM and, only when <code>systemctl is-system-running</code> says <code>stopping</code> (a real shutdown or reboot,
+  not an updater restart), with the ramp on and the panel awake, writes the dim target (floor, 0 when unset) in <strong>one</strong>
+  DDC write before exiting. It first sets a shutdown flag that stops any ramp or check from writing, then takes the
+  brightness lock for at most 1.5 s, so the panel powers on low next boot;
+  the first-wake ramp brings it up. The write runs in a thread abandoned after 4 s, and the unit has
+  <code>TimeoutStopSec=15</code>, so it can never hold the shutdown up. Skipped when the ramp is off, the agent has not yet
+  reconciled, or the panel is asleep (already at its sleep level). Logged. <strong>Unplanned power cuts are out of scope</strong>
+  (nothing runs then; that is what the owner's power blocker is for).</li>
+</ul>
+<h3 id="103-findings-kept-across-runs">10.3 Findings (kept across runs)<a class="headerlink" href="#103-findings-kept-across-runs" title="Permanent link">&para;</a></h3>
+<p>Only the latest run record is stored, so a later run would erase the detect and write verdicts of an earlier one.
+The backend therefore also keeps a per-kiosk <strong>findings</strong> object, updated from each finished run's report and never
+cleared by a later run. It is returned as <code>displayCheck</code> on every row of <code>GET /kiosks</code> and as <code>findings</code> next to <code>run</code>
+on <code>GET /kiosks/{id}/display-check</code>. Every field is always present; <code>null</code> = not checked yet.</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span><span class="w"> </span><span class="nt">&quot;checkedAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601|null&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ddc&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;writes&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;model&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;NOMAD TOUCH&quot;</span><span class="p">,</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;connector&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;card0-HDMI-A-1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;vcpVersion&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2.1&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;limit&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">26</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">&quot;powerTrouble&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ISO-8601&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;step&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;write&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;level&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;kind&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;under-voltage&quot;</span><span class="p">}</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<ul>
+<li>
+<p><code>powerTrouble</code> is <code>null</code> or the latest incident. A preflight fault sets it with <code>step: "preflight"</code>, <code>level: null</code>
+  and <code>kind</code> from the fault text; a calibration fault (steps 1-3) sets it from <code>fault</code>. A later run clears it when its
+  preflight is clean and its <code>write</code> step reports <code>done</code> with no fault in that run (a later fault sets it again). A fault in the
+  <code>limit</code> step does not set it.</p>
+</li>
+<li>
+<p>Each step's <code>done</code> or <code>error</code> report updates these while the run goes on. <code>detect</code> done: <code>ddc</code> true and <code>model</code>, <code>connector</code>, <code>vcpVersion</code> from the report's <code>info</code>; <code>detect</code> error: <code>ddc</code> false.</p>
+</li>
+<li><code>write</code> done: <code>writes</code> true; <code>write</code> error: <code>writes</code> false.</li>
+<li><code>limit</code> done with a <code>limit</code>: <code>limit</code> set. A limit step that found none leaves the earlier <code>limit</code> alone.</li>
+<li><code>asleep</code>, <code>stopped</code>, <code>interrupted</code>, <code>timeout</code> and <code>running</code> change nothing.</li>
+<li><code>checkedAt</code> is the finish time of the last run that changed a field.</li>
+<li><strong><code>writes</code> is decided by the owner</strong> (step 2). <code>POST /kiosks/{id}/display-check/verdict</code> (admin) takes
+  <code>{"writes": true|false}</code> ("Yes, it changed" / "No, it looked the same"), sets <code>findings.writes</code> and <code>checkedAt</code>, and
+  returns the findings object. It overrides the agent's own <code>write</code> verdict and leaves the other fields alone. 404
+  for an unknown kiosk, 422 for a missing or non-boolean <code>writes</code>.</li>
+<li><strong><code>placeholderReads</code></strong> is passed through in the <code>detect</code> result's <code>info</code> (calibration v2); older agents omit it.</li>
+</ul>
+<h3 id="104-rules-added-in-review">10.4 Rules added in review<a class="headerlink" href="#104-rules-added-in-review" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>The report endpoint has no credential.</strong> The agent has none, so <code>POST /kiosks/{id}/display-check</code> is guarded only by
+  the run id (accepted by this spec). A caller who knows a live run id can post reports for it; the run ids are random
+  and a report can only propose a limit (and change what the UI shows and the findings): a limit takes effect only
+  after the admin's explicit <code>save-limit</code>.</li>
+<li><strong>A run that has ended never becomes active again.</strong> After it has ended, or once it has expired, a <code>running</code>
+  report is refused with 409 and the job is not offered again. A repeated ending report (the agent's <code>_finish</code> can
+  send a second one) and the ending report of a rebooted agent on an expired run are accepted; the first ending
+  status stays, and a <code>done</code> on an expired run reads <code>timeout</code>.</li>
+<li><strong>A start target above <code>limit - 2 × step</code> is refused</strong> (422 <code>value_above_limit</code>, with <code>max</code>), using the screen's
+  merged <code>brightnessLimit</code> and <code>brightnessStep</code> (default 2), and also the limit this run's <code>limit</code> step found but the admin has not saved yet (the lower of the two applies). With no limit, 0–100 is allowed. The agent's conversion
+  step does not apply the limit itself.</li>
+<li><strong>Agent reports are tolerant</strong>: unknown fields are ignored, and log notes and <code>detail</code> are clipped to 500 characters
+  and the log to its newest 500 entries, so one long error never rejects a report. Admin request bodies stay strict.</li>
+<li><strong>Brightness keys are per-screen only.</strong> <code>POST /config</code> refuses all seven with 422; write them to a screen's
+  overrides.</li>
+<li><strong>Stopping the run of an offline kiosk</strong>: <code>stop</code> only marks the run <code>action: "stop"</code>. The run stays active until the
+  agent reports or the run expires (at most 10 minutes); the UI should say so.</li>
+</ul>
+<p><strong>Calvin never goes above the limit (calvin-rjyn).</strong> The limit already carries its own margin: a limit found from
+readings is the highest level read, one step under the cut-out, and a limit derived from a fault (<code>faultLimit</code>, and the
+agent's own ramp fault limit) has the margin applied once, when it is stored. So the ceiling is the limit as it
+stands; nothing more is subtracted anywhere (agent <code>brightness_ceiling</code>, the backend ceiling, <code>value_above_limit</code>, and
+the frontend slider/clamp). A <code>read</code> step's <code>panelLevel</code> (optional, 0-100: the level the owner typed from the panel's
+buttons) is carried in the job and the run view; a fault during a read step records <code>level: null</code> and that
+<code>panelLevel</code>. A successful <code>read</code> sets <code>findings.ddc</code> to true. After a run that took readings ends without power
+trouble, the agent ramps once from 0 to the saved everyday brightness (capped by the new ceiling, even with the ramp
+off), when the stop that ended the run says the Save landed.</p>
+<p>The restore runs only on an explicit signal: <code>POST /display-check/stop</code> with <code>{"saved": true}</code> (sent by the dialog's
+Done, Stop or close after its Save landed) sets <code>run.saved</code>, which the config poll carries as <code>job.saved</code>. Changed or
+identical config values, and any overrides write from another device, prove nothing. Without the flag a run's end after
+readings only drops (one write; no default and no old saved level). The drop is written first, and a power fault
+anywhere in that window, or during the restore ramp, is recorded, the screen dropped and the ceiling held below it. A
+fault while waiting for the owner's next panel step (<code>read</code>, <code>detect</code>) records no level and no <code>panelLevel</code>.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

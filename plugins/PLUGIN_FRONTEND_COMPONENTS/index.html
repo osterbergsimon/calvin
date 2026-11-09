@@ -1,0 +1,2722 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/plugins/PLUGIN_FRONTEND_COMPONENTS/">
+      
+      
+        <link rel="prev" href="../PLUGIN_REPOSITORY_SETUP/">
+      
+      
+        <link rel="next" href="../PLUGIN_PERSISTENCE_AND_RESTART/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Plugin Display UI - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#plugin-display-ui" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Plugin Display UI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-binding-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data binding conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-fields-every-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell fields (every kind)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#renderer-kinds-and-their-schema-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renderer kinds and their schema fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Renderer kinds and their schema fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#status-readouts-label-over-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        status — readouts (label over value)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#card-grid-cards-with-titled-item-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        card-grid — cards with titled item lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#item-list-timestamped-feedlog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        item-list — timestamped feed/log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iframe-embedded-web-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iframe — embedded web page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-with-caption-full-bleed-image-caption-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        image-with-caption — full-bleed image + caption overlay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metric-dashboard-grid-of-big-metric-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metric-dashboard — grid of big metric tiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weather-forecast-current-conditions-daily-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        weather-forecast — current conditions + daily forecast
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-component-the-escape-hatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        web-component — the escape hatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statusbar-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statusbar items
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-calvin-plugin-css-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The calvin-plugin-* CSS vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-renderer-kind-host-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new renderer kind (host development)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-binding-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data binding conventions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-fields-every-kind" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shell fields (every kind)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#renderer-kinds-and-their-schema-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Renderer kinds and their schema fields
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Renderer kinds and their schema fields">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#status-readouts-label-over-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        status — readouts (label over value)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#card-grid-cards-with-titled-item-lists" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        card-grid — cards with titled item lists
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#item-list-timestamped-feedlog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        item-list — timestamped feed/log
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iframe-embedded-web-page" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        iframe — embedded web page
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#image-with-caption-full-bleed-image-caption-overlay" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        image-with-caption — full-bleed image + caption overlay
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#metric-dashboard-grid-of-big-metric-tiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        metric-dashboard — grid of big metric tiles
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weather-forecast-current-conditions-daily-forecast" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        weather-forecast — current conditions + daily forecast
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#web-component-the-escape-hatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        web-component — the escape hatch
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statusbar-items" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Statusbar items
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-calvin-plugin-css-vocabulary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The calvin-plugin-* CSS vocabulary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adding-a-new-renderer-kind-host-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a new renderer kind (host development)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#choosing-a-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Choosing a contract
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="plugin-display-ui">Plugin Display UI<a class="headerlink" href="#plugin-display-ui" title="Permanent link">&para;</a></h1>
+<p>Under plugin contract 1.0 a plugin draws its dashboard panel through exactly
+one path: it declares a <code>display_schema</code> with a built-in <code>kind</code>, returns a
+JSON payload from <code>fetch()</code>, and a built-in Vue renderer draws it. The
+<code>web-component</code> kind is the escape hatch for custom UI — pre-built JS served
+from the plugin's own directory.</p>
+<p><strong>Gone and rejected at load:</strong> shipping <code>.vue</code> sources, <code>render_template</code>,
+<code>type: "api"</code> display schemas, and per-plugin frontend builds. Installing a
+plugin never triggers a frontend rebuild.</p>
+<p>Dispatch: <a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/SchemaRenderer.vue">SchemaRenderer.vue</a>
+looks up <code>schema.kind</code> in
+<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/rendererRegistry.js">rendererRegistry.js</a>.
+The kind list must match <code>SUPPORTED_DISPLAY_KINDS</code> in
+<a href="https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py">definitions.py</a> — the backend
+rejects unknown kinds at plugin load, and
+<code>backend/tests/unit/test_display_kind_sync.py</code> fails the build if the two
+lists drift.</p>
+<h2 id="data-binding-conventions">Data binding conventions<a class="headerlink" href="#data-binding-conventions" title="Permanent link">&para;</a></h2>
+<p>All renderers share the same binding vocabulary:</p>
+<ul>
+<li><strong>JSON paths</strong> — any <code>&lt;key&gt;_path</code> field is a JSONPath-lite expression
+  resolved against the payload from <code>GET /api/plugins/{instance_id}/data</code>
+  (<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/utils/jsonPath.js">jsonPath.js</a>). Supported syntax:
+  <code>$</code>, <code>$.foo</code>, <code>$.foo.bar</code>, <code>$.items[0].name</code>. Missing paths yield
+  <code>undefined</code> (the renderer omits the element).</li>
+<li><strong>Literals</strong> — the same key without <code>_path</code> (e.g. <code>label</code> vs <code>label_path</code>)
+  is a literal value. The <code>_path</code> variant wins when both are set.</li>
+<li><strong>Formatters</strong> — <code>&lt;key&gt;_format</code> names a built-in formatter applied to the
+  resolved value (<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/utils/formatters.js">formatters.js</a>):
+  <code>weekday-short</code>, <code>weekday-long</code>, <code>date</code>, <code>time-12h</code>, <code>time-24h</code>, <code>percent</code>,
+  <code>percent-raw</code>, <code>bytes</code>, <code>round-1</code>, <code>capitalize</code>.</li>
+<li><strong><code>data_path</code></strong> — scopes the payload before per-item binding; an array
+  yields one item per element.</li>
+<li><strong><code>poll_interval_ms</code></strong> — number on the schema; the frontend re-fetches the
+  data endpoint on that interval
+  (<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/composables/useSchemaData.js">useSchemaData.js</a>).</li>
+</ul>
+<h2 id="shell-fields-every-kind">Shell fields (every kind)<a class="headerlink" href="#shell-fields-every-kind" title="Permanent link">&para;</a></h2>
+<p>Panels are wrapped in Calvin's shared region shell, which owns the header,
+padding, clipping, and scroll boundary. Renderers draw body content only.</p>
+<ul>
+<li><code>title_path</code> — resolved against the payload; wins when present.</li>
+<li><code>title</code> — literal fallback. Final fallback: the instance name.</li>
+<li><code>panel_variant</code> — <code>default</code> | <code>dense</code> | <code>media</code> | <code>iframe</code>. Controls panel
+  chrome. Defaults to <code>iframe</code> for <code>kind: "iframe"</code>, else <code>default</code>
+  (see <a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/service/ServiceViewer.vue">ServiceViewer.vue</a>).</li>
+</ul>
+<h2 id="renderer-kinds-and-their-schema-fields">Renderer kinds and their schema fields<a class="headerlink" href="#renderer-kinds-and-their-schema-fields" title="Permanent link">&para;</a></h2>
+<p>Renderers live in
+<a href="https://github.com/osterbergsimon/calvin/tree/develop/frontend/src/components/plugins/renderers">frontend/src/components/plugins/renderers/</a>.
+Each row below lists the renderer-specific keys (every value key also accepts
+its <code>_path</code> / <code>_format</code> variants as described above).</p>
+<h3 id="status-readouts-label-over-value"><code>status</code> — readouts (label over value)<a class="headerlink" href="#status-readouts-label-over-value" title="Permanent link">&para;</a></h3>
+<p>One renderer, three layouts (<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/Status.vue">Status.vue</a>):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">display_schema</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="s2">&quot;tile&quot;</span><span class="p">,</span>            <span class="c1"># &quot;tile&quot; | &quot;row&quot; | &quot;list&quot;; default tile in panels, row in the statusbar</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="s2">&quot;data_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.readings&quot;</span><span class="p">,</span>   <span class="c1"># array -&gt; one item per element; object -&gt; single item</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="s2">&quot;item&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="s2">&quot;icon&quot;</span><span class="p">:</span> <span class="s2">&quot;🌡&quot;</span><span class="p">,</span> <span class="s2">&quot;label_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.name&quot;</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="s2">&quot;value_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.value&quot;</span><span class="p">,</span> <span class="s2">&quot;value_format&quot;</span><span class="p">:</span> <span class="s2">&quot;round-1&quot;</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="s2">&quot;unit&quot;</span><span class="p">:</span> <span class="s2">&quot;°C&quot;</span><span class="p">,</span> <span class="s2">&quot;status_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.state&quot;</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="p">},</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>item.status</code> takes <code>"ok" | "warn" | "error"</code> — <code>ok</code> renders monochrome;
+<code>warn</code>/<code>error</code> light the square indicator lamp and tint the value. Color on
+the wall means "needs attention"; don't mark everything.</p>
+<h3 id="card-grid-cards-with-titled-item-lists"><code>card-grid</code> — cards with titled item lists<a class="headerlink" href="#card-grid-cards-with-titled-item-lists" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/CardGrid.vue">CardGrid.vue</a></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">display_schema</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;card-grid&quot;</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="s2">&quot;data_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.days&quot;</span><span class="p">,</span>                       <span class="c1"># array of cards</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="s2">&quot;auto-fit-220&quot;</span><span class="p">},</span>       <span class="c1"># int | &quot;auto-square&quot; | &quot;auto-fit-&lt;minpx&gt;&quot;</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="s2">&quot;card&quot;</span><span class="p">:</span> <span class="p">{</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>        <span class="s2">&quot;title_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.title&quot;</span><span class="p">,</span>                 <span class="c1"># + title / title_format</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>        <span class="s2">&quot;items_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.meals&quot;</span><span class="p">,</span>                 <span class="c1"># array of rows within the card</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="s2">&quot;item&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;label_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.type&quot;</span><span class="p">,</span> <span class="s2">&quot;value_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.name&quot;</span><span class="p">,</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>                 <span class="s2">&quot;click_url_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.url&quot;</span><span class="p">},</span>     <span class="c1"># click opens in a new tab</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="p">},</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="s2">&quot;empty_text&quot;</span><span class="p">:</span> <span class="s2">&quot;Nothing planned.&quot;</span><span class="p">,</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>item.click_url_path</code> makes rows clickable. <strong><code>item.link_action</code></strong> (optional,
+<code>"handoff"</code> | <code>"embed"</code>) — hints how a clickable item's link should open on the
+dashboard. <code>"handoff"</code> (default) shows a QR handoff overlay; <code>"embed"</code> opens
+the destination in an in-app iframe overlay. A per-region tune override can
+force <code>handoff</code>/<code>embed</code>/<code>off</code> regardless of the hint. Plugins never emit
+<code>"off"</code>. The dashboard never navigates the wall away — that is why raw links
+are not honored. The same field applies in <code>item-list</code>.</p>
+<h3 id="item-list-timestamped-feedlog"><code>item-list</code> — timestamped feed/log<a class="headerlink" href="#item-list-timestamped-feedlog" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/ItemList.vue">ItemList.vue</a></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">display_schema</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;item-list&quot;</span><span class="p">,</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="s2">&quot;data_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.entries&quot;</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="s2">&quot;item&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;timestamp_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.time&quot;</span><span class="p">,</span> <span class="s2">&quot;timestamp_format&quot;</span><span class="p">:</span> <span class="s2">&quot;time-24h&quot;</span><span class="p">,</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>             <span class="s2">&quot;label_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.title&quot;</span><span class="p">,</span> <span class="s2">&quot;value_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.detail&quot;</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>             <span class="s2">&quot;click_url_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.url&quot;</span><span class="p">},</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="s2">&quot;empty_text&quot;</span><span class="p">:</span> <span class="s2">&quot;Nothing to show yet.&quot;</span><span class="p">,</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="iframe-embedded-web-page"><code>iframe</code> — embedded web page<a class="headerlink" href="#iframe-embedded-web-page" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/IframeRenderer.vue">IframeRenderer.vue</a></p>
+<ul>
+<li><code>url</code> (literal) or <code>url_path</code>. Pair with <code>panel_variant: "iframe"</code>.</li>
+<li>Sites that refuse embedding (X-Frame-Options/CSP) get a built-in error
+  overlay with an "open in new window" action.</li>
+</ul>
+<h3 id="image-with-caption-full-bleed-image-caption-overlay"><code>image-with-caption</code> — full-bleed image + caption overlay<a class="headerlink" href="#image-with-caption-full-bleed-image-caption-overlay" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/ImageWithCaption.vue">ImageWithCaption.vue</a></p>
+<ul>
+<li><code>image_url</code> / <code>image_url_path</code></li>
+<li><code>title</code> / <code>title_path</code> / <code>title_format</code></li>
+<li><code>caption</code> / <code>caption_path</code></li>
+<li><code>metadata</code> / <code>metadata_path</code> / <code>metadata_format</code> (tabular microtext line)</li>
+<li>Pair with <code>panel_variant: "media"</code>.</li>
+</ul>
+<h3 id="metric-dashboard-grid-of-big-metric-tiles"><code>metric-dashboard</code> — grid of big metric tiles<a class="headerlink" href="#metric-dashboard-grid-of-big-metric-tiles" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/MetricDashboard.vue">MetricDashboard.vue</a></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">display_schema</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;metric-dashboard&quot;</span><span class="p">,</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="s2">&quot;data_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.metrics&quot;</span><span class="p">,</span>                    <span class="c1"># array of tiles</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="s2">&quot;layout&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;columns&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>                    <span class="c1"># int | &quot;auto-square&quot;; default 2</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="s2">&quot;tile&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;icon_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.icon&quot;</span><span class="p">,</span> <span class="s2">&quot;label_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.name&quot;</span><span class="p">,</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>             <span class="s2">&quot;value_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.value&quot;</span><span class="p">,</span> <span class="s2">&quot;value_format&quot;</span><span class="p">:</span> <span class="s2">&quot;percent-raw&quot;</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>             <span class="s2">&quot;unit_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.unit&quot;</span><span class="p">,</span> <span class="s2">&quot;status_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.status&quot;</span><span class="p">},</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="p">}</span>
+</span></code></pre></div>
+<p><code>tile.status</code> follows the same <code>ok</code>/<code>warn</code>/<code>error</code> convention as <code>status</code>.</p>
+<h3 id="weather-forecast-current-conditions-daily-forecast"><code>weather-forecast</code> — current conditions + daily forecast<a class="headerlink" href="#weather-forecast-current-conditions-daily-forecast" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/renderers/WeatherForecast.vue">WeatherForecast.vue</a></p>
+<ul>
+<li><code>current_path</code> (default <code>$.current</code>), <code>forecast_path</code> (default <code>$.forecast</code>)</li>
+<li><code>current</code>: <code>icon</code>, <code>temperature</code>, <code>description</code>, <code>feels_like</code>, <code>humidity</code>,
+  <code>pressure</code>, <code>wind_speed</code> (each with <code>_path</code> variant)</li>
+<li><code>forecast</code> (per day): <code>date</code>, <code>icon</code>, <code>description</code>, <code>temp_min</code>, <code>temp_max</code></li>
+<li><code>units</code>: <code>{"temperature": "°C", "wind": "m/s"}</code> (defaults shown)</li>
+<li>A payload with <code>{"error": "...", "message": "..."}</code> renders as an error
+  state instead of the forecast.</li>
+</ul>
+<h3 id="web-component-the-escape-hatch"><code>web-component</code> — the escape hatch<a class="headerlink" href="#web-component-the-escape-hatch" title="Permanent link">&para;</a></h3>
+<p><a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/WebComponentHost.vue">WebComponentHost.vue</a></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">display_schema</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;web-component&quot;</span><span class="p">,</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="s2">&quot;element&quot;</span><span class="p">:</span> <span class="s2">&quot;calvin-my-widget&quot;</span><span class="p">,</span>   <span class="c1"># required: the custom element tag</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="s2">&quot;module&quot;</span><span class="p">:</span> <span class="s2">&quot;dist.js&quot;</span><span class="p">,</span>             <span class="c1"># ES module in the plugin&#39;s frontend/ dir (default &quot;dist.js&quot;)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="s2">&quot;stylesheet&quot;</span><span class="p">:</span> <span class="s2">&quot;dist.css&quot;</span><span class="p">,</span>        <span class="c1"># optional, linked into &lt;head&gt; while mounted</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Host behavior:</p>
+<ol>
+<li>Imports the module from <code>/api/plugins/{plugin_id}/static/{module}</code> at
+   runtime (the endpoint is confined to the plugin's <code>frontend/</code> directory).</li>
+<li>Errors visibly if the custom element named by <code>element</code> isn't registered
+   after import.</li>
+<li>Mounts the element and assigns each <code>fetch()</code> payload to its <strong><code>data</code>
+   property</strong> — implement <code>set data(value)</code> and re-render.</li>
+<li>Removes the stylesheet link on unmount.</li>
+</ol>
+<p>The module must be <strong>pre-built</strong> browser JS shipped in the plugin's
+<code>frontend/</code> directory. The host serves whatever is present there; it does not
+read <code>files.include</code>. No <code>.vue</code> sources, no build step on the host.</p>
+<p><strong>Theming across shadow DOM:</strong> CSS custom properties inherit into shadow
+roots. Style with the shell's semantic tokens — <code>--ink</code>, <code>--ink-2</code>, <code>--ink-3</code>,
+<code>--bg-0</code>, <code>--bg-1</code>, <code>--bg-2</code>, <code>--line</code>, <code>--line-soft</code>, <code>--font-ui</code>,
+<code>--font-data</code>, <code>--focus</code> — plus the plugin-layer sizes below, and your
+component follows Calvin's themes automatically.</p>
+<p>For the tones, use the pair rather than picking a colour: <code>--ok</code>/<code>--warn</code>/
+<code>--err</code>/<code>--focus</code> are fills (<code>*-ink</code> is the readable ink to put ON one of
+them, <code>*-text</code> is the tone used AS text on a surface). Both clear WCAG AA in
+every built-in theme. Type and spacing come from <code>--fs-*</code>, <code>--space-*</code> and
+<code>--radius-*</code>; don't hard-code a font size.</p>
+<p>Reference: the <code>chromecast</code> plugin in <code>calvin-plugins</code>.</p>
+<p>Web components are wrapped by the same region shell: fill the host
+(<code>width: 100%; height: 100%</code>) and don't draw your own panel header.</p>
+<p><strong>Web-component plugins must not self-navigate</strong> (<code>window.location</code> /
+<code>window.open</code> / target-navigating anchors). Route link intents through the host
+so kiosk-safe handling applies; direct navigation can strand a wall display.</p>
+<h2 id="statusbar-items">Statusbar items<a class="headerlink" href="#statusbar-items" title="Permanent link">&para;</a></h2>
+<p><code>statusbar_schema</code> puts a compact item in the clock bar, rendered by the same
+dispatch with <code>context="statusbar"</code>
+(<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/PluginStatusbarItems.vue">PluginStatusbarItems.vue</a>).
+Its kind namespace is intentionally small — <strong><code>SUPPORTED_STATUSBAR_KINDS = {"status"}</code></strong>:
+a statusbar item is a strip, not a panel, so it can't declare an iframe or
+grid. In the statusbar, <code>status</code> defaults to <code>layout: "row"</code> (inline cells
+with hairline dividers).</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">statusbar_schema</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;status&quot;</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="s2">&quot;item&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;icon&quot;</span><span class="p">:</span> <span class="s2">&quot;☀&quot;</span><span class="p">,</span> <span class="s2">&quot;value_path&quot;</span><span class="p">:</span> <span class="s2">&quot;$.current.temperature&quot;</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>             <span class="s2">&quot;value_format&quot;</span><span class="p">:</span> <span class="s2">&quot;round-1&quot;</span><span class="p">,</span> <span class="s2">&quot;unit&quot;</span><span class="p">:</span> <span class="s2">&quot;°&quot;</span><span class="p">},</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="s2">&quot;poll_interval_ms&quot;</span><span class="p">:</span> <span class="mi">600000</span><span class="p">,</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="the-calvin-plugin-css-vocabulary">The <code>calvin-plugin-*</code> CSS vocabulary<a class="headerlink" href="#the-calvin-plugin-css-vocabulary" title="Permanent link">&para;</a></h2>
+<p>The shared visual identity of every plugin surface — "instrument readouts on
+an appliance" — defined in the plugin-surface section of
+<a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/styles/main.css">frontend/src/styles/main.css</a> and
+derived entirely from the shell's semantic tokens. Built-in renderers use
+these classes; web components should too.</p>
+<p>Rules of the layer:</p>
+<ul>
+<li>Every datum is set in <code>var(--font-data)</code> with tabular numerals; labels are
+  small tracked-uppercase <code>--ink-3</code>.</li>
+<li>State color appears <strong>only</strong> when something needs attention: <code>ok</code> is
+  monochrome; <code>warn</code>/<code>error</code> light the lamp and tint the value.</li>
+<li>Separation inside a panel is hairline (<code>--line-soft</code>); raised surfaces
+  (<code>--bg-2</code> + <code>--line</code>) are reserved for true grouping.</li>
+</ul>
+<p><strong>Readouts (the core primitive)</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calvin-plugin-readout</code></td>
+<td>Microlabel over tabular value.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-readout__label</code> / <code>__value</code> / <code>__unit</code></td>
+<td>The readout's parts.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-readout--warn</code> / <code>--error</code></td>
+<td>Alert tint on label + value.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-lamp</code></td>
+<td>The square indicator lamp (render only on alert).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Layout containers</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calvin-plugin-fill</code></td>
+<td>Root that fills the panel body (100% w/h).</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-section</code></td>
+<td>Vertical flex grouping with gap.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-toolbar</code></td>
+<td>Small horizontal action row.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Grids and lists</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calvin-plugin-grid</code></td>
+<td>Base grid (1rem gap, fills body).</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-grid--auto</code> / <code>--dense</code> / <code>--2</code> / <code>--3</code></td>
+<td>Column presets.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-list</code></td>
+<td>Vertical list; consecutive rows get hairline separators.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-list--scroll</code></td>
+<td>Internal vertical scrolling.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Surfaces and rows</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calvin-plugin-surface</code></td>
+<td>Raised card (<code>--bg-2</code>, <code>--line</code> border, 1rem padding).</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-row</code></td>
+<td>Quiet list row (padding only; separator comes from the list).</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-metric</code></td>
+<td>Extra padding for prominent tiles.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-clickable</code></td>
+<td>Pointer cursor + hover/focus affordance.</td>
+</tr>
+<tr>
+<td><code>calvin-plugin-media</code></td>
+<td>Full-bleed image/video/canvas container (<code>panel_variant: "media"</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Fallback states</strong></p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Use for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>calvin-plugin-empty</code> / <code>calvin-plugin-loading</code> / <code>calvin-plugin-error</code></td>
+<td>Empty / loading / error messages — write direction, not mood.</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>--plugin-*</code> custom properties</strong> (cross shadow-DOM boundaries, so web
+components inherit them):</p>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--plugin-value-size</code></td>
+<td>Readout value size (tile), <code>2rem</code>.</td>
+</tr>
+<tr>
+<td><code>--plugin-value-size-lg</code></td>
+<td>Hero metric, <code>2.6rem</code>.</td>
+</tr>
+<tr>
+<td><code>--plugin-value-size-sm</code></td>
+<td>Inline (row/statusbar) value, <code>1.05rem</code>.</td>
+</tr>
+<tr>
+<td><code>--plugin-lamp-size</code></td>
+<td>Indicator lamp square, <code>0.45rem</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>Example web-component body:</p>
+<div class="language-html highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">&lt;</span><span class="nt">div</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;calvin-plugin-fill calvin-plugin-section&quot;</span><span class="p">&gt;</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>  <span class="p">&lt;</span><span class="nt">div</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;calvin-plugin-grid calvin-plugin-grid--auto&quot;</span><span class="p">&gt;</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>    <span class="p">&lt;</span><span class="nt">article</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;calvin-plugin-surface calvin-plugin-readout&quot;</span><span class="p">&gt;</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>      <span class="p">&lt;</span><span class="nt">span</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;calvin-plugin-readout__label&quot;</span><span class="p">&gt;</span>CPU<span class="p">&lt;/</span><span class="nt">span</span><span class="p">&gt;</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>      <span class="p">&lt;</span><span class="nt">span</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;calvin-plugin-readout__value&quot;</span><span class="p">&gt;</span>42<span class="p">&lt;</span><span class="nt">span</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;calvin-plugin-readout__unit&quot;</span><span class="p">&gt;</span>%<span class="p">&lt;/</span><span class="nt">span</span><span class="p">&gt;&lt;/</span><span class="nt">span</span><span class="p">&gt;</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>    <span class="p">&lt;/</span><span class="nt">article</span><span class="p">&gt;</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>  <span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+</span></code></pre></div>
+<h2 id="adding-a-new-renderer-kind-host-development">Adding a new renderer kind (host development)<a class="headerlink" href="#adding-a-new-renderer-kind-host-development" title="Permanent link">&para;</a></h2>
+<ol>
+<li>Add the component under
+   <a href="https://github.com/osterbergsimon/calvin/tree/develop/frontend/src/components/plugins/renderers">renderers/</a>.</li>
+<li>Register it in
+   <a href="https://github.com/osterbergsimon/calvin/blob/develop/frontend/src/components/plugins/rendererRegistry.js">rendererRegistry.js</a>.</li>
+<li>Add the kind to <code>SUPPORTED_DISPLAY_KINDS</code> in
+   <a href="https://github.com/osterbergsimon/calvin/blob/develop/backend/app/plugins/definitions.py">definitions.py</a>.</li>
+</ol>
+<p>The kind-sync test enforces that all three stay together.</p>
+<h2 id="choosing-a-contract">Choosing a contract<a class="headerlink" href="#choosing-a-contract" title="Permanent link">&para;</a></h2>
+<p>Prefer schema renderers — they inherit Calvin's layout, theming,
+accessibility, and test coverage for free. Use <code>web-component</code> only for
+visualizations or interactions the built-in set genuinely can't express.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

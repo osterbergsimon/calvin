@@ -1,0 +1,3118 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/research/2026-10-29-kiosk-wayland/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Kiosk display stack: X11 or Wayland? - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kiosk-display-stack-x11-or-wayland" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Kiosk display stack: X11 or Wayland?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommendation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#comparison-at-a-glance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Comparison at a glance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-what-current-raspberry-pi-os-ships-and-defaults-to" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. What current Raspberry Pi OS ships and defaults to
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-candidate-compositors-for-a-single-app-kiosk" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Candidate compositors for a single-app kiosk
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Candidate compositors for a single-app kiosk">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#labwc" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        labwc
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        cage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#sway" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sway
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wayfire" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        wayfire
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weston" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        weston
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-pi-3b3b-is-wayland-chromium-usable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Pi 3B/3B+: is Wayland + Chromium usable?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-replacing-what-the-backend-does-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Replacing what the backend does today
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-chromium-on-wayland-on-a-pi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Chromium on Wayland on a Pi
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Chromium on Wayland on a Pi">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#ozone-flags-and-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ozone flags and environment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gpu-raster-and-hardware-video-decode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GPU raster and hardware video decode
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#known-kiosk-bugs-sharp-edges" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known kiosk bugs / sharp edges
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-what-comparable-projects-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. What comparable projects do
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-proposed-migration-shape" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Proposed migration shape
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Proposed migration shape">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-target-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Target matrix
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-dual-support-not-a-flag-day" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Dual support, not a flag day
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-backend-agent-changes-proposed-not-implemented-here" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Backend / agent changes (proposed, not implemented here)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-rotation-mapping-must-be-verified-on-hardware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Rotation mapping (must be verified on hardware)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#75-environment-keys-proposed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.5 Environment keys (proposed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-what-must-be-tested-on-real-hardware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. What must be tested on real hardware
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-open-questions-explicitly-unverified" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Open questions / explicitly unverified
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="kiosk-display-stack-x11-or-wayland">Kiosk display stack: X11 or Wayland?<a class="headerlink" href="#kiosk-display-stack-x11-or-wayland" title="Permanent link">&para;</a></h1>
+<p><strong>Research date:</strong> 2026-10-29
+<strong>Bead:</strong> <code>calvin-98dq</code></p>
+<h2 id="recommendation">Recommendation<a class="headerlink" href="#recommendation" title="Permanent link">&para;</a></h2>
+<p>Move the Pi 4/5 kiosks (SPLIT and FULL) to Raspberry Pi OS Trixie with <strong>Wayland +
+labwc</strong>, and keep <strong>X11 + openbox as the supported fallback for Pi 3B/3B+ SPLIT</strong>
+until real hardware proves that Chromium-in-a-compositor is acceptable there. Pi OS
+has made Wayland/labwc the default desktop on every model, Trixie still ships an
+X11 meta-package, and labwc gives us the three things Calvin's agent needs
+(<code>wlr-output-management</code> for <code>wlr-randr</code> rotation, <code>wlr-output-power-management</code>
+for <code>wlopm</code>, and FreeDesktop/labwc autostart) with the least distance from the
+platform Raspberry Pi itself supports. Cage is the cleaner single-app compositor,
+but its Pi OS build has no cursor control and no configuration, and its
+headless/hotplug behaviour is a known operational hazard. Do <strong>not</strong> do a
+flag-day switch: add a model-based dual-stack setup, make the display agent
+compositor-aware, and only then flip the default for Pi 4/5. Pi 3B/3B+ stay on
+X11 for now: they can run Wayland (Pi OS defaults to it), but the 1 GB RAM and
+VideoCore IV GPU leave too little margin for a browser kiosk, and no credible
+benchmark shows a win.</p>
+<p><strong>Scope:</strong> Calvin's kiosk browser stack (Pi OS Lite + Chromium), both SPLIT
+(remote backend) and FULL (backend on the same Pi). This is a research document
+only; no scripts, services, or application code were changed.</p>
+<p><strong>Evidence note.</strong> Facts are linked inline. Package versions were checked against
+the Raspberry Pi Trixie archive and Debian on 2026-10-29. Forum posts and user
+reports are labelled as such; anything I could not verify is marked <strong>UNVERIFIED</strong>.</p>
+<hr />
+<h2 id="comparison-at-a-glance">Comparison at a glance<a class="headerlink" href="#comparison-at-a-glance" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>In Pi OS Trixie?</th>
+<th>Upstream status</th>
+<th>Single-app start</th>
+<th>Cursor hiding</th>
+<th>Runtime rotation</th>
+<th>Touch follows rotation</th>
+<th>Fit for Calvin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>labwc</strong></td>
+<td>Yes, default; <code>0.20.2-1~bpo13+1</code> in the Pi archive</td>
+<td>Active; 0.20.2 (2026-08-21)</td>
+<td><code>~/.config/labwc/autostart</code> or XDG <code>.desktop</code>; can run standalone from a systemd/PAM session</td>
+<td><code>HideCursor</code> + <code>WarpCursor</code> actions, but one-shot (no idle auto-hide)</td>
+<td><code>wlr-randr</code> / <code>kanshi</code> (wlr-output-management v4)</td>
+<td>Yes via wlroots; explicit <code>&lt;touch&gt;&lt;mapToOutput&gt;</code> available</td>
+<td><strong>Best overall</strong> for Pi 4/5</td>
+</tr>
+<tr>
+<td><strong>cage</strong></td>
+<td>Yes; <code>0.3.1-1~bpo13+1+rpt2</code></td>
+<td>Active; 0.3.1 (2026-06-30)</td>
+<td><code>cage -- chromium …</code> from a systemd unit (PAM/logind session required)</td>
+<td><strong>No option</strong> in 0.3.1; cursor shown if any pointer-capable device exists; master has a post-0.3.1 fix</td>
+<td><code>wlr-randr</code> / <code>kanshi</code> (wlr-output-management v4)</td>
+<td>Expected via wlroots; needs per-panel verification</td>
+<td>Good minimal alternative, weaker operations story</td>
+</tr>
+<tr>
+<td><strong>sway</strong></td>
+<td>Yes; <code>1.10.1-2+rpt1</code></td>
+<td>Active; 1.12 (2026-05-25)</td>
+<td><code>exec</code> in config; can run from a systemd/TTY session</td>
+<td><code>seat seat0 hide_cursor 1000</code></td>
+<td><code>output … transform</code>; also <code>wlr-randr</code></td>
+<td><code>input … map_to_output</code></td>
+<td>Works, but a tiling WM is more config than a kiosk needs</td>
+</tr>
+<tr>
+<td><strong>wayfire</strong></td>
+<td>Yes; <code>0.9.0-5+rpt1</code>, but Raspberry Pi <strong>no longer supports/updates it</strong></td>
+<td>Upstream active (0.11, 2026-07-27), but dropped by Pi OS</td>
+<td><code>[autostart]</code> in <code>wayfire.ini</code></td>
+<td>Plugin/config dependent; <strong>UNVERIFIED</strong></td>
+<td>wlr-output-management supported</td>
+<td>Supported via wlroots, but stack is legacy on Pi OS</td>
+<td>Not recommended</td>
+</tr>
+<tr>
+<td><strong>weston</strong></td>
+<td>Debian <code>14.0.2</code> (apt, not a Pi OS default)</td>
+<td>Active upstream (16.0)</td>
+<td><code>--shell=kiosk</code> / <code>weston.ini</code></td>
+<td>Kiosk shell hides cursor in practice; no documented toggle (<strong>UNVERIFIED</strong>)</td>
+<td>Config only (<code>[output] transform</code>), no wlr-output-management</td>
+<td>Historically problematic; needs calibration (<strong>UNVERIFIED</strong>)</td>
+<td>Not a fit: no wlr-output-management/power-management</td>
+</tr>
+</tbody>
+</table>
+<p>Version sources: Pi archive
+<a href="http://archive.raspberrypi.com/debian/dists/trixie/main/binary-arm64/Packages.gz"><code>dists/trixie/main/binary-arm64/Packages.gz</code></a>
+(queried 2026-10-29); Debian <a href="https://api.ftp-master.debian.org/madison?package=weston&amp;table=all">madison</a>.
+Protocol support: <a href="https://wayland.app/protocols/wlr-output-management-unstable-v1">wlr-output-management</a>
+and <a href="https://wayland.app/protocols/wlr-output-power-management-unstable-v1">wlr-output-power-management</a>
+compositor tables. Upstream dates from GitHub releases.</p>
+<hr />
+<h2 id="1-what-current-raspberry-pi-os-ships-and-defaults-to">1. What current Raspberry Pi OS ships and defaults to<a class="headerlink" href="#1-what-current-raspberry-pi-os-ships-and-defaults-to" title="Permanent link">&para;</a></h2>
+<p><strong>Trixie is current; Bookworm is oldstable but still relevant.</strong></p>
+<ul>
+<li>Debian 13 "trixie" is the current stable release (13.7, 2026-09-12). Debian 12
+  "bookworm" is oldstable, with LTS through <strong>2028-06-30</strong>. Trixie's own
+  end-of-life is <strong>2028-08-09</strong>, with LTS through <strong>2030-06-30</strong>
+  (<a href="https://www.debian.org/releases/">Debian releases</a>).</li>
+<li>Raspberry Pi OS Trixie was announced on 2025-10-02. Raspberry Pi staff said
+  Bookworm would get Debian support for another two years and new kernels for
+  critical vulnerabilities, but <strong>no further Raspberry Pi-specific package
+  updates</strong> (<a href="https://www.raspberrypi.com/news/trixie-the-new-version-of-raspberry-pi-os/">Trixie announcement + staff comments</a>).
+  Bookworm remains downloadable as "Legacy" and still receives Chromium builds;
+  the Pi archive currently carries Chromium 156 for both Bookworm and Trixie.</li>
+<li><strong>Desktop default:</strong> since the October 2024 Bookworm release, Raspberry Pi
+  Desktop runs <strong>Wayland with labwc by default on all models</strong>, including Pi 3;
+  X11 remains selectable, and Wayfire is no longer supported with updates
+  (<a href="https://www.raspberrypi.com/news/a-new-release-of-raspberry-pi-os/">labwc announcement</a>).
+  Trixie continues the labwc default. On Bookworm before that update, Pi 4/5 used
+  Wayfire/Wayland and Pi 3 used X11.</li>
+<li><strong>Lite:</strong> Raspberry Pi OS Lite is command-line only; it ships <strong>no display
+  server and no compositor</strong>. Trixie splits the desktop into meta-packages:
+  <code>rpd-wayland-core</code> for a bare Wayland desktop, <code>rpd-x-core</code> for a bare X11
+  desktop, plus <code>rpd-theme</code>, <code>rpd-preferences</code>, etc.
+  (<a href="https://www.raspberrypi.com/news/trixie-the-new-version-of-raspberry-pi-os/">Trixie announcement</a>).
+  Both meta-packages are present in the Trixie archive at version <code>1.35</code>.</li>
+<li><strong>Is X11 still supported on Lite?</strong> Yes. Installing <code>rpd-x-core</code> (or just
+  <code>xserver-xorg</code>/<code>xinit</code>/<code>openbox</code>) gives a supported X11 kiosk, and
+  <code>raspi-config</code> still exposes an X11 session. <strong>UNVERIFIED:</strong> Raspberry Pi has
+  not published a date on which X11 will be removed. The practical horizon is the
+  Trixie support window (Debian security to 2028, LTS to 2030); do not assume X11
+  survives beyond that, but there is no announced near-term cutoff.</li>
+</ul>
+<p><strong>Per model, in practice:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Pi OS Trixie Desktop default</th>
+<th>Lite: what you install</th>
+<th>Notes for Calvin</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pi 5 / Pi 500 / CM5</td>
+<td>Wayland + labwc</td>
+<td><code>rpd-wayland-core</code> + Chromium</td>
+<td>Best Wayland target; Pi 5 has no H.264 decoder (see §5)</td>
+</tr>
+<tr>
+<td>Pi 4B / Pi 400 / CM4</td>
+<td>Wayland + labwc</td>
+<td>same</td>
+<td>Recommended Wayland target; 2 GB+</td>
+</tr>
+<tr>
+<td>Pi 3B / 3B+ / 3A+</td>
+<td>Wayland + labwc</td>
+<td>same</td>
+<td>1 GB (3A+ 512 MB); Chromium is the bottleneck, not the compositor</td>
+</tr>
+<tr>
+<td>Pi Zero 2 W / older</td>
+<td>Wayland + labwc on Desktop</td>
+<td>same</td>
+<td>512 MB; not recommended for Chromium (Calvin already says this)</td>
+</tr>
+</tbody>
+</table>
+<p>The X11 option is still present on Trixie; Raspberry Pi's own current kiosk
+tutorial uses the <strong>Desktop</strong> image and labwc's <code>~/.config/labwc/autostart</code>
+(<a href="https://www.raspberrypi.com/tutorials/how-to-use-a-raspberry-pi-in-kiosk-mode/">Raspberry Pi kiosk tutorial</a>).
+That is a strong signal that Wayland/labwc is now the supported path, while X11 is
+compatibility, not the future.</p>
+<hr />
+<h2 id="2-candidate-compositors-for-a-single-app-kiosk">2. Candidate compositors for a single-app kiosk<a class="headerlink" href="#2-candidate-compositors-for-a-single-app-kiosk" title="Permanent link">&para;</a></h2>
+<h3 id="labwc">labwc<a class="headerlink" href="#labwc" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Packaged:</strong> yes, default. Pi archive Trixie: <code>0.20.2-1~bpo13+1</code>; Bookworm:
+  <code>0.8.4-1+rpt1</code>. Debian stable has 0.8.3, so Pi OS deliberately ships a newer
+  backport.</li>
+<li><strong>Maintenance:</strong> active; 0.20.2 released 2026-08-21, developed closely with
+  Raspberry Pi and wlroots.</li>
+<li><strong>Autostart without a desktop:</strong> yes. <code>~/.config/labwc/autostart</code> (shell script)
+  or a FreeDesktop <code>.desktop</code> file in <code>/etc/xdg/autostart</code>; Raspberry Pi's kiosk
+  tutorial uses the former. labwc can be started directly as the session process;
+  it does not require LXDE or a login manager.</li>
+<li><strong>Cursor:</strong> <code>HideCursor</code> and <code>WarpCursor</code> actions exist, but there is no
+  persistent "hide after idle" setting. piSignage documents the workaround:
+  bind <code>HideCursor</code> + <code>WarpCursor x=-1 y=-1</code>, then fire it at startup with
+  <code>wtype</code> (<a href="https://labwc.github.io/labwc-actions.5.html">labwc actions</a>,
+  <a href="https://help.pisignage.com/hc/en-us/articles/59094755442201-Hiding-the-Mouse-Cursor-on-the-labwc-Wayland-Player">piSignage cursor guide</a>).
+  The cursor reappears on pointer/touch input.</li>
+<li><strong>Rotation:</strong> <code>wlr-randr</code> or <code>kanshi</code>; labwc implements
+  wlr-output-management v4. labwc's own integration guide recommends
+  <code>wlr-randr</code> for one-shot output changes and <code>kanshi</code> for profiles
+  (<a href="https://labwc.github.io/integration.html">labwc integration</a>).</li>
+<li><strong>Touch mapping:</strong> wlroots maps touch to the output under the touch point and
+  applies the output transform. labwc additionally exposes
+  <code>&lt;touch&gt;&lt;mapToOutput&gt;HDMI-A-1&lt;/mapToOutput&gt;</code> and per-device <code>&lt;libinput&gt;</code>
+  settings in <code>rc.xml</code> (<a href="https://github.com/labwc/labwc/blob/master/docs/rc.xml.all">rc.xml reference</a>).
+  There is a known stylus-specific rotation bug, while finger touch rotates
+  correctly (<a href="https://github.com/labwc/labwc/issues/1990">labwc #1990</a>); test the
+  actual panel.</li>
+</ul>
+<h3 id="cage">cage<a class="headerlink" href="#cage" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Packaged:</strong> yes. Pi archive Trixie: <code>0.3.1-1~bpo13+1+rpt2</code>; Bookworm:
+  <code>0.2.0-2+rpt1</code>.</li>
+<li><strong>Maintenance:</strong> active but small; 0.3.1 released 2026-06-30. Cage is purpose
+  built for one maximized application, with no configuration file: everything is
+  command-line or environment
+  (<a href="https://github.com/cage-kiosk/cage/wiki/Configuration">cage configuration wiki</a>,
+  <a href="https://man.archlinux.org/man/cage.1.en">cage(1)</a>).</li>
+<li><strong>Autostart without a desktop:</strong> yes, but it needs a proper logind/PAM session
+  (wlroots must be built with systemd-logind support). The upstream wiki has a
+  <code>cage@.service</code> template with <code>PAMName</code>, <code>TTYPath</code>, and <code>pam_systemd</code>
+  (<a href="https://github.com/cage-kiosk/cage/wiki/Starting-Cage-on-boot-with-systemd">cage systemd guide</a>).
+  This is very close to Calvin's existing <code>calvin-x.service</code> shape.</li>
+<li><strong>Cursor:</strong> <strong>no supported option in 0.3.1.</strong> If any input device has pointer
+  capability, cage shows a cursor. On a Pi, <code>vc4-hdmi</code> itself can register as a
+  keyboard+pointer device, which is why a cursor appears in the middle of the
+  screen even with no mouse. Workarounds are a transparent cursor theme, udev
+  rules to ignore the device, or patching. Cage master gained a cursor-shape fix
+  and "drop set_cursor when pointer capability is absent" in 2026, after 0.3.1
+  (<a href="https://github.com/cage-kiosk/cage/issues/299">cage #299</a>). For a product
+  kiosk this is a real drawback.</li>
+<li><strong>Rotation:</strong> <code>wlr-randr</code>/<code>kanshi</code>; cage supports wlr-output-management v4
+  (<a href="https://github.com/cage-kiosk/cage/wiki/Configuration">cage configuration wiki</a>).</li>
+<li><strong>Touch mapping:</strong> wlroots default mapping follows the output layout/transform;
+  cage exposes no mapping configuration. Verify with the target panel.</li>
+</ul>
+<h3 id="sway">sway<a class="headerlink" href="#sway" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Packaged:</strong> yes; Pi archive <code>1.10.1-2+rpt1</code>, Debian stable 1.10.1, upstream
+  1.12 (2026-05-25).</li>
+<li><strong>Maintenance:</strong> very active.</li>
+<li><strong>Autostart without a desktop:</strong> <code>exec</code> lines in <code>~/.config/sway/config</code>; can be
+  launched from a TTY or systemd session.</li>
+<li><strong>Cursor:</strong> <code>seat seat0 hide_cursor &lt;timeout-ms&gt;</code> is a first-class setting
+  (<a href="https://man.archlinux.org/man/sway-input.5.en">sway-input(5)</a>).</li>
+<li><strong>Rotation:</strong> <code>output &lt;name&gt; transform 90|180|270|flipped…</code> or <code>wlr-randr</code>
+  (<a href="https://man.archlinux.org/man/sway-output.5.en">sway-output(5)</a>).</li>
+<li><strong>Touch:</strong> <code>input &lt;identifier&gt; map_to_output &lt;output&gt;</code> plus the output transform.</li>
+<li><strong>Fit:</strong> capable, but it brings tiling-window-manager concepts (workspaces,
+  borders, config language) that a one-app kiosk does not need. More to get wrong
+  than labwc.</li>
+</ul>
+<h3 id="wayfire">wayfire<a class="headerlink" href="#wayfire" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Packaged:</strong> yes, but legacy on Pi OS: Pi archive <code>0.9.0-5+rpt1</code>; upstream 0.11.
+  Raspberry Pi's October 2024 announcement says Wayfire will no longer be
+  supported with updates on Pi OS
+  (<a href="https://www.raspberrypi.com/news/a-new-release-of-raspberry-pi-os/">announcement</a>).</li>
+<li><strong>Autostart:</strong> <code>[autostart]</code> in <code>wayfire.ini</code>.</li>
+<li><strong>Rotation/touch:</strong> supports wlr-output-management, so <code>wlr-randr</code> works, but
+  the stack is frozen on Pi OS. Do not start a new deployment on it.</li>
+</ul>
+<h3 id="weston">weston<a class="headerlink" href="#weston" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Packaged:</strong> Debian (<code>14.0.2</code> stable, <code>16.0.0</code> testing); not part of Pi OS's
+  desktop stack.</li>
+<li><strong>Kiosk shell:</strong> exists and is designed for single-app use
+  (<a href="https://wayland.pages.freedesktop.org/weston/toc/kiosk-shell.html">Weston kiosk-shell</a>).</li>
+<li><strong>Missing pieces:</strong> Weston does <strong>not</strong> implement wlr-output-management or
+  wlr-output-power-management (both marked <code>x</code> in the Wayland Explorer tables),
+  so no <code>wlr-randr</code>, <code>kanshi</code>, or <code>wlopm</code>. Rotation is <code>weston.ini</code> plus restart.
+  It is a reference compositor, not a good fit for Calvin's runtime display
+  controls.</li>
+</ul>
+<hr />
+<h2 id="3-pi-3b3b-is-wayland-chromium-usable">3. Pi 3B/3B+: is Wayland + Chromium usable?<a class="headerlink" href="#3-pi-3b3b-is-wayland-chromium-usable" title="Permanent link">&para;</a></h2>
+<p><strong>Technically yes; practically, not yet a safe default.</strong></p>
+<p>What is verified:</p>
+<ul>
+<li>Raspberry Pi says labwc was optimised until it "runs just as fast as X on older
+  Raspberry Pi models", and Trixie was tested back to Pi 1; a staff comment calls
+  the Pi 3 desktop "perfectly usable"
+  (<a href="https://www.raspberrypi.com/news/a-new-release-of-raspberry-pi-os/">labwc announcement</a>,
+  <a href="https://www.raspberrypi.com/news/trixie-the-new-version-of-raspberry-pi-os/">Trixie comments</a>).
+  That is a <strong>desktop</strong> claim, not a Chromium-kiosk benchmark.</li>
+<li>The Pi 3 GPU is VideoCore IV: Mesa's VC4 driver supports Pi 0–3 with OpenGL
+  ES 2.0 (<a href="https://docs.mesa3d.org/drivers/vc4.html">Mesa VC4</a>). A wlroots
+  compositor can run on it, but every frame is composited by that GPU, and
+  Chromium's raster/compositing competes for the same 1 GB of RAM.</li>
+<li>Pi 3B/3B+ have 1 GB RAM. Calvin's own install guide already says "Pi 3B / 3B+
+  works, but Chromium is slow" and treats Pi 4/5 as recommended
+  (<a href="../../setup/KIOSK_INSTALL/">KIOSK_INSTALL.md</a>). Raspberry Pi's kiosk tutorial
+  sets the floor at "Pi 3 or newer with at least 1 GB RAM", and Chromium/Firefox
+  refuse to run below that (<a href="https://www.raspberrypi.com/tutorials/how-to-use-a-raspberry-pi-in-kiosk-mode/">tutorial</a>).</li>
+<li>Real reports are mixed, and none show a performance win:</li>
+<li>A Pi 3B+ user running Bookworm + labwc + Chromium kiosk reports Chromium
+    starting to a <strong>white screen</strong> from the labwc autostart
+    (<a href="https://forums.raspberrypi.com/viewtopic.php?p=2386021">forum report</a>).
+    Anecdotal, but exactly the kind of failure a kiosk cannot have.</li>
+<li>A Pi 3 user reports Chromium 149 failing to start on a fresh Trixie 32-bit
+    Desktop image, on <strong>both X11 and Wayland</strong>
+    (<a href="https://forums.raspberrypi.com/viewtopic.php?p=2381452">forum report, June 2026</a>).
+    Current Chromium is 156, so this may be fixed; <strong>UNVERIFIED</strong>.</li>
+<li>Chromium has a low-RAM warning popup on Pi 3-class devices that is hard to
+    suppress in kiosk mode (<a href="https://issues.chromium.org/issues/373891800">Chromium issue 373891800</a>).</li>
+<li>The most experienced comparable project, Anthias, deliberately does <strong>not</strong>
+    put a compositor on Pi 3 or Pi 4: it uses linuxfb on Pi 1/2/3-32, eglfs on
+    Pi 3-64/Pi 4, and cage/Wayland only on Pi 5/x86/Rock Pi 4
+    (<a href="https://github.com/Screenly/Anthias/blob/master/.claude/skills/anthias-hardware/SKILL.md">Anthias hardware notes</a>).
+    That is a strong practitioner signal about where compositor overhead is
+    affordable.</li>
+<li>A small hobby project, KioskPi, does claim cage + Chromium on "Pi 3+ / Trixie
+    64-bit" (<a href="https://github.com/memcos/KioskPi">KioskPi</a>), but it is a
+    one-maintainer project with no published benchmark. Treat it as existence
+    proof, not evidence of acceptable performance.</li>
+</ul>
+<p><strong>Conclusion:</strong> Wayland + Chromium will boot on a Pi 3, and Pi OS defaults to it,
+but there is no evidence it is faster than X11 for this workload, and the failure
+reports cluster around exactly the Pi 3. Keeping X11 for Pi 3B/3B+ SPLIT is
+reasonable and low-risk: X11 is still supported in Trixie, and the only thing we
+give up is being on the default path. Re-evaluate after a measured Chromium 156
+A/B test on a 3B+ (cold boot, first paint, tab switch, 24 h memory).</p>
+<hr />
+<h2 id="4-replacing-what-the-backend-does-today">4. Replacing what the backend does today<a class="headerlink" href="#4-replacing-what-the-backend-does-today" title="Permanent link">&para;</a></h2>
+<p>Calvin currently uses <code>xrandr</code> (<code>display_orientation_service.py</code>,
+<code>calvin_display_agent.py</code>) and <code>xset dpms</code> / <code>xset s</code>
+(<code>display_power_service.py</code>, <code>calvin_display_agent.py</code>). Under Wayland those
+tools either do not see the DRM output or do not own it: Xwayland is a client, not
+the display server, so <code>xset dpms</code> cannot power the panel. The labwc maintainers
+explicitly recommend <code>wlopm</code> for this instead of <code>wlr-randr --off</code>
+(<a href="https://labwc.github.io/integration.html">labwc integration</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Need</th>
+<th>X11 today</th>
+<th>Wayland replacement</th>
+<th>Compositor support</th>
+<th>Caveats</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Rotation / mode</td>
+<td><code>xrandr --output … --rotate left --mode 1920x1080</code></td>
+<td><code>wlr-randr --output HDMI-A-1 --transform 90 --mode 1920x1080@60Hz</code></td>
+<td>cage, labwc, sway, wayfire (wlr-output-management v4); <strong>not</strong> weston</td>
+<td>Output names change (<code>HDMI-1</code> → <code>HDMI-A-1</code>); transform direction differs from xrandr (see migration table); <code>CALVIN_DISPLAY_OUTPUT=HDMI-1</code> will be wrong</td>
+</tr>
+<tr>
+<td>Output profile</td>
+<td><code>xrandr</code> script</td>
+<td><code>kanshi</code> profile, or <code>wlr-randr</code> at compositor start</td>
+<td>cage, labwc, sway, wayfire</td>
+<td>kanshi needs the compositor's output-management protocol; start it inside the session</td>
+</tr>
+<tr>
+<td>Panel on/off</td>
+<td><code>xset dpms force off/on</code>, <code>vcgencmd display_power</code></td>
+<td><code>wlopm --off &lt;output&gt;</code> / <code>--on &lt;output&gt;</code></td>
+<td>cage ≥0.3.0, labwc, sway, wayfire (wlr-output-power-management); <strong>not</strong> weston</td>
+<td>Some monitors fake a hotplug when signal drops; labwc re-enables outputs by default → panel wakes. Set <code>&lt;autoEnableOutputs&gt;no&lt;/autoEnableOutputs&gt;</code> and use <code>wlr-randr</code>/kanshi to enable at boot. <code>wlopm --on</code> can fail after a hotplug; <code>wlr-randr --output … --on</code> is the fallback</td>
+</tr>
+<tr>
+<td>Legacy panel power</td>
+<td><code>vcgencmd display_power 0/1</code></td>
+<td>Not a Wayland API; keep only as a legacy Pi 3/4 fallback</td>
+<td>n/a</td>
+<td>Pi 5 <code>vcgencmd</code> may not register <code>display_power</code> at all; under <code>vc4-kms-v3d</code> on Pi 4 it can be a no-op or the panel can wake after ~12 s. Do not make it the primary path</td>
+</tr>
+<tr>
+<td>Screen-blank timeout</td>
+<td><code>xset s N</code>, <code>xset +dpms</code>, <code>xset dpms N N N</code></td>
+<td><code>swayidle -w timeout N 'wlopm --off *' resume 'wlopm --on *'</code>, or the backend schedule calling <code>wlopm</code> directly</td>
+<td>labwc and sway support ext-idle-notify; <code>swayidle</code> works with both</td>
+<td>Calvin's authoritative feature is a <strong>schedule</strong>, not an idle timeout. Keep the schedule logic and call <code>wlopm</code>; add idle blanking only if the product wants it</td>
+</tr>
+<tr>
+<td>TV on/off (optional)</td>
+<td>—</td>
+<td><code>cec-ctl -d /dev/cec0 --to 0 --standby</code> / <code>--image-view-on</code></td>
+<td>Display-server independent</td>
+<td>Only works through HDMI-CEC on a TV; most monitors have no CEC. <code>cec-ctl</code> comes from <code>v4l-utils</code> (<a href="https://man.archlinux.org/man/cec-ctl.1.en">cec-ctl(1)</a>)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Which compositor gets which protocol:</strong> cage, labwc, sway, and wayfire support
+both wlr-output-management and wlr-output-power-management. Weston supports
+neither. That alone eliminates Weston for Calvin's runtime rotation/power.</p>
+<p><strong><code>wlopm</code> is in Debian Trixie</strong> as <code>0.1.0-1</code> (arm64 <code>0.1.0-1+b1</code>), so it is one
+<code>apt install</code> on Pi OS Lite; <code>wlr-randr</code> is <code>0.4.1-1</code>, <code>kanshi</code> <code>1.5.1-2</code>,
+<code>swayidle</code> <code>1.8.0-1</code> (Debian madison, 2026-10-29).</p>
+<hr />
+<h2 id="5-chromium-on-wayland-on-a-pi">5. Chromium on Wayland on a Pi<a class="headerlink" href="#5-chromium-on-wayland-on-a-pi" title="Permanent link">&para;</a></h2>
+<h3 id="ozone-flags-and-environment">Ozone flags and environment<a class="headerlink" href="#ozone-flags-and-environment" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Chromium ≥140 auto-detects the display server and prefers Wayland when
+  available; <code>--ozone-platform-hint</code> default changed to <code>auto</code>
+  (<a href="https://www.omgubuntu.co.uk/2025/08/chrome-140-wayland-auto-detection-linux">Chrome 140 change</a>).
+  On current Pi OS Chromium (156) you normally do <strong>not</strong> need Ozone flags when
+  Chromium is started inside a Wayland session.</li>
+<li>To force it, or if auto-detection fails, use <code>--ozone-platform=wayland</code>
+  (documented in the <a href="https://chromium.googlesource.com/chromium/src/+/HEAD/docs/ozone_overview.md">Ozone overview</a>).
+  <code>--enable-features=UseOzonePlatform</code> is the legacy form; do not add it blindly.</li>
+<li>A systemd-launched Chromium needs the session environment, not just the binary:
+  <code>XDG_SESSION_TYPE=wayland</code>, <code>WAYLAND_DISPLAY=wayland-0</code>, and
+  <code>XDG_RUNTIME_DIR=/run/user/&lt;uid&gt;</code>. Without those it may fall back to X11/
+  XWayland or fail to connect. This is the single most important unit-file change.</li>
+<li>Keep kiosk flags minimal. Real Pi 5 cage kiosks run
+  <code>chromium --kiosk --ozone-platform=wayland &lt;url&gt;</code> successfully
+  (<a href="https://github.com/raspberrypi/linux/issues/7721">rpi/linux #7721</a>).</li>
+</ul>
+<h3 id="gpu-raster-and-hardware-video-decode">GPU raster and hardware video decode<a class="headerlink" href="#gpu-raster-and-hardware-video-decode" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Raster/compositing:</strong> Pi 4/5 use V3D for rendering with VC4/KMS for display
+  (<a href="https://docs.mesa3d.org/drivers/v3d.html">Mesa V3D</a>); Pi 3 uses VC4
+  (GLES2 only). Chromium does use the GPU for compositing/raster when Mesa/EGL
+  works, but you must verify on the device with <code>chrome://gpu</code>. Do not cargo-cult
+  <code>--use-gl=egl</code>, <code>--use-angle=gles-egl</code>, or <code>--ignore-gpu-blocklist</code>: a current
+  Pi 5 cage kiosk report shows <code>--use-angle=gles-egl</code> triggering repeated V3D
+  resets, while stock flags ran for hours
+  (<a href="https://github.com/raspberrypi/linux/issues/7721">rpi/linux #7721</a>).</li>
+<li><strong>Hardware video decode is model- and codec-specific, and not a reason to
+  choose Wayland:</strong></li>
+<li>Pi 4: the Raspberry Pi Chromium build can hardware-decode H.264 through the
+    V4L2 stateful decoder; users report working 1080p playback with the RPi build
+    (<a href="https://forums.raspberrypi.com/viewtopic.php?t=357870">forum report</a>).</li>
+<li>Pi 5: the legacy H.264 decoder was removed; the Pi 5 decoder is HEVC-only
+    (rpivid/V4L2 stateless). Stock Chromium reports software decode and does not
+    accept HEVC, so hardware decode is effectively unavailable without a patched
+    build (<a href="https://gist.github.com/schickling/089f4faf412b5267508f758408f0645f">Pi 5 decode investigation</a>;
+    a patched Chromium exists at <a href="https://github.com/sslivins/chromium-rpi-hevc">chromium-rpi-hevc</a>).</li>
+<li>Calvin's dashboard is calendars, photos, and web services; do not make video
+    decode a migration gate. If a plugin embeds video, test that plugin
+    separately.</li>
+</ul>
+<h3 id="known-kiosk-bugs-sharp-edges">Known kiosk bugs / sharp edges<a class="headerlink" href="#known-kiosk-bugs-sharp-edges" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Cursor</strong> on cage (no option, vc4-hdmi counts as a pointer) and labwc
+   (one-shot <code>HideCursor</code> only). See §2.</li>
+<li><strong>Pi 3B+ labwc autostart → white Chromium window</strong>, one forum report; test
+   cold boot, not just <code>systemctl restart</code>.</li>
+<li><strong>Pi 5 V3D GPU hang</strong> in a cage + Chromium kiosk while zooming a map
+   (Oct 2026, open). Stock flags are safer; add a GPU-hang watchdog/restart.</li>
+<li><strong>Low-RAM warning</strong> on Pi 3-class devices; the popup can cover a kiosk page.</li>
+<li><strong>Cage headless boot binds zero outputs</strong> and never recovers without udev in
+   the container; Anthias added a watchdog that exits/restarts the viewer when
+   there is no bindable output
+   (<a href="https://github.com/Screenly/Anthias/blob/master/.claude/skills/anthias-hardware/SKILL.md">Anthias notes</a>).</li>
+<li><strong>Monitor hotplug wake</strong> after <code>wlopm --off</code>; see §4.</li>
+<li><strong>Panel over fullscreen</strong> if you run the full Raspberry Pi Desktop; use the
+   bare <code>rpd-wayland-core</code> stack (no panel) or configure the panel away.</li>
+</ol>
+<hr />
+<h2 id="6-what-comparable-projects-do">6. What comparable projects do<a class="headerlink" href="#6-what-comparable-projects-do" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Project</th>
+<th>Current stack</th>
+<th>Why / lesson</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>FullPageOS</strong></td>
+<td>Raspberry Pi OS Bookworm (2024-11-19 base), 32-bit, Chromium 130, <strong>X11</strong> (uses <code>xdotool</code>, <code>x11vnc</code>); last release 0.14.0, 2025-07-14 (<a href="https://github.com/guysoft/FullPageOS/releases/tag/0.14.0">release</a>)</td>
+<td>The best-known "browser on boot" distro has not moved to Trixie/Wayland yet. Inertia and X11 tooling still dominate the kiosk-distro niche.</td>
+</tr>
+<tr>
+<td><strong>Anthias (Screenly OSE)</strong></td>
+<td>Per-board: linuxfb on Pi 1/2/3-32, eglfs/KMS on Pi 3-64/Pi 4, <strong>cage/Wayland</strong> on Pi 5/x86/Rock Pi 4; QtWebEngine viewer, not Chromium (<a href="https://github.com/Screenly/Anthias/blob/master/.claude/skills/anthias-hardware/SKILL.md">hardware notes</a>, <a href="https://github.com/Screenly/Anthias/blob/master/bin/lib/viewer/platform_wayland.sh">wayland launcher</a>)</td>
+<td>They only pay for a compositor where the SoC can afford it. On Wayland they rotate with <code>wlr-randr</code> transforms and blank with <code>wlr-randr --off</code>; they hit cage's headless/hotplug bugs and added a watchdog. This is the closest match to Calvin's problem.</td>
+</tr>
+<tr>
+<td><strong>piSignage</strong></td>
+<td>Current Pi player is <strong>labwc/Wayland</strong>; docs include a labwc cursor-hiding procedure and a Trixie post-install guide (<a href="https://help.pisignage.com/hc/en-us/articles/59094755442201-Hiding-the-Mouse-Cursor-on-the-labwc-Wayland-Player">cursor guide</a>)</td>
+<td>Commercial signage moved with Pi OS to labwc. It also confirms that cursor hiding is a manual hack (<code>HideCursor</code> + <code>wtype</code>), not a supported compositor feature.</td>
+</tr>
+<tr>
+<td><strong>MagicMirror²</strong></td>
+<td>Electron; v2.38 (2026-10-01) starts with <code>--ozone-platform=wayland</code> when <code>WAYLAND_DISPLAY</code> is set, otherwise X11 (<a href="https://github.com/MagicMirrorOrg/MagicMirror/blob/master/clientonly/index.js">clientonly/index.js</a>, <a href="https://github.com/MagicMirrorOrg/MagicMirror/blob/master/CHANGELOG.md">changelog</a>)</td>
+<td>Electron/Chromium upstream now handles Wayland; the remaining work is session environment, not browser patches. Many installed mirrors still run X11.</td>
+</tr>
+</tbody>
+</table>
+<p>The pattern: <strong>new/high-end boards go Wayland; low-end boards stay on a
+framebuffer/EGL stack; X11 remains common where tooling or inertia wins.</strong> No
+comparable project reports Wayland making a Pi 3 browser kiosk faster.</p>
+<hr />
+<h2 id="7-proposed-migration-shape">7. Proposed migration shape<a class="headerlink" href="#7-proposed-migration-shape" title="Permanent link">&para;</a></h2>
+<h3 id="71-target-matrix">7.1 Target matrix<a class="headerlink" href="#71-target-matrix" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Hardware / topology</th>
+<th>Default stack</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pi 5 / Pi 500 / CM5, SPLIT or FULL</td>
+<td><strong>Wayland + labwc</strong></td>
+<td>Primary target; test V3D hang and HEVC</td>
+</tr>
+<tr>
+<td>Pi 4B / Pi 400 / CM4 (2 GB+), SPLIT or FULL</td>
+<td><strong>Wayland + labwc</strong></td>
+<td>Recommended minimum for FULL</td>
+</tr>
+<tr>
+<td>Pi 3B / 3B+, <strong>SPLIT</strong></td>
+<td><strong>X11 + openbox (unchanged)</strong></td>
+<td>Keep supported; optional Wayland pilot behind an env flag</td>
+</tr>
+<tr>
+<td>Pi 3B / 3B+, <strong>FULL</strong></td>
+<td><strong>X11 + openbox</strong> (best effort)</td>
+<td>FULL officially needs Pi 4/5; do not block the migration on Pi 3 FULL</td>
+</tr>
+<tr>
+<td>Pi Zero 2 W / older</td>
+<td>Unsupported</td>
+<td>512 MB is below Chromium's practical floor</td>
+</tr>
+</tbody>
+</table>
+<p>Use an explicit <code>CALVIN_DISPLAY_STACK=x11|wayland</code> (default <code>auto</code>) in
+<code>/etc/default/calvin-kiosk</code>, plus a model check from <code>/proc/device-tree/model</code>
+(Calvin already reads this in <code>is_raspberry_pi()</code>). <code>auto</code> chooses X11 on Pi 3,
+Wayland on Pi 4/5. Do not infer only from <code>WAYLAND_DISPLAY</code>: an X11 session can
+have XWayland, and a broken Wayland session can leave a stale variable.</p>
+<h3 id="72-dual-support-not-a-flag-day">7.2 Dual support, not a flag day<a class="headerlink" href="#72-dual-support-not-a-flag-day" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Phase 1 (SPLIT, opt-in):</strong> add the Wayland unit/config and agent branch;
+   install it only with <code>--display-stack wayland</code> or on Pi 4/5 test devices.
+   Keep the X11 packages and units installed so rollback is a service switch,
+   not a reimage.</li>
+<li><strong>Phase 2 (SPLIT, default Pi 4/5):</strong> make <code>setup-kiosk.sh</code> choose Wayland on
+   Pi 4/5, X11 on Pi 3. Keep an env override.</li>
+<li><strong>Phase 3 (FULL, Pi 4/5):</strong> same selection in <code>setup.sh</code>; FULL on Pi 3 stays
+   X11 and is documented as legacy.</li>
+<li><strong>Phase 4 (Pi 3 reassessment):</strong> only after an A/B test on 3B+ with the
+   current Chromium, and only if it wins on cold boot and 24 h memory.</li>
+</ol>
+<h3 id="73-backend-agent-changes-proposed-not-implemented-here">7.3 Backend / agent changes (proposed, not implemented here)<a class="headerlink" href="#73-backend-agent-changes-proposed-not-implemented-here" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>File / service</th>
+<th>Today</th>
+<th>Wayland change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>backend/app/services/display_orientation_service.py</code></td>
+<td>Parses <code>xrandr --query</code>, applies <code>xrandr --rotate normal|left|right|inverted</code></td>
+<td>Add a Wayland branch: list/apply with <code>wlr-randr</code> (<code>--json</code> if available, else text); <code>--transform normal|90|180|270</code>; <code>--mode WxH@Hz</code>. Keep X11 branch for Pi 3. Do <strong>not</strong> use <code>/boot/config.txt display_rotate</code> as a live fallback under KMS; it is legacy firmware behaviour</td>
+</tr>
+<tr>
+<td><code>backend/app/services/display_power_service.py</code></td>
+<td><code>vcgencmd display_power</code>, then <code>xset dpms force on/off</code>; timeout via <code>xset s</code>/<code>xset dpms</code></td>
+<td>Wayland branch: <code>wlopm --off &lt;output&gt;</code> / <code>--on &lt;output&gt;</code> for schedule; <code>wlr-randr --output &lt;output&gt; --on</code> as wake fallback; <code>swayidle</code> + <code>wlopm</code> only if idle blanking is required. <code>vcgencmd</code> becomes a legacy fallback, never the primary path</td>
+</tr>
+<tr>
+<td><code>deploy/kiosk-agent/calvin_display_agent.py</code></td>
+<td><code>X11_ENV</code>, <code>xrandr</code> detection/rotation/mode, <code>apply_on()</code> uses <code>vcgencmd</code> + <code>xset</code></td>
+<td>Add <code>wayland</code> helpers (<code>wlr-randr</code>, <code>wlopm</code>), detect the stack, set <code>WAYLAND_DISPLAY</code>/<code>XDG_RUNTIME_DIR</code>; keep the schedule/reconcile logic unchanged; map orientation values to wlr transforms</td>
+</tr>
+<tr>
+<td><code>backend/app/utils/platform.py</code></td>
+<td><code>has_x11()</code> runs <code>xset -q</code></td>
+<td>Add <code>has_wayland()</code> (env + <code>wlr-randr</code>/<code>wlopm</code> probe). Do not use <code>has_x11()</code> as a proxy for "can control the display"</td>
+</tr>
+<tr>
+<td><code>deploy/systemd/calvin-x.service</code></td>
+<td><code>startx</code> on tty1 with <code>PAMName=login</code></td>
+<td>Add <code>calvin-wayland.service</code> (labwc) with the same PAM/logind session shape, <code>TTYPath=/dev/tty1</code>, <code>Conflicts=getty@tty1</code>, and <code>Before=calvin-kiosk*.service</code>; cage, if chosen, uses the upstream <code>cage@.service</code> template. Exactly one compositor unit is enabled</td>
+</tr>
+<tr>
+<td><code>deploy/systemd/calvin-kiosk*.service</code></td>
+<td><code>DISPLAY=:0</code>, <code>XAUTHORITY=…</code>; waits for <code>/tmp/.X11-unix/X0</code> or <code>Xorg</code></td>
+<td>Wayland variant: <code>XDG_SESSION_TYPE=wayland</code>, <code>WAYLAND_DISPLAY=wayland-0</code>, <code>XDG_RUNTIME_DIR=/run/user/%U</code>; no <code>DISPLAY</code>/<code>XAUTHORITY</code>; wait for the Wayland socket/compositor process, not Xorg</td>
+</tr>
+<tr>
+<td><code>deploy/systemd/calvin-display-agent.service</code></td>
+<td><code>DISPLAY=:0</code>, <code>XAUTHORITY=…</code></td>
+<td>Same Wayland environment so <code>wlopm</code>/<code>wlr-randr</code> can connect to the session</td>
+</tr>
+<tr>
+<td><code>scripts/setup-common.sh</code> (<code>CALVIN_KIOSK_PACKAGES</code>, <code>configure_display</code>, <code>configure_openbox_autostart</code>)</td>
+<td>Installs <code>xserver-xorg</code>, <code>xinit</code>, <code>openbox</code>, <code>unclutter</code>, <code>xdotool</code>, <code>x11-xserver-utils</code>; writes <code>.xprofile</code>, <code>.xinitrc</code>, Openbox autostart</td>
+<td>Split the package set by stack; Wayland needs <code>labwc</code>, <code>chromium</code>, <code>wlr-randr</code>, <code>wlopm</code>, <code>kanshi</code> (optional), <code>swayidle</code> (optional). Write <code>~/.config/labwc/autostart</code> with <code>wlr-randr</code>/Chromium and a cursor-hide action; no <code>unclutter</code>/<code>xset</code> on Wayland</td>
+</tr>
+<tr>
+<td><code>scripts/setup.sh</code> (FULL)</td>
+<td>Installs <code>calvin-x.service</code> + <code>calvin-kiosk.service</code></td>
+<td>Select the compositor unit by model/flag; keep <code>calvin-app.service</code> and the local backend unchanged</td>
+</tr>
+<tr>
+<td><code>backend/app/services/kiosk_bundle.py</code> + <code>deploy/kiosk-agent/update-kiosk.sh</code></td>
+<td>Bundle is six files; updater has a hard-coded unit/path allowlist</td>
+<td>Add the Wayland unit + labwc config to the bundle and to the updater allowlist (<code>KNOWN_UNITS</code>, path map), bump the bundle version, and test rollback. The current allowlist will reject an unknown unit by design</td>
+</tr>
+<tr>
+<td>Docs</td>
+<td>X11/openbox wording in <code>KIOSK_INSTALL.md</code>, <code>DEPLOYMENT_TOPOLOGIES.md</code></td>
+<td>Document the model matrix and the <code>CALVIN_DISPLAY_STACK</code> override</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-rotation-mapping-must-be-verified-on-hardware">7.4 Rotation mapping (must be verified on hardware)<a class="headerlink" href="#74-rotation-mapping-must-be-verified-on-hardware" title="Permanent link">&para;</a></h3>
+<p><code>xrandr</code> and <code>wlr-randr</code> use different names and directions. A reasonable first
+mapping, to be confirmed by looking at the panel:</p>
+<table>
+<thead>
+<tr>
+<th>Calvin config</th>
+<th>xrandr today</th>
+<th>wlr transform (proposed)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>landscape, not flipped</td>
+<td><code>normal</code></td>
+<td><code>normal</code></td>
+</tr>
+<tr>
+<td>portrait, not flipped</td>
+<td><code>left</code> (90° CCW)</td>
+<td><code>90</code> (wlroots transform 90 is CCW)</td>
+</tr>
+<tr>
+<td>landscape, flipped</td>
+<td><code>inverted</code></td>
+<td><code>180</code></td>
+</tr>
+<tr>
+<td>portrait, flipped</td>
+<td><code>right</code> (90° CW)</td>
+<td><code>270</code></td>
+</tr>
+</tbody>
+</table>
+<p>Anthias documents the same trap from the other direction: <code>wlr</code> transforms turn
+counter-clockwise, so a user-facing "rotate 90° clockwise" maps to <code>270</code>
+(<a href="https://github.com/Screenly/Anthias/blob/master/.claude/skills/anthias-hardware/SKILL.md">Anthias notes</a>).
+Treat this table as a starting point and assert the result physically; a wrong
+direction is easy to miss on a symmetric dashboard.</p>
+<h3 id="75-environment-keys-proposed">7.5 Environment keys (proposed)<a class="headerlink" href="#75-environment-keys-proposed" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>CALVIN_DISPLAY_STACK=auto        # auto | x11 | wayland
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>CALVIN_DISPLAY_ROTATION=normal   # normal | left | right | inverted (existing)
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>CALVIN_DISPLAY_OUTPUT=HDMI-A-1   # Wayland names differ from xrandr&#39;s HDMI-1
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>CALVIN_DISPLAY_RESOLUTION=1920x1080@60
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>CALVIN_WAYLAND_DISPLAY=wayland-0
+</span></code></pre></div>
+<p><code>CALVIN_DISPLAY_OUTPUT</code> deserves a compatibility pass: existing installs have
+<code>HDMI-1</code>; Wayland uses <code>HDMI-A-1</code>. Accept both, or leave it unset and
+auto-detect the first connected output, before changing any defaults.</p>
+<hr />
+<h2 id="8-risks">8. Risks<a class="headerlink" href="#8-risks" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Likelihood</th>
+<th>Impact</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Wayland session does not start reliably from systemd (no logind session, no <code>XDG_RUNTIME_DIR</code>, no DRM master)</td>
+<td>Medium</td>
+<td>Kiosk black on boot</td>
+<td>Copy the <code>PAMName</code>/<code>pam_systemd</code>/TTY pattern from <code>calvin-x.service</code> and cage's <code>cage@.service</code>; test cold boot, not just restart; keep X11 fallback</td>
+</tr>
+<tr>
+<td>Pi 3 regression (RAM/CPU/first paint)</td>
+<td>High if switched</td>
+<td>Slow or unusable kiosk</td>
+<td>Keep Pi 3 on X11; A/B test before changing</td>
+</tr>
+<tr>
+<td>Cursor visible in the middle of the screen</td>
+<td>High on cage, medium on labwc</td>
+<td>Cosmetic but looks broken</td>
+<td>Prefer labwc; use <code>HideCursor</code>+<code>WarpCursor</code> at startup; for cage, udev-ignore <code>vc4-hdmi</code> pointer or transparent cursor theme; track cage &gt;0.3.1</td>
+</tr>
+<tr>
+<td>Monitor wakes immediately after <code>wlopm --off</code> (fake hotplug)</td>
+<td>Medium</td>
+<td>Schedule fails at night</td>
+<td><code>&lt;autoEnableOutputs&gt;no&lt;/autoEnableOutputs&gt;</code> in labwc; enable with kanshi/wlr-randr at boot; per-monitor test</td>
+</tr>
+<tr>
+<td><code>wlopm --on</code> does not restore after hotplug</td>
+<td>Medium</td>
+<td>Screen stays black in the morning</td>
+<td>Fallback <code>wlr-randr --output … --on</code>; watchdog that re-enables the output</td>
+</tr>
+<tr>
+<td>Rotation direction or touch mapping wrong</td>
+<td>Medium</td>
+<td>Portrait touchscreen unusable</td>
+<td>Physical test on the exact panel; explicit <code>mapToOutput</code>; keep 180° test too</td>
+</tr>
+<tr>
+<td>Pi 5 V3D GPU hang under Chromium</td>
+<td>Low–medium</td>
+<td>Black screen until restart</td>
+<td>Stock Chromium flags; GPU-hang watchdog; test the actual dashboard/plugins for long sessions; track rpi/linux #7721</td>
+</tr>
+<tr>
+<td>Bookworm vs Trixie feature drift (labwc 0.8.4 vs 0.20.2, cage 0.2.0 vs 0.3.1)</td>
+<td>High</td>
+<td>Config that works on Trixie fails on Bookworm</td>
+<td>Do not claim <code>autoEnableOutputs</code>/<code>HideCursor</code>/touch options on Bookworm without testing; gate features by compositor version</td>
+</tr>
+<tr>
+<td>Bundle updater rejects the new unit</td>
+<td>Medium</td>
+<td>Remote update fails/rolls back</td>
+<td>Update <code>BUNDLE_FILES</code>, <code>KNOWN_UNITS</code>, and the path allowlist together; test update + rollback</td>
+</tr>
+<tr>
+<td>X11 disappears from a future Pi OS</td>
+<td>Low now, certain eventually</td>
+<td>Pi 3 support ends</td>
+<td>Track Raspberry Pi release notes; plan a Pi 3 hardware refresh or a measured Wayland cutover before Trixie LTS ends</td>
+</tr>
+<tr>
+<td>HDMI-CEC is not available on the monitor</td>
+<td>High</td>
+<td>CEC fallback useless</td>
+<td>Treat CEC as optional; <code>wlopm</code> is the primary path</td>
+</tr>
+<tr>
+<td>Video decode expectations</td>
+<td>Medium</td>
+<td>Stutter on video plugins</td>
+<td>Do not promise HW decode; test per plugin/model; Pi 4 H.264 is the best case, Pi 5 HEVC is not enabled by default</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="9-what-must-be-tested-on-real-hardware">9. What must be tested on real hardware<a class="headerlink" href="#9-what-must-be-tested-on-real-hardware" title="Permanent link">&para;</a></h2>
+<p>Minimum matrix (do not sign off from a single Pi 5):</p>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Cases</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Board</td>
+<td>Pi 3B, Pi 3B+, Pi 4B (2 GB and 4/8 GB), Pi 5 (4/8 GB), Pi 400/500 if available</td>
+</tr>
+<tr>
+<td>OS</td>
+<td>Trixie Lite 64-bit (primary), Trixie Lite 32-bit (spot check), Bookworm Lite 64-bit legacy (upgrade path)</td>
+</tr>
+<tr>
+<td>Topology</td>
+<td>SPLIT (remote backend) and FULL (local backend)</td>
+</tr>
+<tr>
+<td>Display</td>
+<td>HDMI 1080p; 4K on Pi 4/5; DSI Touch Display 2; portrait and 180°; cold boot with display attached; boot headless then hot-plug; monitor power-cycle</td>
+</tr>
+<tr>
+<td>Boot</td>
+<td>Cold boot 20×; boot with backend down; boot with network down; boot after unclean shutdown</td>
+</tr>
+<tr>
+<td>Chromium</td>
+<td>First paint; kiosk URL/query string; backend restart/reconnect; tab/screen switching; <code>chrome://gpu</code> and <code>chrome://media-internals</code>; 72 h soak; memory on Pi 3; GPU-reset logs (<code>dmesg | grep v3d</code>)</td>
+</tr>
+<tr>
+<td>Rotation</td>
+<td>All four orientations; output/mode change at runtime; touch coordinates after each; 180° + touch</td>
+</tr>
+<tr>
+<td>Power</td>
+<td>Schedule on/off across midnight and DST; <code>wlopm</code> off/on; wake after hotplug; fake-hotplug monitor; <code>vcgencmd</code> fallback on Pi 3/4 only</td>
+</tr>
+<tr>
+<td>Cursor</td>
+<td>No mouse; touch-only panel; USB mouse plugged/unplugged; after idle; after touch</td>
+</tr>
+<tr>
+<td>Update</td>
+<td>Kiosk bundle self-update; rollback; unit restart; signature/manifest checks; unknown-unit rejection</td>
+</tr>
+<tr>
+<td>Regression</td>
+<td>X11 Pi 3 still boots and the agent still rotates/powers the panel after the shared code changes</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Acceptance criteria for flipping Pi 4/5 to Wayland:</strong> 20/20 clean cold boots
+with a display attached; no cursor at rest; rotation and touch correct in all
+four orientations on the target panel; schedule off/on works for 7 consecutive
+days including a monitor power-cycle; Chromium survives a 72 h soak without a
+GPU-reset black screen; rollback to X11 is one service switch and re-tested.</p>
+<hr />
+<h2 id="10-open-questions-explicitly-unverified">10. Open questions / explicitly unverified<a class="headerlink" href="#10-open-questions-explicitly-unverified" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>UNVERIFIED:</strong> a formal Raspberry Pi end-of-support date for X11. Debian's
+  Trixie LTS (2030-06-30) is the outer bound I can defend; Raspberry Pi has made
+  no such promise for its own packages.</li>
+<li><strong>UNVERIFIED:</strong> whether Bookworm's labwc 0.8.4 supports <code>autoEnableOutputs</code>,
+  <code>HideCursor</code>/<code>WarpCursor</code>, and <code>&lt;touch&gt;&lt;mapToOutput&gt;</code>. Trixie's 0.20.2 does.
+  Test before promising feature parity on legacy installs.</li>
+<li><strong>UNVERIFIED:</strong> current (Chromium 156) status of the Pi 3 Trixie "Chromium
+  won't start" report; the report is from June 2026 and Chromium has moved on.</li>
+<li><strong>UNVERIFIED:</strong> whether <code>wlopm --on</code> works reliably on the specific monitors
+  Calvin users have; the labwc discussion shows at least one monitor family where
+  it does not, and <code>wlr-randr --on</code> is required.</li>
+<li><strong>UNVERIFIED:</strong> touch rotation behaviour on the DSI Touch Display 2 under cage
+  specifically; labwc's wlroots path and explicit <code>mapToOutput</code> are better
+  documented.</li>
+<li><strong>UNVERIFIED:</strong> whether Calvin's dashboard (no heavy WebGL) can trigger the Pi 5
+  V3D hang; the public report is a map/OpenLayers page, so test the real screens.</li>
+</ul>
+<hr />
+<h2 id="sources">Sources<a class="headerlink" href="#sources" title="Permanent link">&para;</a></h2>
+<p>Official / primary:</p>
+<ul>
+<li><a href="https://www.raspberrypi.com/news/trixie-the-new-version-of-raspberry-pi-os/">Raspberry Pi OS Trixie announcement</a></li>
+<li><a href="https://www.raspberrypi.com/news/a-new-release-of-raspberry-pi-os/">Raspberry Pi OS labwc/Wayland default announcement</a></li>
+<li><a href="https://www.raspberrypi.com/tutorials/how-to-use-a-raspberry-pi-in-kiosk-mode/">Raspberry Pi kiosk-mode tutorial</a></li>
+<li><a href="https://www.debian.org/releases/">Debian releases / EOL table</a></li>
+<li><a href="https://www.debian.org/releases/bookworm/">Debian bookworm LTS</a></li>
+<li><a href="http://archive.raspberrypi.com/debian/dists/trixie/main/binary-arm64/Packages.gz">Raspberry Pi Trixie package archive</a></li>
+<li><a href="https://github.com/cage-kiosk/cage/wiki/Configuration">Cage configuration wiki</a></li>
+<li><a href="https://github.com/cage-kiosk/cage/wiki/Starting-Cage-on-boot-with-systemd">Cage systemd boot guide</a></li>
+<li><a href="https://man.archlinux.org/man/cage.1.en">cage(1)</a></li>
+<li><a href="https://labwc.github.io/integration.html">labwc integration guide</a></li>
+<li><a href="https://github.com/labwc/labwc/blob/master/docs/rc.xml.all">labwc rc.xml reference</a></li>
+<li><a href="https://labwc.github.io/labwc-actions.5.html">labwc actions</a></li>
+<li><a href="https://labwc.github.io/labwc-config.5.html#entry_core_autoenableoutputs">labwc config: autoEnableOutputs</a></li>
+<li><a href="https://man.archlinux.org/man/sway-output.5.en">sway-output(5)</a></li>
+<li><a href="https://man.archlinux.org/man/sway-input.5.en">sway-input(5)</a></li>
+<li><a href="https://wayland.pages.freedesktop.org/weston/toc/kiosk-shell.html">Weston kiosk-shell</a></li>
+<li><a href="https://wayland.app/protocols/wlr-output-management-unstable-v1">wlr-output-management support table</a></li>
+<li><a href="https://wayland.app/protocols/wlr-output-power-management-unstable-v1">wlr-output-power-management support table</a></li>
+<li><a href="https://chromium.googlesource.com/chromium/src/+/HEAD/docs/ozone_overview.md">Chromium Ozone overview</a></li>
+<li><a href="https://man.archlinux.org/man/cec-ctl.1.en">cec-ctl(1)</a></li>
+<li><a href="https://docs.mesa3d.org/drivers/vc4.html">Mesa VC4</a></li>
+<li><a href="https://docs.mesa3d.org/drivers/v3d.html">Mesa V3D</a></li>
+<li><a href="https://api.ftp-master.debian.org/madison?package=wlopm&amp;table=all">Debian package versions (madison)</a></li>
+</ul>
+<p>Real-world reports / comparable projects:</p>
+<ul>
+<li><a href="https://www.omgubuntu.co.uk/2025/08/chrome-140-wayland-auto-detection-linux">Chrome 140 Wayland auto-detection</a></li>
+<li><a href="https://github.com/raspberrypi/linux/issues/7721">Pi 5 V3D hang in a cage Chromium kiosk (2026-10-27)</a></li>
+<li><a href="https://gist.github.com/schickling/089f4faf412b5267508f758408f0645f">Pi 5 Chromium hardware-decode investigation</a></li>
+<li><a href="https://github.com/sslivins/chromium-rpi-hevc">chromium-rpi-hevc (Pi 5/CM5 HEVC patch)</a></li>
+<li><a href="https://forums.raspberrypi.com/viewtopic.php?p=2381452">Pi 3 Trixie Chromium 149 report</a></li>
+<li><a href="https://forums.raspberrypi.com/viewtopic.php?p=2386021">Pi 3B+ labwc Chromium white-screen report</a></li>
+<li><a href="https://issues.chromium.org/issues/373891800">Chromium low-RAM kiosk warning</a></li>
+<li><a href="https://github.com/cage-kiosk/cage/issues/299">Cage cursor issue #299</a></li>
+<li><a href="https://github.com/labwc/labwc/discussions/3455">labwc monitor power discussion #3455</a></li>
+<li><a href="https://github.com/labwc/labwc/issues/1990">labwc stylus rotation issue #1990</a></li>
+<li><a href="https://help.pisignage.com/hc/en-us/articles/59094755442201-Hiding-the-Mouse-Cursor-on-the-labwc-Wayland-Player">piSignage labwc cursor workaround</a></li>
+<li><a href="https://github.com/guysoft/FullPageOS/releases/tag/0.14.0">FullPageOS 0.14.0 release</a></li>
+<li><a href="https://github.com/Screenly/Anthias/blob/master/.claude/skills/anthias-hardware/SKILL.md">Anthias hardware notes</a></li>
+<li><a href="https://github.com/Screenly/Anthias/blob/master/bin/lib/viewer/platform_wayland.sh">Anthias Wayland launcher</a></li>
+<li><a href="https://github.com/MagicMirrorOrg/MagicMirror/blob/master/clientonly/index.js">MagicMirror clientonly Wayland handling</a></li>
+<li><a href="https://github.com/memcos/KioskPi">KioskPi (cage on Pi 3+ claim)</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,3100 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/research/2026-11-02-kiosk-performance/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Kiosk performance profile — Raspberry Pi 3B+ / cog (WPE WebKit) - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#kiosk-performance-profile-raspberry-pi-3b-cog-wpe-webkit" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Kiosk performance profile — Raspberry Pi 3B+ / cog (WPE WebKit)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#tldr" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TL;DR
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Method
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bundle-and-first-load-payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bundle and first-load payload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#initial-load-to-first-meaningful-paint" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial load to first meaningful paint
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#interaction-measurements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interaction measurements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Interaction measurements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#top-application-self-time-per-interaction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Top application self time per interaction
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#per-region-breakdown-owners-real-dashboard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Per-region breakdown (owner's real dashboard)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#idle-every-timer-animation-and-transition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Idle: every timer, animation and transition
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Idle: every timer, animation and transition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#setintervals-active-while-idle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        setIntervals active while idle
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pending-settimeouts-at-the-end-of-the-idle-window" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pending setTimeouts at the end of the idle window
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#requestanimationframe" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        requestAnimationFrame
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#css-animations-and-transitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CSS animations and transitions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#expensive-css-on-a-pi-gpu-and-where-it-is-used" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Expensive CSS on a Pi GPU (and where it is used)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ranked-fixes-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ranked fixes (10)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#would-a-low-power-screen-setting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Would a "low-power screen" setting help?
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#other-findings-follow-ups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Other findings / follow-ups
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="kiosk-performance-profile-raspberry-pi-3b-cog-wpe-webkit">Kiosk performance profile — Raspberry Pi 3B+ / cog (WPE WebKit)<a class="headerlink" href="#kiosk-performance-profile-raspberry-pi-3b-cog-wpe-webkit" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2026-11-02
+<strong>Task:</strong> calvin-qpao (phase 1: measure, do not optimise)
+<strong>Scope:</strong> the dashboard, not Settings. The owner reports that Settings feels fast
+while the dashboard feels slow. The profile is weighted towards the dashboard and
+breaks the cost down per region type.</p>
+<h2 id="tldr">TL;DR<a class="headerlink" href="#tldr" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>A dashboard tap is not a JavaScript problem.</strong> The all-regions tap costs
+  <strong>658 ms</strong> of main-thread time, but application JS is only <strong>8 ms</strong>. About
+  <strong>90 %</strong> is native <code>(program)</code> work — paint, raster and image decode. The same
+  is true for the photo advance (<strong>18.9 ms</strong> app JS, <strong>558 ms</strong> native).</li>
+<li><strong>The two biggest paint costs are the focus light and the photo backdrop.</strong>
+  Every tap turns on a four-layer <code>box-shadow</code> (up to 68 px blur) on the active
+  region and applies <code>filter: saturate() brightness()</code> to every other region.
+  Every photo is drawn twice: a full-size <code>&lt;img&gt;</code> plus a full-size copy with
+  <code>filter: blur(28px) brightness(0.55)</code>.</li>
+<li><strong>The initial bundle is 1.22 MB of JS (≈392 kB gzip) plus 257 kB of CSS.</strong>
+  The 630 kB <code>settings</code> chunk and the 378 kB <code>plugins</code> chunk are both loaded on
+  the first dashboard paint, although the dashboard does not need most of either.</li>
+<li><strong>A photo is downloaded and decoded at 4032×3024 (12.2 MP) for a 626×637
+  (0.40 MP) box</strong> — about 30× more pixels than displayed — and a second
+  full-size <code>&lt;img&gt;</code> copy is rasterized with a 28 px blur for the backdrop. The
+  mock photo is 4.00 MB.</li>
+<li><strong>Idle is cheap but not quiet.</strong> Steady-state idle is 54–160 ms of main-thread
+  work per 30 s (≈0.2–0.5 % of one core), but a <strong>100 ms <code>setInterval</code> fires 300
+  times per 30 s</strong>, a <strong>30 s photo rotation</strong> triggers the full 0.74–0.96 s photo
+  advance, and 66 <code>comet-orbit</code> CSS animations exist (paused at idle, running
+  during loads).</li>
+<li><strong>A "low-power screen" setting would help</strong>, because the dominant cost is
+  decorative paint. It can switch off the comet loading light, the focus glow and
+  dim filter, the photo backdrop blur, and lengthen/disable photo rotation. It
+  will not fix the initial bundle or the calendar's forced layout.</li>
+</ul>
+<p>All timings below are from Chromium with <code>Emulation.setCPUThrottlingRate = 6</code>
+(the Pi 3 core is roughly 6–10× slower than a desktop core). Treat them as
+approximations of the Pi, not exact port measurements.</p>
+<h2 id="method">Method<a class="headerlink" href="#method" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Production build (<code>npm run build</code>), served from <code>dist/</code> by <code>vite preview</code> on
+  <code>127.0.0.1:4173</code>. The profiling script builds with sourcemaps and a temporary
+  Vite config that exposes the Vue app for component mount/update counters; the
+  repository config is unchanged.</li>
+<li>Playwright Chromium 143, viewport <strong>1280×720</strong>, <code>serviceWorkers: "block"</code>.</li>
+<li><strong>Every <code>/api</code> request is answered by the existing mocked harness</strong>
+  (<code>frontend/tests/e2e/phone/fixtures/api-mock.js</code>). Host-acting routes
+  (<code>/api/system/reboot</code>, <code>/restart-*</code>, <code>/update</code>, <code>/display/*</code>, …) are
+  intercepted and recorded; <code>hostActions</code> is empty in every run. No real backend
+  is contacted.</li>
+<li>Realistic mock data: two/three dashboard screens; a calendar with 22 timed and
+  all-day events; five 4032×3024 photos (4.00 MB each); the horizontal clock bar
+  at the top; <code>showUI: true</code>, focus light on interaction, dim-others on, 30 s
+  photo rotation, 30 s config poll.</li>
+<li>Measurements:</li>
+<li>CDP <code>Performance.getMetrics()</code> for <code>TaskDuration</code>, <code>ScriptDuration</code>,
+    <code>RecalcStyleCount/Duration</code>, <code>LayoutCount/Duration</code>;</li>
+<li>CDP <code>Profiler</code> (500 µs sampling) for self time, symbolised through the
+    production sourcemaps to <code>frontend/src/...:line</code>;</li>
+<li><code>PerformanceObserver({ entryTypes: ["longtask"] })</code> for tasks &gt; 50 ms;</li>
+<li>a Vue mixin in the profiling build for per-component mount/update counts;</li>
+<li>wrapped <code>setInterval</code>/<code>setTimeout</code>/<code>requestAnimationFrame</code> for the idle
+    timer inventory, with stacks symbolised to source.</li>
+<li><strong>Caveats:</strong> Chromium, not cog/WPE WebKit. Paint and raster behaviour differs;
+  the Pi's GPU may make some effects cheaper and others more expensive. Mock
+  data is not the owner's real library. Run-to-run variance was ±20–30 % (initial
+  load ranged 1.58–2.24 s across runs). The iframe region is a mocked external
+  page and is not present on the owner's real dashboard; it was measured briefly.
+  The unauthenticated Settings lock screen crashes the production renderer in
+  this harness, so the OSK was measured on the Settings search field instead.</li>
+</ul>
+<p>Reproduce:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd</span><span class="w"> </span>frontend
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>node<span class="w"> </span>scripts/profile-kiosk.mjs<span class="w"> </span>--out<span class="w"> </span>/tmp/opencode/kiosk-profile.json
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># reuse an existing build/preview</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>node<span class="w"> </span>scripts/profile-kiosk.mjs<span class="w"> </span>--skip-build<span class="w"> </span>--base-url<span class="w"> </span>http://localhost:4173<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>--only<span class="w"> </span>initial-load,photo-advance,page-switch-calendar-photos
+</span></code></pre></div>
+<p>The script prints a summary and writes the raw JSON (scenario metrics, profiles,
+timer stacks, bundle list) to the <code>--out</code> path.</p>
+<h2 id="bundle-and-first-load-payload">Bundle and first-load payload<a class="headerlink" href="#bundle-and-first-load-payload" title="Permanent link">&para;</a></h2>
+<p>Build output (<code>frontend/dist/assets/js</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Chunk</th>
+<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">gzip</th>
+<th>Loaded on first dashboard paint?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>settings-C71QFHqq.js</code></td>
+<td style="text-align: right;">630.6 kB</td>
+<td style="text-align: right;">186.8 kB</td>
+<td><strong>yes</strong> (preloaded)</td>
+</tr>
+<tr>
+<td><code>plugins-kQWZQFpj.js</code></td>
+<td style="text-align: right;">378.3 kB</td>
+<td style="text-align: right;">134.9 kB</td>
+<td><strong>yes</strong> (preloaded)</td>
+</tr>
+<tr>
+<td><code>vendor-DuaJhtm4.js</code></td>
+<td style="text-align: right;">116.0 kB</td>
+<td style="text-align: right;">36.3 kB</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>index-B51Nxhm5.js</code></td>
+<td style="text-align: right;">28.4 kB</td>
+<td style="text-align: right;">10.8 kB</td>
+<td>yes (entry)</td>
+</tr>
+<tr>
+<td><code>Dashboard-XjzAyQU3.js</code></td>
+<td style="text-align: right;">21.7 kB</td>
+<td style="text-align: right;">7.6 kB</td>
+<td>yes (route)</td>
+</tr>
+<tr>
+<td><code>CalendarView-D_KO-5WP.js</code></td>
+<td style="text-align: right;">31.6 kB</td>
+<td style="text-align: right;">10.2 kB</td>
+<td>yes (region, async)</td>
+</tr>
+<tr>
+<td><code>PhotoSlideshow-CdRN-oIq.js</code></td>
+<td style="text-align: right;">5.1 kB</td>
+<td style="text-align: right;">2.2 kB</td>
+<td>yes (region, async)</td>
+</tr>
+<tr>
+<td><code>vendor-vue-BayPuY_-.js</code></td>
+<td style="text-align: right;">2.5 kB</td>
+<td style="text-align: right;">0.9 kB</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>RegionHeaderControls-BS7EwiVc.js</code></td>
+<td style="text-align: right;">1.9 kB</td>
+<td style="text-align: right;">0.9 kB</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>RegionViewOptions-ZOkEm_vJ.js</code></td>
+<td style="text-align: right;">1.3 kB</td>
+<td style="text-align: right;">0.7 kB</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>rolldown-runtime-BWaJ3C7D.js</code></td>
+<td style="text-align: right;">0.9 kB</td>
+<td style="text-align: right;">0.5 kB</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>WebServiceViewer-D3Zx5VP2.js</code></td>
+<td style="text-align: right;">8.6 kB</td>
+<td style="text-align: right;">3.2 kB</td>
+<td>no (service region only)</td>
+</tr>
+<tr>
+<td><code>Settings-CyLxLekw.js</code></td>
+<td style="text-align: right;">8.0 kB</td>
+<td style="text-align: right;">3.1 kB</td>
+<td>no (route chunk)</td>
+</tr>
+<tr>
+<td><code>GuestShare-DrulyO9M.js</code></td>
+<td style="text-align: right;">8.2 kB</td>
+<td style="text-align: right;">3.5 kB</td>
+<td>no (route chunk)</td>
+</tr>
+</tbody>
+</table>
+<p>Measured initial requests: <strong>1.22 MB JS + 257 kB CSS</strong> (the preview server did
+not gzip; the gzip column is the build's own figure, ≈392 kB JS gzip).</p>
+<p>Why the two big chunks are initial:</p>
+<ul>
+<li><code>AdminOverflow.vue:30</code> imports <code>ConfirmModal</code> from
+  <code>components/settings/shared/</code>. <code>vite.config.js:145-148</code> puts every
+  <code>components/settings/*</code> file into the <code>settings</code> chunk, so the whole settings
+  chunk is pulled in by the clock-bar menu.</li>
+<li><code>ClockBarHorizontal.vue:37</code> imports <code>PluginStatusbarItems.vue</code>, which imports
+  <code>SchemaStatusbarItem.vue</code> → <code>SchemaRenderer.vue</code> → <code>rendererRegistry.js</code>, which
+  imports every built-in renderer. <code>vite.config.js:141-144</code> puts all
+  <code>components/plugins/*</code> into the <code>plugins</code> chunk, so the whole plugin renderer
+  set is initial.</li>
+<li><code>App.vue:10</code> mounts <code>OnScreenKeyboard</code> globally; it imports <code>simple-keyboard</code>
+  and constructs it on load even when no field is focused. <code>App.vue:11</code> mounts
+  <code>AdminSignInDialog</code>, which pulls <code>Dialog</code>/<code>ConfirmModal</code>/<code>Popover</code>.</li>
+</ul>
+<p>The initial load mounts <strong>77 Vue components</strong>, including <code>OnScreenKeyboard</code>,
+<code>AdminSignInDialog</code>, <code>Dialog</code>, <code>ConfirmModal</code>, <code>Popover</code>, <code>NotificationSystem</code>,
+<code>StatusRail</code>, <code>ReloadLight</code> and three <code>CometIndicator</code> frames.</p>
+<h2 id="initial-load-to-first-meaningful-paint">Initial load to first meaningful paint<a class="headerlink" href="#initial-load-to-first-meaningful-paint" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>First paint</td>
+<td style="text-align: right;">108 ms</td>
+</tr>
+<tr>
+<td>First contentful paint</td>
+<td style="text-align: right;">1 020 ms</td>
+</tr>
+<tr>
+<td>First meaningful paint (calendar events + photo loaded + clock bar)</td>
+<td style="text-align: right;"><strong>1 560 ms</strong></td>
+</tr>
+<tr>
+<td>Largest contentful paint</td>
+<td style="text-align: right;">1 568 ms</td>
+</tr>
+<tr>
+<td>Main-thread task time</td>
+<td style="text-align: right;"><strong>1 583 ms</strong></td>
+</tr>
+<tr>
+<td>Script</td>
+<td style="text-align: right;">238 ms</td>
+</tr>
+<tr>
+<td>Style recalc</td>
+<td style="text-align: right;">28 × / 83 ms</td>
+</tr>
+<tr>
+<td>Layout</td>
+<td style="text-align: right;">9 × / 296 ms</td>
+</tr>
+<tr>
+<td>Long tasks (&gt; 50 ms)</td>
+<td style="text-align: right;"><strong>7, total 766 ms</strong> (244, 85, 111, 68, 141, 52, 65)</td>
+</tr>
+<tr>
+<td>Vue</td>
+<td style="text-align: right;">20 updates, 77 mounted</td>
+</tr>
+</tbody>
+</table>
+<p>Top application self time (share of busy CPU; total busy 1 544 ms):</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Self</th>
+<th style="text-align: right;">Share</th>
+<th>Function</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">93.5 ms</td>
+<td style="text-align: right;">6.1 %</td>
+<td><code>measureHeaderWidth</code></td>
+<td><code>src/components/CalendarView.vue:613</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">39.0 ms</td>
+<td style="text-align: right;">2.5 %</td>
+<td><code>computed</code> (clock formatting)</td>
+<td><code>src/composables/useClockBar.js:133</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">38.9 ms</td>
+<td style="text-align: right;">2.5 %</td>
+<td>service/plugin instance loading</td>
+<td><code>src/stores/webServices.js:39</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">15.5 ms</td>
+<td style="text-align: right;">1.0 %</td>
+<td><code>reportArea</code></td>
+<td><code>src/components/ui/EmptyState.vue:144</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">10.5 ms</td>
+<td style="text-align: right;">0.7 %</td>
+<td>anonymous (plugin renderer bundle)</td>
+<td><code>assets/js/plugins-*.js:1</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">10.1 ms</td>
+<td style="text-align: right;">0.7 %</td>
+<td>event time formatting</td>
+<td><code>src/composables/useEventHelpers.js:35</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">9.2 ms</td>
+<td style="text-align: right;">0.6 %</td>
+<td><code>measureContainer</code></td>
+<td><code>src/components/PhotoSlideshow.vue:196</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">7.7 ms</td>
+<td style="text-align: right;">0.5 %</td>
+<td>app setup</td>
+<td><code>assets/js/index-*.js:2</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">7.4 ms</td>
+<td style="text-align: right;">0.5 %</td>
+<td><code>appendChild</code> (Vue mount)</td>
+<td><code>assets/js/index-*.js:2</code></td>
+</tr>
+</tbody>
+</table>
+<p>Vendor self time on the first load: <code>simple-keyboard</code> 43.7 ms
+(<code>node_modules/simple-keyboard/build/index.js:12</code>) and <code>vuedraggable</code> 14.3 ms.
+Both are in the initial graph even though the dashboard does not use them.
+<code>(program)</code> native work was 829 ms, which is mostly compile/parse of the 1.22 MB
+bundle, style/layout and first paint.</p>
+<h2 id="interaction-measurements">Interaction measurements<a class="headerlink" href="#interaction-measurements" title="Permanent link">&para;</a></h2>
+<p>All scenarios use the real dashboard layout (calendar + photos + clock bar)
+unless the name says otherwise. "Main thread" is <code>TaskDuration</code>; "app JS" is the
+CPU-profile category for <code>frontend/src</code> and unmapped app chunks.</p>
+<table>
+<thead>
+<tr>
+<th>Interaction</th>
+<th style="text-align: right;">Main thread</th>
+<th style="text-align: right;">Script</th>
+<th style="text-align: right;">Style recalc</th>
+<th style="text-align: right;">Layout</th>
+<th style="text-align: right;">Long tasks</th>
+<th>Vue</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial load to FMP</td>
+<td style="text-align: right;">1 583 ms</td>
+<td style="text-align: right;">238 ms</td>
+<td style="text-align: right;">28 × / 83 ms</td>
+<td style="text-align: right;">9 × / 296 ms</td>
+<td style="text-align: right;">7 / 766 ms</td>
+<td>20 upd, 77 mounted</td>
+</tr>
+<tr>
+<td>Page switch, all regions</td>
+<td style="text-align: right;">895 ms</td>
+<td style="text-align: right;">14 ms</td>
+<td style="text-align: right;">13 × / 16 ms</td>
+<td style="text-align: right;">7 × / 119 ms</td>
+<td style="text-align: right;">2 / 194 ms</td>
+<td>50 upd, 41 mounted, 46 unmounted</td>
+</tr>
+<tr>
+<td>Tap, all regions</td>
+<td style="text-align: right;">658 ms</td>
+<td style="text-align: right;">10 ms</td>
+<td style="text-align: right;">21 × / 7 ms</td>
+<td style="text-align: right;">1 × / 5 ms</td>
+<td style="text-align: right;">1 / 152 ms</td>
+<td>34 updates</td>
+</tr>
+<tr>
+<td>Photo advance</td>
+<td style="text-align: right;">739 ms</td>
+<td style="text-align: right;">47 ms</td>
+<td style="text-align: right;">17 × / 12 ms</td>
+<td style="text-align: right;">1 × / 8 ms</td>
+<td style="text-align: right;">0</td>
+<td>41 updates</td>
+</tr>
+<tr>
+<td>Kiosk menu open + close</td>
+<td style="text-align: right;">638 ms</td>
+<td style="text-align: right;">10 ms</td>
+<td style="text-align: right;">27 × / 22 ms</td>
+<td style="text-align: right;">4 × / 11 ms</td>
+<td style="text-align: right;">0</td>
+<td>18 updates, 1 mounted</td>
+</tr>
+<tr>
+<td>OSK open + close</td>
+<td style="text-align: right;">532 ms</td>
+<td style="text-align: right;">15 ms</td>
+<td style="text-align: right;">20 × / 47 ms</td>
+<td style="text-align: right;">2 × / 5 ms</td>
+<td style="text-align: right;">0</td>
+<td>6 updates</td>
+</tr>
+<tr>
+<td>Idle 30 s, all regions</td>
+<td style="text-align: right;">160 ms</td>
+<td style="text-align: right;">18 ms</td>
+<td style="text-align: right;">2 × / 0 ms</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0</td>
+<td>13 updates</td>
+</tr>
+</tbody>
+</table>
+<p>The same interactions on the isolated region sets are in the next section.</p>
+<h3 id="top-application-self-time-per-interaction">Top application self time per interaction<a class="headerlink" href="#top-application-self-time-per-interaction" title="Permanent link">&para;</a></h3>
+<p>Only application frames (<code>frontend/src</code>, unmapped app chunks) are listed. The
+rest of the busy time is mostly native <code>(program)</code>; vendor and harness shares are
+given where they matter.</p>
+<p><strong>Page switch, all regions</strong> — busy 867 ms, app 167.9 ms, vendor 73.2 ms, native
+program 539.5 ms.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Self</th>
+<th style="text-align: right;">Share</th>
+<th>Function</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">90.8 ms</td>
+<td style="text-align: right;">10.5 %</td>
+<td><code>get clientWidth</code> (forced layout)</td>
+<td><code>src/components/CalendarView.vue:613</code> (<code>measureHeaderWidth</code>)</td>
+</tr>
+<tr>
+<td style="text-align: right;">25.7 ms</td>
+<td style="text-align: right;">3.0 %</td>
+<td>event time formatting</td>
+<td><code>src/composables/useEventHelpers.js:35</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">9.0 ms</td>
+<td style="text-align: right;">1.0 %</td>
+<td><code>formatEventStartTime</code></td>
+<td><code>src/composables/useEventHelpers.js:55</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">9.0 ms</td>
+<td style="text-align: right;">1.0 %</td>
+<td>anonymous calendar render</td>
+<td><code>src/components/CalendarView.vue:746</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">6.4 ms</td>
+<td style="text-align: right;">0.7 %</td>
+<td><code>get clientWidth</code> (container measure)</td>
+<td><code>src/components/PhotoSlideshow.vue:196</code> (<code>measureContainer</code>)</td>
+</tr>
+<tr>
+<td style="text-align: right;">2.7 ms</td>
+<td style="text-align: right;">0.3 %</td>
+<td>calendar lifecycle</td>
+<td><code>src/components/CalendarView.vue:140</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.8 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>calendar helper</td>
+<td><code>src/components/CalendarView.vue:1319</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.4 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>calendar computed</td>
+<td><code>src/components/CalendarView.vue:890</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.4 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>image store</td>
+<td><code>src/stores/images.js:65</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.4 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>OSK layout helper</td>
+<td><code>src/composables/useOnScreenKeyboard.js:695</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Tap, all regions</strong> — busy 634.6 ms, app <strong>8.3 ms</strong>, vendor 26.0 ms, native
+program <strong>570.4 ms</strong>. The top application frames are all ≤ 1.3 ms
+(<code>src/main.js:106</code>, <code>src/utils/kioskId.js:16</code>, <code>src/utils/layout.js:725</code>,
+<code>src/components/CalendarView.vue:158</code>, <code>src/components/DashboardRegion.vue:5</code>).
+This is the clearest signal in the profile: <strong>the tap cost is paint/raster, not
+application code.</strong></p>
+<p><strong>Photo advance</strong> — busy 675.8 ms, app <strong>18.9 ms</strong>, vendor 37.4 ms, native
+program <strong>558.1 ms</strong>, GC 25.4 ms.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Self</th>
+<th style="text-align: right;">Share</th>
+<th>Function</th>
+<th>Location</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">3.4 ms</td>
+<td style="text-align: right;">0.5 %</td>
+<td>calendar lifecycle (unrelated region)</td>
+<td><code>src/components/CalendarView.vue:140</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.8 ms</td>
+<td style="text-align: right;">0.3 %</td>
+<td>photo next click handler</td>
+<td><code>src/components/PhotoSlideshow.vue:37</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.4 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>legacy layout creation</td>
+<td><code>src/utils/layout.js:698</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.3 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>photo source computed</td>
+<td><code>src/components/PhotoSlideshow.vue:178</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.2 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>panel render helper</td>
+<td><code>src/components/DashboardPanel.vue:3</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.2 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>layout helper</td>
+<td><code>src/utils/layout.js:725</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">1.1 ms</td>
+<td style="text-align: right;">0.2 %</td>
+<td>dashboard render</td>
+<td><code>src/views/Dashboard.vue:350</code></td>
+</tr>
+</tbody>
+</table>
+<p>The remaining time is the browser decoding a 12.2 MP image, rasterizing a second
+full-size blurred backdrop layer and painting the transition.</p>
+<p><strong>Calendar page switch (calendar only)</strong> — busy 664.6 ms, app 159.5 ms, vendor
+61 ms, native program 420.3 ms. Same top frames as the all-regions switch:
+<code>get clientWidth</code> 92.7 ms (<code>CalendarView.vue:613</code>), event formatting 22.4 ms
+(<code>useEventHelpers.js:35</code>), <code>formatEventStartTime</code> 12 ms (<code>:55</code>), anonymous
+calendar render 7 ms (<code>:746</code>).</p>
+<p><strong>Photos page switch (photos only)</strong> — busy 474 ms, app 11.3 ms, vendor 24.4 ms,
+native program 414.2 ms. Top app frame: <code>measureContainer</code> 2.9 ms
+(<code>PhotoSlideshow.vue:196</code>).</p>
+<p><strong>Clock bar only</strong> — busy 474.4 ms, app 8.7 ms, vendor 39.2 ms, native program
+400.3 ms. The "clock bar only" screen contains one empty service region because
+the layout normaliser always materialises at least one region; it does no content
+fetch. Tap cost: busy 461.8 ms, app 1.9 ms.</p>
+<p><strong>Iframe service only (short run)</strong> — page switch 599 ms, tap 481 ms, idle 10 s
+15 ms. This is not on the owner's real dashboard; it is included for completeness.</p>
+<p><strong>Menu</strong> — busy 612.4 ms, app 21.9 ms. Top: <code>getBoundingClientRect</code> 7.9 ms
+(<code>usePopoverPlacement.js:48</code>, <code>place</code>), <code>focus</code> 2.7 ms (<code>Popover.vue:122</code>),
+<code>onActivity</code> 1.4 ms (<code>useFocusLight.js:41</code>). Style recalc 27 × / 22 ms; the
+popover placement reads layout twice.</p>
+<p><strong>OSK</strong> — busy 505.5 ms, app 49.3 ms. Top: <code>getPropertyValue</code> 20.4 ms
+(<code>utils/themePalettes.js:40</code>), <code>getBoundingClientRect</code> 20 ms
+(<code>ui/OnScreenKeyboard.vue:260</code>, <code>measureHeight</code>), <code>getBoundingClientRect</code> 2 ms
+(<code>useOnScreenKeyboard.js:513</code>, <code>raf</code>). Style recalc <strong>20 × / 47 ms</strong>: opening the
+keyboard re-resolves theme colours and re-lays out the page.</p>
+<h2 id="per-region-breakdown-owners-real-dashboard">Per-region breakdown (owner's real dashboard)<a class="headerlink" href="#per-region-breakdown-owners-real-dashboard" title="Permanent link">&para;</a></h2>
+<p>The owner's dashboard is calendar + photos + clock bar. The table below repeats
+the same interactions with only one region type at a time. "Idle" is 30 s of no
+input (10 s for the iframe); the number is main-thread task time, not wall time.</p>
+<table>
+<thead>
+<tr>
+<th>Region set</th>
+<th style="text-align: right;">Page switch</th>
+<th style="text-align: right;">Tap</th>
+<th style="text-align: right;">Idle 30 s</th>
+<th>Tap re-renders (total)</th>
+<th>Page-switch mounts / unmounts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Calendar + photos + clock bar</strong> (real)</td>
+<td style="text-align: right;"><strong>895 ms</strong></td>
+<td style="text-align: right;"><strong>658 ms</strong></td>
+<td style="text-align: right;"><strong>160 ms</strong></td>
+<td><strong>34</strong> — CalendarView 3, PhotoSlideshow 3, ClockBar 2, DashboardRegion 6</td>
+<td>41 / 46</td>
+</tr>
+<tr>
+<td>Calendar only</td>
+<td style="text-align: right;">694 ms</td>
+<td style="text-align: right;">627 ms</td>
+<td style="text-align: right;">64 ms</td>
+<td>23 — CalendarView 3, ClockBar 2</td>
+<td>39 / 39</td>
+</tr>
+<tr>
+<td>Photos only</td>
+<td style="text-align: right;">496 ms</td>
+<td style="text-align: right;">468 ms</td>
+<td style="text-align: right;">98 ms</td>
+<td>18 — PhotoSlideshow 3, ClockBar 2</td>
+<td>11 / 11</td>
+</tr>
+<tr>
+<td>Clock bar + one empty service region</td>
+<td style="text-align: right;">500 ms</td>
+<td style="text-align: right;">482 ms</td>
+<td style="text-align: right;">54 ms</td>
+<td>6 — WebServiceViewer 1, FocusPanel 1</td>
+<td>11 / 11</td>
+</tr>
+<tr>
+<td>Iframe service only (short)</td>
+<td style="text-align: right;">599 ms</td>
+<td style="text-align: right;">481 ms</td>
+<td style="text-align: right;">15 ms (10 s)</td>
+<td>8 — WebServiceViewer 1, ServiceViewer 1</td>
+<td>12 / 12</td>
+</tr>
+</tbody>
+</table>
+<p>What changes in the <em>other</em> regions:</p>
+<ul>
+<li><strong>A tap on the calendar re-renders the photos region three times and the clock
+  bar twice</strong>, even though neither changed. <code>focusRegion</code>
+  (<code>useKeyboardActions.js:1031</code>) calls <code>saveDashboardScreens</code>, which posts the
+  whole <code>dashboardScreens</code> config through <code>updateConfig</code> (<code>:67-76</code>). The response
+  replaces the config payload and re-renders every region. <code>activeRegionId</code> is
+  screen state, not a global setting, and should not be persisted on every tap.</li>
+<li><strong>Advancing a photo re-renders the calendar four times and the clock bar three
+  times.</strong> The same full-config write is involved (focusing the photo region
+  before the advance), plus the photo store update.</li>
+<li><strong>A page switch unmounts and remounts every region component</strong> (46 unmounted,
+  41 mounted in the all-regions layout). That is where the 119 ms layout and the
+  90–126 ms <code>measureHeaderWidth</code> go: 20 <code>CalendarTimedEvent</code> and 3
+  <code>CalendarRibbon</code> components are created again.</li>
+<li><strong>Idle cost is mostly timers, not region rendering.</strong> The isolated idle runs
+  are 54–160 ms per 30 s. The photos-only idle is higher because the 30 s
+  rotation fires at the edge of the window; the real cost of that rotation is the
+  photo-advance measurement (0.74–0.96 s).</li>
+<li><strong>The clock bar itself is cheap</strong> (tap 482 ms with app JS 1.9 ms; idle 54 ms).
+  It is the focus light / paint path that makes even the clock-bar tap expensive.</li>
+</ul>
+<h2 id="idle-every-timer-animation-and-transition">Idle: every timer, animation and transition<a class="headerlink" href="#idle-every-timer-animation-and-transition" title="Permanent link">&para;</a></h2>
+<p>30 s idle on the real dashboard (calendar + photos + clock bar), 1280×720, no
+input. <code>TaskDuration</code> 160 ms, script 18 ms, style 2 × / 0 ms, layout 0, no long
+tasks, 13 Vue updates.</p>
+<h3 id="setintervals-active-while-idle"><code>setInterval</code>s active while idle<a class="headerlink" href="#setintervals-active-while-idle" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Delay</th>
+<th style="text-align: right;">Fires in 30 s</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">900 000 ms</td>
+<td style="text-align: right;">0</td>
+<td><code>src/utils/serviceWorkerUpdate.js:87</code> (15 min deploy check; production only)</td>
+</tr>
+<tr>
+<td style="text-align: right;">30 000 ms</td>
+<td style="text-align: right;">1</td>
+<td><code>src/components/KeyboardHandler.vue:177</code> (keyboard config poll)</td>
+</tr>
+<tr>
+<td style="text-align: right;"><strong>100 ms</strong></td>
+<td style="text-align: right;"><strong>300</strong></td>
+<td><code>src/components/KeyboardHandler.vue:216</code> (reboot combo check)</td>
+</tr>
+<tr>
+<td style="text-align: right;">30 000 ms</td>
+<td style="text-align: right;">1</td>
+<td><code>src/views/Dashboard.vue:545</code> (config poll)</td>
+</tr>
+<tr>
+<td style="text-align: right;">60 000 ms</td>
+<td style="text-align: right;">0</td>
+<td><code>src/components/CalendarView.vue:566</code> (today refresh)</td>
+</tr>
+<tr>
+<td style="text-align: right;">900 000 ms</td>
+<td style="text-align: right;">0</td>
+<td><code>src/components/CalendarView.vue:521</code> (calendar auto-refresh)</td>
+</tr>
+<tr>
+<td style="text-align: right;">30 000 ms</td>
+<td style="text-align: right;">1</td>
+<td><code>src/components/PhotoSlideshow.vue:265</code> (photo rotation; photos/all only)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="pending-settimeouts-at-the-end-of-the-idle-window">Pending <code>setTimeout</code>s at the end of the idle window<a class="headerlink" href="#pending-settimeouts-at-the-end-of-the-idle-window" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">Delay</th>
+<th style="text-align: right;">Remaining</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">60 000 ms</td>
+<td style="text-align: right;">~28 s</td>
+<td><code>src/composables/useClockBar.js:233</code> (next minute tick)</td>
+</tr>
+<tr>
+<td style="text-align: right;">30 000 ms</td>
+<td style="text-align: right;">~26 s</td>
+<td><code>src/stores/connection.js:65</code> (health check)</td>
+</tr>
+<tr>
+<td style="text-align: right;">300 000 ms</td>
+<td style="text-align: right;">~287 s</td>
+<td><code>@tanstack/query-core</code> timeout manager (service-only scenario)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="requestanimationframe"><code>requestAnimationFrame</code><a class="headerlink" href="#requestanimationframe" title="Permanent link">&para;</a></h3>
+<p><strong>Zero callbacks during idle.</strong> There is no rAF loop on the dashboard. (The
+interaction runs use Playwright's <code>waitForFunction</code> polling, which does use rAF;
+that is harness traffic, not app traffic.)</p>
+<h3 id="css-animations-and-transitions">CSS animations and transitions<a class="headerlink" href="#css-animations-and-transitions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>66 paused <code>comet-orbit</code> CSSAnimations</strong>: 22 <code>CometIndicator</code> beads × 3
+  <code>LoadingLight</code> frames (app frame + calendar region + photos region). In the
+  calendar-only or clock-bar-only layout there are 44 (app + one region).
+  <code>animation-play-state: paused</code> is working: <code>playState</code> is <code>paused</code> and there is
+  no animation work at idle. During a load, the same 66 elements animate
+  <code>offset-path</code> and paint three box-shadow layers each.</li>
+<li><strong>No running CSS transitions at idle.</strong> The focus-light and panel transitions
+  finish within 200 ms of the last input.</li>
+<li><strong>No animated gradients.</strong> The gradients in <code>FocusPanel.vue:40-42</code>,
+  <code>DashboardPanel.vue:100-104</code> and the between-bar are static; <code>color-mix()</code> in
+  them is resolved during style recalc, not animated.</li>
+<li>The 30 s photo rotation and 30 s config poll each fire once per idle window and
+  account for the 13 Vue updates (CalendarView, PhotoSlideshow, ClockBar,
+  DashboardRegion, ScreenDots, FocusPanel, RegionHeaderControls,
+  CalendarViewOptions).</li>
+</ul>
+<h2 id="expensive-css-on-a-pi-gpu-and-where-it-is-used">Expensive CSS on a Pi GPU (and where it is used)<a class="headerlink" href="#expensive-css-on-a-pi-gpu-and-where-it-is-used" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Property</th>
+<th>Where</th>
+<th>Value</th>
+<th>Why it matters</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>filter: blur()</code></td>
+<td><code>src/components/PhotoSlideshow.vue:422</code></td>
+<td><code>blur(28px) brightness(0.55)</code> on <code>.photo-backdrop</code></td>
+<td>A full-size blurred copy of a 12 MP photo; blur is a full-layer raster operation, and the same URL is already shown by the main <code>&lt;img&gt;</code> (<code>:68-76</code>).</td>
+</tr>
+<tr>
+<td><code>filter: saturate() brightness()</code></td>
+<td><code>src/components/ui/FocusPanel.vue:56</code></td>
+<td><code>.focus-panel.is-dim { opacity: .62; filter: saturate(.65) brightness(.86) }</code></td>
+<td>Applied to every non-active region on every tap; the filter is transitioned at <code>:33-37</code>, so the whole region layer is re-rastered for 200 ms.</td>
+</tr>
+<tr>
+<td>Large multi-layer <code>box-shadow</code></td>
+<td><code>src/components/ui/FocusPanel.vue:47-51</code></td>
+<td><code>0 0 0 2px</code>, <code>0 0 10px</code>, <code>0 0 30px 1px</code>, <code>0 0 68px 3px</code></td>
+<td>A 68 px blur is paint-heavy, not compositor-friendly; active on every tap and page switch.</td>
+</tr>
+<tr>
+<td><code>backdrop-filter: blur()</code></td>
+<td><code>src/components/ui/DialogScrim.vue:25</code></td>
+<td><code>blur(6px)</code> on <code>.dialog-scrim.is-blurred</code></td>
+<td>Only dialogs, not the dashboard; still expensive on a Pi and should stay opt-in.</td>
+</tr>
+<tr>
+<td>22 animated beads with 3-layer shadows</td>
+<td><code>src/components/indicators/CometIndicator.vue:38,83-93</code></td>
+<td><code>beadCount = 22</code>; each bead <code>0 0 4px</code>, <code>0 0 12px</code>, <code>0 0 24px</code>; <code>offset-path</code> animation</td>
+<td>22 elements per frame × 3 frames; runs during first load and region loads. Paused at idle.</td>
+</tr>
+<tr>
+<td>Pulsing box-shadow</td>
+<td><code>src/components/indicators/PulseIndicator.vue:49-53</code></td>
+<td>inset + outer shadow, <code>pulse-breathe</code></td>
+<td>Cheaper than the comet, but still animates a box-shadow; active during loads.</td>
+</tr>
+<tr>
+<td><code>filter: brightness()</code> keyframes</td>
+<td><code>src/components/StatusRail.vue:264-292</code></td>
+<td><code>lamp-arrive</code>, <code>lamp-alert</code></td>
+<td>Animated filter on notification arrival; brief, but avoid on a low-power screen.</td>
+</tr>
+<tr>
+<td><code>transition: all</code></td>
+<td><code>PluginSections.vue:106</code>, <code>PluginFieldRenderer.vue:301</code>, <code>PluginActions.vue:156,178</code>, <code>CalendarEventItem.vue:110</code>, <code>ThemeSelector.vue:161</code>, <code>CollapsibleSection.vue:74</code>, <code>TabNavigation.vue:125</code></td>
+<td><code>all var(--dur) ease</code></td>
+<td>Animates every property (including layout-affecting ones). Mostly Settings, but the dashboard's event chips also use it.</td>
+</tr>
+<tr>
+<td>Static gradients + <code>color-mix()</code></td>
+<td><code>FocusPanel.vue:40-42</code>, <code>DashboardPanel.vue:100-104</code>, <code>ClockBarHorizontal.vue:179</code></td>
+<td>linear-gradient / color-mix</td>
+<td>Not animated, but each theme change forces style recalc; keep an eye on it when changing theme tokens.</td>
+</tr>
+<tr>
+<td><code>will-change</code></td>
+<td>—</td>
+<td>none found in <code>frontend/src</code></td>
+<td>No misuse. Do not add it to the focus panel: the problem is the paint itself, not layer promotion.</td>
+</tr>
+</tbody>
+</table>
+<p>The dashboard does <strong>not</strong> use <code>backdrop-filter</code>. The two effects that dominate
+the measured dashboard interactions are the focus-light filter/box-shadow and the
+photo backdrop blur.</p>
+<h2 id="ranked-fixes-10">Ranked fixes (10)<a class="headerlink" href="#ranked-fixes-10" title="Permanent link">&para;</a></h2>
+<p>Estimated wins are measured under the 6× CPU throttle, so they approximate the
+Pi. "Risk" is implementation risk, not visual risk.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">#</th>
+<th>Fix</th>
+<th>Estimated win</th>
+<th>Risk</th>
+<th>Files</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td><strong>Request display-sized photos.</strong> Add width/height (or a thumbnail endpoint) to <code>/api/images/{id}</code> and use <code>srcset</code>; cache resized variants.</td>
+<td>Photo advance 739 ms → likely &lt;200 ms; 4.0 MB → ~100–200 kB per photo. Removes the 12.2 MP decode for a 0.40 MP box.</td>
+<td>Medium (backend image route, EXIF/orientation, cache invalidation)</td>
+<td><code>backend/app/api/routes/images.py</code> (image route), <code>frontend/src/stores/images.js:173-180</code>, <code>frontend/src/components/PhotoSlideshow.vue:77-86</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td><strong>Make the focus light cheap.</strong> Replace the four-layer 68 px glow with a 2 px border/outline or one small shadow; remove <code>filter: saturate() brightness()</code> from <code>.is-dim</code>; transition only <code>opacity</code>/<code>border-color</code>.</td>
+<td>Tap 658 ms → ~150–250 ms (est. 400–500 ms saved); page-switch paint also drops. App JS is already only 8 ms, so this is the main tap win.</td>
+<td>Low (visual only)</td>
+<td><code>frontend/src/components/ui/FocusPanel.vue:33-56</code>, <code>frontend/src/components/DashboardRegion.vue:287-305</code>, <code>frontend/src/views/Dashboard.vue:713-732</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">3</td>
+<td><strong>Stop preloading the <code>settings</code> chunk.</strong> Move <code>ConfirmModal</code> out of <code>components/settings/shared</code> (e.g. to <code>components/ui</code>) or lazy-load it; stop grouping every settings component into one manual chunk.</td>
+<td>~187 kB gzip and its parse/compile removed from first paint; initial load est. −150–300 ms.</td>
+<td>Medium (chunk graph, import paths)</td>
+<td><code>frontend/vite.config.js:145-148</code>, <code>frontend/src/components/dashboard/AdminOverflow.vue:30</code>, <code>frontend/src/components/settings/shared/ConfirmModal.vue</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td><strong>Stop preloading the <code>plugins</code> chunk.</strong> Lazy-load <code>PluginStatusbarItems</code>/<code>SchemaRenderer</code>/<code>rendererRegistry</code>, or split each renderer; only load plugin renderers when a statusbar/region plugin actually needs one.</td>
+<td>~135 kB gzip removed from first paint; initial load est. −100–250 ms.</td>
+<td>Medium (async component, plugin rendering timing)</td>
+<td><code>frontend/src/components/ClockBarHorizontal.vue:37</code>, <code>ClockBarVertical.vue</code>, <code>frontend/src/components/PluginStatusbarItems.vue:20</code>, <code>frontend/src/components/plugins/rendererRegistry.js</code>, <code>frontend/vite.config.js:141-144</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">5</td>
+<td><strong>Keep the active region local.</strong> Do not POST the whole <code>dashboardScreens</code> config on every tap/focus; store <code>activeRegionId</code> in a local/session ref and persist only on a deliberate change.</td>
+<td>Removes 34–41 component updates per tap/photo, including 3–4 re-renders of the unrelated region; est. 50–150 ms per interaction and less layout churn.</td>
+<td>Medium (persistence semantics)</td>
+<td><code>frontend/src/composables/useKeyboardActions.js:1031</code>, <code>frontend/src/stores/config.js:565-575</code>, <code>frontend/src/utils/layout.js</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">6</td>
+<td><strong>Fix <code>measureHeaderWidth</code> forced layout.</strong> Use the <code>ResizeObserver</code> <code>contentRect</code> already available (<code>CalendarView.vue:552-559</code>) instead of reading <code>clientWidth</code> per render/event; cache the header width.</td>
+<td>90–126 ms app self time + up to 122 ms layout per calendar page switch (~25–35 % of the switch).</td>
+<td>Low</td>
+<td><code>frontend/src/components/CalendarView.vue:552-559,613</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">7</td>
+<td><strong>Remove the photo backdrop blur / duplicate layer.</strong> Use a solid scrim or a pre-blurred thumbnail; or only render the backdrop for non-<code>fill</code> fits and never at full resolution.</td>
+<td>Part of the photo advance: est. 100–200 ms and one full-size raster layer; less GPU memory.</td>
+<td>Low–medium (visual)</td>
+<td><code>frontend/src/components/PhotoSlideshow.vue:68-76,416-425</code>, <code>frontend/src/utils/photoFit.js</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td><strong>Cheapen the loading light.</strong> Default to <code>pulse</code>, or a single static edge; if the comet stays, use fewer beads and one shadow layer, and do not run it on every region frame.</td>
+<td>Initial load and page-switch paint est. 100–300 ms; removes 66 animated elements during loads.</td>
+<td>Low</td>
+<td><code>frontend/src/components/indicators/CometIndicator.vue</code>, <code>frontend/src/components/LoadingLight.vue</code>, <code>frontend/src/stores/progress.js</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">9</td>
+<td><strong>Lazy-load the OSK / <code>simple-keyboard</code>.</strong> Mount <code>OnScreenKeyboard</code> only when a text field is focused or the keyboard button is shown; import <code>simple-keyboard</code> dynamically.</td>
+<td>~44 ms vendor self time on first load plus its parse/compile; smaller initial graph.</td>
+<td>Medium (focus timing, first-tap keyboard)</td>
+<td><code>frontend/src/App.vue:10</code>, <code>frontend/src/components/ui/OnScreenKeyboard.vue:80</code>, <code>frontend/src/composables/useOnScreenKeyboard.js</code></td>
+</tr>
+<tr>
+<td style="text-align: right;">10</td>
+<td><strong>Idle timer hygiene.</strong> Replace the 100 ms reboot-combo interval with keydown/keyup tracking + a timeout only while both keys are held; lengthen photo rotation (or rotate only when visible); skip config re-application when the payload is unchanged.</td>
+<td>Removes 300 wakeups/30 s; removes the 0.74–0.96 s photo spike every 30 s; removes the 30 s full-config re-render (13 updates).</td>
+<td>Low</td>
+<td><code>frontend/src/components/KeyboardHandler.vue:216</code>, <code>frontend/src/components/PhotoSlideshow.vue:265</code>, <code>frontend/src/views/Dashboard.vue:545</code>, <code>frontend/src/stores/config.js:340-380</code></td>
+</tr>
+</tbody>
+</table>
+<p>Not in the top 10 but visible in the data: event formatting (<code>useEventHelpers.js:35</code>
+and <code>:55</code>) costs 22–35 ms per calendar switch; caching formatted event strings per
+event/time-format would remove most of it. The menu's popover placement does two
+<code>getBoundingClientRect</code> reads (<code>usePopoverPlacement.js:48</code>); one is avoidable.</p>
+<h2 id="would-a-low-power-screen-setting-help">Would a "low-power screen" setting help?<a class="headerlink" href="#would-a-low-power-screen-setting-help" title="Permanent link">&para;</a></h2>
+<p><strong>Yes.</strong> The measurements show the dashboard's per-interaction cost is dominated
+by decorative paint, not application JS (tap: 8 ms app JS vs 570 ms native
+program). A per-screen preset can remove most of that paint without touching the
+data model.</p>
+<p>It should switch off:</p>
+<ul>
+<li><strong>Loading light</strong> → <code>off</code> (or <code>pulse</code>): removes the 22-bead comet with three
+  box-shadow layers and <code>offset-path</code> animation on the app frame and each region.</li>
+<li><strong>Focus light</strong> → <code>off</code>, and <strong>dim others</strong> → <code>false</code>: removes the 68 px
+  four-layer glow and the <code>filter: saturate() brightness()</code> transition on every
+  non-active region.</li>
+<li><strong>Photo backdrop</strong> → force <code>fill</code> (or a new "no backdrop" option): removes the
+  second full-size layer and the 28 px blur.</li>
+<li><strong>Photo rotation</strong> → 5–15 min, or only while the screen is awake: removes the
+  0.74–0.96 s spike every 30 s.</li>
+<li><strong>On-screen keyboard</strong> → <code>off</code> on kiosks that use a remote/keyboard, and/or
+  lazy-load it so <code>simple-keyboard</code> is not in the initial graph.</li>
+<li><strong>Decorative motion</strong> → a <code>data-low-power</code> class (or reusing the
+  <code>prefers-reduced-motion</code> rules) that sets <code>animation: none</code>, <code>transition: none</code>,
+  <code>filter: none</code>, <code>backdrop-filter: none</code> for non-essential chrome.</li>
+<li><strong>Clock seconds</strong> → keep off (already the default); if on, it re-renders the
+  clock every second.</li>
+</ul>
+<p>It will <strong>not</strong> fix:</p>
+<ul>
+<li>the 1.22 MB initial JS / 630 kB settings + 378 kB plugins chunks (fixes 3–4);</li>
+<li>the calendar's forced layout and event formatting (fix 6);</li>
+<li>the full-config write that re-renders unrelated regions (fix 5);</li>
+<li>the 12 MP photo decode unless photos are also resized (fix 1).</li>
+</ul>
+<p>A low-power preset is therefore a useful <strong>mitigation</strong> (estimated 40–60 % of the
+tap/page-switch paint cost and most of the photo cost if combined with resized
+photos), but not a substitute for the bundle, photo-resize and focus-light code
+fixes.</p>
+<h2 id="other-findings-follow-ups">Other findings / follow-ups<a class="headerlink" href="#other-findings-follow-ups" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The photo next/previous buttons are under the image for hit-testing.</strong>
+  Playwright's click on <code>.photo-slideshow [data-action="next"]</code> is intercepted by
+  <code>img.photo-image</code>: the header overlay and the photo both use
+  <code>--z-raised</code>, and the photo is later in the DOM. The profiling script drives
+  the handler directly, but a real tap on the arrow may do nothing. This looks
+  like a real hit-testing defect worth a separate issue with a small
+  z-index/stacking fix in <code>DashboardPanel.vue</code>/<code>PhotoSlideshow.vue</code>.</li>
+<li><strong>The unauthenticated Settings lock screen crashes the production renderer in
+  this harness</strong> (<code>#auth-signin-password</code> never appears; the target crashes).
+  The existing e2e OSK spec runs against the dev server and passes, so this may
+  be a production-build/harness interaction rather than a user-facing bug; it was
+  not investigated further in this measurement task.</li>
+<li><strong><code>simple-keyboard</code> and <code>vuedraggable</code> are in the initial graph</strong> (43.7 ms and
+  14.3 ms of self time) even though the dashboard does not use them. This is part
+  of fixes 3, 4 and 9.</li>
+<li><strong><code>configPollInterval</code> is 30 s</strong> and each poll replaces the whole config
+  payload, causing 13 component updates in an otherwise idle window. If the
+  payload is unchanged, skip the reactive write.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

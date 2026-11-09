@@ -1,0 +1,2564 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/design/frontend-doctrine/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Calvin frontend doctrine - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#calvin-frontend-doctrine" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Calvin frontend doctrine
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#0-why" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0. Why
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Principles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-tokens-three-layers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Tokens: three layers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-components-one-per-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Components: one per job
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Components: one per job">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-building-blocks-for-settings-the-new-setting-looks-out-of-place-fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Building blocks for settings (the "new setting looks out of place" fix)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-layout-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Layout rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-colour-and-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Colour and state
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-writing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Writing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-enforcement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Enforcement
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Migration
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="calvin-frontend-doctrine">Calvin frontend doctrine<a class="headerlink" href="#calvin-frontend-doctrine" title="Permanent link">&para;</a></h1>
+<p>Status: doctrine (owner request 2026-10-31). It applies to every frontend PR, and design specs cite it instead of
+re-deciding basics. Extends <a href="../2026-07-04-ui-sizing-tokens/">2026-07-04-ui-sizing-tokens.md</a> (sizing mechanism,
+settings zoom) and the copy rules in <a href="../2026-10-30-settings-copy-audit/">2026-10-30-settings-copy-audit.md</a> §5.</p>
+<h2 id="0-why">0. Why<a class="headerlink" href="#0-why" title="Permanent link">&para;</a></h2>
+<p>Things look different everywhere because:
+- <strong>There is no shared Button.</strong> There are 61 hand-rolled button classes in 33 files (<code>security-btn</code>, <code>maint-btn</code>,
+  <code>backup-btn</code>, <code>admin-btn</code>, <code>pc-btn</code>, <code>btn-install</code>, <code>kiosk-software__btn</code>, …). Specs say ".btn", which doesn't
+  exist, so each builder invents one.
+- <strong>The token scales encode the old chaos.</strong> They were created 1:1 from existing literals, so we have:
+  - 13 font sizes (<code>--fs-3xs</code> 0.6 … <code>--fs-3xl</code> 1.7, plus <code>--fs-control</code> 0.875 and <code>--fs-control-lg</code> 0.9375);
+  - 9 spacing steps (0.35, 0.4, 0.5, 0.6, 0.75 rem…);
+  - 7 radii (6, 8, 10, 11, 12, 16px, pill).</p>
+<p>"Uses a token" no longer means "consistent".
+- <strong>Layout has no rules.</strong> Settings panels have no padding, so children inset themselves (fixed for three
+  components in #202), and there are 258 raw-rem paddings.</p>
+<p>The token lint (CLV-64) stops raw colours. This doctrine stops everything else drifting.</p>
+<h2 id="1-principles">1. Principles<a class="headerlink" href="#1-principles" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Roles, not sizes.</strong> Components use <em>semantic role tokens</em> (<code>--text-label</code>, <code>--gap-inline</code>,
+   <code>--radius-control</code>). Raw scales are primitives for <code>theme.css</code> only.</li>
+<li><strong>One component per job.</strong> If a control exists in <code>components/ui/</code>, use it. Feature components lay things out;
+   they never restyle controls.</li>
+<li><strong>Layout comes from primitives</strong>: Panel, Row, ListRow, Stack. They own insets, dividers and rhythm, so a
+   feature never sets padding on a child.</li>
+<li><strong>Orange means "act here" or "selected".</strong> Nothing else is orange.</li>
+<li><strong>Every rule is checked by a test</strong>, not by memory.</li>
+</ol>
+<h2 id="2-tokens-three-layers">2. Tokens: three layers<a class="headerlink" href="#2-tokens-three-layers" title="Permanent link">&para;</a></h2>
+<p>All tokens are declared in <code>frontend/src/styles/theme.css</code>. Only theme.css may contain literal values.</p>
+<p><strong>Primitives</strong> (theme.css only): palettes per theme, and the existing <code>--fs-*</code>, <code>--space-*</code> and <code>--radius-*</code> scales.
+Components stop referencing these (§7 migration).</p>
+<p><strong>Semantic roles</strong> (what components use):</p>
+<table>
+<thead>
+<tr>
+<th>Family</th>
+<th>Token</th>
+<th>Value</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Type</td>
+<td><code>--text-dense</code></td>
+<td><code>--fs-3xs</code></td>
+<td>calendar grid chrome only</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--text-caption</code></td>
+<td><code>--fs-2xs</code> (0.75)</td>
+<td>tags, counts, timestamps, hints under fields</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--text-meta</code></td>
+<td><code>--fs-xs</code> (0.8)</td>
+<td>row descriptions, secondary lines</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--text-body</code></td>
+<td><code>--fs-md</code> (0.9)</td>
+<td>body text, control text (buttons, inputs, selects)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--text-label</code></td>
+<td><code>--fs-base</code> (1)</td>
+<td>row labels, list-row names</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--text-title</code></td>
+<td><code>--fs-lg</code> (1.15)</td>
+<td>panel and dialog titles, inspector headings</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--text-display</code></td>
+<td><code>--fs-3xl</code> (1.7)</td>
+<td>clock, lock-screen title</td>
+</tr>
+<tr>
+<td>Weight</td>
+<td><code>--weight-body</code> / <code>--weight-strong</code> / <code>--weight-title</code></td>
+<td>400 / 500 / 600</td>
+<td>nothing else (no 550, 650, 700, bold)</td>
+</tr>
+<tr>
+<td>Space (4px grid)</td>
+<td><code>--gap-1</code> … <code>--gap-8</code></td>
+<td>0.25, 0.5, 0.75, 1, 1.25, 1.5, 2rem (<code>--gap-1</code>,<code>2</code>,<code>3</code>,<code>4</code>,<code>5</code>,<code>6</code>,<code>8</code>)</td>
+<td>primitives of the roles below</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--gap-tight</code></td>
+<td><code>--gap-1</code></td>
+<td>icon ↔ text inside a control</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--gap-inline</code></td>
+<td><code>--gap-2</code></td>
+<td>between controls in a row</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--gap-stack</code></td>
+<td><code>--gap-3</code></td>
+<td>between stacked items in a group</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--gap-group</code></td>
+<td><code>--gap-4</code></td>
+<td>between groups in a panel</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--gap-section</code></td>
+<td><code>--gap-8</code></td>
+<td>between sections (eyebrow + panel)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--panel-pad-x</code> / <code>--panel-pad-y</code></td>
+<td><code>--gap-5</code> / <code>--gap-3</code></td>
+<td>every panel child's inset (exists since #202)</td>
+</tr>
+<tr>
+<td>Radius</td>
+<td><code>--radius-control</code></td>
+<td>8px</td>
+<td>buttons, inputs, selects, tags, list-row inner controls</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--radius-card</code></td>
+<td>12px</td>
+<td>list rows, inner cards, popovers, sheets</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--radius-panel</code></td>
+<td>16px</td>
+<td>settings panels, dialogs, the dashboard card chrome</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--radius-round</code></td>
+<td>999px</td>
+<td>toggles, dots, pill indicators (status pill, connection pill)</td>
+</tr>
+<tr>
+<td>Colour</td>
+<td><code>--bg-0/1/2</code>, <code>--line</code>, <code>--line-soft</code>, <code>--ink</code>, <code>--ink-2</code>, <code>--ink-3</code></td>
+<td>existing</td>
+<td>surfaces, borders, text</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--focus</code>, <code>--focus-ink</code>, <code>--focus-text</code>, <code>--focus-glow</code>, <code>--focus-edge</code></td>
+<td>existing</td>
+<td>action and selection only (§5)</td>
+</tr>
+<tr>
+<td></td>
+<td><code>--ok</code>, <code>--warn</code>, <code>--err</code> (+ the <code>--tag-*</code> mix rule)</td>
+<td>existing</td>
+<td>status only</td>
+</tr>
+<tr>
+<td>Elevation</td>
+<td><code>--elev-1</code> (raised: menus, popovers), <code>--elev-2</code> (dialogs, sheets)</td>
+<td><code>0 6px 18px -8px var(--shadow-hover)</code> / <code>0 18px 50px -16px var(--shadow-hover)</code></td>
+<td>nothing else casts shadows</td>
+</tr>
+<tr>
+<td>Motion</td>
+<td><code>--dur-fast</code> 120ms, <code>--dur</code> 200ms, <code>--ease</code> <code>cubic-bezier(.2,.7,.2,1)</code>; <code>--dur-loading-fade</code> 450ms (<code>calc(var(--dur) * 2.25)</code>)</td>
+<td></td>
+<td>all transitions; zero under <code>prefers-reduced-motion</code>. <code>--dur-loading-fade</code> is the loading light's fade only (<a href="../2026-11-01-loading-light/">loading light</a> §2), the one slow transition</td>
+</tr>
+<tr>
+<td>Layers</td>
+<td><code>--z-raised</code> 10, <code>--z-sticky</code> 100, <code>--z-dialog</code> 1000, <code>--z-popover</code> 1050 (popovers teleport to body, so they must clear an open dialog), <code>--z-osk</code> 1100, <code>--z-toast</code> 1200</td>
+<td></td>
+<td>no other z-index values</td>
+</tr>
+<tr>
+<td>Breakpoints</td>
+<td><code>--bp-phone</code> (<code>max-width: 600px</code>, or <code>max-height: 500px</code> in landscape on anything but a kiosk), <code>--bp-wide</code> (<code>min-width: 1024px</code>)</td>
+<td><code>src/styles/breakpoints.js</code></td>
+<td>every width <code>@media</code> in app CSS, and the viewport phone checks in JS (<code>isPhone()</code>); nothing else</td>
+</tr>
+</tbody>
+</table>
+<p>Breakpoint rules:
+- <strong>Phone</strong> is a viewport <code>width &lt;= 600</code> <strong>or</strong> a landscape viewport <code>height &lt;= 500</code> (a phone turned sideways:
+  667x375, 640x360). A phone gets no automatic on-screen keyboard, no phone hand-off QR, and the compact
+  calendar, panel and lock-screen layouts.
+- <strong>The kiosk is never a landscape phone.</strong> The 800x480 wall panel is short and landscape too, so the height
+  clause is skipped on a kiosk. The signal is the kiosk identity (<code>?kiosk=&lt;id&gt;</code>, <code>src/utils/kioskId.js</code>): at boot
+  it puts <code>calvin-kiosk</code> on <code>&lt;html&gt;</code>. <code>isPhone()</code> reads that class, and the <code>customMedia</code> PostCSS plugin emits
+  the height clause of <code>(--bp-phone)</code> as a second block scoped to <code>:where(:root:not(.calvin-kiosk))</code>. A kiosk
+  started without an id gets the phone layout at 800x480.
+- Width still decides on a kiosk: a portrait Pi 7" (480x800) gets the phone layout, by design.
+- <strong>A screen can force either layout.</strong> Settings › Dashboard › Focus &amp; remote › Layout (<code>src/utils/layoutMode.js</code>)
+  sets <code>calvin-layout-desktop</code> or <code>calvin-layout-phone</code> on <code>&lt;html&gt;</code> from the effective choice: a kiosk's screen
+  override, or this browser's own <code>localStorage</code> choice. <code>isPhone()</code>/<code>isPhoneWidth()</code> and the <code>customMedia</code>
+  expansion of <code>(--bp-phone)</code> both read that class; Auto (the default) leaves it off and keeps the viewport rule.
+- Since CLV-98 the 481-600 px band (and exactly 480) gets the phone variants that used to start at 480 or 768
+  (calendar extra-small scaling, OSK phone layout, PhoneSetupCard, lock-screen phone layout, AdminAccess stacked
+  rows, SetupWelcomeCard phone card), and 601-767 px landscape screens taller than 500 px lose the compact
+  calendar and panel scaling.
+- Pane and container sizes are not viewport breakpoints: the pages editor sizes itself from its own modal with
+  <code>isPhoneWidth()</code>. ScreensSettings' two-pane <code>(max-width: 900px)</code> matchMedia is the one JS query still outside
+  the set (tracked as a follow-up).
+- <strong>Plugin and theme CSS is served as-is</strong>, without PostCSS, so <code>(--bp-*)</code> never expands there. Plugins and
+  themes keep the literal <code>@media (max-width: 600px)</code>; the plugin tokens and <code>.calvin-plugin-*</code> classes are
+  otherwise unchanged.</p>
+<p><strong>Component tokens</strong> are allowed when a component has geometry of its own. They're prefixed with the component
+name and built from roles, e.g. <code>--tag-*</code>, <code>--toggle-*</code>, <code>--tab-height</code>, <code>--osk-height</code>, <code>--touch-target</code>,
+<code>--control-height</code>.</p>
+<p>Rules:
+- The type roles are the whole vocabulary. If a design needs a size that isn't a role, the design changes, not the
+  scale.
+- <code>--fs-control</code> and <code>--fs-control-lg</code> fold into <code>--text-body</code>; <code>--fs-micro</code> into <code>--text-caption</code>; <code>--fs-sm</code> into
+  <code>--text-body</code> or <code>--text-meta</code> (choose by role); <code>--fs-xl</code>/<code>--fs-2xl</code> into <code>--text-title</code>.
+- Radii snap: 6→8 (<code>control</code>), 10/11→12 (<code>card</code>). The visual change is deliberate and small.</p>
+<h2 id="3-components-one-per-job">3. Components: one per job<a class="headerlink" href="#3-components-one-per-job" title="Permanent link">&para;</a></h2>
+<p><code>components/ui/</code> is the only place controls are styled.</p>
+<table>
+<thead>
+<tr>
+<th>Job</th>
+<th>Use</th>
+<th>Never</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Any button with text</td>
+<td><strong><code>Button.vue</code> (new)</strong>: <code>variant</code> = <code>primary</code> (orange, one per view region), <code>secondary</code> (default: <code>--bg-2</code>, 1px <code>--line</code>), <code>ghost</code> (no border, <code>--ink-2</code>), <code>danger</code> (<code>--err</code> text; filled only inside a destructive confirm); <code>size</code> = <code>md</code> (<code>--control-height</code>) or <code>sm</code> (<code>--touch-target</code>); optional <code>icon</code></td>
+<td>a styled <code>&lt;button class="foo-btn"&gt;</code></td>
+</tr>
+<tr>
+<td>Icon-only button</td>
+<td><code>IconButton.vue</code></td>
+<td>an emoji or letter in a styled button</td>
+</tr>
+<tr>
+<td>Text link that acts</td>
+<td><code>Button variant="link"</code> (underline, <code>--ink</code>; <code>--focus-text</code> on hover)</td>
+<td><code>link-btn</code> copies</td>
+</tr>
+<tr>
+<td>On/off</td>
+<td><code>ToggleSwitch</code></td>
+<td>checkbox styled as a toggle</td>
+</tr>
+<tr>
+<td>One of 2–4</td>
+<td><code>SegmentedControl</code></td>
+<td>tab-like custom groups, filter pills</td>
+</tr>
+<tr>
+<td>One of many</td>
+<td><code>SelectPill</code></td>
+<td>native <code>&lt;select&gt;</code></td>
+</tr>
+<tr>
+<td>Many of many</td>
+<td><code>ChipMultiSelect</code></td>
+<td>checkbox rows for chips</td>
+</tr>
+<tr>
+<td>Number</td>
+<td><code>NumberStepper</code>, <code>RangeSlider</code></td>
+<td><code>&lt;input type="number"&gt;</code></td>
+</tr>
+<tr>
+<td>Text / secret</td>
+<td><code>TextField</code> (new, from <code>PasswordField</code>'s shell), <code>PasswordField</code></td>
+<td>bare <code>&lt;input&gt;</code> with local styles</td>
+</tr>
+<tr>
+<td>Label / status</td>
+<td><code>Tag</code></td>
+<td>badges, chips, pills</td>
+</tr>
+<tr>
+<td>Settings section</td>
+<td><code>SettingsSection</code> (Panel)</td>
+<td>a bordered div</td>
+</tr>
+<tr>
+<td>Setting</td>
+<td><code>SettingRow</code></td>
+<td>label/description markup by hand</td>
+</tr>
+<tr>
+<td>Item in a list (source, screen, key, plugin)</td>
+<td><strong><code>ListRow.vue</code> (new)</strong>, extracted from <code>SourceList</code>: lead (dot/thumb/icon), body (name <code>--text-label</code> + meta lines), trailing actions group</td>
+<td>per-feature cards</td>
+</tr>
+<tr>
+<td>Empty</td>
+<td><code>EmptyState</code></td>
+<td>an ad-hoc centred paragraph</td>
+</tr>
+<tr>
+<td>Progress of a long task (uploads)</td>
+<td><strong><code>ProgressBar.vue</code></strong>: ARIA <code>progressbar</code> with a label, <code>--progress-h</code> track on <code>--bg-2</code>, <code>--focus</code> fill (progress is action feedback, so it may use orange); the visible "3 of 8" text sits beside it, outside any live region</td>
+<td>a styled <code>&lt;div&gt;</code> bar, a spinner</td>
+</tr>
+<tr>
+<td>Confirm / dialog</td>
+<td><code>ConfirmModal</code>, <code>DialogScrim</code>; <code>Dialog</code> with <code>size</code> = <code>sm</code> / <code>md</code> (default) / <strong><code>full</code></strong> (edge-to-edge, for the pages editor; same focus trap, Escape and OSK rules)</td>
+<td>custom overlays, hand-built full-screen shells</td>
+</tr>
+<tr>
+<td>Navigation between views of the same thing (editor pages, catalog kinds)</td>
+<td><strong><code>Tabs.vue</code> (new)</strong>: ARIA <code>tablist</code>, one line per tab (label + optional <code>--ink-3</code> meta), 2px <code>--focus</code> underline on the active tab, arrow keys move, scrolls horizontally with edge fades</td>
+<td>local tablists, filter pills used as tabs. Choosing a <em>value</em> (Light/Dark, Month/Week) stays <code>SegmentedControl</code></td>
+</tr>
+<tr>
+<td>Small floating surface anchored to a control (⋯ menus, pickers, the connection explainer)</td>
+<td><strong><code>Popover.vue</code> (new)</strong>: anchored, flips at viewport edges, Escape/outside tap closes, focus returns, <code>--elev-1</code>, <code>--radius-card</code>, <code>--z-popover</code>; <strong><code>Menu.vue</code></strong> on top of it for action lists (items ≥ <code>--touch-target</code>, danger item last)</td>
+<td>per-feature popovers (SourceList ⋯, ThemePicker, ActionPicker, RegionViewOptions, ConnectionStatus)</td>
+</tr>
+<tr>
+<td>Colour</td>
+<td><strong><code>ColourField.vue</code> (new)</strong>: the theme's <code>--event-1…8</code> swatches first (radio group), then <strong>Custom…</strong> opening the native picker; shows the chosen swatch + name, never a raw hex field by default</td>
+<td>a bare <code>&lt;input type="color"&gt;</code> + hex text box</td>
+</tr>
+</tbody>
+</table>
+<h3 id="31-building-blocks-for-settings-the-new-setting-looks-out-of-place-fix">3.1 Building blocks for settings (the "new setting looks out of place" fix)<a class="headerlink" href="#31-building-blocks-for-settings-the-new-setting-looks-out-of-place-fix" title="Permanent link">&para;</a></h3>
+<p>A new setting must look like every other setting, because it's <strong>built from the same blocks, with no CSS of its
+own</strong>. The blocks:</p>
+<table>
+<thead>
+<tr>
+<th>Block</th>
+<th>What it is</th>
+<th>Props that cover the variations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SettingsSection</code></td>
+<td>eyebrow + panel; owns inset, dividers, rhythm</td>
+<td><code>title</code>, <code>id</code>, <code>#action</code> slot (one secondary Button)</td>
+</tr>
+<tr>
+<td><code>SettingRow</code></td>
+<td>label · description · control</td>
+<td><code>label</code>, <code>description</code> (or <code>#description</code>), <code>stacked</code>, <code>#label-extra</code> (a <code>Tag</code>)</td>
+</tr>
+<tr>
+<td><code>SettingGroup</code> (new)</td>
+<td>a sub-heading inside a panel (<code>--text-label</code>, sentence case) + its rows; replaces uppercase in-card labels</td>
+<td><code>title</code></td>
+</tr>
+<tr>
+<td><code>ListRow</code> / <code>SourceList</code></td>
+<td>items with lead · body · actions</td>
+<td><code>lead</code>, <code>name</code>, <code>meta[]</code>, <code>#actions</code></td>
+</tr>
+<tr>
+<td><code>ScopeLine</code> (new, from <code>KioskScope</code>)</td>
+<td>"Same as Default" / "Changed here · Reset to default"</td>
+<td><code>overridden</code>, <code>@reset</code></td>
+</tr>
+<tr>
+<td><code>InlineNote</code> (new)</td>
+<td>the one-line note/hint/error under a row (<code>--text-meta</code>; tone <code>neutral</code>/<code>warn</code>/<code>err</code>)</td>
+<td><code>tone</code>, <code>#action</code></td>
+</tr>
+<tr>
+<td><code>EmptyState</code>, <code>Button</code>, <code>Tag</code> and the <code>ui/</code> controls</td>
+<td>see the table above</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<p>Rules:
+1. <strong>A settings category or tab component has no <code>&lt;style&gt;</code> block</strong>, or only layout for a genuinely new arrangement,
+   which then becomes a block. <code>controlLint</code> and a new <code>settingsNoStyle</code> check (allowlist, shrinking) enforce it.
+2. <strong>A new variation becomes a prop on the block</strong>, not a local class. If a spec needs something the blocks can't
+   express, the spec says so and the block grows, with a gallery entry (below).
+3. <strong>Plugin settings already work this way</strong> (schema → <code>PluginFieldRenderer</code>). Host settings now follow the same
+   discipline.</p>
+<p><strong>Gallery.</strong> <code>frontend/ui-gallery.html</code> (dev-only entry, like <code>renderer-gallery.html</code>) renders every block and <code>ui/</code>
+control in every state:
+- default, hover, focus, selected, disabled, error, loading, empty;
+- at 1280 and 390, in light and Backlit, with the theme switcher on top.</p>
+<p>It's the reference a builder copies from and the page a reviewer opens. A Playwright snapshot of the gallery in CI
+makes any visual change to a block show up as a diff, so drift becomes visible in review instead of on the wall.</p>
+<h2 id="4-layout-rules">4. Layout rules<a class="headerlink" href="#4-layout-rules" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Panel inset:</strong> every direct child of a panel insets with <code>--panel-pad-x</code> / <code>--panel-pad-y</code>. A child that needs
+   to bleed to the edge (a full-width list divider) does so explicitly, and only for its border.</li>
+<li><strong>Dividers:</strong> <code>1px solid var(--line-soft)</code> <strong>between</strong> panel children, never before the first or after the last.
+   Panel owns this (<code>.settings-section__panel &gt; * + * { border-top }</code>). Children don't draw their own outer
+   dividers. This replaces ad-hoc rules like <code>.where-shows + .setting-row</code>.</li>
+<li><strong>Row anatomy</strong> (<code>SettingRow</code>): label (<code>--text-label</code>, <code>--weight-strong</code>) over description (<code>--text-meta</code>,
+   <code>--ink-2</code>), control on the right, <code>--gap-group</code> between them. It stacks under 600px or with <code>:stacked</code>.
+   Descriptions are one sentence (copy rules).</li>
+<li><strong>ListRow anatomy:</strong> lead · body · actions. The actions group never wraps internally. Under 600px the whole group
+   moves under the body as one right-aligned line. (Today the ⋯ wraps alone; see #202.)</li>
+<li><strong>Section rhythm:</strong> eyebrow title (<code>--font-data</code>, uppercase, letter-spaced, <code>--ink-3</code>) outside the panel,
+   <code>--gap-2</code> above the panel, <code>--gap-section</code> between sections. <strong>Eyebrows are only for section titles</strong>; inside a
+   panel, sub-labels are <code>--text-label</code> sentence case.</li>
+<li><strong>One primary per region:</strong> at most one <code>primary</code> Button per panel/dialog. "Add …" in a list header is
+   <code>secondary</code> unless the list is empty, where the EmptyState's button is primary.</li>
+<li><strong>Touch:</strong> every interactive element is ≥ <code>--touch-target</code> in both directions (use padding, not visual size).</li>
+<li><strong>Widths:</strong> phone (&lt; 600) one column with a 16px page gutter; kiosk/desktop as designed. No horizontal page
+   scroll ever (the e2e phone audit enforces this).</li>
+</ol>
+<h2 id="5-colour-and-state">5. Colour and state<a class="headerlink" href="#5-colour-and-state" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Treatment (all controls, via <code>ui/</code>)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hover</td>
+<td>surface <code>--bg-2</code> → <code>color-mix(--ink 4%, --bg-2)</code>; text unchanged</td>
+</tr>
+<tr>
+<td>Focus-visible</td>
+<td><code>outline: 2px solid var(--focus); outline-offset: 2px</code>. Never removed, never colour-only</td>
+</tr>
+<tr>
+<td>Selected / on</td>
+<td><code>color-mix(in srgb, var(--focus) 16%, var(--bg-2))</code> fill + <code>--focus</code> border, or a filled <code>--focus</code> with <code>--focus-ink</code> text for segmented/toggle</td>
+</tr>
+<tr>
+<td>Primary action</td>
+<td><code>--focus</code> fill, <code>--focus-ink</code> text</td>
+</tr>
+<tr>
+<td>Disabled</td>
+<td><code>opacity: .5</code>, <code>cursor: not-allowed</code>, no hover change</td>
+</tr>
+<tr>
+<td>Loading</td>
+<td>label becomes the verb + "…" ("Saving…"), control disabled; no spinners in rows</td>
+</tr>
+<tr>
+<td>Error</td>
+<td><code>--err</code> text line under the control (<code>--text-meta</code>), plus <code>aria-invalid</code>; never a red box</td>
+</tr>
+<tr>
+<td>Status</td>
+<td><code>Tag</code> tones only (<code>ok</code>/<code>warn</code>/<code>err</code>)</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Orange (<code>--focus</code>)</strong> is for primary actions, selection, focus and the <code>ProgressBar</code> fill only. Never use it for decoration,
+  headings, dots that mean nothing, or links (links use <code>--ink</code> + underline).</li>
+<li><strong>Status colours</strong> never decorate. A plugin type, a category or a page is never coloured.</li>
+<li><strong>No blue.</strong> Calvin's palette has none, so a browser-default blue (checkbox, link) is a bug. Use
+  <code>accent-color: var(--focus)</code>.</li>
+<li>Every view is checked in the 5 themes × light/dark (CLV-64 contrast test). Text pairs must hit AA.</li>
+</ul>
+<h2 id="6-writing">6. Writing<a class="headerlink" href="#6-writing" title="Permanent link">&para;</a></h2>
+<p>Follow the copy rules (settings audit §5) and the no-developer-words table (#193): sentence case, one-sentence
+descriptions, units on controls, plain words (screen, page, source, plugin, Calvin).</p>
+<h2 id="7-enforcement">7. Enforcement<a class="headerlink" href="#7-enforcement" title="Permanent link">&para;</a></h2>
+<p>Tests (vitest, <code>tests/unit/styles/</code>):
+1. <code>tokenLint</code> (exists): no literal colours, sizes or radii outside theme.css.
+2. <strong><code>roleLint</code> (new)</strong>: components may not reference <code>--fs-*</code>, <code>--space-*</code> or <code>--radius-{xs,sm,md,lg,xl,2xl}</code>
+   primitives, only roles. Allowlist shrinks per migration phase; it starts with today's files and must only shrink.
+3. <strong><code>controlLint</code> (new)</strong>: in <code>&lt;style&gt;</code> blocks outside <code>components/ui/</code>, a selector that targets a <code>button</code>,
+   <code>input</code>, <code>select</code> or a class containing <code>btn|button</code> may not set <code>background</code>, <code>border</code>, <code>border-radius</code>,
+   <code>font-size</code>, <code>font-weight</code>, <code>color</code> or <code>padding</code>. Layout properties (margin, gap, grid, flex, width) are fine.
+   Same shrinking allowlist.
+4. <code>panelInset</code> (exists, #202), generalised: every component rendered as a direct panel child uses the inset tokens.
+5. Weights: only <code>--weight-*</code> (no numeric font-weight outside theme.css).</p>
+<p>Review: every UI PR attaches screenshots from the mocked e2e harness (<code>tests/e2e/phone/fixtures/api-mock.js</code>, no
+backend) at 1280 and 390, light and one dark theme. The design lead reviews against this doc.</p>
+<h2 id="8-migration">8. Migration<a class="headerlink" href="#8-migration" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Roles in, no visual change.</strong> Add the role tokens as aliases of today's primitives (radius snaps excepted) and
+   add the lints with full allowlists. One PR, mechanical.</li>
+<li><strong>The blocks and the gallery.</strong> Build <code>Button</code>, <code>TextField</code>, <code>ListRow</code>, <code>SettingGroup</code>, <code>ScopeLine</code>, <code>InlineNote</code>, <code>Popover</code>/<code>Menu</code>, <code>ColourField</code>, <code>Tabs</code>, the <code>Dialog</code> <code>full</code> size and
+   <code>ui-gallery.html</code> first. Then replace the 61 button classes and remove settings <code>&lt;style&gt;</code> blocks file by file. The
+   largest are Security (15 <code>security-btn</code>), Plugins (<code>btn-install</code>, <code>pc-btn</code>), System (<code>maint-btn</code>,
+   <code>backup-btn</code>, <code>update-btn</code>) and Screens (<code>kiosk-software__btn</code>). Each file leaves the <code>controlLint</code> allowlist
+   when done. Panel-owned dividers land here too.</li>
+<li><strong>Roles everywhere.</strong> Swap primitives for roles per category (Content, Dashboard, Screens, Plugins, System,
+   Security, then the dashboard). Each leaves the <code>roleLint</code> allowlist. Delete the unused primitives at the end.</li>
+</ol>
+<p>Open question for the owner: the toggle knob in the "on" state is <code>--focus-ink</code> (near-black in light themes) since
+CLV-64. That's correct for contrast, but it reads heavy next to every other control. Keep it, or use a white knob
+with a darker track?</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

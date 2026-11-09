@@ -1,0 +1,2462 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/superpowers/specs/2026-07-14-recursive-region-nesting-design/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Recursive region nesting (sub-cells within sub-cells) - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#recursive-region-nesting-sub-cells-within-sub-cells" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Recursive region nesting (sub-cells within sub-cells)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#problem" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Problem
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#investigation-findings-current-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Investigation findings (current state)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Investigation findings (current state)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#backend-no-work-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Backend — no work needed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#frontend-model-utilslayoutjs-three-enforcers-of-the-2level-cap" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Frontend model (utils/layout.js) — three enforcers of the 2‑level cap
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#live-dashboard-renderer-2level-and-resize-is-toplevel-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live dashboard renderer — 2‑level, and resize is top‑level only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#editor-2level-render-resize" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor — 2‑level render + resize
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-model-path-semantics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data model &amp; path semantics
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#utilslayoutjs-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        utils/layout.js changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="utils/layout.js changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-primitives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New primitives
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#path-addressed-mutation-helpers-replace-the-flat-ones" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Path-addressed mutation helpers (replace the flat ones)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recursion-in-existing-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recursion in existing functions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#live-dashboard-renderer-componentsdashboardregionvue-viewsdashboardvue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Live dashboard renderer (components/DashboardRegion.vue + views/Dashboard.vue)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#editor-screenregioneditorvue-regionsregionnodevue-regionsregioninspectorvue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Editor (ScreenRegionEditor.vue, regions/RegionNode.vue, regions/RegionInspector.vue)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#navigation-active-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Navigation &amp; active region
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope-boundaries-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope boundaries (non-goals)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-by-file-change-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File-by-file change list
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risks
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="recursive-region-nesting-sub-cells-within-sub-cells">Recursive region nesting (sub-cells within sub-cells)<a class="headerlink" href="#recursive-region-nesting-sub-cells-within-sub-cells" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>Superseded: the flat helpers named here were removed in CLV-112; use the *AtPath helpers.</p>
+</blockquote>
+<ul>
+<li><strong>Date:</strong> 2026-07-14</li>
+<li><strong>Status:</strong> Design — awaiting review</li>
+<li><strong>Branch:</strong> <code>feature/regions-editor-redesign</code></li>
+<li><strong>Related:</strong> the region editor redesign (<code>ScreenRegionEditor.vue</code>), the live dashboard (<code>views/Dashboard.vue</code>, <code>components/DashboardRegion.vue</code>), and the layout model (<code>utils/layout.js</code>).</li>
+</ul>
+<h2 id="problem">Problem<a class="headerlink" href="#problem" title="Permanent link">&para;</a></h2>
+<p>A dashboard screen's layout is a list of top-level regions, and a region can be
+<strong>split</strong> into sub-regions (<code>region.split.regions</code>). Today that nesting is capped
+at exactly <strong>two levels</strong>: a top-level region may split once, but a sub-region
+cannot split again. Users want true nesting — e.g. <em>"two columns, the right
+column split into two rows, and one of those rows split into two."</em> That is
+level‑3 nesting, which the current model, renderers, and resize interactions
+cannot represent or display.</p>
+<h2 id="investigation-findings-current-state">Investigation findings (current state)<a class="headerlink" href="#investigation-findings-current-state" title="Permanent link">&para;</a></h2>
+<p>Three layers were audited. The 2‑level cap is enforced in the frontend only; the
+backend is depth‑agnostic.</p>
+<h3 id="backend-no-work-needed">Backend — no work needed<a class="headerlink" href="#backend-no-work-needed" title="Permanent link">&para;</a></h3>
+<p><code>dashboardScreens</code> is persisted as an <strong>opaque <code>dict[str, Any]</code></strong> (Pydantic
+<code>ConfigUpdate.dashboardScreens</code> in <code>backend/app/api/routes/config.py:100</code>) and
+stored as JSON via <code>ConfigDB</code> (<code>value_type="json"</code>) with <strong>zero structural
+validation</strong> (<code>config_service.py</code> just <code>json.dumps</code>/<code>json.loads</code>). A layout with
+arbitrarily deep <code>split</code> nesting is persisted verbatim. <strong>No backend changes.</strong></p>
+<h3 id="frontend-model-utilslayoutjs-three-enforcers-of-the-2level-cap">Frontend model (<code>utils/layout.js</code>) — three enforcers of the 2‑level cap<a class="headerlink" href="#frontend-model-utilslayoutjs-three-enforcers-of-the-2level-cap" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong><code>normalizeRegionSplit(split, parentId)</code> (~line 602)</strong> builds each sub-region
+   <em>without</em> copying its <code>.split</code>, so any deeper nesting is <strong>silently dropped on
+   normalize</strong>. This is the hard data-model cap.</li>
+<li><strong><code>getLeafRegions(layout)</code> (~line 397)</strong> flattens exactly two levels; it does
+   not recurse into a sub-region that has its own split. Used by region cycling,
+   <code>activeRegionId</code> validation, and <code>getActiveDashboardRegion</code>.</li>
+<li><strong>All mutation helpers use flat addressing</strong> — <code>splitTopRegion(layout,
+   topIndex)</code>, <code>addSubRegion(layout, topIndex)</code>, <code>removeSubRegion(layout,
+   topIndex, subIndex)</code>, <code>setSplitDirection(layout, topIndex, dir)</code>,
+   <code>resizeSubRegionPair(layout, topIndex, firstIndex, size)</code>,
+   <code>setSubRegionContent(layout, topIndex, subIndex, patch)</code>. <code>(topIndex,
+   subIndex)</code> cannot address a third level.</li>
+</ol>
+<p>Already recursive and reusable: <strong><code>setRegionView</code></strong> (by id) and the focus-light
+<strong><code>regionContainsLeaf</code></strong> (<code>views/Dashboard.vue</code>).</p>
+<h3 id="live-dashboard-renderer-2level-and-resize-is-toplevel-only">Live dashboard renderer — 2‑level, and resize is top‑level only<a class="headerlink" href="#live-dashboard-renderer-2level-and-resize-is-toplevel-only" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>components/DashboardRegion.vue</code></strong> renders two hardcoded cases: <code>region.split</code>
+  → loop <code>region.split.regions</code> rendering leaf viewers directly; else → a single
+  leaf viewer. It never recurses (<code>&lt;DashboardRegion&gt;</code> does not render itself) and
+  never checks <code>sub.split</code>.</li>
+<li><strong><code>views/Dashboard.vue</code></strong> owns drag‑to‑resize but only for <strong>top-level</strong>
+  dividers: <code>resizeHandles</code> emits one handle per gap between top-level regions;
+  <code>startRegionResize(firstIndex)</code> → <code>resizeAdjacentRegions(layout.regions, …)</code>;
+  a live <code>dragSizes</code> overlay keyed by <code>region.id</code> is applied through
+  <code>getRegionAxisStyle</code>. Sub-region dividers are <strong>not draggable on the kiosk
+  today.</strong> The <code>dragSizes</code> overlay is keyed by id, so it is already
+  depth-agnostic; only handle placement and drag math are top-level-bound.</li>
+</ul>
+<h3 id="editor-2level-render-resize">Editor — 2‑level render + resize<a class="headerlink" href="#editor-2level-render-resize" title="Permanent link">&para;</a></h3>
+<p><code>ScreenRegionEditor.vue</code> renders region → sub-split → sub-leaf (two levels) and
+has two resize paths (<code>startResize</code> top, <code>startSubResize</code> sub). <code>RegionInspector</code>
+marks a region <code>splittable</code> only when it is top-level.</p>
+<h2 id="decisions">Decisions<a class="headerlink" href="#decisions" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Depth: soft cap at 3 levels.</strong> The recursion is general; the cap is a single
+   guard. A cell can be split only when its depth (<code>path.length</code>) is <code>&lt; 3</code>, so
+   level‑1 and level‑2 cells can split, and level‑3 cells cannot. Enforced both in
+   the UI (Split control disabled) and in data (<code>normalizeRegionSplit</code> drops a
+   level‑3 child's <code>.split</code>). Constant: <code>MAX_SPLIT_DEPTH = 3</code>. Raising it later is
+   a one-line change.</li>
+<li><strong>Approach A: path-based helpers + recursive rendering.</strong> Nodes are addressed
+   by an index <strong>path</strong>; mutations are pure path-addressed functions in
+   <code>layout.js</code>; rendering recurses in each renderer. Rejected alternatives:
+   controlled patch-bubbling components (welds mutation to the view tree, breaks
+   whole-layout ops like leaf cycling), and unifying the editor + live renderers
+   into one component (they render fundamentally different content).</li>
+<li><strong>Symmetric resize.</strong> Both the editor <strong>and</strong> the live kiosk get nested
+   drag-resize at every divider at every level. Nothing regresses: top-level
+   resize behaves exactly as today.</li>
+</ol>
+<h2 id="data-model-path-semantics">Data model &amp; path semantics<a class="headerlink" href="#data-model-path-semantics" title="Permanent link">&para;</a></h2>
+<p>Node shape is unchanged. <code>split.regions[]</code> becomes <strong>recursive</strong> — a sub-node may
+carry its own <code>.split</code>.</p>
+<p>A <strong>path</strong> is an array of indices into <code>regions</code> / <code>split.regions</code>, alternating:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Resolves to</th>
+<th>Level (depth)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[]</code></td>
+<td>layout root (container, not a node)</td>
+<td>0</td>
+</tr>
+<tr>
+<td><code>[2]</code></td>
+<td><code>layout.regions[2]</code></td>
+<td>1</td>
+</tr>
+<tr>
+<td><code>[2,0]</code></td>
+<td><code>layout.regions[2].split.regions[0]</code></td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>[2,0,1]</code></td>
+<td><code>…regions[2].split.regions[0].split.regions[1]</code></td>
+<td>3</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Depth = <code>path.length</code>.</strong> <code>canSplit(path) ⇔ path.length &lt; MAX_SPLIT_DEPTH</code>.</li>
+<li><strong>Selection stays id-based</strong> (<code>selectedRegionId</code>) so it survives re-renders; the
+  mutation path is derived on demand via <code>getPathById(layout, id)</code>.</li>
+</ul>
+<h2 id="utilslayoutjs-changes"><code>utils/layout.js</code> changes<a class="headerlink" href="#utilslayoutjs-changes" title="Permanent link">&para;</a></h2>
+<h3 id="new-primitives">New primitives<a class="headerlink" href="#new-primitives" title="Permanent link">&para;</a></h3>
+<div class="language-js highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">export</span><span class="w"> </span><span class="kd">const</span><span class="w"> </span><span class="nx">MAX_SPLIT_DEPTH</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">3</span><span class="p">;</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1">// Walk indices to the addressed node (or null).</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getNodeAtPath</span><span class="p">(</span><span class="nx">layout</span><span class="p">,</span><span class="w"> </span><span class="nx">path</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">…</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1">// Immutably replace the node at `path` with fn(node). JSON-clone (reactive-safe),</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1">// consistent with setRegionView&#39;s existing clone strategy.</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">updateNodeAtPath</span><span class="p">(</span><span class="nx">layout</span><span class="p">,</span><span class="w"> </span><span class="nx">path</span><span class="p">,</span><span class="w"> </span><span class="nx">fn</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">…</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1">// Immutably transform the regions array of the container at `containerPath`</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1">// (containerPath === [] → layout.regions; otherwise node.split.regions).</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">updateContainerAtPath</span><span class="p">(</span><span class="nx">layout</span><span class="p">,</span><span class="w"> </span><span class="nx">containerPath</span><span class="p">,</span><span class="w"> </span><span class="nx">fn</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">…</span><span class="w"> </span><span class="p">}</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1">// Recursive id → path lookup (null if not found).</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="k">export</span><span class="w"> </span><span class="kd">function</span><span class="w"> </span><span class="nx">getPathById</span><span class="p">(</span><span class="nx">layout</span><span class="p">,</span><span class="w"> </span><span class="nx">id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">…</span><span class="w"> </span><span class="p">}</span>
+</span></code></pre></div>
+<h3 id="path-addressed-mutation-helpers-replace-the-flat-ones">Path-addressed mutation helpers (replace the flat ones)<a class="headerlink" href="#path-addressed-mutation-helpers-replace-the-flat-ones" title="Permanent link">&para;</a></h3>
+<p>Each is a thin wrapper over the primitives, reusing existing size math
+(<code>resizeAdjacentRegions</code>, <code>normalizeRegionSizes</code>, <code>normalizeRegionPercentages</code>):</p>
+<ul>
+<li><code>splitRegionAtPath(layout, path)</code> — guard <code>canSplit(path)</code> and "not already
+  split"; produces the same <code>{regions:[a,b]}</code> shape as today's <code>splitTopRegion</code>.</li>
+<li><code>unsplitRegionAtPath(layout, path)</code> — collapse <code>.split</code> into a leaf, keeping the
+  first sub's content (as <code>unsplitTopRegion</code>).</li>
+<li><code>addSubRegionAtPath(layout, path)</code> — node must be split; append a sub (guard
+  <code>&lt; MAX_TOP_REGIONS</code>), rescaling as today's <code>addSubRegion</code>.</li>
+<li><code>setSplitDirectionAtPath(layout, path, dir)</code>.</li>
+<li><code>setRegionContentAtPath(layout, path, patch)</code> — kind/serviceId/instanceIds.</li>
+<li><code>removeRegionAtPath(layout, path)</code> — remove the node from its parent container
+  (<code>parentPath = path.slice(0,-1)</code>, <code>index = path.at(-1)</code>): root parent keeps a
+  min of 1 (as <code>removeTopRegion</code>); split parent collapses to a leaf when it would
+  drop below 2 children (as <code>removeSubRegion</code>).</li>
+<li><code>resizePairAtPath(layout, containerPath, firstIndex, firstSize)</code> — one resize
+  entry point for every level, wrapping <code>resizeAdjacentRegions</code> on the addressed
+  container's children.</li>
+</ul>
+<p>The existing flat helpers are removed once no caller remains (editor and dashboard
+migrate to the path helpers). <code>resizeAdjacentRegions</code> / size-normalization stay.</p>
+<h3 id="recursion-in-existing-functions">Recursion in existing functions<a class="headerlink" href="#recursion-in-existing-functions" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>normalizeRegionSplit(split, parentId, childLevel)</code></strong> — normalize each child,
+  then set <code>child.split = childLevel &lt; MAX_SPLIT_DEPTH ?
+  normalizeRegionSplit(child.split, child.id, childLevel + 1) : null</code>. Called from
+  <code>normalizeDashboardLayout</code> with <code>childLevel = 2</code> (top regions are level 1).
+  This both enables nesting and <strong>enforces the depth cap in data</strong>.</li>
+<li><strong><code>getLeafRegions(layout)</code></strong> — recurse to the deepest leaves (carry <code>parentId</code>).</li>
+</ul>
+<h2 id="live-dashboard-renderer-componentsdashboardregionvue-viewsdashboardvue">Live dashboard renderer (<code>components/DashboardRegion.vue</code> + <code>views/Dashboard.vue</code>)<a class="headerlink" href="#live-dashboard-renderer-componentsdashboardregionvue-viewsdashboardvue" title="Permanent link">&para;</a></h2>
+<p><code>DashboardRegion.vue</code> becomes <strong>recursive and owns resize for its own container</strong>:</p>
+<ul>
+<li>Template: <code>v-if="region.split"</code> → a flex container (direction = split direction)
+  that loops children, rendering <code>&lt;DashboardRegion :region="child" …&gt;</code> for each,
+  with a <strong>resize handle between adjacent children</strong> (skipped when
+  <code>configStore.regionsLocked</code>); <code>v-else</code> → the leaf viewer
+  (<code>CalendarView</code>/<code>PhotoSlideshow</code>/<code>WebServiceViewer</code>), unchanged. Content
+  resolution stays keyed by <code>kind</code>/<code>id</code>, valid at any depth.</li>
+<li><strong>Ownership split (single source of truth):</strong> <code>Dashboard.vue</code> owns the whole
+  drag <em>lifecycle</em> — pointer listeners, the id-keyed <code>dragSizes</code> overlay, the
+  commit-on-<code>pointerup</code> persistence, the between-clock-bar gap skip, and the
+  <code>regionsLocked</code> gate. <code>DashboardRegion.vue</code> owns only <em>rendering the handles</em>
+  and reporting a drag: on handle <code>pointerdown</code> it emits <code>(containerPath,
+  firstIndex, containerEl)</code> up to <code>Dashboard.vue</code>, which measures that element and
+  runs <code>resizePairAtPath</code> on the addressed container. So the recursive component
+  never mutates layout state itself — it just says "a divider at this path
+  started dragging," matching how top-level resize is wired today.</li>
+<li><code>regionStyle</code>/<code>getRegionAxisStyle</code> already size a node by <code>size</code> + parent
+  direction; each recursion level applies it to its children.</li>
+</ul>
+<h2 id="editor-screenregioneditorvue-regionsregionnodevue-regionsregioninspectorvue">Editor (<code>ScreenRegionEditor.vue</code>, <code>regions/RegionNode.vue</code>, <code>regions/RegionInspector.vue</code>)<a class="headerlink" href="#editor-screenregioneditorvue-regionsregionnodevue-regionsregioninspectorvue" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Extract <code>regions/RegionNode.vue</code></strong> — a recursive editor cell. <code>v-if="split"</code> →
+  flex container (direction = split direction) of child <code>RegionNode</code>s with
+  resizers between siblings; else → the leaf face (emoji / name / size badge).
+  Emits <code>select(id)</code> and <code>resize(containerId, firstIndex, event)</code>. Registers its
+  container element ref by id so the parent can measure the right rect.</li>
+<li><strong><code>ScreenRegionEditor</code></strong> computes a <strong>selection context</strong> from the derived path —
+  <code>{ depth, isSub, canSplit, canAddSub, splitDir }</code> — and passes it to
+  <code>RegionInspector</code> as props. <code>RegionInspector</code> stops walking the tree itself
+  (removing its current 2-level <code>screen.layout.regions.some/find</code> logic) and
+  simply renders controls from the context: Split enabled when <code>canSplit</code>, Add
+  row/column when <code>canAddSub</code>, sub-direction from <code>splitDir</code>. Its emitted events
+  are unchanged.</li>
+<li><strong>Unified resize:</strong> the two handlers (<code>startResize</code>, <code>startSubResize</code>) collapse
+  into one that takes <code>(containerId, firstIndex)</code>, resolves the container path via
+  <code>getPathById</code>, measures that container's element, and calls <code>resizePairAtPath</code>.
+  Per-container element refs are registered by <code>RegionNode</code> (keyed by the
+  split-owner id), replacing the current <code>screenEl</code>/<code>subRefs</code> pair.</li>
+<li>All existing editor handlers (<code>toggleSplitSelected</code>, <code>addSubToSelected</code>,
+  <code>removeSelected</code>, <code>toggleSubDirSelected</code>, <code>setSelectedComponent</code>,
+  <code>applySourceIds</code>) switch from <code>topIndexOf(region)</code> to <code>getPathById</code> + the
+  path helpers.</li>
+<li><strong>Clock-bar "between" stays top-level only</strong> — no clock bar between deep
+  sub-cells. Unchanged.</li>
+</ul>
+<h2 id="navigation-active-region">Navigation &amp; active region<a class="headerlink" href="#navigation-active-region" title="Permanent link">&para;</a></h2>
+<p>With <code>getLeafRegions</code> recursive, <code>cycleActiveDashboardRegion</code> (region arrows /
+keyboard), the touch nav dots, <code>getActiveDashboardRegion</code>, and the
+<code>activeRegionId</code> validation in <code>normalizeDashboardScreen</code> all reach the deepest
+leaves with no further change. <code>regionContainsLeaf</code> (focus lighting) is already
+recursive. Verify arrows cycle through level‑3 leaves.</p>
+<h2 id="testing">Testing<a class="headerlink" href="#testing" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>tests/unit/utils/layout.spec.js</code></strong> — extend: <code>getNodeAtPath</code> /
+  <code>updateNodeAtPath</code> / <code>updateContainerAtPath</code> / <code>getPathById</code>; <code>splitRegionAtPath</code>
+  incl. the <code>MAX_SPLIT_DEPTH</code> guard (level‑3 split refused); <code>addSubRegionAtPath</code>;
+  <code>removeRegionAtPath</code> (root-min-1 and split-collapse cases); <code>resizePairAtPath</code> at
+  each level; recursive <code>getLeafRegions</code>; recursive <code>normalizeRegionSplit</code>
+  asserting a level‑3 child's <code>.split</code> is dropped; a <strong>backward-compat</strong> case
+  proving an existing 2-level config normalizes byte-identically.</li>
+<li><strong><code>tests/unit/views/DashboardKioskResize.spec.js</code></strong> — extend for nested resize
+  (drag an inner divider; assert only that container's children rescale; top-level
+  resize still behaves as before; <code>regionsLocked</code> still gates).</li>
+<li><strong>Live verification (Playwright + real backend on <code>:5174</code>/<code>:18001</code>)</strong> — build a
+  3‑level layout in the editor; confirm the <strong>live dashboard</strong> renders it; confirm
+  persistence; confirm region arrows reach the deep leaves; confirm nested
+  drag-resize works on the kiosk view.</li>
+</ul>
+<h2 id="scope-boundaries-non-goals">Scope boundaries (non-goals)<a class="headerlink" href="#scope-boundaries-non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>No migration — recursion is additive; existing 2-level configs are unchanged. An
+  older frontend reading a 3-level config degrades gracefully (drops level‑3 on
+  normalize).</li>
+<li>No cell drag-to-reorder.</li>
+<li>Presets remain top-level only.</li>
+<li>Clock-bar "between" remains between top-level regions only.</li>
+<li>Depth stays capped at 3 (soft; one constant).</li>
+</ul>
+<h2 id="file-by-file-change-list">File-by-file change list<a class="headerlink" href="#file-by-file-change-list" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>frontend/src/utils/layout.js</code></td>
+<td>Add path primitives + path mutation helpers + <code>MAX_SPLIT_DEPTH</code>; make <code>normalizeRegionSplit</code> and <code>getLeafRegions</code> recursive; remove flat split helpers once callers migrate.</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/DashboardRegion.vue</code></td>
+<td>Make recursive; render nested resize handles; measure own container.</td>
+</tr>
+<tr>
+<td><code>frontend/src/views/Dashboard.vue</code></td>
+<td>Generalize the drag lifecycle to accept a container path; keep <code>dragSizes</code>/persistence/<code>regionsLocked</code>; move/param top-level handle logic.</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/settings/shared/regions/RegionNode.vue</code></td>
+<td>New recursive editor cell (extracted from <code>ScreenRegionEditor</code>).</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/settings/shared/ScreenRegionEditor.vue</code></td>
+<td>Use <code>RegionNode</code>; derive path from selection id; compute selection context; unify resize; migrate handlers to path helpers.</td>
+</tr>
+<tr>
+<td><code>frontend/src/components/settings/shared/regions/RegionInspector.vue</code></td>
+<td>Consume selection-context props; drop internal 2-level tree-walking.</td>
+</tr>
+<tr>
+<td><code>frontend/tests/unit/utils/layout.spec.js</code></td>
+<td>Extend (above).</td>
+</tr>
+<tr>
+<td><code>frontend/tests/unit/views/DashboardKioskResize.spec.js</code></td>
+<td>Extend for nested resize.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="risks">Risks<a class="headerlink" href="#risks" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Nested resize drag math on the live renderer</strong> is the fiddliest piece — each
+  container must measure its own element and rescale only its own children. Covered
+  by unit tests + live Playwright verification.</li>
+<li><strong>Tiny cells</strong> at depth 3 — the existing <code>minSize</code> floor in <code>resizeAdjacentRegions</code>
+  guards correctness; depth is capped to keep cells usable on a Pi screen.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2298 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/superpowers/plans/2026-10-29-admin-auth-backend/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Admin Auth (CLV-9) — Backend Implementation Plan - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#admin-auth-clv-9-backend-implementation-plan" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Admin Auth (CLV-9) — Backend Implementation Plan
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#global-constraints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Global Constraints
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#review-focus" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Review Focus
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Review Focus">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#task-1-admin-secret-store" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: Admin secret store
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-2-login-rate-limiter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: Login rate limiter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-3-route-policy-dependency-and-install_security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: Route policy dependency and install_security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-4-auth-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: Auth endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-5-host-and-origin-middleware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: Host and Origin middleware
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-6-kiosk-path-stays-open-regression-guard" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: Kiosk path stays open (regression guard)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-7-docs-and-unraid-template" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: Docs and Unraid template
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-8-pr-2-after-clv-13-merges-plugin-check-in-a-subprocess" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8 (PR 2, after CLV-13 merges): plugin check in a subprocess
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="admin-auth-clv-9-backend-implementation-plan">Admin Auth (CLV-9) — Backend Implementation Plan<a class="headerlink" href="#admin-auth-clv-9-backend-implementation-plan" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> Require an admin session for every state-changing or secret-leaking API route, block cross-site writes and DNS rebinding, and stop rejected plugin uploads from running code in the server.</p>
+<p><strong>Architecture:</strong> A new <code>app/security/</code> package holds four pure units: the admin secret store (password hash, server secret, session cookies, login rate limit), the route policy (which routes are public, viewer-write, or admin), a Host/Origin middleware, and a one-call <code>install_security(app)</code> used by both <code>app/main.py</code> and the test app in <code>tests/conftest.py</code>. The policy is a FastAPI app-level dependency that reads the matched route template, so every new write route is admin-only by default. Plugin checks run in a child interpreter (<code>python -I -m app.plugins.check_plugin</code>).</p>
+<p><strong>Tech Stack:</strong> FastAPI/Starlette, pydantic-settings, stdlib <code>hashlib.scrypt</code> / <code>hmac</code> / <code>secrets</code>, pytest + TestClient.</p>
+<p><strong>Spec:</strong> <code>docs/superpowers/specs/2026-10-29-admin-auth-design.md</code> (approved by the owner 2026-10-29, all section 10 calls as written). Read it before starting; section numbers below refer to it.</p>
+<p><strong>Execution split:</strong>
+- <strong>PR 1 (Tasks 1–7):</strong> backend auth, policy, Host/Origin, docs and template. Ships alone; the frontend still works logged out for viewing, and Settings will show 401s until PR 3.
+- <strong>PR 2 (Task 8):</strong> plugin check in a subprocess. Start only after CLV-13 (plugin loader R12 changes) has merged into develop.
+- <strong>PR 3 (frontend):</strong> a separate plan, written once the design lead's spec for the lock screen, login dialog and Security tab is in.</p>
+<h2 id="global-constraints">Global Constraints<a class="headerlink" href="#global-constraints" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Password: any characters, minimum 8. No username. Stored as scrypt hash with random salt, never plaintext.</li>
+<li>Secret file: <code>admin-auth.json</code>, mode <code>0600</code>, default <code>&lt;data_dir&gt;/admin-auth.json</code>, override <code>ADMIN_AUTH_PATH</code>. Never in the DB, never in a backup, never in <code>GET /api/config</code>.</li>
+<li>Env: <code>CALVIN_ADMIN_PASSWORD</code> (pre-sets the password on startup and always wins), <code>CALVIN_ALLOWED_HOSTS</code> (comma list; <code>*</code> disables the Host check).</li>
+<li>Cookie: name <code>calvin_admin</code>, HttpOnly, SameSite=Strict, Path=/, Max-Age 400 days (34560000 s). Value <code>"{issued_at}.{generation}.{hex_hmac}"</code>, HMAC-SHA256 keyed by <code>server_secret</code>.</li>
+<li>Login rate limit: per peer IP; 5 failures within 60 s → 429, cooldown starts at 60 s and doubles per further lockout, capped at 900 s. In memory. <code>X-Forwarded-*</code> is never trusted.</li>
+<li>Error bodies: <code>{"detail": {"code": "&lt;code&gt;", "message": "&lt;text&gt;"}}</code> with codes <code>admin_required</code> (401), <code>setup_required</code> (401), <code>already_configured</code> (409), <code>rate_limited</code> (429, plus <code>"retry_after": &lt;int seconds&gt;</code> in <code>detail</code> and a <code>Retry-After</code> header), <code>bad_password</code> (401), <code>password_too_short</code> (422).</li>
+<li>Host rejection: <code>400</code>, <code>text/plain</code>, body names <code>CALVIN_ALLOWED_HOSTS</code> and <code>PUBLIC_URL</code>.</li>
+<li>Origin rejection: <code>403</code> with <code>{"detail": {"code": "cross_origin", "message": ...}}</code>.</li>
+<li>Logging via <code>loguru</code> only. Use <code>retry_on_db_locked</code> for any DB write (this plan adds none).</li>
+<li>Commits: conventional messages, no Co-Authored-By / AI attribution. PR base <code>develop</code>.</li>
+</ul>
+<h2 id="review-focus">Review Focus<a class="headerlink" href="#review-focus" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Reverse proxy / Docker port mapping:</strong> a request with <code>Host: 192.0.2.10:8080</code> and <code>Origin: http://192.0.2.10:8080</code> (port differs from the container's 8000) must pass. Compare Origin's host:port with the Host header <em>as received</em>. Test in Task 5.</li>
+<li><strong>Vite dev server:</strong> <code>Origin: http://localhost:5173</code> against <code>Host: localhost:8000</code> must pass when <code>http://localhost:5173</code> is in <code>CORS_ORIGINS</code>. Test in Task 5.</li>
+<li><strong>Restart with <code>CALVIN_ADMIN_PASSWORD</code> unchanged:</strong> it must NOT bump <code>generation</code> (or every restart would sign everyone out). Only a different password rewrites the hash. Test in Task 1.</li>
+<li><strong>Corrupt or empty <code>admin-auth.json</code>:</strong> treat it as not configured and log an error. No crash at startup, no 500 on every request. Test in Task 1.</li>
+<li><strong>IPv6 Host header</strong> <code>[fe80::1]:8000</code> and bare <code>[::1]</code> are IP literals and allowed. Test in Task 5.</li>
+</ol>
+<hr />
+<h3 id="task-1-admin-secret-store">Task 1: Admin secret store<a class="headerlink" href="#task-1-admin-secret-store" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Create: <code>backend/app/security/__init__.py</code> (empty)
+- Create: <code>backend/app/security/admin_auth.py</code>
+- Modify: <code>backend/app/config.py</code>: add <code>admin_auth_path: Path = Path("admin-auth.json")</code> and append <code>"admin_auth_path"</code> to <code>_DATA_PATHS</code>; add <code>admin_password: str = Field(default="", validation_alias=AliasChoices("calvin_admin_password", "admin_password"))</code> and <code>allowed_hosts: str = Field(default="", validation_alias=AliasChoices("calvin_allowed_hosts", "allowed_hosts"))</code>, following the <code>data_dir</code> pattern.
+- Test: <code>backend/tests/unit/security/test_admin_auth.py</code></p>
+<p><strong>Interfaces (Produces):</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">AdminAuthStore</span><span class="p">:</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">):</span> <span class="o">...</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">is_configured</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>          <span class="c1"># raises PasswordTooShort; bumps generation</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">verify_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>        <span class="c1"># constant-time</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">issue_cookie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span>   <span class="c1"># &quot;{issued_at}.{generation}.{hmac}&quot;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">verify_cookie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">apply_env_password</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">password</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>     <span class="c1"># set only if not configured or verify fails</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>                                 <span class="c1"># delete the file (tests, recovery)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">PasswordTooShort</span><span class="p">(</span><span class="ne">ValueError</span><span class="p">):</span> <span class="o">...</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">COOKIE_NAME</span> <span class="o">=</span> <span class="s2">&quot;calvin_admin&quot;</span><span class="p">;</span> <span class="n">COOKIE_MAX_AGE</span> <span class="o">=</span> <span class="mi">34560000</span><span class="p">;</span> <span class="n">MIN_PASSWORD_LEN</span> <span class="o">=</span> <span class="mi">8</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_admin_store</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">AdminAuthStore</span>   <span class="c1"># module singleton bound to settings.admin_auth_path; re-reads the file on each call to is_configured/verify (cheap; lets &quot;delete the file&quot; work without a restart)</span>
+</span></code></pre></div>
+File JSON: <code>{"version": 1, "scrypt": {"salt": hex, "n": 16384, "r": 8, "p": 1, "hash": hex}, "server_secret": hex(32 bytes), "generation": int}</code>. Write atomically (temp file in the same dir + <code>os.replace</code>), then <code>os.chmod(path, 0o600)</code>. Deleting the file (recovery) also discards <code>server_secret</code>, so old cookies die.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong> in <code>test_admin_auth.py</code> using <code>tmp_path</code>:</li>
+<li><code>test_not_configured_when_file_missing</code>: <code>AdminAuthStore(tmp_path/"a.json").is_configured() is False</code></li>
+<li><code>test_set_and_verify_password</code>: after <code>set_password("correct horse")</code>, <code>verify_password("correct horse")</code> is True and <code>verify_password("wrong pass")</code> is False</li>
+<li><code>test_short_password_rejected</code>: <code>set_password("1234567")</code> raises <code>PasswordTooShort</code></li>
+<li><code>test_file_mode_is_0600</code>: <code>stat.S_IMODE(path.stat().st_mode) == 0o600</code></li>
+<li><code>test_file_has_no_plaintext</code>: <code>"correct horse" not in path.read_text()</code></li>
+<li><code>test_cookie_roundtrip</code>: <code>verify_cookie(issue_cookie())</code> is True; tampered last char → False; <code>None</code> → False; <code>"garbage"</code> → False</li>
+<li><code>test_cookie_expires_after_400_days</code>: <code>verify_cookie(issue_cookie(now=1000), now=1000+34560000+1)</code> is False</li>
+<li><code>test_password_change_invalidates_old_cookies</code>: cookie issued, <code>set_password("another pass")</code>, old cookie → False</li>
+<li><code>test_env_password_same_does_not_bump_generation</code>: <code>set_password("pw-123456")</code>; c = <code>issue_cookie()</code>; <code>apply_env_password("pw-123456")</code>; <code>verify_cookie(c)</code> still True</li>
+<li><code>test_env_password_different_wins</code>: <code>apply_env_password("new-pass-99")</code> → <code>verify_password("new-pass-99")</code> True</li>
+<li><code>test_corrupt_file_counts_as_not_configured</code>: write <code>"{not json"</code> → <code>is_configured()</code> False, no exception</li>
+<li><code>test_reset_deletes_file_and_kills_cookies</code>: after <code>reset()</code>, the file is gone, <code>is_configured()</code> False, an old cookie → False</li>
+<li>[ ] <strong>Step 2: Run</strong> <code>cd backend &amp;&amp; uv run pytest tests/unit/security/test_admin_auth.py -q</code>. Expected: FAIL (module missing).</li>
+<li>[ ] <strong>Step 3: Implement</strong> <code>admin_auth.py</code> and the three settings fields. Use <code>hashlib.scrypt(password.encode(), salt=..., n=16384, r=8, p=1, dklen=32)</code>, <code>hmac.compare_digest</code>, <code>secrets.token_bytes(32)</code>.</li>
+<li>[ ] <strong>Step 4: Run</strong> the same command. Expected: PASS.</li>
+<li>[ ] <strong>Step 5: Commit</strong> <code>feat(security): admin secret store with scrypt hash and signed session cookies (CLV-9)</code></li>
+</ul>
+<h3 id="task-2-login-rate-limiter">Task 2: Login rate limiter<a class="headerlink" href="#task-2-login-rate-limiter" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Modify: <code>backend/app/security/admin_auth.py</code>
+- Test: <code>backend/tests/unit/security/test_rate_limit.py</code></p>
+<p><strong>Interfaces (Produces):</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">LoginRateLimiter</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">max_failures</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span> <span class="n">window</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">base_cooldown</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">max_cooldown</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">900</span><span class="p">):</span> <span class="o">...</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span>     <span class="c1"># 0 = allowed, else seconds to wait</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">record_failure</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">record_success</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ip</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>                     <span class="c1"># clears the failure history, keeps the lockout count</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">login_limiter</span><span class="p">:</span> <span class="n">LoginRateLimiter</span>   <span class="c1"># module singleton</span>
+</span></code></pre></div></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests:</strong></li>
+<li><code>test_five_failures_then_locked</code>: 5× <code>record_failure("1.2.3.4", now=0)</code> → <code>check("1.2.3.4", now=1) == 59</code> (60 − elapsed, rounded up)</li>
+<li><code>test_other_ip_unaffected</code>: <code>check("5.6.7.8", now=1) == 0</code></li>
+<li><code>test_cooldown_doubles</code>: lock out, wait until <code>now=61</code>, 5 more failures → <code>check(...)</code> ≈ 120; a third time ≈ 240; never more than 900</li>
+<li><code>test_failures_outside_window_forgotten</code>: 4 failures at now=0, 1 at now=61 → <code>check == 0</code></li>
+<li>[ ] <strong>Step 2: Run</strong> <code>uv run pytest tests/unit/security/test_rate_limit.py -q</code>. Expected: FAIL.</li>
+<li>[ ] <strong>Step 3: Implement</strong> with a <code>dict[str, deque[float]]</code> of failure times and a <code>dict[str, tuple[locked_until, lockouts]]</code>.</li>
+<li>[ ] <strong>Step 4: Run.</strong> Expected: PASS.</li>
+<li>[ ] <strong>Step 5: Commit</strong> <code>feat(security): per-IP login rate limit with doubling cooldown (CLV-9)</code></li>
+</ul>
+<h3 id="task-3-route-policy-dependency-and-install_security">Task 3: Route policy dependency and <code>install_security</code><a class="headerlink" href="#task-3-route-policy-dependency-and-install_security" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Create: <code>backend/app/security/route_policy.py</code>
+- Create: <code>backend/app/security/install.py</code>
+- Modify: <code>backend/app/main.py</code>: <code>app = FastAPI(..., dependencies=[Depends(enforce_route_policy)])</code> and call <code>install_security(app)</code> right after the existing middleware is added. At startup in <code>lifespan</code>, before plugins load: if <code>settings.admin_password</code>, call <code>get_admin_store().apply_env_password(settings.admin_password)</code> (log "admin password set from CALVIN_ADMIN_PASSWORD", never the value).
+- Modify: <code>backend/tests/conftest.py</code>: build <code>test_app</code> the same way (<code>dependencies=[Depends(enforce_route_policy)]</code> + <code>install_security(test_app)</code>), point <code>settings.admin_auth_path</code> at a tmp file, and log the client in by default (see Step 3).
+- Test: <code>backend/tests/integration/test_route_policy.py</code></p>
+<p><strong>Interfaces (Produces):</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">UNSAFE_METHODS</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;PUT&quot;</span><span class="p">,</span> <span class="s2">&quot;PATCH&quot;</span><span class="p">,</span> <span class="s2">&quot;DELETE&quot;</span><span class="p">})</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">PUBLIC_WRITES</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span>   <span class="c1"># (method, path_format)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">ADMIN_READS</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>                 <span class="c1"># path_format values that need admin on GET</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">CONFIG_DISPLAY_KEYS</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>         <span class="c1"># keys POST /api/config accepts without admin</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_admin</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>      <span class="c1"># verifies the calvin_admin cookie via get_admin_store()</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">admin_error</span><span class="p">(</span><span class="n">store_configured</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">HTTPException</span>   <span class="c1"># 401 setup_required or admin_required</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">enforce_route_policy</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>     <span class="c1"># the app-level dependency</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">install_security</span><span class="p">(</span><span class="n">app</span><span class="p">:</span> <span class="n">FastAPI</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>  <span class="c1"># adds HostOriginMiddleware (Task 5) and includes the auth router (Task 4) at prefix /api</span>
+</span></code></pre></div>
+<code>enforce_route_policy</code> reads <code>request.scope["route"].path_format</code>. Unsafe method and <code>(method, path)</code> not in <code>PUBLIC_WRITES</code> → admin required. GET/HEAD with <code>path</code> in <code>ADMIN_READS</code> → admin required. Otherwise allowed. Not-configured stores answer <code>setup_required</code>.</p>
+<p>Initial values (spec §3; the system router is mounted at <code>/api/system</code>):
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">PUBLIC_WRITES</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/images/next&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/images/previous&quot;</span><span class="p">),</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/calendar/refresh&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/plugins/</span><span class="si">{plugin_id}</span><span class="s2">/fetch&quot;</span><span class="p">),</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/system/display/power/on&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/system/display/power/off&quot;</span><span class="p">),</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/config&quot;</span><span class="p">),</span>   <span class="c1"># body is further restricted in the route (Task 3 Step 5)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/auth/setup&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/auth/login&quot;</span><span class="p">),</span> <span class="p">(</span><span class="s2">&quot;POST&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/auth/logout&quot;</span><span class="p">),</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">}</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">ADMIN_READS</span> <span class="o">=</span> <span class="p">{</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>  <span class="s2">&quot;/api/backup/export&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/backup/files&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/backup/files/</span><span class="si">{name}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/backup/schedule&quot;</span><span class="p">,</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>  <span class="s2">&quot;/api/config/git/branches&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/plugins/</span><span class="si">{plugin_id}</span><span class="s2">/scan&quot;</span><span class="p">,</span> <span class="s2">&quot;/api/plugins/local/suggest&quot;</span><span class="p">,</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>  <span class="s2">&quot;/api/system/update/stream&quot;</span><span class="p">,</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<code>CONFIG_DISPLAY_KEYS</code>: start from <code>dashboardScreens, regionsLocked, showUI, themeMode, selectedTheme, darkModeStart, darkModeEnd, lastSideViewMode</code>, then confirm the list by grepping the frontend for <code>updateConfig(</code> callers outside <code>frontend/src/views/Settings*</code>/<code>components/settings/</code>. List each extra key you find in the PR body with the caller's file:line.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong> in <code>test_route_policy.py</code>. Use a <code>client</code> fixture that is NOT logged in (marker <code>@pytest.mark.no_admin_login</code>, see Step 3):</li>
+<li><code>test_every_unsafe_route_needs_admin</code>: one test that loops over <code>client.app.routes</code> (the test app, which has the same routers as <code>app.main.app</code>): every <code>APIRoute</code> × each of its methods in <code>UNSAFE_METHODS</code>, minus <code>PUBLIC_WRITES</code>. Request each with path params filled with <code>"x"</code> and no body. Collect every route that does not answer 401 with <code>detail.code in {"admin_required", "setup_required"}</code>, and assert the collected list is empty, so one run names all the unprotected routes. A 422 or 404 means the policy let the request through.</li>
+<li><code>test_admin_reads_need_admin</code> (parametrised over <code>ADMIN_READS</code>) → 401</li>
+<li><code>test_public_writes_allowed_logged_out</code>: <code>POST /api/images/next</code> is not 401</li>
+<li><code>test_dashboard_reads_public</code>: <code>GET /api/config</code>, <code>GET /api/health</code>, <code>GET /api/kiosks/{id}/config</code> are not 401</li>
+<li><code>test_unconfigured_says_setup_required</code>: with the store reset, <code>POST /api/calendar/sources</code> → <code>detail.code == "setup_required"</code></li>
+<li><code>test_policy_tables_reference_real_routes</code>: every entry in <code>PUBLIC_WRITES</code> and <code>ADMIN_READS</code> matches a real route template/method in <code>app.main.app</code> (catches typos and renamed routes)</li>
+<li>[ ] <strong>Step 2: Run</strong> <code>uv run pytest tests/integration/test_route_policy.py -q</code>. Expected: FAIL.</li>
+<li>[ ] <strong>Step 3: Implement</strong> <code>route_policy.py</code> and <code>install.py</code>, then wire <code>main.py</code> and <code>conftest.py</code>. In <code>conftest.test_client</code>: set <code>app.config.settings.admin_auth_path = tmp_path / "admin-auth.json"</code>, <code>get_admin_store().set_password("test-admin-password")</code>, and unless <code>request.node.get_closest_marker("no_admin_login")</code>, <code>client.post("/api/auth/login", json={"password": "test-admin-password"})</code> and assert 200. Register the marker in <code>pytest.ini</code>/<code>pyproject</code> <code>[tool.pytest.ini_options] markers</code>. Restore the settings path in teardown. (Login needs Task 4's router. If you do Task 3 before Task 4, set the cookie directly with <code>client.cookies.set(COOKIE_NAME, store.issue_cookie())</code>, and switch to the real login once Task 4 is done.)</li>
+<li>[ ] <strong>Step 4: Run</strong> the new test file, then the WHOLE backend suite <code>uv run pytest -q</code>. Expected: all pass. Existing tests keep their meaning because the client is logged in by default. Tests that build their own app or client must get the same login; fix each one you find.</li>
+<li>[ ] <strong>Step 5: Config body restriction.</strong> In <code>backend/app/api/routes/config.py</code> <code>update_config</code>, add a <code>request: Request</code> parameter. <code>keys = config_update.model_dump(exclude_unset=True).keys()</code>. If <code>not is_admin(request)</code> and <code>not keys &lt;= CONFIG_DISPLAY_KEYS</code>, raise <code>admin_error(...)</code>. Tests (<code>no_admin_login</code>): <code>POST /api/config {"themeMode": "dark"}</code> → 200; <code>{"gitBranch": "main"}</code> → 401; <code>{"themeMode": "dark", "gitBranch": "x"}</code> → 401 (a mixed request is rejected as a whole).</li>
+<li>[ ] <strong>Step 6: Run</strong> the full suite plus ruff/mypy. Commit: <code>feat(security): default-deny admin policy for state-changing routes (CLV-9)</code></li>
+</ul>
+<h3 id="task-4-auth-endpoints">Task 4: Auth endpoints<a class="headerlink" href="#task-4-auth-endpoints" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Create: <code>backend/app/api/routes/auth.py</code> (router included by <code>install_security</code>)
+- Test: <code>backend/tests/integration/test_auth_routes.py</code></p>
+<p><strong>Interfaces:</strong>
+- Consumes: <code>get_admin_store()</code>, <code>login_limiter</code>, <code>is_admin</code>, <code>COOKIE_NAME</code>, <code>COOKIE_MAX_AGE</code> (Tasks 1–3).
+- Produces (all under <code>/api</code>):
+  - <code>GET /auth/status</code> → <code>{"configured": bool, "authenticated": bool}</code>
+  - <code>POST /auth/setup {password}</code> → 200 <code>{"ok": true}</code> + cookie; 409 <code>already_configured</code> if configured; 422 <code>password_too_short</code>
+  - <code>POST /auth/login {password}</code> → 200 + cookie; 401 <code>bad_password</code>; 429 <code>rate_limited</code> (checked BEFORE verifying); 401 <code>setup_required</code> if not configured
+  - <code>POST /auth/logout</code> → 200, clears the cookie (<code>Max-Age=0</code>)
+  - <code>POST /auth/password {current, new}</code> → admin only, else 401 <code>admin_required</code>; wrong <code>current</code> → 401 <code>bad_password</code> (counts toward the rate limit); success → new cookie for this client (generation bumped, so other sessions die)
+  - Rate limit on all three password-taking endpoints: <code>setup</code>, <code>login</code> and <code>password</code> call <code>login_limiter.check(ip)</code> first and answer 429 <code>rate_limited</code> with the <code>Retry-After</code> header and <code>detail.retry_after</code> (the frontend countdown reads them; design spec <code>docs/design/2026-10-29-clv-9-admin-auth-ui.md</code>). Only wrong passwords count as failures.
+  - Set cookies with <code>response.set_cookie(COOKIE_NAME, value, max_age=COOKIE_MAX_AGE, httponly=True, samesite="strict", path="/", secure=False)</code>. Calvin is commonly served over plain HTTP on the LAN; TLS is a proxy job (spec non-goal).
+  - Peer IP: <code>request.client.host</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong> (<code>no_admin_login</code> marker; the store is reset per test):</li>
+<li><code>test_status_unconfigured</code>: <code>{"configured": False, "authenticated": False}</code></li>
+<li><code>test_setup_logs_in</code>: setup → 200 and the cookie is set; then <code>GET /auth/status</code> → <code>authenticated: True</code>; then <code>POST /api/calendar/sources</code> is not 401</li>
+<li><code>test_second_setup_409</code></li>
+<li><code>test_setup_short_password_422</code></li>
+<li><code>test_login_wrong_then_right</code>: wrong → 401 <code>bad_password</code>; right → 200</li>
+<li><code>test_login_rate_limited</code>: 5 wrong → 6th (even with the right password) → 429 with <code>Retry-After</code> header and <code>detail.retry_after &gt; 0</code></li>
+<li><code>test_password_change_rate_limited</code>: 5 wrong <code>current</code> → 429 with <code>Retry-After</code>; and while that IP is locked out, <code>POST /auth/setup</code> (on a reset store) also answers 429 with <code>Retry-After</code></li>
+<li><code>test_logout_clears</code>: after logout, an admin route → 401</li>
+<li><code>test_password_change_signs_out_others</code>: clients A and B both logged in; A changes the password → A's admin route OK, B's → 401</li>
+<li><code>test_env_password_presets</code> (unit-level: call the startup hook with <code>settings.admin_password="preset-pass-1"</code>) → configured, and login with it works</li>
+<li><code>test_cookie_attributes</code>: the <code>set-cookie</code> header contains <code>HttpOnly</code>, <code>SameSite=strict</code> (case-insensitive), <code>Path=/</code>, <code>Max-Age=34560000</code></li>
+<li>[ ] <strong>Step 2: Run.</strong> Expected: FAIL.</li>
+<li>[ ] <strong>Step 3: Implement</strong> <code>auth.py</code>. Pydantic bodies: <code>PasswordBody(password: str)</code>, <code>ChangePasswordBody(current: str, new: str)</code>. Return errors via <code>HTTPException(status_code, detail={"code":..., "message":...})</code>; for 429 also <code>headers={"Retry-After": str(wait)}</code>.</li>
+<li>[ ] <strong>Step 4: Run</strong> this file and the full suite. Expected: PASS.</li>
+<li>[ ] <strong>Step 5: Commit</strong> <code>feat(security): admin setup, login, logout and password change endpoints (CLV-9)</code></li>
+</ul>
+<h3 id="task-5-host-and-origin-middleware">Task 5: Host and Origin middleware<a class="headerlink" href="#task-5-host-and-origin-middleware" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Create: <code>backend/app/security/host_origin.py</code>
+- Modify: <code>backend/app/security/install.py</code> (add the middleware)
+- Test: <code>backend/tests/unit/security/test_host_origin.py</code></p>
+<p><strong>Interfaces (Produces):</strong>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_allowed_host</span><span class="p">(</span><span class="n">host_header</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">public_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">allowed_hosts</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">def</span><span class="w"> </span><span class="nf">origin_allowed</span><span class="p">(</span><span class="n">origin</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sec_fetch_site</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">host_header</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">cors_origins</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">class</span><span class="w"> </span><span class="nc">HostOriginMiddleware</span><span class="p">:</span>   <span class="c1"># pure ASGI (no BaseHTTPMiddleware), so SSE/streaming is untouched</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">app</span><span class="p">:</span> <span class="n">ASGIApp</span><span class="p">):</span> <span class="o">...</span>  <span class="c1"># reads settings at call time, so tests can monkeypatch</span>
+</span></code></pre></div>
+Rules (spec §5):
+- Host: strip the port; <code>[v6]</code> brackets → IP literal. Allowed: any IP literal (<code>ipaddress.ip_address</code>), <code>localhost</code>, <code>*.localhost</code>, single-label names (no dot), suffixes <code>.local .lan .home .home.arpa .internal .localdomain</code>, the hostname of <code>settings.public_url</code>, and entries in <code>settings.allowed_hosts</code> (comma list, case-insensitive; <code>*</code> → allow all). A missing Host header is allowed (HTTP/1.0 clients on the LAN). Applies to every HTTP request, not only <code>/api</code>. Rejection: 400 text/plain <code>"Calvin refused this request: the host name '&lt;host&gt;' is not allowed. If you reach Calvin through a domain name, add it to CALVIN_ALLOWED_HOSTS or set PUBLIC_URL."</code>
+- Origin: only for unsafe methods on paths starting with <code>/api</code>. If <code>settings.cors_allow_all</code>, skip. If Origin is present: its <code>host[:port]</code> (from <code>urlsplit</code>, with default ports made explicit on both sides: http 80, https 443) must equal the Host header's <code>host[:port]</code>, OR the origin must be in <code>cors_origins</code>. Scheme is ignored. Origin <code>null</code> is rejected. If Origin is absent: reject only if <code>Sec-Fetch-Site == "cross-site"</code>. Rejection: 403 JSON <code>cross_origin</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests</strong> (pure functions plus a tiny Starlette app with the middleware for the ASGI path):</li>
+<li>Hosts allowed: <code>"192.0.2.10:8000"</code>, <code>"[fe80::1]:8000"</code>, <code>"[::1]"</code>, <code>"localhost:5173"</code>, <code>"app.localhost"</code>, <code>"calvin"</code>, <code>"raspberrypi:8000"</code>, <code>"calvin.local"</code>, <code>"pi.home.arpa"</code>, <code>"x.lan"</code>, <code>"testserver"</code>, the host of <code>public_url="https://dash.example.com"</code>, and <code>"foo.example.org"</code> with <code>allowed_hosts="foo.example.org"</code>; anything with <code>allowed_hosts="*"</code></li>
+<li>Hosts rejected: <code>"evil.example"</code>, <code>"calvin.local.evil.example"</code>, <code>"1.2.3.4.nip.io"</code></li>
+<li>Origin allowed: same host:port (<code>http://192.0.2.10:8080</code> vs Host <code>192.0.2.10:8080</code>); <code>https://dash.example.com</code> vs Host <code>dash.example.com</code> (default ports); <code>http://localhost:5173</code> with that value in <code>cors_origins</code>; no Origin and no Sec-Fetch-Site (curl)</li>
+<li>Origin rejected: <code>http://evil.example</code> vs Host <code>192.0.2.10:8000</code>; Origin <code>null</code>; no Origin + <code>Sec-Fetch-Site: cross-site</code></li>
+<li>ASGI: a GET with Host <code>evil.example</code> → 400 plain text containing <code>CALVIN_ALLOWED_HOSTS</code>; a POST <code>/api/x</code> with a foreign Origin → 403; the same POST to a non-<code>/api</code> path → passes the Origin check</li>
+<li>[ ] <strong>Step 2: Run.</strong> Expected: FAIL.</li>
+<li>[ ] <strong>Step 3: Implement</strong> and add to <code>install_security</code>.</li>
+<li>[ ] <strong>Step 4: Run</strong> this file and the full suite (TestClient uses Host <code>testserver</code> and sends no Origin, so existing tests must still pass).</li>
+<li>[ ] <strong>Step 5: Commit</strong> <code>feat(security): reject foreign Host and cross-site Origin (CLV-9)</code></li>
+</ul>
+<h3 id="task-6-kiosk-path-stays-open-regression-guard">Task 6: Kiosk path stays open (regression guard)<a class="headerlink" href="#task-6-kiosk-path-stays-open-regression-guard" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Test: <code>backend/tests/integration/test_kiosk_no_session.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write tests</strong> (<code>no_admin_login</code>): with no cookie and the store unconfigured, <code>GET /api/kiosks/&lt;new-id&gt;/config</code> (registers on first poll), the kiosk manifest route, <code>GET /api/kiosks/install.sh</code> and the agent-file routes all answer 2xx. Find the exact paths in <code>backend/app/api/routes/kiosks.py</code>. <code>PUT /api/kiosks/{id}/overrides</code> → 401.</li>
+<li>[ ] <strong>Step 2: Run.</strong> Expected: PASS if Tasks 3–5 are correct. If one fails, fix the policy, not the test.</li>
+<li>[ ] <strong>Step 3: Update</strong> <code>scripts/seed_test_calendar.py</code>: read <code>CALVIN_ADMIN_PASSWORD</code>, <code>POST /api/auth/login</code> first, and reuse the cookie (<code>requests.Session</code> or <code>httpx.Client</code>). Print a clear message if the variable is unset.</li>
+<li>[ ] <strong>Step 4: Commit</strong> <code>test(security): kiosk endpoints stay public without a session (CLV-9)</code></li>
+</ul>
+<h3 id="task-7-docs-and-unraid-template">Task 7: Docs and Unraid template<a class="headerlink" href="#task-7-docs-and-unraid-template" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Create: <code>docs/configuration/ADMIN_AUTH.md</code>: first run, <code>CALVIN_ADMIN_PASSWORD</code>, forgotten password (delete <code>admin-auth.json</code> or set the env var, then restart), <code>CALVIN_ALLOWED_HOSTS</code> and <code>PUBLIC_URL</code>, a table of what is public, viewer-write and admin (from <code>route_policy.py</code>), and the limits (plain HTTP on the LAN; anyone on the LAN can still change display state).
+- Modify: the kiosk provisioning doc's "Trust model" section (find it with <code>grep -rl "Trust model" docs</code>): signing is implemented; the signing key and backups now need the admin password; residuals: unsigned kiosks trust the LAN, and the server process still holds the HMAC key until Ed25519 lands.
+- Modify: <code>deploy/unraid/calvin.xml</code>: two optional <code>Type="Variable"</code> entries. <code>CALVIN_ADMIN_PASSWORD</code> uses <code>Display="always" Mask="true"</code>; <code>CALVIN_ALLOWED_HOSTS</code> uses <code>Display="advanced"</code>. Write descriptions in the style of the existing <code>PUBLIC_URL</code> entry.
+- Modify: <code>mkdocs.yml</code> nav to include <code>configuration/ADMIN_AUTH.md</code>.
+- Beads: <code>bd create --title "Ed25519 release-signed kiosk manifests" --description "&lt;spec §7 summary&gt;"</code>, then close calvin-580 as superseded: <code>bd close calvin-580 --reason "superseded by &lt;new id&gt; (CLV-9 design §7)"</code>.</p>
+<ul>
+<li>[ ] <strong>Step 1: Write</strong> the docs and template entries.</li>
+<li>[ ] <strong>Step 2: Verify</strong> <code>uvx --with mkdocs-material mkdocs build --strict</code> passes (or the repo's mkdocs requirements) and <code>xmllint --noout deploy/unraid/calvin.xml</code> passes.</li>
+<li>[ ] <strong>Step 3: Commit</strong> <code>docs(security): admin auth guide, trust model, Unraid fields (CLV-9)</code>. Then push and open <strong>PR 1</strong> to <code>develop</code>.</li>
+</ul>
+<h3 id="task-8-pr-2-after-clv-13-merges-plugin-check-in-a-subprocess">Task 8 (PR 2, after CLV-13 merges): plugin check in a subprocess<a class="headerlink" href="#task-8-pr-2-after-clv-13-merges-plugin-check-in-a-subprocess" title="Permanent link">&para;</a></h3>
+<p><strong>Files:</strong>
+- Create: <code>backend/app/plugins/check_plugin.py</code>: <code>python -I -m app.plugins.check_plugin &lt;plugin_dir&gt;</code>. It imports <code>plugin.py</code> the same way the loader does for installed plugins (same module name <code>installed_plugin_{id}</code>, same <code>register_module</code> + metadata validation), prints exactly one JSON line <code>{"errors": [...], "type_ids": [...]}</code> and exits 0. It catches <code>SystemExit</code> and <code>BaseException</code> from the plugin and reports them as errors. No DB init.
+- Create: <code>backend/app/plugins/isolated_check.py</code> with <code>def run_isolated_plugin_check(plugin_id: str, timeout: float = 60.0) -&gt; list[str]</code>. It runs the child with <code>sys.executable</code>, cwd = the backend dir, and a minimal env (<code>PATH</code>, <code>HOME</code>, <code>CALVIN_DATA_DIR</code>, <code>PLUGIN_DIR</code>, <code>PYTHONPATH</code> = backend dir), all via <code>asyncio.to_thread</code>-safe <code>subprocess.run</code>. Non-zero exit, timeout, unparseable output or a non-empty <code>errors</code> list → returns the error strings.
+- Modify: the three install paths (<code>management.py</code> install, both installs in <code>github.py</code>). Insert the check after <code>plugin_installer.install_plugin(...)</code> and BEFORE <code>plugin_loader.load_installed_plugins()</code>. On errors: <code>plugin_installer.uninstall_plugin(installed_id)</code> (it already rolls back pip via <code>_installed_packages</code>) → 400 with the errors. Keep <code>_validate_just_installed_plugin</code> after the in-process load as a second guard.
+- Test: <code>backend/tests/integration/test_plugin_install_isolated.py</code></p>
+<ul>
+<li>[ ] <strong>Step 1: Write failing tests:</strong></li>
+<li><code>test_bad_plugin_never_imported_in_server</code>: a zip whose <code>plugin.py</code> writes a marker file at import and then declares invalid metadata → 400. The marker file WAS written (by the child), but <code>"installed_plugin_&lt;id&gt;" not in sys.modules</code> in the test process, and the plugin dir is gone.</li>
+<li><code>test_plugin_calling_sys_exit</code> → 400 with an error mentioning SystemExit; the server is still up</li>
+<li><code>test_hanging_plugin_times_out</code> (<code>timeout=2</code>, <code>plugin.py</code> does <code>time.sleep(10)</code>) → 400 timeout error</li>
+<li><code>test_good_plugin_still_installs</code> → 200, and it appears in the plugin list</li>
+<li>[ ] <strong>Step 2: Run.</strong> Expected: FAIL.</li>
+<li>[ ] <strong>Step 3: Implement.</strong></li>
+<li>[ ] <strong>Step 4: Run</strong> the full backend suite and gates.</li>
+<li>[ ] <strong>Step 5: Commit</strong> <code>feat(plugins): validate uploaded plugins in a child process before loading (CLV-9)</code>. Open <strong>PR 2</strong> to <code>develop</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

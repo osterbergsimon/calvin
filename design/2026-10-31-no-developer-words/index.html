@@ -1,0 +1,2487 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/design/2026-10-31-no-developer-words/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>No developer words in the UI (CLV-63) - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#no-developer-words-in-the-ui-clv-63" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              No developer words in the UI (CLV-63)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-raw-errors-fix-once-everywhere" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Raw errors (fix once, everywhere)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-string-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. String table
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. String table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#system-updates-componentssettingstabssystemupdatestabvue-updatesourcerowsvue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System › Updates (components/settings/tabs/system/UpdatesTab.vue, UpdateSourceRows.vue)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-messages-composablesusesystemjs-shown-as-system-toasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System messages (composables/useSystem.js, shown as "System" toasts)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#system-restart-versions-categoriesmaintenancesettingsvue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        System › Restart &amp; versions (categories/MaintenanceSettings.vue)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard-wall-screen" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Dashboard (wall screen)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#screens-categoriesscreenssettingsvue-sharedkioskstatusheadervue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Screens (categories/ScreensSettings.vue, shared/KioskStatusHeader.vue)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#plugins-categoriespluginscategoryvue-specializedplugininstallervue-pluginmanagervue-orderingmanagervue-plugininstancesvue-composablesusepluginsjs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Plugins (categories/PluginsCategory.vue, specialized/PluginInstaller.vue, PluginManager.vue, OrderingManager.vue, PluginInstances.vue, composables/usePlugins.js)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#content-and-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Content and Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-lock-setup-empty-states" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Lock / setup, empty states
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-guard-vitest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Guard (vitest)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="no-developer-words-in-the-ui-clv-63">No developer words in the UI (CLV-63)<a class="headerlink" href="#no-developer-words-in-the-ui-clv-63" title="Permanent link">&para;</a></h1>
+<p>Status: spec (release prep, epic calvin-354a). Frontend copy only, plus one small helper. Rules from
+<a href="../2026-10-30-settings-copy-audit/">2026-10-30-settings-copy-audit.md</a> §5:
+- say <strong>screen</strong>, <strong>page</strong>, <strong>source</strong>, <strong>plugin</strong>, <strong>Calvin</strong> (for the server);
+- never "backend", "frontend", "API", "instance", "config", "branch", "schema", "Healthy";
+- no raw error text on the dashboard.</p>
+<p>Paths are under <code>frontend/src/</code>. "→ remove" means delete the element. Build after CLV-64 (theme tokens).</p>
+<h2 id="1-raw-errors-fix-once-everywhere">1. Raw errors (fix once, everywhere)<a class="headerlink" href="#1-raw-errors-fix-once-everywhere" title="Permanent link">&para;</a></h2>
+<p>Today raw <code>err.message</code> / <code>response.data.detail</code> reaches the screen. On the wall that means "Network Error" or
+"Request failed with status code 500". Where: <code>stores/images.js</code>, <code>calendar.js</code>, <code>webServices.js</code>, <code>config.js</code>,
+<code>keyboard.js</code> (<code>error.value = err.message</code>), shown in <code>PhotoSlideshow.vue:23</code>; also <code>WebComponentHost.vue:56</code>,
+<code>ClockBarItemsTab.vue:110</code>, <code>SecuritySettings.vue:105/145</code>, <code>useConfigForm.js:241</code>.</p>
+<p><strong>New helper</strong> <code>utils/friendlyError.js</code>: <code>friendlyError(err, action)</code> → one sentence:</p>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th>Text</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>no response (network)</td>
+<td><strong>Couldn't reach Calvin. Check that it's running and on the same network.</strong></td>
+</tr>
+<tr>
+<td>401/403</td>
+<td><strong>You need to sign in as admin to {action}.</strong></td>
+</tr>
+<tr>
+<td>404</td>
+<td><strong>That's no longer there. Reload and try again.</strong></td>
+</tr>
+<tr>
+<td>409</td>
+<td><strong>That conflicts with an existing one.</strong> (callers may pass a specific line)</td>
+</tr>
+<tr>
+<td>422/400 with a string <code>detail</code> written for people (backend validation messages)</td>
+<td>that <code>detail</code></td>
+</tr>
+<tr>
+<td>5xx / anything else</td>
+<td><strong>Something went wrong on the Calvin server while trying to {action}.</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Stores keep the raw error for logs (<code>logError</code>) and expose <code>errorText</code> from <code>friendlyError</code>.</li>
+<li><strong>On the dashboard, no error text at all</strong>: offline/stale states use the CLV-20 empty states and the
+  <code>ConnectionStatus</code> pill (#172). Remove <code>PhotoSlideshow.vue:23-24</code> (<code>{{ imagesStore.error }}</code>).</li>
+<li>In Settings, a raw detail may appear only behind a <strong>Details</strong> disclosure (<code>--fs-xs</code>, <code>--font-data</code>, <code>--ink-3</code>)
+  under the friendly line. Same for <code>UpdatesTab.vue:69, 117</code>.</li>
+</ul>
+<h2 id="2-string-table">2. String table<a class="headerlink" href="#2-string-table" title="Permanent link">&para;</a></h2>
+<h3 id="system-updates-componentssettingstabssystemupdatestabvue-updatesourcerowsvue">System › Updates (<code>components/settings/tabs/system/UpdatesTab.vue</code>, <code>UpdateSourceRows.vue</code>)<a class="headerlink" href="#system-updates-componentssettingstabssystemupdatestabvue-updatesourcerowsvue" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Status row description</td>
+<td>Live backend and updater state.</td>
+<td><strong>Whether Calvin is running and if an update is under way.</strong></td>
+</tr>
+<tr>
+<td>Status row label</td>
+<td Healthy_="Healthy/…">Backend API ·</td>
+<td><strong>Calvin</strong> · <strong>Running</strong> / <strong>Not responding</strong> / <strong>Checking…</strong></td>
+</tr>
+<tr>
+<td>Status row label</td>
+<td raw="raw" status="status">Update state ·</td>
+<td><strong>Updates</strong> · <strong>Up to date</strong> / <strong>Updating</strong> / <strong>Update failed</strong> / <strong>Not checked yet</strong> (map statuses; never print the raw value)</td>
+</tr>
+<tr>
+<td>Status row</td>
+<td>{formatPhase(phase)} (title-cased raw phase)</td>
+<td>phases map: pulling → <strong>Downloading</strong>, deps/installing → <strong>Installing</strong>, building → <strong>Preparing the screens</strong>, restarting → <strong>Restarting</strong>; unknown → hide</td>
+</tr>
+<tr>
+<td>Status fallback</td>
+<td>Unknown</td>
+<td><strong>Not checked yet</strong></td>
+</tr>
+<tr>
+<td>Install updates description</td>
+<td>Pull and apply the latest version from the selected branch.</td>
+<td><strong>Download and install the latest Calvin.</strong></td>
+</tr>
+<tr>
+<td>Docker "How to update"</td>
+<td>Calvin runs in a Docker container, so it is updated from the host by pulling a new image.</td>
+<td><strong>Calvin runs in Docker, so you update it there: pull the new image and restart the container.</strong> (keep the command block; it's for the person running Docker)</td>
+</tr>
+<tr>
+<td>Advanced › Repository</td>
+<td>Repository / GitHub repository to pull updates from. / aria Git repository URL</td>
+<td><strong>Update source</strong> / <strong>Where Calvin downloads updates from. Leave as is unless you run your own copy.</strong> / aria <strong>Update source address</strong></td>
+</tr>
+<tr>
+<td>Advanced › Branch</td>
+<td>Branch / Which branch to track. / aria Git branch</td>
+<td><strong>Release channel</strong> / <strong>Which line of updates to follow.</strong> / aria <strong>Release channel</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="system-messages-composablesusesystemjs-shown-as-system-toasts">System messages (<code>composables/useSystem.js</code>, shown as "System" toasts)<a class="headerlink" href="#system-messages-composablesusesystemjs-shown-as-system-toasts" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Line</th>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>143</td>
+<td>Restarting backend…</td>
+<td><strong>Restarting Calvin…</strong></td>
+</tr>
+<tr>
+<td>151</td>
+<td>Failed to restart backend (+detail)</td>
+<td><code>friendlyError(err, "restart Calvin")</code></td>
+</tr>
+<tr>
+<td>159</td>
+<td>Backend restarting — waiting for it to come back…</td>
+<td><strong>Calvin is restarting. This takes about 15 seconds.</strong></td>
+</tr>
+<tr>
+<td>164</td>
+<td>Backend restarted successfully! Reloading…</td>
+<td><strong>Calvin is back. Reloading…</strong></td>
+</tr>
+<tr>
+<td>169</td>
+<td>Backend not responding after restart. Check the service manually.</td>
+<td><strong>Calvin hasn't come back yet. If it stays down, restart the machine it runs on.</strong></td>
+</tr>
+<tr>
+<td>177/190</td>
+<td>Restarting frontend… / Frontend restarting — waiting…</td>
+<td><strong>Restarting this screen…</strong></td>
+</tr>
+<tr>
+<td>183</td>
+<td>Failed to restart frontend</td>
+<td><code>friendlyError(err, "restart this screen")</code></td>
+</tr>
+<tr>
+<td>195</td>
+<td>Frontend restarted successfully! Reloading…</td>
+<td><strong>Reloading…</strong></td>
+</tr>
+<tr>
+<td>200</td>
+<td>Frontend not responding after restart. Check the service manually.</td>
+<td><strong>This screen hasn't come back. Turn it off and on again.</strong></td>
+</tr>
+<tr>
+<td>225</td>
+<td>Pulling latest code...</td>
+<td><strong>Downloading the update…</strong></td>
+</tr>
+<tr>
+<td>227</td>
+<td>Updating dependencies...</td>
+<td><strong>Installing…</strong></td>
+</tr>
+<tr>
+<td>232</td>
+<td>Building frontend... (this may take a few minutes)</td>
+<td><strong>Preparing the screens. This can take a few minutes.</strong></td>
+</tr>
+<tr>
+<td>234</td>
+<td>Restarting services...</td>
+<td><strong>Restarting Calvin…</strong></td>
+</tr>
+<tr>
+<td>278</td>
+<td>Update started...</td>
+<td><strong>Update started.</strong></td>
+</tr>
+<tr>
+<td>289</td>
+<td>Update complete. Waiting for backend to come back…</td>
+<td><strong>Update installed. Waiting for Calvin to restart…</strong></td>
+</tr>
+<tr>
+<td>293</td>
+<td>Update completed successfully!</td>
+<td><strong>Calvin is up to date.</strong></td>
+</tr>
+<tr>
+<td>297</td>
+<td>Update completed, but backend is not responding yet. Please wait or check logs.</td>
+<td><strong>Update installed, but Calvin hasn't restarted yet. Give it a minute.</strong></td>
+</tr>
+<tr>
+<td>301</td>
+<td _Check="&quot;Check" details._="details.&quot;" for="for" logs="logs" message="message" or="or">Update failed:</td>
+<td><strong>The update didn't finish. Calvin is still on the previous version.</strong> (+ Details in System)</td>
+</tr>
+<tr>
+<td>305</td>
+<td>Update is taking longer than expected. Please check logs or try again later.</td>
+<td><strong>The update is taking longer than usual. Leave it running and check back later.</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="system-restart-versions-categoriesmaintenancesettingsvue">System › Restart &amp; versions (<code>categories/MaintenanceSettings.vue</code>)<a class="headerlink" href="#system-restart-versions-categoriesmaintenancesettingsvue" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Restart kiosk browser / Restarts the browser on this Pi's screen. The server keeps running.</td>
+<td><strong>Restart this screen</strong> / <strong>Reloads this screen's browser. Calvin keeps running.</strong></td>
+</tr>
+<tr>
+<td>To restart the server, restart the Calvin container from Docker (Unraid: Docker tab).</td>
+<td><strong>To restart Calvin, restart its container in Docker (on Unraid: the Docker tab).</strong></td>
+</tr>
+<tr>
+<td>Version · Unknown</td>
+<td><strong>Version · Not available</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="dashboard-wall-screen">Dashboard (wall screen)<a class="headerlink" href="#dashboard-wall-screen" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>service/ServiceViewer.vue:23-24</code></td>
+<td>This service can't be shown. / Its plugin doesn't declare a display schema — update the plugin.</td>
+<td><strong>This can't be shown here.</strong> / <strong>Its plugin needs an update.</strong></td>
+</tr>
+<tr>
+<td><code>plugins/WebComponentHost.vue:4</code></td>
+<td error="error" raw="raw">Couldn't load this plugin's display.</td>
+<td><strong>Couldn't show {plugin name}.</strong> (no raw text; log it)</td>
+</tr>
+<tr>
+<td><code>plugins/WebComponentHost.vue:42</code></td>
+<td>throw "schema.element missing"</td>
+<td>keep as the log message only; never rendered</td>
+</tr>
+<tr>
+<td><code>PhotoSlideshow.vue:23-24</code></td>
+<td>{imagesStore.error}</td>
+<td>→ remove (§1)</td>
+</tr>
+<tr>
+<td><code>NotificationSystem.vue:194</code></td>
+<td>action label fallback "Unknown"</td>
+<td><strong>Button pressed</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="screens-categoriesscreenssettingsvue-sharedkioskstatusheadervue">Screens (<code>categories/ScreensSettings.vue</code>, <code>shared/KioskStatusHeader.vue</code>)<a class="headerlink" href="#screens-categoriesscreenssettingsvue-sharedkioskstatusheadervue" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hardware config · Not yet reported</td>
+<td><strong>Display settings · Not confirmed yet</strong></td>
+</tr>
+<tr>
+<td>Hardware config · Pending (applies shortly)</td>
+<td><strong>Display settings · Applying…</strong></td>
+</tr>
+<tr>
+<td>Hardware config · Pending — applies when this kiosk reconnects</td>
+<td><strong>Display settings · Applies when this screen comes back online</strong></td>
+</tr>
+<tr>
+<td>Hardware config ✓ Applied</td>
+<td><strong>Display settings ✓ Applied</strong></td>
+</tr>
+<tr>
+<td>title: Offline — this screen hasn't applied the current hardware config yet / aria <code>{id}: offline, hardware config not yet applied</code></td>
+<td><strong>Offline. It will apply the new display settings when it's back.</strong> / aria <strong>{name}: offline, display settings waiting</strong></td>
+</tr>
+<tr>
+<td>toast: Couldn't start the update on {id}.</td>
+<td><strong>Couldn't start the update on {name}.</strong> (name, not id)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="plugins-categoriespluginscategoryvue-specializedplugininstallervue-pluginmanagervue-orderingmanagervue-plugininstancesvue-composablesusepluginsjs">Plugins (<code>categories/PluginsCategory.vue</code>, <code>specialized/PluginInstaller.vue</code>, <code>PluginManager.vue</code>, <code>OrderingManager.vue</code>, <code>PluginInstances.vue</code>, <code>composables/usePlugins.js</code>)<a class="headerlink" href="#plugins-categoriespluginscategoryvue-specializedplugininstallervue-pluginmanagervue-orderingmanagervue-plugininstancesvue-composablesusepluginsjs" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Only install plugins from sources you trust. A malicious pip package can execute arbitrary code on your server.</td>
+<td><strong>Only install plugins from people you trust. A plugin runs on your Calvin server and can do anything Calvin can.</strong></td>
+</tr>
+<tr>
+<td>Enter a GitHub repository URL and click "List plugins" to see available plugins and themes.</td>
+<td><strong>Paste a GitHub address and choose List plugins.</strong></td>
+</tr>
+<tr>
+<td>Using branch</td>
+<td><strong>Version:</strong> (the field shows the branch value; label only)</td>
+</tr>
+<tr>
+<td>ℹ️ Branch switched from 'main' to 'master' (main branch not found)</td>
+<td>→ remove (an internal fallback, not news)</td>
+</tr>
+<tr>
+<td>Install directly from a local cloned repository. Enter an absolute path to the repo root.</td>
+<td>(dev mode only) <strong>For plugin developers: install from a folder on the Calvin server.</strong></td>
+</tr>
+<tr>
+<td>Themes install just like plugins — list a repository above, then install any theme that appears. Built-in themes (…) are always available.</td>
+<td><strong>Themes are plugins too: install them here, then choose one in Dashboard › Appearance.</strong></td>
+</tr>
+<tr>
+<td>Plugin installed — reload this page if it does not appear.</td>
+<td><strong>Plugin installed.</strong> (the list refreshes; if it really can't, the lane fixes the refresh rather than the copy)</td>
+</tr>
+<tr>
+<td><code>{n} instance(s)</code> / No instances configured</td>
+<td><strong>{n} source(s)</strong> / <strong>No sources yet</strong></td>
+</tr>
+<tr>
+<td>Running / Stopped (status title)</td>
+<td><strong>Working</strong> / <strong>Off</strong></td>
+</tr>
+<tr>
+<td><code>usePlugins.js:53</code> type label "Backend"</td>
+<td><strong>Background</strong> (matches the content &amp; plugins spec §3.4)</td>
+</tr>
+<tr>
+<td><code>usePlugins.js:657</code> Configuration saved successfully</td>
+<td><strong>Saved.</strong></td>
+</tr>
+<tr>
+<td><code>PluginActions.vue:12</code> title <code>Custom action: {id}</code></td>
+<td>the action's <code>label</code>, else → remove the title</td>
+</tr>
+<tr>
+<td><code>ClockBarItemsTab.vue:110</code> Failed to update {name}: {err.message}</td>
+<td><strong>Couldn't change {name}. Try again.</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="content-and-security">Content and Security<a class="headerlink" href="#content-and-security" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Where</th>
+<th>Now</th>
+<th>New</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SecuritySettings.vue:105</code></td>
+<td>{detail} or Failed to save sealed mode.</td>
+<td><code>friendlyError(err, "change sealed mode")</code></td>
+</tr>
+<tr>
+<td><code>SecuritySettings.vue:145</code></td>
+<td>{detail} or Failed to save.</td>
+<td><code>friendlyError(err, "save the allowed sites")</code></td>
+</tr>
+<tr>
+<td><code>useConfigForm.js:241</code></td>
+<td>{detail} or {err.message} or Failed to save configuration</td>
+<td><code>friendlyError(err, "save your settings")</code></td>
+</tr>
+<tr>
+<td><code>settingsRegistry.js:307</code></td>
+<td>Power, display schedule, and timeout</td>
+<td><strong>Screen on/off schedule and idle</strong></td>
+</tr>
+</tbody>
+</table>
+<p>"API keys" stays: it's what scripts and Home Assistant call it, and that section is for people setting those up.</p>
+<h2 id="3-lock-setup-empty-states">3. Lock / setup, empty states<a class="headerlink" href="#3-lock-setup-empty-states" title="Permanent link">&para;</a></h2>
+<p>Checked (CLV-9, CLV-20, CLV-21, CLV-27 copy): no developer words. No changes.</p>
+<h2 id="4-guard-vitest">4. Guard (vitest)<a class="headerlink" href="#4-guard-vitest" title="Permanent link">&para;</a></h2>
+<p><code>tests/unit/copy/noDevWords.spec.js</code> scans template text and the <code>label|description|title|placeholder|aria-label|
+message</code> strings in <code>components/**</code> and <code>composables/useSystem.js</code> for
+<code>/\b(backend|frontend|api(?! key)|instance|schema|payload|endpoint|branch|repository|healthy|config(?!m))\b/i</code>.
+- Allowlist: the Docker command block, dev-mode-only Local path copy, <code>dev/</code>.
+- Plus: no <code>{{ *.error }}</code> / <code>err.message</code> interpolation in dashboard components (<code>components/*.vue</code> outside
+  <code>settings/</code>).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

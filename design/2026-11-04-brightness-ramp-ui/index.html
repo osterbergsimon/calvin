@@ -1,0 +1,2664 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/design/2026-11-04-brightness-ramp-ui/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Brightness ramp and display check: UI - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#brightness-ramp-and-display-check-ui" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Brightness ramp and display check: UI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-where-it-lives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Where it lives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-the-brightness-group-fig-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. The Brightness group (fig. 1)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. The Brightness group (fig. 1)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#unavailable-and-transient-states-figs-2-2b" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unavailable and transient states (figs. 2, 2b)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-display-check-figs-36-calibration-v3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The display check (figs. 3–6; calibration v3)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The display check (figs. 3–6; calibration v3)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-the-rules-the-check-follows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 The rules the check follows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-states-copy-and-the-primary-action" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 States, copy and the primary action
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-fallback-this-panel-doesnt-report-its-own-buttons" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Fallback: this panel doesn't report its own buttons
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.4 Summary
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-power-trouble-during-a-level-calvin-tzzx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.5 Power trouble during a level (calvin-tzzx)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-stop-calvin-qkm8-and-an-unfinished-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.6 Stop (calvin-qkm8) and an unfinished run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-rules-for-the-whole-dialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.7 Rules for the whole dialog
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#38-needs-from-backendagent-lane-a" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.8 Needs from backend/agent (lane A)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-words" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Words
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-accessibility-and-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Accessibility and input
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-design-lead-calls-the-owner-can-overturn-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Design-lead calls (the owner can overturn them)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-tests-the-build-should-have-vitest" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Tests the build should have (vitest)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="brightness-ramp-and-display-check-ui">Brightness ramp and display check: UI<a class="headerlink" href="#brightness-ramp-and-display-check-ui" title="Permanent link">&para;</a></h1>
+<p><strong>Date:</strong> 2026-11-04 · <strong>Bead:</strong> calvin-29ws · <strong>Status:</strong> design, for build
+<strong>v3 (2026-11-07, calvin-idts / calvin-qkm8 / calvin-mvtv):</strong> §3 rewritten: the owner sets the panel with its own
+buttons and Calvin reads. §2 gains a lowest-brightness line and <strong>Clear calibration</strong>.
+<strong>v2 (2026-11-06, calvin-c805 / calvin-u8yn):</strong> §3 calibration and power-trouble states rewritten after the first real
+Pi 3B+ run; §3.7 lists what the backend and agent need.
+<strong>Functional spec:</strong> <a href="../../superpowers/specs/2026-11-04-kiosk-brightness-ramp-design/">../superpowers/specs/2026-11-04-kiosk-brightness-ramp-design.md</a>.
+It is the source of truth for behaviour, including the owner's answers in its section 6. This document covers only
+what people see and do.
+<strong>Mocks:</strong> <a href="../mocks/brightness-ramp/brightness.html">mocks/brightness-ramp/brightness.html</a>, with a capture at
+<a href="../mocks/brightness-ramp/png/board.png">mocks/brightness-ramp/png/board.png</a>. The figure numbers below refer to it.
+<strong>Scope rules:</strong> <a href="../2026-11-03-settings-scope/">settings scope</a>. These are per-screen values with no household
+default except "ramp off".</p>
+<h2 id="1-where-it-lives">1. Where it lives<a class="headerlink" href="#1-where-it-lives" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Screens › {screen} › Power</strong>, in a <strong>Brightness</strong> group under <strong>Screen now</strong> (fig. 1). These settings are about the
+  screen's power, and they act at the same moments as the schedule and Screen now.</li>
+<li><strong>Screens › Default › Power</strong> has no Brightness rows. It shows one line in their place: "Brightness is set on each
+  screen." These settings have no household value apart from the ramp being off, so there is nothing to edit there
+  (settings scope §2 rule 1).</li>
+<li><strong>This browser</strong> has nothing. A plain browser has no display agent (functional spec §3).</li>
+<li><strong>The display check</strong> opens as a dialog from the group's <strong>Check this display…</strong> button. The same dialog works on a
+  desktop, on a phone (it becomes full-screen) and on the kiosk panel itself.</li>
+<li><strong>Search keywords:</strong> "brightness", "dim", "ramp", "DDC", "display check", "under-voltage", "brown out", "power
+  supply", "wake". All of them open the Kitchen page's Power section, or the screen list when no screen is selected.</li>
+</ul>
+<h2 id="2-the-brightness-group-fig-1">2. The Brightness group (fig. 1)<a class="headerlink" href="#2-the-brightness-group-fig-1" title="Permanent link">&para;</a></h2>
+<p>Rows, in order:</p>
+<ol>
+<li><strong>Ramp brightness at sleep and wake</strong> (toggle). Description: "Dims before the screen turns off and brightens
+   slowly after it wakes. Use it when the screen's power supply struggles as it wakes."</li>
+<li><strong>Brightness</strong>, shown only while the ramp is on. A slider with the current value shown large.</li>
+<li><strong>When a menu match exists</strong>, the value and the track are on the screen's own menu scale: "61 on the screen's
+     menu", with "Calvin value 19 · estimated" in small text. The track runs from the menu value of DDC 0 to the
+     menu value of the limit.</li>
+<li><strong>Without a menu match</strong>, the slider is on Calvin's scale (DDC 0–100): "19 (Calvin's scale)", with a link,
+     "Match it to the panel's own menu", that opens the display check.</li>
+<li><strong>The highest value you can pick</strong> is the limit. The range between that and the limit is drawn
+     hatched and can't be reached, with the limit marked and labelled. The note under the slider says "You can go up
+     to 67 on the screen's menu (Calvin 22). Above that is too close to the limit the display check found on 4 Nov."
+     When no limit has been found, there is no hatch, and the note says "No limit found yet. Run the display check to
+     set one" (a link that opens it).</li>
+<li><strong>Moving the slider applies now</strong> (owner answer 1). The note changes to "Changing… 61 → 67 on the screen's menu,
+     2 at a time" until the agent reports it is done. While the screen is asleep, it says "Applies when Kitchen wakes".
+     Save the value when the knob is released, not while it is dragged, so a drag never queues a series of ramps.</li>
+<li><strong>The first time the ramp is turned on</strong>, the brightness starts at the lower of "the limit" and DDC 20.
+     It never starts above the limit.</li>
+<li><strong>Last wake.</strong> The result of the latest ramp, from the agent's report:</li>
+<li>"Today 06:30 · brightened to 19 in 22 s · no power trouble" (normal text);</li>
+<li>"Today 06:30 · stopped at 20: under-voltage · tries again at the next wake" (amber), when a ramp hit a fault;</li>
+<li><strong>History</strong> opens a short list of the last 20 ramps and checks, newest first: the time, what triggered it, the
+     result and the level reached.</li>
+<li><strong>Display check.</strong> One line summarising the latest check: "Answers brightness commands · changes take effect · menu
+   match from 3 readings · limit 26 (4 Nov)". The button is <strong>Check this display…</strong>. Before any check has run, the line
+   says "Not checked yet".</li>
+<li><strong>Lowest.</strong> A second line shows the floor the check found: "Lowest: Panel 10 (Calvin 2)", the lowest Calvin dims
+     to, including the dim sleep. It shows only while a floor is saved.</li>
+<li><strong>Clear calibration</strong> sits next to the limit's note and replaces the old "Clear limit". It clears the readings,
+     the limit and the floor together (<code>brightnessConversion</code>, <code>brightnessLimit</code>, <code>brightnessFloor</code>). The brightness
+     keeps its value, and the slider falls back to Calvin's scale.</li>
+<li><strong>Ramp speed.</strong> "2 every 1.5 s · the pace that worked on this screen", with <strong>Change</strong>. Change reveals two steppers:
+   step size (1–5) and interval (1–5 s). It also shows a warning: "Bigger steps are what reset the touch screen. Keep
+   the default unless the check says otherwise." This row is shown only while the ramp is on.</li>
+</ol>
+<p><strong>No <code>ScopeLine</code> on these rows.</strong> They are per screen only, with no Default to reset to. The section's <strong>Reset
+everything to default</strong> turns the ramp off and keeps the check results.</p>
+<h3 id="unavailable-and-transient-states-figs-2-2b">Unavailable and transient states (figs. 2, 2b)<a class="headerlink" href="#unavailable-and-transient-states-figs-2-2b" title="Permanent link">&para;</a></h3>
+<p><strong>When the ramp isn't available, the toggle row stays in place and says why</strong>, with the one action that fixes it:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Row text</th>
+<th>Action</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Never checked</td>
+<td>"Calvin checks the display first. It takes about 10 s."</td>
+<td>Turning it on opens the check at step 1, and the ramp starts once step 2 passes</td>
+</tr>
+<tr>
+<td>No DDC</td>
+<td>"Not available: this screen doesn't answer brightness commands (DDC/CI). Checked 4 Nov." Hint: adapter or cable, or DDC/CI off in the screen's menu</td>
+<td><strong>Check again</strong></td>
+</tr>
+<tr>
+<td>Writes don't take effect</td>
+<td>"Not available: brightness commands reach the screen but don't change it. Checked 4 Nov."</td>
+<td><strong>Check again</strong></td>
+</tr>
+<tr>
+<td>Not cog</td>
+<td>"Needs the Calvin kiosk display (cog). Hallway uses X11."</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Agent too old</td>
+<td>"Needs a newer kiosk agent on Hallway (1.4 → 1.6)."</td>
+<td><strong>Update kiosk software</strong>, which goes to the screen's Software section</td>
+</tr>
+<tr>
+<td>Offline</td>
+<td>The rows stay editable. The page header already says the screen is offline; the Brightness note says "Applies when Kitchen is back"</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>In every unavailable state the toggle is disabled. The exception is Never checked, where turning it on is how the
+check starts.</p>
+<p><strong>Power trouble found</strong> (§3.3) is not an unavailable state: the ramp is the software help for it, so the toggle stays
+on offer. The Display check row shows "Power trouble at Calvin 12 (6 Nov) · How to fix the power" in amber until a
+clean check clears it.</p>
+<p>Live states:</p>
+<ul>
+<li><strong>Turn off now with the ramp on</strong> (owner answer 3). The Screen now note reads "Dimming… then off · about 15 s". The
+  time is estimated from the current level and the step. <strong>Turn on now</strong> during the dim cancels it and brightens back
+  from where it is. At a schedule boundary the same note appears, starting at the boundary.</li>
+<li><strong>Ramp turned off while the screen sleeps</strong> (owner answer 4). The toggle row's description becomes "Kitchen is asleep
+  at its lowest brightness. At its next wake it brightens to 61 once, carefully, then Calvin stops changing its
+  brightness." After that wake it goes back to the normal off description.</li>
+</ul>
+<h2 id="3-the-display-check-figs-36-calibration-v3">3. The display check (figs. 3–6; calibration v3)<a class="headerlink" href="#3-the-display-check-figs-36-calibration-v3" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>v3, 2026-11-07 (calvin-idts, calvin-qkm8, calvin-mvtv).</strong> Rewrites §3 after the second real run on the Pi 3B+.
+v2 wrote brightness values to the panel to find a menu match, and its limit climb browned the panel out.
+<strong>v3 changes who does the work.</strong> The owner sets the panel with its own buttons and Calvin only <em>reads</em>.
+- The "does it change?" test (v2 step 2), the two-reading menu match (v2 step 3) and the limit climb (v2 step 4)
+  are gone. The climb is removed from the UI entirely; Calvin never brightens during a check.
+- The run has three readings: the <strong>highest</strong> level that works, an <strong>everyday</strong> level, and the <strong>lowest</strong>.
+- Only <strong>Save</strong> changes anything. A run that doesn't finish keeps the previous calibration.
+- The last v2 text stays in git history (<code>docs/design/</code> at <code>b5827671</code>), and the mocks' figs. 3–6 are historical.</p>
+</blockquote>
+<p>It is a dialog titled <strong>Check the {screen} display</strong>. The strip shows four steps:</p>
+<ul>
+<li><strong>1 Find the display</strong></li>
+<li><strong>2 Highest level</strong></li>
+<li><strong>3 Everyday level</strong></li>
+<li><strong>4 Lowest level</strong></li>
+</ul>
+<p>Then a summary, which is not a numbered step. The three levels are always all taken, even when the first reading
+matches what was typed.</p>
+<h3 id="31-the-rules-the-check-follows">3.1 The rules the check follows<a class="headerlink" href="#31-the-rules-the-check-follows" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Calvin only reads.</strong> In steps 2–4 it asks the panel what it reports, never writes a level. The one exception is
+   the fallback (§3.4), and it only writes low (5, then 1).</li>
+<li><strong>The words are "the panel's own menu".</strong> Never put the screen's name in this copy ({screen} names the kiosk in
+   the title and in status lines only). A screen named "calvin" must not read as "Calvin's menu" (calvin-mvtv).
+   Where a number is shown in two scales it reads <strong>Panel 60 · Calvin 20</strong>: the panel's number first, because that is
+   what the person just typed.</li>
+<li><strong>Every state has one primary action and a status line.</strong> The status line sits directly above the primary
+   button. Busy states have a spinner and no primary button. The footer's <strong>Stop the check</strong> stays throughout.
+   There are two exceptions: the number field in a step counts as part of its primary (field + button on one row), and
+   <strong>Same as highest</strong> in step 3 is a secondary text button.</li>
+<li><strong>Nothing is saved until Save.</strong> Readings live in the dialog. The old calibration is replaced only by <strong>Save</strong>,
+   and only with this run's three levels (<code>brightnessConversion</code> is <em>replaced</em>, not added to).</li>
+<li><strong>Power trouble is surfaced, never retried</strong> (§3.5). It never ends the whole check.</li>
+<li><strong>Stop always answers at once</strong> (§3.6, calvin-qkm8).</li>
+</ol>
+<h3 id="32-states-copy-and-the-primary-action">3.2 States, copy and the primary action<a class="headerlink" href="#32-states-copy-and-the-primary-action" title="Permanent link">&para;</a></h3>
+<p><strong>Before step 1: waiting for the screen (calvin-elko).</strong> The agent only picks a check up on its next config poll
+(up to about a minute), so the dialog first shows "Waiting for the screen to pick up the check. It checks in about
+once a minute." with no countdown and Stop available. The power check below starts when the agent's first report for
+this run arrives (arrival time in the browser, not the screen's clock).</p>
+<p><strong>Before step 1: power check (preflight).</strong> Unchanged from v2 apart from when it starts: it writes nothing, and
+shows "Checking the power before changing anything · 7 s" (no screen name), counting 10 s from the first report. Trouble at idle shows the v2 "has power trouble
+already" state with <strong>How to fix the power</strong> as the primary and <strong>Check again</strong> / <strong>Close</strong> as secondaries.</p>
+<p><strong>Step 1: Find the display</strong> (detect)</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Status line</th>
+<th>Body</th>
+<th>Primary</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Asking</td>
+<td>"Step 1 of 4 · Asking {screen}'s screen…"</td>
+<td>—</td>
+<td>— (busy)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Found</td>
+<td>"Step 1 of 4 · Found the display"</td>
+<td>"Found NOMAD TOUCH · DDC/CI 2.1 · HDMI-A-1." "Next you'll set the panel's brightness with its own buttons, three times, and Calvin will read what it reports. Calvin won't change the brightness."</td>
+<td><strong>Next</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>No DDC</td>
+<td>"Check ended · no brightness control"</td>
+<td>The No DDC text from §2</td>
+<td><strong>Close</strong></td>
+<td><strong>Try again</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Steps 2–4: a level is read.</strong> All three steps share one layout; only the question changes.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Heading</th>
+<th>Body</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2</td>
+<td>Highest level</td>
+<td>"Use the panel's own buttons to set Brightness to the highest level that works: its max, or the highest without flicker or the screen cutting out."</td>
+</tr>
+<tr>
+<td>3</td>
+<td>Everyday level</td>
+<td>"Now set Brightness to a comfortable level for everyday use. It can be the same as the highest."</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Lowest level</td>
+<td>"Now set Brightness to the lowest level you'd use, the lowest that is still readable."</td>
+</tr>
+</tbody>
+</table>
+<p>Below the body: "Type the Brightness the panel's own menu shows." and a number field (<code>inputmode="numeric"</code>, 6 ch wide).</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Status line</th>
+<th>Primary</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Waiting for a number</td>
+<td>"Step 2 of 4 · Highest level · type what the panel's menu shows"</td>
+<td><strong>Read it</strong> (disabled until the field holds 0–100)</td>
+<td>Step 3 only: <strong>Same as highest</strong> (fills the field with the highest level and reads at once)</td>
+</tr>
+<tr>
+<td>Reading</td>
+<td>"Step 2 of 4 · Reading…"</td>
+<td>— (busy)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Read</td>
+<td>"Step 2 of 4 · Highest level · Panel 60 · Calvin 20"</td>
+<td><strong>Next</strong> (step 4: <strong>See the summary</strong>)</td>
+<td><strong>Read it again</strong> (text link)</td>
+</tr>
+</tbody>
+</table>
+<p>Notes:
+- <strong>The pair is the result.</strong> After the read the body shows it large, in tabular figures: "Panel 60 · Calvin 20". The
+  number field is hidden so nothing looks editable but <strong>Read it again</strong>.
+- <strong>A level can't be higher than the one before.</strong> The field refuses a number above the previous level ("The
+  everyday level can't be higher than the highest, 60"). It fits the owner's order and keeps the saved floor ≤
+  brightness ≤ limit.
+- <strong>Same scale.</strong> After step 4, when all three Calvin values equal the typed numbers, the summary says "Calvin and the
+  panel use the same scale." Nothing else changes.
+- <strong>The first read is not special.</strong> Even when the typed number equals the DDC value, the user does steps 3 and 4.</p>
+<h3 id="33-fallback-this-panel-doesnt-report-its-own-buttons">3.3 Fallback: this panel doesn't report its own buttons<a class="headerlink" href="#33-fallback-this-panel-doesnt-report-its-own-buttons" title="Permanent link">&para;</a></h3>
+<p>After step 4 Calvin checks whether the DDC value followed the buttons. It didn't when <strong>all three reads are equal</strong>, or
+when <strong>a read equals the agent's <code>lastWrite</code> while the typed number differs from it</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Status line</th>
+<th>Body</th>
+<th>Primary</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Explaining</td>
+<td>"This panel doesn't report its own buttons"</td>
+<td>"Its brightness reading didn't change when you changed it with the buttons. Calvin can still match the panel's menu: it will set the brightness low, twice, and ask what the menu shows each time. It won't go above 5."</td>
+<td><strong>Set 5 and ask</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Setting 5 / 1</td>
+<td>"Low level 1 of 2 · Setting Calvin 5…"</td>
+<td>—</td>
+<td>— (busy)</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Question 5</td>
+<td>"Low level 1 of 2 · Calvin 5 · type what the panel's menu shows"</td>
+<td>"Type the Brightness the panel's own menu shows now." <code>[ number ]</code></td>
+<td><strong>Save reading</strong></td>
+<td>—</td>
+</tr>
+<tr>
+<td>Set 1</td>
+<td>"Low level 2 of 2 · Setting Calvin 1…" (busy) then the same question for Calvin 1</td>
+<td></td>
+<td><strong>Save reading</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>Then the summary. The typed highest, everyday and lowest levels are converted with the line fitted through the two low
+readings, and <strong>the highest rounds down</strong> (never up). The summary labels the line <strong>approximate</strong>, because the fit
+rests on two low points and may be off near the top by a few menu units. If the two typed numbers are equal the fit
+is impossible, and the check says "The panel showed the same Brightness at 5 and at 1, so Calvin can't match it. Nothing was
+changed." with <strong>Done</strong> and <strong>Try again</strong>.</p>
+<p>What is saved in the fallback is the two low pairs as <code>brightnessConversion</code> (they are what the line is made of),
+plus the three converted values.</p>
+<h3 id="34-summary">3.4 Summary<a class="headerlink" href="#34-summary" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Status line</th>
+<th>Body</th>
+<th>Primary</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>"Check finished · not saved yet"</td>
+<td>Three rows: <strong>Highest</strong> Panel 60 · Calvin 20; <strong>Everyday</strong> Panel 40 · Calvin 12; <strong>Lowest</strong> Panel 10 · Calvin 2. Then one line saying what Save does: "Saving sets the limit to Calvin 20, the everyday brightness to 12 and the lowest to 2, and replaces the earlier readings." "Calvin never goes above 20." The same-scale or approximate note when it applies. A checkbox, ticked by default: "Use these levels when the screen wakes and starts" (Save then also turns the ramp on, in the same save; unticked, the ramp setting is left alone).</td>
+<td><strong>Save</strong></td>
+<td><strong>Try again</strong></td>
+</tr>
+<tr>
+<td>"Saved"</td>
+<td>"Saved. Brightness can go from Panel 10 to Panel 60." "Calvin never goes above 20." "Calvin is bringing the screen back to your everyday level." (the agent does the ramp; the checkbox is gone)</td>
+<td><strong>Done</strong></td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Not saved yet, until it is.</strong> The summary's lead reads "Not saved yet" until Save succeeds. <strong>Save</strong> waits for the
+  write to land: the button shows a spinner, and "Saved" appears only after the server accepted it. On failure the
+  dialog shows the error ("Couldn't save to the server. Check the connection and try again.") and keeps the three
+  readings, so <strong>Save</strong> can be tapped again.</li>
+<li><strong>Order check.</strong> Each read must be no higher (in Calvin values) than the one before: highest ≥ everyday ≥ lowest.
+  If it is higher, the panel's reading probably lags the menu by a step. The step says "That reading looks behind"
+  and offers <strong>Read it again</strong> as the primary action instead of <strong>Next</strong>.</li>
+<li><strong>One write.</strong> Save sends a single PATCH of overrides:
+  <code>brightnessConversion</code> = this run's pairs, <code>brightnessLimit</code> = the highest Calvin value, <code>brightness</code> = the everyday
+  Calvin value, <code>brightnessFloor</code> = the lowest Calvin value, and <code>brightnessRampEnabled: true</code> when "Use these levels when the screen wakes and starts" is ticked.</li>
+<li><strong>The limit is the ceiling itself.</strong> There is no margin under it any more: the highest reading is already one step
+  below where the panel cut out (§3.5), so the summary says "Calvin never goes above {highest Calvin value}." The
+  everyday level is never above the highest (the order check in §3.2 already enforces this).</li>
+</ul>
+<h3 id="35-power-trouble-during-a-level-calvin-tzzx">3.5 Power trouble during a level (calvin-tzzx)<a class="headerlink" href="#35-power-trouble-during-a-level-calvin-tzzx" title="Permanent link">&para;</a></h3>
+<p>After a power drop in step 2–4 the dialog shows <strong>only</strong> this, in place of the step's normal text, with no red banner
+(the banner used to name Calvin's dim level as the fault level and said the check had ended while the dialog went on):</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Status line</th>
+<th>Body</th>
+<th>Primary</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>After a drop</td>
+<td>"Step 2 of 4 · Highest level · type what the panel's menu shows"</td>
+<td>"The power dropped. Calvin dimmed the screen to keep it safe." / "Use the panel's buttons to set Brightness one step below where it cut out. Then type the number its menu shows now." and the number field</td>
+<td><strong>Read it</strong></td>
+<td><strong>Back</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>That reading is the level's reading.</strong> The typed panel number and a real Calvin read at <strong>Read it</strong> are stored as
+  the reading for the step; nothing is computed, estimated or excluded. After a drop on the <strong>highest</strong> step the check
+  goes <strong>straight to the Everyday step</strong> (no reading screen, no re-asking the highest). A drop on step 3 or 4 shows
+  the normal reading screen for that level.</li>
+<li><strong>No delay for the dim.</strong> Calvin dims at once; it never waits to read a value during the brownout.</li>
+<li><strong>Works whether or not the agent ends the run.</strong> If it ended, <strong>Read it</strong> starts a new session; if it kept it open,
+  the read moves that run on. A read that was waiting when the drop came is dropped (it can't be answered).</li>
+<li><strong>Nothing from the faulted level is kept</strong> other than the new reading. Only Save writes.</li>
+<li><strong>The limit step never raises the brightness</strong>, so there is no "save the fault level as the limit" offer.</li>
+</ul>
+<p><strong>Back and Remove.</strong> Every step 2–4 has <strong>Back</strong> (text button, last secondary). It leaves the step, drops its reading
+and the previous step's, and returns to the previous step so that one is taken again (from step 2 it returns to
+"Found the display"). The summary lists each reading with <strong>Remove</strong>; Remove takes that one step again, keeps the
+other readings, and returns to the summary after the retake. Remove is gone once the readings are saved; nothing is
+saved until <strong>Save</strong>.</p>
+<h3 id="36-stop-calvin-qkm8-and-an-unfinished-run">3.6 Stop (calvin-qkm8) and an unfinished run<a class="headerlink" href="#36-stop-calvin-qkm8-and-an-unfinished-run" title="Permanent link">&para;</a></h3>
+<p><strong>Stop the check</strong> (footer, ≥ 48 px high) has a <strong>visible pressed state at once</strong>, on <code>pointerdown</code>, before the
+request returns: the button darkens, shows a spinner and reads "Stopping…" (<code>aria-pressed="true"</code>). Then, in <strong>every
+step</strong> until the agent reports the run finished:</p>
+<ul>
+<li><strong>Status line:</strong> "Stopping, bringing brightness down". It is busy, with no primary button.</li>
+<li><strong>Repeated taps are safe.</strong> Each tap sends Stop again; the dialog shows no error and keeps the same text.</li>
+<li><strong>Touch may drop during a fault.</strong> The agent ends the run on its own at the first fault, so Stop is a backstop.</li>
+</ul>
+<p><strong>The stopped / ended view says exactly what was kept.</strong> It replaces v2's "Check stopped" + "Try again" only:</p>
+<table>
+<thead>
+<tr>
+<th>Ending</th>
+<th>Status line</th>
+<th>Body</th>
+<th>Primary</th>
+<th>Secondary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Stopped</td>
+<td>"Check stopped"</td>
+<td>"Nothing changed; the previous calibration is still in place." (With no earlier calibration: "Nothing changed; no calibration is saved yet.")</td>
+<td><strong>Done</strong></td>
+<td><strong>Try again</strong></td>
+</tr>
+<tr>
+<td>Timed out, restarted, error</td>
+<td>"Check ended"</td>
+<td>The reason, then the same "Nothing changed…" line</td>
+<td><strong>Done</strong></td>
+<td><strong>Try again</strong></td>
+</tr>
+<tr>
+<td>No DDC / no control</td>
+<td>as §3.2</td>
+<td></td>
+<td><strong>Close</strong></td>
+<td><strong>Try again</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Nothing is saved from an unfinished run.</p>
+<h3 id="37-rules-for-the-whole-dialog">3.7 Rules for the whole dialog<a class="headerlink" href="#37-rules-for-the-whole-dialog" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>No fine print about turning the screen off.</strong> The dialog does not say that "Turn off now" or a schedule off waits
+  until the check ends (up to 10 min). If that needs saying, it goes in the Screen now and schedule controls while a
+  check runs, not here.</li>
+<li><strong>Watching another device.</strong> When the watched run ends, the read-only view gives way to an ended state
+  ("The check on the other device ended"), with <strong>Done</strong> and <strong>Try again</strong>. A reloaded browser recognises its own
+  run again (the run ids it started are kept in the tab's session storage).</li>
+<li><strong>Fallback levels never dead-end.</strong> The two low writes are min(5, the run's ceiling, the start level) and then
+  min(1, …), at least 1.</li>
+<li><strong>Closing the dialog, or Stop the check, ends the run.</strong> Closing before Save keeps the previous calibration. The
+  agent returns the screen to where it was.</li>
+<li><strong>Footer</strong>, <strong>one check per screen</strong>, <strong>asleep</strong>, <strong>admin</strong>: unchanged from v2 (§3.5 there). A read-only dialog (a
+  run from another device) keeps Stop.</li>
+<li><strong>Phone layout</strong> is unchanged from v2: full-screen, sticky bar with the status line then the primary at full width,
+  secondaries under it as text buttons, and Stop the check at the bar's top right. The number field and <strong>Read it</strong>
+  share one row. The strip uses short labels below 480 px: "1 Display · 2 Highest · 3 Everyday · 4 Lowest".</li>
+</ul>
+<h3 id="38-needs-from-backendagent-lane-a">3.8 Needs from backend/agent (lane A)<a class="headerlink" href="#38-needs-from-backendagent-lane-a" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Step <strong><code>read</code></strong> returns <code>{level, lastWrite}</code>: <code>level</code> is the DDC reading; <code>lastWrite</code> is the last value the agent
+  wrote, or <code>null</code>. It writes nothing.</li>
+<li>Every step request carries a per-run <strong><code>seq</code></strong> that the agent echoes in its result, so the dialog matches each
+  read to the request it sent (three reads in a row each resolve).</li>
+<li>Step <strong><code>limit</code></strong> is removed. A run has <code>detect</code>, <code>read</code>, <code>conversion</code> (the fallback, low only) and <code>write</code> is no longer asked for.</li>
+<li>A per-screen key <strong><code>brightnessFloor</code></strong> (0–100, no higher than <code>brightnessLimit</code>).</li>
+<li>The agent ends a run itself on the first fault and reports <code>fault</code> as in v2.</li>
+<li><code>value_above_ceiling</code> etc. for the fallback stay as they are.</li>
+</ul>
+<h2 id="4-words">4. Words<a class="headerlink" href="#4-words" title="Permanent link">&para;</a></h2>
+<p>Use these words everywhere: <strong>Ramp brightness at sleep and wake</strong>, <strong>Brightness</strong>, <strong>Display check</strong> / <strong>Check this
+display…</strong>, <strong>menu match</strong>, <strong>safe limit</strong> / <strong>limit</strong>, <strong>Changing…</strong>, <strong>Dimming… then off</strong>, <strong>Applies when {screen}
+wakes</strong>, <strong>Last wake</strong>.</p>
+<p>Users see "Calvin value", never "DDC" (the only exception is the No DDC message, which names DDC/CI because the
+screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-out". The log says "under-voltage",
+"over-current" and "touch controller reset", because those are what the owner will search for.</p>
+<h2 id="5-accessibility-and-input">5. Accessibility and input<a class="headerlink" href="#5-accessibility-and-input" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The slider</strong> is a native range input. It has an accessible value text ("61 on the screen's menu, Calvin value 19")
+  and steps by one menu unit (or one Calvin unit) with the arrow keys. It commits on release or on key-up.</li>
+<li><strong>Live progress</strong> in steps 2 and 4, the status line (§3.1 rule 5) and the Changing… notes go in a polite live
+  region. A power-trouble banner is announced once with <code>role="alert"</code>. Log lines are not announced
+  one by one; only the result is.</li>
+<li><strong>Touch targets are at least 44 px</strong>, which matters on the 3B+ panel and on phones. <strong>Stop now</strong> is at least 48 px
+  high.</li>
+<li><strong>The number field in step 3</strong> uses <code>inputmode="numeric"</code>, so on the kiosk the on-screen keyboard opens with the
+  number layout.</li>
+</ul>
+<h2 id="6-design-lead-calls-the-owner-can-overturn-them">6. Design-lead calls (the owner can overturn them)<a class="headerlink" href="#6-design-lead-calls-the-owner-can-overturn-them" title="Permanent link">&para;</a></h2>
+<ul>
+<li>The Brightness group sits in Power, not in Display.</li>
+<li>There are no Brightness rows on Default; one line explains why.</li>
+<li>The first-time brightness is the lower of "the limit" and DDC 20.</li>
+<li>Calibration (steps 1–3) never brightens above the start level (owner, v2). Step 2 dims from the start and back.
+  Step 3 reads at the start and start − 4; a third point near limit − 2 × step only once a limit is known.</li>
+<li>v2: the unknown-start menu question is asked in step 1, before the dim (§3.2).</li>
+<li>v2: a calibration fault offers its last good level as the limit, as the primary action (§3.3).</li>
+<li>The check can't run while the screen is asleep.</li>
+<li>If a check is already running, the dialog opens read-only, with Stop still available.</li>
+<li>History keeps the last 20 entries.</li>
+<li>Ramp speed sits behind Change, with a warning.</li>
+</ul>
+<h2 id="7-tests-the-build-should-have-vitest">7. Tests the build should have (vitest)<a class="headerlink" href="#7-tests-the-build-should-have-vitest" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>The Brightness rows</strong> appear only while the ramp is on.</li>
+<li><strong>Every unavailable state</strong> shows its text and action, and its toggle is disabled (Never checked opens the check).</li>
+<li><strong>The slider:</strong></li>
+<li>menu scale with a menu match, Calvin scale without one;</li>
+<li>it can't go past the limit;</li>
+<li>it saves once on release, not during the drag;</li>
+<li>it shows "Changing…" until the agent reports, and "Applies when Kitchen wakes" while the screen is asleep.</li>
+<li><strong>Screen now</strong> shows "Dimming… then off" while the ramp is on.</li>
+<li><strong>Ramp off while asleep</strong> shows the one-last-step-up note.</li>
+<li><strong>The dialog:</strong></li>
+<li>a preflight fault shows the trouble-at-idle state and starts nothing; Check again is manual;</li>
+<li>step 1 failing ends the run;</li>
+<li>known start: step 2 and step 3 never ask for a value above the start; unknown start: the floor is used and the
+    menu-at-start question appears in step 1;</li>
+<li>step 2 "No" ends in the writes-don't-take-effect state;</li>
+<li>every state renders exactly one primary button and a status line (busy states: none, Stop in the footer);</li>
+<li>step 3: reading 1 at the start, then "Dim to {start − 4}"; Next only after two; fit marked approximate; the third
+    reading only when a limit is known; an off-line third reading asks to type it again;</li>
+<li>a fault report in steps 1–3 shows the banner, then the ended-by-power-trouble state with Save {faultLimit} as the
+    primary; settling faults join the same incident;</li>
+<li>step 4's Start is replaced on the panel itself;</li>
+<li>Stop is always visible while the test runs;</li>
+<li>closing the dialog ends the run;</li>
+<li>a second device sees the read-only view.</li>
+<li><strong>Screens › Default</strong> shows the one-line note and no rows.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

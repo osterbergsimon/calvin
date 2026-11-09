@@ -1,0 +1,2688 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/setup/KIOSK_PROVISIONING/">
+      
+      
+        <link rel="prev" href="../KIOSK_INSTALL/">
+      
+      
+        <link rel="next" href="../KIOSK_POWER/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Zero-touch kiosk provisioning - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#zero-touch-kiosk-provisioning" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Zero-touch kiosk provisioning
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you need
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-flash-a-clean-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Flash a CLEAN image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-bake-the-first-boot-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Bake the first-boot bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-boot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Boot
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#after-provisioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After provisioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kiosk-agent-self-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kiosk agent self-update
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kiosk agent self-update">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bundle-source-local-calvin-server-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bundle source: local Calvin server only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updating-the-updater-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating the updater itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-units-and-removed-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New units and removed components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interrupted-updates-self-heal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interrupted updates self-heal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trust-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trust model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifest-signing-closing-the-lan-mitm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest signing (closing the LAN-MITM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-version-floor-min_python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python version floor (min_python)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initial-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-option-zipapp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future option: zipapp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-all-kiosks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Update all" kiosks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-you-need" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What you need
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-flash-a-clean-image" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1 — Flash a CLEAN image
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-bake-the-first-boot-bundle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2 — Bake the first-boot bundle
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-boot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3 — Boot
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#after-provisioning" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After provisioning
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#kiosk-agent-self-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Kiosk agent self-update
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Kiosk agent self-update">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#how-it-works" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How it works
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bundle-source-local-calvin-server-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bundle source: local Calvin server only
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#updating-the-updater-itself" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Updating the updater itself
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#new-units-and-removed-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        New units and removed components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#interrupted-updates-self-heal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Interrupted updates self-heal
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#trust-model" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Trust model
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#manifest-signing-closing-the-lan-mitm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest signing (closing the LAN-MITM)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#python-version-floor-min_python" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python version floor (min_python)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#initial-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Initial install
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#future-option-zipapp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Future option: zipapp
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#update-all-kiosks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Update all" kiosks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="zero-touch-kiosk-provisioning">Zero-touch kiosk provisioning<a class="headerlink" href="#zero-touch-kiosk-provisioning" title="Permanent link">&para;</a></h1>
+<p>Prepare a Raspberry Pi card once so a non-technical person can plug in
+power and reach a running Calvin kiosk — no SSH, no typing on the Pi.</p>
+<p>This is for <strong>Mode B</strong> (remote backend + kiosk Pi). See
+<a href="../DEPLOYMENT_TOPOLOGIES/">DEPLOYMENT_TOPOLOGIES.md</a>. For the short version
+(including the one-command install over SSH), start with
+<a href="../KIOSK_INSTALL/">KIOSK_INSTALL.md</a>.</p>
+<h2 id="what-you-need">What you need<a class="headerlink" href="#what-you-need" title="Permanent link">&para;</a></h2>
+<ul>
+<li>A Raspberry Pi and an SD card / SSD.</li>
+<li>Raspberry Pi Imager.</li>
+<li>The Calvin repo checked out on your workstation (Linux/macOS) at the release
+  your server runs — a <code>vX.Y.Z</code> tag; <code>develop</code> is fine to test the next one.
+  Only the bake script and the installer it embeds come from this checkout. The
+  Pi gets everything else from your Calvin server, never from GitHub.</li>
+<li>Your backend URL, e.g. <code>http://homeserver.local:8000</code>.</li>
+<li>Recommended: the server's signing key (see
+  <a href="../KIOSK_INSTALL/#step-0-get-the-signing-key-from-the-server-recommended">KIOSK_INSTALL.md</a>).</li>
+</ul>
+<h2 id="step-1-flash-a-clean-image">Step 1 — Flash a CLEAN image<a class="headerlink" href="#step-1-flash-a-clean-image" title="Permanent link">&para;</a></h2>
+<p>In Raspberry Pi Imager, choose <strong>Raspberry Pi OS Lite (64-bit)</strong> and flash.</p>
+<blockquote>
+<p><strong>Important:</strong> Do <strong>not</strong> use Imager's OS-customization (the gear /
+"Edit settings"). Calvin's bake step writes its own first-boot hook, and
+Imager's customization writes a competing one. Flash a clean image.</p>
+</blockquote>
+<h2 id="step-2-bake-the-first-boot-bundle">Step 2 — Bake the first-boot bundle<a class="headerlink" href="#step-2-bake-the-first-boot-bundle" title="Permanent link">&para;</a></h2>
+<p>Re-insert the flashed card; the boot partition auto-mounts (often
+<code>/media/$USER/bootfs</code>). From the repo root:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>sudo<span class="w"> </span>bash<span class="w"> </span>scripts/bake-kiosk-firstrun.sh<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span>--backend-url<span class="w"> </span>http://homeserver.local:8000<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span>--hostname<span class="w"> </span>kitchen<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">  </span>--wifi-ssid<span class="w"> </span>HomeNet<span class="w"> </span>--wifi-psk<span class="w"> </span><span class="s1">&#39;s3cret&#39;</span><span class="w"> </span>--wifi-country<span class="w"> </span>SE<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">  </span>--ssh-pubkey<span class="w"> </span>~/.ssh/id_ed25519.pub<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">  </span>--signing-key-file<span class="w"> </span>calvin.key<span class="w"> </span><span class="se">\</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">  </span>--boot-dir<span class="w"> </span>/media/<span class="nv">$USER</span>/bootfs
+</span></code></pre></div>
+<p>Only <code>--backend-url</code> and <code>--boot-dir</code> are required. Omit <code>--wifi-*</code> if the
+Pi is on Ethernet. <code>--ssh-pubkey</code> creates a recovery admin user,
+<code>calvin-admin</code> (rename with <code>--admin-user</code>), with key-only SSH login and
+passwordless sudo; without it the kiosk has no admin login. <code>calvin</code>, which runs
+Chromium, gets no SSH key and no sudo. The old <code>--git-repo</code>/<code>--git-branch</code> flags are gone because nothing is
+fetched from GitHub any more.</p>
+<p>Eject the card.</p>
+<h2 id="step-3-boot">Step 3 — Boot<a class="headerlink" href="#step-3-boot" title="Permanent link">&para;</a></h2>
+<p>Put the card in the Pi and power on. It self-provisions unattended:</p>
+<ol>
+<li><strong>Boot 1</strong> sets hostname, wifi and SSH, creates the admin user (if a key was
+   baked), turns off the interactive first-user wizard (<code>userconfig.service</code>),
+   seeds config and the signing key,
+   installs the kiosk installer (<code>/usr/local/bin/calvin-kiosk-install.sh</code>),
+   deletes <code>firstrun.sh</code> from the boot partition (it held the wifi PSK and key),
+   and reboots.</li>
+<li><strong>Boot 2</strong> waits up to 15 minutes for the server's <code>/api/health</code>, then
+   runs the installer. The installer fetches <code>setup-kiosk.sh</code> from the server
+   (verified against the signed manifest when a key is baked), installs X,
+   openbox, Chromium and the Calvin services, and reboots.</li>
+<li><strong>Boot 3</strong> — Chromium opens the dashboard.</li>
+</ol>
+<p>First provisioning takes several minutes (package installs). Boot 2 prints its
+progress on the screen (tty1): waiting for the server, installing, or the
+error and that it will retry. Over SSH: <code>ssh calvin-admin@&lt;kiosk&gt;</code> then
+<code>journalctl -u calvin-kiosk-firstboot -f</code>.</p>
+<h2 id="after-provisioning">After provisioning<a class="headerlink" href="#after-provisioning" title="Permanent link">&para;</a></h2>
+<p>The kiosk behaves exactly like one set up by hand with <code>setup-kiosk.sh</code>:
+stable <code>CALVIN_KIOSK_ID</code>, display-power agent, rotation via
+<code>/etc/default/calvin-kiosk</code>. See the <a href="../DEPLOYMENT_TOPOLOGIES/#kiosk-identity">kiosk identity</a>
+section to rename it.</p>
+<h2 id="kiosk-agent-self-update">Kiosk agent self-update<a class="headerlink" href="#kiosk-agent-self-update" title="Permanent link">&para;</a></h2>
+<p>The kiosk's Python display-agent and its systemd units can be updated remotely
+from the Calvin admin UI — no SSH, no re-flash.</p>
+<h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
+<ol>
+<li>
+<p><strong>Admin triggers the update.</strong> In Settings → Screens, click <strong>Update</strong> next to
+   a kiosk. This sets a per-kiosk <code>agentUpdateRequested</code> flag in the backend
+   registry (<code>POST /api/kiosks/{id}/update</code>).</p>
+</li>
+<li>
+<p><strong>Agent sees the flag on its next config poll.</strong> On every successful
+   <code>GET /api/kiosks/{id}/config</code> (roughly once per minute), the display-agent
+   checks for <code>agentUpdateRequested: true</code> and a new <code>agentAvailableVersion</code>. If
+   the available version differs from its own running version
+   (<code>/var/lib/calvin/agent-version.json</code>) and hasn't already been tried this
+   session, the agent fires the root oneshot updater:</p>
+</li>
+</ol>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>sudo -n systemctl start --no-block calvin-kiosk-update.service
+</span></code></pre></div>
+<p>The sudoers fragment installed at <code>/etc/sudoers.d/calvin-kiosk-update</code>
+   (mode 0440) allows exactly this call for the <code>calvin</code> user — nothing else.</p>
+<ol>
+<li><strong>Updater fetches the bundle from the local backend.</strong> <code>update-kiosk.sh</code>
+   (installed to <code>/usr/local/bin/</code>) pulls the bundle manifest from
+   <code>GET /api/kiosks/agent/manifest</code> and downloads only changed files from
+   <code>GET /api/kiosks/agent/files/{name}</code>. The bundle source is the <strong>local
+   Calvin server</strong>, not GitHub — no internet access required on the kiosk.</li>
+</ol>
+<p>The bundle is 6 files: the display-agent script, three systemd units, the
+   updater itself, and the oneshot service unit. The updater only installs these
+   six, each at its fixed path and mode (0755 scripts, 0644 units), and only
+   restarts or enables their units; anything else in a manifest is refused. A
+   new bundle file therefore needs the updater that knows it: when a manifest
+   brings both, the old updater installs the known files and re-runs the new
+   updater for the rest. Units that should be enabled are re-enabled on every
+   run. This pinning is defence in depth only: the updater is itself a bundle
+   file and runs as root, so without a signing key a hostile server can still
+   ship its own updater. Only the manifest signature protects against that. No full repo checkout lives
+   on the kiosk.</p>
+<ol>
+<li><strong>Verify, backup, atomic swap, restart.</strong> For each changed file the updater:</li>
+<li>verifies the sha256 against the manifest value,</li>
+<li>runs <code>py_compile</code> on Python files,</li>
+<li>backs up the current file to <code>/var/lib/calvin/agent-backup/</code>,</li>
+<li>atomic-replaces via <code>install -m &lt;mode&gt;</code>,</li>
+<li>restarts only the systemd units that own the changed files (uses
+     <code>daemon-reload</code> when a unit file changed).</li>
+</ol>
+<p>Every update also (re)creates <code>/var/lib/calvin/agent/</code> owned by the agent user
+   (<code>calvin</code>); the agent keeps its display-check and DDC state there while the
+   updater files above stay root-owned. This repairs kiosks installed with a
+   root-owned state dir. The repair is made by the updater that is already
+   installed, so a kiosk updating from an agent that predates it gets the new
+   agent first and the directory on the <em>next</em> agent update; until then the
+   agent logs <code>state dir ... is not writable ... repaired on the next agent
+   update</code> once at startup. A symlinked or non-directory <code>agent</code> path is refused
+   (never chowned) and logged.</p>
+<ol>
+<li>
+<p><strong>Auto-rollback on unhealthy agent.</strong> If the display-agent was among the
+   restarted units, the updater waits up to 30 seconds for it to become both
+   <code>active</code> and to have written the ready-marker
+   (<code>/run/calvin/agent-ready</code>, a tmpfs file created on the first successful
+   backend contact). If the agent doesn't come up healthy in time, all changed
+   files are restored from backup and the affected units are restarted again.</p>
+</li>
+<li>
+<p><strong>Update flag auto-clears.</strong> On the next config poll after a successful
+   update the agent reports its new version via the <code>kagent</code> query parameter.
+   The backend auto-clears <code>agentUpdateRequested</code> once it sees
+   <code>kagent == agentAvailableVersion</code>.</p>
+</li>
+</ol>
+<h3 id="bundle-source-local-calvin-server-only">Bundle source: local Calvin server only<a class="headerlink" href="#bundle-source-local-calvin-server-only" title="Permanent link">&para;</a></h3>
+<p><code>setup-kiosk.sh</code> and <code>update-kiosk.sh</code> both pull the bundle from
+<code>${CALVIN_BACKEND_URL}/api/kiosks/agent/*</code>. The kiosk needs no internet access
+and no copy of the Calvin git repo; everything comes from the server it is
+already talking to.</p>
+<h3 id="updating-the-updater-itself">Updating the updater itself<a class="headerlink" href="#updating-the-updater-itself" title="Permanent link">&para;</a></h3>
+<p><code>update-kiosk.sh</code> is part of the bundle, so it updates itself like any other file. Before a
+new copy is adopted it is verified up front — <code>bash -n</code> for syntax and a read-only
+<code>--self-check</code> run (which fetches and parses the manifest but changes nothing). If either
+fails, the whole update aborts before anything is swapped and the current, known-good updater
+stays installed. This is what makes it safe to evolve the updater remotely: a dead-on-arrival
+updater is never installed. <code>--self-check</code> validates the new code against the <em>current</em>
+manifest and environment, so it proves the updater starts and can parse today's manifest — a
+new updater that misbehaves only mid-apply, or that expects a future manifest shape or a new
+env var, is only partially exercised. That residual gap is bounded by the durable no-retry
+guard (<code>agent-update-state.json</code>), which prevents a failing version from re-triggering in a
+loop.</p>
+<h3 id="new-units-and-removed-components">New units and removed components<a class="headerlink" href="#new-units-and-removed-components" title="Permanent link">&para;</a></h3>
+<p>The updater is authoritative over kiosk-side bundle state. When a bundle release adds a new
+always-on service (a unit marked <code>enable</code> in the manifest), the update enables and starts it
+after the agent health check passes. When a release drops a file or unit, the updater compares
+the manifest against the device receipt (<code>agent-manifest.json</code>) and, again only after the agent
+is confirmed healthy, stops + disables the unit and removes the file. Both actions happen only
+post-health, so an unhealthy update rolls back the changed agent files and reconciles nothing.</p>
+<h3 id="interrupted-updates-self-heal">Interrupted updates self-heal<a class="headerlink" href="#interrupted-updates-self-heal" title="Permanent link">&para;</a></h3>
+<p>The version file and receipt are written last, only on success. If power is lost mid-update the
+version is not advanced, so the backend still sees the old version, the update stays pending, and
+the next poll re-runs the updater; the checksum loop re-syncs any half-written file. Combined
+with the durable no-retry guard (<code>agent-update-state.json</code>), a kiosk cannot get stuck in a
+half-updated state.</p>
+<h3 id="trust-model">Trust model<a class="headerlink" href="#trust-model" title="Permanent link">&para;</a></h3>
+<p>Two controls now protect a kiosk update:</p>
+<ul>
+<li><strong>Manifest signing is implemented</strong> (see below). A kiosk with a baked key
+  verifies the signature before trusting the manifest, the file hashes or any
+  downloaded file.</li>
+<li><strong>The signing key and backups need the admin password.</strong> Kiosk signing is
+  host-side, and <code>GET /api/backup/export</code> — which can include the kiosk signing
+  key and stored plugin secrets — answers only an admin session (CLV-9, see
+  <a href="../../configuration/ADMIN_AUTH/">Admin authentication</a>). A LAN client without
+  the password can no longer download the key or a backup.</li>
+</ul>
+<p>Residuals:</p>
+<ul>
+<li><strong>Unsigned kiosks still trust the LAN.</strong> A kiosk with no key baked keeps
+  integrity-only (sha256) checks, so a LAN attacker who can MITM the backend
+  could serve matching-sha files. Bake the key to close that gap.</li>
+<li><strong>The server process holds the HMAC key</strong>, so code an admin installs (a
+  plugin) can read it. Moving to Ed25519 manifests signed at release time, where
+  the server holds only the public key, is planned (see below).</li>
+<li><strong>No anti-rollback.</strong> The bundle version is a content hash (a change marker,
+  not a monotonic counter), so a server rolled back to an older bundle will be
+  adopted.</li>
+</ul>
+<h3 id="manifest-signing-closing-the-lan-mitm">Manifest signing (closing the LAN-MITM)<a class="headerlink" href="#manifest-signing-closing-the-lan-mitm" title="Permanent link">&para;</a></h3>
+<p>The backend signs the bundle manifest with HMAC-SHA256 using a shared secret generated on first
+run at <code>&lt;data dir&gt;/kiosk-signing.key</code> (see <a href="../../configuration/DATA_DIR/">Data directory</a>; mode <code>0600</code>; the path is logged the first time it is created).
+When a kiosk has that secret baked, it verifies the manifest signature before trusting the
+manifest, the file hashes, or any downloaded file — closing the LAN man-in-the-middle gap that
+plain sha256 integrity leaves open.</p>
+<p><strong>Enable it on a kiosk (out-of-band — never over the LAN):</strong></p>
+<ol>
+<li>On the server, read the secret over your existing trusted access. The server
+   creates it at startup and logs the path (<code>Kiosk manifest signing key: …</code>):</li>
+<li>Unraid: <code>/mnt/user/appdata/calvin/kiosk-signing.key</code></li>
+<li>Docker: <code>/var/lib/calvin/kiosk-signing.key</code> in the container, which is the data volume
+     (<code>CALVIN_DATA_DIR</code>), so it survives image updates</li>
+<li>Source checkout: <code>backend/data/kiosk-signing.key</code> (or <code>$CALVIN_DATA_DIR/kiosk-signing.key</code>)</li>
+<li>Pass it to provisioning:</li>
+<li>Over SSH: copy the key <strong>and</strong> <code>install-kiosk.sh</code> from the server, then run
+     <code>sudo bash install-kiosk.sh --backend-url &lt;url&gt; --signing-key-file &lt;path&gt;</code> (exact commands in
+     <a href="../KIOSK_INSTALL/#option-a-install-over-ssh-on-a-running-pi">KIOSK_INSTALL.md</a>). Don't pass the
+     key to the <code>curl … | sudo bash</code> form: that script comes over plain HTTP.</li>
+<li>Zero-touch: <code>bake-kiosk-firstrun.sh ... --signing-key-file &lt;path&gt;</code> (or <code>--signing-key &lt;hex&gt;</code>).</li>
+<li>Manual: <code>setup-kiosk.sh --backend-url &lt;url&gt; --signing-key &lt;hex&gt;</code>.</li>
+</ol>
+<p>The key is written to a dedicated root-only file <code>/etc/default/calvin-kiosk-signing</code> (mode
+   <code>0600</code>) — never the world-readable <code>/etc/default/calvin-kiosk</code>.</p>
+<p><strong>Behavior once a key is baked (fail-closed):</strong> the updater aborts and installs nothing if the
+signature is invalid, <strong>missing</strong> (an attacker must not be able to strip it to fall back to
+LAN-trust), or uses an unknown algorithm. A kiosk with <strong>no</strong> key baked keeps the previous
+LAN-trust behavior, so signing is opt-in per kiosk — but note the backend always signs, so a
+keyed kiosk requires a backend running this version or newer.</p>
+<p><strong>Key rotation:</strong> delete <code>&lt;data dir&gt;/kiosk-signing.key</code> on the server (a new one is generated on the
+next manifest request) and re-bake / re-run <code>--signing-key</code> on each kiosk. There is no automatic
+rotation.</p>
+<p><strong>Stronger isolation (planned):</strong> the shared key means the server process — and
+therefore any installed plugin — can forge manifests. The plan is Ed25519
+manifests signed at release time in CI (private key in a GitHub Actions secret),
+with kiosks pinning the public key: the server then holds no signing key at all.
+That supersedes the earlier per-kiosk KDF idea (calvin-580); kiosk-side
+verification for the current HMAC scheme is unchanged until it lands.</p>
+<h3 id="python-version-floor-min_python">Python version floor (<code>min_python</code>)<a class="headerlink" href="#python-version-floor-min_python" title="Permanent link">&para;</a></h3>
+<p>The bundle manifest carries <code>"min_python": "3.9"</code>. The updater checks the
+kiosk's Python version before downloading anything; if the device Python is
+below 3.9 the update is aborted with a <code>python-too-old</code> status and the current
+agent is left in place. The agent reports the updater's status and message on
+its next config poll, so the backend's <code>agentUpdateStatus</code> is <code>"error"</code> and its
+<code>agentUpdateMessage</code> is <code>"device python &lt; 3.9; keeping current agent"</code> — the
+kiosk will need an OS upgrade before the agent can be updated, and the Screens
+list marks it "update needs a newer OS".</p>
+<p>The display-agent itself enforces the same floor at startup and exits
+immediately if it runs on Python older than 3.9.</p>
+<h3 id="initial-install">Initial install<a class="headerlink" href="#initial-install" title="Permanent link">&para;</a></h3>
+<p>The one-command installer (<code>deploy/kiosk-agent/install-kiosk.sh</code>, served at
+<code>/api/kiosks/install.sh</code> with the server URL baked in, and baked onto the card by
+<code>bake-kiosk-firstrun.sh</code>) downloads <code>setup-kiosk.sh</code> + <code>setup-common.sh</code> from
+<code>/api/kiosks/installer/*</code>. It checks them against the <code>installer</code> hashes in the signed
+manifest, then runs <code>setup-kiosk.sh</code>. Those hashes are signed but are not part of the
+bundle <code>version</code>, so editing a setup script never flags kiosks for an agent update.</p>
+<p><code>setup-kiosk.sh</code> calls <code>bootstrap_kiosk</code> (in <code>scripts/setup-common.sh</code>), which fetches
+<code>update-kiosk.sh</code> from the backend, verifies it against the manifest, and runs it with
+<code>--bootstrap</code>. <code>--bootstrap</code> installs the whole bundle (agent, units, updater), enables the
+boot units, and seeds both <code>/var/lib/calvin/agent-version.json</code> and the device receipt
+<code>/var/lib/calvin/agent-manifest.json</code>. It performs no restart, health check, or rollback —
+first boot has nothing running and reboots afterward. The updater is now the single install
+path; there is no separate bundle-install routine.</p>
+<h3 id="future-option-zipapp">Future option: zipapp<a class="headerlink" href="#future-option-zipapp" title="Permanent link">&para;</a></h3>
+<p>If the agent is ever split into multiple Python modules, packaging it as a
+<code>zipapp</code> <code>.pyz</code> file is a supported path — the bundle endpoint can serve any
+allowlisted file. PyInstaller and PyCrucible were rejected because they produce
+architecture-specific artifacts; the current <code>python3</code> script works on any
+Debian-family Raspberry Pi OS without recompilation.</p>
+<h3 id="update-all-kiosks">"Update all" kiosks<a class="headerlink" href="#update-all-kiosks" title="Permanent link">&para;</a></h3>
+<p>Bulk-updating all kiosks at once is not yet implemented. Each kiosk must be
+triggered individually. Bulk update is tracked as <code>calvin-3d1</code>.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Nothing happens on first boot:</strong> confirm you flashed a <em>clean</em> image
+  (no Imager customization) and that <code>cmdline.txt</code> on the card contains
+  <code>systemd.run=/boot/firmware/firstrun.sh</code>.</li>
+<li><strong>Wifi doesn't connect:</strong> check <code>--wifi-country</code> was set (regulatory
+  domain) and the PSK is correct.</li>
+<li><strong>Provisioning failed:</strong> the screen shows the last status. SSH in as the
+  admin user (if you baked a key) and read
+  <code>journalctl -u calvin-kiosk-firstboot</code>. If the server was unreachable for the
+  whole 15-minute wait, the unit fails and systemd retries it every minute
+  (<code>Restart=on-failure</code>) until the server answers. Fix, then
+  <code>sudo rm /var/lib/calvin/firstboot.done &amp;&amp; sudo systemctl start calvin-kiosk-firstboot</code>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,2414 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Documentation for Calvin - A lightweight DAKBoard alternative">
+      
+      
+        <meta name="author" content="Calvin Contributors">
+      
+      
+        <link rel="canonical" href="https://osterbergsimon.github.io/calvin/design/2026-10-31-themes-audit/">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Themes audit (CLV-76) - Calvin Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#themes-audit-clv-76" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Calvin Documentation" class="md-header__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Calvin Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Themes audit (CLV-76)
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="blue" data-md-color-accent="blue"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../setup/GETTING_STARTED/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-tabs__link">
+          
+  
+  
+  Plugins
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/REMOTE_CONFIG/" class="md-tabs__link">
+          
+  
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../integrations/MCP/" class="md-tabs__link">
+          
+  
+  
+  Integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../EVENT_SYSTEM/" class="md-tabs__link">
+          
+  
+  
+  Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../testing/BACKEND_TESTS/" class="md-tabs__link">
+          
+  
+  
+  Testing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../RELEASING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Releasing
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../CONTRIBUTING/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Contributing
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Calvin Documentation" class="md-nav__button md-logo" aria-label="Calvin Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Calvin Documentation
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/osterbergsimon/calvin" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    osterbergsimon/calvin
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/GETTING_STARTED/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started with Calvin
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/DEPLOYMENT_TOPOLOGIES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment Topologies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_SCRIPTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup Scripts Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_LINUX/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Linux Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_INSTALL/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Install a kiosk Pi: fresh SD card to Calvin on screen
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_PROVISIONING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zero-touch kiosk provisioning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/KIOSK_POWER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiosk power: fixing under-voltage with a USB touch panel
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/UNRAID/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Unraid Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_DEVELOP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Development on Windows (Develop Branch)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/QUICKSTART_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start - Windows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_WINDOWS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windows Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/SETUP_PRE_COMMIT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting Up Pre-commit Hooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../setup/POLKIT_SERVICE_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Privileged Restart Helpers
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugins
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Plugins
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_DEVELOPMENT_GUIDE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Development Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INTERFACE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Interface Reference (contract 1.0)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_INSTALLATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Installation Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Package Format Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/THEME_PACKAGE_FORMAT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Theme package format (theme_api 2)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_REPOSITORY_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Repository Setup Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_FRONTEND_COMPONENTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Display UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/PLUGIN_PERSISTENCE_AND_RESTART/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Plugin Persistence and Lifecycle
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../plugins/ADD_GOOGLE_CALENDAR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a Google Calendar Share Link
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/REMOTE_CONFIG/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Remote Settings Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/SETTINGS_SAVE_BEHAVIOR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Settings Save Behavior
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/BACKUP_RESTORE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backup and restore
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/DATA_DIR/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/ADMIN_AUTH/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Admin authentication
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Integrations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../integrations/MCP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    MCP server (AI assistants)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../EVENT_SYSTEM/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Event System Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../IMAP_LOCAL_IMAGES_RELATIONSHIP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    IMAP Plugin and Local Images Relationship
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Testing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/BACKEND_TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/TEST_COVERAGE_NEW_FEATURES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Coverage for New Features
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../testing/E2E_TEST_REPO_SETUP/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Test Repository Setup for E2E Tests
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../RELEASING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CONTRIBUTING/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-how-theming-works-today" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. How theming works today
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Findings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Findings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-light-and-dark-are-not-themes-calvin-0ue-problem-2-still-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Light and Dark are not themes (calvin-0ue problem 2, still open)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-status-colours-collide-with-the-accent-all-themes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Status colours collide with the accent (all themes)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-colours-outside-the-theme-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Colours outside the theme system
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#24-unfinished-looking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.4 Unfinished-looking
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Recommendations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-plugin-themes-eg-calvin-plugins-midnight-theme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Plugin themes (e.g. calvin-plugins midnight-theme)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-where-the-fixes-land" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Where the fixes land
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="themes-audit-clv-76">Themes audit (CLV-76)<a class="headerlink" href="#themes-audit-clv-76" title="Permanent link">&para;</a></h1>
+<p>Status: audit + decisions. <strong>Owner decisions 2026-10-31: D1 yes, D2 yes, D3 yes, D4 yes (four built-ins; plugin themes per §4).</strong>
+The fixes fold into the doctrine migration PRs (<a href="../frontend-doctrine/">frontend doctrine</a>,
+<a href="../audits/2026-10-31-frontend-audit/">frontend audit</a>). Owner decisions are marked <strong>D1–D4</strong>.</p>
+<h2 id="1-how-theming-works-today">1. How theming works today<a class="headerlink" href="#1-how-theming-works-today" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Mode</strong> (<code>themeMode</code>: Light · Dark · Follow device · On a schedule) toggles <code>.dark</code> on <code>&lt;html&gt;</code>. <code>theme.css</code>
+  holds Calvin's own palette for both.</li>
+<li><strong>Theme</strong> (<code>selectedThemeId</code>; picker shows <strong>Calvin default</strong> plus the built-ins Light, Dark, Ocean, Forest,
+  Sunset from <code>backend/data/themes/builtin.json</code>). <code>applyCustomTheme()</code> writes the theme's <code>variables</code>, plus its
+  <code>dark_mode</code> block when the mode is dark, onto <code>:root</code>.</li>
+<li>Every built-in sets the same <strong>22 semantic colours</strong> in both modes: <code>bg-0/1/2</code>, <code>ink/-2/-3</code>, <code>line</code>,
+  <code>line-soft</code>, <code>focus</code>, <code>ok</code>, <code>warn</code>, <code>err</code>, their <code>-ink</code>/<code>-text</code> pairs, and <code>shadow</code>/<code>shadow-hover</code>.</li>
+<li>Everything else is derived from those via <code>color-mix</code>: <code>--focus-glow</code>, <code>--switch-track-off</code>, <code>--tag-*</code> tints.</li>
+<li>So the role tokens (<code>--text-*</code>, <code>--gap-*</code>, <code>--radius-*</code>) are theme-independent by design. Only colour varies.</li>
+<li><strong>calvin-0ue problem 1 (themes didn't tint the shell) is resolved</strong>: all five set the surface tokens since the
+  semantic migration and CLV-64. The CLV-64 contrast test covers 5 themes × 2 modes for text pairs.</li>
+</ul>
+<h2 id="2-findings">2. Findings<a class="headerlink" href="#2-findings" title="Permanent link">&para;</a></h2>
+<h3 id="21-light-and-dark-are-not-themes-calvin-0ue-problem-2-still-open">2.1 Light and Dark are not themes (calvin-0ue problem 2, still open)<a class="headerlink" href="#21-light-and-dark-are-not-themes-calvin-0ue-problem-2-still-open" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Theme</th>
+<th>In light mode</th>
+<th>In dark mode</th>
+<th>Problem</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Light</strong></td>
+<td>identical to Calvin default</td>
+<td>identical to Calvin default's dark</td>
+<td>a duplicate of "Calvin default"</td>
+</tr>
+<tr>
+<td><strong>Dark</strong></td>
+<td><strong>dark palette</strong> while the mode says Light</td>
+<td>dark palette</td>
+<td>contradicts the "Light or dark" setting; <strong>On a schedule</strong> and <strong>Follow device</strong> silently stop working</td>
+</tr>
+</tbody>
+</table>
+<p>So the picker offers 6 entries where there are really 4 palettes (Calvin, Ocean, Forest, Sunset), and two of the
+entries fight the mode setting.</p>
+<h3 id="22-status-colours-collide-with-the-accent-all-themes">2.2 Status colours collide with the accent (all themes)<a class="headerlink" href="#22-status-colours-collide-with-the-accent-all-themes" title="Permanent link">&para;</a></h3>
+<p>Hue of <code>focus</code> (the accent) against the status colours:</p>
+<table>
+<thead>
+<tr>
+<th>Theme · mode</th>
+<th>focus</th>
+<th>warn</th>
+<th>ok</th>
+<th>err</th>
+<th>Collision</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Calvin · light</td>
+<td>33°</td>
+<td>39°</td>
+<td>153°</td>
+<td>6°</td>
+<td>warn ≈ focus (6° apart)</td>
+</tr>
+<tr>
+<td><strong>Calvin · dark</strong></td>
+<td><code>#f3b052</code></td>
+<td><strong><code>#f3b052</code></strong></td>
+<td>155°</td>
+<td>5°</td>
+<td><strong>warn is the accent colour exactly</strong></td>
+</tr>
+<tr>
+<td>Ocean · light / dark</td>
+<td>201° / 199°</td>
+<td>38° / 42°</td>
+<td>174° / 168°</td>
+<td>0° / 4°</td>
+<td>ok vs focus 27–31° apart (teal vs blue): borderline</td>
+</tr>
+<tr>
+<td>Forest · light / dark</td>
+<td>95° / 88°</td>
+<td>39° / 42°</td>
+<td>123° / 123°</td>
+<td>3° / 5°</td>
+<td>ok ≈ focus (28–35° apart, both green)</td>
+</tr>
+<tr>
+<td><strong>Sunset · light / dark</strong></td>
+<td>27° / 32°</td>
+<td>35° / 42°</td>
+<td>113° / 88°</td>
+<td>14° / 14°</td>
+<td><strong>focus, warn and err all orange-red</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Effect: a <code>warn</code> Tag ("Update"), an <code>err</code> line and a selected control look alike. That breaks the doctrine rule
+"orange = act here or selected". Contrast passes, so CLV-64 didn't catch it: this is a hue problem, not a contrast
+problem.</p>
+<h3 id="23-colours-outside-the-theme-system">2.3 Colours outside the theme system<a class="headerlink" href="#23-colours-outside-the-theme-system" title="Permanent link">&para;</a></h3>
+<p>Colour tokens with literal values that no theme sets (<code>theme.css</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Tokens</th>
+<th>Verdict</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--region-calendar #4caf50</code>, <code>--region-photos #2196f3</code>, <code>--region-service #ff9800</code> (page-editor region fills)</td>
+<td><strong>Fix.</strong> Material green/blue/orange, the same in every theme. Blue breaks the palette, orange collides with focus, and colour-coding kinds breaks the doctrine ("a category is never coloured")</td>
+</tr>
+<tr>
+<td>default calendar colour <code>#2196f3</code> in the add form</td>
+<td><strong>Fix.</strong> Material blue; ignores the theme</td>
+</tr>
+<tr>
+<td><code>--device-*</code> (editor device bezel), <code>--scrim-*</code>, <code>--on-scrim</code>, <code>--qr-surface</code>, <code>--mask-opaque</code>, <code>--on-event-ink*</code></td>
+<td>Fine: a device bezel is dark, a QR plate is white and a scrim is black in every theme</td>
+</tr>
+</tbody>
+</table>
+<h3 id="24-unfinished-looking">2.4 Unfinished-looking<a class="headerlink" href="#24-unfinished-looking" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Sunset light</strong>: everything is peach (<code>bg-0 #ffe2d0</code>, <code>bg-1 #fff1e7</code>), so cards barely separate from the page
+  (bg-0 vs bg-1 ΔL small). With §2.2 it reads as one orange wash.</li>
+<li><strong>Theme picker</strong>: a list of names with one swatch. You can't see what a theme does in your current mode, and
+  "Calvin default" vs "Light" looks like a bug.</li>
+<li>Ocean/Forest/Sunset otherwise look complete in both modes (after #197/#206: toggles, tags and buttons all derive
+  from the 22 tokens).</li>
+</ul>
+<h2 id="3-recommendations">3. Recommendations<a class="headerlink" href="#3-recommendations" title="Permanent link">&para;</a></h2>
+<p><strong>D1. Drop Light and Dark as themes</strong> (recommended). A theme is a palette family; light or dark is the mode.
+- The picker lists <strong>Calvin</strong> (renamed from "Calvin default"), <strong>Ocean</strong>, <strong>Forest</strong>, <strong>Sunset</strong>.
+- Migration on load: <code>selectedTheme: "light"</code> → <code>null</code>; <code>selectedTheme: "dark"</code> → <code>null</code> and <code>themeMode: "dark"</code>, so
+  nobody's screen changes.
+- Remove both from <code>builtin.json</code>. Plugin themes follow the same model (§4).
+- Alternative (not recommended): picking Dark sets the mode to Dark. That keeps two controls for one thing, and
+  the mode would change behind the user's back.</p>
+<p><strong>D2. Keep status hues apart from the accent</strong> (recommended). Rule for every theme, enforced by extending the CLV-64
+contrast test:
+- hue distance ≥ 25° between <code>focus</code> and each of <code>ok</code> and <code>err</code>;
+- ≥ 25° between <code>warn</code> and <code>err</code>;
+- ≥ 12° between <code>focus</code> and <code>warn</code>. Warm accents can't get further from an amber warning without it turning olive, so
+  warn is also never shown without its ⚠ icon and word.</p>
+<p>Proposed values (checked: hue Δ and ≥ 3:1 against the surface for the colour itself; the <code>-ink</code>/<code>-text</code> pairs are
+recomputed for AA by the same script CLV-64 used):</p>
+<table>
+<thead>
+<tr>
+<th>Theme · mode</th>
+<th>Change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Calvin · light</td>
+<td><code>warn</code> → <code>#b38f00</code> (48°, Δ15° from focus)</td>
+</tr>
+<tr>
+<td>Calvin · dark</td>
+<td><code>warn</code> → <code>#ffd84d</code> (47°, Δ12°; it was identical to focus)</td>
+</tr>
+<tr>
+<td>Forest · both</td>
+<td><code>ok</code> → teal-green <code>#1f8a6e</code> / <code>#5fd3b0</code> (≈ 163°, Δ69–74°)</td>
+</tr>
+<tr>
+<td>Sunset · both</td>
+<td><code>err</code> → crimson <code>#b0203f</code> / <code>#ff6b81</code> (≈ 349°, Δ40°); <code>warn</code> → <code>#9a7400</code> / <code>#ffdb4d</code> (Δ16–18°)</td>
+</tr>
+<tr>
+<td>Ocean · both</td>
+<td><code>ok</code> → <code>#2e8b57</code> / <code>#66d19e</code> (≈ 148°, Δ48–55°)</td>
+</tr>
+</tbody>
+</table>
+<p>Plus: status is never colour alone. Tags already carry the word; <code>InlineNote</code> gets the ⚠/✕/✓ icon.</p>
+<p><strong>D3. Neutral regions in the page editor</strong> (recommended). Region fills use <code>--bg-2</code> with a 1px <code>--line</code> border, an
+<code>mdi</code> kind icon and the label. The selected region uses <code>--focus</code>. Delete <code>--region-*</code>. Kinds stay recognisable by
+icon and label, in every theme.</p>
+<p><strong>D4. Theme set: keep four for 0.1.0</strong> (recommended). No new themes now. Later candidates:
+- <strong>Night</strong>: very low luminance, warm, for bedrooms and hallways at night. It would be a mode-like schedule target
+  rather than a palette.
+- <strong>High contrast</strong> (accessibility).</p>
+<p>Both are 0.2+.</p>
+<p>Also, with no decision needed:
+- <strong>Calendar colours</strong>: an <code>--event-1…8</code> palette per theme (curated so <code>--on-event-ink</code> is AA on each). New calendars
+  take the next unused one, and the colour field offers these 8 swatches first and a custom colour second. This
+  replaces the <code>#2196f3</code> default.
+- <strong>Sunset light surfaces</strong>: <code>bg-0</code> a step darker (<code>#f6d6c2</code>), so panels separate from the page (ΔL ≥ the Calvin
+  theme's).
+- <strong>Theme picker</strong>: each option shows a mini preview (page, panel, a primary button, a tag) in the <em>current</em> mode,
+  plus "Light and dark" under the name. It lives with Appearance in the Dashboard category migration PR.</p>
+<h2 id="4-plugin-themes-eg-calvin-plugins-midnight-theme">4. Plugin themes (e.g. calvin-plugins <code>midnight-theme</code>)<a class="headerlink" href="#4-plugin-themes-eg-calvin-plugins-midnight-theme" title="Permanent link">&para;</a></h2>
+<p><strong>Today:</strong> <code>validate_theme_variables</code> accepts any object, and <code>applyCustomTheme()</code> writes every key verbatim as
+<code>--&lt;key&gt;</code> on <code>:root</code>. So a theme can:
+- override layout tokens (<code>--gap-*</code>, <code>--z-*</code>, <code>--touch-target</code>);
+- inject <code>url()</code>/<code>var()</code> values;
+- ship only half a palette, leaving the other half on Calvin's colours.</p>
+<p><code>midnight-theme</code> 1.1.0 shows all three problems:
+- it sets 15 of the 22 colours and 17 legacy keys (<code>accent-*</code>, <code>bg-primary</code>, <code>calendar-*</code>, <code>text-*</code>, <code>border-color</code>,
+  <code>indicator-*</code>) that the shell no longer reads;
+- it sets dark colours in <strong>both</strong> <code>variables</code> and <code>dark_mode</code>, which is the "Dark ignores the mode" problem from §2.1.</p>
+<p><strong>The model (theme contract 2):</strong> a theme is a palette family, exactly like a built-in:
+1. <strong>Colours only.</strong> A theme may set only the colour allowlist: the 22 semantic colours plus the optional
+   <code>event-1</code>…<code>event-8</code>. Any other key (role, size, spacing, radius, z-index, font, legacy names) is <strong>ignored with a
+   warning</strong> at install and never written to the page.
+2. <strong>Both modes.</strong> <code>variables</code> is the light palette and <code>dark_mode</code> the dark one. Both are required, so picking a theme
+   never fights the light/dark setting (D1).
+3. <strong>Required vs derived.</strong>
+   - The 14 base colours are <strong>required in both modes</strong>: <code>bg-0/1/2</code>, <code>ink/-2/-3</code>, <code>line</code>, <code>line-soft</code>, <code>focus</code>, <code>ok</code>,
+     <code>warn</code>, <code>err</code>, <code>shadow</code>, <code>shadow-hover</code>.
+   - The 8 pairs are <strong>derived if missing</strong>: <code>focus/ok/warn/err</code> × <code>-ink</code>/<code>-text</code>.
+     - <code>-ink</code> = <code>--ink</code> or <code>--bg-1</code>, whichever passes AA on the tone.
+     - <code>-text</code> = the tone mixed toward <code>--ink</code> until it passes AA on <code>--bg-1</code>.
+     - The same algorithm CLV-64 used, ported to the backend so derived values are stored at install.
+   - <code>event-1…8</code> fall back to Calvin's palette.
+4. <strong>Values:</strong> <code>#rgb</code>, <code>#rrggbb</code>, <code>#rrggbbaa</code>, <code>rgb()/rgba()</code>, <code>hsl()/hsla()</code> only. No <code>var()</code>, <code>url()</code>, keywords or
+   expressions.
+5. <strong>Checks at install and at load</strong> (every startup, for installed and bundled themes):
+   - missing base colour, bad value, or a text pair below AA (<code>ink</code>/<code>ink-2</code>/<code>ink-3</code> on <code>bg-1</code>; <code>-text</code> on <code>bg-1</code>;
+     <code>-ink</code> on its tone) → <strong>rejected at install</strong>, with the missing or failing keys named:
+     <strong>"Midnight can't be installed: it's missing bg-2 in dark mode."</strong>;
+   - an already-installed theme that fails at load is kept but <strong>not selectable</strong>. If it was selected, Calvin falls
+     back to the Calvin theme in the current mode, and the picker shows it disabled with <strong>"Needs an update to work
+     with this Calvin."</strong>;
+   - the hue-distance rule (D2) is a <strong>warning, not a rejection</strong>, for third-party themes: install succeeds and the
+     picker shows <strong>"Status colours may be hard to tell apart in this theme."</strong> under its name.
+   - Catalog themes (calvin-plugins) must pass <strong>all</strong> rules in that repo's CI (<code>test_validate_plugins.py</code>).
+6. <strong>Versioning:</strong> <code>theme.json</code> gains <code>"theme_api": 2</code>. A theme without it is checked by the same rules (most old
+   themes fail on legacy keys only, which are now just ignored).</p>
+<p><strong>What <code>midnight-theme</code> needs (calvin-plugins PR, version 2.0.0):</strong>
+- add <code>"theme_api": 2</code>; remove the 17 legacy keys;
+- keep the dark palette in <code>dark_mode</code> (focus <code>#8b5cf6</code> 263°, ok <code>#3fb950</code>, warn <code>#fbbf24</code>, err <code>#f87171</code>: all pass the
+  D2 distances);
+- <strong>add a real light palette in <code>variables</code></strong> (contrast and hue checked against <code>bg-1</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Light value</th>
+<th></th>
+<th>Token</th>
+<th>Light value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>bg-0</code></td>
+<td><code>#eceaf6</code></td>
+<td></td>
+<td><code>focus</code></td>
+<td><code>#6d28d9</code> (6.6:1)</td>
+</tr>
+<tr>
+<td><code>bg-1</code></td>
+<td><code>#f7f6fc</code></td>
+<td></td>
+<td><code>ok</code></td>
+<td><code>#15803d</code> (4.7:1)</td>
+</tr>
+<tr>
+<td><code>bg-2</code></td>
+<td><code>#ffffff</code></td>
+<td></td>
+<td><code>warn</code></td>
+<td><code>#a16207</code> (4.6:1, Δ35° from err)</td>
+</tr>
+<tr>
+<td><code>ink</code></td>
+<td><code>#1b1630</code> (16:1)</td>
+<td></td>
+<td><code>err</code></td>
+<td><code>#b91c1c</code> (6.0:1)</td>
+</tr>
+<tr>
+<td><code>ink-2</code></td>
+<td><code>#4b4566</code> (8.3:1)</td>
+<td></td>
+<td><code>line</code></td>
+<td><code>#d9d5ea</code></td>
+</tr>
+<tr>
+<td><code>ink-3</code></td>
+<td><code>#6e6889</code> (4.9:1)</td>
+<td></td>
+<td><code>line-soft</code></td>
+<td><code>#e7e4f2</code></td>
+</tr>
+<tr>
+<td><code>shadow</code> / <code>shadow-hover</code></td>
+<td><code>rgba(27,22,48,.10)</code> / <code>rgba(27,22,48,.16)</code></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>derived pairs: let the host derive them (or ship them; either passes);</li>
+<li>update its README: "Midnight: violet on night blue in dark mode, violet on pale lavender in light mode."</li>
+</ul>
+<h2 id="5-where-the-fixes-land">5. Where the fixes land<a class="headerlink" href="#5-where-the-fixes-land" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Fix</th>
+<th>PR</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D2 status hues + Sunset surfaces + hue-distance test + <code>--event-*</code> tokens</td>
+<td>Phase 1 tokens PR (theme.css + <code>builtin.json</code>), one PR</td>
+</tr>
+<tr>
+<td>D1 drop Light/Dark + migration + picker preview</td>
+<td>Dashboard category migration PR (<code>useTheme.js</code>, <code>ThemePicker</code>)</td>
+</tr>
+<tr>
+<td>D3 neutral regions</td>
+<td>Page editor migration PR</td>
+</tr>
+<tr>
+<td>Calendar colour palette in the add form</td>
+<td>Content category migration PR</td>
+</tr>
+<tr>
+<td>§4 plugin theme contract: backend allowlist + validation + derivation + load check; <code>applyCustomTheme</code> writes allowlisted keys only; picker disabled state</td>
+<td>Phase 1 tokens PR (backend + <code>useTheme.js</code>), with its own tests</td>
+</tr>
+<tr>
+<td><code>midnight-theme</code> 2.0.0</td>
+<td>calvin-plugins PR, after the host accepts <code>theme_api: 2</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-tests">6. Tests<a class="headerlink" href="#6-tests" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Hue-distance assertions (§D2 thresholds) in the CLV-64 contrast spec for 4 themes × 2 modes.</li>
+<li><code>useTheme</code> migration: <code>light</code> → null with the mode unchanged; <code>dark</code> → null and the mode set to dark; runs once.</li>
+<li>The picker lists exactly Calvin, Ocean, Forest, Sunset (plus installed plugin themes).</li>
+<li>No <code>--region-*</code> tokens or <code>#2196f3</code> left (token lint).</li>
+<li><code>--event-*</code>: each passes AA against <code>--on-event-ink</code> in every theme × mode.</li>
+<li>Theme contract (backend): a non-colour key is ignored and logged; a <code>url()</code>/<code>var()</code> value is rejected; a missing base
+  colour is rejected with the key named; missing pairs are derived and pass AA; a load-time failure marks the theme
+  unselectable and falls back to Calvin; a hue-distance failure warns but installs.</li>
+<li><code>applyCustomTheme</code> never writes a non-allowlisted property (unit test with a theme setting <code>--gap-4</code>).</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024 Calvin Contributors
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/osterbergsimon/calvin" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.tabs", "navigation.sections", "navigation.expand", "navigation.top", "search.suggest", "search.highlight", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
