@@ -192,7 +192,10 @@ const screens = computed(() =>
       ]
     : screensConfig.value.screens
 );
-const activeScreenId = computed(() => getActiveDashboardScreen(screensConfig.value)?.id ?? null);
+// The dot follows the tap at once (pending target), not the finished patch.
+const activeScreenId = computed(
+  () => configStore.displayedScreenId ?? getActiveDashboardScreen(screensConfig.value)?.id ?? null
+);
 
 // The room name is a screen's own Name (its displayName override), never a
 // global value: a browser that is not a known screen shows nothing, and an

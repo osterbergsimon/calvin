@@ -629,9 +629,10 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   // A screen switch is mostly render work: the new layout patches after the
-  // tap and can block the main thread. Remember how long the last one took so a
-  // device that switches quickly stops paying for a light it never needs.
-  let lastSwitchSettleMs = null;
+  // tap and can block the main thread. So every change first acknowledges the
+  // tap (the target dot, and the loading light unless it is Off), waits for a
+  // painted frame, and only then commits.
+  const pendingScreenId = ref(null);
 
   const applyScreenSwitch = screenId => {
     if (getKioskId()) {
@@ -647,66 +648,62 @@ export const useConfigStore = defineStore("config", () => {
   };
 
   const commitScreenSwitch = async screenId => {
-    const startedAt = Date.now();
     const persistence = applyScreenSwitch(screenId);
     // The caller still sees a failed save below; catch it now so it is not
     // reported as unhandled while the light finishes painting.
     if (persistence && typeof persistence.catch === "function") persistence.catch(() => {});
     await nextTick();
     await afterPaint();
-    lastSwitchSettleMs = Date.now() - startedAt;
     // Return the save rather than awaiting it here: the light ends as soon as
     // the screen has settled, not when the config write happens to finish.
     return { persistence };
   };
 
   const activateDashboardScreen = async screenId => {
-    const activeId = effectiveDashboardScreens.value.activeScreenId;
-    if (screenId === activeId) return;
+    if (screenId === displayedScreenId.value) return;
     if (getKioskId()) {
       // A screen this kiosk may not show was always a no-op.
       const ids = new Set(effectiveDashboardScreens.value.screens.map(s => s.id));
       if (!ids.has(screenId)) return;
     }
 
-    // "Off" keeps the light off; a device whose last switch was fast skips the
-    // light (and its extra painted-frame wait) for the next one.
-    const fastSwitch =
-      lastSwitchSettleMs != null && lastSwitchSettleMs < SCREEN_SWITCH_TIMING.fastSettleMs;
-    if (loadingLight.value === "off" || fastSwitch) {
-      const { persistence } = await commitScreenSwitch(screenId);
-      if (persistence) await persistence;
-      return;
-    }
-
-    const progress = useProgressStore();
-    const { persistence } = await progress.track(
-      SCREEN_SWITCH_SOURCE_ID,
-      async () => {
-        // Paint the light first, then let the patch take the main thread.
+    // The dot answers at once; the newest target wins.
+    pendingScreenId.value = screenId;
+    try {
+      let persistence = null;
+      if (loadingLight.value === "off") {
+        // No light, but the dot still paints before the commit takes the thread.
         await afterPaint();
-        return commitScreenSwitch(screenId);
-      },
-      {
-        immediate: true,
-        minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+        ({ persistence } = await commitScreenSwitch(screenId));
+      } else {
+        const progress = useProgressStore();
+        ({ persistence } = await progress.track(
+          SCREEN_SWITCH_SOURCE_ID,
+          async () => {
+            // Paint the light and the dot first, then let the patch take the thread.
+            await afterPaint();
+            return commitScreenSwitch(screenId);
+          },
+          {
+            immediate: true,
+            minVisibleMs: SCREEN_SWITCH_TIMING.minVisibleMs,
+          }
+        ));
       }
-    );
-    if (persistence) await persistence;
+      if (persistence) await persistence;
+    } finally {
+      // Settled, refused or failed: the dot ends on the real screen.
+      if (pendingScreenId.value === screenId) pendingScreenId.value = null;
+    }
   };
 
+  // Next/previous screen keys go through the same path as a tap.
   const cycleDashboardScreenBy = async direction => {
-    if (getKioskId()) {
-      const screens = effectiveDashboardScreens.value.screens;
-      if (screens.length <= 1) return;
-      const cur = screens.findIndex(s => s.id === kioskActiveScreenId.value);
-      const next = (cur + direction + screens.length) % screens.length;
-      kioskActiveScreenId.value = screens[next].id;
-      return;
-    }
-    const nextScreens = cycleDashboardScreen(dashboardScreens.value, direction);
-    dashboardScreens.value = nextScreens;
-    await updateConfig({ dashboardScreens: nextScreens });
+    const screens = effectiveDashboardScreens.value.screens;
+    if (screens.length <= 1) return;
+    const cur = screens.findIndex(s => s.id === displayedScreenId.value);
+    const next = (cur + direction + screens.length) % screens.length;
+    await activateDashboardScreen(screens[next].id);
   };
 
   const cycleActiveDashboardRegionBy = async direction => {
@@ -741,6 +738,11 @@ export const useConfigStore = defineStore("config", () => {
     const filtered = filterAvailableScreens(normalized, availableScreens.value);
     return { ...filtered, activeScreenId: kioskActiveScreenId.value ?? filtered.activeScreenId };
   });
+
+  // What the screen dots show: the tapped target while a switch is in flight.
+  const displayedScreenId = computed(
+    () => pendingScreenId.value ?? effectiveDashboardScreens.value.activeScreenId
+  );
 
   const seedKioskActiveScreen = () => {
     if (!getKioskId()) return;
@@ -898,6 +900,8 @@ export const useConfigStore = defineStore("config", () => {
     setMaxVisibleEvents,
     setDashboardScreens,
     activateDashboardScreen,
+    pendingScreenId,
+    displayedScreenId,
     cycleDashboardScreenBy,
     cycleActiveDashboardRegionBy,
     updateRegionView,
