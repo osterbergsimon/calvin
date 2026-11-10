@@ -193,14 +193,23 @@ export function usePhotoFrameMode() {
     // instead of opening an empty fullscreen slideshow (calvin-3xz9).
     // The store keys its lists by source set, so loading the frame's sources
     // does not replace what a dashboard photo region with other sources shows.
-    // A failure/empty result leaves no retry timer: the next input re-arms the
-    // idle wait, so the wall simply stays on the dashboard until then.
+    // A failure/empty result re-arms the idle wait (calvin-agnx), so an
+    // untouched wall kiosk tries again instead of staying on the dashboard
+    // until someone touches it.
     const sourceIds = photoFrameSourceIds.value;
     const token = ++enterToken;
+    const retryLater = () => {
+      // Only when nothing newer took over (input or a settings change already
+      // armed its own timer and bumped the token).
+      if (token === enterToken && !inactivityTimer.value && !isPhotoFrameActive.value) {
+        resetInactivityTimer();
+      }
+    };
     try {
       await imagesStore.fetchImages(sourceIds);
     } catch (error) {
       devLog("[PhotoFrame] Could not load photos, staying on the dashboard:", error);
+      retryLater();
       return false;
     }
     if (token !== enterToken || isPhotoFrameActive.value) {
@@ -209,6 +218,7 @@ export function usePhotoFrameMode() {
     }
     if (!imagesStore.getImagesForSource(sourceIds).length) {
       devLog("[PhotoFrame] No photos in the chosen sources, staying on the dashboard");
+      retryLater();
       return false;
     }
 
@@ -442,14 +452,17 @@ export function usePhotoFrameMode() {
     { immediate: false } // Don't run on initial setup, we handle that in onMounted
   );
 
+  // Watch the contents, not the array: every config apply hands back a new
+  // array, and restarting the idle wait on each one kept a kiosk whose payload
+  // changes between polls from ever reaching its timeout (calvin-agnx).
   watch(
-    photoFrameSourceIds,
+    () => photoFrameSourceIds.value.join("\u0000"),
     () => {
       if (photoFrameEnabled.value) {
         resetInactivityTimer();
       }
     },
-    { immediate: false, deep: true }
+    { immediate: false }
   );
 
   // Watch for route changes to prevent activation on settings page
