@@ -4,16 +4,15 @@ max_rows: 40
 read_by: coordinator, design lead, reviewer
 ---
 How lanes are routed in this project. Route by the intelligence the work needs, cheapest first. Tiers: swift =
-OpenCode with DeepSeek (hosted, sandboxed), the default; standard = Claude Sonnet; deep = Claude Opus. Claude is
-only for the most qualified work, Sonnet before Opus. Tier by the paths a task touches: the highest tier wins, in
-doubt one tier up. The budget decides how many lanes run, never the tier.
+OpenCode with DeepSeek (hosted, sandboxed), the default for the paths listed below; standard = Claude Sonnet; deep =
+Claude Opus. Claude is only for the most qualified work, Sonnet before Opus. Tier by the paths a task touches: the
+highest tier wins, in doubt one tier up. The budget decides how many lanes run, never the tier.
 
 Swift: ordinary backend and frontend code, tests, prose docs, scripts without private data and CI. Swift may write a
 failing test first. Swift never takes a task that needs private data or real credentials; a hosted model seeing this
 public code is fine. Standard whatever the paths: a diagnosis (cause unknown), a cross-cutting refactor, an open
-design question, a feature with subtle text or locale handling, a follow-up of a silent-loss or false-gate-claim
-finding. Deep: the review-C paths and the files that steer agents. A PR touching a path above its lane's tier fails
-review.
+design question, a feature with subtle text or locale handling. Deep: the review-C paths and the files that steer
+agents. A PR touching a path above its lane's tier fails review.
 
 Reviews always run on Claude, whoever wrote the PR: a swift lane gets a standard (Sonnet) reviewer, a standard lane a
 deep (Opus) reviewer, a deep lane a deep reviewer in a fresh session. This file overrides the shared model-routing.md
@@ -36,7 +35,7 @@ backend/alembic/** | deep | C | migration can destroy the DB
 backend/app/api/routes/share.py | standard | B | public share links expose content
 backend/app/api/routes/security.py | deep | C | allowed origins and sealed mode: frames or origins let in, sealed mode turned off
 backend/app/services/kiosk_*.py, backend/app/api/routes/kiosks.py | deep | C | forged kiosk bundle or leaked signing key
-backend/app/services/theme_installer.py | standard | B | unpacks uploaded archives with extractall: path traversal
+backend/app/services/theme_installer.py | deep | B | unpacks uploaded archives with extractall: path traversal
 backend/app/services/validation/** | deep | C | gate for untrusted plugin packages
 backend/app/plugins/** | standard | B | loader runs third-party code; plugin contract
 backend/app/services/plugin_installer.py | deep | C | installs and pip-runs untrusted packages
@@ -44,16 +43,15 @@ backend/app/services/display_*.py | standard | B | acts on the display host
 backend/app/mcp_server/** | standard | B | exposes tools to agents
 backend/app/middleware/** | standard | B | security headers
 backend/app/services/csp.py | standard | B | frame and CSP policy
-backend/app/utils/ical_parser.py | standard | B | parses untrusted input; the iCal URL is a bearer credential, logged and fetched with redirects
 backend/app/database.py | standard | B | DB init and locking
 scripts/*.sh | deep | C | runs as root on the Pi: sudoers, units, users
 scripts/tests/** | swift | B | tests for host scripts
 docker/** | standard | B | runtime image, entrypoint
 .github/workflows/** | swift | B | CI and release flow; owner first
 backend/tests/contract/** | swift | B | API contract snapshot
-backend/app/utils/redact.py, backend/app/api/routes/plugins/instances.py, backend/app/api/routes/calendar.py | standard | B | redaction and the guard that stops a stored secret going to another host
+backend/app/utils/ical_parser.py, backend/app/utils/redact.py, backend/app/api/routes/plugins/instances.py, backend/app/api/routes/calendar.py, frontend/src/stores/auth.js | deep | B | credential handling: the iCal URL is a bearer credential (logged, fetched with redirects), redaction and the guard that stops a stored secret going to another host, admin login and setup code
+backend/app/utils/platform.py, backend/app/api/routes/config.py | standard | B | run_command for the display host; git ls-remote on a user-supplied URL
 backend/** | swift | B | ordinary backend code
-frontend/src/stores/auth.js | standard | B | admin login, setup code and sealed-mode calls
 frontend/src/stores/security.js | standard | B | allowed-origins and sealed-mode calls
 frontend/src/api/** | swift | B | generated types, do not hand-edit
 frontend/public/sw.js | standard | B | service worker caching
@@ -72,4 +70,5 @@ CLAUDE.md, AGENTS.md | deep | B | prompts that steer agents
 - Anything that changes the plugin contract (`api_version`, `PluginMetadata`, `SUPPORTED_DISPLAY_KINDS`): the separate
   calvin-plugins repo depends on it.
 - Kiosk setup or update flow changes, even when only the tests are touched.
+- A follow-up of a silent-loss or false-gate-claim finding.
 - Any change that handles credentials, secrets or redaction, wherever the code lives.
