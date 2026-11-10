@@ -23,7 +23,7 @@ Additions to your persona for this project. They never relax a rule there.
 Base branch `develop`. `orca.yaml`'s setup script does the installs (`uv sync` in backend, `npm ci` in frontend; allow several minutes), and agents wait for `.git/.../orca-setup-done` before starting. Frontend lanes running Playwright must set their own `E2E_PORT`. Worktrees go in `.worktrees/` (gitignored).
 
 ## Owner first
-The owner's standing word for every lane: the coordinator merges a lane PR into develop when CI is green and the reviewer found no blocker or major (minors fixed or waived by the owner); 'Owner first' paths and main still need the owner.
+The owner's standing word for every lane: the coordinator merges a lane PR into develop when CI is green and the reviewer found no blocker or major (minors fixed or waived by the owner); 'Owner first' paths, review-C PRs and main still need the owner.
 - Anything in `backend/app/security/`, backup/restore, Alembic migrations, or the `plugin.json` contract (`api_version`).
 - Changes to `scripts/` that touch sudoers, systemd units, users or the kiosk update path.
 - Any change to the CI workflows, release-please or the promote-develop-to-main flow.

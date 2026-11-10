@@ -18,10 +18,11 @@ review.
 Reviews always run on Claude, whoever wrote the PR: a swift lane gets a standard (Sonnet) reviewer, a standard lane a
 deep (Opus) reviewer, a deep lane a deep reviewer in a fresh session. This file overrides the shared model-routing.md
 for this project. Review tiers, by what a PR touches, not by who wrote it. A: the coordinator's own checks only. B:
-plus an independent review by a different model. C: plus a deep-tier review, and spec statements approved by the
-owner before merge. Keep C for paths where a mistake really hurts (secrets, auth, data loss, the check that keeps bad
-input out, sandbox and host settings) and name that harm in the row's why; ordinary code in a sensitive package is B.
-The "in doubt one tier up" rule is for the model tier, not for the review letter.
+plus an independent review by a different model, or for a deep lane a fresh deep session. C: plus a deep-tier review,
+and spec statements approved by the owner before merge. Keep C for paths where a mistake really hurts (secrets, auth,
+data loss, the check that keeps bad input out, sandbox and host settings) and name that harm in the row's why;
+ordinary code in a sensitive package is B. The "in doubt one tier up" rule is for the model tier, not for the review
+letter.
 
 ## Path map
 path glob | tier | review | why
@@ -43,16 +44,17 @@ backend/app/services/display_*.py | standard | B | acts on the display host
 backend/app/mcp_server/** | standard | B | exposes tools to agents
 backend/app/middleware/** | standard | B | security headers
 backend/app/services/csp.py | standard | B | frame and CSP policy
-backend/app/utils/ical_parser.py | swift | B | parses untrusted input
+backend/app/utils/ical_parser.py | standard | B | parses untrusted input; the iCal URL is a bearer credential, logged and fetched with redirects
 backend/app/database.py | standard | B | DB init and locking
 scripts/*.sh | deep | C | runs as root on the Pi: sudoers, units, users
 scripts/tests/** | swift | B | tests for host scripts
 docker/** | standard | B | runtime image, entrypoint
 .github/workflows/** | swift | B | CI and release flow; owner first
 backend/tests/contract/** | swift | B | API contract snapshot
+backend/app/utils/redact.py, backend/app/api/routes/plugins/instances.py, backend/app/api/routes/calendar.py | standard | B | redaction and the guard that stops a stored secret going to another host
 backend/** | swift | B | ordinary backend code
-frontend/src/stores/auth.js | swift | B | client auth state
-frontend/src/stores/security.js | swift | B | client security state
+frontend/src/stores/auth.js | standard | B | admin login, setup code and sealed-mode calls
+frontend/src/stores/security.js | standard | B | allowed-origins and sealed-mode calls
 frontend/src/api/** | swift | B | generated types, do not hand-edit
 frontend/public/sw.js | standard | B | service worker caching
 frontend/** | swift | B | ordinary frontend code
@@ -70,3 +72,4 @@ CLAUDE.md, AGENTS.md | deep | B | prompts that steer agents
 - Anything that changes the plugin contract (`api_version`, `PluginMetadata`, `SUPPORTED_DISPLAY_KINDS`): the separate
   calvin-plugins repo depends on it.
 - Kiosk setup or update flow changes, even when only the tests are touched.
+- Any change that handles credentials, secrets or redaction, wherever the code lives.
