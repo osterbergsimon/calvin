@@ -1,0 +1,7 @@
+# Orca runs scripts.setup in every new worktree of this repo (a lane's checkout). Written by lane-control
+# project-setup from the lockfiles; edit freely. Keep the last line: agents wait for it before starting.
+scripts:
+  setup: |
+    if command -v uv >/dev/null 2>&1; then (cd backend && uv sync --frozen --quiet) || echo "setup: uv in backend failed" >&2; else echo "setup: uv not on PATH, skipped" >&2; fi
+    if command -v npm >/dev/null 2>&1; then (cd frontend && npm ci --no-audit --no-fund --loglevel=error) || echo "setup: npm in frontend failed" >&2; else echo "setup: npm not on PATH, skipped" >&2; fi
+    touch "$(git rev-parse --git-dir)/orca-setup-done"
