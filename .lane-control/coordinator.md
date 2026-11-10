@@ -21,7 +21,7 @@ Additions to your persona for this project. They never relax a rule there.
 - An API change needs `backend/tests/contract/openapi.json` and `frontend/src/api/types.ts` regenerated.
 
 ## Opening lanes here
-Base branch `develop`. No `orca.yaml` found. Each lane needs `uv sync --extra dev` (backend) and `npm ci` (frontend); allow several minutes. Frontend lanes running Playwright must set their own `E2E_PORT`. Worktrees go in `.worktrees/` (gitignored).
+Base branch `develop`. `orca.yaml`'s setup script does the installs (`uv sync` in backend, `npm ci` in frontend; allow several minutes), and agents wait for `.git/.../orca-setup-done` before starting. Frontend lanes running Playwright must set their own `E2E_PORT`. Worktrees go in `.worktrees/` (gitignored).
 
 ## Owner first
 - Anything in `backend/app/security/`, backup/restore, Alembic migrations, or the `plugin.json` contract (`api_version`).

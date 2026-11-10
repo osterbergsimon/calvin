@@ -3,8 +3,7 @@ lane_control_template: 1
 max_lines: 60
 read_by: every agent
 ---
-Project facts for agents run by lane-control. They add to your persona, your brief and AGENTS.md and never relax
-them. Where this file and AGENTS.md disagree, AGENTS.md wins: say so in your report.
+Project facts for agents run by lane-control. They add to your persona, your brief and AGENTS.md and never relax them. Where this file and AGENTS.md disagree, AGENTS.md wins: say so in your report.
 # Project
 Calvin is a self-hosted dashboard for a Raspberry Pi kiosk screen: calendars, photos, web services. Vue 3 frontend, FastAPI backend, plugin system. Households use it on a wall display and on phones. Breaking the admin lock, the plugin loader, backup/restore or the kiosk install and update scripts would hurt most.
 
@@ -14,11 +13,10 @@ path | what lives there
 backend/app/ | FastAPI: api/routes, plugins (loader, contract), security (auth, keys, share links), services
 backend/alembic/, backend/tests/ | DB migrations (SQLite, Ormar); pytest incl. contract snapshot
 frontend/src/, frontend/tests/ | Vue app, Pinia stores, typed API in src/api; Vitest and Playwright
-scripts/ | kiosk setup/update shell scripts and bats tests
-docker/, docs/ | compose files; MkDocs docs, docs/design for design notes
+scripts/, docker/, docs/ | kiosk shell scripts and bats tests; compose files; MkDocs docs, docs/design for design notes
 
 ## Branches and issues
-Default branch is `main` (release). PRs go into `develop`, never `main`; `main` receives only release-please PRs. Issues: beads (`bd`), local only. Lane key prefix: `calvin-` (for example calvin-6yja). Conventional Commits, scopes backend, frontend, plugins, kiosk, docker, docs, scripts.
+Default branch is `main` (release). PRs go into `develop`, never `main`; `main` receives the promote PR (develop->main) and release-please PRs only. Issues: beads (`bd`), local only. Lane key prefix: `calvin-` (for example calvin-6yja). Conventional Commits, scopes backend, frontend, plugins, kiosk, docker, docs, scripts.
 
 ## Checks
 command | when | where it is written
@@ -27,15 +25,17 @@ command | when | where it is written
 `cd backend && uv run ruff format --check .` | backend change | CONTRIBUTING.md, ci.yml
 `cd backend && uv run mypy app --ignore-missing-imports` | backend change | CONTRIBUTING.md, ci.yml
 `cd backend && uv run bandit -r app -ll` | backend change | ci.yml
-`cd backend && uv run pytest -q` | backend change | CONTRIBUTING.md
+`cd backend && CALVIN_PLUGINS_DIR="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/../calvin-plugins" uv run pytest -q` | backend change; the calvin-plugins checkout beside the main one. A skipped contract test is not a pass: report it | CONTRIBUTING.md
 `cd frontend && npm run lint` | frontend change | CONTRIBUTING.md
 `cd frontend && npx prettier --check "src/**/*.{js,jsx,vue,json,css}"` | frontend change | ci.yml
 `cd frontend && npm run type-check` | frontend change | ci.yml
 `cd frontend && npx vitest run` | frontend change | CONTRIBUTING.md
+`cd frontend && npm run build` | frontend change; postbuild checks the bundle budget | CONTRIBUTING.md, ci.yml
 `cd frontend && npm run gen:api` | API schema change; commit src/api/types.ts | ci.yml
 `cd frontend && E2E_PORT=5273 npm run test:e2e:a11y` | UI change | CONTRIBUTING.md
 `scripts/check-commit-attribution.sh origin/develop..HEAD` | before PR | CONTRIBUTING.md
 `cd scripts && bats tests/` | scripts/ change (needs bats) | Makefile `test-scripts`
+`cd backend && uv sync --extra docs && uv run mkdocs build --strict --config-file ../mkdocs.yml` | docs/ or mkdocs.yml change | CONTRIBUTING.md
 
 ## Do not run
 - `make clean`: deletes dev data, `.venv`, `node_modules`, `dist`.
