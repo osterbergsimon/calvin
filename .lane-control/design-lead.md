@@ -8,7 +8,7 @@ Additions to your persona for this project. They never relax a rule there.
 ## First turn
 - `docs/design/frontend-doctrine.md`: the owner's design decisions. Read it before any design call.
 - Other notes in `docs/design/` and CLAUDE.md "Gotchas" and "House rules".
-- `.lane-control/routing.md` for tiers: `docs/design/**` and `frontend/**` are standard, review B.
+- `.lane-control/routing.md` for tiers and review letters; do not restate them here.
 
 ## Project facts that shape design
 - Calvin runs on a wall display and on phones: check both, light and dark, phone at 390x844.
