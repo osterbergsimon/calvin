@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.0-rc.3](https://github.com/osterbergsimon/calvin/compare/v0.1.0-rc.2...v0.1.0-rc.3) (2026-11-09)
+
+
+### Bug Fixes
+
+* **display-check:** deadline at pickup and lowered limit; plugins: sealed reason and hidden tile fixes (calvin-8ck0, calvin-7xxf) ([#342](https://github.com/osterbergsimon/calvin/issues/342)) ([ac0f28c](https://github.com/osterbergsimon/calvin/commit/ac0f28c55fddaedd83f1e95058c010e6b5b912de))
+* **frontend:** a screen change always acknowledges the tap (calvin-6yja) ([#346](https://github.com/osterbergsimon/calvin/issues/346)) ([120deb5](https://github.com/osterbergsimon/calvin/commit/120deb531cfbc61b9207d961a910fb594c6552a1))
+* **frontend:** clock bar zones never overlap with plugin tiles (calvin-r7lb) ([#343](https://github.com/osterbergsimon/calvin/issues/343)) ([22b545b](https://github.com/osterbergsimon/calvin/commit/22b545b05fcf6049e5ddd4b59685e57cb4ce6b9a))
+* **frontend:** kiosk links stay in Calvin, no promises for missing features, calendar fixes (calvin-eugy, calvin-ks7, calvin-awvd, calvin-v04i, calvin-mbze, calvin-6zkk) ([#340](https://github.com/osterbergsimon/calvin/issues/340)) ([a5259aa](https://github.com/osterbergsimon/calvin/commit/a5259aa02b021370500331fddbc7b0b33c1bebcf))
+* **frontend:** plugin widgets fill their region, headers clear content, options apply (calvin-xxe3) ([#344](https://github.com/osterbergsimon/calvin/issues/344)) ([ac1b266](https://github.com/osterbergsimon/calvin/commit/ac1b2666b5d2ba99ae55169836a876c513a781db))
+* **kiosk:** settings session timeout, Wi-Fi power saving off, display check run matching (calvin-q4o8, calvin-grwq, calvin-hn1e, calvin-8ck0) ([#341](https://github.com/osterbergsimon/calvin/issues/341)) ([6c2b76b](https://github.com/osterbergsimon/calvin/commit/6c2b76bc64f0e01ca8a5b2c819b3b91dc4ef24aa))
+* **plugins:** install turns a plugin on, clock bar lists all providers, fewer cold-load fetches (calvin-zbcg, calvin-shsj, calvin-hwjz, calvin-o8c1, calvin-msa8) ([#339](https://github.com/osterbergsimon/calvin/issues/339)) ([2af992e](https://github.com/osterbergsimon/calvin/commit/2af992ee13e1e9d851d801b2998891326026c5b3))
+* **security:** plugin sites can be shown In-app, blocked frames fall back (calvin-g9jf, calvin-q3m7) ([#345](https://github.com/osterbergsimon/calvin/issues/345)) ([165f2cc](https://github.com/osterbergsimon/calvin/commit/165f2cc76d06bfedfc8ef0b69da6e8d76252a52b))
+
 ## [0.1.0-rc.2](https://github.com/osterbergsimon/calvin/compare/v0.1.0-rc.1...v0.1.0-rc.2) (2026-11-08)
 
 
