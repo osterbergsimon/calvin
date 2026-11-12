@@ -137,9 +137,13 @@ export default defineConfig({
     __FRONTEND_VERSION__: JSON.stringify(frontendVersion),
   },
   resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-    },
+    alias: [
+      { find: "@", replacement: fileURLToPath(new URL("./src", import.meta.url)) },
+      // vuedraggable is CommonJS and does `require("vue")`, which resolves to
+      // the full build with the template compiler. Every import of "vue" gets
+      // the runtime-only ESM build instead; templates are precompiled.
+      { find: /^vue$/, replacement: "vue/dist/vue.runtime.esm-bundler.js" },
+    ],
   },
   build: {
     rollupOptions: {
@@ -151,8 +155,12 @@ export default defineConfig({
             // simple-keyboard is loaded only with the on-screen keyboard, so it
             // must stay in that async chunk instead of the initial vendor bundle.
             if (id.includes("simple-keyboard")) return;
-            // Vue ecosystem
-            if (id.includes("vue") || id.includes("vue-router") || id.includes("pinia")) {
+            // Settings-only libraries: let Rollup keep them with their importers
+            // rather than in a vendor chunk the dashboard loads.
+            if (/node_modules\/(vuedraggable|sortablejs|qrcode|dijkstrajs)\//.test(id)) return;
+            // Vue ecosystem, matched by package name: a substring test for
+            // "vue" also caught vuedraggable, @vueuse and @tanstack/vue-query.
+            if (/node_modules\/(vue|@vue\/[^/]+|vue-router|pinia|vue-demi)\//.test(id)) {
               return "vendor-vue";
             }
             // Vue Query
