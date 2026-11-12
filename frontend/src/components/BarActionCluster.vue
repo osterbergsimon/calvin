@@ -2,7 +2,10 @@
   <div v-if="visible" class="bar-action-cluster" :class="{ compact }">
     <ConnectionStatus :compact="compact" />
 
-    <template v-if="configStore.shouldShowUI">
+    <!-- A phone gets Settings in the ⋯ slot, even with controls hidden; the
+         menu's other items (layout lock, hide controls) are wall-display tools. -->
+    <PhoneSettingsButton v-if="phone" />
+    <template v-else-if="configStore.shouldShowUI">
       <AdminOverflow />
     </template>
   </div>
@@ -13,6 +16,8 @@ import { computed } from "vue";
 import { useConfigStore } from "../stores/config";
 import ConnectionStatus from "./ConnectionStatus.vue";
 import AdminOverflow from "./dashboard/AdminOverflow.vue";
+import PhoneSettingsButton from "./dashboard/PhoneSettingsButton.vue";
+import { usePhoneViewport } from "../composables/usePhoneViewport";
 
 defineProps({
   compact: {
@@ -24,6 +29,7 @@ defineProps({
 const visible = computed(() => true);
 
 const configStore = useConfigStore();
+const phone = usePhoneViewport();
 </script>
 
 <style scoped>

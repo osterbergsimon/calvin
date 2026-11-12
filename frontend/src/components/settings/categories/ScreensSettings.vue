@@ -175,7 +175,13 @@
       </div>
     </template>
 
-    <Button variant="link" size="sm" data-test="screens-back" @click="closeDetail">
+    <Button
+      v-if="!phoneNavOn"
+      variant="link"
+      size="sm"
+      data-test="screens-back"
+      @click="closeDetail"
+    >
       ‹ Screens
     </Button>
 
@@ -189,6 +195,7 @@
 
     <template v-else-if="selectedKiosk">
       <KioskStatusHeader
+        v-if="!phoneSectionOpen"
         :kiosk-id="screenLabel(selectedKiosk)"
         :online="isOnline(selectedKiosk)"
         :last-seen-label="relativeTime(selectedKiosk.lastSeen)"
@@ -199,8 +206,8 @@
         :wifi-power-save="selectedKiosk.wifiPowerSave ?? null"
       />
 
-      <ChangedHereLine :items="changedHereItems" />
-      <ScreenSectionIndex :sections="sectionIndex" />
+      <ChangedHereLine v-if="!phoneSectionOpen" :items="changedHereItems" />
+      <ScreenSectionIndex :sections="sectionIndex" :trailing="phoneTrailingSections" />
 
       <SettingsSection id="screen-name" title="Name">
         <SettingRow label="Name" description="Shown in this screen's clock bar.">
@@ -711,7 +718,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
+import { useRoute } from "vue-router";
+import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import { useNotificationsStore } from "@/stores/notifications";
@@ -845,6 +854,95 @@ const selection = ref(
 const defaultOpen = computed(() => selection.value?.kind === "default");
 const browserOpen = computed(() => selection.value?.kind === "browser");
 const selectedId = computed(() => (selection.value?.kind === "screen" ? selection.value.id : null));
+
+// --- phone Settings: the list, a screen and a section are pages ------------
+// On a phone the open screen and section live in the URL
+// (?screen=default|browser|<kiosk id>&section=<id>, useSettingsPhoneNav.js) so
+// the phone's back gesture steps back through them. Elsewhere nothing changes.
+const route = useRoute();
+const phoneNav = useSettingsPhoneNav();
+const phoneNavOn = computed(() => Boolean(phoneNav?.active.value));
+const selectionKey = computed(() =>
+  !selection.value
+    ? null
+    : selection.value.kind === "screen"
+      ? selection.value.id
+      : selection.value.kind
+);
+const phoneSection = computed(() =>
+  phoneNavOn.value && typeof route.query.section === "string" ? route.query.section : null
+);
+const phoneSectionOpen = computed(() => Boolean(phoneSection.value));
+// "This browser" is one short section: it is shown whole.
+provide(
+  "settingsSectionFocus",
+  computed(() => {
+    if (!phoneNavOn.value || !selection.value || selection.value.kind === "browser") return null;
+    return phoneSection.value || SECTION_FOCUS_INDEX;
+  })
+);
+const phoneTrailingSections = [{ id: "screen-remove", label: "Remove screen", tone: "danger" }];
+
+// The phone top bar names the open page: the screen, then the section.
+const PHONE_SECTION_TITLES = {
+  "default-pages": "Pages",
+  layout: "Display",
+  "device-power": "Power",
+  "device-keyboard": "Touch & keyboard",
+  "device-behaviour": "Behaviour",
+  "screen-remove": "Remove screen",
+};
+watch(
+  [phoneNavOn, selection, phoneSection, () => kiosks.value],
+  () => {
+    if (!phoneNavOn.value) return;
+    const sel = selection.value;
+    let screenTitle = "";
+    if (sel?.kind === "default") screenTitle = "Default";
+    else if (sel?.kind === "browser") screenTitle = "This browser";
+    else if (sel?.kind === "screen") {
+      const kiosk = kiosks.value.find(k => k.id === sel.id);
+      screenTitle = kiosk ? screenLabel(kiosk) : sel.id;
+    }
+    phoneNav.setTitle("screen", screenTitle);
+    const id = phoneSection.value;
+    const label = id
+      ? (sectionIndex.find(section => section.id === id)?.label ?? PHONE_SECTION_TITLES[id] ?? "")
+      : "";
+    phoneNav.setTitle("section", label);
+  },
+  { immediate: true }
+);
+
+// Push the page when the person opens one; the route watcher below applies a
+// back gesture. `fromRoute` breaks the loop.
+function syncScreenToRoute(key, { replace = false } = {}) {
+  if (!phoneNavOn.value) return;
+  if ((route.query.screen ?? null) === key) return;
+  return phoneNav.open({ screen: key }, { replace });
+}
+function applyRouteScreen(key) {
+  if (key === undefined || key === selectionKey.value) return;
+  if (!key) closeDetail({ fromRoute: true });
+  else if (key === "default") openDefault({ fromRoute: true });
+  else if (key === "browser") openBrowser({ fromRoute: true });
+  else select(key, { fromRoute: true });
+}
+// Not immediate: the page state it resets is declared further down. The first
+// sync runs in onMounted.
+watch(() => (phoneNavOn.value ? (route.query.screen ?? null) : undefined), applyRouteScreen);
+async function syncInitialPhoneRoute() {
+  if (!phoneNavOn.value) return;
+  if (route.query.screen) applyRouteScreen(route.query.screen);
+  // A ?setting= deep link (search, the phone hand-off) opened a page before the
+  // route knew about it: make it a page, at its section when it names one.
+  else if (selectionKey.value) {
+    await phoneNav.open(
+      { screen: selectionKey.value, section: props.initialSection || null },
+      { replace: true }
+    );
+  }
+}
 
 // The category is two-pane only where there is room for it (kiosk width):
 // list 320px beside the detail. On a phone the list hides while a page is open,
@@ -1021,20 +1119,23 @@ function clearMessages() {
   removeMsg.value = "";
 }
 
-function openDefault() {
+function openDefault({ fromRoute = false } = {}) {
+  if (!fromRoute) syncScreenToRoute("default");
   selection.value = { kind: "default" };
   editorOpen.value = false;
   clearMessages();
 }
 
-function openBrowser() {
+function openBrowser({ fromRoute = false } = {}) {
+  if (!fromRoute) syncScreenToRoute("browser");
   selection.value = { kind: "browser" };
   editorOpen.value = false;
   clearMessages();
   refreshBrowserCount();
 }
 
-async function select(id) {
+async function select(id, { fromRoute = false } = {}) {
+  if (!fromRoute) syncScreenToRoute(id);
   selection.value = { kind: "screen", id };
   clearMessages();
   const fetched = await store.fetchOverrides(id);
@@ -1053,7 +1154,8 @@ watch(selectedKiosk, kiosk => {
   closeDetail();
 });
 
-function closeDetail() {
+function closeDetail({ fromRoute = false } = {}) {
+  if (!fromRoute && phoneNavOn.value && route.query.screen) phoneNav.up();
   selection.value = null;
   editorOpen.value = false;
   clearMessages();
@@ -1829,6 +1931,7 @@ if (typeof window !== "undefined") {
 
 onMounted(async () => {
   refreshBrowserCount();
+  await syncInitialPhoneRoute();
   await store.loadKiosks();
   if (initialOwnScreenId) await select(initialOwnScreenId);
   if (kiosks.value.length === 0) addOpen.value = true;
@@ -1845,6 +1948,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  phoneNav?.setTitle("screen", "");
+  phoneNav?.setTitle("section", "");
   clearLookNote();
   window.removeEventListener("beforeunload", flushQueuedOverridesOnPageClose);
   window.removeEventListener("pagehide", flushQueuedOverridesOnPageClose);

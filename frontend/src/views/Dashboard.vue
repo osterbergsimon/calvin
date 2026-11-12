@@ -13,6 +13,9 @@
       <!-- Minimal UI overlay (shown when UI is hidden) -->
       <MinimalUIOverlay v-if="!configStore.shouldShowUI" />
 
+      <!-- A phone with no clock bar on screen still needs a way into Settings. -->
+      <PhoneSettingsButton v-if="phone && !clockBarActive" floating />
+
       <!--
         Dashboard stage wraps the side perimeter bars and the body so that
         vertical left/right bars sit at the dashboard edge regardless of the
@@ -185,6 +188,8 @@ import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
 import LoadingLight from "../components/LoadingLight.vue";
 import Button from "../components/ui/Button.vue";
+import PhoneSettingsButton from "../components/dashboard/PhoneSettingsButton.vue";
+import { usePhoneViewport } from "../composables/usePhoneViewport";
 
 const PhotoSlideshow = defineAsyncComponent(() => import("../components/PhotoSlideshow.vue"));
 const WebServiceViewer = defineAsyncComponent(() => import("../components/WebServiceViewer.vue"));
@@ -215,6 +220,7 @@ import {
 
 const configStore = useConfigStore();
 const activeRegionStore = useActiveRegionStore();
+const phone = usePhoneViewport();
 
 // Press-and-hold in the reveal corner shows the UI while it's hidden. Runs at
 // the window level so the corner visual stays pointer-events:none and content

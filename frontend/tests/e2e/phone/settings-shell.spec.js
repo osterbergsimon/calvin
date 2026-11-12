@@ -13,6 +13,7 @@ import {
   gotoSettings,
   expectSettingsReady,
   openSettingsFromDashboard,
+  selectCategory,
 } from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
@@ -83,13 +84,16 @@ test.describe("phone: first run and sign-in", () => {
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expectSettingsReady(page);
 
+    // A phone gets the categories as a list of pages, not the desktop rail.
+    await expect(page.locator(".category-rail")).toHaveCount(0);
+    await expectPhoneLayout(page, "category list");
     for (const category of ["Content", "Dashboard", "Screens", "Plugins", "System", "Security"]) {
-      const item = page.locator(".category-rail__item", { hasText: category }).first();
-      await item.scrollIntoViewIfNeeded();
-      await item.click();
-      await expect(item).toHaveClass(/is-active/);
-      await page.waitForLoadState("networkidle");
+      await selectCategory(page, category);
+      await expect(page.locator('[data-test="settings-phone-home"]')).toHaveCount(0);
       await expectPhoneLayout(page, `${category} category`);
+      // The phone's own back gesture returns to the list.
+      await page.goBack();
+      await expect(page.locator('[data-test="settings-phone-home"]')).toBeVisible();
     }
 
     // Every API route the settings screen asked for had a sample answer.
@@ -97,7 +101,7 @@ test.describe("phone: first run and sign-in", () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test("Settings can be opened from the dashboard overflow menu on a phone", async ({
+  test("a phone opens Settings from its own button, in the ⋯ menu's place", async ({
     page,
     consoleErrors,
   }) => {
@@ -105,9 +109,62 @@ test.describe("phone: first run and sign-in", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
+    // The menu's other items are wall-display tools; the phone gets the gear.
+    await expect(page.getByRole("button", { name: "More controls" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
     await openSettingsFromDashboard(page);
     await expectSettingsReady(page);
+    await expect(page.locator('[data-test="settings-phone-home"]')).toBeVisible();
     await expectPhoneLayout(page, "settings opened from the dashboard");
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("a phone keeps a way into Settings when the screen hides its controls", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await installApiMock(page, { config: { showUI: false, clockBarShowInKiosk: false } });
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // No clock bar on screen: the button floats in a bottom corner.
+    const button = page.locator('[data-test="phone-settings-button"]');
+    await expect(button).toBeVisible();
+    await expect(button).toHaveText("Settings");
+    // Scoped: the hot-corner hint beside it ignores taps on purpose.
+    await expectPhoneLayout(page, "dashboard with controls hidden", {
+      scope: '[data-test="phone-settings-button"]',
+    });
+    await button.click();
+    await expectSettingsReady(page);
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("a screen's page is a list of sections, each its own page", async ({
+    page,
+    consoleErrors,
+  }) => {
+    await installApiMock(page);
+    await gotoSettings(page, "Screens");
+    await page.locator('[data-test="screen-card"]').first().click();
+    await expect(page.locator('[data-test="section-index-screen-look"]')).toBeVisible();
+    await expect(page.locator("#section-screen-look")).toHaveCount(0);
+    await expectPhoneLayout(page, "a screen's section list");
+
+    await page.locator('[data-test="section-index-screen-look"]').click();
+    await expect(page.locator("#section-screen-look")).toBeVisible();
+    await expect(page.locator("#section-screen-display")).toHaveCount(0);
+    await expect(page.locator(".settings-topbar__location")).toHaveText("Look");
+    expect(new URL(page.url()).searchParams.get("section")).toBe("screen-look");
+    await expectPhoneLayout(page, "one section of a screen");
+
+    // Back in the top bar steps up one page at a time.
+    await page.locator('.settings-topbar [data-action="back"]').click();
+    await expect(page.locator('[data-test="section-index-screen-look"]')).toBeVisible();
+    await page.locator('.settings-topbar [data-action="back"]').click();
+    await expect(page.locator('[data-test="screen-card"]').first()).toBeVisible();
 
     expect(consoleErrors).toEqual([]);
   });

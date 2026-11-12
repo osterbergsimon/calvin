@@ -1,13 +1,15 @@
 <template>
   <div class="settings-page">
     <SettingsTopBar
-      :category-label="auth.authenticated ? activeCategoryLabel : 'Settings'"
-      :section-label="auth.authenticated ? sectionLabel : ''"
+      :category-label="auth.authenticated ? topBarTitle : 'Settings'"
+      :section-label="auth.authenticated && !phone ? sectionLabel : ''"
+      :back-label="auth.authenticated ? phoneBackLabel : ''"
       :save-state="saveStatus.state"
       :show-phone="isTouch"
       :locked="!auth.authenticated"
       @done="onDone"
       @phone="phoneOpen = true"
+      @back="phoneNav.up()"
     />
 
     <Dialog
@@ -24,12 +26,31 @@
     </div>
 
     <div v-else class="settings-body">
-      <div class="settings-search-wrapper">
+      <div v-if="!phone || phoneHome" class="settings-search-wrapper">
         <SettingsSearch @jump="onJump" />
       </div>
 
-      <div class="settings-layout">
+      <!-- Phone: the categories are a list of pages (useSettingsPhoneNav.js). -->
+      <nav
+        v-if="phone && phoneHome"
+        class="settings-phone-home"
+        aria-label="Settings"
+        data-test="settings-phone-home"
+      >
+        <ListRowLink
+          v-for="cat in categories"
+          :key="cat.id"
+          :to="{ query: { category: cat.id } }"
+          :lead="cat.icon"
+          :name="cat.label"
+          :meta="[cat.subtitle]"
+          :data-test="`settings-phone-category-${cat.id}`"
+        />
+      </nav>
+
+      <div v-else class="settings-layout">
         <CategoryRail
+          v-if="!phone"
           :categories="categories"
           :active-id="activeCategory"
           @select="selectCategory"
@@ -45,6 +66,9 @@
             <div v-if="error" class="settings-banner settings-banner-error">
               {{ error }}
             </div>
+
+            <!-- Phone: a long category is a list of its sections first. -->
+            <ScreenSectionIndex v-if="phoneSectionList" :sections="phoneSectionList" />
 
             <DashboardSettings
               v-if="activeCategory === 'dashboard' && localConfig"
@@ -116,9 +140,14 @@ import {
   defaultSettingsCategoryId,
   getSettingDestinationById,
   normalizeSettingsCategoryId,
+  phoneSectionPages,
   settingsCategories,
 } from "@/components/settings/settingsRegistry";
 import ContentSettings from "@/components/settings/categories/ContentSettings.vue";
+import ListRowLink from "@/components/ui/ListRowLink.vue";
+import ScreenSectionIndex from "@/components/settings/shared/ScreenSectionIndex.vue";
+import { usePhoneViewport } from "@/composables/usePhoneViewport";
+import { SECTION_FOCUS_INDEX, provideSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 
 // Lazy-load category components for better code splitting
 const DashboardSettings = defineAsyncComponent(
@@ -143,6 +172,18 @@ const modeStore = useModeStore();
 const auth = useAuthStore();
 
 const categories = settingsCategories;
+
+// ── Phone: a stack of pages instead of rail + pane ──────────────────────────
+// /settings is the category list; ?category= opens one; Screens adds ?screen=
+// and ?section=. The desktop and the kiosk keep the rail (useSettingsPhoneNav).
+const phone = usePhoneViewport();
+const phoneNav = provideSettingsPhoneNav({ active: phone, route, router });
+const routeCategory = computed(() =>
+  typeof route.query.category === "string"
+    ? normalizeSettingsCategoryId(route.query.category)
+    : null
+);
+const phoneHome = computed(() => !routeCategory.value && !route.query.setting);
 
 // ── Phone hand-off (F2) ─────────────────────────────────────────────────────
 // A touch kiosk has no keyboard; offer the same settings page on a phone.
@@ -176,6 +217,7 @@ if (
 
 const getInitialCategory = () => {
   if (initialRouteDestination) return initialRouteDestination.category;
+  if (routeCategory.value) return routeCategory.value;
   const storedCategory = sessionStorage.getItem(SETTINGS_CATEGORY_STORAGE_KEY);
   return normalizeSettingsCategoryId(storedCategory) ?? defaultSettingsCategoryId;
 };
@@ -186,6 +228,47 @@ watch(activeCategory, val => sessionStorage.setItem(SETTINGS_CATEGORY_STORAGE_KE
 const activeCategoryLabel = computed(
   () => categories.find(c => c.id === activeCategory.value)?.label ?? ""
 );
+
+// A phone page opened from the list or the back gesture.
+watch(routeCategory, id => {
+  if (!phone.value || !id || id === activeCategory.value) return;
+  activeCategory.value = id;
+  categoryRenderKey.value += 1;
+});
+
+// A long category (Content, System) lists its sections; each opens alone. A
+// search result (?setting=) shows the whole category so it can scroll there.
+const phoneSectionList = computed(() =>
+  phone.value && !route.query.setting ? (phoneSectionPages[activeCategory.value] ?? null) : null
+);
+provide(
+  "settingsSectionFocus",
+  computed(() => {
+    if (!phoneSectionList.value) return null;
+    return typeof route.query.section === "string" ? route.query.section : SECTION_FOCUS_INDEX;
+  })
+);
+const phoneSectionTitle = computed(
+  () => phoneSectionList.value?.find(section => section.id === route.query.section)?.label ?? ""
+);
+
+// The top bar names the page you are on, and its back button the page above.
+const topBarTitle = computed(() => {
+  if (!phone.value) return activeCategoryLabel.value;
+  if (phoneHome.value) return "Settings";
+  const { screen, section } = phoneNav.titles.value;
+  if (route.query.section && phoneSectionTitle.value) return phoneSectionTitle.value;
+  if (route.query.section && section) return section;
+  if (route.query.screen && screen) return screen;
+  return activeCategoryLabel.value;
+});
+const phoneBackLabel = computed(() => {
+  if (!phone.value || phoneHome.value) return "";
+  const { screen } = phoneNav.titles.value;
+  if (route.query.section) return screen || activeCategoryLabel.value;
+  if (route.query.screen) return activeCategoryLabel.value;
+  return "Settings";
+});
 
 const categoryRenderKey = ref(0);
 
@@ -401,6 +484,20 @@ const onJump = async destination => {
     sessionStorage.setItem(destination.tabKey, destination.tab);
   }
 
+  // Phone: a search result opens as a page, so back returns to the list. A
+  // section that is a page of its own (Content, System) opens alone; anything
+  // else opens its category and the ?setting= watcher below scrolls to it.
+  if (phone.value) {
+    const sectionId = sectionFor(destination);
+    const ownPage = phoneSectionPages[destination.category]?.some(s => s.id === sectionId);
+    router.push({
+      query: ownPage
+        ? { category: destination.category, section: sectionId }
+        : { category: destination.category, setting: destination.id },
+    });
+    return;
+  }
+
   activeCategory.value = destination.category;
   categoryRenderKey.value += 1;
   router.replace({ query: { ...route.query, setting: destination.id } });
@@ -562,6 +659,14 @@ onUnmounted(() => {
   background: color-mix(in srgb, var(--err) 15%, transparent);
   color: var(--ink);
   border: 1px solid color-mix(in srgb, var(--err) 40%, transparent);
+}
+
+/* Phone: the category list page (useSettingsPhoneNav.js). */
+.settings-phone-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  margin-top: var(--gap-3);
 }
 
 /* Responsive */

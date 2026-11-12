@@ -27,27 +27,90 @@ export async function gotoSettings(page, category, { kiosk = null } = {}) {
   if (category) await selectCategory(page, category);
 }
 
+// Settings on a phone is a stack of pages (useSettingsPhoneNav.js): the
+// category list, a category, and for long categories one section at a time.
+// A kiosk or desktop keeps the rail.
+const CATEGORY_IDS = {
+  Content: "content",
+  Dashboard: "dashboard",
+  Screens: "screens",
+  Plugins: "plugins",
+  System: "maintenance",
+  Security: "security",
+};
+
+const phoneHome = page => page.locator('[data-test="settings-phone-home"]');
+
 /** Wait for the unlocked settings shell to be interactive. */
 export async function expectSettingsReady(page) {
   await expect(page.locator(".settings-topbar")).toBeVisible();
-  await expect(page.locator(".settings-layout")).toBeVisible();
-  await expect(page.locator(".category-rail")).toBeVisible();
+  await expect(
+    page.locator('.category-rail, [data-test="settings-phone-home"], .settings-layout').first()
+  ).toBeVisible();
 }
 
-/** Click a settings category in the rail and wait for its content. */
+/** Back to the phone's category list from any page below it. */
+export async function gotoPhoneHome(page) {
+  const back = page.locator('.settings-topbar [data-action="back"]');
+  for (let i = 0; i < 4 && (await back.isVisible()); i += 1) {
+    await back.click();
+    await page.waitForLoadState("networkidle");
+  }
+  await expect(phoneHome(page)).toBeVisible();
+}
+
+/** Open a settings category: a rail item, or a page of the phone's list. */
 export async function selectCategory(page, label) {
-  const item = page.locator(".category-rail__item", { hasText: label }).first();
-  await item.scrollIntoViewIfNeeded();
-  await item.click();
-  await expect(item).toHaveClass(/is-active/);
+  const rail = page.locator(".category-rail");
+  if (await rail.isVisible()) {
+    const item = page.locator(".category-rail__item", { hasText: label }).first();
+    await item.scrollIntoViewIfNeeded();
+    await item.click();
+    await expect(item).toHaveClass(/is-active/);
+    await page.waitForLoadState("networkidle");
+    return;
+  }
+  if (!(await phoneHome(page).isVisible())) await gotoPhoneHome(page);
+  const id = CATEGORY_IDS[label] ?? label.toLowerCase();
+  await page.locator(`[data-test="settings-phone-category-${id}"]`).click();
+  await expect(page.locator(".settings-topbar__location")).toHaveText(label);
   await page.waitForLoadState("networkidle");
 }
 
-/** Reach Settings the way a person does: ⋯ › Settings. */
+/**
+ * On a phone, open one section of a long page (Content, System, a screen):
+ * its row in the page's section list. No-op where the page shows every
+ * section (a kiosk, a desktop, a short category).
+ */
+export async function openSection(page, sectionId) {
+  const row = page.locator(`[data-test="section-index-${sectionId}"]`);
+  if (!(await row.isVisible())) return;
+  await row.click();
+  await expect(page.locator(`#section-${sectionId}`)).toBeVisible();
+  await page.waitForLoadState("networkidle");
+}
+
+/** On a phone, step back from a section to its page's section list. */
+export async function closeSection(page) {
+  const url = new URL(page.url());
+  if (!url.searchParams.has("section")) return;
+  await page.locator('.settings-topbar [data-action="back"]').click();
+  await page.waitForLoadState("networkidle");
+}
+
+/**
+ * Reach Settings the way a person does: the Settings button on a phone,
+ * ⋯ › Settings elsewhere.
+ */
 export async function openSettingsFromDashboard(page) {
-  const more = page.getByRole("button", { name: "More controls" });
-  await expect(more).toBeVisible();
-  await more.click();
-  await page.getByRole("menuitem", { name: "Settings" }).click();
+  const phoneButton = page.locator('[data-test="phone-settings-button"]').first();
+  if (await phoneButton.isVisible()) {
+    await phoneButton.click();
+  } else {
+    const more = page.getByRole("button", { name: "More controls" });
+    await expect(more).toBeVisible();
+    await more.click();
+    await page.getByRole("menuitem", { name: "Settings" }).click();
+  }
   await expect(page.locator(".settings-page")).toBeVisible();
 }

@@ -1,10 +1,26 @@
 <template>
   <header class="settings-topbar">
     <div class="settings-topbar__left">
-      <span class="settings-topbar__wordmark" aria-label="Calvin">
+      <!-- Phone pages below the category list: back replaces the wordmark. -->
+      <Button
+        v-if="backLabel"
+        class="settings-topbar__back"
+        variant="ghost"
+        icon-only
+        :icon="mdiChevronLeft"
+        :label="`Back to ${backLabel}`"
+        data-action="back"
+        @click="$emit('back')"
+      />
+      <span v-else class="settings-topbar__wordmark" aria-label="Calvin">
         CAL<span class="settings-topbar__wordmark-dot">·</span>VIN
       </span>
-      <span class="settings-topbar__location" aria-live="polite">{{ locationLabel }}</span>
+      <span
+        class="settings-topbar__location"
+        :class="{ 'settings-topbar__location--page': backLabel }"
+        aria-live="polite"
+        >{{ locationLabel }}</span
+      >
     </div>
 
     <div class="settings-topbar__right">
@@ -41,7 +57,8 @@
 
 <script setup>
 import { computed } from "vue";
-import { mdiCellphone } from "@mdi/js";
+import { mdiCellphone, mdiChevronLeft } from "@mdi/js";
+import Button from "@/components/ui/Button.vue";
 
 const props = defineProps({
   categoryLabel: { type: String, required: true },
@@ -51,9 +68,12 @@ const props = defineProps({
   showPhone: { type: Boolean, default: false },
   // Locked Settings: only the wordmark, location and Done remain.
   locked: { type: Boolean, default: false },
+  // Phone Settings below the category list: the page above, for the back
+  // button ("Back to Screens"). Empty shows the wordmark instead.
+  backLabel: { type: String, default: "" },
 });
 
-defineEmits(["done", "phone"]);
+defineEmits(["done", "phone", "back"]);
 
 const locationLabel = computed(() => props.sectionLabel || props.categoryLabel);
 
@@ -130,6 +150,19 @@ const dotClass = computed(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A phone page: the back button sits where the wordmark was and the page name
+   is the title, without the divider. */
+.settings-topbar__back {
+  flex-shrink: 0;
+  margin-left: calc(-1 * var(--gap-2));
+}
+
+.settings-topbar__location--page {
+  margin-left: calc(-1 * var(--gap-2));
+  padding-left: 0;
+  border-left: 0;
 }
 
 /* Right side */
