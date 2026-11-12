@@ -20,35 +20,42 @@
     <SettingsSection id="maintenance-system" title="Restart">
       <!-- Gate on the real capability: a native Pi with host control but no
            systemctl/helper would answer these with a 500. -->
-      <template v-if="restartAvailable">
+      <SettingRow
+        v-if="restartAvailable"
+        label="Restart Calvin server"
+        description="Restarts Calvin. Screens reconnect on their own in about 15 seconds."
+      >
+        <Button data-test="restart-backend" @click="askRestartBackend">Restart server</Button>
+      </SettingRow>
+      <!-- These act on the display attached to the server, not on the device
+           you hold (on a phone, "this screen" read as the phone). A screen's
+           own Screen now is on its page in Screens. -->
+      <SettingGroup
+        v-if="restartAvailable || displayControlAvailable"
+        title="The server's own screen"
+        data-test="server-screen-group"
+      >
         <SettingRow
-          label="Restart Calvin server"
-          description="Restarts Calvin. Screens reconnect on their own in about 15 seconds."
-        >
-          <Button data-test="restart-backend" @click="askRestartBackend">Restart server</Button>
-        </SettingRow>
-        <SettingRow
-          label="Restart this screen"
-          description="Reloads this screen's browser. Calvin keeps running."
+          v-if="restartAvailable"
+          label="Restart its browser"
+          description="Reloads the browser on the screen attached to this server. Calvin keeps running."
         >
           <Button data-test="restart-frontend" @click="askRestartFrontend">
             Restart browser
           </Button>
         </SettingRow>
-      </template>
-      <!-- "Screen now" left Screens (Default-is-a-screen §3): it drives the
-           server's own display, so it belongs with the other host actions and
-           only where Calvin controls the host. -->
-      <SettingRow
-        v-if="displayControlAvailable"
-        label="This server's screen"
-        data-test="server-display-row"
-      >
-        <Button data-test="server-display-off" @click="onDisplayOff">Turn off</Button>
-        <Button data-test="server-display-on" @click="onDisplayOn">Turn on</Button>
-      </SettingRow>
-      <SettingRow label="Reload this screen" data-test="reload-ui">
+        <SettingRow
+          v-if="displayControlAvailable"
+          label="Turn it off or on"
+          data-test="server-display-row"
+        >
+          <Button data-test="server-display-off" @click="onDisplayOff">Turn off</Button>
+          <Button data-test="server-display-on" @click="onDisplayOn">Turn on</Button>
+        </SettingRow>
+      </SettingGroup>
+      <SettingRow label="Reload this page" data-test="reload-ui">
         <template #description>
+          <InlineNote>Loads Calvin again in the browser you are using now.</InlineNote>
           <InlineNote v-if="isContainer" data-test="docker-restart-hint">
             To restart Calvin, restart its container in Docker (on Unraid: the Docker tab).
           </InlineNote>
@@ -133,6 +140,7 @@ import InlineNote from "@/components/ui/InlineNote.vue";
 import Tag from "@/components/ui/Tag.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
 import CollapsibleSettingsSection from "@/components/settings/shell/CollapsibleSettingsSection.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";

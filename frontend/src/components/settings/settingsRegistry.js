@@ -59,7 +59,6 @@ export const phoneSectionPages = {
     },
     { id: "content-photos", label: "Photos", meta: "Photo sources, guest uploads" },
     { id: "content-services", label: "Web pages & apps", meta: "Pages and apps on the dashboard" },
-    { id: "content-clock-bar", label: "Clock bar info", meta: "Weather and more beside the clock" },
   ],
   maintenance: [
     { id: "maintenance-updates", label: "Updates", meta: "Install Calvin updates" },
@@ -182,10 +181,10 @@ export const settingsDestinations = [
     ],
   },
   {
-    // The per-screen half of the old Dashboard › Focus & remote. Remote
-    // buttons and Hide label after stay in Dashboard.
+    // The per-screen half of the old Dashboard › Focus & remote. The button
+    // labels went on to Remote & keys with the rest of the remote.
     id: "dashboard-kiosk-focus",
-    label: "Effects, focus light and button labels",
+    label: "Effects and focus light",
     path: "Screens / Default · Effects & focus",
     category: "screens",
     section: "screen-effects",
@@ -200,15 +199,6 @@ export const settingsDestinations = [
       "controls",
       "hot corner",
       "effects",
-      "show button presses",
-      "button presses",
-      "label size",
-      "remote",
-      "buttons",
-      "key-press",
-      "key press",
-      "keyboard feedback",
-      "notifications",
     ],
   },
   {
@@ -326,12 +316,13 @@ export const settingsDestinations = [
     keywords: ["services", "web services", "web pages", "apps", "ordering", "content sources"],
   },
   {
+    // Clock bar info joined the clock bar in Dashboard; the id is kept so
+    // links from Plugins and the clock bar editor still land.
     id: "content-clock-bar",
     label: "Clock bar info",
-    path: "Content / Clock bar info",
-    category: "content",
-    tabKey: "settings_tab_content_sources",
-    tab: "clock-bar-sources",
+    path: "Dashboard / Clock bar info",
+    category: "dashboard",
+    section: "content-clock-bar",
     keywords: ["clock bar", "status bar", "weather", "tile", "clock bar info", "content sources"],
   },
   {
@@ -440,35 +431,42 @@ export const settingsDestinations = [
       "physical keyboard",
       "turn off keyboard",
       "show it",
-      "buttons",
-      "mappings",
-      "shortcuts",
     ],
   },
   {
+    // One Remote & keys section on Screens: the button-press label (per
+    // screen), Hide label after, the bindings and the reboot keys (Default).
     id: "device-notifications",
-    label: "Remote buttons and key-press labels",
-    path: "Dashboard / Remote buttons",
-    category: "dashboard",
-    section: "kiosk-touch-focus",
+    label: "Remote, button bindings and key-press labels",
+    path: "Screens / Default · Remote & keys",
+    category: "screens",
+    section: "device-remote",
     keywords: [
       "notifications",
       "key-press",
       "key press",
+      "show button presses",
+      "button presses",
+      "label size",
+      "keyboard feedback",
       "hide label after",
       "mode indicator",
       "auto-hide",
       "remote",
+      "remote buttons",
       "buttons",
       "button bindings",
+      "mappings",
+      "shortcuts",
+      "focus & remote",
     ],
   },
   {
     id: "device-reboot",
     label: "Reboot button combo",
-    path: "Screens / Default · Power",
+    path: "Screens / Default · Remote & keys",
     category: "screens",
-    section: "device-power",
+    section: "device-remote",
     keywords: ["reboot", "restart", "combo", "keys"],
   },
   {

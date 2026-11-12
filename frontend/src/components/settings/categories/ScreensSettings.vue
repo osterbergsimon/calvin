@@ -593,6 +593,37 @@
         </InlineNote>
       </SettingsSection>
 
+      <!-- The button-press label is this screen's; how long it stays, the
+           bindings and the reboot keys are the same on every screen. -->
+      <SettingsSection id="screen-remote" title="Remote & keys">
+        <template v-for="descriptor in visibleRemoteDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :id="rowAnchorId(descriptor.key)"
+            :descriptor="descriptor"
+            :value="remote[descriptor.key]"
+            :overridden="Boolean(remoteOverridden[descriptor.key])"
+            @set="value => setRemote(descriptor.key, value)"
+            @reset="() => resetRemote(descriptor.key)"
+          />
+        </template>
+        <SettingRow
+          label="Shared by every screen"
+          description="Hide label after, button bindings and the reboot keys."
+          data-test="screen-remote-shared"
+        >
+          <Button data-test="open-default-remote" @click="openDefaultRemote">Open Default</Button>
+        </SettingRow>
+        <InlineNote
+          v-if="remoteMsg"
+          class="screens-saved"
+          :tone="toneFor(remoteMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ remoteMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-behaviour" title="Behaviour">
         <ScreenSettingRow
           v-for="descriptor in visibleBehaviourDescriptors"
@@ -718,7 +749,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
@@ -820,6 +851,7 @@ const DEFAULT_SECTION_IDS = new Set([
   "layout",
   "device-power",
   "device-keyboard",
+  "device-remote",
   "device-behaviour",
   "screen-look",
   "screen-effects",
@@ -837,6 +869,7 @@ const sectionIndex = [
   { id: "screen-controls", label: "Controls" },
   { id: "screen-power", label: "Power" },
   { id: "screen-touch", label: "Touch & keyboard" },
+  { id: "screen-remote", label: "Remote & keys" },
   { id: "screen-behaviour", label: "Behaviour" },
   { id: "screen-software", label: "Software" },
 ];
@@ -889,6 +922,7 @@ const PHONE_SECTION_TITLES = {
   layout: "Display",
   "device-power": "Power",
   "device-keyboard": "Touch & keyboard",
+  "device-remote": "Remote & keys",
   "device-behaviour": "Behaviour",
   "screen-remove": "Remove screen",
 };
@@ -973,6 +1007,7 @@ const effectsMsg = ref("");
 const controlsMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
+const remoteMsg = ref("");
 const behaviourMsg = ref("");
 const footerMsg = ref("");
 const overridesQueue = computed(() =>
@@ -1105,6 +1140,7 @@ const footerCopy = computed(() => {
 });
 
 function clearMessages() {
+  remoteMsg.value = "";
   nameMsg.value = "";
   pagesMsg.value = "";
   lookMsg.value = "";
@@ -1698,6 +1734,52 @@ function resetControl(key) {
   const next = { ...overrides.value };
   delete next[key];
   persistControls(next);
+}
+
+// --- Remote & keys: the button-press label --------------------------------
+// Per screen, like Controls. The shared rows (Hide label after, bindings,
+// reboot keys) are on Default only; this page points there.
+const remoteDescriptors = descriptorsForSection("remote");
+const remoteOverridden = computed(() =>
+  Object.fromEntries(
+    remoteDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const remote = computed(() =>
+  Object.fromEntries(
+    remoteDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleRemoteDescriptors = computed(() =>
+  visibleDescriptors(remoteDescriptors, remote.value)
+);
+function persistRemote(next) {
+  persist(next, remoteMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
+}
+function setRemote(key, value) {
+  persistRemote({ ...overrides.value, [key]: value });
+}
+function resetRemote(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistRemote(next);
+}
+async function openDefaultRemote() {
+  if (phoneNavOn.value) {
+    await phoneNav.open({ screen: "default", section: "device-remote" });
+    return;
+  }
+  openDefault();
+  await nextTick();
+  const section = document.getElementById("section-device-remote");
+  if (section && typeof section.scrollIntoView === "function") {
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------

@@ -481,8 +481,9 @@ const cancelDisable = () => {
   pendingDisable.value = null;
 };
 
-// Sources live in Content (§3.1): both "Used by n sources" and "Add a source"
-// open that section with this provider's rows highlighted.
+// Sources live in Content (§3.1), clock bar info beside the clock bar in
+// Dashboard: both "Used by n sources" and "Add a source" open that section
+// with this provider's rows highlighted.
 const CONTENT_SECTION_BY_KIND = {
   calendar: "content-calendars",
   image: "content-photos",

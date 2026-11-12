@@ -148,7 +148,7 @@ export const SCREEN_SETTING_DESCRIPTORS = [
   {
     key: "keyboardFeedbackEnabled",
     label: "Show button presses",
-    section: "effects",
+    section: "remote",
     description: "A short label appears when a remote or keyboard button does something.",
     control: { kind: "toggle" },
     defaultValue: true,
@@ -169,7 +169,7 @@ export const SCREEN_SETTING_DESCRIPTORS = [
   {
     key: "keyboardFeedbackMode",
     label: "Label size",
-    section: "effects",
+    section: "remote",
     control: {
       kind: "segmented",
       options: [

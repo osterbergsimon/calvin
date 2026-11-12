@@ -194,6 +194,9 @@ describe("screen setting descriptors", () => {
       "effectsLevel",
       "focusLightMode",
       "focusLightDimOthers",
+    ]);
+    // The button-press label is part of the remote now.
+    expect(descriptorsForSection("remote").map(descriptor => descriptor.key)).toEqual([
       "keyboardFeedbackEnabled",
       "keyboardFeedbackMode",
     ]);

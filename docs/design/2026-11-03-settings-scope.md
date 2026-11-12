@@ -111,14 +111,23 @@ default-only rows say **Applies to every screen**, as today.
 | Pages | Pages shown, Start page | Built |
 | **Look** | Theme, Light or dark, Dark from / to, Font | **New.** From Dashboard › Appearance; needs H2, H3 and H4 fixed |
 | Display | Orientation, Upside down, Rotate the screen output, **Dashboard size**, **Settings text size** | Sizes move in from Dashboard |
-| **Effects & focus** | **Effects**, Focus light, Dim other regions, Show button presses, Label size | **New.** From Dashboard › Focus & remote |
+| **Effects & focus** | **Effects**, Focus light, Dim other regions | **New.** From Dashboard › Focus & remote |
 | **Controls** | Hide controls, Keep the clock bar when hidden, Tap anywhere to show controls, Show-controls corner, Corner visibility, Corner size, Hold for | **New.** The whole Dashboard › Controls section |
 | Touch & keyboard | Touchscreen, On-screen keyboard; on Default only: Keyboard layout, Also switch to | Built |
+| **Remote & keys** | Show button presses, Label size; on Default only: Hide label after, Reboot button combo, Button bindings (a screen's page points to Default for those) | **Regrouped** (settings organisation): the button-press label left Effects & focus, Hide label after and the bindings left Dashboard, the reboot combo left Power |
 | Behaviour | Photo frame, Start after, Photos from, Loading light, Layout | Built; fix F1 on Default |
-| Power | Screen on/off schedule, Turn off when idle, Reboot button combo (Default only); Screen now (screen only) | Built |
+| Power | Screen on/off schedule, Turn off when idle; Screen now (screen only) | Built; the reboot combo moved to Remote & keys |
 | Software | Kiosk software | Built (screen only) |
 
 The order goes from the most-used, visible changes (Look, Display) to the rare ones (Power, Software).
+
+**Settings organisation (after the move).** A feature lives in one place: the remote is one Remote & keys section
+(decision C had put the bindings in Dashboard next to the focus light; once the focus light moved to Screens, that
+split the remote across three places). Clock bar info (the tiles beside the clock) moved from Content to Dashboard,
+next to the clock bar editor that places them; its destination id `content-clock-bar` is kept. Dashboard is now the
+pages and the clock bar. In System › Restart, the rows that act on the server's attached display are grouped as
+**The server's own screen** (Restart its browser, Turn it off or on) and Reload is **Reload this page**; a per-screen
+remote restart needs a kiosk-agent command and is follow-up work.
 
 ### This browser
 

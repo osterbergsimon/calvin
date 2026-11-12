@@ -164,11 +164,21 @@ describe("settings registry", () => {
       tabKey: "settings_tab_maintenance",
       path: "System / Versions & status",
     });
-    // Remote buttons and Hide label after are what is left of Focus & remote.
+    // The whole remote is one Screens section, the reboot keys included.
     expect(getSettingDestinationById("device-notifications")).toMatchObject({
+      category: "screens",
+      section: "device-remote",
+      path: "Screens / Default · Remote & keys",
+    });
+    expect(getSettingDestinationById("device-reboot")).toMatchObject({
+      category: "screens",
+      section: "device-remote",
+    });
+    // Clock bar info sits with the clock bar; its old id still resolves.
+    expect(getSettingDestinationById("content-clock-bar")).toMatchObject({
       category: "dashboard",
-      section: "kiosk-touch-focus",
-      path: "Dashboard / Remote buttons",
+      section: "content-clock-bar",
+      path: "Dashboard / Clock bar info",
     });
     // The per-screen Controls and Effects & focus groups moved to Screens.
     expect(getSettingDestinationById("dashboard-kiosk")).toMatchObject({
@@ -188,8 +198,8 @@ describe("settings registry", () => {
     });
     expect(getSettingDestinationById("device-reboot")).toMatchObject({
       category: "screens",
-      section: "device-power",
-      path: "Screens / Default · Power",
+      section: "device-remote",
+      path: "Screens / Default · Remote & keys",
     });
     expect(getSettingDestinationById("device-keyboard")).toMatchObject({
       category: "screens",
