@@ -82,7 +82,7 @@ describe("ContentSettings", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
     const row = wrapper
       .findAllComponents({ name: "SettingRow" })
-      .find(r => r.props("label") === "Photo frame when idle");
+      .find(r => r.props("label") === "Photo time and photo frame");
     expect(row).toBeTruthy();
     expect(row.find('[data-test="open-photo-frame-settings"]').exists()).toBe(true);
     // No per-screen value is written from Content any more.
@@ -117,8 +117,8 @@ describe("ContentSettings copy (§3.1)", () => {
 
   const COPY = [
     [
-      "Photo frame when idle",
-      "Per screen now: choose Off/On, the idle wait and the photo sources in Screens › Behaviour.",
+      "Photo time and photo frame",
+      "Set per screen in Screens › Behaviour: how long each photo shows, and the photo frame when idle.",
     ],
   ];
 
@@ -136,11 +136,10 @@ describe("ContentSettings copy (§3.1)", () => {
     expect(w.text()).not.toContain("Highlight holidays");
   });
 
-  it("puts the photo seconds on the control, not in a label", () => {
+  it("leaves how long each photo shows to Screens, where the photo frame is", () => {
     const w = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
-    const row_ = row(w, "Show each photo for");
-    expect(row_.props("description")).toBe("");
-    expect(row_.find(".stepper__value").text()).toBe("30 s");
+    expect(row(w, "Show each photo for")).toBeUndefined();
+    expect(w.find('[data-test="open-photo-frame-settings"]').exists()).toBe(true);
   });
 
   it("leaves Shuffle photos undescribed", () => {

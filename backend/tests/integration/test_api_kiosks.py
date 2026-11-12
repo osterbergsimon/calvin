@@ -288,6 +288,29 @@ def test_overrides_accepts_content_assignment(test_client: TestClient):
 
 
 @pytest.mark.integration
+def test_overrides_photo_show_time_is_per_screen(test_client: TestClient):
+    """How long each photo shows is a screen's own setting, over the household one."""
+    put = test_client.put(
+        "/api/kiosks/kphoto-1/overrides",
+        json={"overrides": {"photoRotationInterval": 600}},
+    )
+    assert put.status_code == 200
+    eff = test_client.get("/api/kiosks/kphoto-1/config").json()
+    assert eff["photoRotationInterval"] == 600
+    assert eff["photo_rotation_interval"] == 600
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("seconds", [0, 4, 86401, "ten"])
+def test_overrides_reject_a_photo_show_time_out_of_range(test_client: TestClient, seconds):
+    resp = test_client.put(
+        "/api/kiosks/kphoto-2/overrides",
+        json={"overrides": {"photoRotationInterval": seconds}},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.integration
 def test_overrides_rejects_bad_available_screens_type(test_client: TestClient):
     resp = test_client.put(
         "/api/kiosks/kroom-2/overrides",

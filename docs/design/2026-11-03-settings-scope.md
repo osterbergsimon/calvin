@@ -97,7 +97,10 @@ renamed for what it now holds.
 
 ### Stays in Content, System, Security, Plugins: household
 
-Unchanged from the audit, except that photo rotation (`photoRotationInterval`) stays household for now (§2 rule 6).
+Unchanged from the audit. Photo rotation (`photoRotationInterval`) first stayed household (§2 rule 6); it has since
+moved to Screens › Behaviour as **Show each photo for**, beside the per-screen photo frame, because a screen with its
+own photo frame needs its own photo time (and the audit's 3B+ cost argument). Its choices are presets from 10 s to
+1 hour instead of a 5 s stepper.
 Installing and removing themes stays in Plugins. Only *choosing* a theme moves.
 
 ### Screens › Default and Screens › {screen}
