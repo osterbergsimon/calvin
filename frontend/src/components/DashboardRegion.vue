@@ -58,7 +58,7 @@
       <PhotoSlideshow
         v-else-if="region.kind === 'photos'"
         :is-fullscreen="false"
-        :auto-rotate="true"
+        :auto-rotate="screenVisible"
         :rotation-interval="photoRotationInterval * 1000"
         :source-ids="region.instanceIds || []"
         :region-id="region.id"
@@ -139,6 +139,10 @@ const emit = defineEmits(["focus-region"]);
 // Inject the resize context provided by Dashboard.vue.
 // null default so DashboardRegion works standalone (e.g. in unit tests).
 const resizeCtx = inject("dashboardResize", null);
+
+// False while this region sits on a stacked, hidden screen (ScreenScope.vue):
+// the photo rotation pauses until the screen is shown again.
+const screenVisible = inject("screenVisible", ref(true));
 
 // Template ref for the split container element (used as the coordinate space
 // when reporting a nested drag-start to the Dashboard resize context).

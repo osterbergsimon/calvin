@@ -41,6 +41,7 @@ ExecStart=/bin/bash -c 'url="$${CALVIN_BACKEND_URL%/}"; \
     q=""; \
     if [ -n "$${CALVIN_KIOSK_ID:-}" ]; then q="kiosk=$${CALVIN_KIOSK_ID}"; else q="display=kiosk"; fi; \
     [ -n "$${CALVIN_KIOSK_HOSTNAME:-}" ] && q="$${q:+$${q}&}khost=$${CALVIN_KIOSK_HOSTNAME}"; \
+    [ -n "$${CALVIN_SCREEN_STACK:-}" ] && q="$${q:+$${q}&}screenStack=$${CALVIN_SCREEN_STACK}"; \
     [ -n "$${q}" ] && url="$${url}?$${q}"; \
     exec /usr/bin/cog \
       --platform=drm \
