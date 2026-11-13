@@ -15,10 +15,24 @@ export function usePhoneViewport() {
   const refresh = () => {
     phone.value = detect();
   };
+  // isPhone() also reads the layout classes on <html> (Layout: Desktop/Phone,
+  // utils/layoutMode.js), which change at runtime without a resize.
+  let observer = null;
   onMounted(() => {
     refresh();
     window.addEventListener("resize", refresh, { passive: true });
+    if (typeof MutationObserver !== "undefined") {
+      observer = new MutationObserver(refresh);
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
   });
-  onUnmounted(() => window.removeEventListener("resize", refresh));
+  onUnmounted(() => {
+    window.removeEventListener("resize", refresh);
+    observer?.disconnect();
+    observer = null;
+  });
   return phone;
 }
