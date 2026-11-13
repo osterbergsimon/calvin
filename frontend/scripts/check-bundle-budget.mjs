@@ -11,6 +11,8 @@
  *   - Settings components (the settings chunk: ~187 kB gzip)
  *   - plugin renderers (the plugins chunk: ~135 kB gzip)
  *   - simple-keyboard (the on-screen keyboard vendor code)
+ *   - Vue's template compiler, which a CommonJS `require("vue")` (vuedraggable)
+ *     pulls in with the full build, and vuedraggable/sortablejs themselves
  *
  * It also prints the initial JS and CSS gzip sizes, so a regression is visible
  * in CI instead of only on a Pi.
@@ -43,6 +45,18 @@ const FORBIDDEN = [
     label: "plugins",
     why: "plugin renderers must load only for a plugin that needs one",
     matches: id => id.includes("/src/components/plugins/"),
+  },
+  {
+    label: "vue-compiler",
+    why: "templates are precompiled; Vue's runtime template compiler must never ship",
+    matches: id =>
+      id.includes("/node_modules/@vue/compiler-") || id.endsWith("/vue/dist/vue.cjs.prod.js"),
+  },
+  {
+    label: "vuedraggable",
+    why: "drag-and-drop is a Settings feature and must load only with Settings",
+    matches: id =>
+      id.includes("/node_modules/vuedraggable/") || id.includes("/node_modules/sortablejs/"),
   },
   {
     label: "simple-keyboard",
@@ -97,8 +111,8 @@ const main = () => {
   let cssGzip = 0;
   if (existsSync(INDEX_PATH)) {
     const html = readFileSync(INDEX_PATH, "utf-8");
-    const styles = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)].map(
-      match => match[1].replace(/^\//, "")
+    const styles = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)].map(match =>
+      match[1].replace(/^\//, "")
     );
     for (const file of styles) {
       const path = join(DIST_DIR, file);
@@ -123,11 +137,11 @@ const main = () => {
   console.log("Initial JS graph (dashboard entry, raw / gzip):");
   for (const file of [...initial].sort()) {
     const buffer = readFileSync(join(DIST_DIR, file));
-    console.log(`  ${file.padEnd(46)} ${formatBytes(buffer.length)} / ${formatBytes(gzipSync(buffer).length)}`);
+    console.log(
+      `  ${file.padEnd(46)} ${formatBytes(buffer.length)} / ${formatBytes(gzipSync(buffer).length)}`
+    );
   }
-  console.log(
-    `  ${"total".padEnd(46)} ${formatBytes(jsRaw)} / ${formatBytes(jsGzip)} gzip`
-  );
+  console.log(`  ${"total".padEnd(46)} ${formatBytes(jsRaw)} / ${formatBytes(jsGzip)} gzip`);
   console.log(`Initial CSS: ${formatBytes(cssRaw)} / ${formatBytes(cssGzip)} gzip`);
 
   if (violations.length) {
@@ -140,7 +154,9 @@ const main = () => {
     return;
   }
 
-  console.log("✓ bundle budget: no settings, plugin or simple-keyboard modules on first paint.");
+  console.log(
+    "✓ bundle budget: no settings, plugin, drag-and-drop, template-compiler or simple-keyboard modules on first paint."
+  );
 };
 
 main();
