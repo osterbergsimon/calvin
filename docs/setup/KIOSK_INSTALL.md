@@ -372,6 +372,11 @@ cog --platform=drm \
   file when the rotation changes. The same switch works in any browser with
   `?screenStack=opacity` on the dashboard URL (remembered per browser;
   `?screenStack=off` clears it).
+  To turn it off again on a kiosk, remove the line from
+  `/etc/default/calvin-kiosk` and restart `calvin-cog.service`: cog always puts
+  `screenStack=off` in the URL when the variable is unset, which also clears the
+  mode the kiosk remembered. Removing the query parameter alone is not enough,
+  because the browser keeps the last mode in local storage.
 - **Screen power** (display schedule) works: cog is the only DRM client, so the
   agent's root helper stops `calvin-cog.service`, waits up to 5 s for its
   `MainPID` to disappear (the kernel restores the console mode when the last DRM

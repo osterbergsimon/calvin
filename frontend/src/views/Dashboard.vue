@@ -61,19 +61,22 @@
           <!-- Dashboard View (Home) - Renders configured dashboard regions.
                With the screen stack on (utils/screenStack.js) every screen stays
                mounted and only the active one is shown; otherwise only the active
-               screen is rendered, as before. -->
+               screen is rendered, as before. With the stack on it stays mounted
+               under a fullscreen view too, so entering and leaving fullscreen
+               (photo frame idle/wake, maximize) does not remount every screen. -->
           <div
-            v-else
+            v-if="isStacked || !modeStore.isFullscreen"
             :class="[
               'screen-stack',
               { 'screen-stack--stacked': isStacked },
               isStacked ? `screen-stack--${screenStackMode}` : null,
+              { 'screen-stack--under-fullscreen': isStacked && modeStore.isFullscreen },
             ]"
           >
             <ScreenScope
               v-for="screen in renderedScreens"
               :key="isStacked ? screen.id : 'active'"
-              :visible="isActiveScreen(screen)"
+              :visible="isActiveScreen(screen) && !modeStore.isFullscreen"
             >
               <div
                 :ref="el => setDashboardViewEl(screen, el)"
@@ -704,11 +707,20 @@ onUnmounted(() => {
 }
 
 /* Stacked: every screen fills the same box; paint containment keeps a hidden
-   screen's updates from invalidating the visible one. */
-.screen-stack--stacked > .dashboard-view {
+   screen's updates from invalidating the visible one. Three classes on
+   purpose: `.mode-content.dashboard-view` below also sets position, so 0,2,0
+   here would lose to it and leave both screens in normal flow side by side. */
+.screen-stack--stacked > .mode-content.dashboard-view {
   position: absolute;
   inset: 0;
   contain: layout paint;
+}
+
+/* While a fullscreen view is open, the stack stays mounted underneath (so a
+   kiosk wake does not remount every screen) but must not take part in layout
+   or paint. */
+.screen-stack--under-fullscreen {
+  display: none;
 }
 
 /* opacity: hidden screens stay rastered on their own layer, so a switch is a

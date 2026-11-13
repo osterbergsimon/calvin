@@ -4,6 +4,7 @@
  * unmounting and remounting every region.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { nextTick } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import { setActivePinia, createPinia } from "pinia";
 
@@ -21,6 +22,7 @@ vi.mock("vue-router", () => ({
 
 import Dashboard from "@/views/Dashboard.vue";
 import { useConfigStore } from "@/stores/config";
+import { useModeStore } from "@/stores/mode";
 
 const screen = (id, regions) => ({
   id,
@@ -53,6 +55,9 @@ const stubs = {
   MinimalUIOverlay: true,
   LoadingLight: true,
   SetupWelcomeCard: true,
+  CalendarView: true,
+  PhotoSlideshow: true,
+  WebServiceViewer: true,
   LayoutManager: { template: "<div><slot /></div>" },
 };
 
@@ -143,5 +148,49 @@ describe("Dashboard screen stack", () => {
 
     expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
     expect(wrapper.find(".region-resizer").exists()).toBe(true);
+  });
+
+  it("keeps every screen mounted while a fullscreen view is open", async () => {
+    setup({ search: "?screenStack=opacity" });
+    const wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+    const before = wrapper.findAll(".region-stub").map(region => region.element);
+
+    const mode = useModeStore();
+    mode.enterFullscreen(mode.MODES.PHOTOS);
+    await nextTick();
+
+    expect(wrapper.find(".fullscreen-mode").exists()).toBe(true);
+    expect(wrapper.find(".screen-stack--under-fullscreen").exists()).toBe(true);
+    const during = wrapper.findAll(".region-stub").map(region => region.element);
+    expect(during).toHaveLength(before.length);
+    during.forEach((element, index) => expect(element).toBe(before[index]));
+
+    mode.exitFullscreen();
+    await nextTick();
+
+    expect(wrapper.find(".fullscreen-mode").exists()).toBe(false);
+    const after = wrapper.findAll(".region-stub").map(region => region.element);
+    expect(after).toHaveLength(before.length);
+    after.forEach((element, index) => expect(element).toBe(before[index]));
+  });
+
+  it("still swaps the dashboard for a fullscreen view when the stack is off", async () => {
+    setup();
+    const wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+    expect(wrapper.findAll(".region-stub")).toHaveLength(2);
+
+    const mode = useModeStore();
+    mode.enterFullscreen(mode.MODES.PHOTOS);
+    await nextTick();
+
+    expect(wrapper.find(".fullscreen-mode").exists()).toBe(true);
+    expect(wrapper.find(".screen-stack").exists()).toBe(false);
+
+    mode.exitFullscreen();
+    await nextTick();
+
+    expect(wrapper.findAll(".region-stub")).toHaveLength(2);
   });
 });
