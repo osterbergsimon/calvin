@@ -663,13 +663,16 @@ const visibleControlDescriptors = computed(() =>
 );
 
 const behaviourDescriptors = descriptorsForSection("behaviour");
-const behaviour = computed(() => ({
-  photoFrameEnabled: props.config.photoFrameEnabled,
-  photoFrameTimeout: props.config.photoFrameTimeout,
-  photoFrameSourceIds: props.config.photoFrameSourceIds,
-  loadingLight: props.config.loadingLight,
-  layoutMode: props.config.layoutMode ?? "auto",
-}));
+// Every Behaviour descriptor reads its household value, so a row added to the
+// section (Show each photo for) shows the stored value, not its default.
+const behaviour = computed(() =>
+  Object.fromEntries(
+    behaviourDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
 const visibleBehaviourDescriptors = computed(() =>
   visibleDescriptors(behaviourDescriptors, behaviour.value)
 );

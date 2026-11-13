@@ -418,6 +418,36 @@ describe("PhotoSlideshow", () => {
       expect(imagesStore.nextImage).toHaveBeenCalled();
     });
 
+    it("restarts the running timer when rotationInterval changes", async () => {
+      const image1 = createImage({ id: "1" });
+      const image2 = createImage({ id: "2" });
+      imagesStore.currentImage = image1;
+      imagesStore.loading = false;
+      imagesStore.fetchImages = vi.fn().mockImplementation(async () => {
+        imagesStore.images = [image1, image2];
+        return { images: [image1, image2] };
+      });
+
+      const wrapper = createWrapper({
+        autoRotate: true,
+        rotationInterval: 3600000,
+      });
+      await wrapper.vm.$nextTick();
+      await vi.waitFor(() => {
+        expect(imagesStore.fetchImages).toHaveBeenCalled();
+      });
+      await flushPromises();
+
+      // The long timer is already running; shorten the interval.
+      await wrapper.setProps({ rotationInterval: 10000 });
+      imagesStore.nextImage.mockClear();
+
+      vi.advanceTimersByTime(10000);
+      await wrapper.vm.$nextTick();
+
+      expect(imagesStore.nextImage).toHaveBeenCalled();
+    });
+
     it("should not rotate when only one image available", async () => {
       const image = createImage();
       imagesStore.images = [image];
