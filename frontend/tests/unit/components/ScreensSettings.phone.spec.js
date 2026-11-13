@@ -82,7 +82,7 @@ describe("ScreensSettings — phone page stack", () => {
     expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
     // Padded like a row, not a bare child of the panel's border.
     expect(wrapper.find("[data-test='screen-removed-note']").element.parentElement.className).toBe(
-      "screens-removed-note"
+      "settings-section__intro"
     );
   });
 
