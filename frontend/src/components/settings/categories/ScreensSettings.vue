@@ -13,9 +13,11 @@
               {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
             </Button>
           </template>
-          <InlineNote v-if="removedScreenNote" tone="warn" data-test="screen-removed-note">
-            That screen was removed.
-          </InlineNote>
+          <div v-if="removedScreenNote" class="screens-removed-note">
+            <InlineNote tone="warn" data-test="screen-removed-note">
+              That screen was removed.
+            </InlineNote>
+          </div>
           <EmptyState
             v-if="kiosks.length === 0"
             compact
@@ -1992,3 +1994,11 @@ onUnmounted(() => {
   }
 });
 </script>
+
+<style scoped>
+/* The note sits inside the section's panel like a row: panel inset, not on the
+   card's border. */
+.screens-removed-note {
+  padding: var(--panel-pad-y) var(--panel-pad-x);
+}
+</style>

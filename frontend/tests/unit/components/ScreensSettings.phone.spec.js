@@ -80,6 +80,10 @@ describe("ScreensSettings — phone page stack", () => {
       "That screen was removed"
     );
     expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(false);
+    // Padded like a row, not a bare child of the panel's border.
+    expect(wrapper.find("[data-test='screen-removed-note']").element.parentElement.className).toBe(
+      "screens-removed-note"
+    );
   });
 
   it("opens a known ?screen= normally, with no note", async () => {
