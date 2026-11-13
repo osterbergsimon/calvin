@@ -484,6 +484,15 @@ watch(
   }
 );
 
+// A new interval must not wait for the timer already running (an hour-long
+// one would otherwise outlive the change): restart the chain with it.
+watch(
+  () => props.rotationInterval,
+  () => {
+    if (props.autoRotate) startAutoRotation();
+  }
+);
+
 watch(sourceKey, async () => {
   stopAutoRotation();
   await trackPhotoFetch(() => imagesStore.fetchImages(props.sourceIds));
