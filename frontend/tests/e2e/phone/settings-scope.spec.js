@@ -13,7 +13,14 @@
 import { expect } from "@playwright/test";
 import { test } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { KIOSK, gotoSettings, gotoDashboard, expectSettingsReady } from "./fixtures/navigation.js";
+import {
+  KIOSK,
+  gotoSettings,
+  gotoDashboard,
+  expectSettingsReady,
+  closeSection,
+  openSection,
+} from "./fixtures/navigation.js";
 
 const THEME_CONTROL = /^Light or dark:/;
 
@@ -38,17 +45,25 @@ test.describe("settings scope — screens write only that screen", () => {
     await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
 
     // One row per moved group: Look, Display, Effects & focus and Controls.
+    // On a phone each is its own page of the screen.
+    await openSection(page, "screen-look");
     await page.locator("#section-screen-look").getByRole("button", { name: THEME_CONTROL }).click();
     await page.getByRole("option", { name: "Dark", exact: true }).click();
     await expect.poll(() => api.overridesByKiosk.hallway?.themeMode).toBe("dark");
 
+    await closeSection(page);
+    await openSection(page, "screen-display");
     await page.getByRole("button", { name: /^Dashboard size:/ }).click();
     await page.getByRole("option", { name: "Large", exact: true }).click();
     await expect.poll(() => api.overridesByKiosk.hallway?.touchControlSize).toBe("large");
 
+    await closeSection(page);
+    await openSection(page, "screen-effects");
     await page.locator("#section-screen-effects").getByLabel("Dim other regions").click();
     await expect.poll(() => api.overridesByKiosk.hallway?.focusLightDimOthers).toBe(false);
 
+    await closeSection(page);
+    await openSection(page, "screen-controls");
     await page.locator("#section-screen-controls").getByLabel("Hide controls").click();
     await expect.poll(() => api.overridesByKiosk.hallway?.showUI).toBe(false);
 
@@ -66,6 +81,7 @@ test.describe("settings scope — screens write only that screen", () => {
     // The kiosk itself is one screen in the list; edit Workshop instead.
     await page.locator('[data-test="screen-card"]', { hasText: "Workshop" }).first().click();
     await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+    await openSection(page, "screen-controls");
 
     await page
       .locator("#section-screen-controls")
@@ -86,13 +102,18 @@ test.describe("settings scope — Default writes the household config", () => {
     await page.locator('[data-test="screen-default-card"]').click();
     await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
 
+    await openSection(page, "screen-look");
     await page.locator("#section-screen-look").getByRole("button", { name: THEME_CONTROL }).click();
     await page.getByRole("option", { name: "Dark", exact: true }).click();
     await expect.poll(() => api.config.themeMode).toBe("dark");
 
+    await closeSection(page);
+    await openSection(page, "screen-effects");
     await page.locator("#section-screen-effects").getByLabel("Dim other regions").click();
     await expect.poll(() => api.config.focusLightDimOthers).toBe(false);
 
+    await closeSection(page);
+    await openSection(page, "screen-controls");
     await page.locator("#section-screen-controls").getByLabel("Hide controls").click();
     await expect.poll(() => api.config.showUI).toBe(false);
 
@@ -133,6 +154,7 @@ test.describe("settings scope — theme does not leak to the household (H2)", ()
     await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
     await expect(page.locator("html")).toHaveClass(/light/);
 
+    await openSection(page, "screen-look");
     await page.locator("#section-screen-look").getByRole("button", { name: THEME_CONTROL }).click();
     await page.getByRole("option", { name: "Dark", exact: true }).click();
 
@@ -175,8 +197,13 @@ test.describe("settings scope — signpost, old links and search", () => {
 
     await signpost.getByRole("button", { name: "Open Screens" }).click();
     await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
+    // On a phone the signpost opens Controls on its own page.
+    await expect(page.locator("#section-screen-controls")).toBeVisible();
+    await closeSection(page);
     for (const section of ["screen-look", "screen-effects", "screen-controls"]) {
+      await openSection(page, section);
       await expect(page.locator(`#section-${section}`)).toBeVisible();
+      await closeSection(page);
     }
   });
 
@@ -277,6 +304,8 @@ test.describe("settings scope — the dashboard Hide controls toggle (F2)", () =
   });
 
   test("a plain browser keeps its own choice across a reload", async ({ page }) => {
+    // The overflow menu is the desktop's; a phone has no Hide controls there.
+    await page.setViewportSize({ width: 1280, height: 720 });
     const api = await installApiMock(page);
     await gotoDashboard(page);
 

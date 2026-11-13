@@ -10,7 +10,13 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 import { GUEST, JPEG, TOKEN, installGuestMock } from "./fixtures/guest-mock.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
@@ -24,6 +30,7 @@ test.describe("phone: share links", () => {
     await gotoSettings(page);
     await expectSettingsReady(page);
     await selectCategory(page, "Content");
+    await openSection(page, "content-photos");
 
     const section = page.locator('[data-test="share-links"]');
     await section.getByRole("button", { name: "Create link" }).click();
