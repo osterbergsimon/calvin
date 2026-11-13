@@ -1584,6 +1584,8 @@
           "photoRotationInterval": {
             "anyOf": [
               {
+                "maximum": 86400.0,
+                "minimum": 5.0,
                 "type": "integer"
               },
               {
