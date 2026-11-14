@@ -1,7 +1,33 @@
 <!-- frontend/src/components/settings/shared/ScreenSectionIndex.vue -->
 <template>
+  <!-- Phone Settings: the page is a list of its sections, each its own page. -->
   <nav
-    v-if="sections.length > 0"
+    v-if="phoneNav && sections.length > 0"
+    v-show="!focusedSection"
+    class="section-index section-index--pages"
+    aria-label="Sections"
+    data-test="section-index"
+  >
+    <ListRowLink
+      v-for="section in sections"
+      :key="section.id"
+      :to="{ query: sectionQuery(section.id) }"
+      :name="section.label"
+      :meta="section.meta ? [section.meta] : []"
+      :data-test="`section-index-${section.id}`"
+    />
+    <ListRowLink
+      v-for="section in trailing"
+      :key="section.id"
+      class="section-index__trailing"
+      :to="{ query: sectionQuery(section.id) }"
+      :name="section.label"
+      :tone="section.tone || ''"
+      :data-test="`section-index-${section.id}`"
+    />
+  </nav>
+  <nav
+    v-else-if="sections.length > 0"
     class="section-index"
     aria-label="Sections"
     data-test="section-index"
@@ -41,12 +67,27 @@
 // A compact index of the page's sections (settings-scope §5), using the same
 // `section-<id>` anchors the deep links scroll to. On a phone it becomes a
 // select.
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 import { isPhone } from "@/styles/breakpoints";
+import ListRowLink from "@/components/ui/ListRowLink.vue";
+import { openQuery, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 
 defineProps({
+  // [{ id, label, meta? }]
   sections: { type: Array, default: () => [] },
+  // Phone pages only: destinations after a gap, e.g. a destructive one
+  // ([{ id: "screen-remove", label: "Remove screen", tone: "danger" }]).
+  trailing: { type: Array, default: () => [] },
 });
+
+const nav = useSettingsPhoneNav();
+const phoneNav = computed(() => Boolean(nav?.active.value));
+const focus = inject("settingsSectionFocus", null);
+const focusedSection = computed(() => {
+  const value = focus?.value;
+  return value && !value.startsWith("__") ? value : null;
+});
+const sectionQuery = id => openQuery(nav?.query.value ?? {}, { section: id });
 
 const detectPhone = () =>
   typeof window !== "undefined" &&
@@ -77,6 +118,17 @@ onUnmounted(() => window.removeEventListener("resize", refreshPhone));
 <style scoped>
 .section-index {
   margin: 0 0 0.75rem;
+}
+
+.section-index--pages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+  margin: var(--gap-3) 0 0;
+}
+
+.section-index__trailing {
+  margin-top: var(--gap-4);
 }
 
 .section-index__list {

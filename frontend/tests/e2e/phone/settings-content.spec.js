@@ -8,15 +8,25 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  closeSection,
+  gotoSettings,
+  expectSettingsReady,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
-async function openContent(page) {
+// On a phone Content is a list of sections; `section` opens one (a no-op where
+// the page shows them all).
+async function openContent(page, section = null) {
   const api = await installApiMock(page);
   await gotoSettings(page);
   await expectSettingsReady(page);
   await selectCategory(page, "Content");
+  if (section) await openSection(page, section);
   return api;
 }
 
@@ -25,12 +35,16 @@ test.describe("phone: Content", () => {
     page,
     consoleErrors,
   }) => {
-    await openContent(page);
+    await openContent(page, "content-calendars");
 
     const content = page.locator(".content-settings");
     await expect(content.getByText("Family", { exact: true })).toBeVisible();
     await expect(content.getByRole("button", { name: "Add a calendar" })).toBeVisible();
+    await closeSection(page);
+    await openSection(page, "content-photos");
     await expect(content.getByRole("button", { name: "Add photos from…" })).toBeVisible();
+    await closeSection(page);
+    await openSection(page, "content-services");
     await expect(content.getByRole("button", { name: "Add a web page or app" })).toBeVisible();
     await expect(content.getByText("Weather", { exact: true })).toBeVisible();
     await expect(content.getByText("Recipes", { exact: true })).toBeVisible();
@@ -40,7 +54,7 @@ test.describe("phone: Content", () => {
   });
 
   test("adds a calendar through the add form", async ({ page, consoleErrors }) => {
-    const api = await openContent(page);
+    const api = await openContent(page, "content-calendars");
 
     await page.getByRole("button", { name: "Add a calendar" }).click();
     const modal = page.locator(".dialog");
@@ -164,7 +178,7 @@ test.describe("phone: Content", () => {
   });
 
   test("opens a row's more-actions menu inside the viewport", async ({ page, consoleErrors }) => {
-    await openContent(page);
+    await openContent(page, "content-calendars");
     const trigger = page
       .locator(".content-settings")
       .getByRole("button", { name: /^More actions for / })
@@ -190,7 +204,7 @@ test.describe("phone: Content", () => {
     page,
     consoleErrors,
   }) => {
-    const api = await openContent(page);
+    const api = await openContent(page, "content-calendars");
     const familyRow = page.locator('.content-settings [data-source-id="src-family"]');
     await familyRow.getByRole("button", { name: "Edit" }).click();
 
@@ -213,7 +227,7 @@ test.describe("phone: Content", () => {
     page,
     consoleErrors,
   }) => {
-    const api = await openContent(page);
+    const api = await openContent(page, "content-photos");
 
     await page.getByRole("button", { name: "Add photos from…" }).click();
     const picker = page.locator(".dialog");
@@ -251,7 +265,7 @@ test.describe("phone: Content", () => {
   });
 
   test("adds a web page through the picker", async ({ page, consoleErrors }) => {
-    const api = await openContent(page);
+    const api = await openContent(page, "content-services");
 
     await page.getByRole("button", { name: "Add a web page or app" }).click();
     const picker = page.locator(".dialog");

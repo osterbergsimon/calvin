@@ -9,7 +9,13 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
@@ -24,6 +30,7 @@ async function openDefaultScreen(page) {
   await selectCategory(page, "Screens");
   await page.locator("[data-test='screen-default-card']").click();
   await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+  await openSection(page, "device-behaviour");
 }
 
 test("Auto keeps the phone layout and Desktop forces the desktop one", async ({
@@ -48,6 +55,10 @@ test("Auto keeps the phone layout and Desktop forces the desktop one", async ({
   await layout.getByRole("radio", { name: "Desktop" }).click();
   await expect(html).toHaveClass(/calvin-layout-desktop/);
   await expect.poll(() => settingsColumns(page)).toBe(2);
+  // The structure follows too, not only the CSS: the category rail is back and
+  // the phone's back button is gone, without a resize (usePhoneViewport).
+  await expect(page.locator(".category-rail")).toBeVisible();
+  await expect(page.locator('.settings-topbar [data-action="back"]')).toHaveCount(0);
   // Default is the household value, so it writes /api/config, not this browser.
   await expect.poll(() => api.config.layoutMode).toBe("desktop");
   expect(await page.evaluate(() => localStorage.getItem("calvin-layout-mode"))).toBeNull();
@@ -65,7 +76,9 @@ test("Auto keeps the phone layout and Desktop forces the desktop one", async ({
     .getByRole("radio", { name: "Auto" })
     .click();
   await expect(page.locator("html")).not.toHaveClass(/calvin-layout-desktop/);
-  await expect.poll(() => settingsColumns(page)).toBe(1);
+  // The phone's stack of pages is back, on the page the URL still names.
+  await expect(page.locator('.settings-topbar [data-action="back"]')).toBeVisible();
+  await expect(page.locator(".category-rail")).toHaveCount(0);
   await expect.poll(() => api.config.layoutMode).toBe("auto");
   expect(await page.evaluate(() => localStorage.getItem("calvin-layout-mode"))).toBeNull();
 

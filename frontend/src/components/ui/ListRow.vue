@@ -29,11 +29,16 @@
     </div>
 
     <div v-if="$slots.actions" class="list-row__actions"><slot name="actions" /></div>
+
+    <svg v-if="chevron" class="list-row__chevron" viewBox="0 0 24 24" aria-hidden="true">
+      <path :d="mdiChevronRight" fill="currentColor" />
+    </svg>
   </div>
 </template>
 
 <script setup>
 import { computed } from "vue";
+import { mdiChevronRight } from "@mdi/js";
 
 // The one item row (docs/design/frontend-doctrine.md §3, §4.4): lead · body ·
 // actions. Screens, sources, keys and plugins build their lists from it instead
@@ -47,6 +52,10 @@ const props = defineProps({
   lead: { type: String, default: "" },
   selected: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
+  // The row opens a page of its own (phone Settings): a trailing chevron that,
+  // unlike the actions group, stays on the row's line at every width. The
+  // caller makes the row a link (wrap it in a RouterLink).
+  chevron: { type: Boolean, default: false },
 });
 
 const metaLines = computed(() =>
@@ -144,9 +153,21 @@ const metaLines = computed(() =>
   margin-left: auto;
 }
 
+.list-row__chevron {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: auto;
+  color: var(--ink-3);
+}
+
 @media (--bp-phone) {
   .list-row {
     align-items: flex-start;
+  }
+
+  .list-row__chevron {
+    align-self: center;
   }
 
   .list-row__actions {

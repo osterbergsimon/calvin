@@ -1,6 +1,11 @@
 <template>
-  <section :id="`section-${id}`" class="settings-section collapsible-settings-section">
+  <section
+    v-if="!hiddenByFocus"
+    :id="`section-${id}`"
+    class="settings-section collapsible-settings-section"
+  >
     <button
+      v-if="!alone"
       type="button"
       class="collapsible-settings-section__header"
       :aria-expanded="open ? 'true' : 'false'"
@@ -12,14 +17,14 @@
         open ? "▾" : "▸"
       }}</span>
     </button>
-    <div v-show="open" :id="contentId" class="settings-section__panel">
+    <div v-show="open || alone" :id="contentId" class="settings-section__panel">
       <slot />
     </div>
   </section>
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import {
   collapseSettingsSection,
   expandSettingsSection,
@@ -38,6 +43,12 @@ let counter = 0;
 const contentId = `settings-section-content-${++counter}`;
 
 const open = computed(() => isSettingsSectionExpanded(props.id));
+
+// Phone pages (see SettingsSection): hidden behind the section list, or the
+// whole page and therefore open, without its own toggle.
+const focus = inject("settingsSectionFocus", null);
+const hiddenByFocus = computed(() => Boolean(focus?.value) && focus.value !== props.id);
+const alone = computed(() => focus?.value === props.id);
 
 const toggle = () => {
   if (open.value) collapseSettingsSection(props.id);
