@@ -17,6 +17,7 @@ import { parse as parseDom } from "@vue/compiler-dom";
 
 const COMPONENTS_DIR = "src/components";
 const USE_SYSTEM = "src/composables/useSystem.js";
+const UPDATE_LIFECYCLE = "src/utils/updateLifecycle.js";
 
 // "Say screen, page, source, plugin, Calvin (for the server)" — never these.
 // `api` stays legal for "API keys", and `configuration` is not `config`.
@@ -120,7 +121,12 @@ describe("copy: no developer words in the UI (CLV-63)", () => {
 
   it("uses plain words in the System toasts", () => {
     const source = readFileSync(USE_SYSTEM, "utf8");
-    const assignments = [...source.matchAll(/updateMessage\.value\s*=\s*(?:"([^"]*)"|`([^`]*)`)/g)];
+    // Calvin's update says its words from one table (utils/updateLifecycle.js).
+    const lifecycle = readFileSync(UPDATE_LIFECYCLE, "utf8");
+    const assignments = [
+      ...source.matchAll(/updateMessage\.value\s*=\s*(?:"([^"]*)"|`([^`]*)`)/g),
+      ...lifecycle.matchAll(/message:\s*(?:"([^"]*)"|`([^`]*)`)/g),
+    ];
     expect(assignments.length).toBeGreaterThan(10);
 
     const failures = [];
