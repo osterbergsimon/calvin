@@ -13,7 +13,14 @@
 import { expect } from "@playwright/test";
 import { test } from "./phone/fixtures/phone-audit.js";
 import { installApiMock } from "./phone/fixtures/api-mock.js";
-import { expectSettingsReady, gotoSettings, selectCategory } from "./phone/fixtures/navigation.js";
+import {
+  closeSection,
+  expectSettingsReady,
+  gotoSettings,
+  listSections,
+  openSection,
+  selectCategory,
+} from "./phone/fixtures/navigation.js";
 import {
   collectSwitchHitProblems,
   collectTouchTargetProblems,
@@ -37,21 +44,28 @@ for (const c of CASES) {
       await expectSettingsReady(page);
 
       let switchesChecked = 0;
-      for (const category of CATEGORIES) {
-        await selectCategory(page, category);
-
+      // A phone shows a long category one section at a time: audit each page.
+      const audit = async label => {
         const hits = await collectSwitchHitProblems(page, ".settings-content");
         switchesChecked += hits.checked;
         expect(
           hits.problems,
-          `${c.name}/${category}: switch centre or +/-20px misses the switch`
+          `${c.name}/${label}: switch centre or +/-20px misses the switch`
         ).toEqual([]);
 
         const problems = await collectTouchTargetProblems(page, ".settings-content");
-        expect(
-          problems,
-          `${c.name}/${category}: controls under the ${TOUCH_TARGET}px target`
-        ).toEqual([]);
+        expect(problems, `${c.name}/${label}: controls under the ${TOUCH_TARGET}px target`).toEqual(
+          []
+        );
+      };
+      for (const category of CATEGORIES) {
+        await selectCategory(page, category);
+        await audit(category);
+        for (const section of await listSections(page)) {
+          await openSection(page, section);
+          await audit(`${category}/${section}`);
+          await closeSection(page);
+        }
       }
 
       // The check would pass vacuously on a page with no switches.
@@ -72,6 +86,7 @@ for (const c of CASES) {
 
       await page.locator('[data-test="screen-default-card"]').click();
       await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
+      await openSection(page, "device-power");
 
       const schedule = page.getByRole("switch", { name: "Screen on/off schedule" });
       if ((await schedule.getAttribute("aria-checked")) !== "true") await schedule.click();

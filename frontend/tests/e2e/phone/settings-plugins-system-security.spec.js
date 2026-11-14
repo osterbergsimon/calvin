@@ -9,7 +9,13 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  gotoSettings,
+  expectSettingsReady,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
@@ -70,13 +76,13 @@ test.describe("phone: System", () => {
     await selectCategory(page, "System");
 
     const system = page.locator(".maintenance-settings");
-    await expect(
-      system.locator(".settings-section__eyebrow", { hasText: "Updates" }).first()
-    ).toBeVisible();
-    await expect(
-      system.locator(".settings-section__eyebrow", { hasText: "Versions & status" }).first()
-    ).toBeVisible();
+    // On a phone each System section is its own page.
+    await openSection(page, "device-hardware");
+    await expect(page.locator("#section-device-hardware")).toBeVisible();
     await expect(page.locator('[data-test="version-readout"]')).toContainText("1.6.0");
+    await page.locator('.settings-topbar [data-action="back"]').click();
+    await openSection(page, "maintenance-updates");
+    await expect(page.locator("#section-maintenance-updates")).toBeVisible();
     // The health and update labels come from the real API vocabulary, not the
     // mock's old "ok"/missing-status shapes (CLV-81 review).
     await expect(page.locator('[data-test="readout-calvin"]')).toContainText("Running");
@@ -86,12 +92,18 @@ test.describe("phone: System", () => {
     await expectPhoneLayout(page, "System category");
 
     // The Advanced disclosure holds the installer-facing rows.
-    await system.getByText("Advanced", { exact: true }).click();
+    await page.locator('.settings-topbar [data-action="back"]').click();
+    await openSection(page, "maintenance-advanced");
+    // On a phone Advanced is a page of its own, open without a toggle.
+    const advancedToggle = system.getByText("Advanced", { exact: true });
+    if (await advancedToggle.isVisible()) await advancedToggle.click();
     await expect(system.getByText("Check for setting changes every")).toBeVisible();
     await expectPhoneLayout(page, "System advanced section");
 
     // Host actions are intercepted by fixtures/api-mock.js, never executed.
     // Do this last: a real restart replaces the page with a waiting overlay.
+    await page.locator('.settings-topbar [data-action="back"]').click();
+    await openSection(page, "maintenance-system");
     await page.locator('[data-test="restart-backend"]').click();
     const confirm = page.getByRole("dialog");
     await expect(confirm).toBeVisible();

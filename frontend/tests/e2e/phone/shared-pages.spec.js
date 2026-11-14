@@ -8,7 +8,14 @@
 import { expect } from "@playwright/test";
 import { test } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  closeSection,
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
@@ -25,6 +32,7 @@ test("adding a page on a screen pins Default and gives only that screen the page
 
   // Open the editor from the first screen (Hallway), not from Default.
   await page.locator('[data-test="screen-card"]').first().click();
+  await openSection(page, "screen-pages");
   await page.locator('[data-test="edit-pages-btn"]').click();
   const editor = page.locator(".sre-root");
   await expect(editor).toBeVisible();
@@ -53,8 +61,10 @@ test("adding a page on a screen pins Default and gives only that screen the page
 
   // Default's page lists every catalog page, with the newcomer switched off.
   await page.getByRole("button", { name: "Close editor" }).click();
-  await page.locator('[data-test="screens-back"]').click();
+  await closeSection(page);
+  await page.locator('.settings-topbar [data-action="back"]').click();
   await page.locator('[data-test="screen-default-card"]').click();
+  await openSection(page, "default-pages");
   const rows = page.locator('[data-test="default-page-row"]');
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(2).locator('[role="switch"]')).toHaveAttribute("aria-checked", "false");

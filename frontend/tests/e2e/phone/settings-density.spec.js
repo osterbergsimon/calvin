@@ -12,7 +12,13 @@
 import { expect } from "@playwright/test";
 import { test } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 // The headless shell bundled with this Playwright crashes rendering the
 // Settings page at 1280 (it can render the same page at 390); the full
@@ -88,6 +94,7 @@ test.describe("settings density at 1280", () => {
     await selectCategory(page, "Screens");
     await page.locator("[data-test='screen-default-card']").click();
     await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+    await openSection(page, "device-power");
     await expect(page.locator("#section-device-behaviour .setting-row").first()).toBeVisible();
     const defaultRows = await compactRows(page);
     expect(defaultRows.length).toBeGreaterThan(0);
@@ -112,6 +119,8 @@ for (const [name, viewport] of [
       const api = await openSettings(page, "Screens");
       await page.locator("[data-test='screen-default-card']").click();
       await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+      await openSection(page, "device-power");
+      await openSection(page, "device-power");
       await expect(page.locator("#section-device-keyboard .setting-row").first()).toBeVisible();
 
       await page.evaluate(() => document.fonts.ready);
@@ -191,6 +200,8 @@ for (const [name, viewport] of [
       await openSettings(page, "Screens");
       await page.locator("[data-test='screen-default-card']").click();
       await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+      await openSection(page, "device-power");
+      await openSection(page, "device-power");
 
       const height = await page.evaluate(() => {
         const toggleRow = [...document.querySelectorAll("#section-device-power .setting-row")].find(
@@ -221,6 +232,7 @@ test.describe("schedule editor at 390", () => {
     const api = await openSettings(page, "Screens");
     await page.locator("[data-test='screen-default-card']").click();
     await expect(page.locator("[data-test='default-screen-page']")).toBeVisible();
+    await openSection(page, "device-power");
 
     await page.locator("[data-test='schedule-change']").click();
     await page

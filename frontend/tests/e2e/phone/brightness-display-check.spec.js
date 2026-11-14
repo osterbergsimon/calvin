@@ -11,7 +11,7 @@ import path from "node:path";
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { KIOSK, gotoSettings, expectSettingsReady } from "./fixtures/navigation.js";
+import { KIOSK, expectSettingsReady, gotoSettings, openSection } from "./fixtures/navigation.js";
 
 const SHOTS = process.env.BRIGHTNESS_SHOTS || "";
 // What GET /kiosks carries for a screen nobody has checked: every field present.
@@ -61,6 +61,7 @@ async function openHallway(page, { kiosk = null } = {}) {
   await expectSettingsReady(page);
   await page.locator('[data-test="screen-card"]', { hasText: "Hallway" }).first().click();
   await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+  await openSection(page, "screen-power");
   const group = page.locator('[data-test="brightness-group"]');
   await group.scrollIntoViewIfNeeded();
   return group;

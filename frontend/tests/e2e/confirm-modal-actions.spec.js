@@ -8,7 +8,12 @@
 import { expect } from "@playwright/test";
 import { test } from "./phone/fixtures/phone-audit.js";
 import { installApiMock } from "./phone/fixtures/api-mock.js";
-import { gotoSettings, expectSettingsReady, selectCategory } from "./phone/fixtures/navigation.js";
+import {
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./phone/fixtures/navigation.js";
 
 const LONG_SCREEN = "Upstairs hallway portrait display beside the stairs";
 
@@ -55,6 +60,7 @@ async function openDeleteConfirm(page) {
   await selectCategory(page, "Screens");
 
   await page.locator('[data-test="screen-card"]', { hasText: LONG_SCREEN }).click();
+  await openSection(page, "screen-pages");
   await page.locator('[data-test="edit-pages-btn"]').click();
 
   const editor = page.locator(".sre-root");

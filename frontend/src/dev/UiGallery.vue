@@ -177,6 +177,22 @@
             </template>
           </ListRow>
         </div>
+
+        <p class="ui-gallery__note">
+          ListRowLink: a row that opens a page of its own (phone Settings). A real link with a
+          chevron that stays on the row's line at every width; <code>tone="danger"</code> for a
+          destructive destination.
+        </p>
+        <div class="ui-gallery__stack">
+          <ListRowLink
+            to="/screens"
+            :lead="mdiMonitor"
+            name="Screens"
+            :meta="['Pages · rotation · power · touch']"
+          />
+          <ListRowLink to="/look" name="Look" :meta="['Theme · light or dark · font']" />
+          <ListRowLink to="/remove" name="Remove screen" tone="danger" />
+        </div>
       </section>
 
       <section class="ui-gallery__section" data-test="gallery-popover">
@@ -458,6 +474,7 @@ import FieldTable from "../components/ui/FieldTable.vue";
 import IconButton from "../components/ui/IconButton.vue";
 import InlineNote from "../components/ui/InlineNote.vue";
 import ListRow from "../components/ui/ListRow.vue";
+import ListRowLink from "../components/ui/ListRowLink.vue";
 import Menu from "../components/ui/Menu.vue";
 import Popover from "../components/ui/Popover.vue";
 import ProgressBar from "../components/ui/ProgressBar.vue";
@@ -645,6 +662,7 @@ onMounted(syncGalleryColours);
   flex-direction: column;
   gap: var(--gap-stack);
 }
+
 .ui-gallery__full-sheet {
   display: flex;
   flex: 1 1 auto;

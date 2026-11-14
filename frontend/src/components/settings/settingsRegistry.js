@@ -45,6 +45,33 @@ export const settingsCategories = [
   },
 ];
 
+// Long categories become a list of their sections on a phone, each section a
+// page of its own (?section=<id>, useSettingsPhoneNav.js). Short categories
+// (Dashboard, Plugins, Security) stay one page. Screens lists the sections of
+// a screen's page itself.
+export const phoneSectionPages = {
+  content: [
+    { id: "content-calendars", label: "Calendars", meta: "Add and edit calendars" },
+    {
+      id: "content-calendar-display",
+      label: "Calendar basics",
+      meta: "Week start, weekend days, time format",
+    },
+    { id: "content-photos", label: "Photos", meta: "Photo sources, guest uploads" },
+    { id: "content-services", label: "Web pages & apps", meta: "Pages and apps on the dashboard" },
+    { id: "content-clock-bar", label: "Clock bar info", meta: "Weather and more beside the clock" },
+  ],
+  maintenance: [
+    { id: "maintenance-updates", label: "Updates", meta: "Install Calvin updates" },
+    { id: "device-hardware", label: "Versions & status" },
+    { id: "maintenance-system", label: "Restart", meta: "Restart the server or a screen" },
+    { id: "maintenance-backup", label: "Backup", meta: "Download a backup" },
+    { id: "maintenance-restore", label: "Restore", meta: "Restore from a backup file" },
+    { id: "maintenance-auto-backup", label: "Automatic backups" },
+    { id: "maintenance-advanced", label: "Advanced", meta: "Logs and diagnostics" },
+  ],
+};
+
 // A retired category still resolves, so a stored session value or an old link
 // never falls back to the default. Clock Bar is now part of Dashboard; Kiosks
 // and Screen & keyboard are now one Screens category.
