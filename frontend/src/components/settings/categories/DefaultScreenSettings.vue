@@ -234,13 +234,6 @@
       />
 
       <InlineNote data-test="default-brightness-note">Brightness is set on each screen.</InlineNote>
-
-      <!-- The reboot combo restarts the Pi, so it sits under Power (decision C)
-           and no screen can override it. -->
-      <div data-test="default-only-reboot">
-        <DefaultOnlyNote block />
-        <RebootCombo :config="config" @update:config="patch => emitChange(patch)" />
-      </div>
     </SettingsSection>
 
     <SettingsSection id="device-keyboard" title="Touch & keyboard">
@@ -325,6 +318,52 @@
       </SettingRow>
     </SettingsSection>
 
+    <!-- Everything about driving the dashboard with a remote or keys, in one
+         place: the button-press label (per screen), how long it stays, the
+         bindings and the reboot keys (the same on every screen). -->
+    <SettingsSection id="device-remote" title="Remote & keys">
+      <template v-for="descriptor in visibleRemoteDescriptors" :key="descriptor.key">
+        <ScreenSettingRow
+          :descriptor="descriptor"
+          :value="remote[descriptor.key]"
+          :show-scope="false"
+          @set="v => emitChange({ [descriptor.key]: v })"
+        />
+        <DefaultEditNote
+          :note="editNote"
+          :setting="descriptor.key"
+          @change-them-too="changeThemToo"
+          @dismiss="dismissNote"
+        />
+      </template>
+      <!-- The three shared rows sit under one heading: every one of them is the
+           same on every screen, so the note is said once instead of three
+           times above rows it qualifies (§3.1, §4.2–4.3). -->
+      <SettingGroup title="Same on every screen">
+        <SettingRow
+          label="Hide label after"
+          description="Also how long the focus light stays after a key press."
+          data-test="default-hide-label-after"
+        >
+          <NumberStepper
+            :model-value="config.modeIndicatorTimeout ?? 5"
+            :min="0"
+            :max="60"
+            unit=" s"
+            aria-label="Hide label after, in seconds"
+            @update:model-value="v => emitChange({ modeIndicatorTimeout: v })"
+          />
+        </SettingRow>
+        <!-- The reboot keys restart the Pi; no screen can override them. -->
+        <div data-test="default-only-reboot">
+          <RebootCombo :config="config" @update:config="patch => emitChange(patch)" />
+        </div>
+        <div data-test="default-only-bindings">
+          <KeyboardTab />
+        </div>
+      </SettingGroup>
+    </SettingsSection>
+
     <SettingsSection id="device-behaviour" title="Behaviour">
       <template v-for="descriptor in visibleBehaviourDescriptors" :key="descriptor.key">
         <ScreenSettingRow
@@ -358,9 +397,11 @@ import { mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
+import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
 import DefaultOnlyNote from "@/components/settings/shared/DefaultOnlyNote.vue";
 import DefaultEditNote from "@/components/settings/shared/DefaultEditNote.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
@@ -368,6 +409,7 @@ import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import DisplayScheduleGrid from "@/components/settings/shared/DisplayScheduleGrid.vue";
 import RebootCombo from "@/components/settings/tabs/layout/keyboard/RebootCombo.vue";
+import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
 import PageThumbnail from "@/components/settings/shared/PageThumbnail.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
@@ -407,6 +449,7 @@ const sectionIndex = [
   { id: "screen-controls", label: "Controls" },
   { id: "device-power", label: "Power" },
   { id: "device-keyboard", label: "Touch & keyboard" },
+  { id: "device-remote", label: "Remote & keys" },
   { id: "device-behaviour", label: "Behaviour" },
 ];
 
@@ -647,6 +690,19 @@ const effects = computed(() =>
 );
 const visibleEffectsDescriptors = computed(() =>
   visibleDescriptors(effectsDescriptors, effects.value)
+);
+
+const remoteDescriptors = descriptorsForSection("remote");
+const remote = computed(() =>
+  Object.fromEntries(
+    remoteDescriptors.map(descriptor => [
+      descriptor.key,
+      props.config[descriptor.key] ?? descriptor.defaultValue,
+    ])
+  )
+);
+const visibleRemoteDescriptors = computed(() =>
+  visibleDescriptors(remoteDescriptors, remote.value)
 );
 
 const controlDescriptors = descriptorsForSection("controls");

@@ -32,29 +32,26 @@
       />
     </SettingsSection>
 
+    <!-- The tiles beside the clock (weather and more) sit with the bar they
+         appear on; Edit clock bar above places them. The id is the old
+         Content one, so links and searches for it still land here. -->
+    <SettingsSection
+      id="content-clock-bar"
+      title="Clock bar info"
+      description="Tiles beside the clock, like the weather. Edit clock bar places them on the bar."
+    >
+      <ClockBarSources :highlight-id="highlightId" :highlight-provider="highlightProvider" />
+    </SettingsSection>
+
     <!-- The moved groups: one line where they used to be (§4). -->
     <InlineNote class="dashboard-signpost" data-test="dashboard-screen-signpost">
-      Look, focus light and controls are set per screen.
+      Look, focus light, controls and the remote are set per screen.
       <template #action>
         <Button variant="link" data-test="open-screens-settings" @click="openScreenSettings">
           Open Screens
         </Button>
       </template>
     </InlineNote>
-
-    <SettingsSection id="kiosk-touch-focus" title="Remote buttons">
-      <SettingRow label="Hide label after">
-        <NumberStepper
-          :model-value="config.modeIndicatorTimeout"
-          :min="0"
-          :max="60"
-          unit=" s"
-          aria-label="Hide label after, in seconds"
-          @update:model-value="v => emit('update:config', { modeIndicatorTimeout: v })"
-        />
-      </SettingRow>
-      <KeyboardTab />
-    </SettingsSection>
   </div>
 </template>
 
@@ -63,11 +60,10 @@ import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import Button from "@/components/ui/Button.vue";
-import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import ClockBarOverview from "@/components/settings/shared/ClockBarOverview.vue";
 import ClockBarEditor from "@/components/settings/shared/ClockBarEditor.vue";
-import KeyboardTab from "@/components/settings/tabs/layout/KeyboardTab.vue";
+import ClockBarSources from "@/components/settings/tabs/content/ClockBarSources.vue";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { normalizeDashboardScreens } from "@/utils/layout";
@@ -88,6 +84,15 @@ const editorOpen = ref(false);
 // Pages & regions (`?setting=clock-bar&edit=clock-bar`).
 const clockEditorOpen = ref(false);
 const route = useRoute();
+
+// Plugins' "Used by n sources" links carry the provider id, so the clock bar
+// info rows pulse once on arrival (§3.3).
+const highlightProvider = computed(() =>
+  typeof route?.query?.highlight === "string" ? route.query.highlight : ""
+);
+const highlightId = computed(() =>
+  typeof route?.query?.source === "string" ? route.query.source : ""
+);
 const router = useRouter();
 const { placement, clearPlacement } = usePlacementRequest();
 const { regionRequest, clearRegionRequest } = useRegionEditorRequest();

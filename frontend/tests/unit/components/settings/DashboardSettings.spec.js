@@ -28,6 +28,7 @@ const baseConfig = () => ({
 
 const stubs = {
   ClockBarEditor: true,
+  ClockBarSources: true,
   KeyboardTab: true,
 };
 
@@ -41,13 +42,18 @@ describe("DashboardSettings", () => {
     window.sessionStorage.clear();
   });
 
-  it("renders what the home shows, with the clock section folded in", () => {
+  it("renders the pages and the clock bar, with its info tiles beside it", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     expect(sectionIds(w)).toEqual([
       "section-regions",
       "section-clock-bar",
-      "section-kiosk-touch-focus",
+      "section-content-clock-bar",
     ]);
+    // The tiles moved here from Content, next to the editor that places them.
+    expect(w.find("#section-content-clock-bar .settings-section__eyebrow").text()).toBe(
+      "Clock bar info"
+    );
+    expect(w.findComponent({ name: "ClockBarSources" }).exists()).toBe(true);
     // Appearance moved to Screens › Look (§7 item 6).
     expect(w.find("#section-appearance").exists()).toBe(false);
     // Screen orientation moved to Screen & keyboard.
@@ -69,12 +75,10 @@ describe("DashboardSettings", () => {
     expect(w.findComponent({ name: "ClockBarEditor" }).exists()).toBe(true);
   });
 
-  it("leaves only the remote rows and points to Screens for the rest", () => {
+  it("keeps no screen rows: the remote went to Screens with the rest", () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const labels = w.findAllComponents({ name: "SettingRow" }).map(r => r.props("label"));
-    // Remote buttons: key-press labels and bindings are what is left.
-    expect(labels).toContain("Hide label after");
-    // Everything that moved lives on Screens now.
+    // Everything that moved lives on Screens now, the remote included.
     for (const label of [
       "Look",
       "Theme",
@@ -89,20 +93,21 @@ describe("DashboardSettings", () => {
       "Dim other regions",
       "Show button presses",
       "Label size",
+      "Hide label after",
     ]) {
       expect(labels, label).not.toContain(label);
     }
-    expect(w.find("#section-kiosk-touch-focus .settings-section__eyebrow").text()).toBe(
-      "Remote buttons"
-    );
-    expect(w.findComponent({ name: "KeyboardTab" }).exists()).toBe(true);
+    expect(w.find("#section-kiosk-touch-focus").exists()).toBe(false);
+    expect(w.findComponent({ name: "KeyboardTab" }).exists()).toBe(false);
   });
 
   it("leaves a true signpost where the moved groups used to be", async () => {
     const w = mount(DashboardSettings, { props: { config: baseConfig() }, global: { stubs } });
     const signpost = w.find("[data-test='dashboard-screen-signpost']");
     expect(signpost.exists()).toBe(true);
-    expect(signpost.text()).toContain("Look, focus light and controls are set per screen.");
+    expect(signpost.text()).toContain(
+      "Look, focus light, controls and the remote are set per screen."
+    );
     const open = signpost.find("[data-test='open-screens-settings']");
     expect(open.exists()).toBe(true);
     expect(open.text()).toBe("Open Screens");

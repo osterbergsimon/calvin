@@ -405,7 +405,6 @@ const SECTION_BY_CATEGORY_TAB = {
     regions: "regions",
     clock: "clock-bar",
     "bar-items": "clock-bar",
-    "kiosk-touch-focus": "kiosk-touch-focus",
   },
   content: {
     calendars: "content-calendars",
@@ -415,7 +414,6 @@ const SECTION_BY_CATEGORY_TAB = {
     services: "content-services",
     // "Add a web page" (plugins-services) lands on the services section.
     "content-services": "content-services",
-    "clock-bar-sources": "content-clock-bar",
   },
   screens: {
     // Screens has no tabs: the list page and each screen's page are sections.

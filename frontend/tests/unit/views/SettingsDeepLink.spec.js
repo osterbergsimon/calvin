@@ -84,14 +84,14 @@ describe("Settings ?setting= deep links after the category reorg", () => {
 
   const activeCategory = w => w.findComponent({ name: "CategoryRail" }).props("activeId");
 
-  it("opens Screens and scrolls to Power for device-reboot", async () => {
+  it("opens Screens and scrolls to Remote & keys for device-reboot", async () => {
     route.query = { setting: "device-reboot" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
           ScreensSettings: {
-            template: `<div>${section("device-power", "All screens · Power")}</div>`,
+            template: `<div>${section("device-remote", "Remote & keys")}</div>`,
           },
         },
       },
@@ -100,7 +100,7 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     await flushPromises();
 
     expect(activeCategory(w)).toBe("screens");
-    expect(document.getElementById("section-device-power").scrollIntoView).toHaveBeenCalled();
+    expect(document.getElementById("section-device-remote").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 
@@ -218,14 +218,34 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     w.unmount();
   });
 
-  it("opens Dashboard › Remote buttons for device-notifications", async () => {
+  it("opens Screens › Remote & keys for device-notifications", async () => {
     route.query = { setting: "device-notifications" };
     const w = mount(Settings, {
       global: {
         stubs: {
           ...stubs,
+          ScreensSettings: {
+            template: `<div>${section("device-remote", "Remote & keys")}</div>`,
+          },
+        },
+      },
+      attachTo: document.body,
+    });
+    await flushPromises();
+
+    expect(activeCategory(w)).toBe("screens");
+    expect(document.getElementById("section-device-remote").scrollIntoView).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it("opens Dashboard › Clock bar info for its old Content link", async () => {
+    route.query = { setting: "content-clock-bar" };
+    const w = mount(Settings, {
+      global: {
+        stubs: {
+          ...stubs,
           DashboardSettings: {
-            template: `<div>${section("kiosk-touch-focus", "Remote buttons")}</div>`,
+            template: `<div>${section("content-clock-bar", "Clock bar info")}</div>`,
           },
         },
       },
@@ -234,7 +254,7 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     await flushPromises();
 
     expect(activeCategory(w)).toBe("dashboard");
-    expect(document.getElementById("section-kiosk-touch-focus").scrollIntoView).toHaveBeenCalled();
+    expect(document.getElementById("section-content-clock-bar").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });
 });
