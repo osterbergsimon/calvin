@@ -99,6 +99,28 @@ export async function closeSection(page) {
 }
 
 /**
+ * Every section a phone page lists (`section-index-*` rows), in order. Empty
+ * where the page shows all its sections (a desktop, a short category).
+ */
+export async function listSections(page) {
+  return page
+    .locator('[data-test^="section-index-"]:not([data-test="section-index-select"])')
+    .evaluateAll(rows => rows.map(row => row.dataset.test.replace("section-index-", "")));
+}
+
+/**
+ * From a screen's page (or one of its sections) back to the Screens list:
+ * the phone's top-bar back, or the pane's "‹ Screens" button elsewhere.
+ */
+export async function backToScreens(page) {
+  await closeSection(page);
+  const back = page.locator('.settings-topbar [data-action="back"]');
+  if (await back.isVisible()) await back.click();
+  else await page.locator('[data-test="screens-back"]').click();
+  await page.waitForLoadState("networkidle");
+}
+
+/**
  * Reach Settings the way a person does: the Settings button on a phone,
  * ⋯ › Settings elsewhere.
  */

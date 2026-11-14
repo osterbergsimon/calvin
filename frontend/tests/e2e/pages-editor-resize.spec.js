@@ -13,11 +13,12 @@ import { expect } from "@playwright/test";
 import { test } from "./phone/fixtures/phone-audit.js";
 import { installApiMock } from "./phone/fixtures/api-mock.js";
 import {
+  expectSettingsReady,
+  gotoSettings,
   KIOSK,
   KIOSK_ID,
+  openSection,
   PHONE,
-  gotoSettings,
-  expectSettingsReady,
   selectCategory,
 } from "./phone/fixtures/navigation.js";
 
@@ -46,6 +47,7 @@ async function openPagesEditor(page) {
   await expectSettingsReady(page);
   await selectCategory(page, "Screens");
   await page.locator('[data-test="screen-default-card"]').click();
+  await openSection(page, "default-pages");
   await page.locator('[data-test="default-edit-pages-btn"]').click();
   const editor = page.locator(".sre-root");
   await expect(editor).toBeVisible();
@@ -150,6 +152,7 @@ test.describe("800x480 touch kiosk", () => {
     await expectSettingsReady(page);
     await selectCategory(page, "Screens");
     await page.locator('[data-test="screen-default-card"]').click();
+    await openSection(page, "default-pages");
     await page.locator('[data-test="default-edit-pages-btn"]').click();
     const editor = page.locator(".sre-root");
     await expect(editor).toBeVisible();

@@ -1,9 +1,14 @@
 <template>
-  <RouterLink :to="to" class="list-row-link" :replace="replace">
-    <ListRow :name="name" :meta="meta" :lead="lead" :class="toneClass" chevron>
-      <template v-if="$slots.lead" #lead><slot name="lead" /></template>
-      <template v-if="$slots.meta" #meta><slot name="meta" /></template>
-    </ListRow>
+  <!-- custom: a plain <a>, so no aria-current. RouterLink's active matching
+       ignores the query string, and every row links to the same /settings path,
+       so every row would announce itself as the current page. -->
+  <RouterLink v-slot="{ href, navigate }" :to="to" :replace="replace" custom>
+    <a :href="href" class="list-row-link" @click="navigate">
+      <ListRow :name="name" :meta="meta" :lead="lead" :class="toneClass" chevron>
+        <template v-if="$slots.lead" #lead><slot name="lead" /></template>
+        <template v-if="$slots.meta" #meta><slot name="meta" /></template>
+      </ListRow>
+    </a>
   </RouterLink>
 </template>
 

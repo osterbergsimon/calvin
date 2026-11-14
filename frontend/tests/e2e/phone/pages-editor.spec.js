@@ -9,7 +9,13 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
@@ -22,6 +28,7 @@ test("phone: pages editor opens, edits a region and adds a page", async ({
   await expectSettingsReady(page);
   await selectCategory(page, "Screens");
   await page.locator('[data-test="screen-default-card"]').click();
+  await openSection(page, "default-pages");
   await page.locator('[data-test="default-edit-pages-btn"]').click();
 
   const editor = page.locator(".sre-root");

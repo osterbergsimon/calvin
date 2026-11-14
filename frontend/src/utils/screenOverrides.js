@@ -49,6 +49,16 @@ const photoFrameTimeout = value => {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 300;
 };
 
+// How long each photo shows: slideshow regions and the photo frame. Presets
+// instead of a 5 s stepper, so ten minutes is one choice, not 114 taps. A
+// stored value between presets (45 s) is kept and listed (keepCurrent).
+const PHOTO_SHOW_SECONDS = [10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+
+const photoShowSeconds = value => {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds >= 5 ? seconds : 30;
+};
+
 const IDLE_OPTIONS = [
   { value: 0, label: "Never" },
   { value: 300, label: "5 min" },
@@ -743,6 +753,34 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     keywords: ["photo frame", "photos from", "sources", "album", "slideshow"],
   },
   {
+    key: "photoRotationInterval",
+    label: "Show each photo for",
+    section: "behaviour",
+    description: "In photo regions and the photo frame.",
+    ariaLabel: "Show each photo for",
+    control: {
+      kind: "select",
+      options: PHOTO_SHOW_SECONDS.map(seconds => ({ value: seconds, label: idleLabel(seconds) })),
+      keepCurrent: true,
+      formatOption: idleLabel,
+    },
+    defaultValue: 30,
+    parse: photoShowSeconds,
+    browserLayer: false,
+    copyable: true,
+    resetTest: "reset-photo-show-time",
+    keywords: [
+      "show each photo for",
+      "photo",
+      "slideshow",
+      "rotation",
+      "interval",
+      "seconds",
+      "minutes",
+      "next photo",
+    ],
+  },
+  {
     key: "loadingLight",
     label: "Loading light",
     section: "behaviour",
@@ -857,6 +895,7 @@ const SCREEN_PAGE_ROW_ORDER = [
   "photoFrameEnabled",
   "photoFrameTimeout",
   "photoFrameSourceIds",
+  "photoRotationInterval",
   "loadingLight",
   "layoutMode",
 ];

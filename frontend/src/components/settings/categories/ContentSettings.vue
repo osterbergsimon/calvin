@@ -68,17 +68,6 @@
         :highlight-id="highlightId"
         :highlight-provider="highlightProvider"
       />
-      <SettingRow label="Show each photo for">
-        <NumberStepper
-          :model-value="config.photoRotationInterval || 30"
-          :min="5"
-          :max="3600"
-          :step="5"
-          unit=" s"
-          aria-label="Show each photo for, in seconds"
-          @update:model-value="v => emit('update:config', { photoRotationInterval: v })"
-        />
-      </SettingRow>
       <SettingRow label="Shuffle photos">
         <ToggleSwitch
           :model-value="config.randomizeImages ?? false"
@@ -87,8 +76,8 @@
         />
       </SettingRow>
       <SettingRow
-        label="Photo frame when idle"
-        description="Per screen now: choose Off/On, the idle wait and the photo sources in Screens › Behaviour."
+        label="Photo time and photo frame"
+        description="Set per screen in Screens › Behaviour: how long each photo shows, and the photo frame when idle."
       >
         <Button data-test="open-photo-frame-settings" @click="openPhotoFrameSettings">
           Open Screens
@@ -117,7 +106,6 @@ import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import SelectPill from "@/components/ui/SelectPill.vue";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
-import NumberStepper from "@/components/ui/NumberStepper.vue";
 import CalendarSourcesTab from "@/components/settings/tabs/content/CalendarSourcesTab.vue";
 import ImagesTab from "@/components/settings/tabs/content/ImagesTab.vue";
 import ShareLinksSection from "@/components/settings/tabs/content/ShareLinksSection.vue";

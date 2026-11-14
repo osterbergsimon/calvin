@@ -163,7 +163,8 @@ class ConfigUpdate(BaseModel):
     photoFrameEnabled: bool | None = None
     photoFrameTimeout: int | None = None
     showUI: bool | None = None
-    photoRotationInterval: int | None = None  # Photo rotation interval in seconds
+    # How long each photo shows, in seconds: household value or a screen's own.
+    photoRotationInterval: int | None = Field(None, ge=5, le=86400)
     timeFormat: str | None = None  # '12h' or '24h' (default: '24h')
     modeIndicatorTimeout: int | None = (
         None  # Mode indicator auto-hide timeout in seconds (0 = never hide)

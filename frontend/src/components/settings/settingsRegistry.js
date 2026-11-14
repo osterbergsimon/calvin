@@ -205,7 +205,7 @@ export const settingsDestinations = [
     // Photo frame, Loading light and Layout used to live under Dashboard ›
     // Focus & remote; their old words still find them in their new home (§4).
     id: "screen-behaviour",
-    label: "Photo frame, loading light and layout",
+    label: "Photo time, photo frame, loading light and layout",
     path: "Screens / Default · Behaviour",
     category: "screens",
     section: "device-behaviour",
@@ -215,6 +215,10 @@ export const settingsDestinations = [
       "photo frame",
       "photo-frame",
       "photo slideshow",
+      "show each photo for",
+      "photo time",
+      "rotation interval",
+      "next photo",
       "start after",
       "photos from",
       "loading light",
@@ -281,12 +285,12 @@ export const settingsDestinations = [
   },
   {
     id: "content-photos",
-    label: "Photo slideshow behavior",
+    label: "Shuffle photos",
     path: "Content / Photos",
     category: "content",
     tabKey: "settings_tab_content_sources",
     tab: "photos",
-    keywords: ["photos", "slideshow", "photo frame", "random", "image mode", "content sources"],
+    keywords: ["photos", "shuffle", "random", "order", "content sources"],
   },
   {
     id: "content-images",

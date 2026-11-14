@@ -3,7 +3,7 @@
   <ScreensLayout :detail="Boolean(selection)" :narrow="narrow" data-test="screens-category">
     <template #list>
       <div data-test="screens-list">
-        <SettingsSection id="screens-list" title="Screens">
+        <SettingsSection id="screens-list" title="Screens" :title-hidden="phoneNavOn">
           <template #action>
             <Button
               data-test="add-screen-btn"
@@ -12,6 +12,12 @@
             >
               {{ addOpen ? "Hide instructions" : "+ Add a screen" }}
             </Button>
+          </template>
+          <!-- The section's own intro strip: padded like a row inside the panel. -->
+          <template v-if="removedScreenNote" #description>
+            <InlineNote tone="warn" data-test="screen-removed-note">
+              That screen was removed.
+            </InlineNote>
           </template>
           <EmptyState
             v-if="kiosks.length === 0"
@@ -74,6 +80,7 @@
               class="screen-card screen-card--default"
               :name="'Default'"
               :selected="defaultOpen"
+              :chevron="phoneNavOn"
               data-test="screen-default-card"
               role="button"
               tabindex="0"
@@ -102,6 +109,7 @@
               class="screen-card"
               :name="screenLabel(k)"
               :selected="k.id === selectedId"
+              :chevron="phoneNavOn"
               data-test="screen-card"
               role="button"
               tabindex="0"
@@ -159,6 +167,7 @@
               class="screen-card screen-card--browser"
               name="This browser"
               :selected="browserOpen"
+              :chevron="phoneNavOn"
               data-test="screen-browser-card"
               role="button"
               tabindex="0"
@@ -750,7 +759,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
 import { useKiosksStore } from "@/stores/kiosks";
@@ -893,6 +902,7 @@ const selectedId = computed(() => (selection.value?.kind === "screen" ? selectio
 // (?screen=default|browser|<kiosk id>&section=<id>, useSettingsPhoneNav.js) so
 // the phone's back gesture steps back through them. Elsewhere nothing changes.
 const route = useRoute();
+const router = useRouter();
 const phoneNav = useSettingsPhoneNav();
 const phoneNavOn = computed(() => Boolean(phoneNav?.active.value));
 const selectionKey = computed(() =>
@@ -955,24 +965,45 @@ function syncScreenToRoute(key, { replace = false } = {}) {
   if ((route.query.screen ?? null) === key) return;
   return phoneNav.open({ screen: key }, { replace });
 }
+// A ?screen= that names no screen (removed, or an old link): once the list has
+// loaded, step up to it and say so, instead of a blank page titled with the id.
+const kiosksLoaded = ref(false);
+const removedScreenNote = ref(false);
 function applyRouteScreen(key) {
   if (key === undefined || key === selectionKey.value) return;
   if (!key) closeDetail({ fromRoute: true });
   else if (key === "default") openDefault({ fromRoute: true });
   else if (key === "browser") openBrowser({ fromRoute: true });
-  else select(key, { fromRoute: true });
+  else if (!kiosksLoaded.value)
+    return; // re-applied once the list has loaded
+  else if (!kiosks.value.some(k => k.id === key)) {
+    closeDetail({ fromRoute: true });
+    removedScreenNote.value = true;
+    const query = { ...route.query };
+    delete query.screen;
+    delete query.section;
+    router.replace({ query });
+  } else select(key, { fromRoute: true });
 }
 // Not immediate: the page state it resets is declared further down. The first
 // sync runs in onMounted.
 watch(() => (phoneNavOn.value ? (route.query.screen ?? null) : undefined), applyRouteScreen);
+watch(
+  () => (phoneNavOn.value ? route.query.screen : null),
+  screen => {
+    if (screen) removedScreenNote.value = false;
+  }
+);
 async function syncInitialPhoneRoute() {
   if (!phoneNavOn.value) return;
   if (route.query.screen) applyRouteScreen(route.query.screen);
   // A ?setting= deep link (search, the phone hand-off) opened a page before the
   // route knew about it: make it a page, at its section when it names one.
   else if (selectionKey.value) {
+    // `category` too: a deep link arrives as ?setting= alone, and without a
+    // category the page would read as the phone's category list.
     await phoneNav.open(
-      { screen: selectionKey.value, section: props.initialSection || null },
+      { category: "screens", screen: selectionKey.value, section: props.initialSection || null },
       { replace: true }
     );
   }
@@ -2015,6 +2046,8 @@ onMounted(async () => {
   refreshBrowserCount();
   await syncInitialPhoneRoute();
   await store.loadKiosks();
+  kiosksLoaded.value = true;
+  if (phoneNavOn.value && route.query.screen) applyRouteScreen(route.query.screen);
   if (initialOwnScreenId) await select(initialOwnScreenId);
   if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside

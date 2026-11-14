@@ -187,6 +187,7 @@ describe("screen setting descriptors", () => {
       "photoFrameEnabled",
       "photoFrameTimeout",
       "photoFrameSourceIds",
+      "photoRotationInterval",
       "loadingLight",
       "layoutMode",
     ]);
@@ -251,6 +252,32 @@ describe("descriptor values", () => {
     expect(options.find(option => option.value === 420)).toBeTruthy();
   });
 
+  it("offers photo times from 10 seconds to an hour, and keeps a time between them", () => {
+    const showFor = descriptorFor("photoRotationInterval");
+    expect(showFor.section).toBe("behaviour");
+    expect(settingControlOptions(showFor, 30).map(option => option.label)).toEqual([
+      "10 s",
+      "15 s",
+      "30 s",
+      "1 min",
+      "2 min",
+      "5 min",
+      "10 min",
+      "15 min",
+      "30 min",
+      "1 hour",
+    ]);
+    // Ten minutes is one choice.
+    expect(settingControlOptions(showFor, 600).find(option => option.value === 600).label).toBe(
+      "10 min"
+    );
+    // A value set with the old 5 s stepper stays as it was.
+    expect(normalizeSettingValue(showFor, 45)).toBe(45);
+    expect(settingControlOptions(showFor, 45).map(option => option.label)).toContain("45 s");
+    expect(normalizeSettingValue(showFor, "nope")).toBe(30);
+    expect(normalizeSettingValue(showFor, 2)).toBe(30);
+  });
+
   it("normalizes a number against its limits", () => {
     const descriptor = {
       key: "demoNumber",
@@ -268,6 +295,7 @@ describe("descriptor values", () => {
     const behaviour = descriptorsForSection("behaviour");
     expect(visibleDescriptors(behaviour, {}).map(descriptor => descriptor.key)).toEqual([
       "photoFrameEnabled",
+      "photoRotationInterval",
       "loadingLight",
       "layoutMode",
     ]);
@@ -277,6 +305,7 @@ describe("descriptor values", () => {
       "photoFrameEnabled",
       "photoFrameTimeout",
       "photoFrameSourceIds",
+      "photoRotationInterval",
       "loadingLight",
       "layoutMode",
     ]);

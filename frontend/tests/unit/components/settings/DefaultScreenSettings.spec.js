@@ -94,6 +94,17 @@ describe("DefaultScreenSettings", () => {
     expect(wrapper.find("#section-default-name").exists()).toBe(false);
   });
 
+  it("shows and writes the household photo time in Behaviour", () => {
+    const wrapper = mountDefault({ photoRotationInterval: 600 });
+    const row = wrapper
+      .findAllComponents({ name: "ScreenSettingRow" })
+      .find(r => r.props("descriptor").key === "photoRotationInterval");
+    expect(row).toBeTruthy();
+    expect(row.props("value")).toBe(600);
+    row.vm.$emit("set", 1800);
+    expect(wrapper.emitted("update:config")).toContainEqual([{ photoRotationInterval: 1800 }]);
+  });
+
   it("emits orientation changes", () => {
     const wrapper = mountDefault();
     const orientation = wrapper

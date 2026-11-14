@@ -1,10 +1,10 @@
 <template>
   <section v-if="!hiddenByFocus" :id="`section-${id}`" class="settings-section">
     <!-- Alone on a phone page, the top bar already names the section. -->
-    <div v-if="!alone || $slots.action" class="settings-section__head">
+    <div v-if="!(alone || titleHidden) || $slots.action" class="settings-section__head">
       <div
         class="settings-section__eyebrow"
-        :class="{ 'settings-section__eyebrow--hidden': alone }"
+        :class="{ 'settings-section__eyebrow--hidden': alone || titleHidden }"
       >
         {{ title }}
       </div>
@@ -27,6 +27,9 @@ const props = defineProps({
   // One sentence introducing what the panel's rows are for, above the first
   // row. Keeps a category from inventing its own intro row or paragraph.
   description: { type: String, default: "" },
+  // The title is already on screen (phone Settings' top bar names the page):
+  // keep it for screen readers, hide it visually.
+  titleHidden: { type: Boolean, default: false },
 });
 
 // Phone Settings shows a long page (a screen's settings) one section at a time

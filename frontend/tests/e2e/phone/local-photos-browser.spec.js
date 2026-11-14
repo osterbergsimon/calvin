@@ -10,7 +10,13 @@
 import { expect } from "@playwright/test";
 import { test, expectPhoneLayout } from "./fixtures/phone-audit.js";
 import { installApiMock } from "./fixtures/api-mock.js";
-import { PHONE, gotoSettings, expectSettingsReady, selectCategory } from "./fixtures/navigation.js";
+import {
+  PHONE,
+  expectSettingsReady,
+  gotoSettings,
+  openSection,
+  selectCategory,
+} from "./fixtures/navigation.js";
 
 test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
 
@@ -34,6 +40,7 @@ async function openBrowser(page) {
   await gotoSettings(page);
   await expectSettingsReady(page);
   await selectCategory(page, "Content");
+  await openSection(page, "content-photos");
 
   const row = page.locator('.content-settings [data-source-id="local-images"]');
   await expect(row).toBeVisible();
