@@ -93,8 +93,8 @@
                   },
                 ]"
                 :style="regionChromeVars(configStore.touchControlSize)"
-                :inert="!isActiveScreen(screen) || undefined"
-                :aria-hidden="!isActiveScreen(screen) || undefined"
+                :inert="!isScreenInteractive(screen) || undefined"
+                :aria-hidden="!isScreenInteractive(screen) || undefined"
               >
                 <template v-for="elementType in layoutOrderFor(screen)" :key="elementType">
                   <!-- Dashboard Region -->
@@ -290,6 +290,9 @@ const renderedScreens = computed(() => {
   return normalizeDashboardScreens(dashboardScreens.value).screens;
 });
 const isActiveScreen = screen => screen?.id === activeScreen.value?.id;
+// A screen only takes input while it is the active one and no fullscreen view
+// covers the stack.
+const isScreenInteractive = screen => isActiveScreen(screen) && !modeStore.isFullscreen;
 // Focus/tap moves the session bookmark only; the persisted screen config is
 // written by the editor, not by every interaction.
 const activeRegionId = computed(() => activeRegionStore.getActiveRegionId(activeScreen.value));
@@ -722,11 +725,27 @@ onUnmounted(() => {
   contain: layout paint;
 }
 
-/* While a fullscreen view is open, the stack stays mounted underneath (so a
-   kiosk wake does not remount every screen) but must not take part in layout
-   or paint. */
+/* While a fullscreen view is open, the stack stays mounted and laid out behind
+   it: same box, no paint, no input. `display: none` would drop every screen's
+   boxes, so a kiosk wake (photo frame -> dashboard) would have to restyle and
+   lay out all N screens again, and opacity mode would lose the tiles it keeps
+   on purpose. The fullscreen view is opaque, so it still covers the stack. */
 .screen-stack--under-fullscreen {
-  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.screen-stack--under-fullscreen > .dashboard-view {
+  pointer-events: none;
+}
+/* visibility: every screen is unpainted, the active one included. */
+.screen-stack--under-fullscreen.screen-stack--visibility > .dashboard-view {
+  visibility: hidden;
+}
+/* opacity: same, but keep the will-change layer rather than flipping
+   visibility (a visibility change drops the retained tiles). */
+.screen-stack--under-fullscreen.screen-stack--opacity > .dashboard-view {
+  opacity: 0;
 }
 
 /* opacity: hidden screens stay rastered on their own layer, so a switch is a

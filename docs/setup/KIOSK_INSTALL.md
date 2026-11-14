@@ -377,6 +377,13 @@ cog --platform=drm \
   `screenStack=off` in the URL when the variable is unset, which also clears the
   mode the kiosk remembered. Removing the query parameter alone is not enough,
   because the browser keeps the last mode in local storage.
+  A fullscreen view (the photo frame, a maximized calendar) keeps the whole
+  stack mounted and laid out behind it, so leaving and re-entering the dashboard
+  does not rebuild the screens. Two costs are known: on a kiosk with `opacity`
+  the hidden screens stay rastered behind the photo frame on purpose (that is
+  the GPU memory above), and opening `/settings` and coming back still remounts
+  every screen, not just the active one — an admin-visit cost, not a page
+  switch.
 - **Screen power** (display schedule) works: cog is the only DRM client, so the
   agent's root helper stops `calvin-cog.service`, waits up to 5 s for its
   `MainPID` to disappear (the kernel restores the console mode when the last DRM

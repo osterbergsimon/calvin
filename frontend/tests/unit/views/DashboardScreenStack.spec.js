@@ -165,6 +165,11 @@ describe("Dashboard screen stack", () => {
     const during = wrapper.findAll(".region-stub").map(region => region.element);
     expect(during).toHaveLength(before.length);
     during.forEach((element, index) => expect(element).toBe(before[index]));
+    // Behind the fullscreen view nothing on the stack takes input or is read.
+    for (const view of wrapper.findAll(".dashboard-view")) {
+      expect(view.attributes("inert")).toBeDefined();
+      expect(view.attributes("aria-hidden")).toBe("true");
+    }
 
     mode.exitFullscreen();
     await nextTick();
