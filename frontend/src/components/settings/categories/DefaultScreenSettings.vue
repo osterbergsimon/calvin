@@ -336,29 +336,32 @@
           @dismiss="dismissNote"
         />
       </template>
-      <SettingRow label="Hide label after" data-test="default-hide-label-after">
-        <template #description>
-          <InlineNote>Also how long the focus light stays after a key press.</InlineNote>
-          <DefaultOnlyNote />
-        </template>
-        <NumberStepper
-          :model-value="config.modeIndicatorTimeout ?? 5"
-          :min="0"
-          :max="60"
-          unit=" s"
-          aria-label="Hide label after, in seconds"
-          @update:model-value="v => emitChange({ modeIndicatorTimeout: v })"
-        />
-      </SettingRow>
-      <!-- The reboot keys restart the Pi; no screen can override them. -->
-      <div data-test="default-only-reboot">
-        <DefaultOnlyNote block />
-        <RebootCombo :config="config" @update:config="patch => emitChange(patch)" />
-      </div>
-      <div data-test="default-only-bindings">
-        <DefaultOnlyNote block />
-        <KeyboardTab />
-      </div>
+      <!-- The three shared rows sit under one heading: every one of them is the
+           same on every screen, so the note is said once instead of three
+           times above rows it qualifies (§3.1, §4.2–4.3). -->
+      <SettingGroup title="Same on every screen">
+        <SettingRow
+          label="Hide label after"
+          description="Also how long the focus light stays after a key press."
+          data-test="default-hide-label-after"
+        >
+          <NumberStepper
+            :model-value="config.modeIndicatorTimeout ?? 5"
+            :min="0"
+            :max="60"
+            unit=" s"
+            aria-label="Hide label after, in seconds"
+            @update:model-value="v => emitChange({ modeIndicatorTimeout: v })"
+          />
+        </SettingRow>
+        <!-- The reboot keys restart the Pi; no screen can override them. -->
+        <div data-test="default-only-reboot">
+          <RebootCombo :config="config" @update:config="patch => emitChange(patch)" />
+        </div>
+        <div data-test="default-only-bindings">
+          <KeyboardTab />
+        </div>
+      </SettingGroup>
     </SettingsSection>
 
     <SettingsSection id="device-behaviour" title="Behaviour">
@@ -398,6 +401,7 @@ import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import SettingGroup from "@/components/ui/SettingGroup.vue";
 import DefaultOnlyNote from "@/components/settings/shared/DefaultOnlyNote.vue";
 import DefaultEditNote from "@/components/settings/shared/DefaultEditNote.vue";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";

@@ -153,14 +153,16 @@ describe("DefaultScreenSettings", () => {
   });
 
   describe("default-only rows are marked", () => {
-    it("marks Timezone, the remote's shared rows and the keyboard layout rows", () => {
+    it("marks Timezone and the keyboard layout rows, and groups the remote's shared rows", () => {
       const wrapper = mountDefault({ displayScheduleEnabled: true });
-      // Timezone; Hide label after, reboot keys, bindings; layout and extras.
-      expect(wrapper.findAll("[data-test='default-only-note']")).toHaveLength(6);
-      expect(wrapper.find("[data-test='default-only-reboot']").text()).toContain(
+      // Timezone; layout and extras. The remote's three shared rows say it once
+      // under their group heading.
+      expect(wrapper.findAll("[data-test='default-only-note']")).toHaveLength(3);
+      expect(wrapper.find("#section-device-remote").text()).toContain("Same on every screen");
+      expect(wrapper.find("[data-test='default-only-reboot']").text()).not.toContain(
         "Applies to every screen"
       );
-      expect(wrapper.find("[data-test='default-only-bindings']").text()).toContain(
+      expect(wrapper.find("[data-test='default-only-bindings']").text()).not.toContain(
         "Applies to every screen"
       );
       expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
@@ -172,7 +174,7 @@ describe("DefaultScreenSettings", () => {
         .findAllComponents({ name: "SettingRow" })
         .filter(row => row.text().includes("Applies to every screen"))
         .map(row => row.props("label"));
-      expect(notes).toEqual(["Timezone", "Keyboard layout", "Also switch to", "Hide label after"]);
+      expect(notes).toEqual(["Timezone", "Keyboard layout", "Also switch to"]);
     });
   });
 

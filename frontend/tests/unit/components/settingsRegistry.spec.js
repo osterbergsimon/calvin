@@ -72,6 +72,7 @@ describe("settings registry", () => {
       "kiosks-software",
       "device-power",
       "device-keyboard",
+      "screen-remote",
       "device-notifications",
       "device-reboot",
       "device-hardware",
@@ -236,10 +237,35 @@ describe("settings registry", () => {
         word
       ).toContain("dashboard-kiosk-focus");
     }
-    // Remote buttons and Hide label after stayed in Dashboard.
+    // Hide label after belongs to the shared half of Remote & keys.
     expect(filterSettingsDestinations("hide label after").map(item => item.id)).toContain(
       "device-notifications"
     );
+  });
+
+  it("sends the per-screen label words to the screen's own Remote & keys rows", () => {
+    // The button-press label and its size are overrides on a kiosk. Landing on
+    // Default's household row made the edit a no-op (review finding).
+    expect(getSettingDestinationById("screen-remote")).toMatchObject({
+      category: "screens",
+      section: "device-remote",
+      path: "Screens / Default · Remote & keys",
+    });
+    for (const word of ["show button presses", "button presses", "label size"]) {
+      expect(
+        filterSettingsDestinations(word).map(item => item.id),
+        word
+      ).toEqual(["screen-remote"]);
+    }
+    // "key-press" stays a per-screen word, so it finds only that destination.
+    expect(filterSettingsDestinations("key-press").map(item => item.id)).toEqual(["screen-remote"]);
+    // The shared rows keep their own destination.
+    expect(filterSettingsDestinations("hide label after").map(item => item.id)).toEqual([
+      "device-notifications",
+    ]);
+    expect(filterSettingsDestinations("button bindings").map(item => item.id)).toEqual([
+      "device-notifications",
+    ]);
   });
 
   it("points the moved behaviour rows at Screens while the old words still find them", () => {

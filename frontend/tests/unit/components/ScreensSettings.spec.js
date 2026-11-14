@@ -1514,13 +1514,21 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     await openDefault(wrapper);
 
     const notes = wrapper.findAll("[data-test='default-only-note']").map(n => n.text());
-    // Timezone; Hide label after, the reboot keys and the bindings; the
-    // keyboard layout and its extras.
-    expect(notes.length).toBe(6);
+    // Timezone; the keyboard layout and its extras. The remote's three shared
+    // rows say it once under their group heading instead (§3.1).
+    expect(notes.length).toBe(3);
     expect(notes.every(text => text === "Applies to every screen")).toBe(true);
     expect(wrapper.find("#section-device-power").text()).toContain("Applies to every screen");
     expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
-    expect(wrapper.find("#section-device-remote").text()).toContain("Applies to every screen");
+
+    const remote = wrapper.find("#section-device-remote");
+    expect(remote.text()).not.toContain("Applies to every screen");
+    expect(remote.text()).toContain("Same on every screen");
+    // The focus-light sentence is the row's description, not a note of its own.
+    expect(remote.text()).toContain("Also how long the focus light stays after a key press.");
+    expect(
+      remote.findAll(".inline-note").every(note => !note.text().includes("Also how long"))
+    ).toBe(true);
   });
 
   it("has no global Room name row (the name is per screen, CLV-84)", async () => {
@@ -2031,6 +2039,21 @@ describe("ScreensSettings — moved Controls and Effects & focus (§7 item 4)", 
       await flushPromises();
       expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
       expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+
+  it("opens this screen's own Remote & keys rows from a per-screen label search", async () => {
+    // "show button presses" is a screen override; opening Default's
+    // household row made the edit a no-op (review finding).
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({ initialSection: "device-remote" });
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+      expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(false);
+      expect(wrapper.find("#section-screen-remote").exists()).toBe(true);
     } finally {
       window.sessionStorage.clear();
     }

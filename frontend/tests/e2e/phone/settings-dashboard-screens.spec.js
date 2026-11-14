@@ -1,7 +1,7 @@
 /**
  * CLV-66 — Dashboard and Screens settings on a phone.
  *
- * Dashboard: pages & regions launcher, clock bar and remote buttons.
+ * Dashboard: pages & regions launcher, clock bar and clock bar info.
  * Screens: the Default page, one screen's own page, and per-screen overrides
  * (including the Look group that used to be Dashboard › Appearance).
  */
@@ -30,7 +30,7 @@ test.describe("phone: Dashboard", () => {
     const dashboard = page.locator(".dashboard-settings");
     await expect(dashboard.getByText("Pages & regions")).toBeVisible();
     await expect(dashboard.getByRole("button", { name: "Open editor" })).toBeVisible();
-    for (const section of ["Clock bar", "Remote buttons"]) {
+    for (const section of ["Clock bar", "Clock bar info"]) {
       await expect(
         dashboard.locator(".settings-section__eyebrow", { hasText: section }).first()
       ).toBeVisible();
@@ -44,7 +44,9 @@ test.describe("phone: Dashboard", () => {
     // The moved per-screen groups leave a signpost behind (§4). It opens
     // Screens › Default on a plain browser, where the household values live.
     const signpost = dashboard.locator('[data-test="dashboard-screen-signpost"]');
-    await expect(signpost).toContainText("Look, focus light and controls are set per screen.");
+    await expect(signpost).toContainText(
+      "Look, focus light, controls and the remote are set per screen."
+    );
     await dashboard.getByRole("button", { name: "Open Screens" }).click();
     await expect(page.locator('[data-test="default-screen-page"]')).toBeVisible();
     // On a phone the signpost opens Controls on its own page; the other two
@@ -52,6 +54,10 @@ test.describe("phone: Dashboard", () => {
     const controls = page.locator("#section-screen-controls");
     await expect(controls).toBeVisible();
     await closeSection(page);
+    // The remote moved here with the rest: its section is on Default's list.
+    await expect(page.locator('[data-test="section-index-device-remote"]')).toContainText(
+      "Remote & keys"
+    );
     await openSection(page, "screen-effects");
     await expect(page.locator("#section-screen-effects")).toBeVisible();
     await closeSection(page);

@@ -438,23 +438,35 @@ export const settingsDestinations = [
     ],
   },
   {
-    // One Remote & keys section on Screens: the button-press label (per
-    // screen), Hide label after, the bindings and the reboot keys (Default).
-    id: "device-notifications",
-    label: "Remote, button bindings and key-press labels",
+    // The button-press label is the screen's own setting: on a kiosk this
+    // opens that screen's Remote & keys section, never Default's household
+    // value (an override there would be a no-op).
+    id: "screen-remote",
+    label: "Show button presses and label size",
     path: "Screens / Default · Remote & keys",
     category: "screens",
     section: "device-remote",
     keywords: [
-      "notifications",
       "key-press",
       "key press",
       "show button presses",
       "button presses",
       "label size",
       "keyboard feedback",
-      "hide label after",
       "mode indicator",
+    ],
+  },
+  {
+    // The shared half of Remote & keys: Hide label after, the bindings and the
+    // reboot keys are the same on every screen.
+    id: "device-notifications",
+    label: "Remote, button bindings and reboot keys",
+    path: "Screens / Default · Remote & keys",
+    category: "screens",
+    section: "device-remote",
+    keywords: [
+      "notifications",
+      "hide label after",
       "auto-hide",
       "remote",
       "remote buttons",

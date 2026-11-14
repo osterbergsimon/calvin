@@ -854,8 +854,16 @@ const editorOpen = ref(false);
 // null (the list) · "default" · "browser" · a screen id on a kiosk selection.
 // These sections exist on both the Default page and a screen's own page, so a
 // deep link can open the right one for the device: a kiosk opens its own page,
-// any other browser opens Default.
-const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-look", "screen-effects", "screen-controls"]);
+// any other browser opens Default. Default calls the remote section
+// device-remote while a screen's own page calls it screen-remote, so the
+// per-screen label rows map to that id on a kiosk.
+const INITIAL_PER_SCREEN_SECTIONS = new Set([
+  "screen-look",
+  "screen-effects",
+  "screen-controls",
+  "device-remote",
+]);
+const PER_SCREEN_SECTION_IDS = { "device-remote": "screen-remote" };
 const DEFAULT_SECTION_IDS = new Set([
   "layout",
   "device-power",
@@ -886,6 +894,9 @@ const initialOwnScreenId =
   props.initialSection && INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) && kioskId
     ? kioskId
     : null;
+// On a kiosk the remote rows live under the screen page's own section id.
+const initialSectionId =
+  (initialOwnScreenId && PER_SCREEN_SECTION_IDS[props.initialSection]) || props.initialSection;
 const selection = ref(
   initialOwnScreenId
     ? { kind: "screen", id: initialOwnScreenId }
@@ -1003,7 +1014,7 @@ async function syncInitialPhoneRoute() {
     // `category` too: a deep link arrives as ?setting= alone, and without a
     // category the page would read as the phone's category list.
     await phoneNav.open(
-      { category: "screens", screen: selectionKey.value, section: props.initialSection || null },
+      { category: "screens", screen: selectionKey.value, section: initialSectionId || null },
       { replace: true }
     );
   }
@@ -2048,7 +2059,18 @@ onMounted(async () => {
   await store.loadKiosks();
   kiosksLoaded.value = true;
   if (phoneNavOn.value && route.query.screen) applyRouteScreen(route.query.screen);
-  if (initialOwnScreenId) await select(initialOwnScreenId);
+  if (initialOwnScreenId) {
+    await select(initialOwnScreenId);
+    // The remote's anchor has a different id on a screen's own page; Settings.vue
+    // could only scroll to Default's, so open the screen's section here.
+    if (initialSectionId !== props.initialSection) {
+      await nextTick();
+      const section = document.getElementById(`section-${initialSectionId}`);
+      if (section && typeof section.scrollIntoView === "function") {
+        section.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  }
   if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,
