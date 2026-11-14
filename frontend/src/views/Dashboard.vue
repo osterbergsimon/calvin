@@ -61,75 +61,104 @@
             />
           </div>
 
-          <!-- Dashboard View (Home) - Renders configured dashboard regions -->
+          <!-- Dashboard View (Home) - Renders configured dashboard regions.
+               With the screen stack on (utils/screenStack.js) every screen stays
+               mounted and only the active one is shown; otherwise only the active
+               screen is rendered, as before. With the stack on it stays mounted
+               under a fullscreen view too, so entering and leaving fullscreen
+               (photo frame idle/wake, maximize) does not remount every screen. -->
           <div
-            v-else
-            ref="dashboardViewEl"
+            v-if="isStacked || !modeStore.isFullscreen"
             :class="[
-              'mode-content',
-              'dashboard-view',
-              mainLayoutClass,
-              { 'dashboard-view--unlocked': !configStore.regionsLocked },
+              'screen-stack',
+              { 'screen-stack--stacked': isStacked },
+              isStacked ? `screen-stack--${screenStackMode}` : null,
+              { 'screen-stack--under-fullscreen': isStacked && modeStore.isFullscreen },
             ]"
-            :style="regionChromeVars(configStore.touchControlSize)"
           >
-            <template v-for="elementType in layoutOrder" :key="elementType">
-              <!-- Dashboard Region -->
-              <div
-                v-if="isRegionElement(elementType)"
-                class="dashboard-region-section"
-                :class="{ 'dashboard-region-section--lit': isLitSection(elementType) }"
-                :style="getRegionStyle(elementType)"
-              >
-                <DashboardRegion
-                  :region="getRegionForElement(elementType)"
-                  :path="regionPath(elementType)"
-                  :photo-rotation-interval="configStore.photoRotationInterval"
-                  :parent-direction="layoutDirection"
-                  :active-region-id="activeRegionId"
-                  :light-active="lightActive"
-                  :controls-visible="configStore.shouldShowUI"
-                  :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
-                  @focus-region="onFocusRegion"
-                />
-              </div>
-
-              <!-- Horizontal between bar (regions stacked vertically) -->
-              <ClockBarHorizontal
-                v-else-if="elementType === 'horizontalBarBetween'"
-                position="between"
-                :show-in-non-kiosk="true"
-                :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
-                :enabled="true"
-              />
-
-              <!-- Vertical between bar (regions side by side) -->
-              <ClockBarVertical
-                v-else-if="elementType === 'verticalBarBetween'"
-                position="between"
-                :show-in-non-kiosk="true"
-                :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
-                :enabled="true"
-              />
-            </template>
-
-            <!-- CLV-20: one welcome card while every content region is empty -->
-            <SetupWelcomeCard />
-
-            <!-- Drag-to-resize handles (only when the layout is unlocked) -->
-            <div
-              v-for="handle in resizeHandles"
-              :key="`resizer-${handle.firstIndex}`"
-              class="region-resizer"
-              :class="`region-resizer--${layoutDirection}`"
-              :style="resizerStyle(handle)"
-              role="separator"
-              aria-orientation="vertical"
-              :aria-label="`Drag to resize regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
-              @pointerdown="startRegionResize(handle.firstIndex, $event)"
+            <ScreenScope
+              v-for="screen in renderedScreens"
+              :key="isStacked ? screen.id : 'active'"
+              :visible="isActiveScreen(screen) && !modeStore.isFullscreen"
             >
-              <span class="region-resizer__grip" aria-hidden="true" />
-            </div>
+              <div
+                :ref="el => setDashboardViewEl(screen, el)"
+                :class="[
+                  'mode-content',
+                  'dashboard-view',
+                  mainLayoutClassFor(screen),
+                  {
+                    'dashboard-view--unlocked': !configStore.regionsLocked,
+                    'is-active-screen': isActiveScreen(screen),
+                  },
+                ]"
+                :style="regionChromeVars(configStore.touchControlSize)"
+                :inert="!isScreenInteractive(screen) || undefined"
+                :aria-hidden="!isScreenInteractive(screen) || undefined"
+              >
+                <template v-for="elementType in layoutOrderFor(screen)" :key="elementType">
+                  <!-- Dashboard Region -->
+                  <div
+                    v-if="isRegionElement(elementType)"
+                    class="dashboard-region-section"
+                    :class="{
+                      'dashboard-region-section--lit': isLitSection(screen, elementType),
+                    }"
+                    :style="getRegionStyle(screen, elementType)"
+                  >
+                    <DashboardRegion
+                      :region="getRegionForElement(screen, elementType)"
+                      :path="regionPath(screen, elementType)"
+                      :photo-rotation-interval="configStore.photoRotationInterval"
+                      :parent-direction="layoutDirectionFor(screen)"
+                      :active-region-id="activeRegionStore.getActiveRegionId(screen)"
+                      :light-active="lightActive && isActiveScreen(screen)"
+                      :controls-visible="configStore.shouldShowUI"
+                      :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
+                      @focus-region="onFocusRegion"
+                    />
+                  </div>
+
+                  <!-- Horizontal between bar (regions stacked vertically) -->
+                  <ClockBarHorizontal
+                    v-else-if="elementType === 'horizontalBarBetween'"
+                    position="between"
+                    :show-in-non-kiosk="true"
+                    :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+                    :enabled="true"
+                  />
+
+                  <!-- Vertical between bar (regions side by side) -->
+                  <ClockBarVertical
+                    v-else-if="elementType === 'verticalBarBetween'"
+                    position="between"
+                    :show-in-non-kiosk="true"
+                    :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+                    :enabled="true"
+                  />
+                </template>
+
+                <template v-if="isActiveScreen(screen)">
+                  <!-- CLV-20: one welcome card while every content region is empty -->
+                  <SetupWelcomeCard />
+
+                  <!-- Drag-to-resize handles (only when the layout is unlocked) -->
+                  <div
+                    v-for="handle in resizeHandles"
+                    :key="`resizer-${handle.firstIndex}`"
+                    class="region-resizer"
+                    :class="`region-resizer--${layoutDirection}`"
+                    :style="resizerStyle(handle)"
+                    role="separator"
+                    aria-orientation="vertical"
+                    :aria-label="`Drag to resize regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
+                    @pointerdown="startRegionResize(handle.firstIndex, $event)"
+                  >
+                    <span class="region-resizer__grip" aria-hidden="true" />
+                  </div>
+                </template>
+              </div>
+            </ScreenScope>
           </div>
 
           <!-- Unlocked-layout banner: clear status + one-tap re-lock -->
@@ -188,6 +217,8 @@ import ClockBarHorizontal from "../components/ClockBarHorizontal.vue";
 import ClockBarVertical from "../components/ClockBarVertical.vue";
 import LoadingLight from "../components/LoadingLight.vue";
 import Button from "../components/ui/Button.vue";
+import ScreenScope from "../components/ScreenScope.vue";
+import { readScreenStackMode } from "../utils/screenStack";
 import PhoneSettingsButton from "../components/dashboard/PhoneSettingsButton.vue";
 import { usePhoneViewport } from "../composables/usePhoneViewport";
 
@@ -236,13 +267,12 @@ const { focusRegion } = useKeyboardActions();
 
 let configPollInterval = null;
 
-const layoutDirection = computed(() =>
-  getLayoutDirection(activeScreen.value?.layout, configStore.orientation)
-);
+const layoutDirectionFor = screen => getLayoutDirection(screen?.layout, configStore.orientation);
+const layoutDirection = computed(() => layoutDirectionFor(activeScreen.value));
 
-const mainLayoutClass = computed(() => {
-  return `layout-${configStore.orientation} layout-direction-${layoutDirection.value}`;
-});
+const mainLayoutClassFor = screen =>
+  `layout-${configStore.orientation} layout-direction-${layoutDirectionFor(screen)}`;
+const mainLayoutClass = computed(() => mainLayoutClassFor(activeScreen.value));
 
 const barVisible = computed(
   () => configStore.shouldShowUI || configStore.effectiveClockBarShowInKiosk
@@ -250,6 +280,19 @@ const barVisible = computed(
 
 const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
+
+// Screen stack experiment (utils/screenStack.js). Editing the layout always
+// works on the single active screen, so the stack is off while unlocked.
+const screenStackMode = readScreenStackMode();
+const isStacked = computed(() => screenStackMode !== "off" && configStore.regionsLocked);
+const renderedScreens = computed(() => {
+  if (!isStacked.value) return activeScreen.value ? [activeScreen.value] : [];
+  return normalizeDashboardScreens(dashboardScreens.value).screens;
+});
+const isActiveScreen = screen => screen?.id === activeScreen.value?.id;
+// A screen only takes input while it is the active one and no fullscreen view
+// covers the stack.
+const isScreenInteractive = screen => isActiveScreen(screen) && !modeStore.isFullscreen;
 // Focus/tap moves the session bookmark only; the persisted screen config is
 // written by the editor, not by every interaction.
 const activeRegionId = computed(() => activeRegionStore.getActiveRegionId(activeScreen.value));
@@ -296,23 +339,23 @@ watch(
   }
 );
 
-const effectiveClockBar = computed(() =>
+const clockBarFor = screen =>
   resolveClockBarForScreen(
-    activeScreen.value,
+    screen,
     getGlobalClockBarSettings({
       clockBarMode: configStore.clockBarMode,
       clockBarPosition: configStore.clockBarPosition,
     })
-  )
-);
+  );
+const effectiveClockBar = computed(() => clockBarFor(activeScreen.value));
 
 const clockBarActive = computed(() => effectiveClockBar.value.enabled && barVisible.value);
 const isHorizontalMode = computed(() => effectiveClockBar.value.mode === "horizontal");
 const isVerticalMode = computed(() => effectiveClockBar.value.mode === "vertical");
 const clockBarPosition = computed(() => effectiveClockBar.value.position);
-const clockBarPlacementGap = computed(() =>
-  getClockBarPlacementGap(clockBarPosition.value, activeScreen.value?.layout?.regions?.length || 0)
-);
+const clockBarPlacementGapFor = screen =>
+  getClockBarPlacementGap(clockBarFor(screen).position, screen?.layout?.regions?.length || 0);
+const clockBarPlacementGap = computed(() => clockBarPlacementGapFor(activeScreen.value));
 
 const showHorizontalBarTop = computed(
   () => clockBarActive.value && isHorizontalMode.value && clockBarPosition.value === "top"
@@ -327,13 +370,12 @@ const showHorizontalBarBottom = computed(
 // a horizontal strip when regions stack and a vertical strip when they sit
 // side by side, regardless of whether the user picked horizontal or vertical
 // mode for the perimeter case.
-const betweenClockBarElement = computed(() =>
-  clockBarActive.value && clockBarPlacementGap.value !== null
-    ? layoutDirection.value === "row"
+const betweenClockBarElementFor = screen =>
+  clockBarFor(screen).enabled && barVisible.value && clockBarPlacementGapFor(screen) !== null
+    ? layoutDirectionFor(screen) === "row"
       ? "verticalBarBetween"
       : "horizontalBarBetween"
-    : null
-);
+    : null;
 
 const showVerticalBarLeft = computed(
   () => clockBarActive.value && isVerticalMode.value && clockBarPosition.value === "left"
@@ -344,45 +386,49 @@ const showVerticalBarRight = computed(
 );
 
 // Computed layout order - determines the order elements should be rendered
-const layoutOrder = computed(() => {
-  const regionElements = activeScreen.value.layout.regions.map(region => `region:${region.id}`);
+const layoutOrderFor = screen => {
+  const regionElements = screen.layout.regions.map(region => `region:${region.id}`);
   if (regionElements.length <= 1) return regionElements;
 
-  const placedBetween = clockBarPlacementGap.value;
+  const placedBetween = clockBarPlacementGapFor(screen);
+  const betweenElement = betweenClockBarElementFor(screen);
   const elements = [];
   regionElements.forEach((regionElement, index) => {
     if (index > 0 && index - 1 === placedBetween) {
-      if (betweenClockBarElement.value) elements.push(betweenClockBarElement.value);
+      if (betweenElement) elements.push(betweenElement);
     }
     elements.push(regionElement);
   });
   return elements;
-});
+};
 
 const isRegionElement = elementType => elementType.startsWith("region:");
 
-const getRegionForElement = elementType => {
+const getRegionForElement = (screen, elementType) => {
   const regionId = elementType.replace("region:", "");
-  return activeScreen.value.layout.regions.find(region => region.id === regionId);
+  return screen.layout.regions.find(region => region.id === regionId);
 };
 
-const regionPath = elementType => {
+const regionPath = (screen, elementType) => {
   const regionId = elementType.replace("region:", "");
-  const idx = activeScreen.value.layout.regions.findIndex(r => r.id === regionId);
+  const idx = screen.layout.regions.findIndex(r => r.id === regionId);
   return idx >= 0 ? [idx] : [];
 };
 
-const getRegionStyle = elementType => {
-  const region = getRegionForElement(elementType);
+const getRegionStyle = (screen, elementType) => {
+  const region = getRegionForElement(screen, elementType);
   // During a live drag, override sizes from dragSizes for instant feedback
   // without persisting on every pointer move.
   const override = region && dragSizes.value ? dragSizes.value[region.id] : undefined;
   const sized = override != null ? { ...region, size: override } : region;
-  return getRegionAxisStyle(sized, layoutDirection.value);
+  return getRegionAxisStyle(sized, layoutDirectionFor(screen));
 };
 
 // ── Drag-to-resize regions (top-level and nested) (calvin-fou) ──────────────
 const dashboardViewEl = ref(null);
+const setDashboardViewEl = (screen, el) => {
+  if (isActiveScreen(screen)) dashboardViewEl.value = el;
+};
 const dragSizes = ref(null); // { [regionId]: size } live override while dragging
 let resizeState = null; // { containerPath, firstIndex, rect, direction }
 
@@ -537,9 +583,9 @@ const regionContainsLeaf = (region, leafId) => {
   if (!region.split) return region.id === leafId;
   return region.split.regions.some(sub => regionContainsLeaf(sub, leafId));
 };
-const isLitSection = elementType => {
-  if (!lightActive.value) return false;
-  return regionContainsLeaf(getRegionForElement(elementType), activeRegionId.value);
+const isLitSection = (screen, elementType) => {
+  if (!lightActive.value || !isActiveScreen(screen)) return false;
+  return regionContainsLeaf(getRegionForElement(screen, elementType), activeRegionId.value);
 };
 
 const startConfigPolling = () => {
@@ -657,6 +703,65 @@ onUnmounted(() => {
   gap: var(--gap-2);
   min-height: 0;
   min-width: 0;
+}
+
+/* Holds the dashboard view(s). With the screen stack off it holds one view and
+   lays out exactly like the view did on its own. */
+.screen-stack {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+
+/* Stacked: every screen fills the same box; paint containment keeps a hidden
+   screen's updates from invalidating the visible one. Three classes on
+   purpose: `.mode-content.dashboard-view` below also sets position, so 0,2,0
+   here would lose to it and leave both screens in normal flow side by side. */
+.screen-stack--stacked > .mode-content.dashboard-view {
+  position: absolute;
+  inset: 0;
+  contain: layout paint;
+}
+
+/* While a fullscreen view is open, the stack stays mounted and laid out behind
+   it: same box, no paint, no input. `display: none` would drop every screen's
+   boxes, so a kiosk wake (photo frame -> dashboard) would have to restyle and
+   lay out all N screens again, and opacity mode would lose the tiles it keeps
+   on purpose. The fullscreen view is opaque, so it still covers the stack. */
+.screen-stack--under-fullscreen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.screen-stack--under-fullscreen > .dashboard-view {
+  pointer-events: none;
+}
+/* visibility: every screen is unpainted, the active one included. */
+.screen-stack--under-fullscreen.screen-stack--visibility > .dashboard-view {
+  visibility: hidden;
+}
+/* opacity: same, but keep the will-change layer rather than flipping
+   visibility (a visibility change drops the retained tiles). */
+.screen-stack--under-fullscreen.screen-stack--opacity > .dashboard-view {
+  opacity: 0;
+}
+
+/* opacity: hidden screens stay rastered on their own layer, so a switch is a
+   compositor opacity change rather than a repaint. */
+.screen-stack--opacity > .dashboard-view {
+  will-change: opacity;
+}
+.screen-stack--opacity > .dashboard-view:not(.is-active-screen) {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* visibility: hidden screens stay mounted but are not painted. */
+.screen-stack--visibility > .dashboard-view:not(.is-active-screen) {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* Inset the region grid from the screen edges so each panel "floats" with

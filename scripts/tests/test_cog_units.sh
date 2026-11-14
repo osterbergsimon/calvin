@@ -57,6 +57,9 @@ assert_contains "$cog" '^EnvironmentFile=-/etc/default/calvin-kiosk-cog$' \
     "cog does not read the rotation env file"
 assert_contains "$cog" 'CALVIN_KIOSK_ID' "the kiosk id query parameter was dropped"
 assert_contains "$cog" 'CALVIN_KIOSK_HOSTNAME' "the kiosk hostname query parameter was dropped"
+assert_contains "$cog" 'screenStack=.*CALVIN_SCREEN_STACK:-off' \
+    "the screen stack query parameter does not default to off"
+assert_contains "$cog" 'screenStack=.*CALVIN_SCREEN_STACK' "the screen stack query parameter was dropped"
 pass "cog launches on DRM with the gles renderer and the agent-managed rotation"
 
 # SIGSEGV on SIGTERM is cog's normal exit as root, SIGABRT as the calvin user;
