@@ -99,3 +99,16 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
 }
 
 app.mount("#app");
+
+// SPIKE (calvin-fufd, throwaway): poll the focus-style variant.
+const pollFocusSpike = async () => {
+  try {
+    const r = await fetch(`/focus-spike.txt?t=${Date.now()}`, { cache: "no-store" });
+    if (r.ok) document.documentElement.dataset.focusSpike = (await r.text()).trim();
+  } catch {
+    // ignore
+  }
+};
+pollFocusSpike();
+setInterval(pollFocusSpike, 3000);
+

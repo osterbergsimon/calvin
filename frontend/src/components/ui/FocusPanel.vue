@@ -77,3 +77,29 @@ const stateClass = computed(() => {
   }
 }
 </style>
+
+<style>
+/* SPIKE (calvin-fufd, throwaway): focus-style variants picked at runtime via
+   html[data-focus-spike], read from /focus-spike.txt. */
+html[data-focus-spike="std-still"] .focus-panel,
+html[data-focus-spike="std-still"] .focus-panel::after,
+html[data-focus-spike="std-flat"] .focus-panel,
+html[data-focus-spike="std-flat"] .focus-panel::after,
+html[data-focus-spike="border"] .focus-panel,
+html[data-focus-spike="border"] .focus-panel::after {
+  transition: none;
+}
+html[data-focus-spike="std-still"] .focus-panel.is-focused,
+html[data-focus-spike="std-flat"] .focus-panel.is-focused,
+html[data-focus-spike="border"] .focus-panel.is-focused {
+  transform: none;
+}
+html[data-focus-spike="std-flat"] .focus-panel.is-focused {
+  box-shadow: none;
+}
+html[data-focus-spike="border"] .focus-panel.is-focused {
+  background: var(--bg-1);
+  outline: none;
+  box-shadow: none;
+}
+</style>
