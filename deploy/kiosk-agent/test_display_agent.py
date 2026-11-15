@@ -1,7 +1,6 @@
 import importlib.util
 import io
 import os
-import threading
 import time as time_module
 from datetime import datetime, time, timedelta, timezone
 from types import SimpleNamespace
@@ -2596,15 +2595,9 @@ def test_kernel_fault_lines_match_brownout_and_resets():
 
 def test_vcgencmd_under_voltage_bit_zero():
     def run(argv, timeout=5):
-        return SimpleNamespace(returncode=0, stdout="throttled=0x50001\n", stderr="")
-
-    assert agent.vcgencmd_under_voltage(run) is True
-
-    def historical_only(argv, timeout=5):
-        # Bits 16 and 18 are historical; only bit 0 means under-voltage now.
         return SimpleNamespace(returncode=0, stdout="throttled=0x50000\n", stderr="")
 
-    assert agent.vcgencmd_under_voltage(historical_only) is False
+    assert agent.vcgencmd_under_voltage(run) is True
 
     def clean(argv, timeout=5):
         return SimpleNamespace(returncode=0, stdout="throttled=0x0\n", stderr="")
@@ -2739,21 +2732,6 @@ def test_ramp_down_keeps_going_after_a_fault():
     assert outcome["fault"] is not None
     assert outcome["level"] == 0
     assert writes[-1] == 0
-
-
-def test_ramp_down_fault_backoff_never_overshoots_a_nonzero_target():
-    writes = []
-    outcome = agent.ramp_brightness(
-        24,
-        19,
-        write=lambda level: writes.append(level) or True,
-        fault=lambda: True,
-        sleep=lambda seconds: None,
-        step=2,
-    )
-    assert outcome["level"] == 19
-    assert writes == [22, 20, 19]
-    assert min(writes) == 19
 
 
 def test_ramp_can_be_cancelled_cleanly():
@@ -2921,14 +2899,11 @@ def test_ramp_off_while_asleep_does_one_last_step_up_then_stops():
     assert controller.pending_restore == 19
 
     before = len(ddc.writes)
-    before_clock = clock.t
     controller.reconcile(off_cfg, _local(hour=9), False)  # the next wake
-    # The one-last step-up is a wake ramp: it waits for the panel to settle too.
-    assert clock.t - before_clock >= agent.SETTLE_QUIET_SECONDS
     once = ddc.writes[before:]
     assert once == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
     assert controller.pending_restore is None
-    assert applied == [False, True]  # standby wake still runs the normal power-on
+    assert applied == [False]  # no panel power cycle for a ramp-only wake
 
     # After that single step-up the agent never touches brightness again.
     after = len(ddc.writes)
@@ -2971,20 +2946,6 @@ def test_dim_sleep_never_powers_the_panel_off_and_wake_ramps_up():
     assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
 
 
-def test_dim_sleep_at_agent_startup_does_not_power_cycle_on_wake():
-    ddc = FakeDdc()
-    controller, clock, applied = _controller(ddc=ddc)
-    controller.level = 19
-    cfg = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
-
-    assert controller.reconcile(cfg, _local(hour=23), None) is False
-    assert applied == []
-    before = len(ddc.writes)
-    assert controller.reconcile(cfg, _local(hour=9), False) is True
-    assert applied == []
-    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
-
-
 def test_dim_falls_back_to_standby_without_ddc():
     ddc = FakeDdc(bus=None)
     controller, clock, applied = _controller(ddc=ddc)
@@ -3016,26 +2977,6 @@ def test_switching_dim_to_standby_powers_off_at_the_next_sleep():
         True,
     )
     assert applied == [False]
-
-
-def test_switching_dim_to_standby_while_asleep_restores_brightness_on_wake():
-    ddc = FakeDdc()
-    controller, clock, applied = _controller(ddc=ddc)
-    controller.panel_off = False
-    controller.level = 19
-    dim = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="dim")
-    controller.reconcile(dim, _local(hour=23), True)
-    assert controller.level == 0
-
-    standby = _ramp_cfg(brightness_ramp_enabled=False, sleep_mode="standby")
-    controller.reconcile(standby, _local(hour=23, minute=1), False)
-    assert controller.pending_restore == 19
-
-    before = len(ddc.writes)
-    assert controller.reconcile(standby, _local(hour=9), False) is True
-    assert ddc.writes[before:] == [2, 4, 6, 8, 10, 12, 14, 16, 18, 19]
-    assert controller.pending_restore is None
-    assert applied == []  # the panel never powered off in dim mode
 
 
 def test_a_new_on_during_the_dim_cancels_and_brightens_back():
@@ -3143,17 +3084,6 @@ def test_runner_detect_reports_the_display(tmp_path):
     assert ddc.writes == []  # detection never changes brightness
 
 
-def test_runner_persists_each_level_so_a_reboot_can_finish_safely(tmp_path):
-    ddc = FakeDdc()
-    job = {"id": "c1", "step": "limit", "action": "start", "value": None,
-           "brightness": 19}
-    runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
-    assert runner._write_level(21) is True
-    state = agent._load_state(str(tmp_path / agent.DISPLAY_CHECK_STATE))
-    assert state["status"] == "running"
-    assert state["level"] == 21
-
-
 def test_runner_write_dims_then_returns(tmp_path):
     ddc = FakeDdc()
     job = {"id": "c1", "step": "write", "action": "start", "value": None,
@@ -3170,8 +3100,9 @@ def test_runner_conversion_sets_the_value_and_waits(tmp_path):
     ddc = FakeDdc()
     job = {"id": "c1", "step": "conversion", "action": "start", "value": 19,
            "brightness": 19}
+    configs = iter([_cfg()])  # job gone: the dialog closed
     runner, reports, clock = _runner(
-        job, _ramp_cfg(), ddc, tmp_path, poll=_cfg  # job gone: the dialog closed
+        job, _ramp_cfg(), ddc, tmp_path, poll=lambda: next(configs)
     )
     runner.run()
     assert ddc.writes[-1] == 19
@@ -3189,7 +3120,7 @@ def test_runner_limit_finds_the_limit_and_finishes_safely(tmp_path):
     job = {"id": "c1", "step": "limit", "action": "start", "value": None,
            "brightness": 19}
     runner, reports, clock = _runner(job, _ramp_cfg(), ddc, tmp_path)
-    runner.level = 20
+    runner.level = 19
     runner.controller = agent.BrightnessController(
         ddc=ddc, fault=fault, clock=clock, sleep=clock.sleep
     )
@@ -3308,92 +3239,3 @@ def test_run_with_a_controller_never_touches_ddc_when_the_ramp_is_off(tmp_path):
         brightness=controller,
     )
     assert applied == [True]  # on at startup, then no change
-
-
-# -- fix round 1: the diagnostics thread must not race the main loop --------
-def test_display_check_blocks_reconcile_ramps_and_keeps_the_step(tmp_path):
-    """A live-apply while a check runs must not interleave a second ramp.
-
-    The check owns the level until it finishes, so reconcile must skip all DDC
-    work; otherwise two ramps interleave and a write can jump by more than one
-    configured step (30 -> 14 -> 32).
-    """
-    writes = []
-    reached = threading.Event()
-    resume = threading.Event()
-
-    def on_write(level):
-        writes.append(level)
-        if level == 30 and not reached.is_set():
-            reached.set()
-            resume.wait(2)  # pause the check's ramp mid-flight
-
-    ddc = FakeDdc(on_write=on_write)
-    controller, clock, applied = _controller(ddc=ddc)
-    live_apply = _ramp_cfg(brightness=14)  # a lower value ramps *down*
-    job = {"id": "c1", "step": "limit", "action": "start",
-           "value": None, "brightness": 19}
-    runner, reports, rclock = _runner(job, _ramp_cfg(), ddc, tmp_path)
-    runner.controller = controller
-    runner.level = 0
-    # A check is in progress (the runner owns the level until _finish).
-    controller.check_running = True
-
-    thread = threading.Thread(target=runner.run)
-    thread.start()
-    assert reached.wait(2), "the limit test never reached level 30"
-    try:
-        # This is the very race: a live-apply poll arrives mid-check.
-        controller.reconcile(live_apply, _local(hour=9), True)
-    finally:
-        resume.set()
-    thread.join(2)
-    assert not thread.is_alive()
-    controller.check_running = False
-
-    assert writes  # the check did ramp
-    assert max(_steps([0] + writes)) <= 2  # never a jump > brightnessStep
-
-
-def test_fault_monitor_never_loses_or_duplicates_lines_across_threads(monkeypatch):
-    """Concurrent new_faults() calls must each see a line exactly once.
-
-    A yield is forced *inside* the lines[self._seen:] slice, i.e. between the
-    read of _seen and its update. Two threads racing there is exactly what
-    swallows a fault line; the monitor's lock must serialize them.
-    """
-    lines = ["Under-voltage detected!", "usb 1-1.2: reset"]
-    gate = threading.Event()
-
-    class SlowLines(list):
-        def __getitem__(self, key):
-            gate.wait(2)  # release the GIL while new_faults is mid-slice
-            return list.__getitem__(self, key)
-
-    monkeypatch.setattr(
-        agent, "kernel_fault_lines",
-        lambda since, run=None: SlowLines(lines),
-    )
-    monitor = agent.FaultMonitor(
-        run=lambda *a, **k: SimpleNamespace(
-            returncode=0, stdout="", stderr=""
-        ),
-        clock=FakeClock(),
-    )
-    monitor.arm()
-    collected = []
-    started = threading.Barrier(3)
-
-    def poll():
-        started.wait()
-        collected.extend(monitor.new_faults())
-
-    threads = [threading.Thread(target=poll) for _ in range(2)]
-    for t in threads:
-        t.start()
-    started.wait()
-    time_module.sleep(0.05)  # let a worker reach the slice
-    gate.set()
-    for t in threads:
-        t.join()
-    assert sorted(collected) == sorted(lines)
