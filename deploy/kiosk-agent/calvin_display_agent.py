@@ -273,7 +273,7 @@ DISPLAY_CHECK_POLL_SECONDS = 1.5
 DISPLAY_CHECK_TIMEOUT_SECONDS = 600
 DISPLAY_CHECK_REPORT_PATH = "/api/kiosks/{kiosk_id}/display-check"
 RAMP_FAULT_RE = re.compile(
-    r"(Undervoltage detected|over-current|usb .*: reset)", re.IGNORECASE
+    r"(Under-?voltage detected|over-current|usb .*: reset)", re.IGNORECASE
 )
 COG_UNIT = "calvin-cog.service"
 
@@ -686,10 +686,10 @@ def wait_for_settle(
 
 
 # -- the ramp itself ----------------------------------------------------------
-def _two_steps_back(level, step, write):
+def _two_steps_back(level, step, write, *, floor=0):
     """Step back down two configured steps, one write at a time (never bigger)."""
     for _ in range(2):
-        back = max(0, level - step)
+        back = max(floor, level - step)
         if back == level:
             break
         if not write(back):
@@ -756,10 +756,13 @@ def ramp_brightness(
                     outcome["ceiling"] = level
                     log_fn(f"brightness: stepped back to {level}; stopping this ramp")
                     break
-                level = _two_steps_back(level, step, write)
+                # Going down is safe, and a persistent fault (under-voltage
+                # now) must not stop it. Step back two, never below the target,
+                # then keep going; stop when there is nowhere lower to go.
+                before = level
+                level = _two_steps_back(level, step, write, floor=target)
                 outcome["ceiling"] = level
-                continued = level != target
-                if not continued:
+                if level == target or level == before:
                     break
                 continue
         if level == target:
@@ -861,15 +864,6 @@ class BrightnessController:
             )
         return outcome
 
-    def _wake(self, settings, dim, cancel):
-        """Settle after a real panel power-on, then ramp to the chosen level."""
-        self._ramp(
-            brightness_target(settings, self.fault_ceiling),
-            cancel=cancel,
-            stop_on_fault=True,
-        )
-        return None
-
     def _sleep_standby(self, settings, cancel):
         """Dim first (when the ramp is on), then run the normal off."""
         if settings["enabled"] and self.level > 0:
@@ -898,6 +892,7 @@ class BrightnessController:
                     "falling back to standby"
                 )
                 return "failed"
+        self.panel_off = False
         self.log("brightness: dim-only sleep at 0; panel stays powered")
         return "ok"
 
@@ -910,17 +905,26 @@ class BrightnessController:
         dim = settings["sleep_mode"] == "dim"
 
         # Owner answer 4: the ramp was switched off while the panel slept at 0.
+        # The same one-last step-up is needed when "Dim only" is switched back
+        # to standby while dimmed: the panel never powered off, so nothing else
+        # would bring its backlight back.
         if (
             previous is not None
-            and previous["enabled"]
             and not settings["enabled"]
             and not on
             and self.level == 0
+            and (
+                previous["enabled"]
+                or (
+                    previous["sleep_mode"] == "dim"
+                    and settings["sleep_mode"] != "dim"
+                )
+            )
         ):
             self.pending_restore = brightness_target(previous)
             self.log(
-                "brightness: ramp turned off while asleep; one last step-up "
-                f"to {self.pending_restore} at the next wake"
+                "brightness: ramp or dim switched off while asleep; "
+                f"one last step-up to {self.pending_restore} at the next wake"
             )
         self.settings = settings
 
@@ -938,7 +942,11 @@ class BrightnessController:
                     # After a real power-on the panel and its USB devices must
                     # settle before any DDC write. (Dim-only wakes never powered
                     # anything off, so they go straight back up.)
-                    if settings["enabled"] or dim:
+                    if (
+                        settings["enabled"]
+                        or dim
+                        or self.pending_restore is not None
+                    ):
                         self._arm()
                         wait_for_settle(
                             fault_monitor=self.fault,
@@ -959,6 +967,7 @@ class BrightnessController:
                     if outcome.get("cancelled"):
                         self.reschedule = True
                         return True
+                    self.pending_restore = None
                 elif self.pending_restore is not None:
                     self._ramp(
                         min(
@@ -1159,6 +1168,7 @@ class DisplayCheckRunner:
         self._stop_reason = None
         self._deadline = self.clock() + DISPLAY_CHECK_TIMEOUT_SECONDS
         self.log_entries = []
+        self.result = {}
         self.started_at = datetime.now(timezone.utc).isoformat()
 
     def _path(self):
@@ -1195,9 +1205,12 @@ class DisplayCheckRunner:
         self._touched = True
         if self.controller is not None:
             self.controller.level = level
+        # Persist every step: if the kiosk reboots mid-ramp (the limit test can
+        # cause exactly that), recovery must know the last level reached.
+        self._save()
         return True
 
-    def _cancel(self):
+    def _cancel(self, *, gone_is_stop=True):
         if self._stop_reason is not None:
             return True
         if self.clock() >= self._deadline:
@@ -1210,12 +1223,28 @@ class DisplayCheckRunner:
         except Exception:
             return False
         job = display_check_job(cfg)
-        if job is None or job["id"] != self.job["id"] or job["action"] == "stop":
+        if job is not None and job["id"] == self.job["id"]:
+            if job["action"] == "stop":
+                self._stop_reason = "stopped"
+                return True
+            return False
+        # The dialog closed (job gone) or a different run replaced this one.
+        # A single conversion write still completes first: the owner needs the
+        # value set to read the menu, and the runner finishes safely right after.
+        if gone_is_stop:
             self._stop_reason = "stopped"
             return True
         return False
 
-    def _ramp(self, target, *, stop_on_fault=True):
+    def _ramp(self, target, *, stop_on_fault=True, cancel_missing=True):
+        if cancel_missing is True:
+            cancel = self._cancel
+        elif cancel_missing is False:
+            cancel = lambda: self._cancel(gone_is_stop=False)
+        else:
+            # Finishing is a safety action: a Stop or a closed dialog must not
+            # leave the screen at whatever level the check stopped on.
+            cancel = None
         return ramp_brightness(
             self.level,
             target,
@@ -1224,7 +1253,7 @@ class DisplayCheckRunner:
             sleep=self.sleep,
             step=self.settings["step"],
             step_seconds=self.settings["step_seconds"],
-            cancel=self._cancel,
+            cancel=cancel,
             stop_on_fault=stop_on_fault,
             log_fn=log,
         )
@@ -1247,11 +1276,9 @@ class DisplayCheckRunner:
                 if part
             )
             self._entry(f"found {detail or 'a DDC display'}")
-            self.report(
-                self._payload(
-                    "done", info=info, detail=detail or "found a DDC/CI display"
-                )
-            )
+            self.result["info"] = info
+            self.result["detail"] = detail or "found a DDC/CI display"
+            self.report(self._payload("done"))
             return
         if step == "write":
             base = self.level or brightness_target(self.settings)
@@ -1271,7 +1298,9 @@ class DisplayCheckRunner:
             if value is None:
                 value = self.level or brightness_target(self.settings)
             value = max(0, min(BRIGHTNESS_MAX, int(value)))
-            outcome = self._ramp(value, stop_on_fault=value > self.level)
+            outcome = self._ramp(
+                value, stop_on_fault=value > self.level, cancel_missing=False
+            )
             if outcome.get("write_failed"):
                 self._entry("brightness writes did not take effect")
                 self._stop_reason = "error"
@@ -1332,13 +1361,16 @@ class DisplayCheckRunner:
             "startedAt": self.started_at,
             "finishedAt": datetime.now(timezone.utc).isoformat(),
         }
+        payload.update(self.result)
         payload.update(extra)
         return payload
 
     def _finish(self, status):
         target = _safe_target(self.settings, self.limit)
         if self._touched and self.panel_on() and self.level != target:
-            self._ramp(target, stop_on_fault=target > self.level)
+            self._ramp(
+                target, stop_on_fault=target > self.level, cancel_missing=None
+            )
         payload = self._payload(status)
         self.report(payload)
         _clear_state(self._path())
@@ -1417,7 +1449,6 @@ def recover_display_check(
         _clear_state(path)
         return None
     settings = brightness_settings(cfg)
-    step = _as_int(state.get("step"))
     last_level = _as_int(state.get("level"))
     limit = _as_int(state.get("limit"))
     if state.get("step") == "limit" and limit is None and last_level is not None:
@@ -1636,6 +1667,7 @@ def run(
     last_version = _UNSET
     update_state = {"attempted": set()}
     check_thread = None
+    handled_check_id = None
     recovered = False
 
     def ramp_cancel(desired):
@@ -1672,15 +1704,19 @@ def run(
                     ddc=controller.ddc,
                     report=lambda payload: post_display_check(backend_url, payload),
                     controller=controller,
-                    panel_on=lambda: desired_on(cfg, now_in(cfg)),
+                    panel_on=lambda cfg=cfg: desired_on(cfg, now_in(cfg)),
                 )
                 recovered = True
             job = display_check_job(cfg)
+            if job is None or job["id"] != handled_check_id:
+                handled_check_id = None
             if (
                 controller is not None
                 and job is not None
+                and job["id"] != handled_check_id
                 and (check_thread is None or not check_thread.is_alive())
             ):
+                handled_check_id = job["id"]
                 check_thread = start_display_check(
                     job,
                     cfg,
