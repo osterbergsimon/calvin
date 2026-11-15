@@ -22,6 +22,7 @@
 // screen's page (settings-scope §5). Every name is a link to that row; the row
 // flashes briefly so the jump is easy to follow.
 import { rowAnchorId } from "@/utils/screenOverrides";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 
 defineProps({
   items: { type: Array, default: () => [] },
@@ -33,7 +34,7 @@ function jumpTo(key) {
   const row = document.getElementById(rowAnchorId(key));
   if (!row) return;
   if (typeof row.scrollIntoView === "function") {
-    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
   }
   row.classList.remove("calvin-row-flash");
   // Restart the animation when the same link is clicked twice.

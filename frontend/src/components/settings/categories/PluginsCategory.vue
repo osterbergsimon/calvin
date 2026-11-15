@@ -139,6 +139,7 @@ import { pluginKindKey } from "@/utils/pluginKind";
 import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
 import { errorDetailMessage } from "@/utils/apiErrors";
 import { isNewerVersion } from "@/utils/pluginVersions";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 
 // Use composables
 const {
@@ -297,7 +298,7 @@ const afterInstall = async installedIds => {
   await nextTick();
   document
     .querySelector(`[data-plugin-id="${CSS.escape(first.id)}"]`)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    ?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
 
   const names = installed.map(p => p.name || p.id).join(", ");
   const stillOff = first.type !== "theme" && !first.enabled;

@@ -129,6 +129,7 @@ import { useModeStore } from "@/stores/mode";
 import { useAuthStore } from "@/stores/auth";
 import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy";
 import { expandSettingsSection } from "@/utils/settingsSectionExpansion";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
@@ -465,7 +466,7 @@ function scrollToDestination(destination, attempt = 0) {
   expandSettingsSection(sectionId);
   const el = document.getElementById("section-" + sectionId);
   if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     pinSection(el);
   } else if (attempt < 20) {
     requestAnimationFrame(() => scrollToDestination(destination, attempt + 1));

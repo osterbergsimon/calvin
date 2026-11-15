@@ -808,6 +808,7 @@ import ScopeLine from "@/components/ui/ScopeLine.vue";
 import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
 import DisplayCheckDialog from "@/components/settings/shared/DisplayCheckDialog.vue";
 import { clampBrightness, dimSeconds, firstBrightness } from "@/utils/brightness";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
@@ -1828,16 +1829,11 @@ async function openDefaultRemote() {
   scrollSectionToTop(document.getElementById("section-device-remote"));
 }
 
-// A deep link brings its section into view. Someone who asked for less motion
-// gets the jump, not the scroll, the same query base.css honours for CSS
-// motion (ScreenSettingRow reads it the same way).
+// A deep link brings its section into view. The shared helper hands someone
+// who asked for less motion the jump, not the scroll.
 function scrollSectionToTop(section) {
   if (!section || typeof section.scrollIntoView !== "function") return;
-  const reduced =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    Boolean(window.matchMedia("(prefers-reduced-motion: reduce)")?.matches);
-  section.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
+  section.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
 }
 
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------
