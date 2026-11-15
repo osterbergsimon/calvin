@@ -44,6 +44,7 @@
             :count="zoneMeta(zoneKey, 'date').count"
             :label="partAria('date', zoneKey)"
             :time-data="timeData"
+            :compact-date="compactDate"
             @select="$emit('select-part', $event)"
             @move="$emit('move-part', $event)"
           />

@@ -31,7 +31,7 @@
     <span
       v-else-if="partId === 'time'"
       class="clock-time"
-      :class="{ 'compact-time': isStackedTime }"
+      :class="{ 'compact-time': isStackedTime, 'is-vertical': orientation === 'vertical' }"
       :style="{ fontSize: `${part.sizePx ?? 16}px` }"
     >
       <template v-if="isStackedTime">
@@ -48,7 +48,11 @@
     <span
       v-else-if="partId === 'date'"
       class="clock-date"
-      :class="{ 'compact-date-stacked': isStackedDate }"
+      :class="{
+        'compact-date': compactDate,
+        'compact-date-stacked': isStackedDate,
+        'is-vertical': orientation === 'vertical',
+      }"
       :style="{ fontSize: `${part.sizePx ?? 14}px` }"
     >
       <template v-if="isStackedDate">
@@ -110,6 +114,8 @@ const props = defineProps({
   roomLabel: { type: String, default: "" },
   screens: { type: Array, default: () => [] },
   activeScreenId: { type: String, default: null },
+  // The side bar's compact-time layout draws a non-stacked date vertically.
+  compactDate: { type: Boolean, default: false },
 });
 defineEmits(["select", "move", "select-screen"]);
 
@@ -137,3 +143,78 @@ const SAMPLE_SCREENS = [
 const dotsScreens = computed(() => (props.sample ? SAMPLE_SCREENS : props.screens));
 const dotsActiveId = computed(() => (props.sample ? SAMPLE_SCREENS[0].id : props.activeScreenId));
 </script>
+
+<style scoped>
+/* The part markup lives here, so its faces live here too: the bar components
+   only style the box around it (calvin-d7cl review 1). */
+.clock-time {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: var(--weight-title);
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.clock-time.is-vertical {
+  line-height: 1.1;
+}
+
+.clock-date {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.clock-date.is-vertical {
+  line-height: 1.1;
+}
+
+.clock-bar-room {
+  font-family: var(--font-ui);
+  color: var(--ink-3);
+  font-size: var(--text-body);
+}
+
+.compact-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
+}
+
+.compact-period {
+  margin-top: var(--gap-1);
+  font-size: 0.45em;
+  line-height: 1;
+}
+
+.compact-date {
+  max-height: 35vh;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+}
+
+.compact-date-stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-height: none;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-date-year {
+  font-size: 0.78em;
+  color: var(--ink-2);
+}
+</style>
