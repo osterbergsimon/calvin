@@ -16,6 +16,8 @@ import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
+import { getSettingDestinationById } from "@/components/settings/settingsRegistry";
+import { actionForUrl } from "@/stores/auth";
 
 // Settings writes are coalesced over a quiet period, so settle the queued save
 // before asserting (the production UI does not wait for it).
@@ -84,6 +86,7 @@ function mountScreens({
   availableVersion = null,
   narrow,
   initialSection = null,
+  initialSetting = null,
 } = {}) {
   setActivePinia(createPinia());
   if (narrow === undefined) {
@@ -109,7 +112,7 @@ function mountScreens({
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = vi.fn(async () => availableVersion);
   return {
-    wrapper: mount(ScreensSettings, { props: { config: cfg, initialSection } }),
+    wrapper: mount(ScreensSettings, { props: { config: cfg, initialSection, initialSetting } }),
     store,
     cfg,
   };
@@ -2049,11 +2052,53 @@ describe("ScreensSettings — moved Controls and Effects & focus (§7 item 4)", 
     // household row made the edit a no-op (review finding).
     window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
     try {
-      const { wrapper } = mountScreens({ initialSection: "device-remote" });
+      const { wrapper } = mountScreens({
+        initialSection: "device-remote",
+        initialSetting: "screen-remote",
+      });
       await flushPromises();
       expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
       expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(false);
       expect(wrapper.find("#section-screen-remote").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+
+  it("opens Default for a remote row that is the same on every screen, even on a kiosk", async () => {
+    // Hide label after, the bindings and the reboot keys are Default's rows,
+    // so their deep link must not open the kiosk's own page (review finding).
+    const destination = getSettingDestinationById("device-notifications");
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({
+        initialSection: destination.section,
+        initialSetting: destination.id,
+      });
+      await flushPromises();
+      expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+      expect(wrapper.find("#section-device-remote").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-remote").exists()).toBe(false);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+
+  it("opens Default when the reboot sign-in link lands on a kiosk", async () => {
+    // The sign-in dialog's phone link carries its action's destination;
+    // rebooting is Default's shared row, never the kiosk page (review finding).
+    const reboot = actionForUrl("/api/system/reboot");
+    const destination = getSettingDestinationById(reboot.settingId);
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({
+        initialSection: destination.section,
+        initialSetting: destination.id,
+      });
+      await flushPromises();
+      expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+      expect(wrapper.find("#section-device-remote").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-remote").exists()).toBe(false);
     } finally {
       window.sessionStorage.clear();
     }

@@ -63,7 +63,7 @@ export const phoneSectionPages = {
   maintenance: [
     { id: "maintenance-updates", label: "Updates", meta: "Install Calvin updates" },
     { id: "device-hardware", label: "Versions & status" },
-    { id: "maintenance-system", label: "Restart", meta: "Restart the server or a screen" },
+    { id: "maintenance-system", label: "Restart", meta: "Restart the server or its screen" },
     { id: "maintenance-backup", label: "Backup", meta: "Download a backup" },
     { id: "maintenance-restore", label: "Restore", meta: "Restore from a backup file" },
     { id: "maintenance-auto-backup", label: "Automatic backups" },
@@ -443,7 +443,7 @@ export const settingsDestinations = [
     // value (an override there would be a no-op).
     id: "screen-remote",
     label: "Show button presses and label size",
-    path: "Screens / Default · Remote & keys",
+    path: "Screens / A screen · Remote & keys",
     category: "screens",
     section: "device-remote",
     keywords: [
@@ -453,12 +453,11 @@ export const settingsDestinations = [
       "button presses",
       "label size",
       "keyboard feedback",
-      "mode indicator",
     ],
   },
   {
     // The shared half of Remote & keys: Hide label after, the bindings and the
-    // reboot keys are the same on every screen.
+    // reboot keys are the same on every screen, so they live on Default.
     id: "device-notifications",
     label: "Remote, button bindings and reboot keys",
     path: "Screens / Default · Remote & keys",
@@ -468,6 +467,7 @@ export const settingsDestinations = [
       "notifications",
       "hide label after",
       "auto-hide",
+      "mode indicator",
       "remote",
       "remote buttons",
       "buttons",

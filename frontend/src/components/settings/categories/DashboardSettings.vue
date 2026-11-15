@@ -80,8 +80,8 @@ const emit = defineEmits(["update:config"]);
 // attribute quoting.
 
 const editorOpen = ref(false);
-// The clock bar editor: opened by its section or by a link from Content /
-// Pages & regions (`?setting=clock-bar&edit=clock-bar`).
+// The clock bar editor: opened by its section, or by Clock bar info's "Edit
+// clock bar look" link (`?setting=clock-bar&edit=clock-bar`).
 const clockEditorOpen = ref(false);
 const route = useRoute();
 
@@ -124,7 +124,8 @@ watch(
   { immediate: true }
 );
 
-// Content › Clock bar info and Pages & regions › Clock bar panel link here.
+// Clock bar info's "Edit clock bar look" link (in Dashboard › Clock bar info)
+// and the Pages & regions clock bar panel open the editor here.
 watch(
   () => route?.query?.edit,
   next => {

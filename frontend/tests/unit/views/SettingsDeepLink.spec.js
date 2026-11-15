@@ -91,7 +91,11 @@ describe("Settings ?setting= deep links after the category reorg", () => {
         stubs: {
           ...stubs,
           ScreensSettings: {
-            template: `<div>${section("device-remote", "Remote & keys")}</div>`,
+            props: ["initialSection", "initialSetting"],
+            template: `<div><span data-test="screens-initial">{{ initialSection }}</span><span data-test="screens-setting">{{ initialSetting }}</span>${section(
+              "device-remote",
+              "Remote & keys"
+            )}</div>`,
           },
         },
       },
@@ -100,6 +104,10 @@ describe("Settings ?setting= deep links after the category reorg", () => {
     await flushPromises();
 
     expect(activeCategory(w)).toBe("screens");
+    // The destination travels with the section: only screen-remote opens the
+    // kiosk's own page, the shared remote rows are Default's.
+    expect(w.find("[data-test='screens-initial']").text()).toBe("device-remote");
+    expect(w.find("[data-test='screens-setting']").text()).toBe("device-reboot");
     expect(document.getElementById("section-device-remote").scrollIntoView).toHaveBeenCalled();
     w.unmount();
   });

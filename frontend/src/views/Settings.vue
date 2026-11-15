@@ -88,6 +88,7 @@
               :key="categoryRenderKey"
               :config="localConfig"
               :initial-section="routeSection"
+              :initial-setting="routeSettingId"
               @update:config="handleConfigUpdate"
             />
             <MaintenanceSettings
@@ -206,6 +207,11 @@ const initialRouteDestination = getRouteSettingDestination();
 // Screens destinations that live inside the Default page open it on mount, so a
 // ?setting=device-power / device-keyboard / layout link still lands (§8).
 const routeSection = computed(() => getRouteSettingDestination()?.section ?? null);
+// The destination id too: Screens needs it to open the right page. The remote's
+// per-screen row (screen-remote) and its shared rows (device-notifications,
+// device-reboot) all name the device-remote section, but only screen-remote is
+// the kiosk's own page.
+const routeSettingId = computed(() => getRouteSettingDestination()?.id ?? null);
 // Honour tab hints for non-dashboard categories on initial load
 if (
   initialRouteDestination?.tabKey &&

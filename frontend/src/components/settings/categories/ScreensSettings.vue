@@ -835,6 +835,12 @@ const props = defineProps({
   // A ?setting= deep link that lands inside the Default page (§8). The old
   // All-screens destinations keep working: they open Default at that section.
   initialSection: { type: String, default: null },
+  // The destination id of that deep link. Section ids alone cannot say which
+  // page to open: Default and a screen's own page share them, and the remote's
+  // per-screen row (screen-remote) and its shared rows (device-notifications,
+  // device-reboot) are all in "device-remote". The destination distinguishes
+  // them.
+  initialSetting: { type: String, default: null },
 });
 const emit = defineEmits(["update:config"]);
 
@@ -852,17 +858,16 @@ const editorOpen = ref(false);
 
 // --- which page is open ----------------------------------------------------
 // null (the list) · "default" · "browser" · a screen id on a kiosk selection.
-// These sections exist on both the Default page and a screen's own page, so a
-// deep link can open the right one for the device: a kiosk opens its own page,
-// any other browser opens Default. Default calls the remote section
-// device-remote while a screen's own page calls it screen-remote, so the
-// per-screen label rows map to that id on a kiosk.
-const INITIAL_PER_SCREEN_SECTIONS = new Set([
-  "screen-look",
-  "screen-effects",
-  "screen-controls",
-  "device-remote",
-]);
+// A deep link opens a page depending on where its destination lives: the
+// per-screen Look, Effects and Controls sections, and the screen's own remote
+// row (screen-remote), open the kiosk's own page; everything else opens
+// Default, including the remote's shared rows (device-notifications,
+// device-reboot), which are the same on every screen and live on Default. On a
+// plain browser every destination opens Default. Default calls the remote
+// section device-remote while a screen's own page calls it screen-remote, so
+// the per-screen row maps to that id on a kiosk.
+const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-look", "screen-effects", "screen-controls"]);
+const PER_SCREEN_DESTINATIONS = new Set(["screen-remote"]);
 const PER_SCREEN_SECTION_IDS = { "device-remote": "screen-remote" };
 const DEFAULT_SECTION_IDS = new Set([
   "layout",
@@ -891,7 +896,9 @@ const sectionIndex = [
   { id: "screen-software", label: "Software" },
 ];
 const initialOwnScreenId =
-  props.initialSection && INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) && kioskId
+  kioskId &&
+  (INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) ||
+    PER_SCREEN_DESTINATIONS.has(props.initialSetting))
     ? kioskId
     : null;
 // On a kiosk the remote rows live under the screen page's own section id.
@@ -1818,10 +1825,19 @@ async function openDefaultRemote() {
   }
   openDefault();
   await nextTick();
-  const section = document.getElementById("section-device-remote");
-  if (section && typeof section.scrollIntoView === "function") {
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  scrollSectionToTop(document.getElementById("section-device-remote"));
+}
+
+// A deep link brings its section into view. Someone who asked for less motion
+// gets the jump, not the scroll, the same query base.css honours for CSS
+// motion (ScreenSettingRow reads it the same way).
+function scrollSectionToTop(section) {
+  if (!section || typeof section.scrollIntoView !== "function") return;
+  const reduced =
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    Boolean(window.matchMedia("(prefers-reduced-motion: reduce)")?.matches);
+  section.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "start" });
 }
 
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------
@@ -2065,10 +2081,7 @@ onMounted(async () => {
     // could only scroll to Default's, so open the screen's section here.
     if (initialSectionId !== props.initialSection) {
       await nextTick();
-      const section = document.getElementById(`section-${initialSectionId}`);
-      if (section && typeof section.scrollIntoView === "function") {
-        section.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      scrollSectionToTop(document.getElementById(`section-${initialSectionId}`));
     }
   }
   if (kiosks.value.length === 0) addOpen.value = true;

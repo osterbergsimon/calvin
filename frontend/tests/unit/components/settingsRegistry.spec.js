@@ -249,7 +249,7 @@ describe("settings registry", () => {
     expect(getSettingDestinationById("screen-remote")).toMatchObject({
       category: "screens",
       section: "device-remote",
-      path: "Screens / Default · Remote & keys",
+      path: "Screens / A screen · Remote & keys",
     });
     for (const word of ["show button presses", "button presses", "label size"]) {
       expect(
@@ -259,6 +259,10 @@ describe("settings registry", () => {
     }
     // "key-press" stays a per-screen word, so it finds only that destination.
     expect(filterSettingsDestinations("key-press").map(item => item.id)).toEqual(["screen-remote"]);
+    // "mode indicator" is the old name of Hide label after, a shared row.
+    expect(filterSettingsDestinations("mode indicator").map(item => item.id)).toEqual([
+      "device-notifications",
+    ]);
     // The shared rows keep their own destination.
     expect(filterSettingsDestinations("hide label after").map(item => item.id)).toEqual([
       "device-notifications",
