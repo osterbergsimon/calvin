@@ -24,7 +24,9 @@ const NEVER = {
   vcpVersion: null,
   limit: null,
 };
-const FOUND = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
+// findings_view always sends limit, and the backend never sets it: a limit
+// saved by a check is only in the overrides.
+const FOUND = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z", limit: null };
 
 const SIZES = [
   ["phone", null],
@@ -91,7 +93,7 @@ for (const [size, viewport] of SIZES) {
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await expect(group).toBeVisible();
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "menu match from 2 readings · highest 26 (set here)"
+        "menu match from 2 readings · checked 4 Nov · highest 26"
       );
 
       await group.getByRole("switch", { name: "Ramp brightness at sleep and wake" }).click();
@@ -137,7 +139,6 @@ for (const [size, viewport] of SIZES) {
             displayStack: "cog",
             displayCheck: {
               ...FOUND,
-              limit: 26,
               powerTrouble: { at: "2026-11-07T10:00:00Z", step: "conversion", level: 28 },
             },
           },
@@ -157,9 +158,9 @@ for (const [size, viewport] of SIZES) {
       await expect(group.locator('[data-test="levels-summary"]')).toContainText(
         "Highest 78 · Lowest 28"
       );
-      // The check saved this limit, so the summary carries its date.
+      // The date belongs to the check's findings, and the highest level is plain.
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "highest 26 (4 Nov)"
+        "checked 4 Nov · highest 26"
       );
       await group.locator('[data-test="levels-change"]').click();
       const editor = group.locator('[data-test="levels-editor"]');
@@ -169,9 +170,9 @@ for (const [size, viewport] of SIZES) {
       await highest.getByRole("button", { name: "Decrease" }).click();
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(25);
       expect(api.overridesByKiosk.hallway.brightness).toBe(19);
-      // A level set here is not the one the check proved, so it loses the date.
+      // The check's date stays with the check, not with the level set here.
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "highest 25 (set here)"
+        "checked 4 Nov · highest 25"
       );
 
       // Raising past the recorded power trouble saves nothing until confirmed.
@@ -209,7 +210,7 @@ for (const [size, viewport] of SIZES) {
     }) => {
       const api = await installApiMock(page, {
         kioskExtras: {
-          hallway: { displayStack: "cog", displayCheck: { ...FOUND, limit: 26 } },
+          hallway: { displayStack: "cog", displayCheck: FOUND },
         },
       });
       api.overridesByKiosk.hallway = {
@@ -248,7 +249,7 @@ for (const [size, viewport] of SIZES) {
     test("Lowest is edited in place and saves at once", async ({ page, consoleErrors }) => {
       const api = await installApiMock(page, {
         kioskExtras: {
-          hallway: { displayStack: "cog", displayCheck: { ...FOUND, limit: 26 } },
+          hallway: { displayStack: "cog", displayCheck: FOUND },
         },
       });
       api.overridesByKiosk.hallway = {

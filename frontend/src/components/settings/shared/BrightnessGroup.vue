@@ -164,7 +164,6 @@
           <NumberStepper
             ref="highestControl"
             data-test="highest-stepper"
-            tabindex="-1"
             :model-value="highestShown"
             :min="unit(0)"
             :max="unit(100)"
@@ -541,9 +540,14 @@ function setHighest(value) {
   patch(change);
 }
 // Keep and Raise both remove the buttons that were pressed, so focus goes back
-// to the Highest stepper (docs/design/frontend-doctrine.md: focus is never lost).
+// to the Highest stepper's Increase button — the control itself is a role=group
+// container, not a focusable element (docs/design/frontend-doctrine.md: focus is
+// never lost).
 function focusHighest() {
-  nextTick(() => highestControl.value?.$el?.focus?.());
+  nextTick(() => {
+    const root = highestControl.value?.$el;
+    root?.querySelector?.('[data-step="inc"]')?.focus?.();
+  });
 }
 function keepHighest() {
   highestDraft.value = null;

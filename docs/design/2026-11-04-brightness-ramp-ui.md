@@ -55,9 +55,10 @@ Rows, in order:
    - **History** opens a short list of the last 20 ramps and checks, newest first: the time, what triggered it, the
      result and the level reached.
 4. **Display check.** One line summarising the latest check: "Answers brightness commands · changes take effect · menu
-   match from 3 readings · highest 26 (4 Nov)". The button is **Check this display…**. Before any check has run, the line
-   says "Not checked yet". The date belongs only to the limit the check itself saved: a level set by hand in the
-   Highest and lowest row reads "highest 26 (set here)", never a check's date.
+   match from 3 readings · checked 4 Nov · highest 26". The button is **Check this display…**. Before any check has run,
+   the line says "Not checked yet". "checked <date>" describes the check's findings and is left out when there is no
+   date; the highest level is plain because the backend does not record which limit the check saved (a follow-up issue
+   tracks that marker).
    - **Highest and lowest** (calvin-hts5) is its own row once a limit is saved: "Highest 67 · Lowest 10 · panel's own
      menu" (Calvin's scale without a match), with **Change**. Change reveals two steppers, in panel numbers converted
      with the saved readings (Highest rounded down, Lowest to the nearest), with the Calvin value beside each.

@@ -214,16 +214,11 @@ export function checkSummary(findings, readings, limit) {
   if (findings.ddc && findings.writes === false) parts.push("changes don't take effect");
   const count = validPoints(readings).length;
   if (count >= 2) parts.push(`menu match from ${count} readings`);
-  if (limit !== null && limit !== undefined) {
-    // The check's date belongs only to the limit the check itself saved. A
-    // highest level set by hand in Settings (calvin-hts5) must not look
-    // check-proven, so it says so instead.
-    const saved = findings.limit;
-    const fromCheck = saved !== null && saved !== undefined && Number(saved) === Number(limit);
-    const when = fromCheck ? checkedDate(findings.checkedAt) : "";
-    parts.push(
-      fromCheck ? `highest ${limit}${when ? ` (${when})` : ""}` : `highest ${limit} (set here)`
-    );
-  }
+  // The date belongs to the check's findings, not to the limit: the backend
+  // never records which limit the check saved (only the run's per-step record
+  // carries it), so the highest level is stated plainly and never dated.
+  const when = checkedDate(findings.checkedAt);
+  if (when) parts.push(`checked ${when}`);
+  if (limit !== null && limit !== undefined) parts.push(`highest ${limit}`);
   return parts.join(" · ");
 }

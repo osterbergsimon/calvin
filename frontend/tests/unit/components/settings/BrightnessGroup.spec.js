@@ -85,22 +85,27 @@ describe("BrightnessGroup rows", () => {
     const wrapper = mountGroup({
       overrides: { brightnessLimit: 26, brightnessConversion: READINGS },
     });
-    // No limit came from the check, so the level set by hand is not dated.
-    expect(find(wrapper, "check-summary").text()).toContain("highest 26 (set here)");
+    // The date describes the check's findings; the highest level is plain,
+    // because the backend never records which limit the check saved.
+    expect(find(wrapper, "check-summary").text()).toBe(
+      "Answers brightness commands · changes take effect · menu match from 2 readings · checked 4 Nov · highest 26"
+    );
     await find(wrapper, "check-open").trigger("click");
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
   });
 
-  it("dates the highest level only when the check itself saved it", () => {
+  it("shows a plain highest level when the findings have no date", () => {
     const wrapper = mountGroup({
       kiosk: {
         id: "kitchen",
         displayStack: "cog",
-        displayCheck: { ...FINDINGS, limit: 26 },
+        displayCheck: { ...FINDINGS, checkedAt: null },
       },
       overrides: { brightnessLimit: 26, brightnessConversion: READINGS },
     });
-    expect(find(wrapper, "check-summary").text()).toContain("highest 26 (4 Nov)");
+    expect(find(wrapper, "check-summary").text()).toBe(
+      "Answers brightness commands · changes take effect · menu match from 2 readings · highest 26"
+    );
   });
 
   it("words a read-step power trouble by the panel's own buttons, not Calvin's level", () => {
@@ -638,25 +643,28 @@ describe("BrightnessGroup highest and lowest", () => {
     );
   });
 
-  it("puts focus back on the Highest stepper after Keep", async () => {
+  const increaseButton = wrapper =>
+    find(wrapper, "highest-stepper").find('[data-step="inc"]').element;
+
+  it("puts focus on the Highest stepper's Increase button after Keep", async () => {
     const wrapper = mountAttached({ overrides: { ...ramp, brightnessLimit: 26 } });
     await openEditor(wrapper);
     await setLevel(wrapper, "highest-stepper", 30);
     await find(wrapper, "raise-cancel").trigger("click");
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
-    expect(document.activeElement).toBe(find(wrapper, "highest-stepper").element);
+    expect(document.activeElement).toBe(increaseButton(wrapper));
     wrapper.unmount();
   });
 
-  it("puts focus back on the Highest stepper after Raise", async () => {
+  it("puts focus on the Highest stepper's Increase button after Raise", async () => {
     const wrapper = mountAttached({ overrides: { ...ramp, brightnessLimit: 26 } });
     await openEditor(wrapper);
     await setLevel(wrapper, "highest-stepper", 30);
     await find(wrapper, "raise-confirm").trigger("click");
     await wrapper.vm.$nextTick();
     await wrapper.vm.$nextTick();
-    expect(document.activeElement).toBe(find(wrapper, "highest-stepper").element);
+    expect(document.activeElement).toBe(increaseButton(wrapper));
     wrapper.unmount();
   });
 

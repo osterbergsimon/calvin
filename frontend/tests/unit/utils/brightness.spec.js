@@ -153,32 +153,38 @@ describe("availability", () => {
 });
 
 describe("checkSummary", () => {
+  const threeReadings = [
+    { ddc: 5, menu: 28 },
+    { ddc: 12, menu: 44 },
+    { ddc: 19, menu: 61 },
+  ];
+  // The shape findings_view returns: every field present, and limit is never
+  // set (the backend does not record which limit the check saved).
+  const foundCheck = {
+    checkedAt: "2026-11-04T10:00:00Z",
+    ddc: true,
+    writes: true,
+    model: null,
+    connector: null,
+    vcpVersion: null,
+    limit: null,
+  };
   it("says Not checked yet", () => {
     expect(checkSummary(null, [], null)).toBe("Not checked yet");
   });
-  it("lists what was found", () => {
-    expect(
-      checkSummary(
-        { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z", limit: 26 },
-        [
-          { ddc: 5, menu: 28 },
-          { ddc: 12, menu: 44 },
-          { ddc: 19, menu: 61 },
-        ],
-        26
-      )
-    ).toBe(
-      "Answers brightness commands · changes take effect · menu match from 3 readings · highest 26 (4 Nov)"
+  it("lists what was found, then the check's date, then a plain highest level", () => {
+    expect(checkSummary(foundCheck, threeReadings, 26)).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov · highest 26"
     );
   });
-  it("does not date a highest level the check did not save", () => {
-    const foundCheck = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z", limit: 20 };
-    expect(checkSummary(foundCheck, [], 26)).toBe(
-      "Answers brightness commands · changes take effect · highest 26 (set here)"
+  it("omits the date part when the findings carry none", () => {
+    expect(checkSummary({ ...foundCheck, checkedAt: null }, threeReadings, 26)).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · highest 26"
     );
-    // Findings from before the check recorded a limit carry none at all.
-    expect(checkSummary({ ...foundCheck, limit: undefined }, [], 26)).toBe(
-      "Answers brightness commands · changes take effect · highest 26 (set here)"
+  });
+  it("omits the highest part before a limit is saved", () => {
+    expect(checkSummary(foundCheck, threeReadings, null)).toBe(
+      "Answers brightness commands · changes take effect · menu match from 3 readings · checked 4 Nov"
     );
   });
 });
