@@ -727,12 +727,13 @@ onUnmounted(() => {
 }
 
 /* The fullscreen view is an absolute overlay on the cell. The stack is
-   positioned as well and comes later in the DOM, so the overlay needs a
-   z-index of its own to paint, and take input, above it. */
+   positioned as well and comes later in the DOM, so the overlay needs a layer
+   of its own (`--z-raised`, local to `.dashboard-main`) to paint, and take
+   input, above it. */
 .fullscreen-mode {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: var(--z-raised);
 }
 
 /* Holds the dashboard view(s). With the screen stack off it holds one view and
