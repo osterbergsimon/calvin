@@ -81,6 +81,13 @@ for (const mode of ["opacity", "visibility"]) {
         ...view.querySelectorAll(".dashboard-region-section"),
       ]);
       const hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+      // Paint order, topmost first. elementsFromPoint ignores pointer-events,
+      // so it reports which of the two actually paints on top; elementFromPoint
+      // alone cannot, because the stack takes no input either way.
+      const atPoint = document.elementsFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+      const topmost = atPoint.find(
+        element => element.closest(".screen-stack") || element.closest(".fullscreen-mode")
+      );
       return {
         stackDisplay: stackStyle.display,
         stackPointerEvents: stackStyle.pointerEvents,
@@ -93,6 +100,7 @@ for (const mode of ["opacity", "visibility"]) {
         sections: sections.map(rect),
         hitIsFullscreen: Boolean(hit?.closest(".fullscreen-mode")),
         hitIsStack: Boolean(hit?.closest(".screen-stack")),
+        topmostIsFullscreen: Boolean(topmost?.closest(".fullscreen-mode")),
       };
     });
 
@@ -118,8 +126,79 @@ for (const mode of ["opacity", "visibility"]) {
       }
     }
 
-    // The fullscreen view still covers the stack and takes the input.
+    // The fullscreen view paints above the stack (the overlay carries the
+    // z-index; the stack still comes later in the DOM) and takes the input.
+    expect(measured.topmostIsFullscreen).toBe(true);
     expect(measured.hitIsFullscreen).toBe(true);
     expect(measured.hitIsStack).toBe(false);
   });
 }
+
+/**
+ * Bottom clock bar: the fullscreen view overlays the screens inside their own
+ * cell, and the clock bar is a sibling of that cell. So the clock bar keeps
+ * its row, and the stack keeps the exact box it had before fullscreen opened —
+ * a box that changed re-lays out every screen on enter and on wake. Before,
+ * the stack was absolutely positioned over `.dashboard-main` (clock bar
+ * included) and grew by the bar's height.
+ */
+test("keeps the stack's box and clears a bottom clock bar when fullscreen opens", async ({
+  page,
+}) => {
+  await installApiMock(page, { config: { clockBarPosition: "bottom" } });
+  await page.goto("/?screenStack=opacity");
+  await expect(page.locator(".screen-stack--stacked")).toBeVisible();
+  await expect(page.locator(".screen-stack--stacked > .dashboard-view")).toHaveCount(2);
+
+  const clockBar = page.locator(".clock-bar-horizontal.position-bottom");
+  await expect(clockBar).toBeVisible();
+
+  const measure = () =>
+    page.evaluate(() => {
+      const rect = element => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height };
+      };
+      const stackEl = document.querySelector(".screen-stack--stacked");
+      const barEl = document.querySelector(".clock-bar-horizontal.position-bottom");
+      const fullscreenEl = document.querySelector(".fullscreen-mode");
+      const barHit = document.elementFromPoint(
+        barEl.getBoundingClientRect().x + barEl.getBoundingClientRect().width / 2,
+        barEl.getBoundingClientRect().y + barEl.getBoundingClientRect().height / 2
+      );
+      return {
+        stack: rect(stackEl),
+        bar: rect(barEl),
+        fullscreen: fullscreenEl ? rect(fullscreenEl) : null,
+        barTakesInput: Boolean(barHit?.closest(".clock-bar-horizontal")),
+      };
+    });
+
+  const normal = await measure();
+  expect(normal.stack.height).toBeGreaterThan(0);
+  // The clock bar sits under the stack, edge to edge at most.
+  expect(normal.stack.y + normal.stack.height).toBeLessThanOrEqual(normal.bar.y + 1);
+  expect(normal.barTakesInput).toBe(true);
+
+  await enterFullscreen(page, "photos");
+  await expect(page.locator(".fullscreen-mode .photo-slideshow.fullscreen")).toBeVisible();
+  await expect(clockBar).toBeVisible();
+
+  const fullscreen = await measure();
+
+  // Same box to the pixel: opening fullscreen must not re-lay out the screens.
+  for (const side of ["x", "y", "width", "height"]) {
+    expect(Math.abs(fullscreen.stack[side] - normal.stack[side])).toBeLessThanOrEqual(1);
+  }
+  // The overlay is the same cell the stack fills, and it does not take the
+  // clock bar's row either: the bar stays visible and hit-testable.
+  expect(fullscreen.fullscreen).not.toBeNull();
+  for (const side of ["x", "y", "width", "height"]) {
+    expect(Math.abs(fullscreen.fullscreen[side] - fullscreen.stack[side])).toBeLessThanOrEqual(1);
+  }
+  expect(fullscreen.stack.y + fullscreen.stack.height).toBeLessThanOrEqual(fullscreen.bar.y + 1);
+  expect(fullscreen.fullscreen.y + fullscreen.fullscreen.height).toBeLessThanOrEqual(
+    fullscreen.bar.y + 1
+  );
+  expect(fullscreen.barTakesInput).toBe(true);
+});

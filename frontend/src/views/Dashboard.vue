@@ -35,130 +35,138 @@
         />
 
         <div :class="['dashboard-main', mainLayoutClass]">
-          <!-- Fullscreen Mode (Calendar, Photos or Web Services) -->
-          <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
-            <!-- Fullscreen Calendar -->
-            <CalendarView
-              v-if="modeStore.fullscreenMode === modeStore.MODES.CALENDAR"
-              :is-fullscreen="true"
-              :source-ids="modeStore.fullscreenContext?.sourceIds || []"
-              :view="modeStore.fullscreenContext?.view || null"
-            />
-            <!-- Fullscreen Photos -->
-            <PhotoSlideshow
-              v-else-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
-              :is-fullscreen="true"
-              :auto-rotate="true"
-              :rotation-interval="configStore.photoRotationInterval * 1000"
-              :source-ids="modeStore.fullscreenContext?.sourceIds || []"
-            />
-            <!-- Fullscreen Web Services -->
-            <WebServiceViewer
-              v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
-              :is-fullscreen="true"
-              :service-id="modeStore.fullscreenContext?.serviceId || null"
-              :view="modeStore.fullscreenContext?.view || null"
-            />
-          </div>
+          <!-- One cell holds the screens and a fullscreen view, so the
+               fullscreen view can overlay the screens without changing their
+               box: the bottom clock bar stays a sibling of the cell, outside
+               it, and the stack keeps its exact size while fullscreen is open.
+               (Opening fullscreen used to resize the stack by the clock bar's
+               height, which re-laid out every screen.) -->
+          <div class="dashboard-view-cell">
+            <!-- Fullscreen Mode (Calendar, Photos or Web Services) -->
+            <div v-if="modeStore.isFullscreen" class="mode-content fullscreen-mode">
+              <!-- Fullscreen Calendar -->
+              <CalendarView
+                v-if="modeStore.fullscreenMode === modeStore.MODES.CALENDAR"
+                :is-fullscreen="true"
+                :source-ids="modeStore.fullscreenContext?.sourceIds || []"
+                :view="modeStore.fullscreenContext?.view || null"
+              />
+              <!-- Fullscreen Photos -->
+              <PhotoSlideshow
+                v-else-if="modeStore.fullscreenMode === modeStore.MODES.PHOTOS"
+                :is-fullscreen="true"
+                :auto-rotate="true"
+                :rotation-interval="configStore.photoRotationInterval * 1000"
+                :source-ids="modeStore.fullscreenContext?.sourceIds || []"
+              />
+              <!-- Fullscreen Web Services -->
+              <WebServiceViewer
+                v-else-if="modeStore.fullscreenMode === modeStore.MODES.WEB_SERVICES"
+                :is-fullscreen="true"
+                :service-id="modeStore.fullscreenContext?.serviceId || null"
+                :view="modeStore.fullscreenContext?.view || null"
+              />
+            </div>
 
-          <!-- Dashboard View (Home) - Renders configured dashboard regions.
-               With the screen stack on (utils/screenStack.js) every screen stays
-               mounted and only the active one is shown; otherwise only the active
-               screen is rendered, as before. With the stack on it stays mounted
-               under a fullscreen view too, so entering and leaving fullscreen
-               (photo frame idle/wake, maximize) does not remount every screen. -->
-          <div
-            v-if="isStacked || !modeStore.isFullscreen"
-            :class="[
-              'screen-stack',
-              { 'screen-stack--stacked': isStacked },
-              isStacked ? `screen-stack--${screenStackMode}` : null,
-              { 'screen-stack--under-fullscreen': isStacked && modeStore.isFullscreen },
-            ]"
-          >
-            <ScreenScope
-              v-for="screen in renderedScreens"
-              :key="isStacked ? screen.id : 'active'"
-              :visible="isActiveScreen(screen) && !modeStore.isFullscreen"
+            <!-- Dashboard View (Home) - Renders configured dashboard regions.
+                 With the screen stack on (utils/screenStack.js) every screen stays
+                 mounted and only the active one is shown; otherwise only the active
+                 screen is rendered, as before. With the stack on it stays mounted
+                 under a fullscreen view too, so entering and leaving fullscreen
+                 (photo frame idle/wake, maximize) does not remount every screen. -->
+            <div
+              v-if="isStacked || !modeStore.isFullscreen"
+              :class="[
+                'screen-stack',
+                { 'screen-stack--stacked': isStacked },
+                isStacked ? `screen-stack--${screenStackMode}` : null,
+                { 'screen-stack--under-fullscreen': isStacked && modeStore.isFullscreen },
+              ]"
             >
-              <div
-                :ref="el => setDashboardViewEl(screen, el)"
-                :class="[
-                  'mode-content',
-                  'dashboard-view',
-                  mainLayoutClassFor(screen),
-                  {
-                    'dashboard-view--unlocked': !configStore.regionsLocked,
-                    'is-active-screen': isActiveScreen(screen),
-                  },
-                ]"
-                :style="regionChromeVars(configStore.touchControlSize)"
-                :inert="!isScreenInteractive(screen) || undefined"
-                :aria-hidden="!isScreenInteractive(screen) || undefined"
+              <ScreenScope
+                v-for="screen in renderedScreens"
+                :key="isStacked ? screen.id : 'active'"
+                :visible="isActiveScreen(screen) && !modeStore.isFullscreen"
               >
-                <template v-for="elementType in layoutOrderFor(screen)" :key="elementType">
-                  <!-- Dashboard Region -->
-                  <div
-                    v-if="isRegionElement(elementType)"
-                    class="dashboard-region-section"
-                    :class="{
-                      'dashboard-region-section--lit': isLitSection(screen, elementType),
-                    }"
-                    :style="getRegionStyle(screen, elementType)"
-                  >
-                    <DashboardRegion
-                      :region="getRegionForElement(screen, elementType)"
-                      :path="regionPath(screen, elementType)"
-                      :photo-rotation-interval="configStore.photoRotationInterval"
-                      :parent-direction="layoutDirectionFor(screen)"
-                      :active-region-id="activeRegionStore.getActiveRegionId(screen)"
-                      :light-active="lightActive && isActiveScreen(screen)"
-                      :controls-visible="configStore.shouldShowUI"
-                      :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
-                      @focus-region="onFocusRegion"
+                <div
+                  :ref="el => setDashboardViewEl(screen, el)"
+                  :class="[
+                    'mode-content',
+                    'dashboard-view',
+                    mainLayoutClassFor(screen),
+                    {
+                      'dashboard-view--unlocked': !configStore.regionsLocked,
+                      'is-active-screen': isActiveScreen(screen),
+                    },
+                  ]"
+                  :style="regionChromeVars(configStore.touchControlSize)"
+                  :inert="!isScreenInteractive(screen) || undefined"
+                  :aria-hidden="!isScreenInteractive(screen) || undefined"
+                >
+                  <template v-for="elementType in layoutOrderFor(screen)" :key="elementType">
+                    <!-- Dashboard Region -->
+                    <div
+                      v-if="isRegionElement(elementType)"
+                      class="dashboard-region-section"
+                      :class="{
+                        'dashboard-region-section--lit': isLitSection(screen, elementType),
+                      }"
+                      :style="getRegionStyle(screen, elementType)"
+                    >
+                      <DashboardRegion
+                        :region="getRegionForElement(screen, elementType)"
+                        :path="regionPath(screen, elementType)"
+                        :photo-rotation-interval="configStore.photoRotationInterval"
+                        :parent-direction="layoutDirectionFor(screen)"
+                        :active-region-id="activeRegionStore.getActiveRegionId(screen)"
+                        :light-active="lightActive && isActiveScreen(screen)"
+                        :controls-visible="configStore.shouldShowUI"
+                        :dim-others="configStore.focusLightDimOthers && configStore.regionsLocked"
+                        @focus-region="onFocusRegion"
+                      />
+                    </div>
+
+                    <!-- Horizontal between bar (regions stacked vertically) -->
+                    <ClockBarHorizontal
+                      v-else-if="elementType === 'horizontalBarBetween'"
+                      position="between"
+                      :show-in-non-kiosk="true"
+                      :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+                      :enabled="true"
                     />
-                  </div>
 
-                  <!-- Horizontal between bar (regions stacked vertically) -->
-                  <ClockBarHorizontal
-                    v-else-if="elementType === 'horizontalBarBetween'"
-                    position="between"
-                    :show-in-non-kiosk="true"
-                    :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
-                    :enabled="true"
-                  />
+                    <!-- Vertical between bar (regions side by side) -->
+                    <ClockBarVertical
+                      v-else-if="elementType === 'verticalBarBetween'"
+                      position="between"
+                      :show-in-non-kiosk="true"
+                      :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
+                      :enabled="true"
+                    />
+                  </template>
 
-                  <!-- Vertical between bar (regions side by side) -->
-                  <ClockBarVertical
-                    v-else-if="elementType === 'verticalBarBetween'"
-                    position="between"
-                    :show-in-non-kiosk="true"
-                    :show-in-kiosk="configStore.effectiveClockBarShowInKiosk"
-                    :enabled="true"
-                  />
-                </template>
+                  <template v-if="isActiveScreen(screen)">
+                    <!-- CLV-20: one welcome card while every content region is empty -->
+                    <SetupWelcomeCard />
 
-                <template v-if="isActiveScreen(screen)">
-                  <!-- CLV-20: one welcome card while every content region is empty -->
-                  <SetupWelcomeCard />
-
-                  <!-- Drag-to-resize handles (only when the layout is unlocked) -->
-                  <div
-                    v-for="handle in resizeHandles"
-                    :key="`resizer-${handle.firstIndex}`"
-                    class="region-resizer"
-                    :class="`region-resizer--${layoutDirection}`"
-                    :style="resizerStyle(handle)"
-                    role="separator"
-                    aria-orientation="vertical"
-                    :aria-label="`Drag to resize regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
-                    @pointerdown="startRegionResize(handle.firstIndex, $event)"
-                  >
-                    <span class="region-resizer__grip" aria-hidden="true" />
-                  </div>
-                </template>
-              </div>
-            </ScreenScope>
+                    <!-- Drag-to-resize handles (only when the layout is unlocked) -->
+                    <div
+                      v-for="handle in resizeHandles"
+                      :key="`resizer-${handle.firstIndex}`"
+                      class="region-resizer"
+                      :class="`region-resizer--${layoutDirection}`"
+                      :style="resizerStyle(handle)"
+                      role="separator"
+                      aria-orientation="vertical"
+                      :aria-label="`Drag to resize regions ${handle.firstIndex + 1} and ${handle.firstIndex + 2}`"
+                      @pointerdown="startRegionResize(handle.firstIndex, $event)"
+                    >
+                      <span class="region-resizer__grip" aria-hidden="true" />
+                    </div>
+                  </template>
+                </div>
+              </ScreenScope>
+            </div>
           </div>
 
           <!-- Unlocked-layout banner: clear status + one-tap re-lock -->
@@ -705,6 +713,28 @@ onUnmounted(() => {
   min-width: 0;
 }
 
+/* One cell holds the screens and, over them, a fullscreen view. It takes the
+   space the bottom clock bar leaves, so opening a fullscreen view never
+   resizes the screens: before, the fullscreen view was a sibling of the stack
+   in `.dashboard-main` and the stack moved to `position: absolute; inset: 0`
+   over the clock bar, which made it taller and re-laid out every screen. */
+.dashboard-view-cell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+}
+
+/* The fullscreen view is an absolute overlay on the cell. The stack is
+   positioned as well and comes later in the DOM, so the overlay needs a
+   z-index of its own to paint, and take input, above it. */
+.fullscreen-mode {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 /* Holds the dashboard view(s). With the screen stack off it holds one view and
    lays out exactly like the view did on its own. */
 .screen-stack {
@@ -725,14 +755,14 @@ onUnmounted(() => {
   contain: layout paint;
 }
 
-/* While a fullscreen view is open, the stack stays mounted and laid out behind
-   it: same box, no paint, no input. `display: none` would drop every screen's
-   boxes, so a kiosk wake (photo frame -> dashboard) would have to restyle and
-   lay out all N screens again, and opacity mode would lose the tiles it keeps
-   on purpose. The fullscreen view is opaque, so it still covers the stack. */
+/* While a fullscreen view is open, the stack stays mounted and laid out under
+   it: same box (it keeps its place in the cell's flow), no paint, no input.
+   `display: none` would drop every screen's boxes, so a kiosk wake (photo
+   frame -> dashboard) would have to restyle and lay out all N screens again,
+   and opacity mode would lose the tiles it keeps on purpose. The fullscreen
+   view covers the stack because `.fullscreen-mode` overlays the cell with a
+   z-index above it, not because it is opaque. */
 .screen-stack--under-fullscreen {
-  position: absolute;
-  inset: 0;
   pointer-events: none;
 }
 .screen-stack--under-fullscreen > .dashboard-view {
