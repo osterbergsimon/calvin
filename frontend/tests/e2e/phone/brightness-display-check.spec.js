@@ -105,7 +105,7 @@ for (const [size, viewport] of SIZES) {
       );
       await expect(group.locator('[data-test="limit-hatch"]')).toBeVisible();
       await expect(group.locator('[data-test="limit-note"]')).toContainText(
-        "You can go up to 78 on the panel's own menu (Calvin 26)"
+        "Calvin never goes above your highest level"
       );
 
       // One save on release, not one per drag step.
@@ -122,6 +122,71 @@ for (const [size, viewport] of SIZES) {
 
       await expectPhoneLayout(page, `Brightness section (${size})`);
       await shot(page, size, "settings-section");
+      expect(consoleErrors).toEqual([]);
+      expect(api.unmatched).toEqual([]);
+    });
+
+    // calvin-hts5: Highest and Lowest edited without a new check.
+    test("Highest and Lowest are edited in place: lower saves at once, raise warns", async ({
+      page,
+      consoleErrors,
+    }) => {
+      const api = await installApiMock(page, {
+        kioskExtras: {
+          hallway: {
+            displayStack: "cog",
+            displayCheck: {
+              ...FOUND,
+              powerTrouble: { at: "2026-11-07T10:00:00Z", step: "conversion", level: 28 },
+            },
+          },
+        },
+      });
+      api.overridesByKiosk.hallway = {
+        brightnessRampEnabled: true,
+        brightness: 19,
+        brightnessLimit: 26,
+        brightnessFloor: 5,
+        brightnessConversion: [
+          { ddc: 5, menu: 28 },
+          { ddc: 19, menu: 61 },
+        ],
+      };
+      const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
+      await expect(group.locator('[data-test="levels-summary"]')).toContainText(
+        "Highest 78 · Lowest 28"
+      );
+      await group.locator('[data-test="levels-change"]').click();
+      const editor = group.locator('[data-test="levels-editor"]');
+      const highest = editor.getByRole("group", { name: "Highest" });
+
+      // Lowering saves at once (77 on the panel rounds down to Calvin 25).
+      await highest.getByRole("button", { name: "Decrease" }).click();
+      await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(25);
+      expect(api.overridesByKiosk.hallway.brightness).toBe(19);
+
+      // Raising past the recorded power trouble saves nothing until confirmed.
+      const saves = api.overridesRequests.length;
+      for (let i = 0; i < 7; i += 1) {
+        await highest.getByRole("button", { name: "Increase" }).click();
+      }
+      await expect(editor.locator('[data-test="raise-trouble"]')).toContainText(
+        "Power trouble at Calvin 28"
+      );
+      await expect(editor.locator('[data-test="raise-warning"]')).toContainText("display check");
+      expect(api.overridesRequests.length).toBe(saves);
+      await expectPhoneLayout(page, `levels editor (${size})`);
+      await editor.scrollIntoViewIfNeeded();
+      await shot(page, size, "levels-raise-light");
+      await page.emulateMedia({ colorScheme: "dark" });
+      await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+      await shot(page, size, "levels-raise-dark");
+      await page.emulateMedia({ colorScheme: "light" });
+
+      await editor.locator('[data-test="raise-cancel"]').click();
+      await expect(editor.locator('[data-test="raise-warning"]')).toBeHidden();
+      expect(api.overridesRequests.length).toBe(saves);
+      expect(api.overridesByKiosk.hallway.brightnessLimit).toBe(25);
       expect(consoleErrors).toEqual([]);
       expect(api.unmatched).toEqual([]);
     });
@@ -240,8 +305,8 @@ for (const [size, viewport] of SIZES) {
       await page.locator('[data-test="check-done"]').click();
       await expect(dialog(page)).toBeHidden();
       await expect.poll(() => api.displayCheckCalls.includes("POST stop")).toBe(true);
-      await expect(group.locator('[data-test="floor-note"]')).toContainText(
-        /Lowest: Panel \d+ \(Calvin 2\)/
+      await expect(group.locator('[data-test="levels-summary"]')).toContainText(
+        /Highest \d+ · Lowest \d+ · panel's own menu/
       );
 
       // Clear calibration wipes the three keys together.

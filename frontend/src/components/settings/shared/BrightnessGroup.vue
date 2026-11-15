@@ -94,17 +94,11 @@
             :style="{ flexGrow: hatchGrow }"
             aria-hidden="true"
           >
-            <span class="brightness-slider__limit">limit {{ unit(limit) }}</span>
+            <span class="brightness-slider__limit">highest {{ unit(limit) }}</span>
           </span>
         </div>
         <p class="brightness-group__note" data-test="limit-note">
-          <template v-if="limit !== null">
-            You can go up to {{ unit(maxDdc) }}
-            {{ fit ? `on the panel's own menu (Calvin ${maxDdc})` : "(Calvin's scale)" }}. Above
-            that is too close to the limit the display check found{{
-              limitDate ? ` on ${limitDate}` : ""
-            }}.
-          </template>
+          <template v-if="limit !== null"> Calvin never goes above your highest level. </template>
           <template v-else>
             No limit found yet.
             <Button
@@ -126,9 +120,6 @@
             Clear calibration
           </Button>
         </p>
-        <p v-if="floor !== null" class="brightness-group__note" data-test="floor-note">
-          Lowest: {{ fit ? `Panel ${unit(floor)} (Calvin ${floor})` : `Calvin ${floor}` }}
-        </p>
         <p
           v-if="brightnessNote"
           class="brightness-group__note"
@@ -140,6 +131,93 @@
         </p>
       </div>
     </SettingRow>
+
+    <SettingRow
+      v-if="showLevels"
+      label="Highest and lowest"
+      :id="rowAnchorId('brightnessFloor')"
+      data-test="levels-row"
+    >
+      <template #description>
+        <InlineNote data-test="levels-summary">
+          Highest {{ unit(limit) }} · Lowest {{ unit(floor ?? 0) }} ·
+          {{ fit ? "panel's own menu" : "Calvin's scale" }}
+        </InlineNote>
+      </template>
+      <Button
+        variant="link"
+        data-test="levels-change"
+        :aria-expanded="levelsOpen ? 'true' : 'false'"
+        @click="toggleLevels"
+      >
+        Change
+      </Button>
+    </SettingRow>
+    <div v-if="showLevels && levelsOpen" class="brightness-group__speed" data-test="levels-editor">
+      <div class="brightness-group__speed-field">
+        <span>Highest</span>
+        <span class="brightness-group__level">
+          <span v-if="fit" class="brightness-group__calvin" data-test="highest-calvin"
+            >Calvin {{ highestDdc }}</span
+          >
+          <NumberStepper
+            data-test="highest-stepper"
+            :model-value="highestShown"
+            :min="unit(0)"
+            :max="unit(100)"
+            :step="1"
+            aria-label="Highest"
+            @update:model-value="setHighest"
+          />
+        </span>
+      </div>
+      <div v-if="raising" class="brightness-group__raise" data-test="raise-warning">
+        <InlineNote v-if="raiseTrouble" tone="err" data-test="raise-trouble">
+          {{ raiseTrouble }}. At this level the Pi can crash and may not start again until the
+          panel's USB is unplugged. Only the display check proves a level works.
+        </InlineNote>
+        <InlineNote v-else tone="warn">
+          Above your highest level ({{ unit(limit) }}). Too bright can cut the power, sometimes only
+          under load or at start-up. Only the display check proves a level works.
+        </InlineNote>
+        <div class="brightness-group__actions">
+          <Button data-test="raise-cancel" @click="highestDraft = null">
+            Keep {{ unit(limit) }}
+          </Button>
+          <Button data-test="raise-check" @click="emit('open-check', { step: 'detect' })">
+            Run the display check
+          </Button>
+          <Button
+            :variant="raiseTrouble ? 'danger' : 'ghost'"
+            data-test="raise-confirm"
+            @click="confirmRaise"
+          >
+            Raise to {{ highestShown }}
+          </Button>
+        </div>
+      </div>
+      <div class="brightness-group__speed-field">
+        <span>Lowest</span>
+        <span class="brightness-group__level">
+          <span v-if="fit" class="brightness-group__calvin" data-test="lowest-calvin"
+            >Calvin {{ floor ?? 0 }}</span
+          >
+          <NumberStepper
+            data-test="lowest-stepper"
+            :model-value="lowestShown"
+            :min="unit(0)"
+            :max="unit(lowestCap)"
+            :step="1"
+            aria-label="Lowest"
+            @update:model-value="setLowest"
+          />
+        </span>
+      </div>
+      <InlineNote>
+        Lowering applies at once. Lowest stays at or below your everyday level, and a lower Highest
+        brings everyday down with it.
+      </InlineNote>
+    </div>
 
     <SettingRow label="Display check" :id="rowAnchorId('brightnessLimit')">
       <template #description>
@@ -226,6 +304,7 @@ import {
   fitConversion,
   maxPickable,
   menuToDdc,
+  menuToDdcDown,
 } from "@/utils/brightness";
 
 // The Brightness group of Screens › {screen} › Power (calvin-29ws, docs/design/
@@ -290,7 +369,6 @@ const valueText = computed(() =>
     ? `${shownValue.value} on the panel's own menu, Calvin value ${shownDdc.value}`
     : `${shownValue.value} on Calvin's scale`
 );
-const limitDate = computed(() => checkedDate(findings.value?.checkedAt));
 const POWER_HELP_URL = "https://osterbergsimon.github.io/calvin/setup/KIOSK_POWER/";
 // Power trouble a check saw (calvin-c805): kept until a later clean check clears it.
 const troubleText = computed(() => {
@@ -371,15 +449,104 @@ function commit() {
   const from = brightness.value;
   draft.value = null;
   if (next === from) return;
-  if (!props.asleep) {
-    pending.value = { from, to: next };
-    clearTimeout(pendingTimer);
-    const ramp = Math.ceil(Math.abs(next - from) / step.value) * stepSeconds.value * 1000;
-    pendingTimer = setTimeout(() => (pending.value = null), 60000 + ramp);
-  }
+  showChanging(from, next);
   patch({ brightness: next });
 }
+function showChanging(from, to) {
+  if (props.asleep) return;
+  pending.value = { from, to };
+  clearTimeout(pendingTimer);
+  const ramp = Math.ceil(Math.abs(to - from) / step.value) * stepSeconds.value * 1000;
+  pendingTimer = setTimeout(() => (pending.value = null), 60000 + ramp);
+}
 onBeforeUnmount(() => clearTimeout(pendingTimer));
+
+// Highest and Lowest (calvin-hts5): edited here without a new display check, in
+// the panel's menu numbers when a match exists. Lowering saves at once; raising
+// waits for a confirm, because a level that looks fine can still cut the power
+// (calvin-qyb3). Editing never makes Calvin write a level above the current one.
+const showLevels = computed(() => limit.value !== null);
+const levelsOpen = ref(false);
+// The typed (stepped) number, kept while the editor is open so a panel number
+// that rounds to the same Calvin value doesn't snap back.
+const highestDraft = ref(null);
+const lowestDraft = ref(null);
+function toggleLevels() {
+  levelsOpen.value = !levelsOpen.value;
+  highestDraft.value = null;
+  lowestDraft.value = null;
+}
+const clampDdc = n => Math.max(0, Math.min(100, n));
+// Highest is rounded down: it must never come out above what was asked for.
+const highestToDdc = value =>
+  fit.value ? (menuToDdcDown(value, readings.value) ?? limit.value) : clampDdc(value);
+const highestShown = computed(() => highestDraft.value ?? unit(limit.value));
+const highestDdc = computed(() =>
+  highestDraft.value === null ? limit.value : highestToDdc(highestDraft.value)
+);
+const raising = computed(() => highestDdc.value > limit.value);
+// Lowest never sits above the everyday level: the agent ramps to at least the
+// floor, so a floor above it would brighten the screen.
+const lowestCap = computed(() =>
+  Math.min(limit.value, Math.max(brightness.value, floor.value ?? 0))
+);
+const lowestShown = computed(() => lowestDraft.value ?? unit(floor.value ?? 0));
+
+function setHighest(value) {
+  highestDraft.value = value;
+  const next = highestToDdc(value);
+  if (next >= limit.value) return; // the same level, or a raise waiting for a confirm
+  const change = { brightnessLimit: next };
+  if (brightness.value > next) {
+    change.brightness = next;
+    showChanging(brightness.value, next);
+  }
+  if (floor.value !== null && floor.value > next) change.brightnessFloor = next;
+  patch(change);
+}
+function confirmRaise() {
+  const change = { brightnessLimit: highestDdc.value };
+  // An unset everyday level would follow the agent's default up to the new limit.
+  if (props.overrides.brightness === undefined || props.overrides.brightness === null) {
+    change.brightness = brightness.value;
+  }
+  highestDraft.value = null;
+  patch(change);
+}
+function setLowest(value) {
+  const ddc = fit.value ? (menuToDdc(value, readings.value) ?? 0) : value;
+  const next = Math.max(0, Math.min(lowestCap.value, ddc));
+  lowestDraft.value = next === ddc ? value : unit(next);
+  if (next !== (floor.value ?? 0)) patch({ brightnessFloor: next });
+}
+// A level changed elsewhere (a new check, Clear calibration) drops the drafts.
+watch(limit, value => {
+  if (highestDraft.value !== null && highestToDdc(highestDraft.value) !== value) {
+    highestDraft.value = null;
+  }
+});
+watch(floor, value => {
+  if (lowestDraft.value === null) return;
+  const ddc = fit.value ? menuToDdc(lowestDraft.value, readings.value) : lowestDraft.value;
+  if (ddc !== value) lowestDraft.value = null;
+});
+
+// Power trouble at or below the level being raised to (calvin-qyb3).
+const raiseTrouble = computed(() => {
+  const trouble = findings.value?.powerTrouble;
+  if (!raising.value || !trouble) return "";
+  const when = checkedDate(trouble.at);
+  const on = when ? ` (${when})` : "";
+  if (trouble.level != null) {
+    return highestDdc.value >= trouble.level ? `Power trouble at Calvin ${trouble.level}${on}` : "";
+  }
+  if (trouble.panelLevel != null && fit.value) {
+    return highestShown.value >= trouble.panelLevel
+      ? `Power trouble at panel ${trouble.panelLevel}${on}`
+      : "";
+  }
+  return "";
+});
 
 const brightnessNote = computed(() => {
   if (!props.online) return `Applies when ${props.screenName} is back`;
@@ -475,6 +642,26 @@ const brightnessNote = computed(() => {
   flex-direction: column;
   gap: var(--gap-2);
   padding: var(--gap-2) var(--gap-4) var(--gap-3);
+}
+.brightness-group__level {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-inline);
+}
+.brightness-group__calvin {
+  font-family: var(--font-data);
+  font-size: var(--text-meta);
+  color: var(--ink-2);
+}
+.brightness-group__raise {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
+}
+.brightness-group__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap-inline);
 }
 .brightness-group__speed-field {
   display: flex;

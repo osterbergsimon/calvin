@@ -264,14 +264,6 @@ describe("BrightnessGroup slider", () => {
     expect(find(wrapper, "limit-hatch").exists()).toBe(true);
   });
 
-  it("explains the limit on the menu scale", () => {
-    const wrapper = mountGroup({ overrides: withMenu });
-    expect(find(wrapper, "limit-note").text()).toContain(
-      "You can go up to 78 on the panel's own menu (Calvin 26)."
-    );
-    expect(find(wrapper, "limit-note").text()).toContain("limit the display check found on 4 Nov");
-  });
-
   it("without a limit there is no hatch and a link that opens the display check", async () => {
     const wrapper = mountGroup({ overrides: ramp });
     expect(find(wrapper, "limit-hatch").exists()).toBe(false);
@@ -405,23 +397,159 @@ describe("BrightnessGroup ramp speed range and the limit", () => {
     const wrapper = mountGroup({ overrides: ramp });
     expect(find(wrapper, "calibration-clear").exists()).toBe(false);
   });
+});
 
-  it("shows the lowest level the check found, on the menu scale when there is a match", () => {
-    const wrapper = mountGroup({
-      overrides: {
-        ...ramp,
-        brightnessLimit: 26,
-        brightnessFloor: 5,
-        brightnessConversion: READINGS,
-      },
-    });
-    expect(find(wrapper, "floor-note").text()).toContain("Lowest: Panel 28 (Calvin 5)");
+// calvin-hts5: Highest and Lowest are edited here, without a new display check.
+describe("BrightnessGroup highest and lowest", () => {
+  const withMenu = {
+    ...ramp,
+    brightnessLimit: 26,
+    brightnessFloor: 5,
+    brightnessConversion: READINGS,
+  };
+  const stepper = (wrapper, name) =>
+    wrapper
+      .findAllComponents({ name: "NumberStepper" })
+      .find(s => s.attributes("data-test") === name);
+  async function openEditor(wrapper) {
+    await find(wrapper, "levels-change").trigger("click");
+  }
+  async function setLevel(wrapper, name, value) {
+    stepper(wrapper, name).vm.$emit("update:modelValue", value);
+    await wrapper.vm.$nextTick();
+  }
+
+  it("shows both levels on the panel's menu when there is a match", () => {
+    const wrapper = mountGroup({ overrides: withMenu });
+    const text = find(wrapper, "levels-summary").text();
+    expect(text).toContain("Highest 78");
+    expect(text).toContain("Lowest 28");
+    expect(text).toContain("panel's own menu");
   });
 
-  it("shows the lowest level on Calvin's scale without a match, and hides it when unset", () => {
-    expect(
-      find(mountGroup({ overrides: { ...ramp, brightnessFloor: 3 } }), "floor-note").text()
-    ).toContain("Lowest: Calvin 3");
-    expect(find(mountGroup({ overrides: ramp }), "floor-note").exists()).toBe(false);
+  it("shows both levels on Calvin's scale without a match", () => {
+    const wrapper = mountGroup({
+      overrides: { ...ramp, brightnessLimit: 26, brightnessFloor: 3 },
+    });
+    const text = find(wrapper, "levels-summary").text();
+    expect(text).toContain("Highest 26");
+    expect(text).toContain("Lowest 3");
+    expect(text).toContain("Calvin's scale");
+  });
+
+  it("has no levels row before a limit exists", () => {
+    expect(find(mountGroup({ overrides: ramp }), "levels-summary").exists()).toBe(false);
+  });
+
+  it("no longer calls the limit something the highest level sits below", () => {
+    const note = find(mountGroup({ overrides: withMenu }), "limit-note").text();
+    expect(note).not.toContain("too close to the limit");
+    expect(note).toContain("never goes above your highest level");
+  });
+
+  it("lowering Highest saves at once, rounded down from the panel number", async () => {
+    const wrapper = mountGroup({ overrides: withMenu });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 70); // (70 - 16.2) / 2.36 = 22.8
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessLimit: 22 }]]);
+    expect(find(wrapper, "levels-editor").text()).toContain("Calvin 22");
+  });
+
+  it("lowering Highest under everyday and lowest pulls both down in one change", async () => {
+    const wrapper = mountGroup({
+      overrides: { ...ramp, brightnessLimit: 26, brightnessFloor: 5 },
+    });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 4);
+    expect(wrapper.emitted("patch")).toEqual([
+      [{ brightnessLimit: 4, brightness: 4, brightnessFloor: 4 }],
+    ]);
+    expect(find(wrapper, "brightness-note").text()).toContain("Changing… 19 → 4");
+  });
+
+  it("raising Highest saves nothing until confirmed, and points to the display check", async () => {
+    const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    expect(wrapper.emitted("patch")).toBeUndefined();
+    const warning = find(wrapper, "raise-warning");
+    expect(warning.text()).toContain("display check");
+    expect(find(wrapper, "raise-trouble").exists()).toBe(false);
+    await find(wrapper, "raise-check").trigger("click");
+    expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
+    await find(wrapper, "raise-confirm").trigger("click");
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessLimit: 30 }]]);
+  });
+
+  it("Keep drops a raise without saving", async () => {
+    const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    await find(wrapper, "raise-cancel").trigger("click");
+    expect(find(wrapper, "raise-warning").exists()).toBe(false);
+    expect(stepper(wrapper, "highest-stepper").props("modelValue")).toBe(26);
+    expect(wrapper.emitted("patch")).toBeUndefined();
+  });
+
+  it("raising Highest keeps an unset everyday level where it is, so nothing brightens", async () => {
+    const wrapper = mountGroup({
+      overrides: { brightnessRampEnabled: true, brightnessLimit: 15 },
+    });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    await find(wrapper, "raise-confirm").trigger("click");
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessLimit: 30, brightness: 15 }]]);
+  });
+
+  it("warns more strongly when raising to a level with recorded power trouble", async () => {
+    const kiosk = {
+      id: "kitchen",
+      displayStack: "cog",
+      displayCheck: {
+        ...FINDINGS,
+        powerTrouble: { at: "2026-11-07T10:00:00Z", step: "conversion", level: 28 },
+      },
+    };
+    const wrapper = mountGroup({ kiosk, overrides: { ...ramp, brightnessLimit: 24 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 27);
+    expect(find(wrapper, "raise-warning").exists()).toBe(true);
+    expect(find(wrapper, "raise-trouble").exists()).toBe(false);
+    await setLevel(wrapper, "highest-stepper", 28);
+    const strong = find(wrapper, "raise-trouble");
+    expect(strong.text()).toContain("Power trouble at Calvin 28");
+    expect(strong.text()).toContain("unplugged");
+  });
+
+  it("compares a panel-buttons power trouble on the panel's menu", async () => {
+    const kiosk = {
+      id: "kitchen",
+      displayStack: "cog",
+      displayCheck: {
+        ...FINDINGS,
+        powerTrouble: { at: "2026-11-08T13:58:00Z", step: "read", level: null, panelLevel: 74 },
+      },
+    };
+    const wrapper = mountGroup({ kiosk, overrides: { ...withMenu, brightnessLimit: 20 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 75);
+    expect(find(wrapper, "raise-trouble").text()).toContain("panel 74");
+  });
+
+  it("changing Lowest saves at once, on the panel's menu", async () => {
+    const wrapper = mountGroup({ overrides: withMenu });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "lowest-stepper", 35); // (35 - 16.2) / 2.36 = 8.0
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessFloor: 8 }]]);
+  });
+
+  it("Lowest can't go above the everyday level, so editing never brightens the screen", async () => {
+    const wrapper = mountGroup({
+      overrides: { ...ramp, brightness: 12, brightnessLimit: 26, brightnessFloor: 3 },
+    });
+    await openEditor(wrapper);
+    expect(stepper(wrapper, "lowest-stepper").props("max")).toBe(12);
+    await setLevel(wrapper, "lowest-stepper", 20);
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessFloor: 12 }]]);
   });
 });
