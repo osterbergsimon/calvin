@@ -215,8 +215,15 @@ export function checkSummary(findings, readings, limit) {
   const count = validPoints(readings).length;
   if (count >= 2) parts.push(`menu match from ${count} readings`);
   if (limit !== null && limit !== undefined) {
-    const when = checkedDate(findings.checkedAt);
-    parts.push(`limit ${limit}${when ? ` (${when})` : ""}`);
+    // The check's date belongs only to the limit the check itself saved. A
+    // highest level set by hand in Settings (calvin-hts5) must not look
+    // check-proven, so it says so instead.
+    const saved = findings.limit;
+    const fromCheck = saved !== null && saved !== undefined && Number(saved) === Number(limit);
+    const when = fromCheck ? checkedDate(findings.checkedAt) : "";
+    parts.push(
+      fromCheck ? `highest ${limit}${when ? ` (${when})` : ""}` : `highest ${limit} (set here)`
+    );
   }
   return parts.join(" · ");
 }

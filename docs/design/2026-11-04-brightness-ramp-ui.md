@@ -55,8 +55,9 @@ Rows, in order:
    - **History** opens a short list of the last 20 ramps and checks, newest first: the time, what triggered it, the
      result and the level reached.
 4. **Display check.** One line summarising the latest check: "Answers brightness commands · changes take effect · menu
-   match from 3 readings · limit 26 (4 Nov)". The button is **Check this display…**. Before any check has run, the line
-   says "Not checked yet".
+   match from 3 readings · highest 26 (4 Nov)". The button is **Check this display…**. Before any check has run, the line
+   says "Not checked yet". The date belongs only to the limit the check itself saved: a level set by hand in the
+   Highest and lowest row reads "highest 26 (set here)", never a check's date.
    - **Highest and lowest** (calvin-hts5) is its own row once a limit is saved: "Highest 67 · Lowest 10 · panel's own
      menu" (Calvin's scale without a match), with **Change**. Change reveals two steppers, in panel numbers converted
      with the saved readings (Highest rounded down, Lowest to the nearest), with the Calvin value beside each.
@@ -308,8 +309,8 @@ Nothing is saved from an unfinished run.
 ## 4. Words
 
 Use these words everywhere: **Ramp brightness at sleep and wake**, **Brightness**, **Display check** / **Check this
-display…**, **menu match**, **safe limit** / **limit**, **Changing…**, **Dimming… then off**, **Applies when {screen}
-wakes**, **Last wake**.
+display…**, **menu match**, **safe limit** / **limit**, **highest N** / **lowest N** (the two levels), **Changing…**,
+**Dimming… then off**, **Applies when {screen} wakes**, **Last wake**.
 
 Users see "Calvin value", never "DDC" (the only exception is the No DDC message, which names DDC/CI because the
 screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-out". The log says "under-voltage",
@@ -322,6 +323,10 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
 - **Live progress** in steps 2 and 4, the status line (§3.1 rule 5) and the Changing… notes go in a polite live
   region. A power-trouble banner is announced once with `role="alert"`. Log lines are not announced
   one by one; only the result is.
+- **The Highest raise note** (calvin-hts5) is in a polite live region that is already in the page while the editor is
+  open, so the warning is announced when the level passes the saved one. **Keep** and **Raise** remove their own
+  buttons, so focus returns to the Highest stepper; the level editors are therefore reachable and usable by keyboard
+  alone.
 - **Touch targets are at least 44 px**, which matters on the 3B+ panel and on phones. **Stop now** is at least 48 px
   high.
 - **The number field in step 3** uses `inputmode="numeric"`, so on the kiosk the on-screen keyboard opens with the

@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
 
-const FINDINGS = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" };
+const FINDINGS = {
+  ddc: true,
+  writes: true,
+  checkedAt: "2026-11-04T10:00:00Z",
+  limit: null,
+};
 const READINGS = [
   { ddc: 5, menu: 28 },
   { ddc: 19, menu: 61 },
@@ -21,9 +26,26 @@ function mountGroup(props = {}) {
 }
 const ramp = { brightnessRampEnabled: true, brightness: 19 };
 const find = (wrapper, name) => wrapper.find(`[data-test="${name}"]`);
+// Focus assertions need the component in the document (a detached node cannot
+// take focus in jsdom).
+function mountAttached(props = {}) {
+  return mount(BrightnessGroup, {
+    attachTo: document.body,
+    props: {
+      kiosk: { id: "kitchen", displayStack: "cog", displayCheck: FINDINGS },
+      overrides: {},
+      screenName: "Kitchen",
+      asleep: false,
+      ...props,
+    },
+  });
+}
 
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  document.body.innerHTML = "";
+});
 
 describe("BrightnessGroup rows", () => {
   it("shows only the ramp toggle while the ramp is off", () => {
@@ -63,9 +85,22 @@ describe("BrightnessGroup rows", () => {
     const wrapper = mountGroup({
       overrides: { brightnessLimit: 26, brightnessConversion: READINGS },
     });
-    expect(find(wrapper, "check-summary").text()).toContain("limit 26 (4 Nov)");
+    // No limit came from the check, so the level set by hand is not dated.
+    expect(find(wrapper, "check-summary").text()).toContain("highest 26 (set here)");
     await find(wrapper, "check-open").trigger("click");
     expect(wrapper.emitted("open-check")[0][0]).toEqual({ step: "detect" });
+  });
+
+  it("dates the highest level only when the check itself saved it", () => {
+    const wrapper = mountGroup({
+      kiosk: {
+        id: "kitchen",
+        displayStack: "cog",
+        displayCheck: { ...FINDINGS, limit: 26 },
+      },
+      overrides: { brightnessLimit: 26, brightnessConversion: READINGS },
+    });
+    expect(find(wrapper, "check-summary").text()).toContain("highest 26 (4 Nov)");
   });
 
   it("words a read-step power trouble by the panel's own buttons, not Calvin's level", () => {
@@ -452,6 +487,9 @@ describe("BrightnessGroup highest and lowest", () => {
     await openEditor(wrapper);
     await setLevel(wrapper, "highest-stepper", 70); // (70 - 16.2) / 2.36 = 22.8
     expect(wrapper.emitted("patch")).toEqual([[{ brightnessLimit: 22 }]]);
+    // The step is rounded down, so the shown number returns to the saved limit.
+    await wrapper.setProps({ overrides: { ...withMenu, brightnessLimit: 22 } });
+    expect(stepper(wrapper, "highest-stepper").props("modelValue")).toBe(68);
     expect(find(wrapper, "levels-editor").text()).toContain("Calvin 22");
   });
 
@@ -551,5 +589,135 @@ describe("BrightnessGroup highest and lowest", () => {
     expect(stepper(wrapper, "lowest-stepper").props("max")).toBe(12);
     await setLevel(wrapper, "lowest-stepper", 20);
     expect(wrapper.emitted("patch")).toEqual([[{ brightnessFloor: 12 }]]);
+  });
+
+  // Major 1: the shown number is the limit, so one step up and back is no
+  // change. Converting the stepped value before comparing it with the limit
+  // reads the saved number as one Calvin step lower (it rounds down).
+  it("steps up and back to the saved Highest without saving or warning", async () => {
+    const wrapper = mountGroup({
+      overrides: { ...ramp, brightnessLimit: 25, brightnessConversion: READINGS },
+    });
+    await openEditor(wrapper);
+    expect(stepper(wrapper, "highest-stepper").props("modelValue")).toBe(75);
+    await setLevel(wrapper, "highest-stepper", 76);
+    await setLevel(wrapper, "highest-stepper", 75);
+    expect(wrapper.emitted("patch")).toBeUndefined();
+    expect(find(wrapper, "raise-warning").exists()).toBe(false);
+  });
+
+  it("does not warn at the saved number when a menu step is under a Calvin step", async () => {
+    const flat = [
+      { ddc: 10, menu: 15 },
+      { ddc: 30, menu: 25 },
+    ];
+    const wrapper = mountGroup({
+      overrides: { ...ramp, brightnessLimit: 25, brightnessConversion: flat },
+    });
+    await openEditor(wrapper);
+    expect(stepper(wrapper, "highest-stepper").props("modelValue")).toBe(23);
+    await setLevel(wrapper, "highest-stepper", 24);
+    await setLevel(wrapper, "highest-stepper", 23);
+    expect(wrapper.emitted("patch")).toBeUndefined();
+    expect(find(wrapper, "raise-warning").exists()).toBe(false);
+  });
+
+  // Major 2: the note is announced, and Keep/Raise return focus to the stepper
+  // whose buttons they removed.
+  it("announces the raise note in a live region that is there before the note", async () => {
+    const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    const status = find(wrapper, "raise-status");
+    expect(status.attributes("role")).toBe("status");
+    expect(status.attributes("aria-live")).toBe("polite");
+    expect(status.text()).toBe("");
+    await setLevel(wrapper, "highest-stepper", 30);
+    expect(find(wrapper, "raise-status").exists()).toBe(true);
+    expect(find(wrapper, "raise-status").text()).toContain(
+      "Only the display check proves a level works"
+    );
+  });
+
+  it("puts focus back on the Highest stepper after Keep", async () => {
+    const wrapper = mountAttached({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    await find(wrapper, "raise-cancel").trigger("click");
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(find(wrapper, "highest-stepper").element);
+    wrapper.unmount();
+  });
+
+  it("puts focus back on the Highest stepper after Raise", async () => {
+    const wrapper = mountAttached({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    await find(wrapper, "raise-confirm").trigger("click");
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(find(wrapper, "highest-stepper").element);
+    wrapper.unmount();
+  });
+
+  it("drops a raise when the limit changes elsewhere", async () => {
+    const wrapper = mountGroup({ overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    expect(find(wrapper, "raise-warning").exists()).toBe(true);
+    await wrapper.setProps({ overrides: { ...ramp, brightnessLimit: 24 } });
+    expect(find(wrapper, "raise-warning").exists()).toBe(false);
+    expect(stepper(wrapper, "highest-stepper").props("modelValue")).toBe(24);
+  });
+
+  it("drops a Lowest draft when the floor changes elsewhere", async () => {
+    const wrapper = mountGroup({ overrides: withMenu });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "lowest-stepper", 40); // (40 - 16.2) / 2.36 = 10.1
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessFloor: 10 }]]);
+    await wrapper.setProps({ overrides: { ...withMenu, brightnessFloor: 2 } });
+    expect(stepper(wrapper, "lowest-stepper").props("modelValue")).toBe(21);
+  });
+
+  it("drops both drafts when the editor is closed and opened again", async () => {
+    const wrapper = mountGroup({ overrides: withMenu });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 90);
+    await setLevel(wrapper, "lowest-stepper", 40);
+    expect(find(wrapper, "raise-warning").exists()).toBe(true);
+    await find(wrapper, "levels-change").trigger("click");
+    await find(wrapper, "levels-change").trigger("click");
+    expect(stepper(wrapper, "highest-stepper").props("modelValue")).toBe(78);
+    expect(stepper(wrapper, "lowest-stepper").props("modelValue")).toBe(28);
+    expect(find(wrapper, "raise-warning").exists()).toBe(false);
+  });
+
+  it("ignores panel-menu power trouble on Calvin's scale, where it cannot compare", async () => {
+    const kiosk = {
+      id: "kitchen",
+      displayStack: "cog",
+      displayCheck: {
+        ...FINDINGS,
+        powerTrouble: { at: "2026-11-08T13:58:00Z", step: "read", level: null, panelLevel: 74 },
+      },
+    };
+    const wrapper = mountGroup({ kiosk, overrides: { ...ramp, brightnessLimit: 26 } });
+    await openEditor(wrapper);
+    await setLevel(wrapper, "highest-stepper", 30);
+    expect(find(wrapper, "raise-warning").exists()).toBe(true);
+    expect(find(wrapper, "raise-trouble").exists()).toBe(false);
+  });
+
+  // No floor saved: the agent dims to DDC 0 (floor_level() in the kiosk agent),
+  // so the editor shows that level instead of a blank.
+  it("shows Lowest at 0, the level the agent dims to, when no floor is saved", async () => {
+    const wrapper = mountGroup({
+      overrides: { ...ramp, brightnessLimit: 26, brightnessConversion: READINGS },
+    });
+    expect(find(wrapper, "levels-summary").text()).toContain("Lowest 16");
+    await openEditor(wrapper);
+    expect(stepper(wrapper, "lowest-stepper").props("modelValue")).toBe(16);
+    await setLevel(wrapper, "lowest-stepper", 30);
+    expect(wrapper.emitted("patch")).toEqual([[{ brightnessFloor: 6 }]]);
   });
 });

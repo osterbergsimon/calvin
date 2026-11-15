@@ -140,20 +140,21 @@
     >
       <template #description>
         <InlineNote data-test="levels-summary">
-          Highest {{ unit(limit) }} · Lowest {{ unit(floor ?? 0) }} ·
+          Highest {{ unit(limit) }} · Lowest {{ unit(floorLevel) }} ·
           {{ fit ? "panel's own menu" : "Calvin's scale" }}
         </InlineNote>
       </template>
       <Button
         variant="link"
         data-test="levels-change"
+        aria-label="Change highest and lowest"
         :aria-expanded="levelsOpen ? 'true' : 'false'"
         @click="toggleLevels"
       >
         Change
       </Button>
     </SettingRow>
-    <div v-if="showLevels && levelsOpen" class="brightness-group__speed" data-test="levels-editor">
+    <div v-if="showLevels && levelsOpen" class="brightness-group__editor" data-test="levels-editor">
       <div class="brightness-group__speed-field">
         <span>Highest</span>
         <span class="brightness-group__level">
@@ -161,7 +162,9 @@
             >Calvin {{ highestDdc }}</span
           >
           <NumberStepper
+            ref="highestControl"
             data-test="highest-stepper"
+            tabindex="-1"
             :model-value="highestShown"
             :min="unit(0)"
             :max="unit(100)"
@@ -171,36 +174,47 @@
           />
         </span>
       </div>
-      <div v-if="raising" class="brightness-group__raise" data-test="raise-warning">
-        <InlineNote v-if="raiseTrouble" tone="err" data-test="raise-trouble">
-          {{ raiseTrouble }}. At this level the Pi can crash and may not start again until the
-          panel's USB is unplugged. Only the display check proves a level works.
-        </InlineNote>
-        <InlineNote v-else tone="warn">
-          Above your highest level ({{ unit(limit) }}). Too bright can cut the power, sometimes only
-          under load or at start-up. Only the display check proves a level works.
-        </InlineNote>
-        <div class="brightness-group__actions">
-          <Button data-test="raise-cancel" @click="highestDraft = null">
-            Keep {{ unit(limit) }}
-          </Button>
-          <Button data-test="raise-check" @click="emit('open-check', { step: 'detect' })">
-            Run the display check
-          </Button>
-          <Button
-            :variant="raiseTrouble ? 'danger' : 'ghost'"
-            data-test="raise-confirm"
-            @click="confirmRaise"
-          >
-            Raise to {{ highestShown }}
-          </Button>
+      <!--
+        Always rendered while the editor is open, so the raise note arriving is
+        a text change inside a polite live region (it is announced), and never
+        the appearance of the region itself.
+      -->
+      <div
+        class="brightness-group__status"
+        :class="{ 'brightness-group__status--empty': !raising }"
+        role="status"
+        aria-live="polite"
+        data-test="raise-status"
+      >
+        <div v-if="raising" class="brightness-group__raise" data-test="raise-warning">
+          <InlineNote v-if="raiseTrouble" tone="err" data-test="raise-trouble">
+            {{ raiseTrouble }}. At this level the Pi can crash and may not start again until the
+            panel's USB is unplugged. Only the display check proves a level works.
+          </InlineNote>
+          <InlineNote v-else tone="warn">
+            Above your highest level ({{ unit(limit) }}). Too bright can cut the power, sometimes
+            only under load or at start-up. Only the display check proves a level works.
+          </InlineNote>
         </div>
+      </div>
+      <div v-if="raising" class="brightness-group__actions" data-test="raise-actions">
+        <Button data-test="raise-cancel" @click="keepHighest">Keep {{ unit(limit) }}</Button>
+        <Button data-test="raise-check" @click="emit('open-check', { step: 'detect' })">
+          Run the display check
+        </Button>
+        <Button
+          :variant="raiseTrouble ? 'danger' : 'ghost'"
+          data-test="raise-confirm"
+          @click="confirmRaise"
+        >
+          Raise to {{ highestShown }}
+        </Button>
       </div>
       <div class="brightness-group__speed-field">
         <span>Lowest</span>
         <span class="brightness-group__level">
           <span v-if="fit" class="brightness-group__calvin" data-test="lowest-calvin"
-            >Calvin {{ floor ?? 0 }}</span
+            >Calvin {{ floorLevel }}</span
           >
           <NumberStepper
             data-test="lowest-stepper"
@@ -247,6 +261,7 @@
       <Button
         variant="link"
         data-test="ramp-speed-change"
+        aria-label="Change ramp speed"
         :aria-expanded="speedOpen ? 'true' : 'false'"
         @click="speedOpen = !speedOpen"
       >
@@ -287,7 +302,7 @@
 
 <script setup>
 import ExternalLink from "@/components/ui/ExternalLink.vue";
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
 import NumberStepper from "@/components/ui/NumberStepper.vue";
@@ -341,6 +356,11 @@ const brightness = computed(() =>
 
 // The slider's own unit: the screen's menu number with a match, else Calvin's.
 const floor = computed(() => props.overrides.brightnessFloor ?? null);
+// The agent dims to DDC 0 when no floor is saved — floor_level() in
+// deploy/kiosk-agent/calvin_display_agent.py: "the screen's floor, or 0 when
+// unset" — so the editor shows that level (0, or its panel number with a menu
+// match) instead of leaving Lowest blank or calling it unset.
+const floorLevel = computed(() => floor.value ?? 0);
 const hasCalibration = computed(
   () => limit.value !== null || floor.value !== null || readings.value.length > 0
 );
@@ -467,10 +487,15 @@ onBeforeUnmount(() => clearTimeout(pendingTimer));
 // (calvin-qyb3). Editing never makes Calvin write a level above the current one.
 const showLevels = computed(() => limit.value !== null);
 const levelsOpen = ref(false);
-// The typed (stepped) number, kept while the editor is open so a panel number
-// that rounds to the same Calvin value doesn't snap back.
+// The value on screen is the limit itself. A stepped number is kept only while
+// it is a raise ("Raise to N" saves exactly what was stepped to); every other
+// change saves at once and the shown number goes back to the saved limit. So
+// stepping up and back to the same number changes nothing: the two are compared
+// as the menu numbers the person sees, and menuToDdcDown is only used to save a
+// changed value (it rounds down, so it is not an inverse of ddcToMenu).
 const highestDraft = ref(null);
 const lowestDraft = ref(null);
+const highestControl = ref(null);
 function toggleLevels() {
   levelsOpen.value = !levelsOpen.value;
   highestDraft.value = null;
@@ -484,18 +509,29 @@ const highestShown = computed(() => highestDraft.value ?? unit(limit.value));
 const highestDdc = computed(() =>
   highestDraft.value === null ? limit.value : highestToDdc(highestDraft.value)
 );
-const raising = computed(() => highestDdc.value > limit.value);
+const raising = computed(
+  () => highestDraft.value !== null && highestDraft.value > unit(limit.value)
+);
 // Lowest never sits above the everyday level: the agent ramps to at least the
 // floor, so a floor above it would brighten the screen.
 const lowestCap = computed(() =>
-  Math.min(limit.value, Math.max(brightness.value, floor.value ?? 0))
+  Math.min(limit.value, Math.max(brightness.value, floorLevel.value))
 );
-const lowestShown = computed(() => lowestDraft.value ?? unit(floor.value ?? 0));
+const lowestShown = computed(() => lowestDraft.value ?? unit(floorLevel.value));
 
 function setHighest(value) {
-  highestDraft.value = value;
+  const current = unit(limit.value);
+  if (value === current) {
+    // Back at the saved limit: nothing to save, and no warning to show.
+    highestDraft.value = null;
+    return;
+  }
+  if (value > current) {
+    highestDraft.value = value; // a raise waits for "Raise to N"
+    return;
+  }
+  highestDraft.value = null;
   const next = highestToDdc(value);
-  if (next >= limit.value) return; // the same level, or a raise waiting for a confirm
   const change = { brightnessLimit: next };
   if (brightness.value > next) {
     change.brightness = next;
@@ -504,6 +540,15 @@ function setHighest(value) {
   if (floor.value !== null && floor.value > next) change.brightnessFloor = next;
   patch(change);
 }
+// Keep and Raise both remove the buttons that were pressed, so focus goes back
+// to the Highest stepper (docs/design/frontend-doctrine.md: focus is never lost).
+function focusHighest() {
+  nextTick(() => highestControl.value?.$el?.focus?.());
+}
+function keepHighest() {
+  highestDraft.value = null;
+  focusHighest();
+}
 function confirmRaise() {
   const change = { brightnessLimit: highestDdc.value };
   // An unset everyday level would follow the agent's default up to the new limit.
@@ -511,6 +556,7 @@ function confirmRaise() {
     change.brightness = brightness.value;
   }
   highestDraft.value = null;
+  focusHighest();
   patch(change);
 }
 function setLowest(value) {
@@ -519,14 +565,14 @@ function setLowest(value) {
   lowestDraft.value = next === ddc ? value : unit(next);
   if (next !== (floor.value ?? 0)) patch({ brightnessFloor: next });
 }
-// A level changed elsewhere (a new check, Clear calibration) drops the drafts.
-watch(limit, value => {
-  if (highestDraft.value !== null && highestToDdc(highestDraft.value) !== value) {
-    highestDraft.value = null;
-  }
+// A level changed elsewhere (a new check, Clear calibration, another device)
+// drops the draft, so the editor never keeps a number that no longer stands.
+watch(limit, (value, previous) => {
+  if (value !== previous) highestDraft.value = null;
 });
-watch(floor, value => {
-  if (lowestDraft.value === null) return;
+watch(floor, (value, previous) => {
+  if (value === previous || lowestDraft.value === null) return;
+  // Keep the typed number while it still saves as the new floor.
   const ddc = fit.value ? menuToDdc(lowestDraft.value, readings.value) : lowestDraft.value;
   if (ddc !== value) lowestDraft.value = null;
 });
@@ -642,6 +688,20 @@ const brightnessNote = computed(() => {
   flex-direction: column;
   gap: var(--gap-2);
   padding: var(--gap-2) var(--gap-4) var(--gap-3);
+}
+/* Space between children, not a flex gap: the raise live region is always in the
+   DOM (so its text is announced) and an empty, zero-height one must not add a
+   gap of its own. */
+.brightness-group__editor {
+  display: flex;
+  flex-direction: column;
+  padding: var(--gap-2) var(--gap-4) var(--gap-3);
+}
+.brightness-group__editor > * + * {
+  margin-top: var(--gap-2);
+}
+.brightness-group__status--empty {
+  margin-top: 0;
 }
 .brightness-group__level {
   display: inline-flex;

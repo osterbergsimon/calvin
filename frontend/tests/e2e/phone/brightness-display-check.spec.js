@@ -91,7 +91,7 @@ for (const [size, viewport] of SIZES) {
       const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
       await expect(group).toBeVisible();
       await expect(group.locator('[data-test="check-summary"]')).toContainText(
-        "menu match from 2 readings · limit 26 (4 Nov)"
+        "menu match from 2 readings · highest 26 (set here)"
       );
 
       await group.getByRole("switch", { name: "Ramp brightness at sleep and wake" }).click();
@@ -137,6 +137,7 @@ for (const [size, viewport] of SIZES) {
             displayStack: "cog",
             displayCheck: {
               ...FOUND,
+              limit: 26,
               powerTrouble: { at: "2026-11-07T10:00:00Z", step: "conversion", level: 28 },
             },
           },
@@ -156,6 +157,10 @@ for (const [size, viewport] of SIZES) {
       await expect(group.locator('[data-test="levels-summary"]')).toContainText(
         "Highest 78 · Lowest 28"
       );
+      // The check saved this limit, so the summary carries its date.
+      await expect(group.locator('[data-test="check-summary"]')).toContainText(
+        "highest 26 (4 Nov)"
+      );
       await group.locator('[data-test="levels-change"]').click();
       const editor = group.locator('[data-test="levels-editor"]');
       const highest = editor.getByRole("group", { name: "Highest" });
@@ -164,10 +169,15 @@ for (const [size, viewport] of SIZES) {
       await highest.getByRole("button", { name: "Decrease" }).click();
       await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(25);
       expect(api.overridesByKiosk.hallway.brightness).toBe(19);
+      // A level set here is not the one the check proved, so it loses the date.
+      await expect(group.locator('[data-test="check-summary"]')).toContainText(
+        "highest 25 (set here)"
+      );
 
       // Raising past the recorded power trouble saves nothing until confirmed.
       const saves = api.overridesRequests.length;
-      for (let i = 0; i < 7; i += 1) {
+      // 75 → 83 reaches Calvin 28, the level the check saw trouble at.
+      for (let i = 0; i < 8; i += 1) {
         await highest.getByRole("button", { name: "Increase" }).click();
       }
       await expect(editor.locator('[data-test="raise-trouble"]')).toContainText(
@@ -187,6 +197,84 @@ for (const [size, viewport] of SIZES) {
       await expect(editor.locator('[data-test="raise-warning"]')).toBeHidden();
       expect(api.overridesRequests.length).toBe(saves);
       expect(api.overridesByKiosk.hallway.brightnessLimit).toBe(25);
+      expect(consoleErrors).toEqual([]);
+      expect(api.unmatched).toEqual([]);
+    });
+
+    // calvin-hts5: a confirmed raise saves the level, and pins an unset everyday
+    // level so the agent's default cannot follow it up.
+    test("a confirmed raise saves the new Highest and pins the everyday level", async ({
+      page,
+      consoleErrors,
+    }) => {
+      const api = await installApiMock(page, {
+        kioskExtras: {
+          hallway: { displayStack: "cog", displayCheck: { ...FOUND, limit: 26 } },
+        },
+      });
+      api.overridesByKiosk.hallway = {
+        brightnessRampEnabled: true,
+        brightnessLimit: 26,
+        brightnessFloor: 5,
+        brightnessConversion: [
+          { ddc: 5, menu: 28 },
+          { ddc: 19, menu: 61 },
+        ],
+      };
+      const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
+      await group.locator('[data-test="levels-change"]').click();
+      const editor = group.locator('[data-test="levels-editor"]');
+      const highest = editor.getByRole("group", { name: "Highest" });
+
+      const saves = api.overridesRequests.length;
+      // 78 → 80 is Calvin 27; one step (79) still rounds down to 26.
+      await highest.getByRole("button", { name: "Increase" }).click();
+      await highest.getByRole("button", { name: "Increase" }).click();
+      await expect(editor.locator('[data-test="raise-warning"]')).toContainText(
+        "Above your highest level (78)"
+      );
+      await expect(editor.locator('[data-test="raise-confirm"]')).toHaveText("Raise to 80");
+      expect(api.overridesRequests.length).toBe(saves);
+
+      await editor.locator('[data-test="raise-confirm"]').click();
+      await expect.poll(() => api.overridesByKiosk.hallway?.brightnessLimit).toBe(27);
+      expect(api.overridesByKiosk.hallway.brightness).toBe(20);
+      await expect(editor.locator('[data-test="raise-warning"]')).toBeHidden();
+      await expect(group.locator('[data-test="levels-summary"]')).toContainText("Highest 80");
+      expect(consoleErrors).toEqual([]);
+      expect(api.unmatched).toEqual([]);
+    });
+
+    test("Lowest is edited in place and saves at once", async ({ page, consoleErrors }) => {
+      const api = await installApiMock(page, {
+        kioskExtras: {
+          hallway: { displayStack: "cog", displayCheck: { ...FOUND, limit: 26 } },
+        },
+      });
+      api.overridesByKiosk.hallway = {
+        brightnessRampEnabled: true,
+        brightness: 19,
+        brightnessLimit: 26,
+        brightnessFloor: 5,
+        brightnessConversion: [
+          { ddc: 5, menu: 28 },
+          { ddc: 19, menu: 61 },
+        ],
+      };
+      const group = await openHallway(page, { kiosk: viewport ? "workshop" : null });
+      await expect(group.locator('[data-test="lowest-calvin"]')).toHaveCount(0);
+      await group.locator('[data-test="levels-change"]').click();
+      const editor = group.locator('[data-test="levels-editor"]');
+      const lowest = editor.getByRole("group", { name: "Lowest" });
+      await expect(editor.locator('[data-test="lowest-calvin"]')).toHaveText("Calvin 5");
+
+      // 28 → 30 on the panel is Calvin 6; one step (29) still rounds to 5.
+      await lowest.getByRole("button", { name: "Increase" }).click();
+      await lowest.getByRole("button", { name: "Increase" }).click();
+      await expect.poll(() => api.overridesByKiosk.hallway?.brightnessFloor).toBe(6);
+      await expect(editor.locator('[data-test="lowest-calvin"]')).toHaveText("Calvin 6");
+      await expect(group.locator('[data-test="levels-summary"]')).toContainText("Lowest 30");
+      expect(api.overridesByKiosk.hallway.brightnessLimit).toBe(26);
       expect(consoleErrors).toEqual([]);
       expect(api.unmatched).toEqual([]);
     });

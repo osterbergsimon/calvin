@@ -159,7 +159,7 @@ describe("checkSummary", () => {
   it("lists what was found", () => {
     expect(
       checkSummary(
-        { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z" },
+        { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z", limit: 26 },
         [
           { ddc: 5, menu: 28 },
           { ddc: 12, menu: 44 },
@@ -168,7 +168,17 @@ describe("checkSummary", () => {
         26
       )
     ).toBe(
-      "Answers brightness commands · changes take effect · menu match from 3 readings · limit 26 (4 Nov)"
+      "Answers brightness commands · changes take effect · menu match from 3 readings · highest 26 (4 Nov)"
+    );
+  });
+  it("does not date a highest level the check did not save", () => {
+    const foundCheck = { ddc: true, writes: true, checkedAt: "2026-11-04T10:00:00Z", limit: 20 };
+    expect(checkSummary(foundCheck, [], 26)).toBe(
+      "Answers brightness commands · changes take effect · highest 26 (set here)"
+    );
+    // Findings from before the check recorded a limit carry none at all.
+    expect(checkSummary({ ...foundCheck, limit: undefined }, [], 26)).toBe(
+      "Answers brightness commands · changes take effect · highest 26 (set here)"
     );
   });
 });
