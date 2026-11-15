@@ -355,14 +355,14 @@
           />
         </SettingRow>
         <!-- The reboot keys restart the Pi; no screen can override them.
-             Each block renders rows of its own, so it carries the row divider
-             the rows cannot draw across the wrapper. -->
-        <div class="remote-shared-block" data-test="default-only-reboot">
+             Each block renders rows of its own, so it sits in a stack that
+             carries the row divider (the shell does that, not this page). -->
+        <SettingRowStack data-test="default-only-reboot">
           <RebootCombo :config="config" @update:config="patch => emitChange(patch)" />
-        </div>
-        <div class="remote-shared-block" data-test="default-only-bindings">
+        </SettingRowStack>
+        <SettingRowStack data-test="default-only-bindings">
           <KeyboardTab />
-        </div>
+        </SettingRowStack>
       </SettingGroup>
     </SettingsSection>
 
@@ -403,6 +403,7 @@ import NumberStepper from "@/components/ui/NumberStepper.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import SettingsSection from "@/components/settings/shell/SettingsSection.vue";
 import SettingRow from "@/components/settings/shell/SettingRow.vue";
+import SettingRowStack from "@/components/settings/shell/SettingRowStack.vue";
 import SettingGroup from "@/components/ui/SettingGroup.vue";
 import DefaultOnlyNote from "@/components/settings/shared/DefaultOnlyNote.vue";
 import DefaultEditNote from "@/components/settings/shared/DefaultEditNote.vue";
@@ -735,13 +736,3 @@ const visibleBehaviourDescriptors = computed(() =>
   visibleDescriptors(behaviourDescriptors, behaviour.value)
 );
 </script>
-
-<style scoped>
-/* RebootCombo and KeyboardTab each render SettingRows inside a wrapper, so the
-   rows' own `.setting-row + .setting-row` divider stops at the wrapper. Draw it
-   on the wrapper instead, so "Same on every screen" has the same dividers as
-   every other group. */
-.remote-shared-block {
-  border-top: 1px solid var(--line-soft);
-}
-</style>
