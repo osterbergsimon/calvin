@@ -120,6 +120,7 @@
 
 <script setup>
 import { computed, onMounted } from "vue";
+import { updatePhaseLabel as updatePhaseLabelFor } from "@/utils/updateLifecycle";
 import { useSystem } from "@/composables";
 import Button from "@/components/ui/Button.vue";
 import InlineNote from "@/components/ui/InlineNote.vue";
@@ -187,23 +188,9 @@ const updateTone = computed(() => {
   return "neutral";
 });
 
-const PHASE_LABELS = {
-  pulling: "Downloading",
-  pulling_code: "Downloading",
-  downloading: "Downloading",
-  deps: "Installing",
-  installing: "Installing",
-  dependencies: "Installing",
-  building: "Preparing the screens",
-  building_frontend: "Preparing the screens",
-  restarting: "Restarting",
-};
-
-const updatePhaseLabel = computed(() => {
-  const phase = updateStatus.value?.phase;
-  if (!phase) return "";
-  return PHASE_LABELS[String(phase).toLowerCase()] || "";
-});
+// Phase names come from the update script; their words live with the update's
+// state machine, which a test keeps in step with the script.
+const updatePhaseLabel = computed(() => updatePhaseLabelFor(updateStatus.value?.phase));
 
 const hasUpdateDetails = computed(() => {
   const s = updateStatus.value;

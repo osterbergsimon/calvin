@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from app.config import settings
+from app.services import update_lifecycle
 from app.services.display_power_service import display_power_service
 from app.utils.errors import internal_error
 from app.utils.git_refs import validate_git_branch
@@ -191,17 +192,10 @@ def _read_update_state(state_file: Path) -> dict[str, Any] | None:
 
 def _state_to_update_status(state: dict[str, Any], state_file: Path) -> dict[str, Any]:
     raw_status = str(state.get("status") or "unknown").lower()
-    status = {
-        "success": "idle",
-        "complete": "idle",
-        "completed": "idle",
-        "running": "running",
-        "error": "error",
-        "failed": "error",
-    }.get(raw_status, "unknown")
+    status = update_lifecycle.api_status(raw_status)
     message = str(state.get("message") or "Update status unknown. Check logs for details.")
 
-    if status == "running":
+    if status == update_lifecycle.API_RUNNING:
         state_mtime = state_file.stat().st_mtime
         stale_after = state.get("stale_after_seconds", _UPDATE_STATE_STALE_AFTER_SEC)
         try:
@@ -210,7 +204,7 @@ def _state_to_update_status(state: dict[str, Any], state_file: Path) -> dict[str
             stale_after = _UPDATE_STATE_STALE_AFTER_SEC
 
         if (time.time() - state_mtime) > stale_after:
-            status = "error"
+            status = update_lifecycle.API_FAILED
             message = "Update appears to have stalled or failed"
 
     data = _empty_update_status(status, message)
@@ -689,9 +683,7 @@ async def stream_update_log(log_offset: int = 0):
                         state = _read_update_state(state_file)
                         if state:
                             status_data = _state_to_update_status(state, state_file)
-                            stream_status = status_data["status"]
-                            if stream_status == "idle":
-                                stream_status = "complete"
+                            stream_status = update_lifecycle.stream_status(status_data["status"])
 
                             yield (
                                 "data: "
@@ -707,7 +699,7 @@ async def stream_update_log(log_offset: int = 0):
                                 + "\n\n"
                             )
 
-                            if stream_status in {"complete", "error"}:
+                            if update_lifecycle.is_settled(stream_status):
                                 return
                 except Exception as e:
                     logger.opt(exception=e).error("Update state stream failed")
