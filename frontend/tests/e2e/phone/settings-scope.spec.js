@@ -172,7 +172,9 @@ test.describe("settings scope — signpost, old links and search", () => {
 
     const dashboard = page.locator(".dashboard-settings");
     const signpost = dashboard.locator('[data-test="dashboard-screen-signpost"]');
-    await expect(signpost).toContainText("Look, focus light and controls are set per screen.");
+    await expect(signpost).toContainText(
+      "Look, focus light, controls and the remote are set per screen."
+    );
     await expect(dashboard.locator("#section-appearance")).toHaveCount(0);
 
     for (const label of [
@@ -237,7 +239,7 @@ test.describe("settings scope — signpost, old links and search", () => {
 
     const cases = [
       ["appearance", /Look: theme, light or dark and font/],
-      ["focus", /Effects, focus light and button labels/],
+      ["focus", /Effects and focus light/],
       ["hot corner", /Controls/],
       ["controls", /Controls/],
     ];

@@ -16,6 +16,8 @@ import ConfirmModal from "@/components/ui/ConfirmModal.vue";
 import ListRow from "@/components/ui/ListRow.vue";
 import ScreenRegionEditor from "@/components/settings/shared/ScreenRegionEditor.vue";
 import { SAVE_DEBOUNCE_MS } from "@/utils/optimisticQueue";
+import { getSettingDestinationById } from "@/components/settings/settingsRegistry";
+import { actionForUrl } from "@/stores/auth";
 
 // Settings writes are coalesced over a quiet period, so settle the queued save
 // before asserting (the production UI does not wait for it).
@@ -84,6 +86,7 @@ function mountScreens({
   availableVersion = null,
   narrow,
   initialSection = null,
+  initialSetting = null,
 } = {}) {
   setActivePinia(createPinia());
   if (narrow === undefined) {
@@ -109,7 +112,7 @@ function mountScreens({
   store.fetchDeviceConfigVersion = vi.fn(async () => null);
   store.fetchAvailableAgentVersion = vi.fn(async () => availableVersion);
   return {
-    wrapper: mount(ScreensSettings, { props: { config: cfg, initialSection } }),
+    wrapper: mount(ScreensSettings, { props: { config: cfg, initialSection, initialSetting } }),
     store,
     cfg,
   };
@@ -496,6 +499,7 @@ describe("ScreensSettings — one screen's page", () => {
       "section-screen-controls",
       "section-screen-power",
       "section-screen-touch",
+      "section-screen-remote",
       "section-screen-behaviour",
       "section-screen-software",
       "section-screen-remove",
@@ -1420,28 +1424,34 @@ describe("ScreensSettings — display stack (calvin-2ibz)", () => {
   });
 });
 
-describe("ScreensSettings — decision C placement", () => {
+describe("ScreensSettings — Remote & keys in one place", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("keeps screen rows on the Default page and leaves remote rows in Dashboard", async () => {
+  it("keeps screen rows on the Default page and the whole remote in Remote & keys", async () => {
     const { wrapper } = mountScreens();
     await flushPromises();
     await wrapper.find("[data-test='screen-default-card']").trigger("click");
     await flushPromises();
 
-    // Default: Display, Power (with the reboot combo) and Touch & keyboard.
+    // Default: Display, Power and Touch & keyboard as before.
     expect(wrapper.find("#section-layout").exists()).toBe(true);
     expect(wrapper.find("#section-device-power").exists()).toBe(true);
     expect(wrapper.find("#section-device-keyboard").exists()).toBe(true);
     expect(rowByLabel(wrapper, "Touchscreen")).toBeTruthy();
     expect(rowByLabel(wrapper, "Orientation")).toBeTruthy();
-    expect(wrapper.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
-    expect(wrapper.find("#section-device-power").text()).toContain("Power");
 
-    // Button bindings stay in Dashboard; the moved Effects & focus rows live
-    // with the other screen settings now (§7 item 4).
-    expect(rowByLabel(wrapper, "Show button presses")).toBeTruthy();
-    expect(rowByLabel(wrapper, "Button bindings")).toBeUndefined();
+    // The remote, together: the button-press label, how long it stays, the
+    // reboot keys and the bindings (no longer split across Dashboard and Power).
+    const remote = wrapper.find("#section-device-remote");
+    expect(remote.exists()).toBe(true);
+    expect(remote.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
+    expect(remote.findComponent({ name: "KeyboardTab" }).exists()).toBe(true);
+    expect(remote.text()).toContain("Show button presses");
+    expect(remote.text()).toContain("Hide label after");
+    expect(
+      wrapper.find("#section-device-power").findComponent({ name: "RebootCombo" }).exists()
+    ).toBe(false);
+    expect(wrapper.find("#section-screen-effects").text()).not.toContain("Show button presses");
   });
 });
 
@@ -1481,6 +1491,7 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
       "section-screen-controls",
       "section-device-power",
       "section-device-keyboard",
+      "section-device-remote",
       "section-device-behaviour",
     ]);
     // No status header, no Software section, no per-row reset links.
@@ -1506,10 +1517,21 @@ describe("ScreensSettings — Default is a screen (§2, §3)", () => {
     await openDefault(wrapper);
 
     const notes = wrapper.findAll("[data-test='default-only-note']").map(n => n.text());
-    expect(notes.length).toBe(4);
+    // Timezone; the keyboard layout and its extras. The remote's three shared
+    // rows say it once under their group heading instead (§3.1).
+    expect(notes.length).toBe(3);
     expect(notes.every(text => text === "Applies to every screen")).toBe(true);
     expect(wrapper.find("#section-device-power").text()).toContain("Applies to every screen");
     expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
+
+    const remote = wrapper.find("#section-device-remote");
+    expect(remote.text()).not.toContain("Applies to every screen");
+    expect(remote.text()).toContain("Same on every screen");
+    // The focus-light sentence is the row's description, not a note of its own.
+    expect(remote.text()).toContain("Also how long the focus light stays after a key press.");
+    expect(
+      remote.findAll(".inline-note").every(note => !note.text().includes("Also how long"))
+    ).toBe(true);
   });
 
   it("has no global Room name row (the name is per screen, CLV-84)", async () => {
@@ -2020,6 +2042,63 @@ describe("ScreensSettings — moved Controls and Effects & focus (§7 item 4)", 
       await flushPromises();
       expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
       expect(wrapper.find("#section-screen-controls").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+
+  it("opens this screen's own Remote & keys rows from a per-screen label search", async () => {
+    // "show button presses" is a screen override; opening Default's
+    // household row made the edit a no-op (review finding).
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({
+        initialSection: "device-remote",
+        initialSetting: "screen-remote",
+      });
+      await flushPromises();
+      expect(wrapper.find("[data-test='screens-detail']").exists()).toBe(true);
+      expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(false);
+      expect(wrapper.find("#section-screen-remote").exists()).toBe(true);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+
+  it("opens Default for a remote row that is the same on every screen, even on a kiosk", async () => {
+    // Hide label after, the bindings and the reboot keys are Default's rows,
+    // so their deep link must not open the kiosk's own page (review finding).
+    const destination = getSettingDestinationById("device-notifications");
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({
+        initialSection: destination.section,
+        initialSetting: destination.id,
+      });
+      await flushPromises();
+      expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+      expect(wrapper.find("#section-device-remote").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-remote").exists()).toBe(false);
+    } finally {
+      window.sessionStorage.clear();
+    }
+  });
+
+  it("opens Default when the reboot sign-in link lands on a kiosk", async () => {
+    // The sign-in dialog's phone link carries its action's destination;
+    // rebooting is Default's shared row, never the kiosk page (review finding).
+    const reboot = actionForUrl("/api/system/reboot");
+    const destination = getSettingDestinationById(reboot.settingId);
+    window.sessionStorage.setItem("calvin_kiosk_id", "kitchen");
+    try {
+      const { wrapper } = mountScreens({
+        initialSection: destination.section,
+        initialSetting: destination.id,
+      });
+      await flushPromises();
+      expect(wrapper.find("[data-test='default-screen-page']").exists()).toBe(true);
+      expect(wrapper.find("#section-device-remote").exists()).toBe(true);
+      expect(wrapper.find("#section-screen-remote").exists()).toBe(false);
     } finally {
       window.sessionStorage.clear();
     }

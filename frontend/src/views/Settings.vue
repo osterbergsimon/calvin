@@ -88,6 +88,7 @@
               :key="categoryRenderKey"
               :config="localConfig"
               :initial-section="routeSection"
+              :initial-setting="routeSettingId"
               @update:config="handleConfigUpdate"
             />
             <MaintenanceSettings
@@ -128,6 +129,7 @@ import { useModeStore } from "@/stores/mode";
 import { useAuthStore } from "@/stores/auth";
 import { resolveScrollView, pickActiveEyebrow } from "@/utils/settingsSectionSpy";
 import { expandSettingsSection } from "@/utils/settingsSectionExpansion";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 import SettingsTopBar from "@/components/settings/shell/SettingsTopBar.vue";
 import SettingsSearch from "@/components/settings/shell/SettingsSearch.vue";
 import CategoryRail from "@/components/settings/shell/CategoryRail.vue";
@@ -206,6 +208,11 @@ const initialRouteDestination = getRouteSettingDestination();
 // Screens destinations that live inside the Default page open it on mount, so a
 // ?setting=device-power / device-keyboard / layout link still lands (§8).
 const routeSection = computed(() => getRouteSettingDestination()?.section ?? null);
+// The destination id too: Screens needs it to open the right page. The remote's
+// per-screen row (screen-remote) and its shared rows (device-notifications,
+// device-reboot) all name the device-remote section, but only screen-remote is
+// the kiosk's own page.
+const routeSettingId = computed(() => getRouteSettingDestination()?.id ?? null);
 // Honour tab hints for non-dashboard categories on initial load
 if (
   initialRouteDestination?.tabKey &&
@@ -405,7 +412,6 @@ const SECTION_BY_CATEGORY_TAB = {
     regions: "regions",
     clock: "clock-bar",
     "bar-items": "clock-bar",
-    "kiosk-touch-focus": "kiosk-touch-focus",
   },
   content: {
     calendars: "content-calendars",
@@ -415,7 +421,6 @@ const SECTION_BY_CATEGORY_TAB = {
     services: "content-services",
     // "Add a web page" (plugins-services) lands on the services section.
     "content-services": "content-services",
-    "clock-bar-sources": "content-clock-bar",
   },
   screens: {
     // Screens has no tabs: the list page and each screen's page are sections.
@@ -461,7 +466,7 @@ function scrollToDestination(destination, attempt = 0) {
   expandSettingsSection(sectionId);
   const el = document.getElementById("section-" + sectionId);
   if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    el.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
     pinSection(el);
   } else if (attempt < 20) {
     requestAnimationFrame(() => scrollToDestination(destination, attempt + 1));

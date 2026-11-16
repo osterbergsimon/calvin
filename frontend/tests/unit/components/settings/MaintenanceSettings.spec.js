@@ -273,8 +273,16 @@ describe("MaintenanceSettings", () => {
 
     const backend = wrapper.find('[data-test="restart-backend"]');
     expect(backend.text()).toBe("Restart server");
-    expect(wrapper.text()).toContain("Restart this screen");
-    expect(wrapper.text()).toContain("Reloads this screen's browser. Calvin keeps running.");
+    // It restarts the browser of the server's own screen, and says so: on a
+    // phone "this screen" read as the phone.
+    expect(wrapper.find("[data-test='server-screen-group']").text()).toContain(
+      "The server's own screen"
+    );
+    expect(wrapper.text()).toContain("Restart its browser");
+    expect(wrapper.text()).toContain(
+      "Reloads the browser on the screen attached to this server. Calvin keeps running."
+    );
+    expect(wrapper.text()).not.toContain("Restart this screen");
     expect(wrapper.text()).toContain(
       "Restarts Calvin. Screens reconnect on their own in about 15 seconds."
     );
@@ -340,13 +348,16 @@ describe("System copy (§3.4) and the Advanced disclosure (§4)", () => {
     expect(row(differ, "Version").text()).toContain("1.2.3 (abc1234) (screen 4.5.6)");
   });
 
-  it("offers Reload this screen", () => {
+  it("offers Reload this page, for the browser you are using", () => {
     const w = mount(MaintenanceSettings, {
       props: { config: baseConfig },
       global: { stubs },
     });
-    expect(row(w, "Reload this screen")).toBeTruthy();
-    expect(row(w, "Reload this screen").text()).toContain("Reload");
+    expect(row(w, "Reload this page")).toBeTruthy();
+    expect(row(w, "Reload this page").text()).toContain(
+      "Loads Calvin again in the browser you are using now."
+    );
+    expect(row(w, "Reload this screen")).toBeFalsy();
   });
 
   it("keeps Advanced closed by default, last in the category", () => {
@@ -441,7 +452,8 @@ describe("MaintenanceSettings — This server's screen", () => {
     });
     const row = w.find("[data-test='server-display-row']");
     expect(row.exists()).toBe(true);
-    expect(row.text()).toContain("This server's screen");
+    expect(row.text()).toContain("Turn it off or on");
+    expect(w.find("[data-test='server-screen-group']").text()).toContain("The server's own screen");
     expect(w.find("#section-maintenance-system [data-test='server-display-row']").exists()).toBe(
       true
     );

@@ -359,6 +359,34 @@
         </SettingsSection>
       </section>
 
+      <section class="ui-gallery__section" data-test="gallery-setting-row-stack">
+        <h2 class="ui-gallery__heading">SettingRowStack</h2>
+        <p class="ui-gallery__note">
+          Rows a child component renders itself arrive as a fragment, so SettingRow's divider stops
+          at the boundary. This wrapper carries the divider before its stack and between two stacks
+          — a category composes rows, the shell draws them.
+        </p>
+
+        <SettingsSection id="gallery-row-stack" title="Reboot">
+          <SettingRow label="Restart now" description="Restart Calvin on this host.">
+            <Button size="sm">Restart</Button>
+          </SettingRow>
+          <SettingRowStack>
+            <SettingRow label="Restart day" description="Which day the host restarts." stacked>
+              <Button size="sm">Sunday</Button>
+            </SettingRow>
+            <SettingRow label="Restart time" description="When on that day it restarts." stacked>
+              <Button size="sm">04:00</Button>
+            </SettingRow>
+          </SettingRowStack>
+          <SettingRowStack>
+            <SettingRow label="Skip a restart" description="Keep this week's uptime." stacked>
+              <Button size="sm">Skip once</Button>
+            </SettingRow>
+          </SettingRowStack>
+        </SettingsSection>
+      </section>
+
       <section class="ui-gallery__section" data-test="gallery-tabs">
         <h2 class="ui-gallery__heading">Tabs</h2>
         <p class="ui-gallery__note">
@@ -486,6 +514,7 @@ import TextField from "../components/ui/TextField.vue";
 import ToggleSwitch from "../components/ui/ToggleSwitch.vue";
 import { eventSwatches } from "../utils/themePalettes";
 import SettingRow from "../components/settings/shell/SettingRow.vue";
+import SettingRowStack from "../components/settings/shell/SettingRowStack.vue";
 import SettingsSection from "../components/settings/shell/SettingsSection.vue";
 
 // ?theme=calvin|ocean|forest|sunset&mode=light|dark makes a review link

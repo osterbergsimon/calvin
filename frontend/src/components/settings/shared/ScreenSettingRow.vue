@@ -94,6 +94,7 @@ import SettingRow from "@/components/settings/shell/SettingRow.vue";
 import ThemePicker from "@/components/settings/shell/ThemePicker.vue";
 import { usePlugins } from "@/composables/usePlugins";
 import { normalizeSettingValue, settingControlOptions } from "@/utils/screenOverrides";
+import { prefersReducedMotion } from "@/utils/scrollIntoViewMotion";
 
 // One descriptor-driven row for every per-screen setting (settings-scope §7
 // item 2). The descriptor says which control to render; the page says where the
@@ -152,12 +153,9 @@ onMounted(() => {
   if (kind.value === "photoSources" && plugins.value.length === 0) loadPlugins();
 });
 
-const prefersReducedMotion =
-  typeof window !== "undefined" &&
-  typeof window.matchMedia === "function" &&
-  Boolean(window.matchMedia("(prefers-reduced-motion: reduce)")?.matches);
+const reducedMotion = prefersReducedMotion();
 const showReducedMotionNote = computed(
-  () => Boolean(props.descriptor.reducedMotionNote) && prefersReducedMotion
+  () => Boolean(props.descriptor.reducedMotionNote) && reducedMotion
 );
 
 const hasDescription = computed(

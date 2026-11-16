@@ -49,7 +49,7 @@ describe("DefaultScreenSettings", () => {
     forgetOskHardware();
   });
 
-  it("renders Pages, Display, Power and Touch & keyboard", () => {
+  it("renders Pages, Display, Power, Touch & keyboard and Remote & keys", () => {
     const wrapper = mountDefault();
     expect(wrapper.findAll("section.settings-section").map(s => s.attributes("id"))).toEqual([
       "section-default-pages",
@@ -59,6 +59,7 @@ describe("DefaultScreenSettings", () => {
       "section-screen-controls",
       "section-device-power",
       "section-device-keyboard",
+      "section-device-remote",
       "section-device-behaviour",
     ]);
     expect(wrapper.find("#section-layout .settings-section__eyebrow").text()).toBe("Display");
@@ -66,13 +67,17 @@ describe("DefaultScreenSettings", () => {
     expect(wrapper.find("#section-device-keyboard .settings-section__eyebrow").text()).toBe(
       "Touch & keyboard"
     );
-    // Remote & buttons and key-press feedback stayed in Dashboard.
-    expect(wrapper.find("#section-device-buttons").exists()).toBe(false);
-    // The reboot combo lives under Power.
-    expect(wrapper.find("#section-device-reboot").exists()).toBe(false);
+    // The whole remote is one section: the reboot keys left Power, the
+    // bindings and Hide label after left Dashboard.
+    expect(wrapper.find("#section-device-remote .settings-section__eyebrow").text()).toBe(
+      "Remote & keys"
+    );
+    const remote = wrapper.find("#section-device-remote");
+    expect(remote.findComponent({ name: "RebootCombo" }).exists()).toBe(true);
+    expect(remote.findComponent({ name: "KeyboardTab" }).exists()).toBe(true);
     expect(
       wrapper.find("#section-device-power").findComponent({ name: "RebootCombo" }).exists()
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("has no Software section and no status header", () => {
@@ -148,10 +153,16 @@ describe("DefaultScreenSettings", () => {
   });
 
   describe("default-only rows are marked", () => {
-    it("marks Timezone, the reboot combo and the keyboard layout rows", () => {
+    it("marks Timezone and the keyboard layout rows, and groups the remote's shared rows", () => {
       const wrapper = mountDefault({ displayScheduleEnabled: true });
-      expect(wrapper.findAll("[data-test='default-only-note']")).toHaveLength(4);
-      expect(wrapper.find("[data-test='default-only-reboot']").text()).toContain(
+      // Timezone; layout and extras. The remote's three shared rows say it once
+      // under their group heading.
+      expect(wrapper.findAll("[data-test='default-only-note']")).toHaveLength(3);
+      expect(wrapper.find("#section-device-remote").text()).toContain("Same on every screen");
+      expect(wrapper.find("[data-test='default-only-reboot']").text()).not.toContain(
+        "Applies to every screen"
+      );
+      expect(wrapper.find("[data-test='default-only-bindings']").text()).not.toContain(
         "Applies to every screen"
       );
       expect(wrapper.find("#section-device-keyboard").text()).toContain("Applies to every screen");
