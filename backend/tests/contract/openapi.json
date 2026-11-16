@@ -2145,6 +2145,19 @@
         "title": "PasswordBody",
         "type": "object"
       },
+      "PluginActionRequest": {
+        "additionalProperties": false,
+        "description": "Body of a plugin action call: only ``params``, checked against the declaration.",
+        "properties": {
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          }
+        },
+        "title": "PluginActionRequest",
+        "type": "object"
+      },
       "PluginDeleteResponse": {
         "properties": {
           "message": {
@@ -6538,6 +6551,70 @@
           }
         },
         "summary": "Update Plugin",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{plugin_id}/actions/{action}": {
+      "post": {
+        "description": "Run ``action`` on the service plugin instance ``plugin_id``.\n\nChecks, in order: the instance exists and is a service plugin (404), is\nenabled (409) and running (409; this route never starts an instance), the\naction is declared (404), the params match the declaration (422), and the\ninstance is under its rate limit (429). Only then is ``perform_action``\ncalled, with the validated params. Its dict is returned unchanged.",
+        "operationId": "run_plugin_action_api_plugins__plugin_id__actions__action__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plugin_id",
+            "required": true,
+            "schema": {
+              "title": "Plugin Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Run Plugin Action Api Plugins  Plugin Id  Actions  Action  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Plugin Action",
         "tags": [
           "plugins"
         ]

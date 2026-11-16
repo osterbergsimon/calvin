@@ -41,6 +41,7 @@ Declared as a class attribute; validated by Pydantic at class-definition time
 | `display_schema` | `dict \| None` | Panel declaration; `kind` required, must be in `SUPPORTED_DISPLAY_KINDS`. |
 | `statusbar_schema` | `dict \| None` | Statusbar item; `kind` must be in `SUPPORTED_STATUSBAR_KINDS` (`status` only). |
 | `browser_origins` | `list[str]` (default `[]`) | Origins **intrinsic to the plugin** that the kiosk browser may reach (CSP host-sources). Extends the kiosk CSP's `frame-src`, `img-src`, `connect-src` for enabled plugins. Empty by default — see below. |
+| `actions` | `list[PluginActionSpec] = []` | Actions a screen can run through the public route `POST /api/plugins/{instance_id}/actions/{name}` (see [Declared actions](#declared-actions)). Service plugins only. Each entry: `{name, label?, params: {key: {type: "string" \| "boolean", required: true}}}`. Optional addition to contract 1.0 — plugins that never set it load unchanged. Not to be confused with `ui_actions`. |
 | `plugin_type`, `plugin_class` | runtime | Filled by the loader — **plugins never declare them**. `plugin_type` is derived from the family base class. |
 
 Validation at class definition (so errors surface at import, not render):
@@ -59,6 +60,11 @@ Validation at class definition (so errors surface at import, not render):
   `http(s)://` URL. **CIDR / IP ranges are rejected** (not expressible in CSP —
   use a wildcard domain). A malformed entry rejects the plugin at load. Entries
   are normalized (host lowercased) and deduped.
+- `actions`: each `name` and each param key must match `^[a-z][a-z0-9_]{0,63}$`;
+  a param `type` is `string` or `boolean`; names must be unique; unknown keys
+  in an entry are rejected. The loader also rejects a plugin that declares
+  `actions` without implementing `perform_action`, implements `perform_action`
+  without declaring `actions`, or declares them on a non-service plugin.
 - `icon`, when written as `mdi:<name>`, must use lowercase letters, digits and
   hyphens (`^mdi:[a-z0-9-]+$`). The host logs a load-time warning for a
   malformed form and keeps loading; the UI falls back to the first letter. The
@@ -205,10 +211,65 @@ Every plugin subclasses exactly one family protocol; the loader derives
 
 | Family | Base class | MUST implement | CAN implement |
 |---|---|---|---|
-| `service` | `ServicePlugin` | — | `fetch(start_date=None, end_date=None)` → the JSON payload the display/statusbar schema binds to; served at `GET /api/plugins/{instance_id}/data`. |
+| `service` | `ServicePlugin` | — | `fetch(start_date=None, end_date=None)` → the JSON payload the display/statusbar schema binds to; served at `GET /api/plugins/{instance_id}/data`. `perform_action(name, params)` → dict, only together with `metadata.actions` (see [Declared actions](#declared-actions)). |
 | `calendar` | `CalendarPlugin` | `fetch_events(start_date, end_date)` → `list[CalendarEvent]` | — |
 | `image` | `ImagePlugin` | `get_images()`, `get_image(id)`, `get_image_data(id)`, `scan_images()` | `upload_image(data, filename)`, `delete_image(id)`, `get_thumbnail_path(id)` |
 | `backend` | `BackendPlugin` | — | `fetch()` (on-demand "check now"), `get_schedule_config()` / `run_scheduled_task()`, `start_worker()` / `stop_worker()`, `provide_service()` / `get_provided_services()`, `handle_event()` / `get_subscribed_events()` |
+
+### Declared actions
+
+A service plugin can let a screen *do* something (for example, switch a
+device) by declaring `metadata.actions` and implementing
+`async perform_action(self, name, params) -> dict`.
+
+```python
+class SwitchPlugin(ServicePlugin):
+    metadata = PluginMetadata(
+        type_id="switches",
+        name="Switches",
+        actions=[{"name": "set_onoff",
+                  "params": {"device": {"type": "string"}, "on": {"type": "boolean"}}}],
+        ...
+    )
+
+    async def perform_action(self, name, params):
+        if params["device"] not in self._chosen_devices():
+            raise PluginActionRefused("Can't be switched from here")
+        ...
+        return {"item": {...}}  # the new state, in the same shape as a fetch() item
+```
+
+What the host guarantees before `perform_action` runs:
+
+- The instance exists, is a service plugin (else `404`), is enabled and running
+  (else `409`; the route never starts an instance).
+- `name` is one of the declared actions (else `404`).
+- `params` match the declaration: declared keys only, required keys present,
+  strict types (`"true"` and `1` are not booleans), strings at most 256
+  characters (else `422`). The plugin receives a validated copy.
+- At most 5 actions per second per instance (else `429` with `Retry-After: 1`).
+- Each call is logged at info level with the instance id, action and params,
+  never with config.
+
+What stays with the plugin:
+
+- **The route is public.** Anyone at a screen can call it with no login (the
+  usual Host/Origin checks still apply). The host cannot know which targets a
+  plugin should accept, so the plugin **must enforce its own allowlist** and
+  raise `PluginActionRefused` (`403`) for anything outside it.
+- **Error messages are shown on screen to anyone.** Raise
+  `PluginActionError("Couldn't reach the hub")` for a failure the caller should
+  see (`502`); the message is trimmed to 200 characters and must hold no
+  secrets, config values or exception text. Any other exception becomes a
+  generic `500` and only its type and raise site are logged.
+- **The returned dict goes to anonymous callers unchanged.** Never put config
+  or secrets in it.
+
+Both error classes live in `app.plugins.actions`. Error bodies are
+`{"detail": {"code", "message"}}` with codes `plugin_not_found`,
+`plugin_disabled`, `plugin_stopped`, `unknown_action`, `invalid_action_params`,
+`rate_limited`, `plugin_action_refused`, `plugin_action_failed` and
+`plugin_action_error`.
 
 `fetch()` is the one data verb for service and backend plugins. It replaces
 the retired per-plugin fetch variants and the deprecated fetch hooks; there is
@@ -251,6 +312,7 @@ does all of this from the class:
 |---|---|
 | `GET /api/plugins/{instance_id}/data` | `instance.fetch(start_date, end_date)` (service plugins); `409` when the instance is disabled or was stopped on purpose (never restarted by this route); an enabled instance that failed to start (e.g. at boot) is retried, and `503` is returned if that retry fails |
 | `POST /api/plugins/{type_id}/fetch` | `instance.fetch()` on each enabled instance of the type |
+| `POST /api/plugins/{instance_id}/actions/{name}` | `instance.perform_action(name, params)` after the checks in [Declared actions](#declared-actions); public (no login), body `{"params": {...}}` |
 | `POST /api/plugins/{type_id}/test` | `cls.test_connection(config)` |
 | `GET /api/plugins/{type_id}/scan?field=` | `cls.scan_options(field)` |
 | `PUT /api/plugins/{type_id}/config` | `apply_plugin_config_update` (see above) |
