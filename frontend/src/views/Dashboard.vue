@@ -754,13 +754,20 @@ onUnmounted(() => {
   position: relative;
 }
 
-/* Stacked: every screen fills the same box; paint containment keeps a hidden
-   screen's updates from invalidating the visible one. Three classes on
-   purpose: `.mode-content.dashboard-view` below also sets position, so 0,2,0
-   here would lose to it and leave both screens in normal flow side by side. */
+/* Stacked: every screen fills the same box. Three classes on purpose:
+   `.mode-content.dashboard-view` below also sets position, so 0,2,0 here would
+   lose to it and leave both screens in normal flow side by side. */
 .screen-stack--stacked > .mode-content.dashboard-view {
   position: absolute;
   inset: 0;
+}
+
+/* Containment is only for hidden screens, where it keeps their updates from
+   invalidating the visible one. On the active screen it would make the screen
+   the containing block for `position: fixed` descendants and clip them, so a
+   region dialog (EventDetailPanel, DialogScrim) would centre on and be cut off
+   by the dashboard box instead of covering the viewport. */
+.screen-stack--stacked > .mode-content.dashboard-view:not(.is-active-screen) {
   contain: layout paint;
 }
 

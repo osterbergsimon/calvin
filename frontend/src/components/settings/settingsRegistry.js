@@ -115,7 +115,7 @@ export const settingsDestinations = [
     // Per screen only (a kiosk), so there is no Default row for it.
     id: "screen-faster-switching",
     label: "Faster page switching",
-    path: "Screens / a screen · Display",
+    path: "Screens / this screen · Display",
     category: "screens",
     section: "screen-display",
     keywords: [

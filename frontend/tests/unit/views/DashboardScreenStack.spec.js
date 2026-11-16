@@ -19,6 +19,25 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({ path: "/" }),
   useRouter: () => ({ push: vi.fn() }),
 }));
+// DashboardRegion's leaves are async components: give them tiny, prop-keeping
+// stand-ins so the one test that mounts a real region stays light. The
+// PhotoSlideshow stub exposes the prop the hidden-screen pause is asserted on.
+vi.mock("../../../src/components/CalendarView.vue", () => ({
+  __esModule: true,
+  default: { name: "CalendarView", template: "<div class='calendar-view-stub' />" },
+}));
+vi.mock("../../../src/components/WebServiceViewer.vue", () => ({
+  __esModule: true,
+  default: { name: "WebServiceViewer", template: "<div class='service-view-stub' />" },
+}));
+vi.mock("../../../src/components/PhotoSlideshow.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "PhotoSlideshow",
+    props: ["autoRotate", "rotationInterval", "regionId"],
+    template: '<div class="photo-slideshow-stub" :data-auto-rotate="String(autoRotate)" />',
+  },
+}));
 
 import Dashboard from "@/views/Dashboard.vue";
 import { useConfigStore } from "@/stores/config";
@@ -86,10 +105,12 @@ function setup({ search = "", locked = true, keep = false } = {}) {
 describe("Dashboard screen stack", () => {
   beforeEach(() => {
     window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   afterEach(() => {
     window.sessionStorage.clear();
+    window.localStorage.clear();
     Object.defineProperty(window, "location", {
       value: realLocation,
       writable: true,
@@ -156,7 +177,7 @@ describe("Dashboard screen stack", () => {
     wrapper = mount(Dashboard, { global: { stubs } });
     await flushPromises();
     expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
-    expect(window.localStorage.getItem("calvin.screenStack")).toBeNull();
+    expect(window.localStorage.length).toBe(0);
   });
 
   it("mounts every screen and shows only the active one", async () => {
@@ -173,6 +194,28 @@ describe("Dashboard screen stack", () => {
     expect(views[1].attributes("aria-hidden")).toBe("true");
     expect(views[0].attributes("inert")).toBeUndefined();
     expect(wrapper.findAll(".region-stub")).toHaveLength(3);
+  });
+
+  it("pauses photo rotation on the hidden screen only", async () => {
+    setup({ search: "?screenStack=on" });
+    // Real DashboardRegion here, so its ScreenScope wiring is what is asserted;
+    // the region content itself stays stubbed.
+    const realRegionStubs = { ...stubs };
+    delete realRegionStubs.DashboardRegion;
+    delete realRegionStubs.PhotoSlideshow;
+    const wrapper = mount(Dashboard, { global: { stubs: realRegionStubs } });
+    await flushPromises();
+    // The hidden screen's async region content resolves a tick later.
+    await vi.waitFor(() =>
+      expect(wrapper.findAllComponents({ name: "PhotoSlideshow" })).toHaveLength(2)
+    );
+
+    const photos = wrapper.findAllComponents({ name: "PhotoSlideshow" });
+    const autoRotate = Object.fromEntries(
+      photos.map(photo => [photo.props("regionId"), photo.props("autoRotate")])
+    );
+    // r2 is on the visible screen-a; r3 is on the hidden screen-b.
+    expect(autoRotate).toEqual({ r2: true, r3: false });
   });
 
   it("switches screens without remounting their regions", async () => {

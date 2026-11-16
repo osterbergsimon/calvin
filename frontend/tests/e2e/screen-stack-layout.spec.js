@@ -19,6 +19,23 @@ const enterFullscreen = (page, mode) =>
     app.config.globalProperties.$pinia._s.get("mode").enterFullscreen(m);
   }, mode);
 
+/** An event on today, so the month grid has something to open. */
+const todayEvent = () => {
+  const start = new Date();
+  start.setHours(9, 0, 0, 0);
+  const end = new Date();
+  end.setHours(10, 0, 0, 0);
+  return {
+    id: "evt-today",
+    title: "Stacked dialog check",
+    start: start.toISOString(),
+    end: end.toISOString(),
+    all_day: false,
+    source: "src-family",
+    color: "green",
+  };
+};
+
 test("every stacked screen fills the stack box", async ({ page }) => {
   await installApiMock(page);
   await page.goto("/?screenStack=on");
@@ -198,3 +215,79 @@ test("every stacked screen fills the stack box", async ({ page }) => {
     expect(fullscreen.barTakesInput).toBe(true);
   });
 }
+
+/**
+ * Region dialogs stay on the viewport. `EventDetailPanel` is `position: fixed`
+ * and `DialogScrim` is `inset: 0`; both are rendered inside a dashboard region.
+ * Stacked screens are contained (layout paint) to isolate a hidden screen's
+ * repaints, but containment also makes the element the containing block for
+ * fixed descendants and clips them. Applied to the active screen too, the
+ * dialog centred on the dashboard box (shifted by the clock bar's height) and
+ * the scrim stopped covering the clock bars. Only hidden screens may contain.
+ */
+test("keeps a region dialog on the viewport, not on the dashboard box", async ({ page }) => {
+  await installApiMock(page, {
+    overrides: [
+      [
+        /^\/api\/calendar\/events$/,
+        route =>
+          route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ events: [todayEvent()] }),
+          }),
+      ],
+    ],
+  });
+
+  // Open the event on the active screen and measure its scrim and panel, plus
+  // the dashboard box they used to be contained by.
+  const openAndMeasure = async url => {
+    await page.goto(url);
+    await expect(page.locator(".screen-stack--stacked, .screen-stack")).toBeVisible();
+    // A timed event is a `.timed-event` chip in the month grid.
+    const item = page.locator(".dashboard-view.is-active-screen .timed-event").first();
+    await expect(item).toBeVisible();
+    await item.click();
+    await expect(
+      page.locator(".dashboard-view.is-active-screen .event-detail-panel")
+    ).toBeVisible();
+
+    return page.evaluate(() => {
+      const box = element => {
+        const bounds = element.getBoundingClientRect();
+        return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height };
+      };
+      const view = document.querySelector(".dashboard-view.is-active-screen");
+      return {
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        view: box(view),
+        scrim: box(view.querySelector(".dialog-scrim")),
+        panel: box(view.querySelector(".event-detail-panel")),
+      };
+    });
+  };
+
+  const stacked = await openAndMeasure("/?screenStack=on");
+  const plain = await openAndMeasure("/");
+
+  // With the stack on, the scrim still covers the whole viewport (clock bars
+  // included) and the panel is centred on it — exactly like with the stack off.
+  for (const side of ["x", "y", "width", "height"]) {
+    expect(Math.abs(stacked.scrim[side] - plain.scrim[side])).toBeLessThanOrEqual(1);
+    expect(Math.abs(stacked.panel[side] - plain.panel[side])).toBeLessThanOrEqual(1);
+  }
+  expect(Math.abs(stacked.scrim.x)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stacked.scrim.y)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stacked.scrim.width - stacked.viewport.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(stacked.scrim.height - stacked.viewport.height)).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(stacked.panel.x + stacked.panel.width / 2 - stacked.viewport.width / 2)
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(stacked.panel.y + stacked.panel.height / 2 - stacked.viewport.height / 2)
+  ).toBeLessThanOrEqual(1);
+  // The dashboard box the dialog was wrongly contained by is smaller than the
+  // viewport: the clock bar takes its own row, so this test is not vacuous.
+  expect(stacked.view.height).toBeLessThan(stacked.viewport.height);
+});
