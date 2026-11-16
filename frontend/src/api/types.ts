@@ -1775,6 +1775,33 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/plugins/{plugin_id}/actions/{action}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Run Plugin Action
+     * @description Run ``action`` on the service plugin instance ``plugin_id``.
+     *
+     *     Checks, in order: the instance exists and is a service plugin (404), is
+     *     enabled (409) and running (409; this route never starts an instance), the
+     *     action is declared (404), the params match the declaration (422), and the
+     *     instance is under its rate limit and has fewer than two actions running
+     *     (both 429). The call is cancelled after ``ACTION_TIMEOUT_S`` (504). Only then is ``perform_action``
+     *     called, with the validated params. Its dict is returned unchanged.
+     */
+    post: operations["run_plugin_action_api_plugins__plugin_id__actions__action__post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/plugins/{plugin_id}/backend/run-task": {
     parameters: {
       query?: never;
@@ -3114,6 +3141,21 @@ export interface components {
       kiosk?: string | null;
       /** Password */
       password: string;
+    };
+    /**
+     * PluginActionRequest
+     * @description Body of a plugin action call: only ``params``, checked against the declaration.
+     *
+     *     Extra top-level keys are accepted here and refused in the route, with a
+     *     bounded message: the generic 422 handler would echo every one in full.
+     */
+    PluginActionRequest: {
+      /** Params */
+      params?: {
+        [key: string]: unknown;
+      };
+    } & {
+      [key: string]: unknown;
     };
     /** PluginDeleteResponse */
     PluginDeleteResponse: {
@@ -6082,6 +6124,44 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["PluginTypeConfigUpdateResponse"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  run_plugin_action_api_plugins__plugin_id__actions__action__post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        plugin_id: string;
+        action: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PluginActionRequest"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from app.models.calendar import CalendarEvent
+from app.plugins.actions import PluginActionError
 from app.plugins.base import BasePlugin, PluginType
 
 
@@ -199,6 +200,27 @@ class ServicePlugin(BasePlugin):
             Dictionary with service data, or None if data fetching not supported.
         """
         return None
+
+    async def perform_action(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
+        """Run one of the actions declared in ``metadata.actions``.
+
+        Optional. Implement it only together with ``metadata.actions`` (the
+        loader rejects one without the other). The host calls it from the
+        public route ``POST /api/plugins/{instance_id}/actions/{name}`` only
+        for a declared ``name``, with ``params`` already validated against the
+        declaration (declared keys only, strict types).
+
+        The route is open to anyone at a screen: enforce your own allowlist
+        here (raise ``PluginActionRefused``, mapped to 403). Raise
+        ``PluginActionError`` for a failure the caller should see (502); its
+        message is shown on screen and must hold no secrets. Any other
+        exception becomes a generic 500.
+
+        Returns:
+            The new state of what changed. The dict is returned unchanged to
+            the (possibly anonymous) caller, so never include config or secrets.
+        """
+        raise PluginActionError("This plugin has no actions.")
 
 
 class BackendPlugin(BasePlugin):

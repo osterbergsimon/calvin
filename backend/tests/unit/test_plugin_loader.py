@@ -14,7 +14,10 @@ import pytest
 
 from app.plugins.base import PluginType
 from app.plugins.definitions import CURRENT_PLUGIN_API_VERSION
+from app.plugins.definitions import PluginMetadata as _Metadata
 from app.plugins.loader import PluginLoader
+from app.plugins.protocols import BackendPlugin as _BackendPlugin
+from app.plugins.protocols import ServicePlugin as _ServicePlugin
 
 _FIXTURE_PLUGIN_PY = '''"""Test installed plugin (contract 1.0)."""
 from typing import Any
@@ -469,3 +472,81 @@ class TestMalformedManifest:
         plugin_loader_instance.load_installed_plugins()
 
         assert plugin_loader_instance.get_plugin_types() == []
+
+
+@pytest.mark.unit
+class TestPluginActionsAtLoad:
+    """Declared actions and perform_action must agree at load (homey switch tiles §1)."""
+
+    @staticmethod
+    def _module(*classes):
+        import types
+
+        module = types.ModuleType("actions_fixture_module")
+        for cls in classes:
+            setattr(module, cls.__name__, cls)
+        return module
+
+    def test_actions_without_perform_action_rejected(self, plugin_loader_instance):
+        class NoHook(_ServicePlugin):
+            metadata = _Metadata(type_id="no_hook", name="X", actions=[{"name": "go"}])
+
+        with pytest.raises(
+            TypeError, match="declares actions but does not implement perform_action"
+        ):
+            plugin_loader_instance.register_module(self._module(NoHook))
+        assert plugin_loader_instance.get_plugin_class("no_hook") is None
+
+    def test_perform_action_without_actions_rejected(self, plugin_loader_instance):
+        class HookOnly(_ServicePlugin):
+            metadata = _Metadata(type_id="hook_only", name="X")
+
+            async def perform_action(self, name, params):
+                return {}
+
+        with pytest.raises(TypeError, match="implements perform_action but declares no actions"):
+            plugin_loader_instance.register_module(self._module(HookOnly))
+
+    def test_actions_on_non_service_plugin_rejected(self, plugin_loader_instance):
+        class Backendish(_BackendPlugin):
+            metadata = _Metadata(type_id="backendish", name="X", actions=[{"name": "go"}])
+
+            async def perform_action(self, name, params):
+                return {}
+
+        with pytest.raises(TypeError, match="only service plugins"):
+            plugin_loader_instance.register_module(self._module(Backendish))
+
+    def test_non_service_perform_action_without_actions_loads(self, plugin_loader_instance):
+        class Backendish(_BackendPlugin):
+            metadata = _Metadata(type_id="own_hook", name="X")
+
+            async def perform_action(self, name, params):
+                return {}
+
+        assert plugin_loader_instance.register_module(self._module(Backendish)) == ["own_hook"]
+
+    def test_plugin_with_actions_and_hook_loads(self, plugin_loader_instance):
+        class Both(_ServicePlugin):
+            metadata = _Metadata(type_id="both", name="X", actions=[{"name": "go"}])
+
+            async def perform_action(self, name, params):
+                return {"ok": True}
+
+        assert plugin_loader_instance.register_module(self._module(Both)) == ["both"]
+
+    def test_plugin_without_actions_loads_unchanged(self, plugin_loader_instance):
+        class Plain(_ServicePlugin):
+            metadata = _Metadata(type_id="plain", name="X")
+
+        assert plugin_loader_instance.register_module(self._module(Plain)) == ["plain"]
+        assert plugin_loader_instance.get_plugin_class("plain") is Plain
+
+    async def test_base_perform_action_raises_plugin_action_error(self):
+        from app.plugins.actions import PluginActionError
+
+        class Plain(_ServicePlugin):
+            metadata = _Metadata(type_id="plain2", name="X")
+
+        with pytest.raises(PluginActionError):
+            await Plain("p", "P").perform_action("go", {})

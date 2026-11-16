@@ -277,3 +277,66 @@ class TestSubSchemaModels:
             DisplaySchema(url_path="$.url")
         with pytest.raises(ValidationError):
             StatusbarSchema(label="Temp")
+
+
+@pytest.mark.unit
+class TestPluginActions:
+    """Declared plugin actions (homey switch tiles §1): additive, validated at load."""
+
+    def test_metadata_without_actions_has_empty_list(self):
+        assert PluginMetadata(type_id="x", name="X").actions == []
+
+    def test_actions_parse_and_lookup(self):
+        md = PluginMetadata(
+            type_id="x",
+            name="X",
+            actions=[
+                {
+                    "name": "set_onoff",
+                    "params": {"device": {"type": "string"}, "on": {"type": "boolean"}},
+                }
+            ],
+        )
+        spec = md.action("set_onoff")
+        assert spec is not None
+        assert spec.params["on"].type == "boolean"
+        assert spec.params["device"].required is True
+        assert md.action("nope") is None
+
+    def test_optional_param_and_label(self):
+        md = PluginMetadata(
+            type_id="x",
+            name="X",
+            actions=[
+                {
+                    "name": "go",
+                    "label": "Go",
+                    "params": {"note": {"type": "string", "required": False}},
+                }
+            ],
+        )
+        spec = md.action("go")
+        assert spec is not None
+        assert spec.label == "Go"
+        assert spec.params["note"].required is False
+
+    @pytest.mark.parametrize(
+        "bad",
+        [
+            {"name": "Set-OnOff"},
+            {"name": ""},
+            {"name": "a" * 65},
+            {"name": "1abc"},
+            {"name": "ok", "params": {"x": {"type": "number"}}},
+            {"name": "ok", "params": {"Bad Key": {"type": "string"}}},
+            {"name": "ok", "params": {"x": {"type": "string", "extra": 1}}},
+            {"name": "ok", "extra": 1},
+        ],
+    )
+    def test_invalid_action_specs_fail_load(self, bad):
+        with pytest.raises(ValidationError):
+            PluginMetadata(type_id="x", name="X", actions=[bad])
+
+    def test_duplicate_action_names_fail_load(self):
+        with pytest.raises(ValidationError):
+            PluginMetadata(type_id="x", name="X", actions=[{"name": "a"}, {"name": "a"}])
