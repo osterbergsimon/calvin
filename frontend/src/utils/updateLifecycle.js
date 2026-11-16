@@ -9,14 +9,16 @@
  * dropping, Calvin not answering while it restarts, and watching too long.
  *
  *   idle ──start──▶ starting ──progress──▶ running ◀──progress──┐
- *                      │                     │  │               │
- *                 startFailed           streamLost unreachable  │
- *                      ▼                     ▼  ▼               │
- *                   failed            following ─▶ waiting ─────┘
- *                                          │          (Calvin restarting)
- *   running|following|waiting ──installed──▶ restarting ──healthy──▶ done
- *                             ──failed─────▶ failed      └notHealthy▶ unconfirmed
- *                             ──timedOut───▶ slow
+ *                      │                  │  │  │              │
+ *                 startFailed        streamLost │ unreachable    │
+ *                      ▼                  ▼     ▼               │
+ *                   failed            following ─▶ waiting ──────┘
+ *                                          │    (Calvin restarting)
+ *   starting|running|following|waiting ──installed──▶ restarting
+ *                    │  │                                │
+ *        timedOut ───┘  └──failed──▶ failed              ├─healthy──▶ done
+ *                                                       └─notHealthy▶ unconfirmed
+ *   restarting ignores late progress, log, streamLost and unreachable events.
  *
  * Every state names what the person sees (message and tone) in one table,
  * so a new phase or outcome is one entry here, not a string in a handler.
@@ -37,6 +39,10 @@ export const UPDATE_PHASES = {
   pulling_image: { label: "Downloading", message: "Downloading the update…" },
   refreshing_host: { label: "Installing", message: "Installing…" },
   restarting: { label: "Restarting", message: "Restarting Calvin…" },
+  preparing_screens: {
+    label: "Preparing the screens",
+    message: "Preparing the screens…",
+  },
   rollback: {
     label: "Going back to the previous version",
     message: "The new version didn't start. Going back to the previous one…",
@@ -51,8 +57,8 @@ const LEGACY_PHASES = {
   deps: "refreshing_host",
   installing: "refreshing_host",
   dependencies: "refreshing_host",
-  building: "refreshing_host",
-  building_frontend: "refreshing_host",
+  building: "preparing_screens",
+  building_frontend: "preparing_screens",
 };
 
 const knownPhase = phase => {
@@ -105,6 +111,22 @@ export function nextUpdate(state, event) {
   }
   if (!busy) return state;
 
+  // The script has finished and Calvin is restarting on the new version.
+  // Only the restart's own outcome moves it on: a late stream, log or status
+  // event must not turn "installed" back into "updating".
+  if (state.stage === "restarting") {
+    switch (event.type) {
+      case "healthy":
+        return { stage: "done" };
+      case "notHealthy":
+        return { stage: "unconfirmed" };
+      case "timedOut":
+        return { stage: "slow" };
+      default:
+        return state;
+    }
+  }
+
   switch (event.type) {
     case "progress":
       return {
@@ -120,13 +142,16 @@ export function nextUpdate(state, event) {
     case "streamLost":
       return { ...state, stage: "following" };
     case "unreachable":
-      return state.stage === "restarting" ? state : { ...state, stage: "waiting" };
+      return { ...state, stage: "waiting" };
+    // The status endpoint did not answer usefully, but Calvin itself did.
+    case "reachable":
+      return { ...state, stage: "following" };
     case "installed":
       return { stage: "restarting" };
     case "healthy":
-      return state.stage === "restarting" ? { stage: "done" } : state;
     case "notHealthy":
-      return state.stage === "restarting" ? { stage: "unconfirmed" } : state;
+      // Only a restart can confirm or doubt an update.
+      return state;
     case "failed":
       return { stage: "failed", message: "" };
     case "timedOut":

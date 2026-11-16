@@ -52,12 +52,31 @@ describe("Calvin update lifecycle", () => {
     expect(nextUpdate(running, { type: "start" })).toBe(running);
   });
 
+  it("ignores late events while Calvin restarts on the new version", () => {
+    const restarting = run(
+      { type: "start" },
+      { type: "progress", phase: "complete" },
+      { type: "installed" }
+    );
+    expect(restarting.stage).toBe("restarting");
+    for (const event of [
+      { type: "progress", phase: "refreshing_host" },
+      { type: "streamLost" },
+      { type: "log", line: "> vite build" },
+      { type: "unreachable" },
+    ]) {
+      expect(nextUpdate(restarting, event).stage, event.type).toBe("restarting");
+    }
+    expect(nextUpdate(restarting, { type: "healthy" }).stage).toBe("done");
+  });
+
   it("keeps following after the stream drops, and waits while Calvin restarts", () => {
     const lost = run({ type: "start" }, { type: "progress" }, { type: "streamLost" });
     expect(lost.stage).toBe("following");
     expect(isUpdateBusy(lost)).toBe(true);
     const waiting = nextUpdate(lost, { type: "unreachable" });
     expect(updateView(waiting)).toMatchObject({ tone: "warning" });
+    expect(nextUpdate(waiting, { type: "reachable" }).stage).toBe("following");
     expect(nextUpdate(waiting, { type: "progress", phase: "restarting" }).stage).toBe("running");
   });
 
@@ -109,7 +128,9 @@ describe("Calvin update lifecycle", () => {
   });
 
   it("labels old phase names and leaves unknown ones blank", () => {
-    expect(updatePhaseLabel("building_frontend")).toBe("Installing");
+    expect(updatePhaseLabel("building_frontend")).toBe("Preparing the screens");
+    expect(updatePhaseLabel("building")).toBe("Preparing the screens");
+    expect(updatePhaseLabel("deps")).toBe("Installing");
     expect(updatePhaseLabel("PULLING_CODE")).toBe("Downloading");
     expect(updatePhaseLabel("something-new")).toBe("");
     expect(updatePhaseLabel(null)).toBe("");

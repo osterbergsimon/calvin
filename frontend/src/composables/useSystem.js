@@ -14,10 +14,10 @@ import {
   updateView,
 } from "../utils/updateLifecycle";
 
-// Singleton refs so any component using useSystem() shares the same status
 // Calvin's own update: one state (utils/updateLifecycle.js); `updating` and
 // the message refs below are derived from it by sendUpdate.
 const updateLife = ref(UPDATE_IDLE);
+// Singleton refs so any component using useSystem() shares the same status
 const updating = ref(false);
 const updateStatus = ref(null);
 const updateStatusLoading = ref(false);
@@ -293,9 +293,21 @@ export function useSystem() {
     sendUpdate({ type: healthy ? "healthy" : "notHealthy" });
   };
 
+  // A status answer we can't use (a 5xx, or "unknown" while the new version
+  // starts) says nothing about Calvin itself. Ask /health: if it answers, the
+  // update is merely being checked on; only silence means Calvin is restarting.
+  const noteUpdateChecking = async () => {
+    try {
+      await systemApi.getHealth();
+      sendUpdate({ type: "reachable" });
+    } catch {
+      sendUpdate({ type: "unreachable" });
+    }
+  };
+
   // Follow an update through the status endpoint until it settles: after the
   // live stream drops (Calvin restarting cuts it), or for an update this page
-  // did not start. A failed request means Calvin is restarting, not done.
+  // did not start. A failed status check is not the end of the update.
   const followUpdate = async () => {
     const timeoutMs = 10 * 60 * 1000; // 10 minutes
     const pollIntervalMs = 5000;
@@ -312,10 +324,10 @@ export function useSystem() {
           return;
         }
         if (event?.type === "failed") return;
+        if (!event) await noteUpdateChecking();
       } catch (error) {
         console.warn("Update status unavailable (backend may be restarting):", error);
-        sendUpdate({ type: "unreachable" });
-        await waitForBackendHealthy({ timeoutMs: 60000, intervalMs: 2000 });
+        await noteUpdateChecking();
       }
 
       await sleep(pollIntervalMs);
@@ -356,8 +368,11 @@ export function useSystem() {
     }
   };
 
-  // Watch an update in progress (one this page did not start).
+  // Watch an update in progress (one this page did not start). An update this
+  // page is already running is followed by its own stream; asking here too
+  // would start a second polling loop.
   const pollUpdateStatus = async () => {
+    if (isUpdateBusy(updateLife.value)) return;
     sendUpdate({ type: "follow" });
     await followUpdate();
   };

@@ -49,9 +49,10 @@ The polling path that could have checked the server (`pollUpdateStatus`) was nev
   stream's `complete`, and the mapping between them. `system.py` uses it; the API is unchanged.
 - `frontend/src/utils/updateLifecycle.js` is the browser's machine: a pure `nextUpdate(state, event)` and an
   `updateView(state)` table of what each state says. Events that do not apply are ignored, so a late stream event
-  cannot undo "up to date". `useSystem.js` sends events; `updating` and the message line are derived.
-- A dropped stream moves to `following`: the browser asks `/update/status` until the server says done or failed, and
-  shows "Calvin is restarting…" while it does not answer.
+  cannot undo "up to date", and while Calvin restarts (`restarting`) only the restart's own outcome moves it on.
+- A dropped stream moves to `following`: the browser asks `/update/status` until the server says done or failed.
+  "Calvin is restarting…" is kept for when Calvin itself does not answer; a status check that fails or is unknown
+  while `/api/health` answers shows "Checking on the update…". The 10-minute timeout is the final stop.
 - Every script phase has plain words, including the rollback.
 - Tests on both sides read `scripts/update-calvin.sh`: a new phase or status there fails CI until it has a meaning in
   Python and words in the browser.
@@ -60,22 +61,34 @@ The polling path that could have checked the server (`pollUpdateStatus`) was nev
 stateDiagram-v2
   [*] --> idle
   idle --> starting: start
+  idle --> following: follow (update already running)
   starting --> failed: startFailed
   starting --> running: progress
+  starting --> waiting: unreachable
+  starting --> slow: timedOut
   running --> running: progress / log
   running --> following: streamLost
-  following --> waiting: unreachable
-  waiting --> running: progress
+  running --> waiting: unreachable
   running --> restarting: installed
-  following --> restarting: installed
-  waiting --> restarting: installed
   running --> failed: failed
+  running --> slow: timedOut
+  following --> following: reachable (health answers, status check failed)
+  following --> waiting: unreachable
+  following --> restarting: installed
   following --> failed: failed
+  following --> slow: timedOut
+  waiting --> following: reachable
+  waiting --> waiting: unreachable
+  waiting --> running: progress
+  waiting --> restarting: installed
+  waiting --> failed: failed
+  waiting --> slow: timedOut
   restarting --> done: healthy
   restarting --> unconfirmed: notHealthy
-  following --> slow: timedOut
+  restarting --> slow: timedOut
   done --> starting: start
   failed --> starting: start
+  slow --> starting: start
 ```
 
 ## 2. Kiosk software update — stuck state (follow-up)
