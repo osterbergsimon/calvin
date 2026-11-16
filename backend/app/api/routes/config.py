@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
 from app.config import settings
-from app.schemas.config_update import BRIGHTNESS_KEYS, ConfigUpdate
+from app.schemas.config_update import PER_SCREEN_ONLY_KEYS, ConfigUpdate
 from app.security.admin_auth import get_admin_store
 from app.security.route_policy import CONFIG_DISPLAY_KEYS, admin_error, is_admin
 from app.services.config_service import config_service
@@ -509,8 +509,9 @@ async def update_config(config_update: ConfigUpdate, request: Request):
     if not is_admin(request) and not update_dict.keys() <= CONFIG_DISPLAY_KEYS:
         raise admin_error(get_admin_store().is_configured())
 
-    # Brightness belongs to one panel: a household value would reach every screen.
-    household_refused = sorted(BRIGHTNESS_KEYS & update_dict.keys())
+    # Brightness belongs to one panel, and the screen stack is a per-screen
+    # choice: a household value would reach every screen.
+    household_refused = sorted(PER_SCREEN_ONLY_KEYS & update_dict.keys())
     if household_refused:
         raise HTTPException(
             status_code=422,

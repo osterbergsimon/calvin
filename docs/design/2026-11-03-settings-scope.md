@@ -113,7 +113,7 @@ default-only rows say **Applies to every screen**, as today.
 | Name | Name | Built |
 | Pages | Pages shown, Start page | Built |
 | **Look** | Theme, Light or dark, Dark from / to, Font | **New.** From Dashboard › Appearance; needs H2, H3 and H4 fixed |
-| Display | Orientation, Upside down, Rotate the screen output, **Dashboard size**, **Settings text size** | Sizes move in from Dashboard |
+| Display | Orientation, Upside down, Rotate the screen output, **Dashboard size**, **Settings text size**, **Faster page switching** | Sizes move in from Dashboard; faster page switching is new |
 | **Effects & focus** | **Effects**, Focus light, Dim other regions | **New.** From Dashboard › Focus & remote |
 | **Controls** | Hide controls, Keep the clock bar when hidden, Tap anywhere to show controls, Show-controls corner, Corner visibility, Corner size, Hold for | **New.** The whole Dashboard › Controls section |
 | Touch & keyboard | Touchscreen, On-screen keyboard; on Default only: Keyboard layout, Also switch to | Built |

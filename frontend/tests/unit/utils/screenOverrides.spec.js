@@ -152,7 +152,7 @@ describe("screen setting descriptors", () => {
       "Font",
     ]);
     const display = descriptorsForSection("display").map(descriptor => descriptor.key);
-    expect(display.slice(-2)).toEqual(["touchControlSize", "uiSize"]);
+    expect(display.slice(-3)).toEqual(["touchControlSize", "uiSize", "keepScreensReady"]);
     expect(descriptorFor("touchControlSize").label).toBe("Dashboard size");
     expect(descriptorFor("uiSize").label).toBe("Settings text size");
   });

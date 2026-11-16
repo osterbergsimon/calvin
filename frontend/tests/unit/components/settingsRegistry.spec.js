@@ -52,6 +52,7 @@ describe("settings registry", () => {
     expect(settingsDestinations.map(destination => destination.id)).toEqual([
       "screens-default",
       "dashboard-layout",
+      "screen-faster-switching",
       "dashboard-regions",
       "dashboard-ui",
       "dashboard-kiosk",

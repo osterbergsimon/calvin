@@ -1412,6 +1412,17 @@
             ],
             "title": "Imagedisplaymode"
           },
+          "keepScreensReady": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keepscreensready"
+          },
           "keyboardFeedbackEnabled": {
             "anyOf": [
               {

@@ -53,6 +53,10 @@ BRIGHTNESS_KEYS = frozenset(
     }
 )
 
+# Per-screen only, like the brightness keys: a household value would switch the
+# screen stack on for every screen. Refused on the household config too.
+PER_SCREEN_ONLY_KEYS = BRIGHTNESS_KEYS | frozenset({"keepScreensReady"})
+
 # snake_case spellings the display agent also reads. Writes are camelCase only.
 BRIGHTNESS_SNAKE_KEYS = frozenset(
     {
@@ -285,6 +289,9 @@ class ConfigUpdate(BaseModel):
     focusLightMode: Literal["always", "interaction", "off"] | None = None
     focusLightDimOthers: bool | None = None
     touchControlSize: Literal["xsmall", "small", "medium", "large", "xlarge"] | None = None
+    # Faster page switching: keep every dashboard page mounted (admin-only, per
+    # kiosk; the dashboard ignores it in a browser that is not a known kiosk).
+    keepScreensReady: StrictBool | None = None
 
     # Brightness ramp, dim-only sleep (calvin-29ws). Ranges match the clamps in
     # deploy/kiosk-agent/calvin_display_agent.py. Calvin/DDC scale, 0-100.

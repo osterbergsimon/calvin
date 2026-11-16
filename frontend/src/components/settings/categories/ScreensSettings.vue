@@ -381,14 +381,14 @@
             @update:model-value="setApply"
           />
         </SettingRow>
-        <template v-for="descriptor in displaySizeDescriptors" :key="descriptor.key">
+        <template v-for="descriptor in displayRows" :key="descriptor.key">
           <ScreenSettingRow
             :descriptor="descriptor"
             :id="rowAnchorId(descriptor.key)"
-            :value="displaySizes[descriptor.key]"
-            :overridden="Boolean(displaySizesOverridden[descriptor.key])"
-            @set="value => setDisplaySize(descriptor.key, value)"
-            @reset="() => resetDisplaySize(descriptor.key)"
+            :value="displayRowValues[descriptor.key]"
+            :overridden="Boolean(displayRowValuesOverridden[descriptor.key])"
+            @set="value => setDisplayRow(descriptor.key, value)"
+            @reset="() => resetDisplayRow(descriptor.key)"
           />
         </template>
         <Card data-test="screen-live-preview">
@@ -1595,19 +1595,19 @@ function resetLook(key) {
   persistLook(next, key);
 }
 
-// --- Display sizes moved in from Dashboard (§7 item 6) --------------------
-const DISPLAY_SIZE_KEYS = ["touchControlSize", "uiSize"];
-const displaySizeDescriptors = descriptorsForSection("display").filter(descriptor =>
-  DISPLAY_SIZE_KEYS.includes(descriptor.key)
+// --- Display rows moved in from Dashboard (§7 item 6) ---------------------
+const DISPLAY_ROW_KEYS = ["touchControlSize", "keepScreensReady", "uiSize"];
+const displayRows = descriptorsForSection("display").filter(descriptor =>
+  DISPLAY_ROW_KEYS.includes(descriptor.key)
 );
-const displaySizesOverridden = computed(() =>
+const displayRowValuesOverridden = computed(() =>
   Object.fromEntries(
-    displaySizeDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+    displayRows.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
   )
 );
-const displaySizes = computed(() =>
+const displayRowValues = computed(() =>
   Object.fromEntries(
-    displaySizeDescriptors.map(descriptor => [
+    displayRows.map(descriptor => [
       descriptor.key,
       descriptor.key in overrides.value
         ? overrides.value[descriptor.key]
@@ -1615,16 +1615,16 @@ const displaySizes = computed(() =>
     ])
   )
 );
-function persistDisplaySize(next) {
+function persistDisplayRow(next) {
   persist(next, displayMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
 }
-function setDisplaySize(key, value) {
-  persistDisplaySize({ ...overrides.value, [key]: value });
+function setDisplayRow(key, value) {
+  persistDisplayRow({ ...overrides.value, [key]: value });
 }
-function resetDisplaySize(key) {
+function resetDisplayRow(key) {
   const next = { ...overrides.value };
   delete next[key];
-  persistDisplaySize(next);
+  persistDisplayRow(next);
 }
 
 function persistDisplay(next) {

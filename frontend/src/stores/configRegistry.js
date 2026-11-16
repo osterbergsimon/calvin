@@ -300,6 +300,11 @@ export const CONFIG_FIELD_DEFINITIONS = [
     defaultValue: true,
   },
   {
+    name: "keepScreensReady",
+    keys: ["keepScreensReady", "keep_screens_ready"],
+    defaultValue: false,
+  },
+  {
     name: "tapAnywhereReveal",
     keys: ["tapAnywhereReveal", "tap_anywhere_reveal"],
     defaultValue: false,

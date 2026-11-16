@@ -150,7 +150,14 @@ def test_a_mixed_request_is_refused_as_a_whole(test_client: TestClient):
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    "key", ["orientation", "orientationFlipped", "applyDisplayRotation", "displayTimeout"]
+    "key",
+    [
+        "orientation",
+        "orientationFlipped",
+        "applyDisplayRotation",
+        "displayTimeout",
+        "keepScreensReady",
+    ],
 )
 def test_device_physical_keys_stay_admin_only(test_client: TestClient, key):
     _seed_layer(test_client, {"showUI": True})
@@ -160,6 +167,14 @@ def test_device_physical_keys_stay_admin_only(test_client: TestClient, key):
 
     assert response.status_code == 403, response.text
     assert key not in _layer(test_client)
+
+
+@pytest.mark.integration
+def test_the_allowlist_does_not_hold_faster_page_switching():
+    """Guard: the screen stack setting is an admin choice, never a screen's own write."""
+    from app.security.route_policy import KIOSK_SELF_WRITE_KEYS
+
+    assert "keepScreensReady" not in KIOSK_SELF_WRITE_KEYS
 
 
 @pytest.mark.integration

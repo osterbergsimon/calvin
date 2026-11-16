@@ -500,6 +500,20 @@ export const SCREEN_SETTING_DESCRIPTORS = [
     ],
   },
   {
+    key: "keepScreensReady",
+    label: "Faster page switching",
+    section: "display",
+    perScreenOnly: true,
+    description:
+      "Keeps every page ready, so switching pages is quicker on a slow screen. The screen takes about a second longer to start.",
+    control: { kind: "toggle" },
+    defaultValue: false,
+    browserLayer: false,
+    copyable: false,
+    resetTest: "reset-keep-screens-ready",
+    keywords: ["faster page switching", "page switching", "pages ready", "slow screen", "speed"],
+  },
+  {
     key: "displayScheduleEnabled",
     label: "Screen on/off schedule",
     section: "power",
@@ -867,6 +881,7 @@ const SCREEN_PAGE_ROW_ORDER = [
   "applyDisplayRotation",
   "touchControlSize",
   "uiSize",
+  "keepScreensReady",
   "effectsLevel",
   "focusLightMode",
   "focusLightDimOthers",
