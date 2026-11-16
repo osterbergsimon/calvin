@@ -365,10 +365,13 @@ cog --platform=drm \
 - **Faster page switching** (a per-screen setting, off by default): in
   Settings › Screens, pick the screen, then turn on **Faster page switching**
   under Display. Only an admin can change it, and it applies to that screen
-  only (a browser that is not a known kiosk never uses it). The dashboard then
-  keeps every page mounted and shows only the active one, so a page switch does
-  not rebuild the page; the pages that are not shown stay hidden, cannot take
-  focus and pause their photo rotation. On a Pi 3B+ (cog, WPE WebKit 2.48) a
+  only (a browser that is not a known kiosk never uses it). It applies only to
+  a screen the server knows by id (opened with `?kiosk=`); the server's own
+  local display page, which opens without a kiosk id, does not use it. The
+  dashboard then keeps every page mounted and shows only the active one, so a
+  page switch does not rebuild the page; the pages that are not shown stay
+  hidden, cannot take focus and pause their photo rotation. On a Pi 3B+ (cog,
+  WPE WebKit 2.48) a
   warm page switch went from about 2.4 s to 0.8 s (about 3x faster) and used
   about half the CPU, with no measurable memory cost. The cost is a start about
   1 s slower (about 5.5 s to 6.5 s), because every page is built at start.
