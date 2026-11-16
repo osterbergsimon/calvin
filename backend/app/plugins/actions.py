@@ -37,7 +37,7 @@ class PluginActionError(Exception):
         self.message = message
 
 
-class PluginActionRefused(PluginActionError):
+class PluginActionRefused(PluginActionError):  # noqa: N818 - name fixed by the plan
     """The plugin refused this call, e.g. a device not on its allowlist (403)."""
 
 

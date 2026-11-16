@@ -40,6 +40,32 @@ def _plugin_family(cls: type[BasePlugin]) -> PluginType | None:
     return None
 
 
+def plugin_implements_actions(cls: type[BasePlugin]) -> bool:
+    """Whether ``cls`` overrides ``ServicePlugin.perform_action``."""
+    hook = getattr(cls, "perform_action", None)
+    return hook is not None and hook is not ServicePlugin.perform_action
+
+
+def _check_actions(cls: type[BasePlugin], metadata: PluginMetadata) -> None:
+    """Declared actions and ``perform_action`` must come together, on a service plugin.
+
+    Fails the load loudly so a half-wired plugin never reaches the public
+    action route.
+    """
+    implements = plugin_implements_actions(cls)
+    if not metadata.actions and not implements:
+        return
+    if not issubclass(cls, ServicePlugin):
+        raise TypeError(
+            f"{cls.__name__} declares actions or perform_action, but only service plugins "
+            "may have actions"
+        )
+    if metadata.actions and not implements:
+        raise TypeError(f"{cls.__name__} declares actions but does not implement perform_action")
+    if implements and not metadata.actions:
+        raise TypeError(f"{cls.__name__} implements perform_action but declares no actions")
+
+
 def import_plugin_module(plugin_id: str, plugin_path: Path, module_name: str) -> ModuleType:
     """Import an installed plugin's ``plugin.py`` under its unique module name.
 
@@ -115,6 +141,7 @@ class PluginLoader:
                     f"{obj.__name__} must subclass one of the plugin family protocols "
                     "(CalendarPlugin, ImagePlugin, ServicePlugin, BackendPlugin)"
                 )
+            _check_actions(obj, metadata)
             type_id = metadata.type_id
             existing = self._types.get(type_id)
             if existing is not None and existing is not obj:
