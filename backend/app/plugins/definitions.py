@@ -8,7 +8,7 @@ this model. There are no registration hooks.
 """
 
 import re
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -109,6 +109,57 @@ class ActionDefinition(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+# Declared plugin actions (homey switch tiles §1). Names are short snake_case
+# identifiers: they appear in a public route path and as param keys in a body
+# anonymous callers send, so the shape is pinned at load.
+_ACTION_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def _check_action_identifier(value: str, what: str) -> str:
+    if not isinstance(value, str) or not _ACTION_NAME_PATTERN.fullmatch(value):
+        raise ValueError(
+            f"{what} {value!r} must match {_ACTION_NAME_PATTERN.pattern} "
+            "(lowercase letters, digits and underscores, starting with a letter)"
+        )
+    return value
+
+
+class ActionParamSpec(BaseModel):
+    """One parameter of a declared plugin action: a string or a boolean."""
+
+    type: Literal["string", "boolean"]
+    required: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class PluginActionSpec(BaseModel):
+    """A plugin action callable through ``POST /api/plugins/{id}/actions/{name}``.
+
+    The host runs only declared actions, with params validated against
+    ``params`` (unknown keys rejected). Not to be confused with ``ui_actions``,
+    which are settings-form buttons.
+    """
+
+    name: str
+    label: str | None = None
+    params: dict[str, ActionParamSpec] = Field(default_factory=dict)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return _check_action_identifier(value, "action name")
+
+    @field_validator("params")
+    @classmethod
+    def validate_param_names(cls, value: dict[str, ActionParamSpec]) -> dict[str, ActionParamSpec]:
+        for key in value:
+            _check_action_identifier(key, "action param name")
+        return value
+
+
 class SectionDefinition(BaseModel):
     """Plugin UI section metadata."""
 
@@ -171,6 +222,10 @@ class PluginMetadata(BaseModel):
     # the kiosk only talks to Calvin. Site-specific origins belong in the admin
     # allowlist, not here. See docs/superpowers/specs/2026-07-15-offline-kiosks-csp-design.md.
     browser_origins: list[str] = Field(default_factory=list)
+    # Declared actions (homey switch tiles §1). Optional and additive: empty
+    # means the plugin has no action route. Only service plugins may declare
+    # them (checked by the loader).
+    actions: list[PluginActionSpec] = Field(default_factory=list)
 
     # Runtime fields, filled by the loader.
     plugin_type: PluginType | None = None
@@ -245,6 +300,22 @@ class PluginMetadata(BaseModel):
             if origin not in normalized:
                 normalized.append(origin)
         return normalized
+
+    @field_validator("actions")
+    @classmethod
+    def validate_unique_action_names(cls, value: list[PluginActionSpec]) -> list[PluginActionSpec]:
+        names = [spec.name for spec in value]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"actions declares duplicate name(s): {duplicates}")
+        return value
+
+    def action(self, name: str) -> PluginActionSpec | None:
+        """Return the declared action called ``name``, or None."""
+        for spec in self.actions:
+            if spec.name == name:
+                return spec
+        return None
 
     @model_validator(mode="after")
     def validate_instance_identity(self) -> "PluginMetadata":
