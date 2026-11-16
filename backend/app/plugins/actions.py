@@ -12,7 +12,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from app.plugins.definitions import PluginActionSpec
 
@@ -21,6 +21,8 @@ from app.plugins.definitions import PluginActionSpec
 MAX_STRING_PARAM = 256
 # Plugin error text shown to callers is trimmed to this length.
 MAX_ERROR_MESSAGE = 200
+# At most this many unknown param names are named in a 422.
+MAX_UNKNOWN_SHOWN = 10
 
 _PY_TYPES: dict[str, type] = {"string": str, "boolean": bool}
 
@@ -64,7 +66,10 @@ def validate_action_params(spec: PluginActionSpec, params: Any) -> dict[str, str
     errors: list[str] = []
     unknown = sorted(str(key)[:64] for key in params if key not in spec.params)
     if unknown:
-        errors.append(f"unknown param(s): {', '.join(unknown)}")
+        # Bounded: the caller may be anonymous, and this list is returned and logged.
+        shown = ", ".join(unknown[:MAX_UNKNOWN_SHOWN])
+        more = len(unknown) - MAX_UNKNOWN_SHOWN
+        errors.append(f"unknown param(s): {shown}" + (f" and {more} more" if more > 0 else ""))
 
     clean: dict[str, str | bool] = {}
     for key, param in spec.params.items():
@@ -72,7 +77,7 @@ def validate_action_params(spec: PluginActionSpec, params: Any) -> dict[str, str
             if param.required:
                 errors.append(f"{key}: required")
             continue
-        value = params[key]
+        value: Any = params[key]
         # type(...) is not, so a bool subclass of int never counts as a string
         # and an int never counts as a bool.
         if type(value) is not _PY_TYPES[param.type]:
@@ -81,7 +86,7 @@ def validate_action_params(spec: PluginActionSpec, params: Any) -> dict[str, str
         if isinstance(value, str) and len(value) > MAX_STRING_PARAM:
             errors.append(f"{key}: longer than {MAX_STRING_PARAM} characters")
             continue
-        clean[key] = value
+        clean[key] = cast(str | bool, value)
 
     if errors:
         raise ActionParamsError(errors)

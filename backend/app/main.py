@@ -606,6 +606,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
+        # Keep e.g. Retry-After on a 429 and WWW-Authenticate on a 401.
+        headers=getattr(exc, "headers", None),
     )
 
 
@@ -619,6 +621,8 @@ async def fastapi_http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
+        # Keep e.g. Retry-After on a 429 and WWW-Authenticate on a 401.
+        headers=getattr(exc, "headers", None),
     )
 
 

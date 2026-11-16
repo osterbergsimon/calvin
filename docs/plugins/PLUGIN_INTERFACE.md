@@ -269,7 +269,9 @@ Both error classes live in `app.plugins.actions`. Error bodies are
 `{"detail": {"code", "message"}}` with codes `plugin_not_found`,
 `plugin_disabled`, `plugin_stopped`, `unknown_action`, `invalid_action_params`,
 `rate_limited`, `plugin_action_refused`, `plugin_action_failed` and
-`plugin_action_error`.
+`plugin_action_error`. A body that is not `{"params": {...}}` at all (not an
+object, or with other top-level keys) is rejected by request validation with
+the app's generic `422` shape, `{"detail": [...], "body": "Validation error"}`.
 
 `fetch()` is the one data verb for service and backend plugins. It replaces
 the retired per-plugin fetch variants and the deprecated fetch hooks; there is

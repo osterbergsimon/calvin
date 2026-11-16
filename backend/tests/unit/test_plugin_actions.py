@@ -108,3 +108,13 @@ def test_refused_is_an_action_error():
     assert issubclass(PluginActionRefused, PluginActionError)
     err = PluginActionRefused("Can't be switched from here")
     assert err.message == "Can't be switched from here"
+
+
+def test_unknown_key_list_is_capped():
+    """An anonymous body with thousands of junk keys must not echo them all."""
+    junk = {f"k{i}_{'x' * 100}": 1 for i in range(1000)}
+    with pytest.raises(ActionParamsError) as exc_info:
+        validate_action_params(SPEC, {"device": "d1", "on": True, **junk})
+    text = " ".join(exc_info.value.errors)
+    assert len(text) < 1000
+    assert "and 990 more" in text
