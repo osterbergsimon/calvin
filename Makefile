@@ -7,8 +7,8 @@ DEV_PROJECT ?= calvin-dev-$(shell basename "$(CURDIR)" | tr 'A-Z' 'a-z' | tr -c 
 COMPOSE_DEV := docker compose -p $(DEV_PROJECT) -f docker/docker-compose.dev.yml
 COMPOSE_PROD := docker compose -f docker/docker-compose.yml
 
-# Machine-wide limit on heavy jobs (builds, tests, type-checks); quick lint and format steps run without it: used when the host
-# has lane-heavy, empty (no effect) otherwise.
+# Machine-wide limit on heavy jobs (builds, tests, type-checks): used when the
+# host has lane-heavy, empty (no effect) otherwise. Lint and format run without it.
 HEAVY := $(firstword $(wildcard $(HOME)/.agents/bin/lane-heavy))
 
 help:
