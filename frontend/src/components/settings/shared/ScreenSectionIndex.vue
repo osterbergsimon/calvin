@@ -71,6 +71,7 @@ import { computed, inject, onMounted, onUnmounted, ref } from "vue";
 import { isPhone } from "@/styles/breakpoints";
 import ListRowLink from "@/components/ui/ListRowLink.vue";
 import { openQuery, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 
 defineProps({
   // [{ id, label, meta? }]
@@ -103,7 +104,7 @@ function jumpTo(id) {
   const section = document.getElementById(`section-${id}`);
   if (!section) return;
   if (typeof section.scrollIntoView === "function") {
-    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    section.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
   }
 }
 

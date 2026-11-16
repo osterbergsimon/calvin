@@ -116,6 +116,59 @@ for (const viewport of VIEWPORTS) {
 
         expect(consoleErrors).toEqual([]);
       });
+
+      // calvin-hts5: the Highest/Lowest editor with its raise warning open.
+      test("the brightness Highest and Lowest editor is accessible", async ({
+        page,
+        consoleErrors,
+      }, testInfo) => {
+        const api = await installApiMock(page, {
+          kioskExtras: {
+            hallway: {
+              displayStack: "cog",
+              displayCheck: {
+                ddc: true,
+                writes: true,
+                checkedAt: "2026-11-04T10:00:00Z",
+                powerTrouble: { at: "2026-11-07T10:00:00Z", step: "conversion", level: 30 },
+              },
+            },
+          },
+        });
+        api.overridesByKiosk.hallway = {
+          brightnessRampEnabled: true,
+          brightness: 19,
+          brightnessLimit: 26,
+          brightnessFloor: 5,
+          brightnessConversion: [
+            { ddc: 5, menu: 28 },
+            { ddc: 19, menu: 61 },
+          ],
+        };
+        await gotoSettings(page);
+        await expectSettingsReady(page);
+        await selectCategory(page, "Screens");
+        await expectTheme(page, theme);
+        await page.locator('[data-test="screen-card"]', { hasText: "Hallway" }).first().click();
+        await expect(page.locator('[data-test="screens-detail"]')).toBeVisible();
+        await openSection(page, "screen-power");
+        const group = page.locator('[data-test="brightness-group"]');
+        await group.locator('[data-test="levels-change"]').click();
+        const highest = group.getByRole("group", { name: "Highest" });
+        // One level above the saved 26 and below the trouble at 30: the amber note.
+        await highest.getByRole("button", { name: "Increase" }).click();
+        await highest.getByRole("button", { name: "Increase" }).click();
+        await expect(group.locator('[data-test="raise-warning"]')).toBeVisible();
+        await expect(group.locator('[data-test="raise-trouble"]')).toBeHidden();
+        await expectAccessible(page, testInfo, `${viewport.name}/${theme}: brightness raise note`);
+        // Up to the level the check saw trouble at: the same note turns red.
+        for (let i = 0; i < 7; i += 1) {
+          await highest.getByRole("button", { name: "Increase" }).click();
+        }
+        await expect(group.locator('[data-test="raise-trouble"]')).toBeVisible();
+        await expectAccessible(page, testInfo, `${viewport.name}/${theme}: brightness levels`);
+        expect(consoleErrors).toEqual([]);
+      });
     });
   }
 }

@@ -7,6 +7,10 @@ DEV_PROJECT ?= calvin-dev-$(shell basename "$(CURDIR)" | tr 'A-Z' 'a-z' | tr -c 
 COMPOSE_DEV := docker compose -p $(DEV_PROJECT) -f docker/docker-compose.dev.yml
 COMPOSE_PROD := docker compose -f docker/docker-compose.yml
 
+# Machine-wide limit on heavy jobs (builds, tests, lint): used when the host
+# has lane-heavy, empty (no effect) otherwise.
+HEAVY := $(firstword $(wildcard $(HOME)/.agents/bin/lane-heavy))
+
 help:
 	@echo "Available commands:"
 	@echo "  make install        - One-time setup (creates docker/.env from example)"
@@ -51,31 +55,28 @@ dev-down:
 	$(COMPOSE_DEV) down
 
 test:
-	cd backend && uv sync --extra dev && uv run pytest
-	cd frontend && npm run test
+	$(HEAVY) sh -c 'cd backend && uv sync --extra dev && uv run pytest && cd ../frontend && npm run test'
 
 test-backend:
-	cd backend && uv sync --extra dev && uv run pytest
+	$(HEAVY) sh -c 'cd backend && uv sync --extra dev && uv run pytest'
 
 test-frontend:
-	cd frontend && npm run test
+	$(HEAVY) sh -c 'cd frontend && npm run test'
 
 test-scripts:
 	@echo "Testing setup scripts..."
 	@if command -v bats >/dev/null 2>&1; then \
 		echo "Running bash script tests..."; \
-		cd scripts && bats tests/ || echo "Warning: bats tests failed or bats not fully configured"; \
+		cd scripts && $(HEAVY) bats tests/ || echo "Warning: bats tests failed or bats not fully configured"; \
 	else \
 		echo "Warning: bats not installed. Install with: brew install bats-core (macOS) or sudo apt-get install bats (Linux)"; \
 	fi
 
 test-coverage:
-	cd backend && uv sync --extra dev && uv run pytest --cov=app --cov-report=html --cov-report=term
-	cd frontend && npm run test:coverage
+	$(HEAVY) sh -c 'cd backend && uv sync --extra dev && uv run pytest --cov=app --cov-report=html --cov-report=term && cd ../frontend && npm run test:coverage'
 
 lint:
-	cd backend && uv run ruff check .
-	cd frontend && npm run lint
+	$(HEAVY) sh -c 'cd backend && uv run ruff check . && cd ../frontend && npm run lint'
 
 format:
 	cd backend && uv run ruff format .
@@ -85,11 +86,10 @@ format:
 # layer (frontend/src/api, including the generated types.ts) only. The rest of
 # the frontend is JavaScript and .vue files are not checked yet.
 type-check:
-	cd backend && uv run mypy app/
-	cd frontend && npm run type-check
+	$(HEAVY) sh -c 'cd backend && uv run mypy app/ && cd ../frontend && npm run type-check'
 
 build:
-	$(COMPOSE_PROD) build
+	$(HEAVY) sh -c '$(COMPOSE_PROD) build'
 
 clean:
 	-$(COMPOSE_DEV) down -v

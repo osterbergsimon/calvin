@@ -139,6 +139,7 @@ import { pluginKindKey } from "@/utils/pluginKind";
 import { isOfficialCatalogRepo } from "@/utils/pluginCatalog";
 import { errorDetailMessage } from "@/utils/apiErrors";
 import { isNewerVersion } from "@/utils/pluginVersions";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 
 // Use composables
 const {
@@ -297,7 +298,7 @@ const afterInstall = async installedIds => {
   await nextTick();
   document
     .querySelector(`[data-plugin-id="${CSS.escape(first.id)}"]`)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    ?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
 
   const names = installed.map(p => p.name || p.id).join(", ");
   const stillOff = first.type !== "theme" && !first.enabled;
@@ -481,8 +482,9 @@ const cancelDisable = () => {
   pendingDisable.value = null;
 };
 
-// Sources live in Content (§3.1): both "Used by n sources" and "Add a source"
-// open that section with this provider's rows highlighted.
+// Sources live in Content (§3.1), clock bar info beside the clock bar in
+// Dashboard: both "Used by n sources" and "Add a source" open that section
+// with this provider's rows highlighted.
 const CONTENT_SECTION_BY_KIND = {
   calendar: "content-calendars",
   image: "content-photos",

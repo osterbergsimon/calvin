@@ -6,7 +6,6 @@ const stubs = {
   CalendarSourcesTab: true,
   ImagesTab: true,
   ServicesTab: true,
-  ClockBarSources: true,
 };
 const baseConfig = {
   photoRotationInterval: 30,
@@ -25,17 +24,18 @@ const baseConfig = {
 };
 
 describe("ContentSettings", () => {
-  it("renders one section per thing you see, including clock bar info", () => {
+  it("renders one section per thing you see; clock bar info sits with the clock bar", () => {
     const wrapper = mount(ContentSettings, { props: { config: baseConfig }, global: { stubs } });
     for (const id of [
       "content-calendars",
       "content-calendar-display",
       "content-photos",
       "content-services",
-      "content-clock-bar",
     ]) {
       expect(wrapper.find(`#section-${id}`).exists()).toBe(true);
     }
+    // Moved to Dashboard, next to the editor that places the tiles.
+    expect(wrapper.find("#section-content-clock-bar").exists()).toBe(false);
   });
 
   it("puts the photo sources in Photos and names the service section plainly", () => {

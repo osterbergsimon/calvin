@@ -602,6 +602,37 @@
         </InlineNote>
       </SettingsSection>
 
+      <!-- The button-press label is this screen's; how long it stays, the
+           bindings and the reboot keys are the same on every screen. -->
+      <SettingsSection id="screen-remote" title="Remote & keys">
+        <template v-for="descriptor in visibleRemoteDescriptors" :key="descriptor.key">
+          <ScreenSettingRow
+            :id="rowAnchorId(descriptor.key)"
+            :descriptor="descriptor"
+            :value="remote[descriptor.key]"
+            :overridden="Boolean(remoteOverridden[descriptor.key])"
+            @set="value => setRemote(descriptor.key, value)"
+            @reset="() => resetRemote(descriptor.key)"
+          />
+        </template>
+        <SettingRow
+          label="Shared by every screen"
+          description="Hide label after, button bindings and the reboot keys."
+          data-test="screen-remote-shared"
+        >
+          <Button data-test="open-default-remote" @click="openDefaultRemote">Open Default</Button>
+        </SettingRow>
+        <InlineNote
+          v-if="remoteMsg"
+          class="screens-saved"
+          :tone="toneFor(remoteMsg)"
+          role="status"
+          aria-live="polite"
+        >
+          {{ remoteMsg }}
+        </InlineNote>
+      </SettingsSection>
+
       <SettingsSection id="screen-behaviour" title="Behaviour">
         <ScreenSettingRow
           v-for="descriptor in visibleBehaviourDescriptors"
@@ -727,7 +758,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, provide, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { SECTION_FOCUS_INDEX, useSettingsPhoneNav } from "@/composables/useSettingsPhoneNav";
 import { mdiAlert, mdiCheck } from "@mdi/js";
@@ -777,6 +808,7 @@ import ScopeLine from "@/components/ui/ScopeLine.vue";
 import BrightnessGroup from "@/components/settings/shared/BrightnessGroup.vue";
 import DisplayCheckDialog from "@/components/settings/shared/DisplayCheckDialog.vue";
 import { clampBrightness, dimSeconds, firstBrightness } from "@/utils/brightness";
+import { scrollBehavior } from "@/utils/scrollIntoViewMotion";
 import SegmentedControl from "@/components/ui/SegmentedControl.vue";
 import Tag from "@/components/ui/Tag.vue";
 import TextField from "@/components/ui/TextField.vue";
@@ -804,6 +836,12 @@ const props = defineProps({
   // A ?setting= deep link that lands inside the Default page (§8). The old
   // All-screens destinations keep working: they open Default at that section.
   initialSection: { type: String, default: null },
+  // The destination id of that deep link. Section ids alone cannot say which
+  // page to open: Default and a screen's own page share them, and the remote's
+  // per-screen row (screen-remote) and its shared rows (device-notifications,
+  // device-reboot) are all in "device-remote". The destination distinguishes
+  // them.
+  initialSetting: { type: String, default: null },
 });
 const emit = defineEmits(["update:config"]);
 
@@ -821,14 +859,22 @@ const editorOpen = ref(false);
 
 // --- which page is open ----------------------------------------------------
 // null (the list) · "default" · "browser" · a screen id on a kiosk selection.
-// These sections exist on both the Default page and a screen's own page, so a
-// deep link can open the right one for the device: a kiosk opens its own page,
-// any other browser opens Default.
+// A deep link opens a page depending on where its destination lives: the
+// per-screen Look, Effects and Controls sections, and the screen's own remote
+// row (screen-remote), open the kiosk's own page; everything else opens
+// Default, including the remote's shared rows (device-notifications,
+// device-reboot), which are the same on every screen and live on Default. On a
+// plain browser every destination opens Default. Default calls the remote
+// section device-remote while a screen's own page calls it screen-remote, so
+// the per-screen row maps to that id on a kiosk.
 const INITIAL_PER_SCREEN_SECTIONS = new Set(["screen-look", "screen-effects", "screen-controls"]);
+const PER_SCREEN_DESTINATIONS = new Set(["screen-remote"]);
+const PER_SCREEN_SECTION_IDS = { "device-remote": "screen-remote" };
 const DEFAULT_SECTION_IDS = new Set([
   "layout",
   "device-power",
   "device-keyboard",
+  "device-remote",
   "device-behaviour",
   "screen-look",
   "screen-effects",
@@ -846,13 +892,19 @@ const sectionIndex = [
   { id: "screen-controls", label: "Controls" },
   { id: "screen-power", label: "Power" },
   { id: "screen-touch", label: "Touch & keyboard" },
+  { id: "screen-remote", label: "Remote & keys" },
   { id: "screen-behaviour", label: "Behaviour" },
   { id: "screen-software", label: "Software" },
 ];
 const initialOwnScreenId =
-  props.initialSection && INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) && kioskId
+  kioskId &&
+  (INITIAL_PER_SCREEN_SECTIONS.has(props.initialSection) ||
+    PER_SCREEN_DESTINATIONS.has(props.initialSetting))
     ? kioskId
     : null;
+// On a kiosk the remote rows live under the screen page's own section id.
+const initialSectionId =
+  (initialOwnScreenId && PER_SCREEN_SECTION_IDS[props.initialSection]) || props.initialSection;
 const selection = ref(
   initialOwnScreenId
     ? { kind: "screen", id: initialOwnScreenId }
@@ -899,6 +951,7 @@ const PHONE_SECTION_TITLES = {
   layout: "Display",
   "device-power": "Power",
   "device-keyboard": "Touch & keyboard",
+  "device-remote": "Remote & keys",
   "device-behaviour": "Behaviour",
   "screen-remove": "Remove screen",
 };
@@ -969,7 +1022,7 @@ async function syncInitialPhoneRoute() {
     // `category` too: a deep link arrives as ?setting= alone, and without a
     // category the page would read as the phone's category list.
     await phoneNav.open(
-      { category: "screens", screen: selectionKey.value, section: props.initialSection || null },
+      { category: "screens", screen: selectionKey.value, section: initialSectionId || null },
       { replace: true }
     );
   }
@@ -1004,6 +1057,7 @@ const effectsMsg = ref("");
 const controlsMsg = ref("");
 const powerMsg = ref("");
 const touchMsg = ref("");
+const remoteMsg = ref("");
 const behaviourMsg = ref("");
 const footerMsg = ref("");
 const overridesQueue = computed(() =>
@@ -1136,6 +1190,7 @@ const footerCopy = computed(() => {
 });
 
 function clearMessages() {
+  remoteMsg.value = "";
   nameMsg.value = "";
   pagesMsg.value = "";
   lookMsg.value = "";
@@ -1731,6 +1786,56 @@ function resetControl(key) {
   persistControls(next);
 }
 
+// --- Remote & keys: the button-press label --------------------------------
+// Per screen, like Controls. The shared rows (Hide label after, bindings,
+// reboot keys) are on Default only; this page points there.
+const remoteDescriptors = descriptorsForSection("remote");
+const remoteOverridden = computed(() =>
+  Object.fromEntries(
+    remoteDescriptors.map(descriptor => [descriptor.key, descriptor.key in overrides.value])
+  )
+);
+const remote = computed(() =>
+  Object.fromEntries(
+    remoteDescriptors.map(descriptor => [
+      descriptor.key,
+      descriptor.key in overrides.value
+        ? overrides.value[descriptor.key]
+        : (props.config[descriptor.key] ?? descriptor.defaultValue),
+    ])
+  )
+);
+const visibleRemoteDescriptors = computed(() =>
+  visibleDescriptors(remoteDescriptors, remote.value)
+);
+function persistRemote(next) {
+  persist(next, remoteMsg, APPLIED_BY_PAGE, OFFLINE_COPY);
+}
+function setRemote(key, value) {
+  persistRemote({ ...overrides.value, [key]: value });
+}
+function resetRemote(key) {
+  const next = { ...overrides.value };
+  delete next[key];
+  persistRemote(next);
+}
+async function openDefaultRemote() {
+  if (phoneNavOn.value) {
+    await phoneNav.open({ screen: "default", section: "device-remote" });
+    return;
+  }
+  openDefault();
+  await nextTick();
+  scrollSectionToTop(document.getElementById("section-device-remote"));
+}
+
+// A deep link brings its section into view. The shared helper hands someone
+// who asked for less motion the jump, not the scroll.
+function scrollSectionToTop(section) {
+  if (!section || typeof section.scrollIntoView !== "function") return;
+  section.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+}
+
 // --- Behaviour: photo frame, loading light and layout (§4) -----------------
 // These rows moved here from Dashboard › Focus & remote; the keys stay the
 // same, so a screen's existing override (or this browser's stored choice) is
@@ -1966,7 +2071,15 @@ onMounted(async () => {
   await store.loadKiosks();
   kiosksLoaded.value = true;
   if (phoneNavOn.value && route.query.screen) applyRouteScreen(route.query.screen);
-  if (initialOwnScreenId) await select(initialOwnScreenId);
+  if (initialOwnScreenId) {
+    await select(initialOwnScreenId);
+    // The remote's anchor has a different id on a screen's own page; Settings.vue
+    // could only scroll to Default's, so open the screen's section here.
+    if (initialSectionId !== props.initialSection) {
+      await nextTick();
+      scrollSectionToTop(document.getElementById(`section-${initialSectionId}`));
+    }
+  }
   if (kiosks.value.length === 0) addOpen.value = true;
   // Fetch all versions concurrently, then commit ONCE — writing the map inside
   // each concurrent callback races (each spreads a stale base, last write wins,

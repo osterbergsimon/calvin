@@ -9,6 +9,66 @@ architecture). To avoid that, all guidance is maintained in one place.
 👉 **Read [CLAUDE.md](CLAUDE.md).** It covers the stack, the plugin system, conventions,
 gotchas, a file map, and links to the deeper docs under [docs/](docs/).
 
+## Project facts for agents
+
+Facts that [CLAUDE.md](CLAUDE.md) does not cover. Where they disagree, CLAUDE.md wins.
+
+**Branches.** Open every PR into `develop`. `main` only receives the promote PR
+(develop to main) and release-please PRs. Use Conventional Commits with scopes
+`backend`, `frontend`, `plugins`, `kiosk`, `docker`, `docs`, `scripts`.
+
+**Checks.** Run the ones for the side you touched; [CONTRIBUTING.md](CONTRIBUTING.md)
+"Quality gates" and `.github/workflows/ci.yml` are the source of truth.
+
+- Backend: `uv run ruff check .`, `uv run ruff format --check .`,
+  `uv run mypy app --ignore-missing-imports`, `uv run bandit -r app -ll` (CI only), `uv run pytest -q`.
+  The plugin contract test needs a calvin-plugins checkout: it finds `../calvin-plugins`
+  or `CALVIN_PLUGINS_DIR`, and skips without one. A skipped contract test is not a pass; say so.
+- Frontend: `npm run lint`, `npx prettier --check "src/**/*.{js,jsx,vue,json,css}"`,
+  `npm run type-check`, `npx vitest run`, `npm run build` (its postbuild step enforces the bundle budget).
+- After an API schema change, run `npm run gen:api` and commit `frontend/src/api/types.ts`
+  (CI fails if it is stale). The generated file is not hand-edited.
+- UI change: `npm run test:e2e:a11y`. Docs change: `mkdocs build --strict` (command in CONTRIBUTING.md).
+  `scripts/` change: `cd scripts && bats tests/` (needs bats).
+- Before opening a PR: `scripts/check-commit-attribution.sh origin/develop..HEAD`.
+
+**Do not run.**
+
+- `make clean` deletes dev data, `.venv`, `node_modules` and `dist`.
+- `make dev`, `make dev-down` and `make build` need Docker.
+- `make demo-seed` and `make demo-clear` write to a data dir.
+- `scripts/setup*.sh`, `update-calvin.sh`, `bake-kiosk-firstrun.sh`, `install-git-hooks.sh`,
+  `reboot-calvin.sh` and `restart-calvin-services.sh` change or reboot the host.
+  Run their bats tests only.
+
+**Playwright.** The e2e suite starts a Vite dev server on port 5173. Set
+`E2E_PORT=<free port>` so parallel runs do not clash, and run one e2e project at a time.
+
+**Private data.** Never read, print or commit `data/`, `backend/data/` (DB, images, plugins,
+`kiosk-signing.key`, `setup-code.txt`), `docker/.env`, `.env*`, `.beads/` or `.dolt/`.
+
+**Host-acting routes.** In `backend/app/api/routes/system.py`: `/update`, `/display/power/*`,
+`/display/timeout/configure`, `/reload-ui`, `/restart-frontend`, `/restart-backend`, `/reboot`.
+The same goes for `backend/app/services/display_*` and `scripts/`. Tests stub these, in the
+browser by route interception as the a11y suite does. Never call them for real.
+
+**Public repo.** Keep these out of commits and PR text: secrets, setup codes, signing keys,
+API keys, real hostnames, IPs, home-directory paths, calendar or photo data, and AI attribution
+(CI rejects it). Security issues go through [SECURITY.md](SECURITY.md), never a public issue.
+
+**Highest-risk paths** (a mistake here hurts most; take extra care and add tests):
+`backend/app/security/`, `api/routes/{auth,system,backup,security,kiosks}.py`,
+`services/backup/`, `services/kiosk_*.py`, `services/plugin_installer.py`,
+`services/theme_installer.py`, `services/validation/`, `backend/alembic/`, `scripts/*.sh`
+(run as root on the Pi) and `.gitignore` (it keeps the signing key, setup code and `.env` out of git).
+The same goes for anything that changes the plugin contract (`api_version`, `PluginMetadata`,
+`SUPPORTED_DISPLAY_KINDS`), since calvin-plugins depends on it.
+
+**Where decisions live.** Design decisions are in `docs/design/` (including `frontend-doctrine.md`);
+change them only when an issue says so. The plugin contract is in
+`backend/app/plugins/definitions.py`, and the API contract snapshot is
+`backend/tests/contract/openapi.json`, the source of `frontend/src/api/types.ts`.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker
 
@@ -64,9 +124,3 @@ This protocol applies when ending a Beads implementation workflow. It is subordi
 - Do not commit or push without clear authority from the active profile or the current user request.
 - If a required sync or push is blocked, stop and report the exact command and error.
 <!-- END BEADS INTEGRATION -->
-
-<!-- lane-control:begin -->
-## lane-control
-
-This project is run with lane-control. Its adapted files are in `.lane-control/`: read them before you start work.
-<!-- lane-control:end -->

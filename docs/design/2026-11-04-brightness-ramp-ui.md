@@ -39,8 +39,9 @@ Rows, in order:
    - **Without a menu match**, the slider is on Calvin's scale (DDC 0–100): "19 (Calvin's scale)", with a link,
      "Match it to the panel's own menu", that opens the display check.
    - **The highest value you can pick** is the limit. The range between that and the limit is drawn
-     hatched and can't be reached, with the limit marked and labelled. The note under the slider says "You can go up
-     to 67 on the screen's menu (Calvin 22). Above that is too close to the limit the display check found on 4 Nov."
+     hatched and can't be reached, with the limit marked and labelled "highest 67". The note under the slider says
+     "Calvin never goes above your highest level." (calvin-hts5: the limit is the ceiling itself, so the old "too close
+     to the limit" wording went.)
      When no limit has been found, there is no hatch, and the note says "No limit found yet. Run the display check to
      set one" (a link that opens it).
    - **Moving the slider applies now** (owner answer 1). The note changes to "Changing… 61 → 67 on the screen's menu,
@@ -54,10 +55,20 @@ Rows, in order:
    - **History** opens a short list of the last 20 ramps and checks, newest first: the time, what triggered it, the
      result and the level reached.
 4. **Display check.** One line summarising the latest check: "Answers brightness commands · changes take effect · menu
-   match from 3 readings · limit 26 (4 Nov)". The button is **Check this display…**. Before any check has run, the line
-   says "Not checked yet".
-   - **Lowest.** A second line shows the floor the check found: "Lowest: Panel 10 (Calvin 2)", the lowest Calvin dims
-     to, including the dim sleep. It shows only while a floor is saved.
+   match from 3 readings · checked 4 Nov · highest 26". The button is **Check this display…**. Before any check has run,
+   the line says "Not checked yet". "checked <date>" describes the check's findings and is left out when there is no
+   date; the highest level is plain because the backend does not record which limit the check saved (a follow-up issue
+   tracks that marker).
+   - **Highest and lowest** (calvin-hts5) is its own row once a limit is saved: "Highest 67 · Lowest 10 · panel's own
+     menu" (Calvin's scale without a match), with **Change**. Change reveals two steppers, in panel numbers converted
+     with the saved readings (Highest rounded down, Lowest to the nearest), with the Calvin value beside each.
+     Lowering Highest saves at once and, in the same change, brings the everyday level and the floor down to it.
+     Raising Highest saves nothing until **Raise to N** is pressed: an amber note says a level above the saved one
+     can cut the power and that only the display check proves it, with **Keep N** and **Run the display check**. When
+     the new level reaches a level with recorded power trouble (`powerTrouble.level`, or `panelLevel` on the menu
+     scale), the note turns red and says the Pi can crash and may not start until the panel's USB is unplugged.
+     Lowest can't go above the everyday level (the agent ramps to at least the floor), so editing either level never
+     makes Calvin write a level above the current one.
    - **Clear calibration** sits next to the limit's note and replaces the old "Clear limit". It clears the readings,
      the limit and the floor together (`brightnessConversion`, `brightnessLimit`, `brightnessFloor`). The brightness
      keeps its value, and the slider falls back to Calvin's scale.
@@ -299,8 +310,8 @@ Nothing is saved from an unfinished run.
 ## 4. Words
 
 Use these words everywhere: **Ramp brightness at sleep and wake**, **Brightness**, **Display check** / **Check this
-display…**, **menu match**, **safe limit** / **limit**, **Changing…**, **Dimming… then off**, **Applies when {screen}
-wakes**, **Last wake**.
+display…**, **menu match**, **safe limit** / **limit**, **highest N** / **lowest N** (the two levels), **Changing…**,
+**Dimming… then off**, **Applies when {screen} wakes**, **Last wake**.
 
 Users see "Calvin value", never "DDC" (the only exception is the No DDC message, which names DDC/CI because the
 screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-out". The log says "under-voltage",
@@ -313,6 +324,10 @@ screen's own menu uses that word). Avoid "VCP", "i2c", "throttled" and "brown-ou
 - **Live progress** in steps 2 and 4, the status line (§3.1 rule 5) and the Changing… notes go in a polite live
   region. A power-trouble banner is announced once with `role="alert"`. Log lines are not announced
   one by one; only the result is.
+- **The Highest raise note** (calvin-hts5) is in a polite live region that is already in the page while the editor is
+  open, so the warning is announced when the level passes the saved one. **Keep** and **Raise** remove their own
+  buttons, so focus returns to the Highest stepper; the level editors are therefore reachable and usable by keyboard
+  alone.
 - **Touch targets are at least 44 px**, which matters on the 3B+ panel and on phones. **Stop now** is at least 48 px
   high.
 - **The number field in step 3** uses `inputmode="numeric"`, so on the kiosk the on-screen keyboard opens with the

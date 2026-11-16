@@ -5,7 +5,9 @@
         {{ copy }} {{ shortVersion(availableVersion) }}.
       </InlineNote>
     </template>
-    <Button data-test="open-kiosks" @click="openKiosks">Open Kiosks</Button>
+    <!-- Kiosk updates live in Screens (Update all, and each screen's
+         Software); System only points there. -->
+    <Button data-test="open-kiosks" @click="openKiosks">Open Screens</Button>
   </SettingRow>
 </template>
 
