@@ -7,7 +7,7 @@ DEV_PROJECT ?= calvin-dev-$(shell basename "$(CURDIR)" | tr 'A-Z' 'a-z' | tr -c 
 COMPOSE_DEV := docker compose -p $(DEV_PROJECT) -f docker/docker-compose.dev.yml
 COMPOSE_PROD := docker compose -f docker/docker-compose.yml
 
-# Machine-wide limit on heavy jobs (builds, tests, lint): used when the host
+# Machine-wide limit on heavy jobs (builds, tests, type-checks); quick lint and format steps run without it: used when the host
 # has lane-heavy, empty (no effect) otherwise.
 HEAVY := $(firstword $(wildcard $(HOME)/.agents/bin/lane-heavy))
 
@@ -76,7 +76,8 @@ test-coverage:
 	$(HEAVY) sh -c 'cd backend && uv sync --extra dev && uv run pytest --cov=app --cov-report=html --cov-report=term && cd ../frontend && npm run test:coverage'
 
 lint:
-	$(HEAVY) sh -c 'cd backend && uv run ruff check . && cd ../frontend && npm run lint'
+	cd backend && uv run ruff check .
+	cd frontend && npm run lint
 
 format:
 	cd backend && uv run ruff format .
