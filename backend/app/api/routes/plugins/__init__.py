@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter
 
+from .actions import router as actions_router
 from .config import router as config_router
 from .github import router as github_router
 from .instances import router as instances_router
@@ -11,6 +12,7 @@ from .static_assets import router as static_assets_router
 # Create main router and include all sub-routers
 router = APIRouter()
 
+router.include_router(actions_router)
 router.include_router(config_router)
 router.include_router(github_router)
 router.include_router(instances_router)

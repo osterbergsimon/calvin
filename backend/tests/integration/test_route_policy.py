@@ -156,3 +156,19 @@ def test_the_app_gates_guest_bodies_before_routing():
     assert GuestGateMiddleware in classes
     # Host/Origin stays outermost: it is added after the gate.
     assert classes.index(HostOriginMiddleware) < classes.index(GuestGateMiddleware)
+
+
+def test_plugin_action_route_is_a_public_write():
+    assert ("POST", "/api/plugins/{plugin_id}/actions/{action}") in PUBLIC_WRITES
+
+
+def test_only_fetch_and_actions_are_public_plugin_writes():
+    plugin_writes = {e for e in PUBLIC_WRITES if e[1].startswith("/api/plugins")}
+    assert plugin_writes == {
+        ("POST", "/api/plugins/{plugin_id}/fetch"),
+        ("POST", "/api/plugins/{plugin_id}/actions/{action}"),
+    }
+
+
+def test_plugin_action_template_matches_a_real_route():
+    assert ("POST", "/api/plugins/{plugin_id}/actions/{action}") in _policy_route_index()

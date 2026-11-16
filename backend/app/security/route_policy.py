@@ -29,6 +29,10 @@ PUBLIC_WRITES = frozenset(
         ("POST", "/api/images/previous"),
         ("POST", "/api/calendar/refresh"),
         ("POST", "/api/plugins/{plugin_id}/fetch"),
+        # Runs only an action the plugin declared, with params the host
+        # validated; the plugin enforces its own allowlist (homey switch
+        # tiles §2). Host/Origin checks still apply.
+        ("POST", "/api/plugins/{plugin_id}/actions/{action}"),
         ("POST", "/api/system/display/power/on"),
         ("POST", "/api/system/display/power/off"),
         # Body keys are restricted to CONFIG_DISPLAY_KEYS in the route itself.
