@@ -367,12 +367,231 @@ describe("useSystem", () => {
 
       expect(FakeEventSource.last.closed).toBe(false);
       expect(system.updateStatus.value.phase).toBe("pulling_code");
-      expect(system.updateMessage.value).toBe("Pulling latest code");
+      // The phase in plain words, not the script's own message (CLV-63).
+      expect(system.updateMessage.value).toBe("Downloading the update…");
+      expect(system.updateStage.value).toBe("running");
 
       await fireStreamEvent({ type: "status", status: "complete" });
       await promise;
 
       expect(system.updateMessageClass.value).toBe("success");
+    });
+
+    it("ignores a second Update now while one is running", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      vi.useRealTimers();
+
+      const system = useSystem();
+      const first = system.triggerUpdate();
+      while (!FakeEventSource.last) {
+        await Promise.resolve();
+      }
+
+      await system.triggerUpdate();
+
+      expect(systemApi.triggerUpdate).toHaveBeenCalledTimes(1);
+
+      FakeEventSource.last.onmessage({ data: JSON.stringify({ type: "status", status: "error" }) });
+      await first;
+    });
+
+    it("starts no second polling loop when asked about a running update", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await fireStreamEvent({ type: "status", status: "running", phase: "pulling_code" });
+
+      // pollUpdateStatus is for an update this page did not start; the running
+      // one already follows its own stream.
+      const polling = system.pollUpdateStatus();
+      expect(systemApi.getUpdateStatus).not.toHaveBeenCalled();
+      await polling;
+
+      await fireStreamEvent({ type: "status", status: "error" });
+      await promise;
+      expect(system.updateMessageClass.value).toBe("error");
+    });
+  });
+
+  describe("triggerUpdate when the live stream drops", () => {
+    const dropStream = async () => {
+      while (!FakeEventSource.last) {
+        await Promise.resolve();
+      }
+      FakeEventSource.last.onerror();
+    };
+
+    it("does not call a dropped stream a finished update: it asks the server", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      systemApi.getUpdateStatus
+        .mockResolvedValueOnce({ status: "running", phase: "refreshing_host" })
+        .mockResolvedValueOnce({ status: "idle", phase: "complete" });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Still updating after the drop: no "up to date" while the server runs.
+      expect(system.updating.value).toBe(true);
+      expect(system.updateMessage.value).not.toBe("Calvin is up to date.");
+      expect(system.updateMessage.value).toBe("Installing…");
+
+      await vi.runAllTimersAsync();
+      await promise;
+      expect(systemApi.getUpdateStatus).toHaveBeenCalledTimes(2);
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+      expect(system.updating.value).toBe(false);
+    });
+
+    it("reports a failure the server recorded after the stream dropped", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getUpdateStatus.mockResolvedValue({ status: "error", phase: "rollback" });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(0);
+      await promise;
+
+      expect(systemApi.getHealth).not.toHaveBeenCalled();
+      expect(system.updateMessage.value).toBe(
+        "The update didn't finish. Calvin is still on the previous version."
+      );
+      expect(system.updateMessageClass.value).toBe("error");
+      expect(system.updating.value).toBe(false);
+      // A failure clears itself after a while, as before.
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(system.updateMessage.value).toBe("");
+    });
+
+    it("waits for Calvin while it restarts, then confirms", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth
+        .mockRejectedValueOnce(new Error("Network Error"))
+        .mockResolvedValue({ status: "healthy" });
+      systemApi.getUpdateStatus
+        .mockRejectedValueOnce(new Error("Network Error"))
+        .mockResolvedValueOnce({ status: "idle" });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(system.updateMessage.value).toBe("Calvin is restarting. This takes about 15 seconds.");
+
+      await vi.runAllTimersAsync();
+      await promise;
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+    });
+
+    it("does not say Calvin is restarting when only the status check fails", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      const error = new Error("Request failed with status code 500");
+      error.response = { status: 500 };
+      systemApi.getUpdateStatus.mockRejectedValueOnce(error).mockResolvedValueOnce({
+        status: "idle",
+      });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Calvin answered the health check, so the restart hasn't happened yet.
+      expect(systemApi.getHealth).toHaveBeenCalled();
+      expect(system.updateMessage.value).toBe("Checking on the update…");
+      expect(system.updateMessage.value).not.toBe(
+        "Calvin is restarting. This takes about 15 seconds."
+      );
+
+      await vi.runAllTimersAsync();
+      await promise;
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+    });
+
+    it("shows the checking wording when the status is unknown but Calvin answers", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      systemApi.getUpdateStatus
+        .mockResolvedValueOnce({ status: "unknown" })
+        .mockResolvedValueOnce({ status: "idle" });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(system.updateMessage.value).toBe("Checking on the update…");
+
+      await vi.runAllTimersAsync();
+      await promise;
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+    });
+
+    it("gives up after ten minutes with the taking-longer message", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      systemApi.getUpdateStatus.mockResolvedValue({ status: "unknown" });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 10 * 1000);
+      await promise;
+
+      expect(system.updateMessage.value).toBe(
+        "The update is taking longer than usual. Leave it running and check back later."
+      );
+      expect(system.updateMessageClass.value).toBe("warning");
+      expect(system.updateStage.value).toBe("slow");
+      expect(system.updating.value).toBe(false);
+    });
+
+    it("follows the server when the stream fails before any event arrives", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      systemApi.getHealth.mockResolvedValue({ status: "healthy" });
+      systemApi.getUpdateStatus
+        .mockResolvedValueOnce({ status: "running", phase: "pulling_code" })
+        .mockResolvedValueOnce({ status: "idle" });
+
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+
+      // No event ever arrives: the connection just fails.
+      await dropStream();
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(system.updateStage.value).toBe("running");
+      expect(system.updateMessage.value).toBe("Downloading the update…");
+      expect(system.updateMessage.value).not.toBe("Calvin is up to date.");
+
+      await vi.runAllTimersAsync();
+      await promise;
+      expect(systemApi.getUpdateStatus).toHaveBeenCalledTimes(2);
+      expect(system.updateMessage.value).toBe("Calvin is up to date.");
+    });
+
+    it("says in plain words when the update is going back to the previous version", async () => {
+      systemApi.triggerUpdate.mockResolvedValue({ log_offset: 0 });
+      vi.useRealTimers();
+      const system = useSystem();
+      const promise = system.triggerUpdate();
+      while (!FakeEventSource.last) {
+        await Promise.resolve();
+      }
+      FakeEventSource.last.onmessage({
+        data: JSON.stringify({ type: "status", status: "running", phase: "rollback" }),
+      });
+      expect(system.updateMessage.value).toBe(
+        "The new version didn't start. Going back to the previous one…"
+      );
+      FakeEventSource.last.onmessage({ data: JSON.stringify({ type: "status", status: "error" }) });
+      await promise;
+      expect(system.updateMessageClass.value).toBe("error");
     });
   });
 

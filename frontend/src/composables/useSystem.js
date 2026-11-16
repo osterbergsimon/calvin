@@ -2,11 +2,21 @@
  * Composable for system operations (display, restart, updates).
  */
 
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import * as systemApi from "../services/systemApi";
 import { errorDetailMessage } from "../utils/apiErrors";
 import { friendlyError } from "../utils/friendlyError";
+import {
+  UPDATE_IDLE,
+  isUpdateBusy,
+  nextUpdate,
+  serverStatusEvent,
+  updateView,
+} from "../utils/updateLifecycle";
 
+// Calvin's own update: one state (utils/updateLifecycle.js); `updating` and
+// the message refs below are derived from it by sendUpdate.
+const updateLife = ref(UPDATE_IDLE);
 // Singleton refs so any component using useSystem() shares the same status
 const updating = ref(false);
 const updateStatus = ref(null);
@@ -64,10 +74,6 @@ export function useSystem() {
   const displayTimeoutEnabled = ref(false);
 
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-  const isUpdateDoneStatus = status => status === "idle";
-  const isUpdateRunningStatus = status => status === "running";
-  const isUpdateErrorStatus = status => status === "error";
 
   const waitForBackendHealthy = async ({ timeoutMs = 120000, intervalMs = 2000 } = {}) => {
     const startedAt = Date.now();
@@ -216,6 +222,20 @@ export function useSystem() {
 
   // System updates
 
+  // Move the update to its next state and show what that state says. The
+  // only writer of `updating` and, during an update, of the message line.
+  const sendUpdate = event => {
+    const next = nextUpdate(updateLife.value, event);
+    if (next === updateLife.value) return;
+    updateLife.value = next;
+    updating.value = isUpdateBusy(next);
+    const view = updateView(next);
+    _cancelMessageClear();
+    updateMessage.value = view.message;
+    updateMessageClass.value = view.tone;
+    if (view.clearAfterMs) _scheduleMessageClear(view.clearAfterMs);
+  };
+
   const streamUpdateStatus = logOffset => {
     return new Promise(resolve => {
       const es = new EventSource(systemApi.getUpdateStreamUrl(logOffset));
@@ -231,20 +251,7 @@ export function useSystem() {
               status: "running",
               last_log: logLines.slice(-80).join("\n"),
             };
-            const line = data.line.toLowerCase();
-            if (line.includes("pulling latest code") || line.includes("fetching latest")) {
-              updateMessage.value = "Downloading the update…";
-            } else if (line.includes("updating") && line.includes("dependenc")) {
-              updateMessage.value = "Installing…";
-            } else if (
-              line.includes("building frontend") ||
-              (line.includes("vite") && line.includes("build"))
-            ) {
-              updateMessage.value = "Preparing the screens. This can take a few minutes.";
-            } else if (line.includes("restarting")) {
-              updateMessage.value = "Restarting Calvin…";
-            }
-            updateMessageClass.value = "info";
+            sendUpdate({ type: "log", line: data.line });
           } else if (data.type === "status") {
             if (data.state) {
               updateStatus.value = {
@@ -254,8 +261,11 @@ export function useSystem() {
               };
             }
             if (data.status === "running") {
-              updateMessage.value = data.message || "Update in progress…";
-              updateMessageClass.value = "info";
+              sendUpdate({
+                type: "progress",
+                phase: data.phase ?? data.state?.phase,
+                message: data.message,
+              });
               return;
             }
             es.close();
@@ -276,59 +286,29 @@ export function useSystem() {
     });
   };
 
-  const triggerUpdate = async () => {
-    updating.value = true;
-    updateMessage.value = "";
-    updateMessageClass.value = "";
-    updateStatus.value = null;
-    _cancelMessageClear();
+  // The script finished: Calvin restarts on the new version; say so only once
+  // it answers again.
+  const confirmRestart = async () => {
+    const healthy = await waitForBackendHealthy();
+    sendUpdate({ type: healthy ? "healthy" : "notHealthy" });
+  };
 
+  // A status answer we can't use (a 5xx, or "unknown" while the new version
+  // starts) says nothing about Calvin itself. Ask /health: if it answers, the
+  // update is merely being checked on; only silence means Calvin is restarting.
+  const noteUpdateChecking = async () => {
     try {
-      const response = await systemApi.triggerUpdate();
-      const logOffset = response.log_offset ?? 0;
-      updateMessage.value = "Update started.";
-      updateMessageClass.value = "info";
-      updateStatus.value = {
-        status: "running",
-        last_log: "",
-        message: "Starting...",
-      };
-
-      const result = await streamUpdateStatus(logOffset);
-
-      if (result.status === "complete" || result.status === "disconnected") {
-        updateMessage.value = "Update installed. Waiting for Calvin to restart…";
-        updateMessageClass.value = "info";
-        const healthy = await waitForBackendHealthy();
-        if (healthy) {
-          updateMessage.value = "Calvin is up to date.";
-          updateMessageClass.value = "success";
-        } else {
-          updateMessage.value =
-            "Update installed, but Calvin hasn't restarted yet. Give it a minute.";
-          updateMessageClass.value = "warning";
-        }
-      } else if (result.status === "error") {
-        updateMessage.value = "The update didn't finish. Calvin is still on the previous version.";
-        updateMessageClass.value = "error";
-        _scheduleMessageClear(8000);
-      } else {
-        updateMessage.value =
-          "The update is taking longer than usual. Leave it running and check back later.";
-        updateMessageClass.value = "warning";
-        _scheduleMessageClear(12000);
-      }
-    } catch (error) {
-      console.error("Failed to trigger update:", error);
-      updateMessage.value = friendlyError(error, "start the update");
-      updateMessageClass.value = "error";
-      _scheduleMessageClear(8000);
-    } finally {
-      updating.value = false;
+      await systemApi.getHealth();
+      sendUpdate({ type: "reachable" });
+    } catch {
+      sendUpdate({ type: "unreachable" });
     }
   };
 
-  const pollUpdateStatus = async () => {
+  // Follow an update through the status endpoint until it settles: after the
+  // live stream drops (Calvin restarting cuts it), or for an update this page
+  // did not start. A failed status check is not the end of the update.
+  const followUpdate = async () => {
     const timeoutMs = 10 * 60 * 1000; // 10 minutes
     const pollIntervalMs = 5000;
     const startedAt = Date.now();
@@ -337,52 +317,64 @@ export function useSystem() {
       try {
         const status = await systemApi.getUpdateStatus();
         updateStatus.value = status;
-
-        if (isUpdateDoneStatus(status.status)) {
-          // Script says update is complete; confirm backend is reachable after restart.
-          updateMessage.value = "Update installed. Waiting for Calvin to restart…";
-          updateMessageClass.value = "info";
-
-          const healthy = await waitForBackendHealthy();
-          if (!healthy) {
-            updateMessage.value =
-              "Update installed, but Calvin hasn't restarted yet. Give it a minute.";
-            updateMessageClass.value = "warning";
-            return;
-          }
-
-          updateMessage.value = "Calvin is up to date.";
-          updateMessageClass.value = "success";
+        const event = serverStatusEvent(status);
+        if (event) sendUpdate(event);
+        if (event?.type === "installed") {
+          await confirmRestart();
           return;
         }
-
-        if (isUpdateErrorStatus(status.status)) {
-          updateMessage.value =
-            "The update didn't finish. Calvin is still on the previous version.";
-          updateMessageClass.value = "error";
-          _scheduleMessageClear(8000);
-          return;
-        }
-
-        if (isUpdateRunningStatus(status.status)) {
-          updateMessage.value = status.message || "Update in progress…";
-          updateMessageClass.value = "info";
-        }
+        if (event?.type === "failed") return;
+        if (!event) await noteUpdateChecking();
       } catch (error) {
-        // During restarts, the backend may be down; treat this as "waiting for health"
         console.warn("Update status unavailable (backend may be restarting):", error);
-        updateMessage.value = "Calvin is restarting. This takes about 15 seconds.";
-        updateMessageClass.value = "warning";
-        await waitForBackendHealthy({ timeoutMs: 60000, intervalMs: 2000 });
+        await noteUpdateChecking();
       }
 
       await sleep(pollIntervalMs);
     }
 
-    updateMessage.value =
-      "The update is taking longer than usual. Leave it running and check back later.";
-    updateMessageClass.value = "warning";
-    _scheduleMessageClear(12000);
+    sendUpdate({ type: "timedOut" });
+  };
+
+  const triggerUpdate = async () => {
+    if (isUpdateBusy(updateLife.value)) return; // one update at a time
+    updateStatus.value = null;
+    sendUpdate({ type: "start" });
+
+    let response;
+    try {
+      response = await systemApi.triggerUpdate();
+    } catch (error) {
+      console.error("Failed to trigger update:", error);
+      sendUpdate({ type: "startFailed", message: friendlyError(error, "start the update") });
+      return;
+    }
+
+    updateStatus.value = { status: "running", last_log: "", message: "Starting..." };
+    const result = await streamUpdateStatus(response.log_offset ?? 0);
+
+    if (result.status === "complete") {
+      sendUpdate({ type: "installed" });
+      await confirmRestart();
+    } else if (result.status === "error") {
+      sendUpdate({ type: "failed" });
+    } else if (result.status === "disconnected") {
+      // A dropped stream is not a finished update: Calvin restarting at the
+      // end cuts it, and so does a network blip in the middle. Ask the server.
+      sendUpdate({ type: "streamLost" });
+      await followUpdate();
+    } else {
+      sendUpdate({ type: "timedOut" });
+    }
+  };
+
+  // Watch an update in progress (one this page did not start). An update this
+  // page is already running is followed by its own stream; asking here too
+  // would start a second polling loop.
+  const pollUpdateStatus = async () => {
+    if (isUpdateBusy(updateLife.value)) return;
+    sendUpdate({ type: "follow" });
+    await followUpdate();
   };
 
   const getUpdateStatus = async () => {
@@ -406,6 +398,9 @@ export function useSystem() {
     displayTimeout,
     displayTimeoutEnabled,
     updating,
+    // Where Calvin's update is (utils/updateLifecycle.js): idle, starting,
+    // running, following, waiting, restarting, done, unconfirmed, failed, slow.
+    updateStage: computed(() => updateLife.value.stage),
     updateStatus,
     updateStatusLoading,
     updateStatusCheckedAt,
