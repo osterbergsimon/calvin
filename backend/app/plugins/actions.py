@@ -11,7 +11,7 @@ allowlist rejected.
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any, cast
 
 from app.plugins.definitions import PluginActionSpec
@@ -23,6 +23,8 @@ MAX_STRING_PARAM = 256
 MAX_ERROR_MESSAGE = 200
 # At most this many unknown param names are named in a 422.
 MAX_UNKNOWN_SHOWN = 10
+# Each unknown name echoed in a 422 is cut to this many characters.
+MAX_UNKNOWN_NAME = 64
 
 _PY_TYPES: dict[str, type] = {"string": str, "boolean": bool}
 
@@ -54,6 +56,20 @@ class ActionParamsError(ValueError):
         self.errors = errors
 
 
+def describe_unknown(kind: str, names: Iterable[Any]) -> str | None:
+    """Bounded text naming unknown keys: at most 10 names, each cut to 64 characters.
+
+    The caller may be anonymous and this text is returned and logged, so a probe
+    with thousands of long keys must not get them echoed back.
+    """
+    unknown = sorted(str(name)[:MAX_UNKNOWN_NAME] for name in names)
+    if not unknown:
+        return None
+    shown = ", ".join(unknown[:MAX_UNKNOWN_SHOWN])
+    more = len(unknown) - MAX_UNKNOWN_SHOWN
+    return f"unknown {kind}(s): {shown}" + (f" and {more} more" if more > 0 else "")
+
+
 def validate_action_params(spec: PluginActionSpec, params: Any) -> dict[str, str | bool]:
     """Check ``params`` against ``spec`` and return a new dict of declared keys only.
 
@@ -64,12 +80,9 @@ def validate_action_params(spec: PluginActionSpec, params: Any) -> dict[str, str
         raise ActionParamsError(["params must be an object"])
 
     errors: list[str] = []
-    unknown = sorted(str(key)[:64] for key in params if key not in spec.params)
-    if unknown:
-        # Bounded: the caller may be anonymous, and this list is returned and logged.
-        shown = ", ".join(unknown[:MAX_UNKNOWN_SHOWN])
-        more = len(unknown) - MAX_UNKNOWN_SHOWN
-        errors.append(f"unknown param(s): {shown}" + (f" and {more} more" if more > 0 else ""))
+    unknown_message = describe_unknown("param", (k for k in params if k not in spec.params))
+    if unknown_message:
+        errors.append(unknown_message)
 
     clean: dict[str, str | bool] = {}
     for key, param in spec.params.items():
@@ -136,6 +149,56 @@ class ActionRateLimiter:
         with self._lock:
             self._hits.clear()
 
+
+# A running action is cancelled and answered 504 after this many seconds.
+ACTION_TIMEOUT_S = 10.0
+# At most this many actions run at once per instance.
+MAX_IN_FLIGHT = 2
+
+
+class ActionInFlightLimiter:
+    """Per-instance cap on actions still running (the rate limiter counts starts).
+
+    Semaphores are made only for keys the route asks about after validation, and
+    idle ones (nothing running) are dropped on every acquire, so memory stays
+    bounded by the number of instances with a running action.
+    """
+
+    def __init__(self, limit: int = MAX_IN_FLIGHT) -> None:
+        self.limit = limit
+        self._running: dict[str, int] = {}
+
+    def try_acquire(self, key: str) -> bool:
+        """Take a slot for ``key``; False when ``limit`` actions already run.
+
+        Called from the event loop only, so no lock is needed.
+        """
+        for k in [k for k, n in self._running.items() if n <= 0]:
+            del self._running[k]
+        count = self._running.get(key, 0)
+        if count >= self.limit:
+            return False
+        self._running[key] = count + 1
+        return True
+
+    def release(self, key: str) -> None:
+        """Give back a slot taken with :meth:`try_acquire`."""
+        count = self._running.get(key, 0) - 1
+        if count <= 0:
+            self._running.pop(key, None)
+        else:
+            self._running[key] = count
+
+    def tracked_keys(self) -> int:
+        """Number of keys with a running action (for tests)."""
+        return len(self._running)
+
+    def reset(self) -> None:
+        """Forget every key (for tests)."""
+        self._running.clear()
+
+
+action_in_flight = ActionInFlightLimiter()
 
 # One limiter for the process, keyed by instance id.
 action_rate_limiter = ActionRateLimiter()

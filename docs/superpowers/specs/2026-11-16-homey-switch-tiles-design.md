@@ -126,6 +126,9 @@ Chromecast) can reuse it later.
 - A simple per-instance rate limit in the route (my call: about 5 actions per
   second per instance; excess gets 429) so a stuck finger or a script cannot
   flood the hub.
+- Actions time out after 10 s (the call is cancelled, answer 504), and at most
+  2 run at once per instance (a third gets 429 with `Retry-After: 1` without
+  calling the plugin), so a hung hub cannot pile up handlers and sockets.
 - Each action is logged at info level with instance, action and params, never
   with config.
 - The route-policy test, a contract test for the route (validation, unknown

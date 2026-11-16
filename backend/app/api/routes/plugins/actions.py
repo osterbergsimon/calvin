@@ -11,6 +11,7 @@ the caller: ``PluginActionError`` messages are written by the plugin for the
 screen; anything else becomes a generic 500.
 """
 
+import asyncio
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -19,11 +20,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.db_models import PluginDB
 from app.plugins.actions import (
+    ACTION_TIMEOUT_S,
     MAX_ERROR_MESSAGE,
     ActionParamsError,
     PluginActionError,
     PluginActionRefused,
+    action_in_flight,
     action_rate_limiter,
+    describe_unknown,
     validate_action_params,
 )
 from app.plugins.manager import plugin_manager
@@ -33,11 +37,15 @@ router = APIRouter()
 
 
 class PluginActionRequest(BaseModel):
-    """Body of a plugin action call: only ``params``, checked against the declaration."""
+    """Body of a plugin action call: only ``params``, checked against the declaration.
+
+    Extra top-level keys are accepted here and refused in the route, with a
+    bounded message: the generic 422 handler would echo every one in full.
+    """
 
     params: dict[str, Any] = Field(default_factory=dict)
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
 
 def _error(status_code: int, code: str, message: str, **kwargs: Any) -> HTTPException:
@@ -71,7 +79,8 @@ async def run_plugin_action(
     Checks, in order: the instance exists and is a service plugin (404), is
     enabled (409) and running (409; this route never starts an instance), the
     action is declared (404), the params match the declaration (422), and the
-    instance is under its rate limit (429). Only then is ``perform_action``
+    instance is under its rate limit and has fewer than two actions running
+    (both 429). The call is cancelled after ``ACTION_TIMEOUT_S`` (504). Only then is ``perform_action``
     called, with the validated params. Its dict is returned unchanged.
     """
     db_plugin = await PluginDB.objects.get_or_none(id=plugin_id)
@@ -88,6 +97,17 @@ async def run_plugin_action(
     spec = metadata.action(action) if metadata is not None else None
     if spec is None:
         raise _error(404, "unknown_action", "This plugin has no such action.")
+
+    extra_keys = describe_unknown("body key", request.model_extra or {})
+    if extra_keys:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "invalid_action_body",
+                "message": "The request body must hold only params.",
+                "errors": [extra_keys],
+            },
+        )
 
     try:
         params = validate_action_params(spec, request.params)
@@ -110,10 +130,24 @@ async def run_plugin_action(
             headers={"Retry-After": "1"},
         )
 
+    if not action_in_flight.try_acquire(plugin_id):
+        raise _error(
+            429,
+            "action_busy",
+            "Another action is still running. Try again in a moment.",
+            headers={"Retry-After": "1"},
+        )
+
     logger.info("Plugin action {} on {} params={}", action, plugin_id, params)
 
     try:
-        result = await instance.perform_action(action, params)
+        result = await asyncio.wait_for(instance.perform_action(action, params), ACTION_TIMEOUT_S)
+    except TimeoutError:
+        # wait_for has cancelled the plugin's call. Log names only, no traceback.
+        logger.warning("Plugin action {} on {} timed out", action, plugin_id)
+        raise _error(
+            504, "plugin_action_timeout", "The action took too long and was stopped."
+        ) from None
     except PluginActionRefused as e:
         logger.info("Plugin action {} on {} refused by the plugin", action, plugin_id)
         raise _error(403, "plugin_action_refused", _plugin_message(e)) from None
@@ -136,6 +170,8 @@ async def run_plugin_action(
             "plugin_action_error",
             "The action failed. Check the server logs for details.",
         ) from None
+    finally:
+        action_in_flight.release(plugin_id)
 
     if not isinstance(result, dict):
         logger.error(

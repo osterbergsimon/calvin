@@ -517,6 +517,15 @@ class TestPluginActionsAtLoad:
         with pytest.raises(TypeError, match="only service plugins"):
             plugin_loader_instance.register_module(self._module(Backendish))
 
+    def test_non_service_perform_action_without_actions_loads(self, plugin_loader_instance):
+        class Backendish(_BackendPlugin):
+            metadata = _Metadata(type_id="own_hook", name="X")
+
+            async def perform_action(self, name, params):
+                return {}
+
+        assert plugin_loader_instance.register_module(self._module(Backendish)) == ["own_hook"]
+
     def test_plugin_with_actions_and_hook_loads(self, plugin_loader_instance):
         class Both(_ServicePlugin):
             metadata = _Metadata(type_id="both", name="X", actions=[{"name": "go"}])

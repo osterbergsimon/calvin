@@ -5,6 +5,9 @@ case here runs logged out. The host must run only a declared action, with
 params it validated, and must never leak config or exception text.
 """
 
+import asyncio
+import threading
+import time
 from typing import Any
 
 import pytest
@@ -14,6 +17,7 @@ from app.plugins.actions import (
     MAX_ERROR_MESSAGE,
     PluginActionError,
     PluginActionRefused,
+    action_in_flight,
     action_rate_limiter,
 )
 from app.plugins.definitions import PluginMetadata
@@ -66,8 +70,10 @@ class FakeBackendPlugin(BackendPlugin):
 @pytest.fixture(autouse=True)
 def _reset_limiter():
     action_rate_limiter.reset()
+    action_in_flight.reset()
     yield
     action_rate_limiter.reset()
+    action_in_flight.reset()
 
 
 @pytest.fixture
@@ -399,3 +405,186 @@ async def test_crash_with_secret_in_message_is_not_logged_even_with_diagnose(tes
     assert "RuntimeError" in joined
     assert SECRET not in joined
     assert SECRET not in response.text
+
+
+# ---- review round 1 ----------------------------------------------------------
+
+
+class HangingPlugin(FakeSwitchPlugin):
+    """``perform_action`` waits on ``gate`` (never set unless the test sets it)."""
+
+    def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+        super().__init__(plugin_id, name, enabled)
+        self.gate = asyncio.Event()
+        self.started = 0
+        self.cancelled = 0
+
+    async def perform_action(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
+        self.started += 1
+        try:
+            await self.gate.wait()
+        except asyncio.CancelledError:
+            self.cancelled += 1
+            raise
+        return {"ok": True}
+
+
+async def test_hung_action_times_out_504_and_plugin_is_cancelled(
+    test_client, register, monkeypatch
+):
+    import app.api.routes.plugins.actions as route
+
+    monkeypatch.setattr(route, "ACTION_TIMEOUT_S", 0.05)
+    plugin = await register(cls=HangingPlugin)
+    lines: list[str] = []
+    sink_id = logger.add(lambda message: lines.append(str(message)), level="DEBUG")
+    try:
+        response = _post(test_client)
+    finally:
+        logger.remove(sink_id)
+    assert response.status_code == 504
+    assert _detail(response)["code"] == "plugin_action_timeout"
+    assert SECRET not in response.text
+    assert plugin.started == 1
+    assert plugin.cancelled == 1
+    assert "timed out" in "".join(lines)
+    assert SECRET not in "".join(lines)
+    assert action_in_flight.tracked_keys() == 0
+
+
+class GatedPlugin(FakeSwitchPlugin):
+    """``perform_action`` blocks until ``release`` (a thread-safe event) is set."""
+
+    def __init__(self, plugin_id: str, name: str, enabled: bool = True):
+        super().__init__(plugin_id, name, enabled)
+        self.release = threading.Event()
+        self.started = 0
+
+    async def perform_action(self, name: str, params: dict[str, Any]) -> dict[str, Any]:
+        self.started += 1
+        await asyncio.to_thread(self.release.wait, 10)
+        return {"ok": True}
+
+
+async def test_third_concurrent_action_is_429_without_calling_plugin(
+    test_client, register, monkeypatch
+):
+    plugin = await register(cls=GatedPlugin)
+    # The in-flight cap is what is under test here, not the 5/s limiter.
+    monkeypatch.setattr(action_rate_limiter, "limit", 100)
+
+    results: list[int] = []
+    threads = [
+        threading.Thread(target=lambda: results.append(_post(test_client).status_code))
+        for _ in range(2)
+    ]
+    for t in threads:
+        t.start()
+    deadline = time.monotonic() + 5
+    while plugin.started < 2 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert plugin.started == 2
+
+    response = _post(test_client)
+    assert response.status_code == 429
+    assert response.headers["Retry-After"] == "1"
+    assert _detail(response)["code"] == "action_busy"
+    assert plugin.started == 2
+
+    plugin.release.set()
+    for t in threads:
+        t.join(5)
+    assert results == [200, 200]
+    assert _post(test_client).status_code == 200
+    assert plugin.started == 3
+    assert action_in_flight.tracked_keys() == 0
+
+
+async def test_in_flight_slot_is_released_after_errors(test_client, register, monkeypatch):
+    plugin = await register()
+    monkeypatch.setattr(action_rate_limiter, "limit", 100)
+    plugin.raise_error = RuntimeError("boom")
+    for _ in range(3):
+        assert _post(test_client).status_code == 500
+    plugin.raise_error = PluginActionError("nope")
+    for _ in range(3):
+        assert _post(test_client).status_code == 502
+    assert action_in_flight.tracked_keys() == 0
+    plugin.raise_error = None
+    assert _post(test_client).status_code == 200
+
+
+async def test_extra_top_level_keys_get_a_small_422_and_plugin_not_called(test_client, register):
+    plugin = await register()
+    body = {"params": {"device": "d1", "on": True}}
+    body.update({f"{i:04d}-" + "x" * 5000: 1 for i in range(2000)})
+    response = _post(test_client, body=body)
+    assert response.status_code == 422
+    assert len(response.content) < 2000
+    assert _detail(response)["code"] == "invalid_action_body"
+    assert "and 1990 more" in response.text
+    assert plugin.calls == []
+
+
+async def _viewer_key() -> str:
+    from app.security.api_keys import get_api_key_store
+
+    _, secret = get_api_key_store().create("action-viewer", "read")
+    return secret
+
+
+async def test_viewer_key_gets_no_more_than_anonymous(test_client, register):
+    plugin = await register()
+    secret = await _viewer_key()
+    headers = {"Authorization": f"Bearer {secret}"}
+    anonymous = _post(test_client)
+    keyed = _post(test_client, headers=headers)
+    assert keyed.status_code == anonymous.status_code == 200
+    # Unknown action / bad params behave the same with and without the key.
+    assert _post(test_client, action="nope", headers=headers).status_code == 404
+    assert _post(test_client, body={"params": {}}, headers=headers).status_code == 422
+    assert len(plugin.calls) == 2
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [{"Origin": "null"}, {"Sec-Fetch-Site": "cross-site"}],
+    ids=["origin-null", "cross-site-no-origin"],
+)
+async def test_hostile_browser_headers_are_refused(test_client, register, headers):
+    plugin = await register()
+    response = _post(test_client, headers=headers)
+    assert response.status_code == 403
+    assert plugin.calls == []
+
+
+async def test_bogus_bearer_key_is_401(test_client, register):
+    from app.security.admin_auth import api_key_limiter
+
+    api_key_limiter._failures.clear()
+    api_key_limiter._lockouts.clear()
+    plugin = await register()
+    response = _post(test_client, headers={"Authorization": "Bearer not-a-real-key"})
+    assert response.status_code == 401
+    assert plugin.calls == []
+    api_key_limiter._failures.clear()
+    api_key_limiter._lockouts.clear()
+
+
+async def test_api_key_lockout_429_carries_retry_after(test_client, register):
+    from app.security.admin_auth import api_key_limiter
+
+    api_key_limiter._failures.clear()
+    api_key_limiter._lockouts.clear()
+    plugin = await register()
+    headers = {"Authorization": "Bearer not-a-real-key"}
+    try:
+        statuses = [_post(test_client, headers=headers) for _ in range(8)]
+        assert statuses[0].status_code == 401
+        locked = [r for r in statuses if r.status_code == 429]
+        assert locked
+        assert int(locked[0].headers["Retry-After"]) >= 1
+    finally:
+        api_key_limiter._failures.clear()
+        api_key_limiter._lockouts.clear()
+    assert plugin.calls == []

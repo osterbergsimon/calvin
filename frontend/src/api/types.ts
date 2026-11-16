@@ -1791,7 +1791,8 @@ export interface paths {
      *     Checks, in order: the instance exists and is a service plugin (404), is
      *     enabled (409) and running (409; this route never starts an instance), the
      *     action is declared (404), the params match the declaration (422), and the
-     *     instance is under its rate limit (429). Only then is ``perform_action``
+     *     instance is under its rate limit and has fewer than two actions running
+     *     (both 429). The call is cancelled after ``ACTION_TIMEOUT_S`` (504). Only then is ``perform_action``
      *     called, with the validated params. Its dict is returned unchanged.
      */
     post: operations["run_plugin_action_api_plugins__plugin_id__actions__action__post"];
@@ -3144,12 +3145,17 @@ export interface components {
     /**
      * PluginActionRequest
      * @description Body of a plugin action call: only ``params``, checked against the declaration.
+     *
+     *     Extra top-level keys are accepted here and refused in the route, with a
+     *     bounded message: the generic 422 handler would echo every one in full.
      */
     PluginActionRequest: {
       /** Params */
       params?: {
         [key: string]: unknown;
       };
+    } & {
+      [key: string]: unknown;
     };
     /** PluginDeleteResponse */
     PluginDeleteResponse: {

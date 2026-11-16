@@ -52,14 +52,17 @@ def _check_actions(cls: type[BasePlugin], metadata: PluginMetadata) -> None:
     Fails the load loudly so a half-wired plugin never reaches the public
     action route.
     """
+    if not issubclass(cls, ServicePlugin):
+        # Another family may have its own, unrelated ``perform_action``; only
+        # declared actions are refused there.
+        if metadata.actions:
+            raise TypeError(
+                f"{cls.__name__} declares actions, but only service plugins may have actions"
+            )
+        return
     implements = plugin_implements_actions(cls)
     if not metadata.actions and not implements:
         return
-    if not issubclass(cls, ServicePlugin):
-        raise TypeError(
-            f"{cls.__name__} declares actions or perform_action, but only service plugins "
-            "may have actions"
-        )
     if metadata.actions and not implements:
         raise TypeError(f"{cls.__name__} declares actions but does not implement perform_action")
     if implements and not metadata.actions:

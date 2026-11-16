@@ -248,6 +248,13 @@ What the host guarantees before `perform_action` runs:
   strict types (`"true"` and `1` are not booleans), strings at most 256
   characters (else `422`). The plugin receives a validated copy.
 - At most 5 actions per second per instance (else `429` with `Retry-After: 1`).
+  The limit is shared per instance, not per client, so any LAN client can use
+  it up; that is fine on a home LAN.
+- At most 2 actions run at once per instance (else `429` with `Retry-After: 1`,
+  and the plugin is not called). An action that has not returned after 10
+  seconds is cancelled and answered `504` (`plugin_action_timeout`), so
+  `perform_action` must be safe to cancel and should use its own shorter
+  upstream timeouts.
 - Each call is logged at info level with the instance id, action and params,
   never with config.
 
@@ -260,7 +267,9 @@ What stays with the plugin:
 - **Error messages are shown on screen to anyone.** Raise
   `PluginActionError("Couldn't reach the hub")` for a failure the caller should
   see (`502`); the message is trimmed to 200 characters and must hold no
-  secrets, config values or exception text. Any other exception becomes a
+  secrets, config values or exception text. The message is shown to the caller
+  and also written to the server log, so a plugin must never put secrets in it
+  (the same goes for the `PluginActionRefused` message). Any other exception becomes a
   generic `500` and only its type and raise site are logged.
 - **The returned dict goes to anonymous callers unchanged.** Never put config
   or secrets in it.
@@ -268,10 +277,12 @@ What stays with the plugin:
 Both error classes live in `app.plugins.actions`. Error bodies are
 `{"detail": {"code", "message"}}` with codes `plugin_not_found`,
 `plugin_disabled`, `plugin_stopped`, `unknown_action`, `invalid_action_params`,
-`rate_limited`, `plugin_action_refused`, `plugin_action_failed` and
-`plugin_action_error`. A body that is not `{"params": {...}}` at all (not an
-object, or with other top-level keys) is rejected by request validation with
-the app's generic `422` shape, `{"detail": [...], "body": "Validation error"}`.
+`invalid_action_body`, `rate_limited`, `action_busy`, `plugin_action_refused`,
+`plugin_action_failed`, `plugin_action_timeout` and `plugin_action_error`. A body
+that is not a JSON object is rejected by request validation with the app's
+generic `422` shape, `{"detail": [...], "body": "Validation error"}`; an object
+with other top-level keys than `params` gets `invalid_action_body` (at most 10
+names, each cut to 64 characters).
 
 `fetch()` is the one data verb for service and backend plugins. It replaces
 the retired per-plugin fetch variants and the deprecated fetch hooks; there is
