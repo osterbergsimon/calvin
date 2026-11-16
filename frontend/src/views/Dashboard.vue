@@ -69,7 +69,7 @@
             </div>
 
             <!-- Dashboard View (Home) - Renders configured dashboard regions.
-                 With the screen stack on (utils/screenStack.js) every screen stays
+                 With the screen stack on (utils/screenStack.js, the Faster page switching setting) every screen stays
                  mounted and only the active one is shown; otherwise only the active
                  screen is rendered, as before. With the stack on it stays mounted
                  under a fullscreen view too, so entering and leaving fullscreen
@@ -79,7 +79,6 @@
               :class="[
                 'screen-stack',
                 { 'screen-stack--stacked': isStacked },
-                isStacked ? `screen-stack--${screenStackMode}` : null,
                 { 'screen-stack--under-fullscreen': isStacked && modeStore.isFullscreen },
               ]"
             >
@@ -226,7 +225,8 @@ import ClockBarVertical from "../components/ClockBarVertical.vue";
 import LoadingLight from "../components/LoadingLight.vue";
 import Button from "../components/ui/Button.vue";
 import ScreenScope from "../components/ScreenScope.vue";
-import { readScreenStackMode } from "../utils/screenStack";
+import { readScreenStackOverride, wantsScreenStack } from "../utils/screenStack";
+import { getKioskId } from "../utils/kioskId";
 import PhoneSettingsButton from "../components/dashboard/PhoneSettingsButton.vue";
 import { usePhoneViewport } from "../composables/usePhoneViewport";
 
@@ -289,10 +289,18 @@ const barVisible = computed(
 const dashboardScreens = computed(() => configStore.effectiveDashboardScreens);
 const activeScreen = computed(() => getActiveDashboardScreen(dashboardScreens.value));
 
-// Screen stack experiment (utils/screenStack.js). Editing the layout always
-// works on the single active screen, so the stack is off while unlocked.
-const screenStackMode = readScreenStackMode();
-const isStacked = computed(() => screenStackMode !== "off" && configStore.regionsLocked);
+// Screen stack (utils/screenStack.js): on when this kiosk's "Faster page
+// switching" setting is on. Editing the layout always works on the single active
+// screen, so the stack is off while unlocked.
+const screenStackOverride = readScreenStackOverride();
+const isStacked = computed(
+  () =>
+    wantsScreenStack({
+      kioskId: getKioskId(),
+      keepScreensReady: configStore.keepScreensReady,
+      override: screenStackOverride,
+    }) && configStore.regionsLocked
+);
 const renderedScreens = computed(() => {
   if (!isStacked.value) return activeScreen.value ? [activeScreen.value] : [];
   return normalizeDashboardScreens(dashboardScreens.value).screens;
@@ -759,38 +767,22 @@ onUnmounted(() => {
 /* While a fullscreen view is open, the stack stays mounted and laid out under
    it: same box (it keeps its place in the cell's flow), no paint, no input.
    `display: none` would drop every screen's boxes, so a kiosk wake (photo
-   frame -> dashboard) would have to restyle and lay out all N screens again,
-   and opacity mode would lose the tiles it keeps on purpose. The fullscreen
-   view covers the stack because `.fullscreen-mode` overlays the cell with a
-   z-index above it, not because it is opaque. */
+   frame -> dashboard) would have to restyle and lay out all N screens again.
+   The fullscreen view covers the stack because `.fullscreen-mode` overlays the
+   cell with a z-index above it, not because it is opaque. */
 .screen-stack--under-fullscreen {
   pointer-events: none;
 }
 .screen-stack--under-fullscreen > .dashboard-view {
   pointer-events: none;
 }
-/* visibility: every screen is unpainted, the active one included. */
-.screen-stack--under-fullscreen.screen-stack--visibility > .dashboard-view {
+/* Every screen is unpainted, the active one included. */
+.screen-stack--under-fullscreen.screen-stack--stacked > .dashboard-view {
   visibility: hidden;
 }
-/* opacity: same, but keep the will-change layer rather than flipping
-   visibility (a visibility change drops the retained tiles). */
-.screen-stack--under-fullscreen.screen-stack--opacity > .dashboard-view {
-  opacity: 0;
-}
 
-/* opacity: hidden screens stay rastered on their own layer, so a switch is a
-   compositor opacity change rather than a repaint. */
-.screen-stack--opacity > .dashboard-view {
-  will-change: opacity;
-}
-.screen-stack--opacity > .dashboard-view:not(.is-active-screen) {
-  opacity: 0;
-  pointer-events: none;
-}
-
-/* visibility: hidden screens stay mounted but are not painted. */
-.screen-stack--visibility > .dashboard-view:not(.is-active-screen) {
+/* Hidden screens stay mounted but are not painted. */
+.screen-stack--stacked > .dashboard-view:not(.is-active-screen) {
   visibility: hidden;
   pointer-events: none;
 }

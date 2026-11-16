@@ -362,27 +362,24 @@ cog --platform=drm \
   `calvin-cog.service` when it changes (rotation is a cog startup property).
   The `renderer=gles` part is required: cog's default `modeset` renderer cannot
   rotate.
-- **Screen stack** (experiment, off by default): add
-  `CALVIN_SCREEN_STACK=opacity` (or `visibility`) to `/etc/default/calvin-kiosk`
-  and restart `calvin-cog.service`. The dashboard then keeps every screen
-  mounted and shows only the active one, so a page switch does not rebuild the
-  page. `opacity` keeps hidden screens painted on their own GPU layer (about
-  4 MB each at 1280×720); `visibility` keeps them mounted but unpainted. Do not
-  put it in `/etc/default/calvin-kiosk-cog`: the display agent rewrites that
-  file when the rotation changes. The same switch works in any browser with
-  `?screenStack=opacity` on the dashboard URL (remembered per browser;
-  `?screenStack=off` clears it).
-  To turn it off again on a kiosk, remove the line from
-  `/etc/default/calvin-kiosk` and restart `calvin-cog.service`: cog always puts
-  `screenStack=off` in the URL when the variable is unset, which also clears the
-  mode the kiosk remembered. Removing the query parameter alone is not enough,
-  because the browser keeps the last mode in local storage.
+- **Faster page switching** (a per-screen setting, off by default): in
+  Settings › Screens, pick the screen, then turn on **Faster page switching**
+  under Display. Only an admin can change it, and it applies to that screen
+  only (a browser that is not a known kiosk never uses it). The dashboard then
+  keeps every page mounted and shows only the active one, so a page switch does
+  not rebuild the page; the pages that are not shown stay hidden, cannot take
+  focus and pause their photo rotation. On a Pi 3B+ (cog, WPE WebKit 2.48) a
+  warm page switch went from about 2.4 s to 0.8 s (about 3x faster) and used
+  about half the CPU, with no measurable memory cost. The cost is a start about
+  1 s slower (about 5.5 s to 6.5 s), because every page is built at start.
+  Editing the layout always works on the single active page, so the setting
+  has no effect while the layout is unlocked for editing.
+  For testing, `?screenStack=on` (or `off`) on the dashboard URL overrides the
+  setting for that one load only; it is not remembered.
   A fullscreen view (the photo frame, a maximized calendar) keeps the whole
   stack mounted and laid out behind it, so leaving and re-entering the dashboard
-  does not rebuild the screens. Two costs are known: on a kiosk with `opacity`
-  the hidden screens stay rastered behind the photo frame on purpose (that is
-  the GPU memory above), and opening `/settings` and coming back still remounts
-  every screen, not just the active one — an admin-visit cost, not a page
+  does not rebuild the pages. Opening `/settings` and coming back still
+  remounts every page, not just the active one: an admin-visit cost, not a page
   switch.
 - **Screen power** (display schedule) works: cog is the only DRM client, so the
   agent's root helper stops `calvin-cog.service`, waits up to 5 s for its

@@ -123,6 +123,7 @@ export const useConfigStore = defineStore("config", () => {
   const loadingLight = ref("comet"); // Loading light style: 'comet' | 'pulse' | 'off' (CLV-115)
   const layoutMode = ref("auto"); // Forced layout per screen: 'auto' | 'desktop' | 'phone' (calvin-tnkg)
   const regionsLocked = ref(true); // Dashboard region drag-resize is locked by default (touch-wall safety)
+  const keepScreensReady = ref(false); // Keep every dashboard screen mounted for faster page switching, per screen (kiosk only)
   const tapAnywhereReveal = ref(false); // When UI is hidden, whether tapping content re-shows it (default: hot corner only)
   const hotCornerPosition = ref("bottom-left"); // Reveal hot corner: 'bottom-left'|'bottom-right'|'top-left'|'top-right'
   const hotCornerOpacity = ref(55); // Rest opacity of the reveal hot corner, 0–100 (0 = invisible but still armed)
@@ -230,6 +231,7 @@ export const useConfigStore = defineStore("config", () => {
     loadingLight,
     layoutMode,
     regionsLocked,
+    keepScreensReady,
     tapAnywhereReveal,
     hotCornerPosition,
     hotCornerOpacity,
@@ -857,6 +859,7 @@ export const useConfigStore = defineStore("config", () => {
     loadingLight,
     layoutMode,
     regionsLocked,
+    keepScreensReady,
     tapAnywhereReveal,
     effectiveTapAnywhereReveal,
     hotCornerPosition,

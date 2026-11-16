@@ -2939,6 +2939,8 @@ export interface components {
       hotCornerSize?: number | null;
       /** Imagedisplaymode */
       imageDisplayMode?: string | null;
+      /** Keepscreensready */
+      keepScreensReady?: boolean | null;
       /** Keyboardfeedbackenabled */
       keyboardFeedbackEnabled?: boolean | null;
       /** Keyboardfeedbackmode */

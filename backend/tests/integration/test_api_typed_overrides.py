@@ -43,6 +43,8 @@ PER_SCREEN_VALUES = [
     ("keyboardFeedbackEnabled", True, "maybe"),
     ("keyboardFeedbackMode", "small", "huge"),
     ("touchControlSize", "large", "huge"),
+    # Faster page switching: per screen only, a strict boolean.
+    ("keepScreensReady", True, "yes"),
     ("uiSize", "compact", "tiny"),
     ("themeMode", "dark", "sepia"),
     ("selectedTheme", "midnight", 5),
@@ -72,6 +74,8 @@ BRIGHTNESS_KEYS = {
     "brightnessStepSeconds",
     "brightnessConversion",
     "sleepMode",
+    # Not brightness, but also per screen only (it switches the screen stack on).
+    "keepScreensReady",
 }
 
 
@@ -212,7 +216,30 @@ def test_brightness_null_clears_and_config_delivers_both_spellings(test_client: 
     ("key", "valid", "_invalid"), [v for v in PER_SCREEN_VALUES if v[0] in BRIGHTNESS_KEYS]
 )
 def test_household_config_refuses_brightness_keys(test_client: TestClient, key, valid, _invalid):
-    """Brightness is per screen only: a household value would reach every panel."""
+    """Brightness (and the screen stack) is per screen only: a household value would reach every screen."""
     bad = test_client.post("/api/config", json={key: valid})
     assert bad.status_code == 422, bad.text
     assert test_client.get("/api/config").json().get(key) is None
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("bad", [1, 0, "true", "on"])
+def test_keep_screens_ready_is_a_strict_boolean(test_client: TestClient, bad):
+    """A number or a string is not a boolean: the write is refused, nothing stored."""
+    response = test_client.put(
+        "/api/kiosks/k-stack/overrides", json={"overrides": {"keepScreensReady": bad}}
+    )
+    assert response.status_code == 400, response.text
+
+
+@pytest.mark.integration
+def test_keep_screens_ready_is_returned_in_the_kiosks_effective_config(test_client: TestClient):
+    """The dashboard reads the setting from the kiosk's merged config; absent means off."""
+    assert "keepScreensReady" not in test_client.get("/api/kiosks/k-stack-cfg/config").json()
+    test_client.put(
+        "/api/kiosks/k-stack-cfg/overrides", json={"overrides": {"keepScreensReady": True}}
+    )
+    assert test_client.get("/api/kiosks/k-stack-cfg/config").json()["keepScreensReady"] is True
+    # Another screen and the household config do not inherit it.
+    assert "keepScreensReady" not in test_client.get("/api/kiosks/k-other/config").json()
+    assert test_client.get("/api/config").json().get("keepScreensReady") is None

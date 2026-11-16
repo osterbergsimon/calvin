@@ -1596,7 +1596,7 @@ function resetLook(key) {
 }
 
 // --- Display sizes moved in from Dashboard (§7 item 6) --------------------
-const DISPLAY_SIZE_KEYS = ["touchControlSize", "uiSize"];
+const DISPLAY_SIZE_KEYS = ["touchControlSize", "keepScreensReady", "uiSize"];
 const displaySizeDescriptors = descriptorsForSection("display").filter(descriptor =>
   DISPLAY_SIZE_KEYS.includes(descriptor.key)
 );

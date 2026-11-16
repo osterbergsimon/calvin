@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { readScreenStackMode } from "@/utils/screenStack";
+import { describe, it, expect, afterEach } from "vitest";
+import { readScreenStackOverride, wantsScreenStack } from "@/utils/screenStack";
 
-const KEY = "calvin.screenStack";
 const realLocation = window.location;
 
 function setSearch(search) {
@@ -12,54 +11,63 @@ function setSearch(search) {
   });
 }
 
-describe("readScreenStackMode", () => {
-  beforeEach(() => {
-    window.localStorage.removeItem(KEY);
-    setSearch("");
+afterEach(() => {
+  Object.defineProperty(window, "location", {
+    value: realLocation,
+    writable: true,
+    configurable: true,
   });
+  window.localStorage.clear();
+});
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    Object.defineProperty(window, "location", {
-      value: realLocation,
-      writable: true,
-      configurable: true,
-    });
-  });
-
-  it("is off by default", () => {
-    expect(readScreenStackMode()).toBe("off");
-  });
-
-  it("takes the mode from the query string and remembers it", () => {
-    setSearch("?kiosk=k1&screenStack=opacity");
-    expect(readScreenStackMode()).toBe("opacity");
-    expect(window.localStorage.getItem(KEY)).toBe("opacity");
-
+describe("readScreenStackOverride", () => {
+  it("is null without the parameter", () => {
     setSearch("?kiosk=k1");
-    expect(readScreenStackMode()).toBe("opacity");
+    expect(readScreenStackOverride()).toBeNull();
   });
 
-  it("turns off again with screenStack=off", () => {
-    window.localStorage.setItem(KEY, "visibility");
+  it("reads on and off", () => {
+    setSearch("?screenStack=on");
+    expect(readScreenStackOverride()).toBe(true);
     setSearch("?screenStack=off");
-    expect(readScreenStackMode()).toBe("off");
-    setSearch("");
-    expect(readScreenStackMode()).toBe("off");
+    expect(readScreenStackOverride()).toBe(false);
   });
 
-  it("ignores unknown values", () => {
-    setSearch("?screenStack=fast");
-    expect(readScreenStackMode()).toBe("off");
-    window.localStorage.setItem(KEY, "fast");
-    setSearch("");
-    expect(readScreenStackMode()).toBe("off");
+  it("ignores any other value, including the retired modes", () => {
+    for (const value of ["opacity", "visibility", "fast", ""]) {
+      setSearch(`?screenStack=${value}`);
+      expect(readScreenStackOverride()).toBeNull();
+    }
   });
 
-  it("falls back to off when storage throws", () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
-      throw new Error("denied");
-    });
-    expect(readScreenStackMode()).toBe("off");
+  it("is not remembered", () => {
+    setSearch("?screenStack=on");
+    readScreenStackOverride();
+    expect(window.localStorage.length).toBe(0);
+    setSearch("");
+    expect(readScreenStackOverride()).toBeNull();
+  });
+});
+
+describe("wantsScreenStack", () => {
+  it("follows the kiosk's setting", () => {
+    expect(wantsScreenStack({ kioskId: "k1", keepScreensReady: true })).toBe(true);
+    expect(wantsScreenStack({ kioskId: "k1", keepScreensReady: false })).toBe(false);
+  });
+
+  it("is off in a browser that is not a known kiosk", () => {
+    expect(wantsScreenStack({ kioskId: null, keepScreensReady: true })).toBe(false);
+  });
+
+  it("is off unless the value is exactly true", () => {
+    expect(wantsScreenStack({ kioskId: "k1", keepScreensReady: "true" })).toBe(false);
+    expect(wantsScreenStack({ kioskId: "k1", keepScreensReady: undefined })).toBe(false);
+  });
+
+  it("lets the URL override win either way", () => {
+    expect(wantsScreenStack({ kioskId: null, keepScreensReady: false, override: true })).toBe(true);
+    expect(wantsScreenStack({ kioskId: "k1", keepScreensReady: true, override: false })).toBe(
+      false
+    );
   });
 });

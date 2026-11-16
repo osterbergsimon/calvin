@@ -70,10 +70,12 @@ function setSearch(search) {
   });
 }
 
-function setup({ search = "", locked = true } = {}) {
+// `keep` is this screen's Faster page switching setting (keepScreensReady).
+function setup({ search = "", locked = true, keep = false } = {}) {
   setSearch(search);
   setActivePinia(createPinia());
   const store = useConfigStore();
+  store.keepScreensReady = keep;
   store.setDashboardScreens(SCREENS);
   store.regionsLocked = locked;
   store.fetchConfig = vi.fn().mockResolvedValue({});
@@ -83,11 +85,11 @@ function setup({ search = "", locked = true } = {}) {
 
 describe("Dashboard screen stack", () => {
   beforeEach(() => {
-    window.localStorage.removeItem("calvin.screenStack");
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
-    window.localStorage.removeItem("calvin.screenStack");
+    window.sessionStorage.clear();
     Object.defineProperty(window, "location", {
       value: realLocation,
       writable: true,
@@ -108,12 +110,61 @@ describe("Dashboard screen stack", () => {
     ]);
   });
 
-  it("mounts every screen and shows only the active one", async () => {
-    setup({ search: "?screenStack=opacity" });
+  it("stays off in a browser that is not a known kiosk, even with the setting on", async () => {
+    setup({ keep: true });
     const wrapper = mount(Dashboard, { global: { stubs } });
     await flushPromises();
 
-    expect(wrapper.find(".screen-stack--opacity").exists()).toBe(true);
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
+    expect(wrapper.find(".screen-stack--stacked").exists()).toBe(false);
+  });
+
+  it("stays off on a kiosk whose setting is off", async () => {
+    setup({ search: "?kiosk=k1" });
+    const wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
+  });
+
+  it("turns on when the setting arrives after the config loads", async () => {
+    const store = setup({ search: "?kiosk=k1" });
+    const wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
+
+    store.keepScreensReady = true;
+    await flushPromises();
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(2);
+  });
+
+  it("?screenStack=on turns it on for one load, off turns it off, nothing is remembered", async () => {
+    setup({ search: "?screenStack=on" });
+    let wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(2);
+    wrapper.unmount();
+
+    setup({ search: "?kiosk=k1&screenStack=off", keep: true });
+    wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
+    wrapper.unmount();
+
+    // A later load without the parameter follows the setting again.
+    setup({ search: "" });
+    wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+    expect(wrapper.findAll(".dashboard-view")).toHaveLength(1);
+    expect(window.localStorage.getItem("calvin.screenStack")).toBeNull();
+  });
+
+  it("mounts every screen and shows only the active one", async () => {
+    setup({ search: "?kiosk=k1", keep: true });
+    const wrapper = mount(Dashboard, { global: { stubs } });
+    await flushPromises();
+
+    expect(wrapper.find(".screen-stack--stacked").exists()).toBe(true);
     const views = wrapper.findAll(".dashboard-view");
     expect(views).toHaveLength(2);
     expect(views[0].classes()).toContain("is-active-screen");
@@ -125,7 +176,7 @@ describe("Dashboard screen stack", () => {
   });
 
   it("switches screens without remounting their regions", async () => {
-    const store = setup({ search: "?screenStack=opacity" });
+    const store = setup({ search: "?kiosk=k1", keep: true });
     const wrapper = mount(Dashboard, { global: { stubs } });
     await flushPromises();
     const before = wrapper.findAll(".region-stub").map(r => r.element);
@@ -142,7 +193,7 @@ describe("Dashboard screen stack", () => {
   });
 
   it("falls back to the single active screen while the layout is unlocked", async () => {
-    setup({ search: "?screenStack=opacity", locked: false });
+    setup({ search: "?kiosk=k1", keep: true, locked: false });
     const wrapper = mount(Dashboard, { global: { stubs } });
     await flushPromises();
 
@@ -151,7 +202,7 @@ describe("Dashboard screen stack", () => {
   });
 
   it("keeps every screen mounted while a fullscreen view is open", async () => {
-    setup({ search: "?screenStack=opacity" });
+    setup({ search: "?kiosk=k1", keep: true });
     const wrapper = mount(Dashboard, { global: { stubs } });
     await flushPromises();
     const before = wrapper.findAll(".region-stub").map(region => region.element);

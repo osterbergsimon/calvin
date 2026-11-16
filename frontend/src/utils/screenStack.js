@@ -1,34 +1,36 @@
 /**
- * Screen stack (experiment): keep every dashboard screen mounted and stacked,
- * and switch by showing a different one, so a page switch can be a compositor
- * operation instead of an unmount + mount + full repaint.
+ * Screen stack: keep every dashboard screen mounted and stacked, and switch by
+ * showing a different one, so a page switch does not unmount, mount and repaint
+ * a whole screen. Hidden screens stay mounted with `visibility: hidden`, `inert`
+ * and `aria-hidden`, and pause their own work through ScreenScope.
  *
- * Modes:
- *   off        — today's behaviour: only the active screen is mounted.
- *   opacity    — inactive screens stay painted on their own GPU layer at
- *                opacity 0 (will-change: opacity). Fastest switch if the
- *                browser keeps the layer's tiles; costs GPU memory.
- *   visibility — inactive screens stay mounted but visibility: hidden. Saves
- *                the mount/layout work but the browser repaints on switch.
+ * It is a per-screen setting, off by default: `keepScreensReady` in a kiosk's
+ * overrides (Settings › Screens › the screen › Display, "Faster page
+ * switching"). On a Pi 3B+ it makes a warm page switch about 3x faster at no
+ * memory cost; the screen takes about a second longer to start.
  *
- * Opt in per device with `?screenStack=opacity` (or `visibility`) on the
- * dashboard URL; the choice is remembered in localStorage. `?screenStack=off`
- * turns it off again.
+ * A browser that is not a known kiosk follows no setting and keeps the stack
+ * off. `?screenStack=on|off` on the dashboard URL overrides the setting for
+ * that one load, for testing only: it is not remembered.
  */
 
-const STORAGE_KEY = "calvin.screenStack";
-const MODES = ["off", "opacity", "visibility"];
-
-export function readScreenStackMode() {
+/** `true` / `false` for `?screenStack=on|off`, or `null` when the URL has none. */
+export function readScreenStackOverride() {
   try {
-    const fromQuery = new URLSearchParams(window.location.search).get("screenStack");
-    if (fromQuery && MODES.includes(fromQuery)) {
-      window.localStorage.setItem(STORAGE_KEY, fromQuery);
-      return fromQuery;
-    }
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return MODES.includes(stored) ? stored : "off";
+    const value = new URLSearchParams(window.location.search).get("screenStack");
+    if (value === "on") return true;
+    if (value === "off") return false;
   } catch {
-    return "off";
+    // No window or an unreadable URL: no override.
   }
+  return null;
+}
+
+/**
+ * Whether the screen stack is wanted: the one-load URL override when there is
+ * one, else the current kiosk's `keepScreensReady` (a non-kiosk browser is off).
+ */
+export function wantsScreenStack({ kioskId, keepScreensReady, override = null }) {
+  if (override !== null) return override;
+  return Boolean(kioskId) && keepScreensReady === true;
 }

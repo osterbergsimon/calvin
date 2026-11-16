@@ -1,6 +1,8 @@
 /**
  * The screen stack lays every dashboard screen on top of the same box and shows
- * one at a time (utils/screenStack.js). The unit tests run in jsdom, which has
+ * one at a time (utils/screenStack.js). The tests switch the stack on with the
+ * `?screenStack=on` URL override; the real switch is a kiosk's Faster page
+ * switching setting. The unit tests run in jsdom, which has
  * no layout, so only a real browser can catch a stacked screen that keeps its
  * normal flow position and shrinks into half the width beside its sibling.
  *
@@ -19,7 +21,7 @@ const enterFullscreen = (page, mode) =>
 
 test("every stacked screen fills the stack box", async ({ page }) => {
   await installApiMock(page);
-  await page.goto("/?screenStack=opacity");
+  await page.goto("/?screenStack=on");
   await expect(page.locator(".screen-stack--stacked")).toBeVisible();
 
   const stack = page.locator(".screen-stack--stacked");
@@ -54,15 +56,12 @@ test("every stacked screen fills the stack box", async ({ page }) => {
 /**
  * The photo frame keeps the dashboard mounted underneath it so a wake does not
  * rebuild every screen. It must stay laid out (not display:none): a vanished
- * box makes the browser restyle and lay out all N screens on wake, and in
- * opacity mode refuses the tiles the hidden screens kept.
+ * box makes the browser restyle and lay out all N screens on wake.
  */
-for (const mode of ["opacity", "visibility"]) {
-  test(`keeps every stacked screen laid out while a fullscreen view is open (${mode})`, async ({
-    page,
-  }) => {
+{
+  test("keeps every stacked screen laid out while a fullscreen view is open", async ({ page }) => {
     await installApiMock(page);
-    await page.goto(`/?screenStack=${mode}`);
+    await page.goto("/?screenStack=on");
     await expect(page.locator(".screen-stack--stacked")).toBeVisible();
     await expect(page.locator(".screen-stack--stacked > .dashboard-view")).toHaveCount(2);
 
@@ -94,7 +93,6 @@ for (const mode of ["opacity", "visibility"]) {
         stack: rect(stackEl),
         views: views.map(view => ({
           ...rect(view),
-          opacity: getComputedStyle(view).opacity,
           visibility: getComputedStyle(view).visibility,
         })),
         sections: sections.map(rect),
@@ -119,11 +117,7 @@ for (const mode of ["opacity", "visibility"]) {
     for (const view of measured.views) {
       expect(Math.abs(view.width - measured.stack.width)).toBeLessThanOrEqual(1);
       expect(Math.abs(view.height - measured.stack.height)).toBeLessThanOrEqual(1);
-      if (mode === "opacity") {
-        expect(view.opacity).toBe("0");
-      } else {
-        expect(view.visibility).toBe("hidden");
-      }
+      expect(view.visibility).toBe("hidden");
     }
 
     // The fullscreen view paints above the stack (the overlay carries the
@@ -142,12 +136,12 @@ for (const mode of ["opacity", "visibility"]) {
  * the stack was absolutely positioned over `.dashboard-main` (clock bar
  * included) and grew by the bar's height.
  */
-for (const mode of ["opacity", "visibility"]) {
-  test(`keeps the stack's box and clears a bottom clock bar when fullscreen opens (${mode})`, async ({
+{
+  test("keeps the stack's box and clears a bottom clock bar when fullscreen opens", async ({
     page,
   }) => {
     await installApiMock(page, { config: { clockBarPosition: "bottom" } });
-    await page.goto(`/?screenStack=${mode}`);
+    await page.goto("/?screenStack=on");
     await expect(page.locator(".screen-stack--stacked")).toBeVisible();
     await expect(page.locator(".screen-stack--stacked > .dashboard-view")).toHaveCount(2);
 

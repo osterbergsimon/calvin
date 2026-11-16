@@ -2236,6 +2236,24 @@ describe("ScreensSettings — Look and Display sizes (§7 item 6)", () => {
     expect(window.localStorage.getItem("calvin-ui-size")).toBeNull();
   });
 
+  it("writes Faster page switching to that screen, off until switched on, and resets it", async () => {
+    const { wrapper, store } = mountScreens();
+    await flushPromises();
+    await selectFirst(wrapper);
+
+    const toggle = control(wrapper, ToggleSwitch, "Faster page switching");
+    expect(toggle.props("modelValue")).toBe(false);
+    expect(wrapper.text()).toContain("Keeps every page ready");
+
+    toggle.vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", { keepScreensReady: true });
+
+    await wrapper.find('[data-test="reset-keep-screens-ready"]').trigger("click");
+    await flushPromises();
+    expect(store.saveOverrides).toHaveBeenLastCalledWith("kitchen", {});
+  });
+
   it("resets one Look row without touching the others", async () => {
     const { wrapper, store } = mountScreens({
       overrides: { selectedTheme: "ocean", typeTheme: "marquee", orientation: "portrait" },
