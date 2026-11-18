@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Switch tiles</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<!--
+  Mock for the switch-grid renderer (homey switch tiles §3, plan Task 2.1).
+  Role tokens copied from frontend/src/styles/theme.css (light and Backlit).
+  Device names are placeholders. Every state is labelled in words, never colour alone.
+-->
+<style>
+:root {
+  --bg-0:#eef1f4; --bg-1:#ffffff; --bg-2:#ffffff; --line:#dde3e8; --line-soft:#e8edf1;
+  --ink:#1b242b; --ink-2:#5d6b75; --ink-3:#636e77; --focus:#e08a1e; --focus-ink:#1b242b;
+  --focus-text:#875c24; --err:#c0392b;
+  --font-ui:"IBM Plex Sans",system-ui,sans-serif; --font-data:"IBM Plex Mono",ui-monospace,monospace;
+  --text-caption:.75rem; --text-meta:.8rem; --text-body:.9rem; --text-label:1rem; --text-title:1.15rem;
+  --weight-body:400; --weight-strong:500; --weight-title:600;
+  --gap-1:.25rem; --gap-2:.5rem; --gap-3:.75rem; --gap-4:1rem; --gap-5:1.25rem;
+  --radius-card:12px; --radius-round:999px; --touch-target:2.75rem;
+  --dur-fast:120ms; --ease:cubic-bezier(.2,.7,.2,1);
+  /* component tokens */
+  --switch-tile-min: calc(var(--touch-target) * 3.5);
+  --switch-tile-h: calc(var(--touch-target) * 2);
+}
+.dark {
+  --bg-0:#0e1316; --bg-1:#151c21; --bg-2:#1d262d; --line:#27313a; --line-soft:#1e272e;
+  --ink:#eaf0f3; --ink-2:#9aa7b0; --ink-3:#818d96; --focus:#f3b052; --focus-ink:#151c21;
+  --focus-text:#efcd9a; --err:#ef6b5e;
+}
+* { box-sizing:border-box; }
+body { margin:0; background:#d9dee3; font-family:var(--font-ui); color:#1b242b; }
+.board { padding:32px 16px; max-width:1360px; margin:0 auto; }
+h1 { font-size:1.4rem; font-weight:600; margin:0 0 8px; }
+.board > p { max-width:72ch; margin:0 0 24px; line-height:1.5; }
+figure { margin:0 0 40px; }
+figcaption { font-size:.85rem; color:#5d6b75; margin-top:8px; }
+.frame { background:var(--bg-0); color:var(--ink); border-radius:6px; box-shadow:0 2px 12px rgba(0,0,0,.18); overflow:hidden; padding:var(--gap-4); }
+.w1280 { width:1280px; } .w390 { width:390px; }
+.panel { background:var(--bg-1); border:1px solid var(--line); border-radius:16px; padding:var(--gap-4); }
+
+/* ---- the renderer ---- */
+.switch-grid { display:flex; flex-direction:column; gap:var(--gap-4); }
+.switch-grid__group { display:flex; flex-direction:column; gap:var(--gap-2); }
+.switch-grid__heading { margin:0; font-size:var(--text-meta); font-weight:var(--weight-strong); color:var(--ink-2); }
+.switch-grid__tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(var(--switch-tile-min), 1fr)); gap:var(--gap-3); }
+
+.switch-tile {
+  display:flex; flex-direction:column; justify-content:space-between; align-items:stretch; gap:var(--gap-2);
+  min-height:var(--switch-tile-h); min-width:var(--touch-target);
+  padding:var(--gap-3) var(--gap-4); text-align:left; font:inherit; color:var(--ink);
+  background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius-card); cursor:pointer;
+  transition:background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.switch-tile:hover { background:color-mix(in srgb, var(--ink) 4%, var(--bg-2)); }
+.switch-tile:focus-visible, .switch-tile.is-focus { outline:2px solid var(--focus); outline-offset:2px; }
+.switch-tile__top { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--gap-2); }
+.switch-tile__label { font-size:var(--text-label); font-weight:var(--weight-strong); line-height:1.25; overflow-wrap:anywhere; }
+.switch-tile__state { font-size:var(--text-body); color:var(--ink-2); }
+/* The lamp: a round indicator that is filled when on and hollow when off. */
+.switch-tile__lamp { flex:none; width:.875rem; height:.875rem; margin-top:.2rem; border-radius:var(--radius-round); border:2px solid var(--ink-3); }
+
+.switch-tile[aria-pressed="true"] { background:color-mix(in srgb, var(--focus) 16%, var(--bg-2)); border-color:var(--focus); }
+.switch-tile[aria-pressed="true"] .switch-tile__lamp { background:var(--focus); border-color:var(--focus); }
+.switch-tile[aria-pressed="true"] .switch-tile__state { color:var(--ink); }
+.switch-tile[aria-busy="true"] { cursor:progress; }
+.switch-tile[aria-busy="true"] .switch-tile__lamp { border-style:dashed; background:transparent; }
+.switch-tile[aria-busy="true"] .switch-tile__state { color:var(--ink); }
+.switch-tile--unavailable { opacity:.5; cursor:not-allowed; }
+.switch-tile--unavailable:hover { background:var(--bg-2); }
+.switch-tile--unavailable .switch-tile__lamp { border-style:dotted; }
+
+.switch-grid__note { min-height:1.25rem; margin:0; font-size:var(--text-meta); color:var(--err); }
+@media (prefers-reduced-motion: reduce) { .switch-tile { transition:none; } }
+</style>
+</head>
+<body>
+<div class="board">
+  <h1>Switch tiles</h1>
+  <p>Each chosen device is one tile: its name, a lamp and the state in words. On uses the selected
+  treatment (orange tint and border), off is the plain surface, and a tile that is not responding is
+  dimmed with the words. While a tap is on its way the tile says what it is doing ("Turning on…") and
+  the lamp turns dashed. Notes go in one line under the grid, read out politely.</p>
+  <div id="frames"></div>
+</div>
+
+<template id="grid">
+  <div class="panel">
+    <div class="switch-grid">
+      <section class="switch-grid__group">
+        <h3 class="switch-grid__heading">Group A</h3>
+        <div class="switch-grid__tiles">
+          <button class="switch-tile" type="button" aria-pressed="true"><span class="switch-tile__top"><span class="switch-tile__label">Lamp A</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">On</span></button>
+          <button class="switch-tile is-focus" type="button" aria-pressed="false"><span class="switch-tile__top"><span class="switch-tile__label">Lamp B</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">Off</span></button>
+          <button class="switch-tile" type="button" aria-pressed="true" aria-busy="true" aria-disabled="true"><span class="switch-tile__top"><span class="switch-tile__label">Lamp C</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">Turning on…</span></button>
+        </div>
+      </section>
+      <section class="switch-grid__group">
+        <h3 class="switch-grid__heading">Group B</h3>
+        <div class="switch-grid__tiles">
+          <button class="switch-tile switch-tile--unavailable" type="button" aria-disabled="true"><span class="switch-tile__top"><span class="switch-tile__label">Plug D</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">Not responding</span></button>
+          <button class="switch-tile switch-tile--unavailable" type="button" aria-disabled="true"><span class="switch-tile__top"><span class="switch-tile__label">Plug E</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">Can't be switched from here</span></button>
+          <button class="switch-tile" type="button" aria-pressed="false"><span class="switch-tile__top"><span class="switch-tile__label">Fan with a longer name F</span><span class="switch-tile__lamp"></span></span><span class="switch-tile__state">Off</span></button>
+        </div>
+      </section>
+      <p class="switch-grid__note" role="status" aria-live="polite">Fan with a longer name F: Couldn't reach Homey</p>
+    </div>
+  </div>
+</template>
+
+<script>
+  // Four copies of one grid: 1280 and 390 wide, light and Backlit.
+  const frames = document.getElementById("frames");
+  const tpl = document.getElementById("grid");
+  for (const [width, dark] of [[1280, false], [1280, true], [390, false], [390, true]]) {
+    const fig = document.createElement("figure");
+    const frame = document.createElement("div");
+    frame.className = `frame w${width}${dark ? " dark" : ""}`;
+    frame.append(tpl.content.cloneNode(true));
+    const cap = document.createElement("figcaption");
+    cap.textContent = `${width} wide, ${dark ? "Backlit (dark)" : "light"}. Lamp B shows focus.`;
+    fig.append(frame, cap);
+    frames.append(fig);
+  }
+</script>
+</body>
+</html>
