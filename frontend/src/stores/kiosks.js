@@ -106,6 +106,19 @@ export const useKiosksStore = defineStore("kiosks", () => {
     setCachedData(CACHE_KEY, kiosks.value);
   }
 
+  // Hold a screen on/off or send it back to its schedule (calvin-2ifv). The
+  // hold lives outside the override layer; keep the list's copy in step.
+  async function setScreenPower(id, power) {
+    const { data } = await api.put(`/kiosks/${encodeURIComponent(id)}/screen-power`, { power });
+    const kiosk = kiosks.value.find(k => k.id === id);
+    if (kiosk && data) {
+      kiosk.powerHold = data.held ? { power: data.power, setAt: data.setAt, by: data.by } : null;
+      kiosk.agentHolds = data.agentHolds ?? kiosk.agentHolds ?? null;
+      setCachedData(CACHE_KEY, kiosks.value);
+    }
+    return data;
+  }
+
   async function triggerUpdate(id) {
     await api.post(`/kiosks/${encodeURIComponent(id)}/update`);
     await loadKiosks();
@@ -131,6 +144,7 @@ export const useKiosksStore = defineStore("kiosks", () => {
     fetchDeviceConfigVersion,
     removeKiosk,
     triggerUpdate,
+    setScreenPower,
     fetchAvailableAgentVersion,
   };
 });

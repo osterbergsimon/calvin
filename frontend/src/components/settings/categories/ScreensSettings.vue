@@ -501,10 +501,18 @@
         <SettingRow label="Screen now">
           <template #description>
             <InlineNote data-test="screen-now-state">
-              {{ desiredOnNow ? "On now" : "Off now" }}
+              {{ powerStateCopy }}
             </InlineNote>
-            <InlineNote v-if="activeOverride" data-test="screen-now-until">
+            <InlineNote v-if="!powerHold && activeOverride" data-test="screen-now-until">
               {{ untilCopy }}
+            </InlineNote>
+            <InlineNote
+              v-if="powerHold && selectedKiosk?.agentHolds === false"
+              tone="warn"
+              data-test="screen-now-old-agent"
+            >
+              This screen needs a software update to hold. Until then it follows the next scheduled
+              change.
             </InlineNote>
             <InlineNote v-if="dimmingSeconds !== null" data-test="screen-now-dimming">
               Dimming… then off · about {{ dimmingSeconds }} s
@@ -517,12 +525,12 @@
             Turn off now
           </Button>
           <Button
-            v-if="activeOverride"
+            v-if="powerHold || activeOverride"
             variant="link"
             data-test="screen-now-follow"
             @click="followSchedule"
           >
-            Follow schedule
+            {{ powerHold ? "Back to schedule" : "Follow schedule" }}
           </Button>
         </SettingRow>
         <BrightnessGroup
@@ -1346,7 +1354,11 @@ const activeOverride = computed(() =>
     timeZone: powerTimeZone.value,
   })
 );
+// A hold from home automation or Settings (calvin-2ifv) lives in its own
+// registry column, not the layer, and wins until it is changed.
+const powerHold = computed(() => selectedKiosk.value?.powerHold ?? null);
 const desiredOnNow = computed(() => {
+  if (powerHold.value) return powerHold.value.power === "on";
   if (activeOverride.value) return activeOverride.value.power === "on";
   return scheduleDesiredOn({
     enabled: effScheduleEnabled.value,
@@ -1354,6 +1366,14 @@ const desiredOnNow = computed(() => {
     now: now(),
     timeZone: powerTimeZone.value,
   });
+});
+const powerStateCopy = computed(() => {
+  const hold = powerHold.value;
+  if (!hold) return desiredOnNow.value ? "On now" : "Off now";
+  const state = hold.power === "on" ? "On" : "Off";
+  return hold.by === "automation"
+    ? `${state}, held by home automation`
+    : `${state}, held until someone changes it`;
 });
 const untilCopy = computed(() => {
   const override = activeOverride.value;
@@ -1365,12 +1385,29 @@ const untilCopy = computed(() => {
   return `${state} until you change it`;
 });
 
-function setScreenNow(power) {
+async function setScreenNow(power) {
+  // A person's own choice ends a hold first, then works as always: until the
+  // next scheduled change.
+  if (powerHold.value && !(await endHold())) return;
   const next = {
     ...overrides.value,
     screenNow: buildPowerOverride({ power, now: new Date() }),
   };
   persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+}
+
+// Ends a hold through the screen-power call; the layer is not touched.
+async function endHold() {
+  const kioskId = selectedId.value;
+  if (!kioskId) return false;
+  powerMsg.value = "";
+  try {
+    await store.setScreenPower(kioskId, "schedule");
+    return true;
+  } catch {
+    powerMsg.value = "Couldn't save to the server. Check the connection and try again.";
+    return false;
+  }
 }
 
 // "Dimming… then off" (calvin-29ws): with the ramp on, "Turn off now" first steps
@@ -1409,7 +1446,14 @@ const checkOpen = ref(false);
 function openCheck() {
   checkOpen.value = true;
 }
-function followSchedule() {
+async function followSchedule() {
+  if (powerHold.value) {
+    if (await endHold()) {
+      const online = selectedKiosk.value ? isOnline(selectedKiosk.value) : false;
+      powerMsg.value = online ? APPLIED_BY_AGENT : OFFLINE_COPY;
+    }
+    return;
+  }
   const next = { ...overrides.value };
   delete next.screenNow;
   persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
