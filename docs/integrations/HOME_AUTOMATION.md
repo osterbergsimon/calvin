@@ -5,7 +5,7 @@ back to its schedule. "Nobody home: screens off", "someone arrived: screens on".
 stays the way automation left it until automation or a person changes it, even across the
 screen's own schedule.
 
-It uses an API key that can do this and nothing else.
+It uses a limited API key that can switch screens and read their state.
 
 ## 1. Create the key
 
@@ -13,10 +13,10 @@ It uses an API key that can do this and nothing else.
 2. **Create key**, give it a name such as `Homey`, and pick **Turn screens on and off**.
 3. Copy the key: it is shown once.
 
-This key can switch screens and read their state. It can't see or change anything else: no
-settings, no backups, no [MCP](MCP.md), no host actions (details in
-[Limited keys](../configuration/ADMIN_AUTH.md#limited-keys)). Settings shows when it was last
-used, and **Revoke** stops it on the next request.
+This key lets home automation switch screens on and off. Beyond that it can only do what anyone
+on your network can do without a key: no settings, no backups, no [MCP](MCP.md), no host actions
+(details in [Limited keys](../configuration/ADMIN_AUTH.md#limited-keys)). Settings shows when it
+was last used, and **Revoke** stops it on the next request.
 
 ## 2. Find each screen's id
 
@@ -63,6 +63,9 @@ The answer, and `GET` on the same path, is the screen's state:
 
 ## Homey
 
+Not yet tried on a real Homey: the header format below comes from community reports. Tell us if
+your card needs something different.
+
 Use the Logic card **Make a web request** in a flow.
 
 | Field | Value |
@@ -89,8 +92,9 @@ condition on `"held":true` is enough to branch.
 ## Security notes
 
 - **Keep the key small and private.** Anyone with admin access to the hub can read the key
-  in the flow card. If it leaks, the holder can switch your screens and nothing else; revoke
-  it in Settings and create a new one. Every change is logged with the key's name.
+  in the flow card. If it leaks, the holder can switch your screens and do what anyone on your
+  network can do; revoke it in Settings and create a new one. Every change is logged with the
+  key's name.
 - **Plain HTTP on the LAN.** Calvin is usually reached over plain HTTP, so a device that can
   watch your network traffic could copy the key and replay a request. Put Calvin behind
   HTTPS (a reverse proxy) if that matters in your home.

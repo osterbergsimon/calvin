@@ -25,7 +25,7 @@ container, or to seed a dev setup instead of entering everything again.
 | Logs, the Python environment, the frontend build | Part of the install, not the setup |
 | The automatic-backup schedule | Belongs to each server (see below) |
 | Calvin's own API keys and admin password | They stay with the server. After a move, create new keys (for example the one home automation uses) and paste them where they are used |
-| A screen held on or off by home automation | It is current state, not a setting; a restored screen follows its schedule until the next command |
+| A screen held on or off by home automation | It is current state, not a setting. On a new server every screen follows its schedule until the next command; restoring on the same server leaves a current hold as it is |
 
 Instance ids are kept exactly, because screens and regions point at sources
 by id.
