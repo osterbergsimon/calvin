@@ -132,6 +132,21 @@ async def test_scope_matrix_rejects_above_scope_before_any_work(name, key_scope,
         await func(ctx=fake_ctx(key_scope), **MINIMAL_ARGS.get(name, {}))
 
 
+async def test_a_hand_edited_limited_key_stays_at_read(monkeypatch):
+    """A limited key counts as read even when its file entry claims host (calvin-2ifv)."""
+
+    def boom(*args, **kwargs):  # any service call before the scope check is a bug
+        raise AssertionError("tool did work before checking scope")
+
+    monkeypatch.setattr("app.utils.host_control.host_control_enabled", boom)
+    monkeypatch.setattr("app.services.display_power_service.display_power_service", boom)
+    with pytest.raises(tools.ToolError, match="host scope"):
+        await tools.display_power(
+            ctx=fake_ctx("host", limited=True, permissions=["screens.power"]),
+            state="off",
+        )
+
+
 @pytest.mark.parametrize("name", sorted(EXPECTED))
 async def test_no_key_on_the_request_is_rejected(name):
     func = getattr(tools, name)

@@ -26,6 +26,7 @@ from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
 
 from app.security.api_keys import SCOPE_RANK
+from app.security.route_policy import key_rank
 
 __all__ = ["TOOL_SCOPES", "ToolError", "register_tools"]
 
@@ -79,7 +80,7 @@ def scoped(scope: str) -> Callable[[Callable[..., Awaitable[str]]], Callable[...
             key = _request_key(kwargs.get("ctx"))
             if key is None:
                 raise ToolError("This request has no valid API key.")
-            if SCOPE_RANK[key["scope"]] < SCOPE_RANK[scope]:
+            if key_rank(key) < SCOPE_RANK[scope]:
                 raise ToolError(
                     f"This API key can't do that. {func.__name__} needs the {scope} scope "
                     f"(this key has {key['scope']})."
