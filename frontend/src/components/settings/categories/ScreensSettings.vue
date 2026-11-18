@@ -518,10 +518,18 @@
               Dimming… then off · about {{ dimmingSeconds }} s
             </InlineNote>
           </template>
-          <Button data-test="screen-now-on" :disabled="desiredOnNow" @click="setScreenNow('on')">
+          <Button
+            data-test="screen-now-on"
+            :disabled="powerBusy || desiredOnNow"
+            @click="setScreenNow('on')"
+          >
             Turn on now
           </Button>
-          <Button data-test="screen-now-off" :disabled="!desiredOnNow" @click="setScreenNow('off')">
+          <Button
+            data-test="screen-now-off"
+            :disabled="powerBusy || !desiredOnNow"
+            @click="setScreenNow('off')"
+          >
             Turn off now
           </Button>
           <Button
@@ -556,6 +564,7 @@
         <InlineNote
           v-if="powerMsg"
           class="screens-saved"
+          data-test="screen-now-message"
           :tone="toneFor(powerMsg)"
           role="status"
           aria-live="polite"
@@ -1357,6 +1366,13 @@ const activeOverride = computed(() =>
 // A hold from home automation or Settings (calvin-2ifv) lives in its own
 // registry column, not the layer, and wins until it is changed.
 const powerHold = computed(() => selectedKiosk.value?.powerHold ?? null);
+// "Turn on/off now" on a held screen makes two calls; both buttons wait for
+// them so a double tap cannot send the pair twice.
+const powerBusy = ref(false);
+const POWER_CHOICE_FAILED = {
+  on: "The hold ended, but turning the screen on didn't save. Try again.",
+  off: "The hold ended, but turning the screen off didn't save. Try again.",
+};
 const desiredOnNow = computed(() => {
   if (powerHold.value) return powerHold.value.power === "on";
   if (activeOverride.value) return activeOverride.value.power === "on";
@@ -1386,15 +1402,26 @@ const untilCopy = computed(() => {
 });
 
 async function setScreenNow(power) {
-  // A person's own choice ends a hold first, then works as always: until the
-  // next scheduled change. Ask the server first: home automation may have held
-  // the screen since this page last looked.
-  if ((await isHeldNow()) && !(await endHold())) return;
-  const next = {
-    ...overrides.value,
-    screenNow: buildPowerOverride({ power, now: new Date() }),
-  };
-  persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+  if (powerBusy.value) return;
+  powerBusy.value = true;
+  powerMsg.value = "";
+  try {
+    // A person's own choice ends a hold first, then works as always: until the
+    // next scheduled change. Ask the server first: home automation may have held
+    // the screen since this page last looked.
+    const wasHeld = await isHeldNow();
+    if (wasHeld && !(await endHold())) return;
+    const next = {
+      ...overrides.value,
+      screenNow: buildPowerOverride({ power, now: new Date() }),
+    };
+    const saved = await persist(next, powerMsg, APPLIED_BY_AGENT, OFFLINE_COPY);
+    // The hold is already gone, so the plain save error would hide that the
+    // screen is now on its schedule.
+    if (!saved && wasHeld) powerMsg.value = POWER_CHOICE_FAILED[power];
+  } finally {
+    powerBusy.value = false;
+  }
 }
 
 async function isHeldNow() {
@@ -1543,7 +1570,11 @@ const APPLIED_BY_AGENT = "Saved. This screen updates within a minute.";
 const APPLIED_BY_PAGE = "Saved. This screen updates within 30 seconds.";
 
 function toneFor(message) {
-  return message.startsWith("Couldn't") || message.startsWith("Pick ") ? "err" : "ok";
+  return message.startsWith("Couldn't") ||
+    message.startsWith("Pick ") ||
+    message.startsWith("The hold ended")
+    ? "err"
+    : "ok";
 }
 
 function setName(value) {

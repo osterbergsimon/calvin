@@ -173,6 +173,70 @@ describe("ScreensSettings — a held screen", () => {
     expect(store.saveOverrides).toHaveBeenCalled();
   });
 
+  it("says the hold ended when turning the screen on failed to save", async () => {
+    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    await open(wrapper);
+    await wrapper.find("[data-test='screen-now-on']").trigger("click");
+    await flushPromises();
+    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
+    expect(text(wrapper, "screen-now-message")).toBe(
+      "The hold ended, but turning the screen on didn't save. Try again."
+    );
+    expect(wrapper.find("[data-test='screen-now-message']").classes()).toContain(
+      "inline-note--err"
+    );
+  });
+
+  it("says the hold ended when turning the screen off failed to save", async () => {
+    const { wrapper, store } = mountScreens({
+      kiosks: [kiosk({ powerHold: { ...HOLD, power: "on" } })],
+    });
+    store.saveOverrides = vi.fn(async () => {
+      throw new Error("offline");
+    });
+    await open(wrapper);
+    await wrapper.find("[data-test='screen-now-off']").trigger("click");
+    await flushPromises();
+    expect(store.setScreenPower).toHaveBeenCalledWith("kitchen", "schedule");
+    expect(text(wrapper, "screen-now-message")).toBe(
+      "The hold ended, but turning the screen off didn't save. Try again."
+    );
+  });
+
+  it("disables both buttons while the hold ends and the choice saves", async () => {
+    const { wrapper, store } = mountScreens({ kiosks: [kiosk({ powerHold: HOLD })] });
+    let release;
+    store.setScreenPower = vi.fn(
+      () =>
+        new Promise(resolve => {
+          release = resolve;
+        })
+    );
+    await open(wrapper);
+    await wrapper.find("[data-test='screen-now-on']").trigger("click");
+    await flushPromisesNow();
+    expect(wrapper.find("[data-test='screen-now-on']").attributes("disabled")).toBeDefined();
+    expect(wrapper.find("[data-test='screen-now-off']").attributes("disabled")).toBeDefined();
+    // A second tap while the calls run sends nothing.
+    await wrapper.find("[data-test='screen-now-on']").trigger("click");
+    await flushPromisesNow();
+    expect(store.setScreenPower).toHaveBeenCalledTimes(1);
+    release({
+      id: "kitchen",
+      power: "schedule",
+      held: false,
+      setAt: null,
+      by: null,
+      desiredOn: true,
+    });
+    await flushPromises();
+    expect(store.setScreenPower).toHaveBeenCalledTimes(1);
+    expect(store.saveOverrides).toHaveBeenCalledTimes(1);
+  });
+
   it("explains a screen whose software is too old to hold", async () => {
     const { wrapper } = mountScreens({
       kiosks: [kiosk({ powerHold: HOLD, agentHolds: false })],
