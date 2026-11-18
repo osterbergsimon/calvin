@@ -184,9 +184,14 @@ async function tap(item) {
   try {
     const result = await props.runAction(item.action);
     const answered = result?.item;
-    const state =
-      answered && answered.id === id && STATES.has(answered.state) ? answered.state : target;
-    settled.set(id, state);
+    // Settle only on a state the plugin reported. Without one, show the data:
+    // the follow-up refetch corrects it, while a guessed target could stay
+    // forever if that refetch brings identical data (same object, no update).
+    if (answered && answered.id === id && STATES.has(answered.state)) {
+      settled.set(id, answered.state);
+    } else {
+      settled.delete(id);
+    }
     setNote("");
   } catch (error) {
     if (error?.response?.status === 403 && errorCode(error) === "plugin_action_refused") {

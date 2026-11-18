@@ -161,15 +161,28 @@ describe("SwitchGrid", () => {
     expect(a.attributes("aria-disabled")).toBeUndefined();
   });
 
-  it("settles on the target when the response carries no item", async () => {
+  it("without an item in the answer the tile shows the data, never a guess", async () => {
+    // A refetch that brings identical data keeps the same object, so a guessed
+    // state would never be corrected: show what the data says instead.
     const pending = deferred();
     const w = mountGrid({ runAction: vi.fn(() => pending.promise) });
     await tile(w, "Lamp A").trigger("click");
     pending.resolve({});
     await flushPromises();
+    expect(tile(w, "Lamp A").text()).toContain("Off");
+    expect(tile(w, "Lamp A").attributes("aria-busy")).toBeUndefined();
+    await w.setProps({
+      data: { items: ITEMS.map(i => (i.id === "d1" ? { ...i, state: "on" } : i)) },
+    });
     expect(tile(w, "Lamp A").text()).toContain("On");
-    // Until new data arrives; the data then decides.
-    await w.setProps({ data: { items: ITEMS } });
+  });
+
+  it("an answered item for another id is not applied", async () => {
+    const pending = deferred();
+    const w = mountGrid({ runAction: vi.fn(() => pending.promise) });
+    await tile(w, "Lamp A").trigger("click");
+    pending.resolve({ item: { id: "d2", state: "on" } });
+    await flushPromises();
     expect(tile(w, "Lamp A").text()).toContain("Off");
   });
 
