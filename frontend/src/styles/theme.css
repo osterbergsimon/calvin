@@ -94,6 +94,11 @@
   --guest-add-h: calc(var(--control-height) * 1.5); /* the one thumb-sized action */
   --guest-thumb-min: calc(var(--touch-target) * 2.5); /* ~3 thumbnails across a phone */
 
+  /* switch-grid tiles (homey switch tiles §3): two touch targets tall, so a
+     tile reads from across a room and takes a thumb anywhere on it. */
+  --switch-tile-min: calc(var(--touch-target) * 3.5); /* ~154px column */
+  --switch-tile-h: calc(var(--touch-target) * 2); /* 88px */
+
   /* Toggle switch geometry — sized to sit in the compact control rhythm
      (~1.5rem tall) rather than the chunky iOS default. */
   --toggle-w: 2.75rem; /* 44px */
