@@ -269,3 +269,15 @@ export async function runPluginAction(instanceId, name, params = {}) {
   const response = await api.post(`/plugins/${id}/actions/${action}`, { params });
   return response.data;
 }
+
+/**
+ * List options for a config field using the settings form's config (admin only).
+ * Secrets left blank are filled server-side from the stored instance; the
+ * answer is only `{options: [{value, label}], error?}`.
+ */
+export async function scanWithConfig(pluginId, field, config = {}, instanceId = undefined) {
+  const body = { field, config };
+  if (instanceId) body.instance_id = instanceId;
+  const response = await api.post(`/plugins/${encodeURIComponent(unref(pluginId))}/scan`, body);
+  return response.data;
+}

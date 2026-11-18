@@ -60,6 +60,24 @@
       @update:model-value="emitSelected"
     />
 
+    <!-- Many of many, listed by a scan that sees the form's config (e.g. a hub's
+         devices). The value is one comma-separated string of ids. -->
+    <div v-else-if="ui && ui.component === 'multi-select-scan'" class="scan-multi">
+      <div class="scan-multi__row">
+        <Button variant="secondary" :disabled="multiScanning" @click="runMultiScan">
+          {{ multiScanning ? "Scanning…" : "Scan" }}
+        </Button>
+      </div>
+      <ChipMultiSelect
+        v-if="multiOptions.length"
+        :model-value="selectedIds"
+        :options="multiOptions"
+        :aria-label="label"
+        @update:model-value="emitSelectedIds"
+      />
+      <InlineNote v-if="multiScanNote" tone="err">{{ multiScanNote }}</InlineNote>
+    </div>
+
     <!-- Select with scan button — fetches options from the backend -->
     <div v-else-if="ui && ui.component === 'select-scan'" class="scan-select">
       <div class="scan-select-row">
@@ -140,6 +158,10 @@ import ExternalLink from "@/components/ui/ExternalLink.vue";
 import { computed, ref } from "vue";
 import axios from "axios";
 import SelectPill from "@/components/ui/SelectPill.vue";
+import Button from "@/components/ui/Button.vue";
+import ChipMultiSelect from "@/components/ui/ChipMultiSelect.vue";
+import InlineNote from "@/components/ui/InlineNote.vue";
+import { scanWithConfig } from "@/services/pluginsApi";
 import ToggleSwitch from "@/components/ui/ToggleSwitch.vue";
 import { fieldLabel, isHiddenField } from "@/utils/pluginFields";
 
@@ -159,6 +181,16 @@ const props = defineProps({
   value: {
     type: [String, Boolean, Number, Object],
     default: "",
+  },
+  // The config the settings form holds (as Test sends it), for scans that need
+  // the address and key; `instanceId` lets the server fill a blank key.
+  formConfig: {
+    type: Object,
+    default: () => ({}),
+  },
+  instanceId: {
+    type: String,
+    default: undefined,
   },
 });
 
@@ -243,6 +275,61 @@ const scanPlaceholder = computed(() => {
 const emit = defineEmits(["update"]);
 const emitSelected = value => emit("update", String(value));
 
+// multi-select-scan: ids parsed from the saved string (split, trim, drop
+// empties and repeats), so a hand-edited "a, b,," still reads as a and b.
+const selectedIds = computed(() => {
+  const raw = typeof fieldValue.value === "string" ? fieldValue.value : "";
+  return [
+    ...new Set(
+      raw
+        .split(",")
+        .map(id => id.trim())
+        .filter(Boolean)
+    ),
+  ];
+});
+const multiScanned = ref([]);
+const multiScanning = ref(false);
+const multiScanNote = ref("");
+
+// Scanned options first; saved ids the scan did not find stay listed under
+// their id, so nothing chosen is dropped without the admin seeing it.
+const multiOptions = computed(() => {
+  const scanned = multiScanned.value.map(toOption);
+  const known = new Set(scanned.map(option => option.value));
+  const missing = selectedIds.value
+    .filter(id => !known.has(id))
+    .map(id => ({ value: id, label: id }));
+  return [...scanned, ...missing];
+});
+
+const emitSelectedIds = ids => emit("update", ids.join(","));
+
+async function runMultiScan() {
+  multiScanning.value = true;
+  multiScanNote.value = "";
+  try {
+    const res = await scanWithConfig(
+      props.pluginId,
+      props.fieldKey,
+      props.formConfig,
+      props.instanceId
+    );
+    const options = Array.isArray(res?.options) ? res.options : [];
+    multiScanned.value = options.filter(option => option && option.value != null);
+    if (!multiScanned.value.length) {
+      multiScanNote.value = res?.error || "Nothing found to choose from.";
+    }
+  } catch (err) {
+    multiScanNote.value =
+      err?.response?.status === 400
+        ? "The address changed, so type the key again before scanning."
+        : "Couldn't scan. Check the settings above, then try again.";
+  } finally {
+    multiScanning.value = false;
+  }
+}
+
 async function runScan() {
   scanning.value = true;
   scanError.value = null;
@@ -263,6 +350,12 @@ async function runScan() {
 </script>
 
 <style scoped>
+.scan-multi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-inline);
+}
+
 .plugin-field {
   margin-bottom: 1rem;
 }
